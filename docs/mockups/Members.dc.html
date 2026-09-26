@@ -154,7 +154,7 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span></div>
@@ -162,61 +162,42 @@
   <span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
-<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
-  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">designer-ao-1</span>
-      <span class="pill s-idle"><span class="dot"></span>idle</span><span class="meta" title="the session's name as its tool holds it">TD-154 transcript</span>
-      <span class="badge ready" title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
-      <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <span class="btn sm next">Close session</span><span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="badge toggle on" title="a selection in the pane copies itself — yours everywhere (design §4.5a, TD-164); Ctrl+C with a selection and Copy work either way">copy on select</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5l3 3v9H4z"></path><path d="M9 2v3h3M6 8h4M6 10.5h4"></path></svg>Transcript</span>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.agentorc/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div class="note">The definition as the file holds it, with the session holding each entry. <b>Add</b> edits one line of the file (a <span class="mono">count:</span> bumped, or one member line added) and, while the team runs, creates the member under the manager at once; <b>Remove</b> edits the line the same way and winds that one session down — never a kill — and its card stays until Forget. Comments in the file are kept: the edit is one line, never a rewrite.</div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Manager</span>
+  <span class="mono">manager-ao-1</span><span class="meta">lane —</span>
+  <span style="flex-grow: 1;"></span>
+  <span class="mono muted" style="font-size: 12px;">ao-agentorc-manager-ao-1</span><span class="pill s-working"><span class="dot"></span>working</span><span class="meta">the manager: a different definition, by hand</span>
+</div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge">Tech Lead</span>
+  <span class="mono">techlead-ao-1</span><span class="meta">lane —</span>
+  <span style="flex-grow: 1;"></span>
+  <span class="mono muted" style="font-size: 12px;">seat</span><span class="pill s-oncall"><span class="dot"></span>on call</span><span class="meta">the seat: by hand</span>
+</div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>Grinder</span>
+  <span class="mono">grinder-ao</span><span class="meta">lane free-pick · count 2</span>
+  <span style="flex-grow: 1;"></span>
+  <span class="mono muted" style="font-size: 12px;">grinder-ao-1 · grinder-ao-2</span><span class="pill s-working"><span class="dot"></span>working</span><span class="btn sm ghost">Remove</span>
+</div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge">Designer</span>
+  <span class="mono">designer-ao-1</span><span class="meta">lane design-first</span>
+  <span style="flex-grow: 1;"></span>
+  <span class="mono muted" style="font-size: 12px;">ao-agentorc-designer-ao-1</span><span class="pill s-idle"><span class="dot"></span>idle</span><span class="btn sm ghost">Remove</span>
+</div>
+    <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-weight: 600;">Add member</span>
+      <span class="input" style="width: 150px;">grinder ▾</span>
+      <span class="input mono" style="width: 170px;">grinder-ao</span><span class="meta">→ grinder-ao-3</span>
+      <span class="input mono" style="width: 150px;">free-pick</span>
       <span style="flex-grow: 1;"></span>
-      <span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · <span style="color: #991b1b;">Kill</span><span class="btn sm link" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></span>
+      <span class="btn primary">Add and start</span>
     </div>
-    <div class="term" style="height: 420px;"><span class="d">● designer-ao-1 · claude-code · /home/kmaster/agentorc/.claude/worktrees/designer-ao-1</span>
-
-<span class="p">&gt;</span> Wrap up: finish what you hold, push, report, and say what is left.
-
-<span class="d">⏺</span> Bash(git push -u origin td154-transcript)
-  <span class="g">branch pushed · PR #556 opened</span>
-<span class="d">⏺</span> Bash(ao progress done TD-154 --pr 556)
-<span class="d">⏺</span> Bash(ao progress none --why "TD-154 designed and handed to the anchor; nothing else on my list")
-  <span class="g">recorded · out of work</span>
-
-Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
-
-<span class="p">&gt;</span> <span class="d">▌</span></div>
-    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
-      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span><span style="flex-grow: 1;"></span><span class="btn primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span></div>
-    </div>
-    <div class="note">Paul took this member over, so it is <b>interactive</b> — his to close. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight; Kill is under more ▾. An unattended team member shows none of this: its team's Wind down or Start closes it, its Ready to close is folded, and its Close is the more ▾ entry.</div>
+    <div class="note" style="color: #7c3d00;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>Remove grinder-ao-2? Edits org.yml (count: 2 → 1) and winds down grinder-ao-2 — it finishes what it holds and exits; its card stays until Forget.</div>
   </div>
-  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Working</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">says · 6m ago</span></div><div style="font-size: 12px; margin-top: 8px;">wrapped up: TD-154 designed and handed to the anchor</div></div>
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Git</span><span style="flex-grow: 1;"></span><span class="mono muted" style="font-size: 12px;">td154-transcript · pushed</span></div><div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div></div>
-    <div class="card" style="padding: 12px;">
-      <div class="side-h"><span class="chev">▾</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta">1 progress</span></div>
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin-top: 8px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-154</span><span class="pill plain s-done">done</span><a href="#">#556</a><span class="meta">18:41</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
-      </div>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div class="side-h"><span class="chev">▾</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm">Close</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-top: 8px;">
-        <div><span style="color: #065f46;">✓</span> tree clean</div>
-        <div><span style="color: #065f46;">✓</span> branch pushed</div>
-        <div><span style="color: #065f46;">✓</span> no subagents running</div>
-        <div><span style="color: #065f46;">✓</span> outcomes reported</div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
-    </div>
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">claude-code · paul · fable-5-1</span></div></div>
-  </div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.agentorc.yml</span> shows no Members…: that file is a PR's.</div>
 </div>
 </div>
 </x-dc>

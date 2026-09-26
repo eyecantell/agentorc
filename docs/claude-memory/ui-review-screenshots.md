@@ -1,6 +1,6 @@
 # An interactive UI/UX review makes the change visible
 
-**Written 2026-09-25** at Paul's ask, after TD-156 (the Focus screen) and TD-170 (the repo strip
+**Written 2026-09-25** at Paul's ask, after TD-156 (the Focus screen) and TD-176 (the repo strip
 and the Repo page) were reviewed with him in one cloud session.
 
 **The rule (Paul's words, corrected the same day).** When an interactive UI/UX review with Paul

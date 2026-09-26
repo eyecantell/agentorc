@@ -84,41 +84,32 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2), (4), (6) done; five remain |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed and reconciled 2026-09-25; pickable |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
-| TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
-| TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
+| TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Designed 2026-09-25 (the designer) — the build is TD-165, TD-166; archives with them |
+| TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Designed 2026-09-25 (the designer) — the build is TD-167; archives with it |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
-| TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Open — design-first |
-| TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Open — design-first |
-| TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Open — design-first |
-| TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
-| TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
-| TD-170 | Build the team-first Org and the Repo page: the host agent's repo facts and doing log, the rollup, the team card's summary and compact cards, `/repo/<name>`, `ao repo` | Medium | Open — designed 2026-09-25 (cloud session with Paul); pickable in slices |
-| TD-171 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, after TD-170's numbers are visible |
+| TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
+| TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Designed 2026-09-25 (the designer) — the build is TD-170; archives with it |
+| TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Designed 2026-09-25 (the designer) — the build is TD-171; archives with it |
+| TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Designed 2026-09-25 (the designer) — the build is TD-172; archives with it |
+| TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Designed 2026-09-25 (the designer) — the build is TD-174; archives with it |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
+| TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
+| TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
+| TD-167 | Build the help: `help.py` as the one table, the *i* marks on the team card, the Focus header and the exited banner, the `title` tooltips from it, the Help page, the overlay's link, and the test that holds it to §4.5a | Medium | Open |
+| TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
+| TD-170 | Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles` | Medium | Open |
+| TD-171 | Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles` | Medium | Open |
+| TD-172 | Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back* | Medium | Open |
+| TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
+| TD-176 | Build the team-first Org and the Repo page: the host agent's repo facts and doing log, the rollup, the team card's summary and compact cards, `/repo/<name>`, `ao repo` | Medium | Open — designed 2026-09-25 (cloud session with Paul); pickable in slices |
+| TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, after TD-176's numbers are visible |
 
 
 ---
 
 <!-- Entry template:
-## TD-001: Short title of the problem
-
-**Priority:** High | Medium | Low
-**Added:** YYYY-MM-DD
-**Owner:** anchor | grinder | paul | dev-cadence
-**Kind:** build | design-first | live-check | evaluation | decision
-**Pickable:** yes | no — <one clause>
-**Status:** Open
-**Location:** `path/to/file.py` (function/section)
-
-**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
-
-**Fix:** concrete direction(s), and what would count as done.
-
-**Related:** other TDs, PRs, decision docs.
--->
-
 ## TD-002: Focus composer: Attach / drop / paste upload
 
 **Priority:** Medium
@@ -379,7 +370,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.10 (the whole section), §4.5a, §4.7, §9 invariants 5, 11 and 13, §10 (the 2026-09-14 entry, and the 2026-09-13 one it answers); TD-039 (the conflict half — a `conflict` message and its exchange, which step 6 bounds), TD-049 (the wake, absorbed by step 3), TD-036 (the graph the gate reads), TD-028 (the report channels the Inbox sits beside and deliberately is not).
 
-
 ## TD-053: A team never winds down when it runs out of work — build design §4.9a
 
 **Priority:** Medium
@@ -407,7 +397,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.9a (the whole section), §4.9 (the stop sequence this reuses, and `ao team start` already being the restart), §4.8 (the `progress` channel and the role presets that carry the tests), §6 (the clock-and-cap stoppers this is orthogonal to), §9 invariant 14, §10 (the 2026-09-14 entry); TD-032 (a stood-down worker sitting `idle` for 20 h with nothing noticing — the same blind spot from the other side); TD-042 (a brief describes the job, not the run — why the test lives in a repeatable template); TD-052 (mail is how *there is work now* reaches an out-of-work session that is still alive, §4.10's wake budget); TD-026 (the schedule that would start a wound-down team again).
 
-
 ## TD-055: Rename to the glossary's decided words — `lead`, `director`, the `control` grant, `round`, and the retired synonyms
 
 **Priority:** Medium
@@ -434,7 +423,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** no live text in `docs/design.md`, `src/` or the briefs uses *orchestrator* for a position, bare *agent* for the daemon, *tick* for a lead's loop, or *nudge*/*supervisor*/*fleet* in prose; `ao new --role lead` and `ao grant <id> control` work; and `--role orchestrator`, `orchestrate` in a config and `orchestrate` on an existing record still work with their deprecation line.
 
 **Related:** `docs/glossary.md`; ADR `docs/decisions/2026-09-13-org-teams-projects.md` (the Org/Team/Project/Role vocabulary this extends); design §4.8 (role presets, grants, *Orc-of-orcs is not a special case*), §4.9 (team definitions), §6 (policies), §9 invariants 1, 9 and 11.
-
 
 ## TD-057: Sessions on different hosts cannot talk — build the home and node split (design §4.4a)
 
@@ -550,7 +538,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** PR #174 (where it was seen), TD-058; docs/cadence.md §1 (worktrees, hydrate), the memory section; §9 invariant 2; memory `agentorc-td-grind-mechanics`.
 
-
 ## TD-062: A merged RPC change breaks `ao` on the live system until the host agent restarts
 
 **Priority:** Medium
@@ -598,7 +585,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** each has either a deterministic wait or failure diagnostics, and neither fails in ten consecutive CI runs. **Still open:** the PR #192 hang, which no longer has a way to recur unnoticed (the 15-minute cap ends it and `-vv` names it), so the next occurrence closes this entry one way or the other.
 
 **Related:** TD-033 (archived: the same class, two other tests), TD-025 (archived: `test_cli.py` idle-wait diagnostics).
-
 
 ## TD-064: Claude Code's peer messages reach a session around the mail gates, and block an unattended one
 
@@ -662,7 +648,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.10 (kinds, bounds, *a reply is mail, not a send*), §4.4 (board write-back), TD-069 (the page these sit on), TD-052, dev-cadence `docs/cadence.md` §3 (the entry format).
 
-
 ## TD-071: Org page review, 2026-09-18 — what was built, and the ideas that were not
 
 **Priority:** Low
@@ -690,7 +675,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** each idea is either built (its own PR, §4.5a first) or struck here.
 
 **Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
-
 
 ## TD-075: A go-between for what needs the person — answer what is written down, pass up the rest with a recommendation
 
@@ -832,7 +816,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a worker that ends its run with work left is back at work, with fresh context, without a person — and one that is truly finished still is never restarted.
 
 **Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
-
 
 ## TD-091: Nothing says how much context a session has left, or that it has just compacted
 
@@ -986,7 +969,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the briefs say a usage stop is a restart declaration, the design says when a team's group collapses and which control it carries, the page matches, and a team stopped for the window reads as one on the live page.
 
 **Related:** TD-083 (a run ends with a declaration), TD-095 (the header), TD-091 (the usage gate and the compaction rule are the same kind of stop).
-
 
 ## TD-100: The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page
 
@@ -1290,8 +1272,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-151 (the build), TD-100 (the usage gate), TD-122 (one reading per account), TD-112 (the second adapter), [ADR 2026-09-24](decisions/2026-09-24-paperclip.md) item 3, [ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md) (dollars at list price were not wanted *on a subscription*; this is the case where they are the bill).
 
-**Review rounds (the reconciliation, 2026-09-25; Sonnet, a fresh reviewer each round, read-only against the repo; every finding adopted):** **Round 1 — NOT READY, 0 BLOCK, 4 FIX, 5 NOTE.** FIX: TD-151's Related still said a metered reading is per profile; TD-128's Fix paragraph still said two token kinds and a sum per profile (now marked superseded); the contract's path is `src/sessionorc/adapters.py`, not the empty `agentorc/adapters/__init__.py`; the never-`limited` rule had no mechanism — `_cap()` in `_refresh_usage_inner` marks any window at 100, so the exception is keyed on the profile's `billing`, read before the windows. NOTE: how `since` starts (now: the first tick that finds the profile metered); what a price change does to stored `cost` (written once, never rewritten); whose midnight (the host agent's zone, `resets` carrying its offset); `_refresh_usage_inner` named; `RESUME_MIN` on a roll. Verified: link.py's frame rule, modes.py untouched, settings.py's parsers, rpc_gate's label check, invariant 9, no leftover per-profile wording. **Round 2 — NOT READY, 1 BLOCK, 3 FIX, 2 NOTE.** BLOCK: *never counted twice* held only against a lost request; a lost reply resent would double-bill — a cursor held at the home, the reply carrying it, a resend dropped. FIX: the Settings row's slice number; how the home knows a node's accounts (from its own `spend` calls) and a push of the reading on `hello`; the mockup's badge matched to the text. NOTE: the node's offline figure is never written; the placeholder. Verified: the settled decisions carried consistently, the chip's and the card's amount rule, TD-151's arithmetic. **Round 3 — NOT READY, 1 BLOCK, 1 FIX.** BLOCK: a cursor by time per account per host drops a late turn from a second transcript directory on the same account — the cursor is now a byte offset per transcript, `Turn` names its `source` and `offset`, the drop test is per transcript. FIX: §4.4a's trigger list. **Round 4 — NOT READY, 1 BLOCK, 3 FIX.** BLOCK: no rule for a cursor past a rewritten transcript's end (a compaction) — the adapter reads it from 0 and the home drops what it ledgered by the transcript's last `at`. FIX: `cursors` plural in §4.4a and the history; a transcript first seen later starts at 0. **Round 5 — NOT READY, 1 BLOCK.** BLOCK: two entries can share a timestamp, so a drop by `at` alone loses the unledgered twin — `Turn` carries the entry's `id`, the ledger keeps the last entry's `at` and `id`, the drop at that `at` runs in file order through that `id`. **Round 6 — NOT READY, 1 FIX.** FIX: when the rewrite removed the anchor entry itself, the two natural readings diverge — decided: every entry at that `at` counts as billed, a survivor being old and a new turn at that millisecond a coincidence worth cents. **Round 7 — NOT READY, 2 FIX.** FIX: the sentence *neither re-bills nor loses a turn* contradicted the concession beside it — now *never re-bills, and loses at most that one coincidence*; this record was a placeholder. **Round 8 — the fact-check, posted on the PR as the evidence comment.** Six of the seven rounds bit on the spend ledger's exactly-once mechanics, which #547 left as *the home sums*; the rest of the design has stood since round 2.
-
 ## TD-130: The pages set 13 px body text, 12 px mail bodies and 11 px small print: small for comfortable reading
 
 **Priority:** Medium
@@ -1323,6 +1303,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** the question is right and early; answering it now, with the trigger named, means the next person to feel the need knows what was decided and why.
 
 **Related:** TD-129 (the rail's counts, the text search), TD-127 (what a row shows), TD-125 (retention and the FYI), TD-057 (nodes and where mail lives).
+
 ## TD-132: Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row
 
 **Priority:** Medium
@@ -1533,8 +1514,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: he resumed the designer to read what it had done)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open — nothing designed. §4.5a has no control that opens a transcript: an exited record offers **Resume**, **Resume with changes…**, **New session here** and **Forget** (*Focus (exited / closed)*), and the Resumable list is a list of things to resume.
+**Pickable:** no — designed; the build is TD-165 (the adapter's read, the RPC, the node read, the CLI) and TD-166 (the page and the button)
+**Status:** Designed 2026-09-25 (the designer): design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript**, the *Transcript* row and the Resumable **Resume** row, §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*, the glossary's *transcript*, mockup `Transcript.dc.html` (the Focus artboards gain the button). Settled: (a) a folded read-only page, VS Code beside it for the raw file — the raw file alone is not a reading surface; (b) `ao transcript <id> [-n N] [--before OFFSET] [--raw]`; (c) the record's own `adapter_id` / `dir` / `adapter` / `profile` locate it, so a superseded `closed` record still reads its own run, and a row with no record passes the tool session id and directory instead; (d) served on the record's host, a node's through `read` (`NODE_READS` gains `transcript`), never copied. The build is TD-165 and TD-166; this entry archives with them. The design is PR #558; the page-against-raw-file choice went to Paul as a steer (the shape is his to prefer), and #558 merges at its bound (12 h from 2026-09-25 18:50 MDT) unless he says otherwise — the next designer run merges it if this one has ended.
 
 **Location:** design §4.5a (*Focus (exited / closed)*, *Resumable*, the Focus header), §4.3 (`transcript_path` on the adapter contract — Claude Code's answer is the JSONL under `~/.claude/projects/`, already read for the model and the resume id), `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`), `src/agentorc/ui/` (a page or panel), `src/agentorc/cli.py` (`ao transcript <id>`).
 
@@ -1591,9 +1572,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul, at a concluded team's card: *questions arise with what "forget" and "start" really mean — when and why would I want to do those?*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-167
 
-**Status:** Open — nothing designed. What exists: §4.5a is the table of every control (a control not in it does not exist, CLAUDE.md), and the UI carries `title=` tooltips on some buttons (`group_head.html`'s fold and Start, the unattended badge) and *i* marks on two pages — the Inbox's section headings (§4.5a *Inbox: section heading, the i mark*: the paragraph that says what the section is and counts) and the Settings page's values (*Settings page: read-only values and the i mark*: where each comes from and when it is re-read). Nothing tells a person, at the button, what **Forget** or **Start** does to the thing it is on or when they would want it.
+**Status:** Designed 2026-09-25 (the designer): design §4.5 screen 10 *Help*, §4.5a the ***i*** mark row (team card header, Focus header, exited banner), the *Help page* row, the **?** overlay's last line, and *The help text* — the list under the table, twelve paragraphs in the shape *what it does · when you would press it · what it does not do*, the one source the marks, the `title` tooltips and the page draw, held equal to `help.py` by a test. Settled: (a) the marks per control group with the page behind them, and the paragraph's first sentence as every control's `title`; the Org card carries no mark (its foot is quiet, TD-095); (b) the source is a list in §4.5a, not a fourth column — the rows are a specification, the paragraphs are for the person; (c) the first set is Start, Wind down, Stop now, the fold, Forget, Forget all, Kill, Close, Wrap up, Resume, Message…, Switch profile…; (d) the Inbox's mark shape carries the keyboard; (e) mockups `Help.dc.html`, the marks on Main and Focus; (f) a named member's Forget stays — Forget drops a run's record, never the seat, and Start fills the seat again. The build is TD-167; this entry archives with it. The design is PR #562, stacked on #558; the surface (marks with a page behind them, against a page alone) and (f) went to Paul as one steer (m-15dfabd2b4dc), and #562 merges after #558 at the steer's bound (12 h from 2026-09-25 19:10 MDT) unless he says otherwise — the next designer run merges both if this one has ended. **What was:** nothing designed. What exists: §4.5a is the table of every control (a control not in it does not exist, CLAUDE.md), and the UI carries `title=` tooltips on some buttons (`group_head.html`'s fold and Start, the unattended badge) and *i* marks on two pages — the Inbox's section headings (§4.5a *Inbox: section heading, the i mark*: the paragraph that says what the section is and counts) and the Settings page's values (*Settings page: read-only values and the i mark*: where each comes from and when it is re-read). Nothing tells a person, at the button, what **Forget** or **Start** does to the thing it is on or when they would want it.
 
 **Location:** design §4.5a (the table, whose third column is the source), §4.5 (*The card's anatomy*, the foot), `src/agentorc/ui/templates/card.html`, `group_head.html`, `focus.html` (the buttons and their `title=`), `src/agentorc/ui/static/app.js` (confirms), `docs/mockups/gen.py`.
 
@@ -1651,9 +1632,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *I should probably start having interactive sessions on the team itself to prove the project and get the benefits — tmux so stays alive, and PRs get routed automatically through the techlead*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-173
 
-**Status:** Open — nothing designed. The mechanism exists in the design; what is missing is the role and the form.
+**Status:** Designed 2026-09-25 (the designer): design §4.9 *A person in the team* (the four points), the *live* rule over unattended sessions, §4.9b's sentence, §4.5 screen 3's Team pick, §4.5a the **Team** picker row and the Start / Wind down / Stop now row's last sentences, §4.7 *A person in the team*, mockup `NewSession.dc.html` (the Team field). Settled: (a) no new role and no `org.yml` edit — a `--team` session whose role carries no `review:` takes the team's: reader techlead when the definition holds that seat, held the union of the member roles' held lists; a role's own `review:` wins; (b) the Team picker, with the reader it brings written under it; (c) `team` keys on nothing new — live, concluded, wound down, the fold and Forget all read over unattended sessions, and Wind down / Stop now name a person's session apart and leave it alone (invariant 5 already refuses); (d) the help line. The design is PR #566; the team-derived reader against a `person` role went to Paul as a steer, and #566 merges at its bound (12 h from 2026-09-25 19:40 MDT) unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-173; this entry archives with it. **What was:** nothing designed. The mechanism exists in the design; what is missing is the role and the form.
 
 **Location:** design §4.9b (the `plain: {review: {reader: techlead}}` example, *a person's own interactive session inside a team*), §4.5a *New session* rows (Role, Controllers, Where, Project, Until, At — no Team), §4.7 `ao new --team`; `src/agentorc/cli.py` (`--team`, whose help reads *a badge, nothing keys on it*); `~/.agentorc/org.yml` `roles:` (only `grinder` and `designer` carry `review:`); the New session form's template.
 
@@ -1671,9 +1652,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *lets talk about adding on-demand buttons for interactive sessions and what that might look like*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-170
 
-**Status:** Open — nothing designed.
+**Status:** Designed 2026-09-25 (the designer): design §4.8 *A role has saved prompts* (`prompts:` — `{label, text}`, layered as every key is, replaced whole per layer, verbatim text, no substitution), §5 (the `roles:` example's `plain: {prompts: …}`), §4.5a *Focus composer* **prompt chips** (a press is a Send of the text, reading as Send reads; Shift+press fills the composer) and *New session* **prompt chips** (a press fills the Opening prompt), §4.5 *Phone layout* (the chips' row above the composer); mockups `Focus.dc.html` and `NewSession.dc.html`. Settled: (a) the text lives on the preset, in `org.yml` or the repo's `.agentorc.yml`, nowhere else; (b) chips beside Send, interactive sessions only, a press sends; (c) the same list fills the opening prompt on New session; (d) a chip is a Send and nothing more. The design is PR #568; the press-sends-against-press-fills choice went to Paul as a steer, and #568 merges at its bound (12 h from 2026-09-25 19:55 MDT) unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-170; this entry archives with it. **What was:** nothing designed.
 
 **Location:** design §4.5a *Focus composer* (**Send**, **Attach**), §4.5a *Inbox row: state* (*Reopen and push* — the precedent: a first prompt the page wrote, fixed text in the source, never anything a session said), §4.8 role presets, §5 (`roles:` in `.agentorc.yml` and `org.yml`), §4.5 screen 5 (Commands — the button that runs a script, phase 4, TD-123); `src/agentorc/ui/templates/focus.html` (the composer), `src/agentorc/ui/static/app.js`.
 
@@ -1691,9 +1672,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *add info icons to each team member's message button to say when you would want to message them*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-171
 
-**Status:** Open — nothing designed. Paul suggested the profiles as the home for the line; a profile is tool · account · model (§4.2a) and says nothing about a job, so the role preset (§4.8) is the candidate — the round confirms.
+**Status:** Designed 2026-09-25 (the designer): design §4.8 *A role says when to message it* (`message:`, one sentence, built-in defaults for the five presets — manager, techlead, grinder, hunter, auditor — and a role's own line in its `roles:` entry for a `designer`; the definition's line, never the session's), §4.5a **Message** (the composer's first line, the control's `title`) and *team groups* (the **who for what** line), mockups `Main.dc.html` (the header line) and `Message.dc.html` (the composer's line). Settled: (a) the field on the preset; (b) the composer's first line and the control's `title` — no mark on every card's Message (the Org card is quiet, TD-095; the team header answers the choice before a card is picked); (c) the team-level line, generated; (d) no, a session may not rewrite it. The design is PR #570; the no-mark-on-the-card choice was to go to Paul as a steer, but the person inbox refused it as full (Paul is away, §4.10), so the choice is on the board (the designer's line of 2026-09-25, merged as PR #571) with a Due date, and #570 merges after 2026-09-26 08:15 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-171; this entry archives with it. **What was:** nothing designed. Paul suggested the profiles as the home for the line; a profile is tool · account · model (§4.2a) and says nothing about a job, so the role preset (§4.8) is the candidate — the round confirms.
 
 **Location:** design §4.5a **Message** (the composer), §4.8 *Role names* and the presets, §4.9 (manager, techlead, members: who does what), §4.9b (an `ask` fills the seat); TD-157 (the *i* mark per control), TD-158 (what the composer says about when the message is read); `src/agentorc/ui/templates/base.html` (`#mailbox`), `src/agentorc/ui/static/app.js` (`AO.compose`).
 
@@ -1711,9 +1692,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the team definition*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-172
 
-**Status:** Open — nothing designed. It crosses a line drawn today: the settings audit (ADR 2026-09-25 §5) says *a definition says what a team is and belongs in its file, by hand or by PR; a setting is a number a person turns* — and its §2 calls the org file *a team editor in waiting*. This is the first control that edits a definition from the page, and the round has to say so in the ADR's terms.
+**Status:** Designed 2026-09-25 (the designer): design §4.9 *Add or remove a member from the team card* (the four points), §4.9a *One member back, today* (f), §4.5a *team card: Members…* and the *Members dialog* rows, the settings audit ADR's dated addendum before its open decisions, mockup `Members.dc.html` and the headers of `Main.dc.html`. Settled: (a) `org.yml`'s `members` edited as text in place — a `count:` bumped or one line added or removed, comments kept, re-parsed, refused when not one line; a repo-defined team is a PR's; (b) at once on a live team — one member's create under the manager, one member's wind-down — and the definition only on a stopped one; (c) **Members…** on the team card, not the Settings page; (d) the record stays until Forget; (e) the mockup; (f) written in §4.9a, and the build puts it on the exited banner and in `ao team --skill`. The design is PR #572; the card-against-Settings-page choice is on the board for Paul (the designer's line of 2026-09-25, extended here — the person inbox is full), and #572 merges after 2026-09-26 08:30 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-172; this entry archives with it. **What was:** nothing designed. It crosses a line drawn today: the settings audit (ADR 2026-09-25 §5) says *a definition says what a team is and belongs in its file, by hand or by PR; a setting is a number a person turns* — and its §2 calls the org file *a team editor in waiting*. This is the first control that edits a definition from the page, and the round has to say so in the ADR's terms.
 
 **Location:** ADR `docs/decisions/2026-09-25-settings-audit.md` §5 and its open decisions, design §4.5 screen 8 (Settings: **Teams** — schedule, until, reserve; no members), §4.5a *Org: team card* (Start / Wind down / Stop now, Forget all), §4.9 (a team definition: manager, techlead, members with role, name, lane, brief), §5 (`org.yml` `teams:`; a repo's `.agentorc.yml` `teams:`), §4.4a (the org file is read per call, clients only, never the agent); `~/.agentorc/org.yml`; TD-146–148 (the settings file, replica and page).
 
@@ -1731,9 +1712,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *is shift-drag necessary for copy/paste in the tmux terminals or should we change it to auto-copy selected text? Ideally it would work smoothly like in vscode terminals where a selection can be made, then grown/shrunk with a shift-click*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-174
 
-**Status:** Open — nothing designed. Today the Focus terminal is a terminal emulator's: the attach sets `mouse on` on the tmux session so the wheel reaches tmux's own history (§4.6 *Scrollback is tmux's*, TD-022), and because tmux then asks for mouse tracking, a plain drag goes to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only Shift+drag selects in the browser, then **Copy**, Ctrl+C with a selection or Ctrl+Shift+C (§4.5a *Focus: Copy / Paste*; `focus.html`'s Copy tooltip and the `select text in the terminal first (Shift+drag: plain drag goes to tmux)` toast in `app.js` say so). The rule is what a tmux user expects of a real terminal, and it is the wrong rule for a browser pane that is mostly read.
+**Status:** Designed 2026-09-25 (the designer): design §4.6 *Scrollback is tmux's* (**The mouse is the browser's**) and *A read-only attach* (the carve-out goes), §4.5a *Focus: Copy / Paste* and the **copy on select** toggle row, §5 `person.terminal.copy_on_select`, §4.5 screen 8 **You**; mockup `Focus.dc.html` (the toggle). Settled: (a) no `mouse on` on the attach, no tracking, a plain drag selects; the wheel is a scroll message with a line count the bridge turns into `copy-mode -e; send-keys -X -N n scroll-up`; (b) Shift+drag still selects and Shift+click grows — xterm.js's own selection service (`shiftKey → _handleIncrementalClick`), checked in the vendored source rather than a live pane; (c) copy on select is the one toggle, **on by default**, Ctrl+C-with-selection and Copy unchanged; (d) a person's setting, `person.terminal.copy_on_select` through `set_settings` — yours everywhere, as the terminal's face, not per browser; (e) a program asking for the mouse itself gets none, and there is no per-session escape; (f) the rows, the paragraphs, the texts named for the build. The design is PR #574, stacked on #572; the default-on choice is on the board for Paul (the designer's line of 2026-09-25, extended here — the person inbox is full), and #574 merges after 2026-09-26 08:45 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-174; this entry archives with it. **What was:** nothing designed. Today the Focus terminal is a terminal emulator's: the attach sets `mouse on` on the tmux session so the wheel reaches tmux's own history (§4.6 *Scrollback is tmux's*, TD-022), and because tmux then asks for mouse tracking, a plain drag goes to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only Shift+drag selects in the browser, then **Copy**, Ctrl+C with a selection or Ctrl+Shift+C (§4.5a *Focus: Copy / Paste*; `focus.html`'s Copy tooltip and the `select text in the terminal first (Shift+drag: plain drag goes to tmux)` toast in `app.js` say so). The rule is what a tmux user expects of a real terminal, and it is the wrong rule for a browser pane that is mostly read.
 
 **Why:** the pane is where a person reads a session's output and lifts a line out of it — an error, a path, a PR number — and today the first drag they try does the wrong thing silently: tmux takes it, the clipboard stays as it was, and the toast is the only teacher. A browser can offer both gestures at once, so this need not be a setting over which drag selects; the one real choice is whether a selection copies itself.
 
@@ -1743,7 +1724,218 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** §4.5a *Focus: Copy / Paste*, §4.6 *Scrollback is tmux's* (TD-022), TD-096 (the read-only attach), TD-157 (an *i* mark for the control), ADR 2026-09-25 (where a person's preference lives).
 
-## TD-170: Build the team-first Org and the Repo page — repo facts and the doing log on the host agent, the rollup, the team card's summary and compact cards, `/repo/<name>`, `ao repo`
+## TD-165: Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-154's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 9 *Transcript* (*The adapter renders, the core draws*; *Where it is read*; *Which record*), §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*.
+
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`, `model_in_use` — the tail read and the `isSidechain` rule to reuse), `src/agentorc/adapters/` (the contract and a neutral `Transcript` / entry model beside `Usage`), `src/sessionorc/agent.py` (`rpc_tail` is the shape; `NODE_READS`; `_route_read`), `src/agentorc/cli.py` (`cmd_tail`, the `tail` parser), `src/agentorc/skill.md` (the read-only line).
+
+**Why:** the only way to read a finished session today is to resume it (TD-154's *Why*): a live session, a lifecycle event, a close. The file is on the host and the adapter already finds it.
+
+**Fix:**
+1. **The neutral shape**, in the adapter package beside `Usage`: `Transcript(path, size, first_at, last_at, turns, before, entries)` — `before` the byte offset that asks for the entries before these (None at the file's start) — and one entry type with `kind` in *prompt · text · thought · tool · compaction · sidechain*: a prompt or text carries `text` and `at`; a thought `lines` and `text`; a tool carries `name`, the one-line `call` (the first line of its input, as the pane draws it) and its `result` (text, folded by the reader); a sidechain carries `count` and its entries, attached to the Agent call that started it; a compaction carries `at`. No field name of the tool's is on it (TD-073's rule).
+2. **`read_transcript`** on the contract and on the Claude Code adapter: reads the file backwards from `before` (the end when None) in chunks until `turns` prompts have been passed, as `model_in_use` reads its tail; a `user` entry with string content or text blocks is a prompt, one with `tool_result` blocks is the result of the tool call it answers, an `assistant` entry's blocks are text, thinking or tool calls, an `isSidechain` entry folds under the Agent call whose id it answers, a `summary` entry is a compaction; every other line type is skipped. A first line cut by the chunk boundary is skipped, as `model_in_use` skips it. The `shell` adapter returns None.
+3. **The `transcript` RPC** (`id`, `before`, `turns`, `raw`; or `adapter`, `adapter_id`, `dir`, `profile` in a record's place, for a Resumable row): served on the record's host; a record with no `adapter_id` is refused naming why (*a shell has no transcript*); `raw` returns the file's last `turns` lines as text. Ungated (§9 invariant 11). **`transcript` joins `NODE_READS`** so the home routes a node's record through `read`, refused as unreachable while the link is down, never copied. `src/sessionorc/**` is a held path: the techlead reads this PR.
+4. **`ao transcript <id> [-n N] [--before OFFSET] [--raw]`** as §4.7 *Transcript* says, `--json` the shape of step 1; the read-only line of `ao --skill` names it beside `tail` and `explain`.
+5. **Tests:** the adapter's read on a fixture transcript (a prompt, text, a thought, two tool calls with results, a sidechain of three, a compaction) — the neutral shape, the backward paging by `before`, the cut-line skip; the RPC's refusal on a record without an `adapter_id`; `NODE_READS` holds three; the CLI's text rendering of the fixture.
+
+**Done when** `ao transcript designer-ao-1` prints the designer's last twenty turns from its exited record without a session starting, `ao transcript designer-ao-1 --json` carries `before`, and a node's record reads through the link (the container node test of TD-057 is the harness).
+
+**Related:** TD-154 (the design), TD-166 (the page reads this RPC), TD-155 (why a resume misleads today), TD-091 (a manager reading a quiet worker), TD-073 (no tool field name leaves the adapter), TD-057 (`read` and `NODE_READS`).
+
+## TD-166: Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-154's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — after TD-165 (the RPC it reads)
+**Status:** Open — nothing built. Design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript** and the *Transcript* row; mockup `Transcript.dc.html` and the Focus artboards' header.
+
+**Location:** `src/agentorc/ui/app.py` (a page route beside Focus's; the editor link's template, §5 *The person's own*), `src/agentorc/ui/templates/`, `src/agentorc/ui/static/app.js` (the Focus header's buttons — VS Code, Open shell here — and `#fexited`), `src/agentorc/ui/static/app.css`.
+
+**Why:** TD-154's *Why*; the page is the reading surface, the raw file is one JSON object per line.
+
+**Fix:**
+1. **The page** at `/transcript/<id>`: the head (name, host, directory, profile and model in use, the file's path, size, first and last timestamps, the count of turns, *showing the last 20 turns · a snapshot at <time>*), then one block per turn as the mockup draws them — the prompt with `>` and its time, the assistant's text, each tool call as one mono line with its result folded under it, a thought as *thought · n lines* folded, a sidechain as *n subagent turns* folded under its Agent call, a compaction as one centred line. Reads the `transcript` RPC (TD-165) once at load; **earlier turns** at the top asks for the twenty before the first shown, with the `before` the reply carried, and prepends them. Folds are plain `<details>`, remembered nowhere. Text is text (TD-071): nothing in a turn is a link or a button.
+2. **VS Code** beside the head: the editor button's link from `open_in:` with the transcript file's path in place of the directory, on the record's host; absent at `none`.
+3. **The Focus header's Transcript button**, beside VS Code, on any state, opening the page in a new tab; drawn only when the record holds an `adapter_id`. The exited banner's hint gains the words *or read its transcript* where the button is drawn.
+4. **Tests:** the page renders the fixture reply of TD-165 (a snapshot test of the folded blocks); the header draws the button for a record with an `adapter_id` and not for a shell; the editor link carries the file path.
+
+**Done when** Paul can read the designer's last run from its exited card without a session starting (TD-154's *Done when*), and a live grinder's page shows its last twenty turns while the card still reads `working`.
+
+**Related:** TD-154 (the design), TD-165 (the RPC), TD-095 (the editor button), TD-071 (nothing on a page is a control from what a session wrote), TD-046 (a new tab beside Focus).
+
+## TD-167: Build the help: `help.py` as the one table, the *i* marks on the team card, the Focus header and the exited banner, the `title` tooltips from it, the Help page, the overlay's link, and the test that holds it to §4.5a
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-157's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 10 *Help*, §4.5a the ***i*** mark row, the *Help page* row, the **?** overlay row's last line, and *The help text* under the table; mockups `Help.dc.html`, and the marks on `Main.dc.html` and `Focus.dc.html`.
+
+**Location:** a new `src/agentorc/ui/help.py` (the table: `(where, control) → paragraph`, plus the groups per mark and the screens' order), `src/agentorc/ui/templates/group_head.html` (Start, Wind down, Stop now, Forget all, the fold: their `title=` and the mark), `card.html` (Forget, Close session, Message…, Switch profile…: `title=`), `focus.html` (Wrap up, Kill, Message…, Close: `title=`; the header's mark; the exited banner's mark beside Forget), the Inbox's mark macro (the same `<button>` shape and script — reuse it), a new `help.html` at `/help` in `src/agentorc/ui/app.py`, `src/agentorc/ui/static/app.js` (the `?` overlay's last line; the marks' open / close remembered per browser as the Inbox's are), a new `tests/test_help.py`.
+
+**Why:** TD-157's *Why*: a person meets Forget and Start on a card whose state they are trying to change, with no way to learn the difference but the design document.
+
+**Fix:**
+1. **`help.py`**: the twelve paragraphs of §4.5a *The help text*, verbatim, keyed by control and place; each mark's group as the *i* mark row lists them; the screens' order for the page.
+2. **The `title` tooltips**: every control of the set carries its paragraph's first sentence as `title`, from `help.py` — replacing the hand-written titles on Start, Wind down, Stop now, Forget all and the fold in `group_head.html`, and adding them where a control has none (Forget, Close session, Kill, Wrap up).
+3. **The marks**: the Inbox's mark reused — `<button>` labelled *About these controls*, `aria-expanded`, `aria-controls`, `aria-describedby`; the panel in the page always, `hidden` when closed, one paragraph per control of the group, *every control → Help* last, linking to the page at the group's heading; which are open remembered in `localStorage` as the Inbox's are. Three places: after the team card header's controls, after the Focus header's Kill, after the exited banner's Forget.
+4. **The Help page** at `/help`: the paragraphs by screen in the table's order, each under a heading whose id is the control's; no controls on it; the `?` overlay's last line links to it.
+5. **`tests/test_help.py`**: parses *The help text* out of `docs/design.md` (the bullet list under that bold lead, `**Name** (where) — paragraph`) and asserts `help.py` equals it word for word and key for key; asserts every `data-help=` mark and every titled control of the set in the templates names a key in `help.py`; renders `/help` and asserts every paragraph is on it once. The test is what makes the design's list the one source.
+
+**Done when** TD-157's *Done when*: a person at a concluded team's card can learn, without leaving the page, that Forget drops the record and keeps the worktree, and that Start closes the concluded sessions and runs the team again from its definition — and the sentence they read is §4.5a's, held so by the test.
+
+**Related:** TD-157 (the design), TD-148 (the Settings page's marks, the nearest built shape), TD-162 (which session to message: its own line per role, on the Message composer), TD-124 (the `?` overlay), TD-095 (the card's quiet foot: no mark on it), TD-071 (fixed text in the source, never a session's).
+
+## TD-170: Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-161's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.8 *A role has saved prompts*, §5 `roles:`, §4.5a *Focus composer* **prompt chips** and *New session* **prompt chips**, §4.5 *Phone layout*; mockups `Focus.dc.html`, `NewSession.dc.html`.
+
+**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `prompts`; the shape check — a list of `{label, text}`, label one line ≤ 24 characters, text non-empty; `resolve_role`'s layering, the key replaced whole), `src/agentorc/cli.py` (`ao roles`: the labels per role), `src/agentorc/ui/app.py` (`/api/roles` carries `prompts`; the Focus route puts the record's role's list on the page), `src/agentorc/ui/templates/focus.html` (the chips in the composer's button row, before Attach), `new.html` (a row before Opening prompt), `src/agentorc/ui/static/app.js` (a chip press → the Send path with the text; Shift → fill and focus; the role pick rebuilds New session's chips), `app.css` (the wrapping row in narrow mode).
+
+**Why:** TD-161's *Why*: the browser and the phone have no keyboard worth typing a prompt into; the prompts a person repeats are a list in a file.
+
+**Fix:**
+1. **The key**: `prompts` in `ROLE_KEYS`, validated when the file is read (an error naming the role and the entry, as every preset error is), layered as `label:` is, replaced whole per layer.
+2. **`/api/roles`** and the Focus page carry the list; `ao roles` prints `prompts: review PR, sweep, waiting on me` per role.
+3. **Focus**: the chips in the composer's row, drawn only when the composer is open and the list is non-empty; a press calls the same `send` the Send button calls, with the chip's text, and takes the same confirmation and refusals; Shift+press writes the text into `#compose` and focuses it. The chip's `title` is the text. Narrow mode: the row wraps above the composer.
+4. **New session**: the chips beside Opening prompt from the picked role, rebuilt on the Role pick; a press sets the field's value.
+5. **Tests:** the shape check (a bad label, a missing text, a non-list); layering (repo replaces org); `/api/roles` carries them; the Focus page draws them for an interactive record with a role that has them and not for one without, nor for an unattended record; the send path under node as `test_ui_keys.py` runs `app.js`; `ao roles` output.
+
+**Done when** TD-161's *Done when*: Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
+
+**Related:** TD-161 (the design), TD-160 / TD-169 (the person's session the chips are for), TD-027 (send's confirmation), TD-096 (the composer closed on an unattended session), TD-003 (the phone's narrow Focus), TD-157 / TD-167 (the chip's `title` as its mark).
+
+## TD-171: Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-162's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.8 *A role says when to message it*, §4.5a **Message** (the composer's first line, the `title`) and *team groups* (**who for what**); mockups `Main.dc.html`, `Message.dc.html`.
+
+**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `message`; the built-in presets' defaults beside their `label:`; the length check as `label:`'s), `src/agentorc/cli.py` (`ao roles` prints it), `src/agentorc/ui/app.py` (the record's view carries `message_line` resolved from its role; `team_groups` builds the header's line from the definition's roles and the sessions holding them), `src/agentorc/ui/templates/base.html` (`#mailbox`: a line under `#mailtitle`), `card.html` / `focus.html` (the Message control's `title`), `group_head.html` (the second line), `src/agentorc/ui/static/app.js` (`AO.compose` takes the line).
+
+**Why:** TD-162's *Why*: six Message buttons and no reason to pick one; the wrong pick costs a wake and a round of passing up.
+
+**Fix:**
+1. **The key** and the five presets' defaults (manager, techlead, grinder, hunter, auditor; `plain` none — a `designer` is an org or repo role, not a preset, and carries its own line in its `roles:` entry), resolved where `label:` is; `ao roles` prints `message:` per role.
+2. **The view**: `message_line` on every record with a role that has one; the seat placeholder's from the seat's role.
+3. **The composer**: `AO.compose` draws the line first, under the title; Reply shows none (the sender chose already).
+4. **The `title`**: the card's *more ▾* Message entry, the seat card's **Message…** and the Focus header's button carry the line, joined to what the title says today with ` — `.
+5. **The header**: *who for what* from the definition's roles in the definition's order, each with the name of the session holding the role (*(on call)* for an empty seat), hidden when no role carries a line.
+6. **Tests:** the default per built-in; an override in a repo's `roles:`; the length check; the view's `message_line`; the header line for a definition with a manager, a techlead seat on call and two grinders; the composer's line under node as `test_ui_keys.py` runs `app.js`.
+
+**Done when** TD-162's *Done when*: a person hovering Message on the techlead's card reads what it is for, and the composer repeats the line above the text box; and the ao-grind header reads *questions → manager-ao-1 · PRs and the architecture → techlead-ao-1 · a grinder about its own card*.
+
+**Related:** TD-162 (the design), TD-158 / TD-168 (the when-read line beneath it), TD-157 / TD-167 (the `title` as the mark), TD-160 / TD-169 (the person in the team), TD-097 (the seat card's Message…).
+
+## TD-172: Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back*
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-163's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.9 *Add or remove a member from the team card*, §4.9a *One member back, today*, §4.5a *team card: Members…* and *Members dialog*, ADR 2026-09-25 (the addendum); mockups `Members.dc.html`, `Main.dc.html`.
+
+**Location:** `src/agentorc/org.py` (`load`; a new `edit_members(path, team, add=…|remove=…) -> str` that edits the text, re-parses, restores on failure — the one writer of `org.yml`), `src/agentorc/teams.py` (`plan`; a `plan_member(org, team, name, host)` that returns the one spec), `src/agentorc/ui/app.py` (`/api/teams/<t>/members` GET and POST; the create of one member as the start route creates one; the wind-down of one as Wrap up does; `team_groups`: the button's presence, the repo-defined note), `src/agentorc/ui/templates/group_head.html` (**Members…**), `base.html` (the dialog), `src/agentorc/ui/static/app.js`, `focus.html` / `app.js` (the exited banner's line: *to bring it back into the team unattended: Resume with changes… and tick Unattended*), `src/agentorc/team_skill.md` (§6 *Stop it*: one member back).
+
+**Why:** TD-163's *Why*: a third grinder or a second designer is a hand edit and a restart today, with nothing on the page saying the definition and the run differ.
+
+**Fix:**
+1. **`edit_members`**: locate the team's `members:` block by lines (the team key at its indent, `members:` under it, the `- ` items at one deeper indent, until the indent drops); add: the line whose `role:` matches and carries `count:` → the number bumped in place, else a new `- {role, name, lane}` line after the last item at its indent; remove: `count:` decremented (to 1 keeps the line; from 1 deletes it) or the line whose `name:` matches deleted. Refuse: no such team in `org.yml`; the item is multi-line; a `- {team: …}` item; the file fails to re-parse (bytes restored). Tests on a fixture with comments above and beside each line: the bytes outside the one line are identical after each edit.
+2. **`plan_member`** and the route's create: the member's spec from the definition as `plan` builds it, created under the manager with the same checks; the reply is the record. Remove on a live member: the `send` RPC with `wrapup=True` and the wrap-up prompt — Focus's Wrap up's own path, which stamps `wrapup_at` and lets the tick finish the session — never `set_stop`, which schedules a later stop.
+3. **The dialog**: the listing, Add member (role select from `/api/roles`, name default from the team's pattern, lane default), Remove with its confirm text; refusals in place. **Members…** drawn on a team defined in `org.yml`, the note on a repo-defined team.
+4. **The two sentences** for *one member back*: the exited banner's hint on a record carrying a `team` badge, and `team_skill.md` §6.
+5. **Tests:** the edit's cases; the route on a stopped team (definition only) and a live one (a create); the note on a repo-defined team; the banner's line; the skill text.
+
+**Done when** TD-163's *Done when*: Paul adds a grinder to ao-grind from its card while it runs, the member appears under the manager without a restart, and `org.yml` shows the member with the comment block above it intact.
+
+**Related:** TD-163 (the design), ADR 2026-09-25 §5, TD-146–148 (the Settings page keeps to settings), TD-157 / TD-167 (Forget on a defined member), TD-160 / TD-169 (a person as a member), TD-081 (Resume in place), §4.9a (Start on a concluded team).
+
+## TD-173: Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-160's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.9 *A person in the team*, the *live* sentence above *The Org page*, §4.9b *The reader* (the person's-own-session sentence), §4.5 screen 3, §4.5a **Team** picker and the Start / Wind down / Stop now row, §4.7 *A person in the team*; mockup `NewSession.dc.html`.
+
+**Location:** `src/agentorc/cli.py` (`cmd_new`: `team=` at line ~484 — resolve the definition, fill `controllers` from the live manager and `review` from the role's else the team's; the `--team` help line), `src/agentorc/teams.py` (`_trigger`, the member specs' `review` — the union of the member roles' `held`; a helper `team_review(team, roles)` both the CLI and the form call), `src/sessionorc/models.py` (`normalize_review`), `src/agentorc/ui/app.py` (the New session route: the teams list and the reader line; `team_groups` ~line 1264: `live`, `stopped`, `concluded`, `wound_down`, `forget` over `unattended` members), `src/agentorc/ui/templates/new.html` (the Team `<select>` before Role; the reader line), `group_head.html` (the confirm text), `src/agentorc/ui/static/app.js` (the Team pick's narrowing and prefills, as the Role pick's).
+
+**Why:** TD-160's *Why*: the safety net exists in the design and no person can reach it from the page.
+
+**Fix:**
+1. **`team_review(team, roles)`** in `teams.py`: `{reader: "techlead", held: sorted(union of member roles' held), bound: default}` when the definition holds a techlead seat, else None; a test per shape (no seat, one role, two roles with overlapping globs).
+2. **`ao new --team`**: the badge as today, plus `controllers` prefilled with the team's live manager (when the record is not given one) and `review` from the role's else `team_review`; the help line reads *the team this session joins (design §4.9): its badge and group, its manager as a controller, the team's reader for its held PRs*.
+3. **The form**: a Team `<select>` (`none` first) before Role; on change: Host and the Directory list narrowed to the team's host and projects, Role filtered to the team's roles plus `plain`, Controllers ticked for the live manager, Unattended left off, and one line under the picker with the reader `team_review` gives (`/api/team_review?team=`), or *no reader: this team has no techlead seat*. Start sends `team`; the route fills `review` as the CLI does.
+4. **Derivations over unattended sessions**: `team_groups`'s `live`, `stopped`, `concluded`, `wound_down`, the fold's `members` count and `forget` read `unattended` members only; an interactive member is listed in the group and counted by state. Wind down's and Stop now's `data-confirm` name the team's interactive sessions: *your session <name> stays: a team act never stops an interactive session*; `ao team stop` prints the same line and skips them (invariant 5 refuses them anyway — the skip is so the stop does not end on a refusal).
+5. **Tests:** the CLI's `review` on the record for a role with and without `review:`; the form's route with a team picked (the reader line, the narrowed lists); `team_groups` on a team whose only live session is interactive (stopped, Start offered); the confirm text; `ao team stop` skipping an interactive member.
+
+**Done when** TD-160's *Done when*: Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so); and Wind down on ao-grind with his session live names it as staying.
+
+**Related:** TD-160 (the design), TD-093 (the reader), TD-036 (controllers prefill), TD-040 (the Role pick's rebuild), TD-053 (wound down), TD-161 / TD-162 (what a person in the team presses and whom they message).
+
+## TD-174: Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-164's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.6 *Scrollback is tmux's* (**The mouse is the browser's**), *A read-only attach*, §4.5a *Focus: Copy / Paste* and **copy on select**, §5 `person:`, §4.5 screen 8 **You**; mockup `Focus.dc.html`.
+
+**Location:** `src/sessionorc/tmux.py` (the attach argv ~line 46: the chained `set-option mouse on` goes), `src/agentorc/ui/pty_bridge.py` (the scroll argv ~line 77: takes `lines`, emits `copy-mode -e -t target ; send-keys -X -N n scroll-up|scroll-down`; `WHEEL_ONLY` and its `read_only` carve-out removed), `src/agentorc/ui/static/app.js` (a `wheel` listener on `#term` batching notches per animation frame into `{scroll, lines}`; the toggle's `change` → `set_settings`; `term.onSelectionChange` copying when on and the selection has ended; the toast *select text in the terminal first (Shift+drag: plain drag goes to tmux)* reworded), `src/agentorc/ui/templates/focus.html` (the toggle beside `#tcopy`, its `title`; `#tcopy`'s tooltip reworded), `src/agentorc/ui/app.py` and `src/sessionorc/agent.py` (`settings` / `set_settings`: the `person.terminal.copy_on_select` key, default true, replicated as `person.terminal` is), the Settings page's **You** section (TD-148 builds the page; this adds the row).
+
+**Why:** TD-164's *Why*: the first drag a person tries does the wrong thing silently.
+
+**Fix:**
+1. **Tracking off**: the attach no longer sets `mouse on`; `WHEEL_ONLY` goes; a test that the attach argv carries no `set-option`.
+2. **The wheel**: `{scroll: "up"|"down", lines: n}` per animation frame; the scroll argv takes `lines`; the Shift+PageUp message keeps `lines` absent → a page, as before. A test on the argv for lines and for a page.
+3. **The selection**: nothing to build — with tracking off xterm.js selects on drag and extends on Shift+click; the PR says it was seen live.
+4. **Copy on select**: the toggle, the setting (default true), the copy on selection end when on, the disabled state without a secure context. `src/sessionorc/**` is a held path (the attach argv, the settings key): the techlead reads this PR.
+5. **The texts**: Copy's tooltip, the toast, the toggle's `title`, from §4.5a.
+6. **Tests:** the argvs; the setting's default and replication; the toggle's write under node as `test_ui_keys.py` runs `app.js`; the read-only attach still passes scroll and drops keys.
+
+**Done when** TD-164's *Done when*: Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
+
+**Related:** TD-164 (the design), TD-022 (scrollback is tmux's), TD-096 (the read-only attach), TD-146–148 (the settings file and page), TD-157 / TD-167 (the toggle's `title` as its mark), goal 12 (a pane you type into).
+
+## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
+
+**Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
+
+**What the design round has to settle:** (a) **whether the round line is kept at all** — as a printed line in the turn it is already in the run log, and `ao progress` is the declared record; (b) **where a restart-surviving narrative lives** if it is wanted — the record's own trail (§4.5a's trail rows), a home-owned per-session notes file under `~/.agentorc/` beside the run logs and pruned with them (`runs_keep_days`, §4.6), or a `note` to itself; never a git branch; (c) **the launch branch's role** — a launch artefact the manager never commits to, as the grinder's is, and what becomes of the 196 commits on `manager-ao-1` (left; §4.1 supersedes the record at the next start under its name, and the branch is the launch's artefact); (d) the template's step 5 and the wind-down's step (4), and the supplement's *the one thing you commit to it* line, which is dev-cadence's shape of a supplement (§4.8, TD-114) and changes with the template; (e) whether Ready to close should ever read a launch branch's own commits as unpushed work, or that is exactly right and the log is what is wrong — the round decides.
+
+**Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
+
+**Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
+
+## TD-176: Build the team-first Org and the Repo page — repo facts and the doing log on the host agent, the rollup, the team card's summary and compact cards, `/repo/<name>`, `ao repo`
 
 **Priority:** Medium
 **Added:** 2026-09-25 (designed with Paul in a cloud session, after TD-156's Focus review: *a quick view of what is outstanding, what is in progress, and what is waiting on me, per repo a team services — and whether the team is balanced*)
@@ -1763,7 +1955,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Location:** `src/sessionorc/agent.py` (the tick: a `_read_repos` beside `_count_seats`, the `repos` RPC, the `repos` event), a new `src/sessionorc/ledger.py`, `src/sessionorc/reports.py` (`_prs` has the `gh pr list` call shape, but swallows a failure into `[]`; the open-PR read follows `merged_prs`, which answers `None` when `gh` could not be asked — the *never zero* rule), `src/agentorc/ui/app.py` (`team_groups` — the summary's data per group and the rollup's sums; a `/repo/{name}` route; the board rows filtered to a repo, from `board_items`), `src/agentorc/ui/templates/group_head.html` / `org.html` / `card.html` (the summary's facets, the rollup, the compact card), a new `templates/repo.html`, `static/app.js` (the `repos` and `doing` events re-rendering the facets), the `/events` handler in `app.py`, which forwards only `session`, `gone` and `usage` today and needs a `repos` arm, `src/agentorc/cli.py` (`ao repo`).
 
-**Why:** nothing on the Org says what a repo holds — the team header counts sessions, the reader's queue and the needs-you mark, and the Inbox is the person's queue, not the repo's state. Paul wants to see, per repo, the open PRs (and whether they are piling up ahead of the reader), the pickable and design-first ledger entries (what a grinder could take next), the board items due (what waits on him), and what each member is on, in one glance from the Org, with the lists a click away — and, once those numbers are visible, a rule a manager can apply to them (TD-171).
+**Why:** nothing on the Org says what a repo holds — the team header counts sessions, the reader's queue and the needs-you mark, and the Inbox is the person's queue, not the repo's state. Paul wants to see, per repo, the open PRs (and whether they are piling up ahead of the reader), the pickable and design-first ledger entries (what a grinder could take next), the board items due (what waits on him), and what each member is on, in one glance from the Org, with the lists a click away — and, once those numbers are visible, a rule a manager can apply to them (TD-177).
 
 **Fix — the slices, each its own PR:**
 1. **Repo facts on the host agent** (§4.4): `sessionorc.ledger` (the entry-header reader — id, title, priority, owner, kind, pickable, with `tests/test_ledger.py`'s regex moved in so the test reads the reader; the four kinds; *opened* / *closed* per window from the file's git history); the PR read (`gh pr list --state all --json …` per remote, in a thread, every `USAGE_EVERY`; the open list and the per-window *opened* / *closed* counts; an outage keeping the last reading with `error` and `failed_at`, `merged_prs`'s semantics, never `_prs`'s `[]`); `repos.json`; the `repos` RPC and event (a new arm in the `/events` handler, which forwards only `session`, `gone` and `usage` today). Done when `ao repo --json` prints every reading for every registered checkout and a `gh` outage reads as *could not look*, never zero.
@@ -1773,38 +1965,20 @@ Two things are missing, and the design round chooses between them or takes both:
 5. **The Repo page** (§4.5 screen 9): `/repo/{name}`, the team's facets by the same partial, the four lists, the doing filters, the *i* marks, narrow layout; `RepoPage.dc.html` regenerated from the built page's shape. Done when every facet link lands on its list and Snooze / Done / Reply write the board as the Inbox does.
 6. **`ao repo`** (§4.7) and **the manager's brief**: `ao repo [name] [--all] [--json]`; the manager brief's *A round* gains one `ao doing` per step (§4.8 *the doing log*). Done when a manager's round shows in a team's Doing feed.
 
-**Related:** §4.5 screen 1 *The Org, team-first* and screen 9, §4.4 *Repo facts*, §4.7, §4.8 *the doing log*, §4.9b (the techlead's queue), §4.5 screen 6 (the board reader the Inbox runs; the rail's URL the *for you* link uses — TD-135), TD-159 (whether the ledger reader belongs to dev-cadence), TD-171 (the balance rule), TD-146–148 (the Settings page's Repos cards, a sibling of this page), TD-156 (the Focus review this followed).
+**Related:** §4.5 screen 1 *The Org, team-first* and screen 9, §4.4 *Repo facts*, §4.7, §4.8 *the doing log*, §4.9b (the techlead's queue), §4.5 screen 6 (the board reader the Inbox runs; the rail's URL the *for you* link uses — TD-135), TD-159 (whether the ledger reader belongs to dev-cadence), TD-177 (the balance rule), TD-146–148 (the Settings page's Repos cards, a sibling of this page), TD-156 (the Focus review this followed).
 
-## TD-171: A manager's balance check on the repo's numbers — open PRs above n, the oldest past d, the reader's queue past its bound → no new claims, and a word to the techlead
+## TD-177: A manager's balance check on the repo's numbers — open PRs above n, the oldest past d, the reader's queue past its bound → no new claims, and a word to the techlead
 
 **Priority:** Medium
 **Added:** 2026-09-25 (Paul: *this may lead to automatic checks by the manager for us, like the PR count*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no — after TD-170 slice 1 or 2 lands, so the rule keys on numbers a person has watched first
+**Pickable:** no — after TD-176 slice 1 or 2 lands, so the rule keys on numbers a person has watched first
 
-**Why:** the repo's numbers (TD-170) make a growing PR count visible; nothing acts on it. A manager keeps handing out claims while the reader's queue grows, and the person finds out from the team card, once it is already large. Paul asked that the numbers come first and a rule after, so that the rule keys on numbers he has watched.
+**Why:** the repo's numbers (TD-176) make a growing PR count visible; nothing acts on it. A manager keeps handing out claims while the reader's queue grows, and the person finds out from the team card, once it is already large. Paul asked that the numbers come first and a rule after, so that the rule keys on numbers he has watched.
 
 **Fix:** design the rule, then build it as a policy of the manager's round. The question is §10 (2026-09-25): a per-team **balance** line — open PRs above `n`, the oldest past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out no new claim and asks the techlead to read, in its log line; never a kill, never a wind-down. To settle: setting or definition (the settings audit's rule, ADR 2026-09-25 §5); whether the manager reads `ao repo` each round or the tick pushes a breach as a `system` note (§4.10); what the manager's brief says (`src/agentorc/briefs/manager.md`, *A round*); and the numbers' defaults.
 
 **Status:** Open — nothing designed beyond the §10 question.
 
-**Related:** TD-170, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
-
-## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
-
-**Priority:** Medium
-**Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** yes
-
-**Status:** Open — nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
-
-**Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
-
-**What the design round has to settle:** (a) **whether the round line is kept at all** — as a printed line in the turn it is already in the run log, and `ao progress` is the declared record; (b) **where a restart-surviving narrative lives** if it is wanted — the record's own trail (§4.5a's trail rows), a home-owned per-session notes file under `~/.agentorc/` beside the run logs and pruned with them (`runs_keep_days`, §4.6), or a `note` to itself; never a git branch; (c) **the launch branch's role** — a launch artefact the manager never commits to, as the grinder's is, and what becomes of the 196 commits on `manager-ao-1` (left; §4.1 supersedes the record at the next start under its name, and the branch is the launch's artefact); (d) the template's step 5 and the wind-down's step (4), and the supplement's *the one thing you commit to it* line, which is dev-cadence's shape of a supplement (§4.8, TD-114) and changes with the template; (e) whether Ready to close should ever read a launch branch's own commits as unpushed work, or that is exactly right and the log is what is wrong — the round decides.
-
-**Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
-
-**Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
+**Related:** TD-176, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.

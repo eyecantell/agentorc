@@ -480,6 +480,13 @@ class Adapter(Protocol):
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
+    def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
+                        before: int | None = None, turns: int = 20) -> Transcript | None
+                                                          # the tool's transcript as neutral entries — a prompt, text, a thought, a
+                                                          # tool call with its result, a compaction, a sidechain group — the last
+                                                          # `turns` before byte `before` (None: the file's end), with the offset that
+                                                          # asks for earlier ones; None when there is no file. No field name of the
+                                                          # tool's leaves this method, as none of `usage` does (§4.5 screen 9, TD-154)
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
     def usage(self, profile: Profile) -> Usage | None     # this account's quota windows: Usage(windows=[Window(label, pct,
                                                           # resets), ...], fetched). The labels are the adapter's; nothing
@@ -584,7 +591,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Create / kill / send / resume sessions (the only writer).
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
-- **Repo facts** (§4.5 screens 1 and 9, TD-170): for every checkout the registry lists, at the
+- **Repo facts** (§4.5 screens 1 and 9, TD-176): for every checkout the registry lists, at the
   home, readings kept in `repos.json` beside `usage.json`, served by the `repos` RPC and pushed as
   a `repos` event when any changes, the shape `usage` has. **Pull requests**: `gh pr list --state
   all --json number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft
@@ -917,7 +924,7 @@ the home instead (*Mail across hosts*).
 | `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below; not built — TD-147: today the row reads *served, link or no link*) | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
 | reports — `progress`, `finding`, `doing` | — | **refused** |
-| the readings — `repos`, the doing log's read (`ao repo`, TD-170) | **forwarded** while the link is up, refused offline: the readings are taken at the home (§4.4 *Repo facts*) and a node holds none | the same |
+| the readings — `repos`, the doing log's read (`ao repo`, TD-176) | **forwarded** while the link is up, refused offline: the readings are taken at the home (§4.4 *Repo facts*) and a node holds none | the same |
 
 **Reports are refused, not kept locally.** They are home-owned, so a claim written to the replica
 would be overwritten by the home's copy on reconnect; and a claim is a lease checked against every
@@ -1351,10 +1358,11 @@ call by call.
   than a forwarded `progress`, because a derived entry carries the branch it came from and a retire,
   which the RPC does not. While the link is down the node derives nothing: a claim written to the
   replica is overwritten on reconnect and was never checked against the siblings' leases. **Reads of
-  a pane.** `tail` and `explain` on `id@host` read a screen only that node's tmux holds, so the home
+  a pane, and of a transcript.** `tail` and `explain` on `id@host` read a screen only that node's tmux
+  holds, and `transcript` a file only that node's disk holds (§4.5 screen 9), so the home
   asks the node for them — `read {rpc, params}`, a link method of its own whose allowlist is exactly
-  those two (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
-  never grows by a read. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
+  those three (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
+  never grows by a read. A transcript is read where it lies and never copied to the home. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
   and a session with no grant reads a node's pane as it reads a local one. Refused as unreachable —
   never queued — while the link is down; the reply is the node's, untouched but for its addresses. A
   node serves reads of its own host's panes only: a call at a node naming another host's session is
@@ -1520,7 +1528,7 @@ Screens:
    hosts get one banner row. Command-kind sessions are hidden unless "show command runs" is on.
    Two shortcuts next to **New session**: **Shell** (host + directory, nothing else) — and on
    Focus, **Open shell here** (a shell in the same directory as the session being viewed).
-   **The Org, team-first (TD-170; Paul, 2026-09-26, four rounds on a design canvas).** Once a
+   **The Org, team-first (TD-176; Paul, 2026-09-26, four rounds on a design canvas).** Once a
    team runs smoothly the unit a person watches is the team, and the questions are the team's:
    is anyone stuck, is review keeping up, what waits on me. So the Org leads with a **rollup**,
    each team's card carries a **summary**, and a team member's card is **compact**; the full
@@ -1708,7 +1716,9 @@ Screens:
    "in use — resume from the Org"; main refused if it already has a session) → fresh or
    resume → optional brief file → **Unattended** switch (off by default; disabled with "no
    `unattended:` block in `.agentorc.yml`" for repos without one; hidden for directory sessions).
-   The same mode can be flipped later from the card or Focus header (§4.5a).
+   The same mode can be flipped later from the card or Focus header (§4.5a). A **Team** pick
+   (TD-160; not built — TD-173) puts the session in a team: its badge and group, its manager as a
+   controller, the team's reader for its held PRs (§4.9 *A person in the team*).
 4. **Resumable**: inactive sessions from each adapter's transcript locator (Claude:
    `list_sessions.py`-style index over `~/.claude/projects`), grouped by host/repo, name first
    and adapter id under it, with Resume (prefills New session) or Switch to (a running one), and
@@ -1945,7 +1955,7 @@ Screens:
    lines (§6 *Usage gate*); **Repos** — a card per registered checkout with its `.agentorc.yml`
    values read-only and the one setting a person flips, the promote's **auto** (§6 *Promote*), which
    this round moves out of the checked-in file; **You** — *yours everywhere*: `open_in` and the
-   terminal's size and face (§5 `person:`), and *this browser*: theme, *mine*, the folds, with
+   terminal's size, face and copy on select (§5 `person:`; TD-164), and *this browser*: theme, *mine*, the folds, with
    **Reset this browser**; **Hosts**, **Profiles**, **Org** — read-only. **Every read-only value
    carries an *i* mark** that says which file it comes from, when that file is re-read, and whether
    a change needs the host agent restarted (§5; a host's name, its `home:` and its identity mode are
@@ -1961,12 +1971,64 @@ Screens:
    mode (§4.8a), and any definition. A **Settings** tab in the top bar once the page is built
    (TD-123: a tab exists only for a built page), last, after Inbox; the host chip's hover names the
    page until then.
-9. **Repo** (`/repo/<name>`; designed 2026-09-25 with Paul, reshaped 2026-09-26 on the canvas —
-   TD-170 builds it; the artboard is `docs/mockups/RepoPage.dc.html`, rendered as
+9. **Transcript** (`/transcript/<id>`; TD-154, designed 2026-09-25 — the build is TD-165 and
+   TD-166; mockup `Transcript.dc.html`): **a read of what a session said and did, without resuming
+   it.** Resuming was the only way to read a finished session, and it is the wrong tool three times
+   over: it creates a live session and a record, it is a lifecycle event a manager may act on, and
+   it has to be closed again. The transcript is a file on the session's host that its adapter
+   already locates (`transcript_path`, §4.3); reading it is a read, gated by nobody (§9 invariant
+   11). **The page is the pane's reading of the conversation, folded**: one block per turn — the
+   prompt as it was sent, drawn as the pane draws it (`>`), the assistant's text in full, each tool
+   call collapsed to its one line (`⏺ Bash(pdm run test …)`) with its result folded under it, opened
+   by a press, and a thought as one folded line (*thought · n lines*) where the file holds any. The
+   turns of a subagent (a sidechain — §4.2a's rule for the model in use already tells them apart)
+   are not the session's and are folded under the Agent call that started them, with their count.
+   A compaction is one line where it happened. Nothing else in the file is drawn: the tool's
+   bookkeeping lines (mode, title, snapshots, the hook attachments) are the tool's, and the raw
+   file is a press away. **The head** says whose it is — the record's name, host, directory,
+   profile and the model in use (§4.2a) — and what it is: the file's path on its host, its size,
+   the first and last timestamps, the count of turns. **Beside the head**: **VS Code**, the editor
+   button's link (§5 *The person's own*) pointed at the file rather than the directory — the raw
+   file's reader, since one JSON object per line is not a page. The page opens on the **last
+   twenty turns** and offers **earlier turns** above them, twenty at a press, read backwards from
+   the file by byte offset, so the transcript of a long run costs what is read and no more; a live
+   session's page is a snapshot at the moment it was opened, refreshed by the browser's reload and
+   by nothing else — the terminal is the live view, the transcript is the record. **Everything on
+   it is text** (TD-071): the only controls are the folds, *earlier turns* and VS Code; nothing a
+   session wrote becomes a button. Reached from the Focus header on **any state** (§4.5a *Focus
+   header* **Transcript**) — a live worker gone quiet is read here rather than resumed or sent to
+   (TD-091's moment) — and from each Resumable row (screen 4, phase 4). Absent where there is
+   nothing to read: a record without a tool session id (a `shell`, a command run, a session whose
+   hook never reported one) offers no Transcript, and `ao transcript` says which. **The adapter
+   renders, the core draws**: `read_transcript` (§4.3) turns the tool's file into a neutral list
+   of entries — a prompt, text, a thought, a tool call with its result, a compaction, a sidechain
+   group — and no field name of the tool's leaves the adapter, as no usage field does (TD-073);
+   the page, `ao transcript` and the `transcript` RPC read only that shape, so a second adapter's
+   transcript draws on the same page. **Where it is read**: the `transcript` RPC is served on the
+   record's host, since the file is there; for a node's record the home asks the node through
+   `read` as it asks for `tail` (§4.4a *Reads of a pane, and of a transcript*: `NODE_READS` is
+   `tail`, `explain`, `transcript`), refused as unreachable while the link is down, and the file
+   is never copied to the home. **Which record**: the transcript is located from the record's own
+   `adapter_id`, `dir`, `adapter` and `profile`, so an `exited` record reads the run it held and a
+   `closed` one left behind by a resume (`superseded_by`, TD-081) still reads its own; the
+   successor's page reads what the successor's tool session wrote, which for Claude Code carries
+   the conversation on. Forgetting a record takes its pointer with it; the file stays, for the
+   Resumable list's index. The CLI's form is `ao transcript` (§4.7).
+
+10. **Help** (`/help`; TD-157, designed 2026-09-25 — the build is TD-167; mockup `Help.dc.html`):
+   every control that has a paragraph in §4.5a *The help text*, by screen, in the table's order,
+   each under its own heading — the page the *i* marks and the **?** overlay point at, and the
+   answer to *what does this button do?* asked away from the button. Nothing on it is a control,
+   and a control without a paragraph is not on it: an empty entry teaches nothing. Not a tab
+   (TD-123's rule is for tabs): the ways in are the mark beside the control and the overlay's
+   last line.
+
+11. **Repo** (`/repo/<name>`; designed 2026-09-25 with Paul, reshaped 2026-09-26 on the canvas —
+   TD-176 builds it; the artboard is `docs/mockups/RepoPage.dc.html`, rendered as
    `docs/mockups/reviews/2026-09-26-repo-page-design.png`): **what a repo holds** — what is
    outstanding, what is in motion, what waits on the person — so a person can see whether a team
    is balanced (Paul: *the grinders are outpacing the techlead*) before a policy is asked to act
-   on it (§10, TD-171). Reached from a team card's Repo facet, a link and no tab (TD-123).
+   on it (§10, TD-177). Reached from a team card's Repo facet, a link and no tab (TD-123).
 
    **The page opens with the team's three facets**, exactly as the team card draws them (screen
    1 *The Org, team-first*): Repo, TDs in motion, Answer needed / Doing — the same numbers, the
@@ -2026,8 +2088,9 @@ then the UI is reachable only over `ssh -L`): the Org view collapses to cards so
 first with Allow / Deny on a pending permission (hook channel) and a Focus button, the Due strip
 on top. Focus gets a **narrow mode** below 720px: header, pending text, the terminal full-width
 with a soft-key row (`↑ ↓ ← → Enter Esc Tab 1–9`) so menus and questions are still answered
-*through the terminal*, the composer under it, side panel collapsed. The git panel and the
-New-session form stay desktop-width.
+*through the terminal*, the composer under it with its prompt chips in one wrapping row above it
+(§4.5a **prompt chips**, TD-161: a turn steered without a keyboard), side panel collapsed. The git
+panel and the New-session form stay desktop-width.
 
 **Type scale (TD-130, 2026-09-25, built by TD-144; mockups `Type.dc.html`, `TypeDark.dc.html`, and every artboard
 regenerated at the scale).** The pages set their sizes as **six tokens on `:root`**, theme-
@@ -2098,9 +2161,9 @@ noted). If a control is not in this table it does not exist.
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
 | every page | **keys** | single keys, when nothing editable has focus — a composer, the filter box, a reply box, the *why?* box, and the Focus terminal, which takes every key, so Focus's terminal is untouched: `1` Org, `2` Inbox, `n` New session, `/` the page's filter box (`Esc` leaves it), `?` the overlay (row below). **A key is a name for a control in this table** and does nothing a button cannot: one `keydown` handler on the document reads one table of *(key, page, control)*, and the overlay is generated from that same table, so the two cannot drift; a key whose control the page does not offer at that moment does nothing. Not browser-specific: the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and no key here is one. Nothing is stored. Out of scope: remapping, chords, and keys inside the terminal (TD-124) |
-| Org | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — **the ring** — between cards in the page's own order (*One order, no control*, screen 1: group by group, the manager's card first, then urgency), skipping a folded team's cards; `g` then a team's initial jumps to the first card of the first team, in page order, whose name starts with that letter (the same pair again, the next such team), and `g` then a digit `1`–`9` to the *n*th group on the page, *No team* counted where it sits; `g` waits two seconds for its second key. On the ringed card: `Enter` or `o` is its **Focus** (**Details** where the foot offers that; *Focus window* raises the window as the button does); `Shift+Enter` its **Pop out** (TD-046); `a` / `d` its **Allow** / **Deny** while it holds a pending permission — on a team member's compact card, whose foot has neither, the same keys answer the ringed member's permission through the team's Answer needed facet, the same hook channel (TD-170) — the same press, hook channel, an empty *why?*. The ring is the browser's focus ring on the card: a card is a tab stop, so `Tab` reaches it too and a screen reader follows it, and the amber *needs you* ring is a different ring (§4.5 screen 1 *Colour*). It is nowhere until a key moves it; a card that leaves the page hands it to its neighbour. Client-side, nothing written (TD-124) |
+| Org | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — **the ring** — between cards in the page's own order (*One order, no control*, screen 1: group by group, the manager's card first, then urgency), skipping a folded team's cards; `g` then a team's initial jumps to the first card of the first team, in page order, whose name starts with that letter (the same pair again, the next such team), and `g` then a digit `1`–`9` to the *n*th group on the page, *No team* counted where it sits; `g` waits two seconds for its second key. On the ringed card: `Enter` or `o` is its **Focus** (**Details** where the foot offers that; *Focus window* raises the window as the button does); `Shift+Enter` its **Pop out** (TD-046); `a` / `d` its **Allow** / **Deny** while it holds a pending permission — on a team member's compact card, whose foot has neither, the same keys answer the ringed member's permission through the team's Answer needed facet, the same hook channel (TD-176) — the same press, hook channel, an empty *why?*. The ring is the browser's focus ring on the card: a card is a tab stop, so `Tab` reaches it too and a screen reader follows it, and the amber *needs you* ring is a different ring (§4.5 screen 1 *Colour*). It is nowhere until a key moves it; a card that leaves the page hands it to its neighbour. Client-side, nothing written (TD-124) |
 | Inbox page | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — the row's own focus ring (*Layout*, screen 6: a row is a tab stop) — between rows in the page's order: *Needs you*, *Steering*, then *FYI* when it is unfolded; snoozed rows only while *n snoozed — show* is open. On the ringed row, each key is one of the row's own buttons, pressed, and does nothing on a row that has no such button: `Enter` the ringed row's **page** where it has one — a mail row (§4.5 screen 6 *The message page*, TD-129) — else **Open** (**Open board** on a board row); `o` **Open** always; `a` / `d` **Allow** / **Deny** on a permission row, an empty *why?*; `r` **Reply**, which opens the composer the button opens; `s` **Snooze ▾**, which opens the menu (the choice is a second press or a click); `x` **Dismiss**, or **Done** on a board row, or **Unsnooze** on a snoozed one. **Delete** confirms and has no key; the *i* mark has none, it is a button `Tab` reaches. On the message page (TD-129): `Esc` **Back**, `j` / `k` the next and previous entry of the list as it was filtered, `r`, `s`, `x` the foot's own controls. Client-side, nothing written (TD-124) |
-| every page | **?** overlay | `?` opens a panel over the page listing every key of *this* page beside the control it presses, generated from the handler's table (row above); `?` or `Esc` closes it, and focus returns to where it was. While it is open nothing behind it takes a key. The top bar carries a small **?** that opens the same panel for the mouse and for a phone, which has no `?` to press. Display only, nothing stored (TD-124) |
+| every page | **?** overlay | `?` opens a panel over the page listing every key of *this* page beside the control it presses, generated from the handler's table (row above); `?` or `Esc` closes it, and focus returns to where it was. While it is open nothing behind it takes a key. The top bar carries a small **?** that opens the same panel for the mouse and for a phone, which has no `?` to press. Its last line is **Help** — a link to the Help page (§4.5 screen 10, TD-157; not built — TD-167). Display only, nothing stored (TD-124) |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
 | Org | ***mine*** | one press beside the filter shows only `interactive` sessions — the person's own, a taken-over worker included; a second press shows everything again. A toggle with no value to type, remembered per browser as a team's fold is. It composes with whatever is typed, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing (TD-095) |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
@@ -2132,11 +2195,15 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Working** | display only: what the session says it is doing — the `doing` line (§4.8) in its own words with *says · <age> ago* in the heading — drawn only while it says something, kept current from the delta; it left the header for this card (TD-156, Paul: *we already have a Reports card for finished work*) |
 | Focus | **Kill** | in the header's *more ▾*, last and red, never the only stop in sight (TD-156); confirms, then kills the tmux session; worktree kept; state `exited` with `pane: false` — unlike a natural exit, whose dead pane is kept, a kill destroys it, so the card offers Details and Focus / `ao focus` refuse without calling tmux (TD-023) |
 | Focus (exited / closed) | **Resume** / **Resume with changes…** / **New session here** / **Forget** | the exited banner. **Resume** is one press and no form (TD-081), on an `exited` or `closed` record holding a tool session id: a `create` on the record's host with its own `name`, `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane` and `controllers`, **its `repo` when it has one** — the scope the name is checked in (§4.1): a session in a worktree is scoped by its repo, and a resume that sent the worktree directory alone computed a different id, so a second record appeared beside the one being resumed (TD-145) — and `resume` = the tool's session id — the name check answers `supersede`, the new session takes the bare name and the record's id, the old record is replaced in place and its mail stays with it (§4.10 *Resume carries mail forward*); a live team finds its member by the same name. **Never carried: `unattended`** — the session a press starts is attended, whatever the record was: an unattended session answers its own permission prompts, and a press with no form is no place to grant that; its prompts come to the Inbox. To make it unattended again use **Resume with changes…**, where *Unattended* and its stop time are on the form together. Also not carried: `run_until` and `wrapup_prompt` (a passed deadline is not one; an attended session has none, §6), `prompt`, and `capabilities` — the page takes the grants of the record's `role` from the role presets, as the form does. `controllers` are carried as they were: a controller that is gone is a wake that goes nowhere; `supervised` (§6) is carried the same way and is inert while the session is attended. A person's act — no `caller`, no attenuation (§4.8 create rule); no CLI form beyond `ao new --resume`. **When it cannot be silent it is not a guess:** no tool session id (a `shell`, a command), a name a *live* record holds, a directory that is gone, a profile or role that no longer exists, or a host not connected — the press lands on the form, filled in, with the reason on it. **Resume with changes…** is that same filled-in form, asked for, *Unattended* as the record had it; a worktree record lands with **Where** = new worktree, the worktree's name and the repo in the directory field — the fields the form's own Start sends back, so the create checks the name in the record's scope. **New session here** prefills the directory only; **Forget** removes the record (pane and run log readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
-| Focus | **Copy / Paste** | in the header's *more ▾*, each naming its keys (TD-156). Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
+| Focus | **Copy / Paste** | in the header's *more ▾*, each naming its keys (TD-156). Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection — made by a plain drag, grown or shrunk by Shift+click, once TD-174 lands (§4.6 *The mouse is the browser's*, TD-164; until then Shift+drag, since a plain drag goes to tmux) — (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
+| Focus | **copy on select** toggle | (TD-164; designed 2026-09-25, not built — TD-174) beside Copy / Paste: a switch, **on by default** — a pane that is mostly read is where a line is lifted out, and the selection is the lift — writing `person.terminal.copy_on_select` through `set_settings` (§5 `person:`, §4.4a *Settings, replicated*), so it is *yours everywhere* like the terminal's face, shown on the Settings page's **You** section too, and it survives a reload. On: a selection ended (the mouse released, or a Shift+click) is copied, silently; Ctrl+C with a selection and **Copy** are unchanged either way. Needs the secure context Copy needs, and is drawn disabled with that reason where there is none. Works on a read-only Focus (Copy only reads). Its `title` says what it does |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** ("steers the turn in flight") while the session is `working` and **Send** ("starts a new turn") when idle (§4.3) — one control, labelled for the job it is doing. `stalled?` steers too — a `working` session that stopped producing output (§4.2) is a turn in flight; `limited` says the cap holds what you send, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Closed, composer and all, on an `unattended` session (TD-096, *Focus watches*: typing is the disruption; Take over opens it). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn (TD-047), and the host agent refuses `send` and `keys` to an `exited` or `closed` record the same, in words with the exit code, whoever sends (TD-078) — the record's own state, not a screen rule |
+| Focus composer | **prompt chips** | (TD-161; designed 2026-09-25, not built — TD-170) one chip per entry of the session's role `prompts:` (§4.8), beside Send, drawn only where the composer is open — an interactive session — and in the same order as the file. A press is **Send** with that text: it pastes the prompt and presses Enter through `send`'s own path, confirmed as Send is, and reads as Send reads — a chip steers while a turn is in flight, since it is a Send; Shift+press fills the composer with the text instead, for editing, and focuses it. The chip's `title` is its text. Hidden when the role has none, and on `exited`, `closed`, `limited` and `unreachable` with the composer. Fixed text from the definition (§4.2): never a session's words, no substitution, nothing on the record. On the phone (§4.5 *Phone layout*) the chips wrap in one row above the composer — the point of them: a turn steered without a keyboard |
+| New session | **prompt chips** | the picked role's `prompts:` beside the Opening prompt (TD-161; not built — TD-170), rebuilt with the Role pick (`/api/roles` carries them): a press fills the Opening prompt with the text — nothing runs yet, so nothing is sent — and a second press of another replaces it; the brief a preset fills is left as it is (the chip is a first prompt, the brief is the job) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above. Every side card is a fold remembered per browser, in reading order — Working, Git, Reports, Inbox, Members, Ready to close (open on an own session, **folded on a team member**, whose note says its team closes it), then **Session**, which starts folded and holds the profile, ids, directory, times, mode, run log, the stops control, and the grants and controllers chips (TD-156) |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
+| New session | **Team** picker | (TD-160; designed 2026-09-25, not built — TD-173) *none*, or a team of `org.yml` and the repos' `.agentorc.yml` (`ao team list`'s set). Picking one narrows Host and the Directory list to the team's host and projects, filters Role to the team's roles plus `plain`, prefills Controllers with the team's live manager, leaves Unattended off, sets the `team` badge, and fills the record's `review` from the role's or else the team's (§4.9 *A person in the team*) — with one line under the picker saying what that is: *held PRs read by techlead-ao-1 on src/sessionorc/**, docs/briefs/**, or *no reader: this team has no techlead seat*. The terminal's form is `ao new --team` |
 | New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `manager`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule (TD-040): the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked (the row below), so nothing it grants applies unseen |
 | New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `control`). Unchecked by default for every preset but `manager`; shown with a one-line warning of what the grant allows (TD-028): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and what is ticked is what the session starts with — an untick on a `manager` preset means the session does not get the grant |
 | card | **doing** line (the card's slot) | display only. The slot's order is §4.5 *The card's anatomy*, row 5 (TD-095): (a) what needs a person or explains a stop, (b) an ending — *exited · code N*, *closed by you*, *out of work*, *restart wanted* — (c) this line, (d) the tail or *at prompt*. *ready to close ✓* is the slot's caption and its Close button the foot's first; neither is slot text. The team's header does not show its manager's line. Within (c)/(d), first that applies: what needs a person (pending permission or question, hook channel, §4.2); the session's `doing` line (§4.8) with its age, *says · 11m ago*; the pane's tail — three lines while working, one when idle. The line replaces the tail only; the record keeps it either way. A session whose adapter's tail *is* the work (`shell`, a command run) has no `doing` line and keeps the tail; a TUI session that has said nothing falls back to it. Nothing here is a control and nothing parses it (TD-071 item 8) |
@@ -2150,7 +2217,7 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Inbox** | the session's mailbox (§4.10): each entry with its sender, kind, time, `about` reference and whether it is read; an `ask` shows its bound and the `reply` that answered it. A person may **reply** to any entry as themselves, and may delete one. Sits beside **Reports**, which it deliberately is not: Reports are what this session declared about its work, the Inbox is what others addressed to it (TD-052). The panel fetches bodies through `inbox` as a person's read and refetches when the pushed record's `unread` or `mail` marks change; delete is the `inbox_delete` RPC, a person's only, removing this session's copy and no other |
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here (TD-052) |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10, TD-052). No Reply on an entry the person sent: a person does not answer themselves — the session's answer lands in the top bar's person inbox, where the person replies |
-| card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control (TD-052). One dialog shared with Reply; **the composer opens on `ask`** — a person's message to a session is usually a question, and only an `ask` fills an on-call seat (§4.9b), so `note` is the choice a person makes, not the one they fall into; an `ask` takes the default bound. Its placeholder asks the person the shape §4.10 asks of a session's message to them — *first what you want, then why* (TD-127; TD-139). **Under the kind selector, one sentence says when the message will be read** (§4.10 *When it is read*, TD-158; built by TD-168): from the addressee's record as the card draws it — *on call — an ask fills this seat now; a note waits for its next question*, *exited — read when it is resumed or started again under this name*, *working — read when its turn ends*, *idle — rung within a tick* — and it changes as the kind is switched, before anything is typed. The `read_when` pair (`ask`, `note`) rides on the record's view, so the dialog opens with it and no request is made; the Reply dialog shows the same line for its kind — the Inbox page's and the Focus panel's Reply the sender's, **Overrule** the asker's, since that is whom it writes to |
+| card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control (TD-052). One dialog shared with Reply; **the composer opens on `ask`** — a person's message to a session is usually a question, and only an `ask` fills an on-call seat (§4.9b), so `note` is the choice a person makes, not the one they fall into; an `ask` takes the default bound. Its placeholder asks the person the shape §4.10 asks of a session's message to them — *first what you want, then why* (TD-127; TD-139). **Under the kind selector, one sentence says when the message will be read** (§4.10 *When it is read*, TD-158; built by TD-168): from the addressee's record as the card draws it — *on call — an ask fills this seat now; a note waits for its next question*, *exited — read when it is resumed or started again under this name*, *working — read when its turn ends*, *idle — rung within a tick* — and it changes as the kind is switched, before anything is typed. The `read_when` pair (`ask`, `note`) rides on the record's view, so the dialog opens with it and no request is made; the Reply dialog shows the same line for its kind — the Inbox page's and the Focus panel's Reply the sender's, **Overrule** the asker's, since that is whom it writes to. **The composer's first line is the role's `message:` sentence** (§4.8 *A role says when to message it*, TD-162; not built — TD-171), under the addressee's name and above the when-read line — *whether this is the one to write to*, then *when it will be read* — and the same sentence is the control's `title` on the card's *more ▾* entry, a seat card's **Message…** and the Focus header's button, so hover answers it before the press; absent for a role without one, and for `plain`. Never the session's words: the definition's (§9 invariant 9) |
 | Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, TD-069). The top bar's **Inbox** opens it, and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. It is not the Org's needs-you count, which is session states alone: the Inbox's number adds open `ask`s to the person, paused `steer`s and due board items, so the two may differ, and each says on hover what it counts and how it differs from the other (on the Inbox, the rail's *Needs you* line since TD-129; the title-row pill it replaced is gone). The count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10); the state rows join *Needs you* in that same computation, so the two numbers cannot disagree. The page's mail is polled from the `inbox` RPC (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). The filters are **the rail** (next row; TD-129), designed 2026-09-24 in place of the typed `team:name` box; due board items joined the count 2026-09-23 (TD-069 step 3) |
 | Inbox page: **the rail** | **Urgency**, **Teams**, **Kinds** — every line a toggle — **Clear filters**, **find** | §4.5 screen 6 *The rail* (TD-129; designed 2026-09-24, built 2026-09-25 — TD-135). Left of the column, sticky, starting under the title (*Inbox* alone on the top line): **Clear filters**, the find box, then three groups of toggles: *Urgency* — the sections in the page's order, each with its count; the teams a row on the page carries and *no team*, each with its **Needs you** count; the kinds — *questions*, *steering*, *session states*, *board items*, *notes*, *trail* — each with its count. Within a group the picks are OR'd, across groups AND'd, and nothing picked means all; every count is a count of the rows on the page now — a picked line its share, an unpicked line in a group with a pick *0*, dimmed, an unpicked line in a group without one its share under the other groups' picks — written as a plain number while nothing is picked or typed and *n of all* while anything is, *all* the line's unfiltered count, on rail lines and section headings alike; a *0* line stays so a pick can be undone. A section not picked is not drawn; one picked and emptied by the other groups draws its heading and its empty line — a filter shows or hides rows and never re-orders the queue. **Clear filters**, drawn only while anything is picked or typed, clears the lot, the find box included. The picks are the URL (`team`, `sec`, `kind`, `find`), remembered per browser for a bare `/inbox` and written back with `replaceState`; the top bar's number stays the unfiltered *Needs you*; the title row is *Inbox* alone, the needs-you pill and its hover moved to the rail's *Needs you* line. A row's team badge is the same press as the rail's line for its team; the typed `team:` syntax is retired. A press is a history entry (Back undoes it); typing in the find replaces the URL rather than adding one per keystroke. **Dismiss all** in FYI dismisses the rows on screen, which under a filter are the rows the rail shows. Counts from `rail_counts` over `inbox_sections`' rows for the first paint (the URL's picks, so a link opens filtered), and from `AO.railCounts` — the same rule over the rows in the DOM, held to one answer with it by a test — on every press, keystroke and poll, so the rail, the headings and the rows cannot disagree; a *Teams* line counts that team's *Needs you* rows. Below 720 px: a pinned **Filters ▾** chip with the number of picks, then the teams as chips, picked ones first; the chip opens a full-screen sheet with the three groups, the find box, Clear filters and Done (*Narrow*; TD-137). Client-side but for the counts; nothing written |
 | Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
@@ -2172,7 +2239,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*, TD-070; up to four, 80 characters each, format characters stripped). Drawn apart from the row's own controls — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm |
 | Inbox row: answered for you | **Overrule**, **Dismiss** | an FYI the home files when a reply carries a `source` (§4.9b, TD-075): the question, the answer, the source, who asked and who answered — all text, the answer in its shape (its first line the verdict, the rest under *details*; TD-127). The group is a fold under *Waiting on them* and above FYI, uncounted, newest first, open until the person folds it (remembered in the browser) and drawn only when it holds something. The row keys on the FYI's `answered` (which carries the `source`), never on who sent it; names the asker by the name it is known by and opens it; draws the question set off as a quotation. **Overrule** is the page's Reply to that entry with the compose naming the asker — a reply to the asker on the question's own thread, a copy to the answerer, marked `[person]` (the home's reply-path branch does the addressing); **Dismiss** ends the row. Neither is offered on anything but this kind |
 | Inbox row: passed up | the row's own kind's controls (**Reply** and **suggested answers**; a `steer`'s **Pause** and ***Go with it***) | the asker's question, from the asker, under its own heading (§4.9b, TD-075) — an `ask` in *Needs you*, a `steer` in *Steering* with the time it has left — with one addition: *`<techlead>` recommends: `<line>`*, labelled and drawn as text, and the techlead's suggested answers as the row's answer buttons, its recommendation first. A reply goes to the asker. The line keys on `passed_up` with a structured `recommend` and names the passer by the name it is known by; the suggested-answers group reads *suggested by `<passer>`* on such a row, since the answers are the passer's |
-| Org | **rollup** | one row of four facets under the title (§4.5 screen 1 *The Org, team-first*, TD-170), sums over every live team, every number a link: **Agents (n)** — a plain coloured pill per state with its count in parentheses, in the grid's urgency order, no glyph; a pill filters the page to that state (the Org filter's `state:` word). **TDs in motion (n)** — a stacked bar by phase, *add · design · grind · review*, a legend under; a segment opens the Repo page of the team holding the most of that phase, filtered to it. **PRs in motion (n)** — the window picker *day · week · month* — **one value per browser** for every window picker on the page, the rollup's, each team's Pull requests and the Repo page's, so they move together — two sized blocks *opened* and *closed* in the window, the open count and how many wait on review under them; a block opens the Repo page's Open PRs of the team with the most. **Needs you (n)** — *answer needed* (members waiting on a permission or a question; scrolls to the first team's Answer needed facet) and *in the Inbox* (the Inbox's Needs you count, with the overdue count; opens the Inbox). Display and links; re-rendered on every delta and on the `repos` event |
+| Org | **rollup** | one row of four facets under the title (§4.5 screen 1 *The Org, team-first*, TD-176), sums over every live team, every number a link: **Agents (n)** — a plain coloured pill per state with its count in parentheses, in the grid's urgency order, no glyph; a pill filters the page to that state (the Org filter's `state:` word). **TDs in motion (n)** — a stacked bar by phase, *add · design · grind · review*, a legend under; a segment opens the Repo page of the team holding the most of that phase, filtered to it. **PRs in motion (n)** — the window picker *day · week · month* — **one value per browser** for every window picker on the page, the rollup's, each team's Pull requests and the Repo page's, so they move together — two sized blocks *opened* and *closed* in the window, the open count and how many wait on review under them; a block opens the Repo page's Open PRs of the team with the most. **Needs you (n)** — *answer needed* (members waiting on a permission or a question; scrolls to the first team's Answer needed facet) and *in the Inbox* (the Inbox's Needs you count, with the overdue count; opens the Inbox). Display and links; re-rendered on every delta and on the `repos` event |
 | team card | **summary** | between the header and the members, three facets in one row (§4.5 screen 1): **Repo**, **TDs in motion**, **Answer needed / Doing** — the rows below. The header carries no state chips (the member cards say it). On a team whose definition names no repo on this host, the Repo facet reads *no repo here* and the other two stand |
 | team card | **Repo facet** | the repo's name (a link to its page) and *open →*; **Technical debt (n open)** with its selector *open · day · week · month*: on *open*, two stacked bars — open entries by priority (High, Medium, Low; one hue darkened by priority; the counts inside) and by kind (pickable, design-first, for you, other; the numbers inside, a legend under) — on a period, two sized blocks, entries *opened* and *closed* in it (§4.4 *Repo facts*, the ledger's history); **Pull requests (n open)** with the window picker *day · week · month* and two sized blocks *opened* and *closed*; under them the oldest open PR's age, how many wait on review (*waiting on review (techlead-1)*), and when the readings were taken. Every segment and block is a link to the Repo page's list filtered to it. The entries' selector is remembered **per team** (a mode, like the fold); the window picker is the page's one value (row *rollup*). A reading that failed reads *could not look*, dimmed, the error on hover. Re-rendered on the `repos` event |
 | team card | **TDs in motion (n)** | one row per reference a member of the team holds (its `progress` claims), each: the **phase** — *add*, *design*, *grind*, *review* (§4.5 screen 1; derived, never declared) — the reference, the entry's title from the ledger reading (the reference alone when the entry is not in it — a foreign or archived reference), the member's name (a link to its Focus; the person glyph on the person's own session) and its PR when it has one (a link to GitHub, marked *merged* / *closed* once it is no longer open, the phase staying *review* until the claim is done or dropped, §4.4); a reference two members hold is one row naming both; a row links to the entry on the Repo page. The heading's line counts the phases. Display and links |
@@ -2197,10 +2264,12 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (the create RPC refuses the same way) |
-| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; a team with something live is never folded; between the header and the cards sits the **summary** (its own row, below: the Repo, TDs in motion and Answer needed / Doing facets), the header carrying no state chips since the member cards say it (TD-170, 2026-09-26), and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. A **concluded** team is drawn like a stopped one **and never folds** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live session carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — the rest exited or closed, and its seats (§4.9b) either absent or `idle` (a seat never declares; a `working` seat is answering somebody). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is not offered (above); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. A team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own |
-| card, team header | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Org rollup's, a team header's): there the summary above says what the glyphs were for, and the word and colour carry the state (TD-170; Paul, 2026-09-26: *are those icons serving a real purpose?*). The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; not built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
+| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; a team with something live is never folded; between the header and the cards sits the **summary** (its own row, below: the Repo, TDs in motion and Answer needed / Doing facets), the header carrying no state chips since the member cards say it (TD-176, 2026-09-26), and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. A **concluded** team is drawn like a stopped one **and never folds** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live session carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — the rest exited or closed, and its seats (§4.9b) either absent or `idle` (a seat never declares; a `working` seat is answering somebody). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is not offered (above); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. A team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own. **Who for what** (TD-162; not built — TD-171): a second line on the header, generated from the `message:` field of every role the definition names, each with the session's name that holds it — *questions → manager-ao-1 · PRs and the architecture → techlead-ao-1 (on call) · a grinder about its own card* — so the choice of whom to write to is made at the team, before a card's Message; display only, hidden on a team whose roles carry no line, and on the phone the line wraps |
+| card, team header | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Org rollup's, a team header's): there the summary above says what the glyphs were for, and the word and colour carry the state (TD-176; Paul, 2026-09-26: *are those icons serving a real purpose?*). The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; not built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
 | Org | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.agentorc.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above); the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, or an idle seat — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it |
-| Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1) |
+| Org | team card: **Members…** | (TD-163; designed 2026-09-25, not built — TD-172) beside Start on a stopped team and beside Wind down on a live one: the dialog of §4.9 *Add or remove a member from the team card* — the definition's manager, techlead seat and member entries, each with the session holding it, **Add member** and **Remove**. Absent on a team defined in a repo's `.agentorc.yml` (a note says *defined in the repo — edit it by PR*) and on *No team* |
+| Members dialog | **Add member** / **Remove** | **Add member**: role, name (defaulted to the team's pattern) and lane, then one press: `org.yml` edited as text in place (a `count:` bumped, or one member line appended), re-parsed, and on a live team the member created under the manager as `ao team start` creates one — refused with the reason when the edit cannot be one line or the file fails to parse, the bytes restored. **Remove**: a confirm naming the file edit and, on a live member, the wind-down it sends (Wrap up's, never a kill); the record stays a card until Forget. The manager and the techlead seat carry no Remove. A person's act, through the UI process, never the host agent (§4.4a: the org file is the clients') |
+| Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1). Live, stopped, concluded and wound down are read over the team's **unattended** sessions, and Wind down's and Stop now's confirm name a person's session in the team apart — *your session main-ao stays: a team act never stops an interactive session* — and leave it alone (§4.9 *A person in the team*, TD-160; not built — TD-173) |
 | Org | team header **✉ n** | display only: on a folded team's header, the sum of its folded sessions' unread counts — the count each card's **unread** chip shows, which the fold hides; nothing at zero, and gone while the team is unfolded or a filter shows its cards. The mail stays where it is: unread never ages out (§4.10 *The lifecycle of an entry*), and a start under the same name moves the old record's mail to the new session (§4.10, TD-081), so what a folded team holds unread is what its next run reads first. Unfold to read or dismiss it (TD-071 item 2) |
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is a plain session |
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026). On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *none — set* in the Session card's row rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs; the identity line's note appears only once a time is set (TD-156). Setting a different time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill |
@@ -2215,16 +2284,85 @@ noted). If a control is not in this table it does not exist.
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
-| Resumable | **Resume** | for a conversation an exited record of ours holds: the banner's one-press **Resume** (*Focus (exited / closed)*, above) with **Resume with changes…** beside it; for a transcript no record holds there is no name or role to take back, so it is the form — New session prefilled (host, repo, directory, worktree, Start = Resume) |
+| Resumable | **Resume** | for a conversation an exited record of ours holds: the banner's one-press **Resume** (*Focus (exited / closed)*, above) with **Resume with changes…** beside it; for a transcript no record holds there is no name or role to take back, so it is the form — New session prefilled (host, repo, directory, worktree, Start = Resume). **Transcript** beside it on every row (§4.5 screen 9, TD-154): the page for the conversation the row names — by its record where one holds it, and by the tool session id and directory the index found where none does, which the `transcript` RPC takes in a record's place |
 | Resumable | **Switch to** | the running card in the Org |
 | Resumable | **Adopt…** | attach to a hand-started tmux session and name it |
 | Commands | **Run / Stop** | start a `kind: command` session / kill it |
 | Commands | **log**, **Focus** | the run log; the run's terminal |
 | Commands | **edit yml** | opens `.agentorc.yml` in the person's editor — the same `open_in:` as the card's button, and not drawn under `none` (TD-095). Not built: as built it opens in VS Code regardless |
 | Focus header | **VS Code** — the **editor** button | the same button as the card's, from the person's `open_in:` (§5 *The person's own*, TD-095) — `none` removes it here too |
-| Org top bar | **filter…** text box | matches name, repo, directory, branch, and the words `team:<name>` and `state:<word>` (the rollup's Agents pills type the latter, TD-170; `needs-you`, `working`, `idle`, `on-call`, … as the pill reads them, hyphenated); client-side |
+| Focus header | **Transcript** | opens the Transcript page (§4.5 screen 9, TD-154) for this record in a new tab, on any state: a read of the file the tool wrote, through the `transcript` RPC on the record's host, gated by nobody (§9 invariant 11). Absent on a record with no tool session id (a `shell`, a command run, a hook that never reported one) — nothing to read, so no button. Designed 2026-09-25, not built — TD-166 |
+| Transcript | **earlier turns** · fold toggles · **VS Code** | the page's only controls (TD-071: nothing a session wrote becomes one). *earlier turns* asks the RPC for the twenty turns before the first shown, by byte offset, and prepends them; a fold opens a tool result, a thought or a sidechain group, and is remembered nowhere; **VS Code** is the editor button's template (§5 *The person's own*) with the transcript file's path in place of the directory, on the record's host — the raw file's reader, absent when `open_in:` is `none`. Not built — TD-166 |
+| team card header · Focus header · exited banner | ***i*** mark | one mark per control group (TD-157; designed 2026-09-25, not built — TD-167), the Inbox's shape (*Inbox: section heading, the i mark*, above): a `<button>` labelled *About these controls*, a tooltip on hover and keyboard focus naming the group's controls, and pressed it opens in place, under the group, one paragraph per control of the group from *The help text* (below the table) — *what it does · when you would press it · what it does not do* — ending in *every control → Help*; pressed again it closes, and which are open is remembered in the browser. `aria-expanded`, `aria-controls` and `aria-describedby` as the Inbox's marks carry them; the panel is in the page always, closed by `hidden`. The team card's group is Start, Wind down, Stop now, Forget all, the fold, and the cards' Forget, Resume, Close and Message…; the Focus header's is Wrap up, Kill, Close and Message…; the exited banner's is Resume and Forget. The Org card carries no mark (§4.5 *The card's anatomy*: the foot is quiet) — its controls are in the team card's group, and every control of the set carries its paragraph's first sentence as its `title`, so hover answers *what* where the button is |
+| Help page | none | display only (§4.5 screen 10, TD-157; not built — TD-167): the paragraphs of *The help text*, by screen in the table's order, each under a heading whose id is the control's, so a mark's *every control → Help* lands on its group. Reached from the **?** overlay's last line and from every mark. Fixed text in the source, held equal to *The help text* by `tests/test_help.py` |
+| Org top bar | **filter…** text box | matches name, repo, directory, branch, and the words `team:<name>` and `state:<word>` (the rollup's Agents pills type the latter, TD-176; `needs-you`, `working`, `idle`, `on-call`, … as the pill reads them, hyphenated); client-side |
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
+
+**The help text (TD-157).** What the *i* marks, the `title` tooltips and the Help page say: one
+paragraph per control, three sentences — *what it does · when you would press it · what it does
+not do* — the third being the one a label cannot carry, and the one Paul asked for at a concluded
+team's card (*what do "forget" and "start" really mean — when and why would I want to do those?*).
+Written for the person, in the page's words; the row above each control stays the specification.
+The source in the code is one table (`src/agentorc/ui/help.py`, keyed by the control's name and
+where it sits), and `tests/test_help.py` holds it equal to this list word for word and holds every
+mark and every titled control of the set in the templates to a key in it — so this list is the one
+place the text is written and no page can drift from it. A control's `title` is the paragraph's
+first sentence; a mark's panel and the Help page carry the whole. The first set, the controls
+whose consequence is least visible:
+
+- **Start** (team card) — Runs the team again from its definition: every check first, then the
+  concluded sessions closed under the wrap-up's own safety check, then the manager and the members
+  created with their briefs. Press it to run the team again — after a wind-down, or when a run has
+  concluded and you want the next. It is not a message: a running session is mailed with Message…,
+  and a session holding uncommitted or unpushed work refuses the start instead of being closed.
+- **Wind down** (team card) — Sends the wrap-up to every member and then to the manager: each
+  finishes what it holds, pushes, and exits. Press it when the team should stop after the work in
+  hand, not in the middle of it. It kills nothing — Stop now does — and forgets nothing.
+- **Stop now** (team card) — Kills every session carrying this team's badge, at once, whatever it
+  holds. Press it when waiting for a wind-down is worse than losing the turn in flight. Worktrees
+  and unpushed work stay on disk under the cards, which read exited; Forget is a separate press.
+- **the fold** (*n sessions* on a stopped team's card) — Shows or hides a stopped team's cards,
+  which are folded away by default. Press it to read their last lines or their mail, or to Forget
+  them. It changes nothing on any record; which teams you have unfolded is remembered in this
+  browser.
+- **Forget** (a card's foot, the exited banner) — Drops this session's record: the card, its report
+  line and its mail. Press it when a finished session's card is clutter — its work merged, or pushed
+  and accounted for. It stops nothing, since a live session offers no Forget; the worktree and the
+  run log stay on disk, and the conversation stays in the tool's own files, where the Resumable
+  list finds it. On a team the seat stays: the definition names it, and Start fills it again.
+- **Forget all** (team card) — The Forget of every exited or closed card of this team, in one
+  press. Press it when the team's run is over and everything it pushed has landed. It never forgets
+  a card carrying work that exists only on this machine — those it names, and you forget them one
+  at a time with the flag in view — nor a seat on call.
+- **Kill** (Focus header, *more ▾*) — Ends this session's process now and destroys its pane; the
+  record stays, reading exited, and the worktree stays. Press it when a session is stuck or running
+  away and a Wrap up would not be read. It is not Close, which also reaps the worktree, and not
+  Forget, which drops the record; both are still there after it.
+- **Close** (*Close session* on a card's foot, the Focus side panel, *more ▾*) — Kills the session
+  and reaps its worktree; the record reads closed. Press it when the work is merged and every line
+  of Ready to close is green. It is offered only when that checklist passes — Kill always is — and
+  it is the one press that removes a worktree.
+- **Wrap up** (Focus header, *more ▾*) — Sends the wrap-up prompt — the one a policy sends before
+  a stop — so the session finishes, pushes and ledgers what it holds, then ends its turn. Press it
+  when you want the work saved rather than the process stopped. It kills nothing: the session ends
+  when it says it has, and a stop time does the same on a clock.
+- **Resume** (the exited banner, a Resumable row) — Starts the conversation again under this name,
+  on this record: the same mail, a new process at the tool's composer. Press it when you want to
+  continue a finished session's conversation. To only read it, press Transcript instead: a resume is
+  a start, which a manager may act on and which has to be closed again.
+- **Message…** (a seat's card, *more ▾*, Focus header) — Mails a question or a note into this
+  session's inbox; the session reads it when it next looks, and a question fills a seat on call.
+  Press it to ask or tell a session something without typing into its terminal. It types nothing
+  into the pane — Send does — and it starts no team: a stopped team is started by Start.
+- **Switch profile…** (a `limited` card) — Re-launches this session under another profile with its
+  conversation carried over. Press it when the account it runs on is capped and another is not. It
+  is a new process on the same record; Wait leaves the session where it is until the account resets.
+
+Which session to message, by role, is TD-162's line; the marks on the Message composer are its.
+Not in the first set, and written when a person asks at them: Take over / Hand back, Transcript,
+Pop out, the mode toggle, Allow / Deny, the New session form's fields.
+
 
 ### 4.5b Reachability, and the shape of a hosted service
 
@@ -2316,19 +2454,41 @@ it is why the terminal rides the host agent's pipe and why the adapter contract 
   terminal shows tmux's scrollback (`history-limit`) only; the run log is a download, never a
   terminal source.
 - **Scrollback is tmux's, reached through tmux (TD-022).** tmux repaints the client in place and
-  keeps the history itself, so xterm.js runs with no local buffer. The attach sets `mouse on` on
-  the session (a session option, never the person's global one): the wheel reaches tmux, which
-  enters copy mode over its history and leaves it on scrolling back to the live screen.
-  Shift+PageUp / Shift+PageDown do the same by a bridge message the UI turns into
-  `copy-mode -e -u` / `page-down` against the session (there is no escape sequence for copy
-  mode). Mouse tracking means plain drag goes to tmux; Shift+drag selects in the browser.
+  keeps the history itself, so xterm.js runs with no local buffer. Shift+PageUp / Shift+PageDown
+  scroll it by a bridge message the UI turns into `copy-mode -e -u` / `page-down` against the
+  session (there is no escape sequence for copy mode). **The mouse is the browser's (TD-164;
+  designed 2026-09-25, not built — TD-174).** Until then the attach set `mouse on` on the session
+  so the wheel reached tmux's copy mode, and because tmux then asked for mouse tracking a plain
+  drag went to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only
+  Shift+drag selected in the browser: a real terminal's rule, and the wrong one for a pane that is
+  mostly read. Now the attach sets no mouse option, tmux asks for no tracking, and xterm.js keeps
+  the mouse: **a plain drag selects in the browser**, Shift+drag does the same (with no tracking,
+  Shift is nothing to xterm.js, so the habit costs nothing and needs no setting), and
+  **Shift+click grows or shrinks the selection** — xterm.js's own selection service does it
+  (`shiftKey → _handleIncrementalClick`, read in the vendored source), as VS Code's terminal
+  does. **The wheel still scrolls tmux's history**: the page catches `wheel` on the terminal and
+  sends the scroll message Shift+PageUp sends, with a line count — `{scroll: up|down, lines: n}`,
+  the notches of one animation frame batched into one message — which the bridge turns into
+  `copy-mode -e` then `send-keys -X -N n scroll-up` / `scroll-down` against the session, so a
+  notch is lines, not a page, and `-e` leaves copy mode at the bottom as before. The wheel is a
+  tmux command per frame down the bridge, never a mouse report: the read-only attach passes it as
+  it passes every scroll message, and its carve-out for wheel-only report frames goes (below).
+  **What is lost, and simply so**: a program in the pane that asks for mouse tracking itself
+  (htop, a mouse-enabled `less`) gets no mouse, since tmux forwards none with its mouse off — a
+  runtime fact `man tmux` does not state, so TD-174's PR checks it in a live pane and says so;
+  Claude Code asks for none, and a person who needs the mouse in such a program has `ao focus` in
+  a real terminal. No per-session escape: a setting over which drag selects is the thing this
+  removes. **Copy on select** is the one choice left, and it is the person's (§4.5a *Focus:
+  copy on select*, §5 `person.terminal.copy_on_select`).
 - **Run-log retention.** A session's log is bounded by its lifetime; retention is by age: logs
   of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the agent's
   tick. Live logs are never truncated, so invariant 3 holds while the session exists.
 - **A read-only attach (TD-096).** The attach is opened read-only when the record says
   `unattended` at open: the pump drops key frames (str and bytes) and passes resize and scroll —
-  and a frame that is only mouse-wheel reports, which tmux's `mouse on` turns into scrolling its
-  history, never typing (`WHEEL_ONLY`; a click is dropped with the keys) — and the page is told
+  until TD-174 lands, also a frame that is only mouse-wheel reports, which tmux's `mouse on`
+  turned into scrolling its history, never typing (`WHEEL_ONLY`; a click is dropped with the
+  keys); with the mouse the browser's (TD-164) the wheel is a scroll message and that carve-out
+  goes — and the page is told
   so in the first frame, a text frame `{"read_only": true}` that is not pane output and resets no
   backoff (TD-029). The rule is enforced in the UI process, not by the terminal widget — a
   client setting can be undone from a devtools console, and the point is that a person cannot
@@ -2373,6 +2533,17 @@ points at them; there is no copy under `docs/`, which would drift.
 **Explain.** `ao explain <id>` prints a session's screen, the rule that fires on it and whether
 it applies; `ao explain --file` classifies a saved screen (TD-015).
 
+**Transcript.** `ao transcript <id> [-n N] [--before OFFSET] [--raw]` prints what a session said
+and did, without resuming it (§4.5 screen 9, TD-154): the last N turns (20) as the pane draws
+them — `>` the prompt, the assistant's text, `⏺ Tool(first line)` per call with its result folded
+to its first line, *thought · n lines*, *n subagent turns* — through the `transcript` RPC on the
+record's host, a read gated by nobody. `--json` prints the adapter's neutral entries and the
+offset `--before` takes for the turns before them; `--raw` prints the file's own lines instead,
+the last N of them, for a reader that wants the tool's shape. A record with no tool session id is
+refused with what it is (*a shell has no transcript*). A read-only verb, listed beside `tail` and
+`explain` in `ao --skill`: what a manager reads before deciding a quiet member has stalled
+(TD-091's moment), and what a person reads instead of Resume.
+
 **Reporting (§4.8, §4.9a).** Each is a small RPC on the calling session's own record — `--id`
 for another's, since the channels are ungated:
 - `ao progress claim TD-027`, `ao progress done TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`;
@@ -2380,6 +2551,8 @@ for another's, since the channels are ungated:
 - `ao progress restart --why "..."` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*, TD-083);
 - `ao finding TD-029 --priority low`;
 - `ao status -v` prints the same report line the card will, and `--json` the entries.
+
+**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, not built — TD-173: today it sets the badge and nothing else) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
 
 **Presets and grants.** `ao new --role grinder --lane TD-027,TD-019` (TD-028, TD-040,
 `agentorc.repoconfig`): the preset fills the brief from its template with `{lane}` filled and `--brief <path>` in its `{repo}` slot (§4.8; `--prompt` is raw text and fills nothing, and is refused beside `--brief`), the
@@ -2430,12 +2603,12 @@ covers both and the host agent knows who is blocked and decides mail wakes (§4.
 own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (TD-069),
 `attention_snooze` and `inbox_dismiss` (TD-079).
 
-**`ao repo [name]`** (§4.5 screen 9, §4.4 *Repo facts*; designed 2026-09-25, not built — TD-170):
+**`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, not built — TD-176):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
 entries, the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
-balance rule exists (§10, TD-171), and what a person reads instead of the page.
+balance rule exists (§10, TD-177), and what a person reads instead of the page.
 
 **`ao pr held <n>`** (§4.9b *The reader*, TD-093): whether PR `n` waits for this session's reader —
 the record's `review` checked against the PR's changed files, read with `gh pr view <n> --json
@@ -2593,7 +2766,7 @@ repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references,
 **Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists:
 
-- **The doing log** (TD-170; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
+- **The doing log** (TD-176; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
   the team — time, doer, what they are doing*): `doing` on the record stays a value, the latest
   line; the host agent also keeps, per team, the last fifty `doing` calls with their time and
   caller (§4.4 *Repo facts*), which is what the team card's **Doing** facet and the Repo page's
@@ -2862,6 +3035,27 @@ person's word to give, and a rename is not live in `org.yml` until it is given. 
 session name `<team>-lead` (§4.9) keeps its word: changing it would rename the manager of a
 running team that relies on it.
 
+**A role says when to message it (TD-162; designed 2026-09-25, not built — TD-171).** A preset or a
+`roles:` entry may carry **`message:`** — one sentence, 120 characters at most, *message me when
+…* — drawn where a person chooses whom to write to, so the manager is told from the techlead
+from a grinder before the composer opens. The built-ins carry defaults, from §4.9 and §4.9b:
+`manager` — *the team's work: what it picks, its pace, a member that is stuck or should stop*;
+`techlead` — *a PR on a held path, the architecture, or a question that is answered somewhere in
+the docs — an `ask` fills the seat*; `grinder` — *its own card only: the entry it holds, a
+finding on its PR*; `hunter` — *an area to look at; it files, never fixes*; `auditor` — *what its
+trigger counts: the last n PRs, the period*; `plain` — none. A role a repo or `org.yml` defines
+with its own brief and no preset — `designer` is one (*Role names*, above) — carries its own line
+in its `roles:` entry, or has none: for ao-grind's designer, *a design-first entry, a control's
+shape, a screen* is the line to write there. Overridable in `org.yml` and the repo's `.agentorc.yml` as
+`label:` is, resolved where the icon is, drawn as text, escaped. **It is the definition's line,
+never the session's**: a session may not rewrite it (`ao doing` is the session's own words about
+now, §4.8; this is what the job is for), in the spirit of §9 invariant 9 — a preset sets defaults
+at start and is a badge afterwards. Where it is drawn: §4.5a **Message** (the composer's first
+line, under the addressee's name, above TD-158's *when it is read*), the control's `title` on the
+card and the Focus header, and the team header's **who for what** line, generated from the same
+field for every role the team defines: *questions → manager-ao-1 · PRs and the architecture →
+techlead-ao-1 · a grinder about its own card*. `ao roles` prints it.
+
 **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** (one line,
 40 characters at most, checked when the file is read) — *Manager*, *Tech Lead*, *Grinder*,
 *Hunter* are the built-ins'; the default is the role's name with its first letter raised;
@@ -2874,6 +3068,19 @@ thing: its name is a key into a fixed set and is never drawn). **It is resolved 
 is, with the icon's limit**: the page reads roles from this host's disk, so a label a repo on
 *another* host gives its role is not seen and the badge falls back to the default — the role's
 name, raised — never to nothing.
+
+**A role has saved prompts (TD-161; designed 2026-09-25, not built — TD-170).** A preset or a
+`roles:` entry may carry **`prompts:`**, a list of `{label, text}` — *review PR* → *Review PR $n
+as the cadence says …*, *sweep* → `/stranded-work`, *waiting on me* → *What is waiting on me
+across this repo's board and my inbox?* — the jobs a person types into their own session by hand,
+again and again. Layered as every preset key is (the package's built-ins, `org.yml`, the repo's
+`.agentorc.yml`; the key replaced whole at each layer, never merged, so a repo's list is the list),
+so a grinder's chips differ from a plain session's and `plain`'s are the person's own. `label` is
+one line, 24 characters at most, drawn as text; `text` is the prompt, verbatim, with no
+substitution — what is typed is what the file says (§4.2's rule: fixed text in the source, never
+anything a session said, the rule *Reopen and push* already keeps). A chip is a **Send** and
+nothing more: no grant, no schedule, no state on the record, and `ao roles` prints each role's
+labels. The surfaces are §4.5a *Focus composer* **prompt chips** and *New session* **prompt chips**.
 
 Each preset also carries the test for when it has **run out of work**, which is the role's and
 never the core's; the tests and what a manager does with them are §4.9a.
@@ -3338,8 +3545,95 @@ whose git state is not known yet is left open, never assumed clean: a wrapped-up
 session sits `idle` rather than leaving, and `ao team start` refuses while a session holds a
 member's name. `ao team status <name>` is the manager's Members view for a terminal: each member
 with state, lane and report line. `ao team list` shows every definition, its source file, and
-whether it is live. A team is **live** when any session carrying its badge is live; there is no
-team record — a stopped team is only its definition.
+whether it is live. A team is **live** when any **unattended** session carrying its badge is live
+(a person's own session in the team keeps nothing live, *A person in the team* below; TD-160, designed
+2026-09-25, not built — TD-173: today every session with the badge counts); there
+is no team record — a stopped team is only its definition.
+
+**A person in the team (TD-160; designed 2026-09-25, not built — TD-173).** Paul: *I should
+start having interactive sessions on the team itself to prove the project and get the benefits —
+tmux stays alive, and PRs get routed through the techlead.* The mechanism was already here — a
+`--team` session with a role whose preset carries `review:` gets the reader a grinder does
+(§4.9b) — and three things were missing: no role a person would pick carried `review:`, the New
+session form had no Team field, and nothing said what a team act does to a person's session.
+
+- **The reader comes from the team, not from a role a person must choose.** A session started
+  with `--team <team>` (the CLI or the form) whose role carries no `review:` of its own takes the
+  team's: `reader: techlead` when the team's definition holds a techlead seat, and `held:` the
+  union of the `held:` lists of the team's member roles — a person in the team is held to the
+  paths its workers are held to, no more. Filled at start onto the record's `review`, as a
+  member's is from its role (`ao team start`), and read only there (§4.9b: whether a PR is held
+  keys on the record's `review` and the PR's paths). A role's own `review:` wins, so `org.yml`
+  may still say `plain: {review: …}`; a team without a techlead seat gives none, and the form
+  says so. Nothing new keys on the badge: the badge picks the definition at start, and the
+  record's field is what the gate reads (§9 invariant 9).
+- **The New session form gains a Team field** (§4.5a *New session* **Team** picker): every team
+  of `org.yml` and the repos' `.agentorc.yml`, or *none*; picking one narrows Host and the
+  Directory list to the team's host and projects, filters Role to the team's roles plus `plain`,
+  prefills Controllers with the team's manager when it is live (as `ao new --team` does), leaves
+  Unattended off, and shows the reader the session will get (*held PRs read by techlead-ao-1 on
+  src/sessionorc/**, docs/briefs/*** — or *no reader: the team has no techlead seat*).
+- **What a team act does to a person's session: nothing, and it says so.** A person's session
+  carries the badge and sits in the team's group, counted by its state as any card is and marked
+  *interactive* with the person mark as every interactive card is (§4.5 *The card's anatomy*).
+  Every team-level derivation runs over the team's **unattended** sessions — *live* (above),
+  *concluded* and *wound down* (§4.9a), the fold, Forget all's list — so a team whose only live
+  session is a person's reads *stopped* or *wound down* and offers **Start**, which starts the
+  workers beside the person's session (the anchor rule sees a worktree each). **Wind down** and
+  **Stop now** name the person's session apart in their confirm (*your session main-ao stays: a
+  team act never stops an interactive session*) and leave it alone — §9 invariant 5 already
+  refuses the acts; the confirm says so before the press rather than the refusal after. A person
+  who wants it stopped closes it from its own card. Keyed on `unattended`, never on the badge.
+- **The CLI**: `ao new <name> --team <team>` is the terminal's form of the same start — the badge,
+  the group, the manager as a controller, the team's reader — and its help line says so, in place
+  of *a badge, nothing keys on it*, which stays true of the badge and was read as *this does nothing*.
+
+**Add or remove a member from the team card (TD-163; designed 2026-09-25, not built — TD-172).**
+Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the
+team definition.* Growing or shrinking a running team is the one change a person makes by watching
+it, and today it is a hand edit of `org.yml` and a restart. **This is the first control that edits
+a definition from the page**, and the settings audit's line holds (ADR 2026-09-25 §5: *a
+definition says what a team is and belongs in its file; a setting is a number a person turns*): the
+control sits on the team's card, not on the Settings page, and it edits the file as the file is —
+its §2 called the org file *a team editor in waiting*, and this is the first key of that editor.
+
+- **What is edited.** `teams.<team>.members` in `~/.agentorc/org.yml`, **as text, in place**: the
+  client that serves the page (the UI process, as `ao` would) finds the team's `members:` block
+  and edits one line — **add** bumps the `count:` of the member line whose `role` matches and
+  carries a `count` (the name pattern `<name>-n` gives the next number), else appends one line
+  `- {role: <role>, name: <name>, lane: <lane>}` after the block's last member line, at the
+  block's indent; **remove** decrements that `count` (the highest-numbered member goes) or deletes
+  the member's one line. Comments, order and spacing stay because nothing is re-serialised
+  (`pyyaml` keeps no comments, so the file is never round-tripped). Refused, with the reason, when
+  the edit cannot be one line: a member written as a multi-line mapping, a nested `- {team: …}`
+  member, a team the file does not hold on one `members:` block — and always for a team defined in
+  a repo's `.agentorc.yml`, which is a PR's (*edit it in the repo; this card only reads it*). After
+  the write the file is parsed again (`org.load`); a parse that fails restores the bytes and
+  refuses, so a definition is never left unreadable. The org file is read per call and never by the
+  host agent (§4.4a), so the next `ao team list` and the next page load see the change.
+- **When it takes effect.** On a **stopped** team, the definition only: the next Start brings the
+  new shape. On a **live** team, **add** plans the team (`teams.plan`) and creates that one member
+  under the manager — the same create `ao team start` does for a member, the name check and the
+  anchor rule included, `controllers: [manager]` — so the card appears in the group without a
+  restart; **remove** of a live member is that one session's wind-down (the wrap-up prompt and a
+  stop now, as **Wrap up** sends it; a `working` member finishes what it holds), never a kill; of
+  a member not live, the definition only. A removed member's record **stays a card until Forget**,
+  as any exited member's does; the definition no longer names it, so no seat is drawn on call for it,
+  and Forget all takes it with the rest.
+- **The surface.** **Members…** on the team card's header, beside Start on a stopped team and
+  beside Wind down on a live one (§4.5a *team card: Members…*): a dialog listing the definition —
+  the manager, the techlead seat when there is one, and each member entry as *role · name · lane ·
+  count*, with the session holding it and its state, or *not live* — and two controls: **Add
+  member** (a role from the org's roles, the name defaulted to the team's pattern — `grinder-ao` in
+  a team whose grinders are `grinder-ao-n` — the lane from the role's default, editable before the
+  press) and **Remove** on each member entry, whose confirm names the consequence: *edits
+  `org.yml` (count: 2 → 1) and winds down grinder-ao-2; its card stays until Forget*. The manager
+  and the techlead seat are listed and not removable here: a team without its manager is a different
+  definition, made by hand. Not on the Settings page: its Teams section holds settings (schedule,
+  until, reserve), and a member is a definition.
+- **The ADR's line, restated.** A definition is edited by a control on the thing it defines, as
+  text, preserving the file; a setting by the Settings page through `set_settings`. Nothing here
+  writes `settings.yml`, and nothing on the Settings page writes `org.yml`.
 
 **The Org page** (TD-040 step d). The home route and nav item are **Org** (the noun does not
 change with what is inside, ADR). The page is the card grid of §4.5, flat only when no session
@@ -3471,6 +3765,15 @@ and would take the command with it if killed — is told what is left instead: i
 declaration, the report), then `ao close` on its own id, which a session may always run on
 itself (§4.8). A member left open because it holds unpushed work is a board item, not a reason
 to keep the round going.
+
+**One member back, today.** Paul asked (2026-09-25) whether an `ask` to the exited designer or
+manager would start it without the grinders. It does not: mail to an exited record is delivered
+and waits (§4.10), and only a *seat* is filled by a question (§4.9b). A member comes back by a
+person's **Resume with changes…** on its own card with *Unattended* ticked — **Resume** alone
+starts it attended (§4.5a *Focus (exited / closed)*, §6) — which supersedes the record in place
+and keeps its mail; or by the team's **Start**, which brings the whole definition; or, once
+TD-172 is built, by **Members…** → Add of the same role, which creates it fresh. The exited
+member's banner says the first (TD-172), and `ao team --skill`'s *Stop it* says all three.
 
 **A person's Start on a concluded team**. A team whose every live session is `idle` and
 has declared — `out_of_work` or `restart_wanted` — with its seats idle or gone (§4.5a *team
@@ -3835,7 +4138,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
   home-owned, set at start and shown on the Focus header as text. **Whether a PR is held keys on
   the record's `review` and the PR's paths** — never on who wrote the PR or its session's mode
   (mode decides only who executes the merge): a person's own interactive session inside a team
-  (`ao new --team`, with a role whose preset carries `review:`) gets the same reader a grinder
+  (`ao new --team` or the form's Team field — with a role whose preset carries `review:`, else the
+  team's own default, §4.9 *A person in the team*, TD-160) gets the same reader a grinder
   does, *a safety net for when I am not intimately familiar with an architecture*. A session whose
   record has no `review`, or whose PR touches no held path, merges as §3's cadence says (the
   author, on a green `scripts/check_cadence.py`). **The record's `review` is read by the author's
@@ -4874,7 +5178,8 @@ repos:                                        # per registered checkout, by its 
   agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
-  terminal: {size: 13, face: "JetBrains Mono"}   # goal 12: ligatures off regardless, monospace always the fallback
+  terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
+             copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a, TD-164; default on)
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
@@ -4934,6 +5239,9 @@ roles:                                # §4.8 presets; every key optional, built
             review: {reader: techlead}}   # §4.9b *The reader*: its PRs wait for the techlead; `held:` defaults to every PR
   hunter: {brief: docs/briefs/hunter.md, icon: search}   # icon: §4.8, one name from the fixed set
   manager: {brief: docs/briefs/manager.md, grants: [control]}
+  plain: {prompts: [{label: review PR, text: "Review the PR I name next as the cadence says, then report."},
+                    {label: sweep, text: /stranded-work},
+                    {label: waiting on me, text: "What is waiting on me across this repo's board and my inbox?"}]}   # prompts: §4.8, the chips beside Send (TD-161)
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
@@ -5626,7 +5934,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       grinders outpacing the techlead; this may lead to automatic checks by the manager*). The
       numbers come first, visible on the team card and the rollup and readable by `ao repo` (§4.5 screens 1 and 9, §4.7),
       so a person watches them before any rule keys on them. The rule under consideration
-      (TD-171, design-first): a per-team **balance** setting — open PRs above `n`, or the oldest
+      (TD-177, design-first): a per-team **balance** setting — open PRs above `n`, or the oldest
       past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out
       no new claim and asks the techlead to read, saying so in its log line; never a kill, never a
       wind-down. Open: whether the line is a setting (Settings page, Teams card) or a definition

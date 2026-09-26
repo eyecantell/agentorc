@@ -154,7 +154,7 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span></div>
@@ -162,61 +162,25 @@
   <span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
-<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
-  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">designer-ao-1</span>
-      <span class="pill s-idle"><span class="dot"></span>idle</span><span class="meta" title="the session's name as its tool holds it">TD-154 transcript</span>
-      <span class="badge ready" title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
-      <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <span class="btn sm next">Close session</span><span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="badge toggle on" title="a selection in the pane copies itself — yours everywhere (design §4.5a, TD-164); Ctrl+C with a selection and Copy work either way">copy on select</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5l3 3v9H4z"></path><path d="M9 2v3h3M6 8h4M6 10.5h4"></path></svg>Transcript</span>
-      <span style="flex-grow: 1;"></span>
-      <span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · <span style="color: #991b1b;">Kill</span><span class="btn sm link" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></span>
-    </div>
-    <div class="term" style="height: 420px;"><span class="d">● designer-ao-1 · claude-code · /home/kmaster/agentorc/.claude/worktrees/designer-ao-1</span>
-
-<span class="p">&gt;</span> Wrap up: finish what you hold, push, report, and say what is left.
-
-<span class="d">⏺</span> Bash(git push -u origin td154-transcript)
-  <span class="g">branch pushed · PR #556 opened</span>
-<span class="d">⏺</span> Bash(ao progress done TD-154 --pr 556)
-<span class="d">⏺</span> Bash(ao progress none --why "TD-154 designed and handed to the anchor; nothing else on my list")
-  <span class="g">recorded · out of work</span>
-
-Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
-
-<span class="p">&gt;</span> <span class="d">▌</span></div>
-    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
-      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span><span style="flex-grow: 1;"></span><span class="btn primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span></div>
-    </div>
-    <div class="note">Paul took this member over, so it is <b>interactive</b> — his to close. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight; Kill is under more ▾. An unattended team member shows none of this: its team's Wind down or Start closes it, its Ready to close is folded, and its Close is the more ▾ entry.</div>
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 1100px; align-self: center; width: 100%;">
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <a href="#" class="muted">&larr; Focus</a>
+    <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / agentorc / designer-ao-1</span>
+    <span class="pill s-ended"><span class="dot"></span>exited 2h</span>
+    <span class="badge">ao-grind</span><span class="badge"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>designer</span>
+    <span class="meta">claude-code · paul (max) · fable-5-1</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span>
   </div>
-  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Working</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">says · 6m ago</span></div><div style="font-size: 12px; margin-top: 8px;">wrapped up: TD-154 designed and handed to the anchor</div></div>
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Git</span><span style="flex-grow: 1;"></span><span class="mono muted" style="font-size: 12px;">td154-transcript · pushed</span></div><div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div></div>
-    <div class="card" style="padding: 12px;">
-      <div class="side-h"><span class="chev">▾</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta">1 progress</span></div>
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin-top: 8px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-154</span><span class="pill plain s-done">done</span><a href="#">#556</a><span class="meta">18:41</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
-      </div>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div class="side-h"><span class="chev">▾</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm">Close</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-top: 8px;">
-        <div><span style="color: #065f46;">✓</span> tree clean</div>
-        <div><span style="color: #065f46;">✓</span> branch pushed</div>
-        <div><span style="color: #065f46;">✓</span> no subagents running</div>
-        <div><span style="color: #065f46;">✓</span> outcomes reported</div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
-    </div>
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">claude-code · paul · fable-5-1</span></div></div>
+  <div class="card" style="padding: 10px 12px;">
+    <dl class="kv" style="margin: 0;">
+      <dt>file</dt><dd class="mono" style="font-size: 12px;">~/.claude/projects/-home-kmaster-agentorc--claude-worktrees-designer-ao-1/9f2c…41b0.jsonl · 812 KB · on kmaster</dd>
+      <dt>turns</dt><dd>63 · 2026-09-25 13:48 &rarr; 16:12 MDT · compacted once</dd>
+      <dt>showing</dt><dd>the last 20 turns · <span class="muted">a snapshot at 18:31; reload to read what came after</span></dd>
+    </dl>
   </div>
+  <div class="card" style="padding: 6px 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.5;"><div style="text-align: center; padding: 10px;"><span class="btn sm">earlier turns · 20 more above</span></div><div style="text-align: center;"><span class="meta">— compacted 14:02 —</span></div><div style="display: flex; gap: 10px; padding: 10px 12px; background: #eef1f5; border-radius: 4px;"><span class="mono" style="color: #6b7280;">&gt;</span><div style="flex-grow: 1; white-space: pre-wrap;">[agentorc] you have 1 unread message — run ao inbox</div><span class="meta mono" style="flex-shrink: 0;">14:06:12</span></div><div style="padding: 3px 12px 3px 30px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ thought · 4 lines</span></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">ao inbox --unread --json</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 21 lines</span></div></div><div style="padding: 4px 12px 4px 30px; white-space: pre-wrap;">Paul answered the steer on TD-128 with <i>go with it</i>. Merging #547 once the cadence check passes.</div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">python3 scripts/check_cadence.py --pr 547; echo exit=$?</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 9 lines</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">gh pr merge 547 --squash --delete-branch</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 2 lines</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">ao progress done TD-128 --pr 547 --json</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 6 lines</span></div></div><div style="padding: 4px 12px 4px 30px; white-space: pre-wrap;">TD-128 is designed and merged as #547. Taking TD-026 next: the start time.</div><div style="display: flex; gap: 10px; padding: 10px 12px; background: #eef1f5; border-radius: 4px;"><span class="mono" style="color: #6b7280;">&gt;</span><div style="flex-grow: 1; white-space: pre-wrap;">Design TD-026 as the brief says: start_at, the scheduled state, the tick's create at the instant.</div><span class="meta mono" style="flex-shrink: 0;">14:21:40</span></div><div style="padding: 3px 12px 3px 30px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ thought · 31 lines</span></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Read(<span style="color: #4b5563;">docs/design.md · §6 Schedule</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 118 lines</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Agent(<span style="color: #4b5563;">Explore · where the tick creates a session</span>) <span class="badge">6 subagent turns</span></div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 40 lines</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Edit(<span style="color: #4b5563;">docs/design.md</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 1 line</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Edit(<span style="color: #4b5563;">docs/technical_debt.md</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 1 line</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">pdm run test tests/test_ledger.py -q</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 3 lines</span></div></div><div style="padding: 4px 12px 4px 30px; white-space: pre-wrap;">The design is written: §6 <i>Schedule</i> gains <span class="mono">start_at</span> and the <span class="mono">scheduled</span> state; §4.5a the card's <i>starts</i> note and <span class="mono">ao at</span>. Opening the PR and a steer to Paul on the verb's name.</div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">gh pr create --title "TD-026 round 2: the start time" --body-file /tmp/pr.md</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 1 line</span></div></div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">ao msg --kind steer --default "ao at" --bound 43200 --about TD-026 person "…"</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 4 lines</span></div></div><div style="padding: 4px 12px 4px 30px; white-space: pre-wrap;">PR #548 is open. Steer sent; on to the next entry.</div><div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> Bash(<span style="color: #4b5563;">ao progress done TD-026 --pr 548 --json</span>)</div><div style="padding-left: 22px;"><span class="meta" style="cursor: pointer; user-select: none;">▸ result · 6 lines</span></div></div></div>
+  <div class="note">Design notes, not page text. The page is the pane's reading of the conversation, folded (design §4.5 screen 9, TD-154): the prompt as sent, the assistant's text in full, each tool call one line with its result folded under it, a thought one folded line, a subagent's turns folded under the Agent call that started them. Every line is text; the only controls are the folds, <b>earlier turns</b> and <b>VS Code</b>, which opens the raw file. Reached from the Focus header on any state and from each Resumable row; <span class="mono">ao transcript &lt;id&gt;</span> prints the same twenty turns.</div>
 </div>
 </div>
 </x-dc>

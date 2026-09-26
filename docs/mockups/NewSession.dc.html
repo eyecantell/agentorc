@@ -172,6 +172,7 @@
     <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free — nothing holds that name here</span></div>
     <div class="field"><label>Profile</label><span class="input">the role's, else claude-code · paul (max) · opus (default)<span class="muted">▾</span></span><span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span></div>
     <div class="field"><label>Role</label><span class="input">grinder [built-in + repo]<span class="muted">▾</span></span><span class="note">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span></div>
+    <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: the team this session joins — its badge and group, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b> on <span class="mono">src/sessionorc/**, docs/briefs/**</span></span></div>
     <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">the references this session is handed, in order; empty: the role's default (free-pick)</span></div>
     <div class="field"><label>Resume (optional)</label><span class="input mono" style="color: #9ca3af;">the tool's session id</span></div>
   </div>
@@ -181,6 +182,7 @@
       <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
     </div>
   </div>
+  <div class="field"><label>Saved prompts</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span><span class="note">the role's <span class="mono">prompts:</span> — a press fills the opening prompt below (design §4.8, TD-161)</span></div></div>
   <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt — a role fills it from its template.</span></div>
   <div class="field">
     <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>

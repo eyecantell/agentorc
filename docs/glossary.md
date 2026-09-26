@@ -144,6 +144,10 @@ not mix:
 - **hook** — a tool's own event callback (Claude Code's `Stop`, `PreToolUse`…) that reports
   state to the host agent. A state from a hook is `hook` confidence; one read off the pane is
   `scraped`. — *proposed*.
+- **transcript** — the tool's own record of one conversation (Claude Code: one JSON object per
+  line under `~/.claude/projects/`), located and rendered by the adapter (design §4.3
+  `transcript_path`, `read_transcript`), read on the Transcript page and by `ao transcript` (§4.5
+  screen 9) and never copied off the host that holds it. Not the run log, which is the pane's output.
 - **anchor session** — the first agent in a checkout; every other concurrent agent works in a
   worktree (invariant 2). — *proposed*.
 - **tick** — one pass of the host agent's own loop: derived reports, policies, the doorbell's
@@ -211,7 +215,7 @@ not mix:
 - **TDs in motion** — the ledger entries a team's members hold, each with its **phase**: *add* (a hunter filing it), *design* (a designer holds a design-first entry), *grind* (a claim, no PR), *review* (a claim with an open PR); derived from the records, never declared. — *proposed 2026-09-26*.
 - **answer needed** — a member waiting on a permission or a question from a person; the team card's facet of that name. *Not:* needs you, which is the wider word (the Inbox's section, the rollup's facet: answers, board items, states stopped on a person). — *proposed 2026-09-26*.
 - **doing log** — the last fifty `ao doing` calls of a team, with time and caller, kept by the host agent for the Doing feed; the record itself keeps only the latest line (design §4.8). — *proposed 2026-09-26*.
-- **Repo page** — `/repo/<name>`: the servicing team's three facets, then the lists behind the numbers, one repo at a time (design §4.5 screen 9). *Not:* dashboard — no history beyond the window. — *proposed 2026-09-25, reshaped 2026-09-26*.
+- **Repo page** — `/repo/<name>`: the servicing team's three facets, then the lists behind the numbers, one repo at a time (design §4.5 screen 11). *Not:* dashboard — no history beyond the window. — *proposed 2026-09-25, reshaped 2026-09-26*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
 - **run window** — the hours unattended sessions may work (design §6). — *proposed*.
 - **setting** — a value the person turns without redefining anything: a reserve, a team's stop time or priority, a schedule, the promote's `auto`, the person's own editor and terminal. Every setting lives in the home's `settings.yml` (design §5), written only through `set_settings`, and the Settings page (§4.5 screen 8) is where it is turned. *Not:* definition, option, config. — *proposed* 2026-09-25 (Paul's line).

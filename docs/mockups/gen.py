@@ -165,6 +165,7 @@ ICON = {
     "resume": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8a5 5 0 019-3M13 8a5 5 0 01-9 3"></path><path d="M12 2v3H9M4 14v-3h3"></path></svg>',
     "play": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"></path></svg>',
     "term": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>',
+    "doc": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5l3 3v9H4z"></path><path d="M9 2v3h3M6 8h4M6 10.5h4"></path></svg>',
     "git": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="1.6"></circle><circle cx="4" cy="12" r="1.6"></circle><circle cx="12" cy="6" r="1.6"></circle><path d="M4 5.6v4.8M12 7.6c0 2.4-8 1.2-8 3"></path></svg>',
 }
 
@@ -185,6 +186,12 @@ PERSON = "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"
 
 # a role's label is a title (TD-095 g): the preset's `label:`, else its name with the first letter raised
 ROLE_LABEL = {"techlead": "Tech Lead"}
+ROLE_MESSAGE = {  # the role's `message:` line (design §4.8, TD-162)
+    "manager": "message me about the team's work: what it picks, its pace, a member that is stuck or should stop",
+    "techlead": "message me about a PR on a held path, the architecture, or a question the docs answer — an ask fills the seat",
+    "grinder": "message me about my own card only: the entry I hold, a finding on my PR",
+    "designer": "message me about a design-first entry, a control's shape, a screen",
+}
 
 def role_icon(role):
     d = ROLE_ICON.get(role)
@@ -499,16 +506,20 @@ def team_desktop(team_first=False):
 
     def group(title, sub, cards_html, needs=0, team=False, strip=""):
         flag = pill("needs", f"{needs} needs you") if needs else ""
-        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span>'
+        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm ghost" title="the definition\'s members: add one, remove one (design §4.9, TD-163)">Members…</span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
                 if team else "")
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
+        # who for what (design §4.5a *team groups*, TD-162): each role's `message:` line, with the session holding it
+        who = (f'<div class="meta" title="who for what: each role\'s message: line (design §4.8, TD-162)">questions → {title.split(" ")[0]}-lead · PRs and the architecture → techlead (on call) · a grinder about its own card</div>'
+               if team else "")
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
                 f'<div style="display: flex; align-items: center; gap: 10px;">'
                 f'<span style="font-weight: 600; font-size: 15px;">{title}</span>'
-                f'<span class="meta">{sub}</span>{flag}{acts}</div>{strip}'
+                f'<span class="meta">{sub}</span>{flag}{acts}</div>'
+                f'{who}{strip}'
                 f'<div style="{GRID}">{cards_html}</div></div>')
 
-    # design §4.5 screen 9 / §4.5a **team card: repo strip** (TD-170): one quiet line per repo the
+    # design §4.5 screen 11 / §4.5a **team card: repo strip** (TD-176): one quiet line per repo the
     # team services, between the header and the cards — the repo's numbers, every one a link; the
     # header keeps the sessions' counts. A reading that failed reads *could not look*, dimmed.
     def strip(repo, prs, oldest, pickable, design_first, for_you, overdue, on_now, failed=False):
@@ -577,7 +588,7 @@ def team_desktop(team_first=False):
         grid += (f'<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #cbd0d6; border-radius: 8px; '
                  f'padding: 10px 14px; background: #eceef1;" title="defined in {source}">'
                  f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>'
-                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}</div>')
+                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm ghost">Members…</span><span class="btn sm primary">Start</span>{fold}<span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></div>')
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
@@ -649,7 +660,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
     line: the next act outlined first (Close session, Take over, or none), the plain ones, more ▾
     at the right with Kill last. Until 2026-09-25 this was one wrapping row, the buttons at its
     tail, which broke over three lines on Paul's screen with the buttons split between two."""
-    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span>' if editor else ""
+    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span><span class="badge toggle on" title="a selection in the pane copies itself — yours everywhere (design §4.5a, TD-164); Ctrl+C with a selection and Copy work either way">copy on select</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span>' if editor else ""
     return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
@@ -659,7 +670,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
       {next_act}<span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link">{ICON["term"]}Open shell here</span>{vs}
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · {"Close · " if member else ""}<span style="color: #991b1b;">Kill</span></span>
+      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · {"Close · " if member else ""}<span style="color: #991b1b;">Kill</span><span class="btn sm link" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></span>
     </div>'''
 
 def side_card(title, meta="", body="", open_=True):
@@ -715,6 +726,7 @@ def focus():
       <div style="display: flex; align-items: center; gap: 8px;">
         <span class="btn">{ICON["clip"]}Attach</span>
         <span class="badge">~/.agentorc/attachments/tdgrind-1/spec.pdf</span><span class="badge">screenshot-1402.png</span>
+        <span class="btn sm ghost" title="Review the PR I name next as the cadence says, then report.">review PR</span><span class="btn sm ghost" title="/stranded-work">sweep</span><span class="btn sm ghost" title="What is waiting on me across this repo's board and my inbox?">waiting on me</span><span class="meta" title="the role's prompts: (design §4.8, TD-161) — a press sends it; Shift+press fills the composer">·</span>
         <span style="flex-grow: 1;"></span>
         <span class="btn primary">{ICON["send"]}Send</span>
       </div>
@@ -859,7 +871,7 @@ def focus_orchestrator():
 ''' + TAIL
 
 def repo_page():
-    """§4.5 screen 9 (TD-170): the strip's numbers as lists, one repo at a time — one centred column
+    """§4.5 screen 11 (TD-176): the strip's numbers as lists, one repo at a time — one centred column
     as the Inbox, a section per number in the strip's order, a row a card; the board rows are the
     Inbox's own with their controls. No chart, no history: the numbers are today's and the lists
     are the things themselves."""
@@ -910,7 +922,7 @@ def repo_page():
        act=f'<span class="btn sm" title="opens docs/technical_debt.md through your open_in (design §5) — an entry is edited in its file, never here">{ICON["code"]}Open ledger</span>')}
   {sec("Waiting on you", "2 due · 1 overdue", board, "the repo's board items that are due — the Inbox's own rows; Snooze, Done and Reply write the board as they do there")}
   {sec("On now", "3 members", now, "every member of the servicing team that holds a claim or says what it is doing, from the records")}
-  <div class="note">Design §4.5 screen 9 (TD-170): <b>not a dashboard</b> — no chart, no history; the numbers are today's and the lists are the things themselves. The heading counts are the strip's numbers; <b>Open ledger</b> on the Technical debt heading opens the file through <span class="mono">open_in</span> and is drawn only when one is set. Reached from the strip on the team card, no tab (TD-123). Narrow: the same column, as the Inbox.</div>
+  <div class="note">Design §4.5 screen 11 (TD-176): <b>not a dashboard</b> — no chart, no history; the numbers are today's and the lists are the things themselves. The heading counts are the strip's numbers; <b>Open ledger</b> on the Technical debt heading opens the file through <span class="mono">open_in</span> and is drawn only when one is set. Reached from the strip on the team card, no tab (TD-123). Narrow: the same column, as the Inbox.</div>
 </div>
 </div>
 ''' + TAIL
@@ -932,6 +944,7 @@ def new_session():
     <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free — nothing holds that name here</span></div>
     <div class="field"><label>Profile</label><span class="input">the role's, else claude-code · paul (max) · opus (default)<span class="muted">▾</span></span><span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span></div>
     <div class="field"><label>Role</label><span class="input">grinder [built-in + repo]<span class="muted">▾</span></span><span class="note">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span></div>
+    <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: the team this session joins — its badge and group, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b> on <span class="mono">src/sessionorc/**, docs/briefs/**</span></span></div>
     <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">the references this session is handed, in order; empty: the role's default (free-pick)</span></div>
     <div class="field"><label>Resume (optional)</label><span class="input mono" style="color: #9ca3af;">the tool's session id</span></div>
   </div>
@@ -941,6 +954,7 @@ def new_session():
       <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
     </div>
   </div>
+  <div class="field"><label>Saved prompts</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span><span class="note">the role's <span class="mono">prompts:</span> — a press fills the opening prompt below (design §4.8, TD-161)</span></div></div>
   <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt — a role fills it from its template.</span></div>
   <div class="field">
     <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>
@@ -1056,6 +1070,7 @@ def message_dialogs():
                else '<span class="input" style="width: 230px;">note — no reply expected ▾</span>')
         return f'''<div class="card" style="width: 560px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
   <div style="font-weight: 600;">{title}</div>
+  <div class="meta">{ROLE_MESSAGE.get(title.split(' ')[1].rsplit('-', 2)[0], '')}</div>
   <div style="display: flex; gap: 10px; align-items: center;"><span class="meta">kind</span>{sel}<span class="meta">about</span><span class="input" style="flex-grow: 1; color: #9ca3af;">TD-052, a PR, a session (optional)</span></div>
   <div style="font-size: 14px; padding: 8px 10px; background: #eef1f5; border-radius: 4px; display: flex; gap: 8px;"><span style="color: #6b7280;">⏱</span><span>{line}</span></div>
   <div class="input" style="height: 84px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">First what you want, then why…</div>
@@ -1079,6 +1094,140 @@ def message_dialogs():
 </div>
 </div>
 ''' + TAIL
+
+
+def transcript():
+    """Screen 9 (TD-154): a session's transcript, folded as the pane draws it — read, never resumed.
+    Everything on it is text; the only controls are the folds, *earlier turns* and VS Code."""
+    def fold(label):
+        return f'<span class="meta" style="cursor: pointer; user-select: none;">▸ {label}</span>'
+    def prompt(text, at):
+        return f'<div style="display: flex; gap: 10px; padding: 10px 12px; background: #eef1f5; border-radius: 4px;"><span class="mono" style="color: #6b7280;">&gt;</span><div style="flex-grow: 1; white-space: pre-wrap;">{text}</div><span class="meta mono" style="flex-shrink: 0;">{at}</span></div>'
+    def said(text):
+        return f'<div style="padding: 4px 12px 4px 30px; white-space: pre-wrap;">{text}</div>'
+    def tool(name, arg, result=None, extra=""):
+        r = f'<div style="padding-left: 22px;">{fold(result)}</div>' if result else ""
+        return f'<div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> {name}(<span style="color: #4b5563;">{arg}</span>){extra}</div>{r}</div>'
+    def thought(n):
+        return f'<div style="padding: 3px 12px 3px 30px;">{fold(f"thought · {n} lines")}</div>'
+    turns = "".join([
+        '<div style="text-align: center; padding: 10px;"><span class="btn sm">earlier turns · 20 more above</span></div>',
+        '<div style="text-align: center;"><span class="meta">— compacted 14:02 —</span></div>',
+        prompt("[agentorc] you have 1 unread message — run ao inbox", "14:06:12"),
+        thought(4),
+        tool("Bash", "ao inbox --unread --json", "result · 21 lines"),
+        said("Paul answered the steer on TD-128 with <i>go with it</i>. Merging #547 once the cadence check passes."),
+        tool("Bash", "python3 scripts/check_cadence.py --pr 547; echo exit=$?", "result · 9 lines"),
+        tool("Bash", "gh pr merge 547 --squash --delete-branch", "result · 2 lines"),
+        tool("Bash", "ao progress done TD-128 --pr 547 --json", "result · 6 lines"),
+        said("TD-128 is designed and merged as #547. Taking TD-026 next: the start time."),
+        prompt("Design TD-026 as the brief says: start_at, the scheduled state, the tick's create at the instant.", "14:21:40"),
+        thought(31),
+        tool("Read", "docs/design.md · §6 Schedule", "result · 118 lines"),
+        tool("Agent", "Explore · where the tick creates a session", "result · 40 lines", ' <span class="badge">6 subagent turns</span>'),
+        tool("Edit", "docs/design.md", "result · 1 line"),
+        tool("Edit", "docs/technical_debt.md", "result · 1 line"),
+        tool("Bash", "pdm run test tests/test_ledger.py -q", "result · 3 lines"),
+        said("The design is written: §6 <i>Schedule</i> gains <span class=\"mono\">start_at</span> and the <span class=\"mono\">scheduled</span> state; §4.5a the card's <i>starts</i> note and <span class=\"mono\">ao at</span>. Opening the PR and a steer to Paul on the verb's name."),
+        tool("Bash", "gh pr create --title \"TD-026 round 2: the start time\" --body-file /tmp/pr.md", "result · 1 line"),
+        tool("Bash", "ao msg --kind steer --default \"ao at\" --bound 43200 --about TD-026 person \"…\"", "result · 4 lines"),
+        said("PR #548 is open. Steer sent; on to the next entry."),
+        tool("Bash", "ao progress done TD-026 --pr 548 --json", "result · 6 lines"),
+    ])
+    return head("Transcript") + f'''<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 1100px; align-self: center; width: 100%;">
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <a href="#" class="muted">&larr; Focus</a>
+    <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / agentorc / designer-ao-1</span>
+    {pill("ended", "exited 2h")}
+    <span class="badge">ao-grind</span><span class="badge">{role_icon("grinder")}designer</span>
+    <span class="meta">claude-code · paul (max) · fable-5-1</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="btn">{ICON["code"]}VS Code</span>
+  </div>
+  <div class="card" style="padding: 10px 12px;">
+    <dl class="kv" style="margin: 0;">
+      <dt>file</dt><dd class="mono" style="font-size: 12px;">~/.claude/projects/-home-kmaster-agentorc--claude-worktrees-designer-ao-1/9f2c…41b0.jsonl · 812 KB · on kmaster</dd>
+      <dt>turns</dt><dd>63 · 2026-09-25 13:48 &rarr; 16:12 MDT · compacted once</dd>
+      <dt>showing</dt><dd>the last 20 turns · <span class="muted">a snapshot at 18:31; reload to read what came after</span></dd>
+    </dl>
+  </div>
+  <div class="card" style="padding: 6px 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.5;">{turns}</div>
+  <div class="note">Design notes, not page text. The page is the pane's reading of the conversation, folded (design §4.5 screen 9, TD-154): the prompt as sent, the assistant's text in full, each tool call one line with its result folded under it, a thought one folded line, a subagent's turns folded under the Agent call that started them. Every line is text; the only controls are the folds, <b>earlier turns</b> and <b>VS Code</b>, which opens the raw file. Reached from the Focus header on any state and from each Resumable row; <span class="mono">ao transcript &lt;id&gt;</span> prints the same twenty turns.</div>
+</div>
+</div>
+''' + TAIL
+
+
+HELP = [('Start', 'team card', "Runs the team again from its definition: every check first, then the concluded sessions closed under the wrap-up's own safety check, then the manager and the members created with their briefs. Press it to run the team again — after a wind-down, or when a run has concluded and you want the next. It is not a message: a running session is mailed with Message…, and a session holding uncommitted or unpushed work refuses the start instead of being closed."), ('Wind down', 'team card', 'Sends the wrap-up to every member and then to the manager: each finishes what it holds, pushes, and exits. Press it when the team should stop after the work in hand, not in the middle of it. It kills nothing — Stop now does — and forgets nothing.'), ('Stop now', 'team card', "Kills every session carrying this team's badge, at once, whatever it holds. Press it when waiting for a wind-down is worse than losing the turn in flight. Worktrees and unpushed work stay on disk under the cards, which read exited; Forget is a separate press."), ('the fold', "*n sessions* on a stopped team's card", "Shows or hides a stopped team's cards, which are folded away by default. Press it to read their last lines or their mail, or to Forget them. It changes nothing on any record; which teams you have unfolded is remembered in this browser."), ('Forget', "a card's foot, the exited banner", "Drops this session's record: the card, its report line and its mail. Press it when a finished session's card is clutter — its work merged, or pushed and accounted for. It stops nothing, since a live session offers no Forget; the worktree and the run log stay on disk, and the conversation stays in the tool's own files, where the Resumable list finds it. On a team the seat stays: the definition names it, and Start fills it again."), ('Forget all', 'team card', "The Forget of every exited or closed card of this team, in one press. Press it when the team's run is over and everything it pushed has landed. It never forgets a card carrying work that exists only on this machine — those it names, and you forget them one at a time with the flag in view — nor a seat on call."), ('Kill', 'Focus header, *more ▾*', "Ends this session's process now and destroys its pane; the record stays, reading exited, and the worktree stays. Press it when a session is stuck or running away and a Wrap up would not be read. It is not Close, which also reaps the worktree, and not Forget, which drops the record; both are still there after it."), ('Close', "*Close session* on a card's foot, the Focus side panel, *more ▾*", 'Kills the session and reaps its worktree; the record reads closed. Press it when the work is merged and every line of Ready to close is green. It is offered only when that checklist passes — Kill always is — and it is the one press that removes a worktree.'), ('Wrap up', 'Focus header, *more ▾*', 'Sends the wrap-up prompt — the one a policy sends before a stop — so the session finishes, pushes and ledgers what it holds, then ends its turn. Press it when you want the work saved rather than the process stopped. It kills nothing: the session ends when it says it has, and a stop time does the same on a clock.'), ('Resume', 'the exited banner, a Resumable row', "Starts the conversation again under this name, on this record: the same mail, a new process at the tool's composer. Press it when you want to continue a finished session's conversation. To only read it, press Transcript instead: a resume is a start, which a manager may act on and which has to be closed again."), ('Message…', "a seat's card, *more ▾*, Focus header", "Mails a question or a note into this session's inbox; the session reads it when it next looks, and a question fills a seat on call. Press it to ask or tell a session something without typing into its terminal. It types nothing into the pane — Send does — and it starts no team: a stopped team is started by Start."), ('Switch profile…', 'a `limited` card', 'Re-launches this session under another profile with its conversation carried over. Press it when the account it runs on is capped and another is not. It is a new process on the same record; Wait leaves the session where it is until the account resets.')]
+
+def help_page():
+    """Screen 10 (TD-157): every control's paragraph, by screen — what the *i* marks point at."""
+    by_screen = [("Org — team card", ["Start", "Wind down", "Stop now", "the fold", "Forget all", "Forget", "Close", "Message…", "Switch profile…"]),
+                 ("Focus", ["Wrap up", "Kill", "Close", "Message…"]),
+                 ("Focus — the exited banner", ["Resume", "Forget"])]
+    text = {n: (w, p) for n, w, p in HELP}
+    body = ""
+    for screen, names in by_screen:
+        body += f'<div style="font-weight: 600; margin: 14px 0 6px;">{screen}</div>'
+        for n in names:
+            w, p = text[n]
+            first, rest = p.split(". ", 1)
+            body += f'<div style="padding: 6px 0 6px 14px; border-left: 2px solid #e3e6ea; margin-bottom: 8px;"><div><b>{n}</b> <span class="meta">{w}</span></div><div style="font-size: 14px; line-height: 1.5;">{first}. {rest}</div></div>'
+    return head("Help") + f'''<div style="width: 1440px; min-height: 1500px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; max-width: 900px; align-self: center; width: 100%;">
+  {page_head("Help", "every control with a paragraph, by screen — the same text as the i marks and the tooltips", "")}
+  <div class="card" style="padding: 8px 16px 14px;">{body}</div>
+  <div class="note">Design notes, not page text. One paragraph per control, three sentences — what it does, when you would press it, what it does not do (design §4.5a <i>The help text</i>, TD-157). The paragraph's first sentence is the control's hover title; an <i>i</i> mark beside a control group opens the group's paragraphs in place; this page holds all of them, reached from the <span class="mono">?</span> overlay's last line and from every mark. The text is written once, in §4.5a, and a test holds the code's copy equal to it.</div>
+</div>
+</div>
+''' + TAIL
+
+
+
+def members_dialog():
+    """The team card's **Members…** dialog (design §4.9 *Add or remove a member from the team card*,
+    TD-163): the definition as the file holds it, the session holding each entry, Add member and Remove."""
+    def row(role, name, lane, count, holder, state, removable=True, note=""):
+        st = pill(state) if state else '<span class="muted">not live</span>'
+        rm = '<span class="btn sm ghost">Remove</span>' if removable else f'<span class="meta">{note}</span>'
+        cnt = f' · count {count}' if count else ""
+        return f'''<div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge">{role_icon(role)}{ROLE_LABEL.get(role, role.capitalize())}</span>
+  <span class="mono">{name}</span><span class="meta">lane {lane}{cnt}</span>
+  <span style="flex-grow: 1;"></span>
+  <span class="mono muted" style="font-size: 12px;">{holder}</span>{st}{rm}
+</div>'''
+    rows = "".join([
+        row("manager", "manager-ao-1", "—", 0, "ao-agentorc-manager-ao-1", "working", False, "the manager: a different definition, by hand"),
+        row("techlead", "techlead-ao-1", "—", 0, "seat", "oncall", False, "the seat: by hand"),
+        row("grinder", "grinder-ao", "free-pick", 2, "grinder-ao-1 · grinder-ao-2", "working"),
+        row("designer", "designer-ao-1", "design-first", 0, "ao-agentorc-designer-ao-1", "idle"),
+    ])
+    return head("Members") + f'''<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.agentorc/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div class="note">The definition as the file holds it, with the session holding each entry. <b>Add</b> edits one line of the file (a <span class="mono">count:</span> bumped, or one member line added) and, while the team runs, creates the member under the manager at once; <b>Remove</b> edits the line the same way and winds that one session down — never a kill — and its card stays until Forget. Comments in the file are kept: the edit is one line, never a rewrite.</div>
+    {rows}
+    <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-weight: 600;">Add member</span>
+      <span class="input" style="width: 150px;">grinder ▾</span>
+      <span class="input mono" style="width: 170px;">grinder-ao</span><span class="meta">→ grinder-ao-3</span>
+      <span class="input mono" style="width: 150px;">free-pick</span>
+      <span style="flex-grow: 1;"></span>
+      <span class="btn primary">Add and start</span>
+    </div>
+    <div class="note" style="color: #7c3d00;">{ICON["warn"]}Remove grinder-ao-2? Edits org.yml (count: 2 → 1) and winds down grinder-ao-2 — it finishes what it holds and exits; its card stays until Forget.</div>
+  </div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.agentorc.yml</span> shows no Members…: that file is a PR's.</div>
+</div>
+</div>
+''' + TAIL
+
 
 
 def resumable():
@@ -1566,6 +1715,9 @@ files = {
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
+    "Members.dc.html": members_dialog(),
+    "Help.dc.html": help_page(),
+    "Transcript.dc.html": transcript(),
     "Message.dc.html": message_dialogs(),
     "Commands.dc.html": commands(),
     "Inbox.dc.html": inbox(),
@@ -1595,6 +1747,9 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
+    ("Members.dc.html", "Members — the team card's dialog", 0),
+    ("Help.dc.html", "Help", 0),
+    ("Transcript.dc.html", "Transcript", 0),
     ("Message.dc.html", "Message — when it is read", 0),
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
@@ -1627,7 +1782,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 11 (2026-09-25, TD-157): screen 10, Help, and the i marks on the team card's header and the Focus header.\nRound 13 (2026-09-25, TD-160): New session gains the Team pick, with the reader it brings.\nRound 14 (2026-09-25, TD-161): prompt chips beside Send on Focus and beside the opening prompt on New session.\nRound 15 (2026-09-25, TD-162): the team header's who-for-what line and the composer's role line.\nRound 16 (2026-09-25, TD-163): Members… on the team card and its dialog.\nRound 17 (2026-09-25, TD-164): the copy-on-select toggle on the Focus header.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
