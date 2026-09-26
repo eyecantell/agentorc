@@ -485,3 +485,5 @@ For a §6 policy: nothing new beyond what's already carried forward — the long
 20:49  grinder-ao-1 resumed working on its own (TD-149, #592 independent review) — restarts list unchanged (no fresh restart entry), restart_wanted field still present but the session is active again. The stall appears to have cleared with the pause/resume cycle; leaving the board entry as the person's to close.
 20:50–20:54  quiet stretch: designer-ao-1 finished again (idle, out_of_work); grinder-ao-1 idle with the same stale restart_wanted, unchanged; techlead seat cycling on its own.
 20:54Z  grinder-ao-2: TD-167 done → PR #604 merged (the Help system). Cadence check pass (review SHIP, ci green, ledger named, worktree clean). No held paths.
+20:57  grinder-ao-1 resumed working again (still carrying the stale restart_wanted, board PR #593 already covers it).
+21:05Z  grinder-ao-2: TD-178 done → PR #606 merged (Org rollup overdue count). Cadence check pass (review SHIP, ci green, ledger named, worktree clean). No held paths.
