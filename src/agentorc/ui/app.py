@@ -2341,7 +2341,11 @@ def inbox_sections(
     out["answered"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))
-    return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"])}
+    # the Org rollup's *m overdue* beside *in the Inbox* (§4.5 screen 1, §4.5a *Org: rollup*, TD-178):
+    # the Needs you board items past their `Due:` date — a civil date, so read in this host's calendar
+    today = at.astimezone().date().isoformat()
+    overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and str(e.get("due") or "") < today)
+    return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue}
 
 
 # -- the rail (design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**; TD-129,
@@ -2925,7 +2929,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
         usage: dict[str, Any] = {}
-        person_needs = person_fyi = 0
+        person_needs = person_fyi = person_overdue = 0
         info: dict[str, Any] | None = None
         entries: list[dict[str, Any]] = []
         try:
@@ -2971,7 +2975,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 ),
                 boards=boards,
             )
-            person_needs, person_fyi = secs["count"], secs["fyi_n"]
+            person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]
         return templates.TemplateResponse(
             request,
             "org.html",
@@ -2987,6 +2991,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
                 "person_needs": person_needs,
+                "person_overdue": person_overdue,
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
                 "identity_note": identity_note(id_info),
@@ -3770,6 +3775,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "sections": {k: [] for k in INBOX_SECTIONS},
                 "needs": None,  # not zero: nothing is *known* to be waiting, which is not *nothing is*
                 "fyi_n": None,  # the same rule for the second number: not known is not zero
+                "overdue_n": None,  # …and the rollup's overdue count (TD-178)
                 "snoozed_n": 0,
                 "answered_marks": None,  # not known either: the team headers keep what they showed
                 "html": {},
@@ -3793,6 +3799,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # first is *what needs you*. The page opens the section by itself when this is higher than
         # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
         got["fyi_n"] = sections["fyi_n"]
+        got["overdue_n"] = sections["overdue_n"]  # the Org rollup's *m overdue* (TD-178)
         got["snoozed_n"] = len(sections["snoozed"])
         # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
         # time, and nothing it says — the browser counts those newer than it last opened the group

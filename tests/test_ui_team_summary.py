@@ -196,3 +196,24 @@ def test_every_card_carries_the_word_the_state_filter_matches():
     assert 'data-pill="working"' in html
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
     assert "/^state:/i" in js and "c.dataset.pill" in js
+
+
+def test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox():
+    """§4.5 screen 1 and §4.5a *Org: rollup* (TD-178): *n in the Inbox · m overdue* — the Needs you
+    board items whose `Due:` date has passed, never one due today; nothing overdue draws no count."""
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime(2026, 9, 26, 18, tzinfo=UTC)
+    today = now.astimezone().date()
+    boards = [
+        {"row": "board", "id": "b1", "due": (today - timedelta(days=3)).isoformat(), "text": "x", "at": ""},
+        {"row": "board", "id": "b2", "due": today.isoformat(), "text": "y", "at": ""},
+    ]
+    secs = ui.inbox_sections([], boards=boards, now=now)
+    assert secs["count"] == 2 and secs["overdue_n"] == 1
+    assert ui.inbox_sections([], boards=boards[1:], now=now)["overdue_n"] == 0
+    ro = {"agents": [], "n_agents": 0, "phases": [], "motion": 0, "prs_open": 0, "has_repo": False,
+          "answer_needed": 0, "answer_team": ""}  # fmt: skip
+    html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2, person_overdue=1)
+    assert "data-inbox-needs>2<" in html and "data-inbox-overdue>1</span> overdue" in html
+    assert 'class="meta overdue hidden"' in ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2)

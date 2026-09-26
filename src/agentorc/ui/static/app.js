@@ -588,6 +588,7 @@
       el.classList.toggle("hidden", !k);
     });
   }
+  let overdueN = null;  // the Needs you board items past their date, from the last poll (TD-178)
   AO.refreshInboxCount = async function () {
     let got;
     try {
@@ -605,6 +606,8 @@
     const fyi = $("#personfyi"), m = got.fyi_n || 0;
     if (fyi && got.fyi_n !== null && got.fyi_n !== undefined) { fyi.textContent = m ? `· ${m}` : ""; fyi.classList.toggle("hidden", !m); }
     if (Array.isArray(got.answered_marks)) { answeredMarks = got.answered_marks; syncAnsweredMarks(); }
+    // the Org rollup's *m overdue* (TD-178): `null` is not known, and the rollup keeps what it showed
+    if (typeof got.overdue_n === "number") { overdueN = got.overdue_n; if (typeof syncSummaries === "function") syncSummaries(); }
     return got;
   };
   if ($("#personneeds")) {
@@ -940,6 +943,9 @@
       $$(".seg[data-pick=win] button", ro).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === win ? "true" : "false"));
       const n = $("#personneeds"), into = $("[data-inbox-needs]", ro);
       if (n && into) into.textContent = n.textContent.trim() || "0";
+      // …and *m overdue* beside it (§4.5 screen 1, TD-178), from the last poll; unknown keeps what it showed
+      const od = $("[data-inbox-overdue]", ro);
+      if (od && overdueN !== null) { od.textContent = String(overdueN); od.parentElement.classList.toggle("hidden", !overdueN); }
     }
     $$(".tsum").forEach((sum) => {
       const st = summaryState(sum);
