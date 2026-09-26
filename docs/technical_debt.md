@@ -97,6 +97,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
+| TD-167 | Build the help: `help.py` as the one table, the *i* marks on the team card, the Focus header and the exited banner, the `title` tooltips from it, the Help page, the overlay's link, and the test that holds it to §4.5a | Medium | Open |
 
 
 ---

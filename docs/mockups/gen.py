@@ -534,7 +534,7 @@ def team_desktop():
         grid += (f'<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #cbd0d6; border-radius: 8px; '
                  f'padding: 10px 14px; background: #eceef1;" title="defined in {source}">'
                  f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>'
-                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}</div>')
+                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}<span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></div>')
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
