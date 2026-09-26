@@ -195,6 +195,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-137, grinder-ao-2): *Narrow* built — the chip row (**Filters ▾** with the number of picks, then the team chips, picked first) and the sheet. *Drawn twice from one list* became literal: the sheet does not redraw the rail's groups but takes the rail's own node into the `<dialog>` while it is open, and the chips are rendered by the script from the same counts; the stacked rail that stood in below 720 px since TD-135 is gone. *A mail row's text opens its page* waits for the page (TD-136).
 - 2026-09-25 (TD-154, the designer; raised by Paul, who resumed the designer to read what it had done): **screen 9, Transcript** — a read-only page of a session's conversation folded as the pane draws it, from the Focus header on any state and from each Resumable row, VS Code beside it for the raw file; resuming to read was the wrong tool three times over (a live session, a lifecycle event, a close). The raw-file-only option was rejected: one JSON object per line is not a reading surface. Build: TD-165 (the adapter's read, the RPC, the node read, the CLI), TD-166 (the page and the button).
 - 2026-09-25 (TD-157, the designer; raised by Paul at a concluded team's card — *what do "forget" and "start" really mean?*): **screen 10, Help** — every control's paragraph by screen, reached from the *i* marks and the `?` overlay; not a tab. Build: TD-167.
+- 2026-09-25 (TD-160, the designer; Paul: *I should start having interactive sessions on the team itself*): the New session form's **Team** pick (screen 3).
 
 ## 4.5a Controls
 
@@ -280,6 +281,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-150 slice 3, grinder-ao-1): the Reports panel's last two pieces — a person's drop of a declared claim files the session a `system` note (`wake="person"`), worded *dropped by the person* without *from Focus*, since `rpc_progress` cannot tell Focus from a person's `ao progress drop`; and the branch's PR as `review_pr` beside the claim (§4.8). The design's *the trail row of a drop names the reference and its PR* was struck: no drop has an open PR once slice 2 refuses one.
 - 2026-09-25 (TD-154, the designer): **Transcript** on the Focus header and on each Resumable row; the Transcript page's three controls — *earlier turns*, the folds, VS Code.
 - 2026-09-25 (TD-157, the designer): the ***i*** mark on the team card's header, the Focus header and the exited banner — the Inbox's shape, one paragraph per control of the group — and **The help text**, the list under the table that is the one source of what the marks, the `title` tooltips and the Help page say, held equal to `help.py` by a test. Chosen over a fourth *help* column (the rows are a specification, the paragraphs are for the person) and over the confirm's first line alone (a confirm comes after the press). Paul's (f) — should a named member be forgettable? — answered: Forget drops a run's record, never the seat; the definition names the seat and Start fills it again, so a member's Forget stays and an on-call seat's absence stays.
+- 2026-09-25 (TD-160, the designer): the New session **Team** picker; Wind down's and Stop now's confirm name a person's session apart; live / stopped / concluded / wound down read over unattended sessions only.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
@@ -330,6 +332,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-136 slice 1, grinder-ao-1): the `thread` read and `ao inbox --thread` built. *Oldest first* became a merge of each mailbox's own order with the reply and settle links, because `at` is whole seconds and the test's reply and its next question landed in one — a sort on `at` and id put them in either order.
 - 2026-09-25 (TD-168, grinder-ao-1): `ao msg`'s *when it is read* built — the reply's last lines, `<id>: <sentence>`, one per addressee named (copies not), `read_when` under `--json`; the skill's `ao msg` line says so.
 - 2026-09-25 (TD-154, the designer): `ao transcript <id> [-n N] [--before OFFSET] [--raw]`, a read-only verb beside `tail` and `explain`.
+- 2026-09-25 (TD-160, the designer): `ao new --team` documented as the terminal's form of the Team pick — the badge, the group, the manager, the team's reader.
 
 ## 4.8 Capabilities, report channels, and role presets
 
@@ -404,6 +407,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22 (TD-107): `lead:` stopped being read; it is an unknown key.
 - TD-041: interactive members out of a manager's reach became a gate (§9 invariant 5), so the start reports it per member.
 - 2026-09-22 (TD-113 (a), grinder-ao-2): `{manager}` added beside `{techlead}`, so a member's `done` line names its manager's id instead of telling it to read `under:` off its own record; the same night the manager preset's crash-restart rule gave way to the tick's (TD-113 (0), §6 rule 1).
+- 2026-09-25 (TD-160, the designer): **A person in the team** — the reader comes from the team (techlead, held = the union of the member roles' held lists) when the role carries none, so no `org.yml` role edit is needed to get a grinder's safety net; a team is live over its unattended sessions only; team acts leave a person's session alone and say so. Rejected: a `person` role preset carrying `review:` (a role a person must remember to pick, and `held:` that would have to be written per repo again).
 
 ## 4.9a Winding down: a team that runs out of work
 
@@ -434,6 +438,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-093): the reader designed; asked for by Paul the same day — *a configuration to require "techlead merges"* — and the shape (a `review:` key of the role preset; `reader`, `held`, `bound`; who merges by the asker's mode) is his. His requirement: a person's own interactive session inside a team gets the same reader a grinder does, *a safety net for when I am not intimately familiar with an architecture*.
 - 2026-09-22 (TD-098 step 1): `seats:` read by the loader (`trigger` required; `{prs: <n>}` a whole number from 1; `{every: …}` in `m`, `h`, `d`; role never `person`, `manager` or `techlead`), `ao team start` starting each seat after the techlead with the manager as controller and no grants, `teamrun.seat_names`, and `ao team list --json` carrying `trigger` and `after`. Step 3 the same day: the `auditor` preset and its built-in brief. Step 2 (the manager's fill rule) was not built.
 - 2026-09-23 (TD-093 slice 1, grinder-ao-1): *The reader*'s fields were built: `review` on a role preset and the record, `pr` on an `ask`, and `prs_waiting` on the view. Two choices the design had left open were made in the build. `review` is checked by one function (`models.normalize_review`) that the config loader and the host agent both apply, so a typo in a repo's `.agentorc.yml` is refused when the file is read, and one in `org.yml`'s `roles:` when the role is resolved, not at the first held PR. The New session page carries the preset's `review` into its create as `ao new --role` does. A seat on a node reads `prs_waiting` as null, since its inbox is the home's, as `asks_waiting` is.
+- 2026-09-25 (TD-160, the designer): the person's-own-session sentence names the form's Team field and the team's default reader.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
