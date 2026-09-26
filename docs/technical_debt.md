@@ -96,11 +96,11 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
-| TD-179 | Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for `/tmp/…/fixture2/consumer` and `fixture3/consumer` | Low | Partly done — the roster cleaned 2026-09-26; left: tell dev-cadence about the leak |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first |
 | TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Open — design-first, Paul set the shape: the same summary as a running team |
 | TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Open — design-first, a small row change then the build |
 | TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
+| TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 
 
 ---
@@ -1787,22 +1787,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-176, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
 
-## TD-179: Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for them
-
-**Priority:** Low
-**Added:** 2026-09-26 (found at the promote of #600: `~/.agentorc/repos.json` named them beside the real repos)
-**Owner:** anchor
-**Kind:** build
-**Pickable:** no — what is left is a word to dev-cadence, which is the anchor's to send, and an optional reader change
-**Status:** Partly done — (1) done 2026-09-26: Paul removed the two fixture lines from the roster, and on the next tick the host agent dropped them from `repos.json`, which now lists the six real repos. Left: (2) the note to dev-cadence, and (3) optional.
-**Location:** `~/.config/dev-cadence/repos.txt` (the `repos_registry` default, `src/sessionorc/hosts.py`); `Agent._refresh_repos` in `src/sessionorc/agent.py`
-
-**Why:** the host's repos registry is dev-cadence's machine roster, and it ends with `/tmp/tmp.4dWahA9hY9/fixture2/consumer` and `/tmp/tmp.4dWahA9hY9/fixture3/consumer`, written 2026-09-23 00:29 (the file's mtime). The temp dir holds a copy of dev-cadence (`c/`) beside the two fixtures, each a `consumer` checkout with a `src.git` origin: a sync run under a temp root that wrote to the real roster because `DEV_CADENCE_REG_DIR` / `XDG_CONFIG_HOME` were not pointed at the temp dir. No checked-in dev-cadence test names `fixture2`, so it was likely an ad-hoc run by a session that night. Since TD-176 slice 1 (#595) the host agent reads PRs and the ledger for every roster line, so it now runs `gh` in those fixtures every five minutes, keeps their readings in `repos.json`, and `_board_root` accepts their boards as boards of a known repo. Once `/tmp` is cleaned, the registry still lists them as checkouts that fail every read.
-
-**Fix:** (1) delete the two lines from `~/.config/dev-cadence/repos.txt`; the next tick drops them from `repos.json` with `repo: null`. (2) Tell dev-cadence (its board or `ao msg` to its lead) that a sync run under a temp root can write the real roster, so a test or ad-hoc run must set `DEV_CADENCE_REG_DIR`; `sync.sh` could also refuse a roster write for a consumer under `$TMPDIR` unless the roster is under it too. (3) Optional here: have the reader skip, and log once, a roster line that is not a directory, so a stale line reads as *gone* rather than *could not look* on every tick. Done when the roster and `repos.json` list only the real repos.
-
-**Related:** TD-176 (the repo facts), design §4.4 *Repo facts*; `docs/claude-memory/scratch-worktree-tests-import-main-checkout.md` (the same pattern: test state reaching the live machine).
-
 ## TD-180: Add a TD from the UI — the person types a line, an agent asks what it needs and writes the entry
 
 **Priority:** Medium
@@ -1869,3 +1853,19 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** design: which area is the press target (the team header row, not the member cards or the summary, whose own links and buttons must keep working); whether a live team can fold now and what its folded row shows (the one-row form plus its marks: needs-you, PRs waiting, answered for you, so a folded live team still flags what needs the person); whether a needs-you member unfolds it or only rings the row; that the fold stays per browser, keyed per team, with the default open for live teams and folded for teams with nothing live; and the keyboard (§4.5a *Org: keys*). Then update §4.5a's *the fold* and **team groups** rows and build it. Done when a click on a team's header folds and unfolds it, live or not, and the choice survives a reload.
 
 **Related:** TD-181 (what an unfolded team shows), design §4.5 screen 1, §4.5a **team groups**, *the fold*, *Org: keys*.
+
+## TD-185: Export `AGENT_NAME` into every session at launch, for dev-cadence's co-author hook
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul: *include the name of the agent, e.g. grinder-ao-1, as a coauthor for PRs*; the git hook chosen over Claude Code's `attribution` setting because it is generic, and the plan is to go beyond Claude: Codex, on-prem models)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (the launch env: `env = {**spec.env, "AGENTORC_SESSION": sid, "AGENTORC_HOME": …}`), design §4.3 / §4.4 where the session's environment is named
+
+**Why:** dev-cadence's TD-067 (filed 2026-09-26, dev-cadence PR #161) adds a `prepare-commit-msg` hook that appends `Co-Authored-By: <AGENT_NAME> <AGENT_NAME@<domain>>` to a normal commit when `AGENT_NAME` is set. The domain comes from git config `cadence.agentDomain`, then `AGENT_DOMAIN` in the environment, then the default `shiftlead.placeholder`. The hook adds nothing when `AGENT_NAME` is unset. agentorc sets only `AGENTORC_SESSION`, which is the tmux id (`ao-agentorc-grinder-ao-1`), not the short name the Org shows (`grinder-ao-1`), so the hook has nothing to read. The two sides agreed on the name `AGENT_NAME` (the dev-cadence anchor, 2026-09-26).
+
+**Fix:** the host agent exports `AGENT_NAME=<the session's name>` beside `AGENTORC_SESSION` for every session it starts, whatever the adapter. The export sits in the tool-neutral launch path, so a Codex or shell session gets it too. For a session started without a name it is left unset, not faked. Add one sentence to the design where the launch environment is described. Done when a commit made in a team member's worktree, with dev-cadence's hook synced, carries `Co-Authored-By: grinder-ao-1 <grinder-ao-1@shiftlead.placeholder>`, and a test checks the env on a named and an unnamed launch. A squash merge keeps the trailer as long as the merge writes no body of its own (cadence's `gh pr merge <n> --squash` writes none).
+
+**Related:** dev-cadence TD-067 (the hook) and TD-068 (the roster guard, from TD-179); design §4.3 (adapters: the export is not the adapter's), §4.8 (the session's name).

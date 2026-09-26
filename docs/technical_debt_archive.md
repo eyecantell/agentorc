@@ -1782,3 +1782,18 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Related:** ADR 2026-09-25 §5 (definition versus setting), TD-146–148 (the Settings page), §4.5a *Org: team card*, §4.9, TD-157 (Forget on a defined member — the same question from the other side), TD-160 (a person as a member).
 
 **Resolved:** 2026-09-26 — built by TD-172 (PR #608); design §4.9 and the §4.5a *Members* rows carry the lasting content.
+
+## TD-179: Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for them
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the promote of #600: `~/.agentorc/repos.json` named them beside the real repos)
+**Owner:** anchor
+**Kind:** build
+**Status:** Resolved 2026-09-26.
+**Location:** `~/.config/dev-cadence/repos.txt` (the `repos_registry` default, `src/sessionorc/hosts.py`); `Agent._refresh_repos` in `src/sessionorc/agent.py`
+
+**Why:** the host's repos registry is dev-cadence's machine roster, and it ends with `/tmp/tmp.4dWahA9hY9/fixture2/consumer` and `/tmp/tmp.4dWahA9hY9/fixture3/consumer`, written 2026-09-23 00:29 (the file's mtime). The temp dir holds a copy of dev-cadence (`c/`) beside the two fixtures, each a `consumer` checkout with a `src.git` origin: a sync run under a temp root that wrote to the real roster because `DEV_CADENCE_REG_DIR` / `XDG_CONFIG_HOME` were not pointed at the temp dir. No checked-in dev-cadence test names `fixture2`, so it was likely an ad-hoc run by a session that night. Since TD-176 slice 1 (#595) the host agent reads PRs and the ledger for every roster line, so it now runs `gh` in those fixtures every five minutes, keeps their readings in `repos.json`, and `_board_root` accepts their boards as boards of a known repo. Once `/tmp` is cleaned, the registry still lists them as checkouts that fail every read.
+
+**Related:** TD-176 (the repo facts), design §4.4 *Repo facts*; `docs/claude-memory/scratch-worktree-tests-import-main-checkout.md` (the same pattern: test state reaching the live machine).
+
+**Resolved:** 2026-09-26 (PR #612 recorded the cleanup): Paul removed the two fixture lines from the roster and the host agent dropped them from `repos.json`. The leak went to dev-cadence as its TD-068 (dev-cadence PR #161): `sync.sh` refuses to add a consumer under a temp dir to a roster outside one, and the readers skip a roster path that no longer exists. That covers step (3) from the source side, so agentorc's reader keeps its current behaviour.
