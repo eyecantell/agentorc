@@ -98,6 +98,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-179 | Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for `/tmp/…/fixture2/consumer` and `fixture3/consumer` | Low | Open — the anchor removes two lines; the leak is dev-cadence's |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first |
+| TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Open — design-first, Paul set the shape: the same summary as a running team |
+| TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Open — design-first, a small row change then the build |
+| TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
 
 
 ---
@@ -1818,3 +1821,51 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the design has the door, the drafter, the question channel and the landing path in §4.5a and the relevant sections. The build is a separate TD.
 
 **Related:** design §4.5 screen 11 (the Repo page) and §4.5a **Open ledger**; §4.5 screen 1 (the *add* phase, the hunter); §4.10 (`ask`); §4.4 (the board write-back's **add**, the one precedent for the UI writing a repo file); §4.5a **Put on the board** (a UI form that writes a repo file); TD-126 (a reply back from the board); TD-160 (the hunter role named as *later*).
+
+## TD-181: An unfolded team with nothing live shows its member cards but no summary
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul, at the dc-grind card after its wind-down: *the unfolded card should show the same info as the running team — some items will become stale and that's ok*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open — Paul set the shape; the design rows and the build remain.
+**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`), `src/agentorc/ui/templates/team_summary.html`, `org.html`
+
+**Why:** the team summary (TD-176 slice 3) is built only for a team with a live member. When dc-grind wound down on 2026-09-26 all three sessions exited. The card folded to one row as §4.5 screen 1 says, and pressing *3 sessions* unfolded the member cards with no summary: no TD or PR bars, no TDs in motion, no Doing. samscrape-grind, concluded but with idle members, kept its summary right below. The repo facts don't depend on anyone being live, and a wound-down team is when the person most wants to see what it left behind. Because the summary wasn't there, a merged PR on the grinder's report line read as outstanding (TD-182).
+
+**Fix:** design: §4.5 screen 1 (*a team with nothing live, or concluded, is one row*) and §4.5a's **team card: summary** row say that unfolding such a team draws the same summary a running team's card does: the Repo facet (live readings), TDs in motion from the members' last records, and Answer needed / Doing from the doing log. Anything read from an exited record may be stale, and that's accepted. The folded one-row form is unchanged. Build: drop the `live` condition from the summary (keep it off *No team*), and keep the members' full cards or switch to the compact ones as a live team does. Done when an unfolded wound-down team shows the three facets, and a test covers a team whose members have all exited.
+
+**Related:** TD-176 (archived), TD-182, TD-183, design §4.5 screen 1, §4.5a **team card: summary**, **team groups**, *the fold*.
+
+## TD-182: A card's report line keeps a merged PR as `TD-066 → #158` with no mark
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the dc-grind wind-down: Paul read the grinder's card as *they have a PR outstanding*; #158 had merged at 17:00 UTC)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/models.py` (`report_line`), the card's report line in `src/agentorc/ui/templates/card.html`; the PR states are in the repo facts (`repos.json`, TD-176 slice 1)
+
+**Why:** §4.5a's **card: report line** row draws `TD-027 → PR #59 · 1/2 done` from the record alone. TDs in motion marks a PR *merged* / *closed* once it is no longer open (§4.5a, TD-176). The member card doesn't, so an exited grinder's last report reads as work in flight. The same line is in `ao status -v` and the Members list.
+
+**Fix:** design: the report line marks its PR *merged* or *closed* the way TDs in motion does, reading the same repo facts. The PR number stays; a PR the readings don't cover is left unmarked, never guessed. Decide whether `ao status -v` shows the mark too (the host agent holds the readings, so it can). Build it, with a test for an open, a merged and an unknown PR. Done when the dc-grind grinder's card would read `TD-066 → #158 merged`.
+
+**Related:** TD-181 (the summary would have shown it), TD-176, TD-095 (the card's anatomy), design §4.5a **card: report line**, **TDs in motion**.
+
+## TD-183: Clicking the team card collapses or expands it
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul: *have the team cards themselves be clickable to expand or collapse them*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open — nothing designed.
+**Location:** `src/agentorc/ui/static/app.js` (`syncTeams`, the fold keyed `fold:<team>`), `src/agentorc/ui/templates/group_head.html`
+
+**Why:** the only fold today is the *n sessions* button (§4.5a *the fold*), and `syncTeams` folds only a team with nothing live: *a live team never folds*. A page with several running teams can't be tidied, and the fold is a small button when the whole header is the natural target.
+
+**Fix:** design: which area is the press target (the team header row, not the member cards or the summary, whose own links and buttons must keep working); whether a live team can fold now and what its folded row shows (the one-row form plus its marks: needs-you, PRs waiting, answered for you, so a folded live team still flags what needs the person); whether a needs-you member unfolds it or only rings the row; that the fold stays per browser, keyed per team, with the default open for live teams and folded for teams with nothing live; and the keyboard (§4.5a *Org: keys*). Then update §4.5a's *the fold* and **team groups** rows and build it. Done when a click on a team's header folds and unfolds it, live or not, and the choice survives a reload.
+
+**Related:** TD-181 (what an unfolded team shows), design §4.5 screen 1, §4.5a **team groups**, *the fold*, *Org: keys*.
