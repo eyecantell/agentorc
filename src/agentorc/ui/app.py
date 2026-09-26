@@ -2344,7 +2344,7 @@ def inbox_sections(
     # the Org rollup's *m overdue* beside *in the Inbox* (§4.5 screen 1, §4.5a *Org: rollup*, TD-178):
     # the Needs you board items past their `Due:` date — a civil date, so read in this host's calendar
     today = at.astimezone().date().isoformat()
-    overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and str(e.get("due") or "") < today)
+    overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue}
 
 
