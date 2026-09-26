@@ -1700,3 +1700,44 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Related:** §4.5a **Message**, §4.8, §4.9, §4.9b, TD-157, TD-158, TD-160 (the person in the team who needs this most).
 
 **Resolved:** 2026-09-26 — built by TD-171 (PR #605); design §4.8 *A role says when to message it* carries the lasting content.
+
+## TD-170: Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-161's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-26. Was: Open — nothing built. Design §4.8 *A role has saved prompts*, §5 `roles:`, §4.5a *Focus composer* **prompt chips** and *New session* **prompt chips**, §4.5 *Phone layout*; mockups `Focus.dc.html`, `NewSession.dc.html`.
+
+**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `prompts`; the shape check — a list of `{label, text}`, label one line ≤ 24 characters, text non-empty; `resolve_role`'s layering, the key replaced whole), `src/agentorc/cli.py` (`ao roles`: the labels per role), `src/agentorc/ui/app.py` (`/api/roles` carries `prompts`; the Focus route puts the record's role's list on the page), `src/agentorc/ui/templates/focus.html` (the chips in the composer's button row, before Attach), `new.html` (a row before Opening prompt), `src/agentorc/ui/static/app.js` (a chip press → the Send path with the text; Shift → fill and focus; the role pick rebuilds New session's chips), `app.css` (the wrapping row in narrow mode).
+
+**Why:** TD-161's *Why*: the browser and the phone have no keyboard worth typing a prompt into; the prompts a person repeats are a list in a file.
+
+**Resolved:** 2026-09-26 (PR #607, `grinder-ao-2`) — `prompts` in `repoconfig` (`_prompts`, whole-list layering), `ao roles`, `/api/roles`, `role_prompts` and the Focus chips beside Send, New session's chips filling the Opening prompt. Design §4.8 *A role has saved prompts* carries the lasting content.
+
+**Done when** TD-161's *Done when*: Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
+
+**Related:** TD-161 (the design), TD-160 / TD-169 (the person's session the chips are for), TD-027 (send's confirmation), TD-096 (the composer closed on an unattended session), TD-003 (the phone's narrow Focus), TD-157 / TD-167 (the chip's `title` as its mark).
+
+## TD-161: Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *lets talk about adding on-demand buttons for interactive sessions and what that might look like*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-170
+
+**Status:** Resolved 2026-09-26. Was: Designed 2026-09-25 (the designer): design §4.8 *A role has saved prompts* (`prompts:` — `{label, text}`, layered as every key is, replaced whole per layer, verbatim text, no substitution), §5 (the `roles:` example's `plain: {prompts: …}`), §4.5a *Focus composer* **prompt chips** (a press is a Send of the text, reading as Send reads; Shift+press fills the composer) and *New session* **prompt chips** (a press fills the Opening prompt), §4.5 *Phone layout* (the chips' row above the composer); mockups `Focus.dc.html` and `NewSession.dc.html`. Settled: (a) the text lives on the preset, in `org.yml` or the repo's `.agentorc.yml`, nowhere else; (b) chips beside Send, interactive sessions only, a press sends; (c) the same list fills the opening prompt on New session; (d) a chip is a Send and nothing more. The design is PR #568; the press-sends-against-press-fills choice went to Paul as a steer, and #568 merges at its bound (12 h from 2026-09-25 19:55 MDT) unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-170; this entry archives with it. **What was:** nothing designed.
+
+**Location:** design §4.5a *Focus composer* (**Send**, **Attach**), §4.5a *Inbox row: state* (*Reopen and push* — the precedent: a first prompt the page wrote, fixed text in the source, never anything a session said), §4.8 role presets, §5 (`roles:` in `.agentorc.yml` and `org.yml`), §4.5 screen 5 (Commands — the button that runs a script, phase 4, TD-123); `src/agentorc/ui/templates/focus.html` (the composer), `src/agentorc/ui/static/app.js`.
+
+**Why:** the design has two on-demand buttons: a Commands button runs a script as a `kind: command` session, and a role preset starts a session shaped for a job. Neither presses a prompt into a running interactive session. What a person types by hand into their own session, again and again — *review PR n*, *sweep stranded work*, `/cadence`, *what is waiting on me* — is a saved prompt, and the rule for one already exists in *Reopen and push*: fixed text from the source, typed by the page, never something a session said. Claude Code's own slash commands cover the case at the keyboard; the button's worth is the browser and the phone, where a person steers a session without a keyboard to type into.
+
+**What the design round has to settle:** (a) **where the text lives** — a `prompts:` list on the role preset (org and repo `roles:`, layered as presets are), each `{label, text}`, so a grinder's chips differ from a plain session's; (b) **the surface** — chips beside Send on the Focus composer, drawn only on an interactive session (an unattended session's composer is closed, TD-096), each press filling the composer or sending outright, and whether the chip reads **Steer** while a turn is in flight as Send does; (c) **on New session** — the same list offered as the first prompt, beside the brief the preset fills; (d) **bounds** — a chip is a Send and nothing more: no grant, no schedule, no state on the record; (e) the §4.5a rows and the mockup.
+
+**Done when** Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
+
+**Related:** §4.5a *Focus composer*, *Inbox row: state* (Reopen and push), §4.8, TD-123 (Commands, the other button), TD-160 (the session the chips are for), TD-157 (an *i* mark per chip is the same mechanism).
+
+**Resolved:** 2026-09-26 — built by TD-170 (PR #607); design §4.8 *A role has saved prompts* carries the lasting content.

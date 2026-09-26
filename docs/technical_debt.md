@@ -89,14 +89,12 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
-| TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Designed 2026-09-25 (the designer) — the build is TD-170; archives with it |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Designed 2026-09-25 (the designer) — the build is TD-172; archives with it |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Designed 2026-09-25 (the designer) — the build is TD-174; archives with it |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
-| TD-170 | Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles` | Medium | Open |
 | TD-172 | Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back* | Medium | Open |
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
@@ -1640,26 +1638,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** §4.9b (the reader, TD-075), §4.5a *New session*, §4.9 (team definitions), ADR 2026-09-24 (cloud sessions cannot join), TD-162 (who a person in the team messages), TD-161 (the prompts they press).
 
-## TD-161: Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today
-
-**Priority:** Medium
-**Added:** 2026-09-25 (raised by Paul: *lets talk about adding on-demand buttons for interactive sessions and what that might look like*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-170
-
-**Status:** Designed 2026-09-25 (the designer): design §4.8 *A role has saved prompts* (`prompts:` — `{label, text}`, layered as every key is, replaced whole per layer, verbatim text, no substitution), §5 (the `roles:` example's `plain: {prompts: …}`), §4.5a *Focus composer* **prompt chips** (a press is a Send of the text, reading as Send reads; Shift+press fills the composer) and *New session* **prompt chips** (a press fills the Opening prompt), §4.5 *Phone layout* (the chips' row above the composer); mockups `Focus.dc.html` and `NewSession.dc.html`. Settled: (a) the text lives on the preset, in `org.yml` or the repo's `.agentorc.yml`, nowhere else; (b) chips beside Send, interactive sessions only, a press sends; (c) the same list fills the opening prompt on New session; (d) a chip is a Send and nothing more. The design is PR #568; the press-sends-against-press-fills choice went to Paul as a steer, and #568 merges at its bound (12 h from 2026-09-25 19:55 MDT) unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-170; this entry archives with it. **What was:** nothing designed.
-
-**Location:** design §4.5a *Focus composer* (**Send**, **Attach**), §4.5a *Inbox row: state* (*Reopen and push* — the precedent: a first prompt the page wrote, fixed text in the source, never anything a session said), §4.8 role presets, §5 (`roles:` in `.agentorc.yml` and `org.yml`), §4.5 screen 5 (Commands — the button that runs a script, phase 4, TD-123); `src/agentorc/ui/templates/focus.html` (the composer), `src/agentorc/ui/static/app.js`.
-
-**Why:** the design has two on-demand buttons: a Commands button runs a script as a `kind: command` session, and a role preset starts a session shaped for a job. Neither presses a prompt into a running interactive session. What a person types by hand into their own session, again and again — *review PR n*, *sweep stranded work*, `/cadence`, *what is waiting on me* — is a saved prompt, and the rule for one already exists in *Reopen and push*: fixed text from the source, typed by the page, never something a session said. Claude Code's own slash commands cover the case at the keyboard; the button's worth is the browser and the phone, where a person steers a session without a keyboard to type into.
-
-**What the design round has to settle:** (a) **where the text lives** — a `prompts:` list on the role preset (org and repo `roles:`, layered as presets are), each `{label, text}`, so a grinder's chips differ from a plain session's; (b) **the surface** — chips beside Send on the Focus composer, drawn only on an interactive session (an unattended session's composer is closed, TD-096), each press filling the composer or sending outright, and whether the chip reads **Steer** while a turn is in flight as Send does; (c) **on New session** — the same list offered as the first prompt, beside the brief the preset fills; (d) **bounds** — a chip is a Send and nothing more: no grant, no schedule, no state on the record; (e) the §4.5a rows and the mockup.
-
-**Done when** Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
-
-**Related:** §4.5a *Focus composer*, *Inbox row: state* (Reopen and push), §4.8, TD-123 (Commands, the other button), TD-160 (the session the chips are for), TD-157 (an *i* mark per chip is the same mechanism).
-
 ## TD-163: Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it
 
 **Priority:** Medium
@@ -1744,30 +1722,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** Paul can read the designer's last run from its exited card without a session starting (TD-154's *Done when*), and a live grinder's page shows its last twenty turns while the card still reads `working`.
 
 **Related:** TD-154 (the design), TD-165 (the RPC), TD-095 (the editor button), TD-071 (nothing on a page is a control from what a session wrote), TD-046 (a new tab beside Focus).
-
-## TD-170: Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles`
-
-**Priority:** Medium
-**Added:** 2026-09-25 (the designer, from TD-161's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.8 *A role has saved prompts*, §5 `roles:`, §4.5a *Focus composer* **prompt chips** and *New session* **prompt chips**, §4.5 *Phone layout*; mockups `Focus.dc.html`, `NewSession.dc.html`.
-
-**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `prompts`; the shape check — a list of `{label, text}`, label one line ≤ 24 characters, text non-empty; `resolve_role`'s layering, the key replaced whole), `src/agentorc/cli.py` (`ao roles`: the labels per role), `src/agentorc/ui/app.py` (`/api/roles` carries `prompts`; the Focus route puts the record's role's list on the page), `src/agentorc/ui/templates/focus.html` (the chips in the composer's button row, before Attach), `new.html` (a row before Opening prompt), `src/agentorc/ui/static/app.js` (a chip press → the Send path with the text; Shift → fill and focus; the role pick rebuilds New session's chips), `app.css` (the wrapping row in narrow mode).
-
-**Why:** TD-161's *Why*: the browser and the phone have no keyboard worth typing a prompt into; the prompts a person repeats are a list in a file.
-
-**Fix:**
-1. **The key**: `prompts` in `ROLE_KEYS`, validated when the file is read (an error naming the role and the entry, as every preset error is), layered as `label:` is, replaced whole per layer.
-2. **`/api/roles`** and the Focus page carry the list; `ao roles` prints `prompts: review PR, sweep, waiting on me` per role.
-3. **Focus**: the chips in the composer's row, drawn only when the composer is open and the list is non-empty; a press calls the same `send` the Send button calls, with the chip's text, and takes the same confirmation and refusals; Shift+press writes the text into `#compose` and focuses it. The chip's `title` is the text. Narrow mode: the row wraps above the composer.
-4. **New session**: the chips beside Opening prompt from the picked role, rebuilt on the Role pick; a press sets the field's value.
-5. **Tests:** the shape check (a bad label, a missing text, a non-list); layering (repo replaces org); `/api/roles` carries them; the Focus page draws them for an interactive record with a role that has them and not for one without, nor for an unattended record; the send path under node as `test_ui_keys.py` runs `app.js`; `ao roles` output.
-
-**Done when** TD-161's *Done when*: Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
-
-**Related:** TD-161 (the design), TD-160 / TD-169 (the person's session the chips are for), TD-027 (send's confirmation), TD-096 (the composer closed on an unattended session), TD-003 (the phone's narrow Focus), TD-157 / TD-167 (the chip's `title` as its mark).
 
 ## TD-172: Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back*
 
