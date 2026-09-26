@@ -71,6 +71,12 @@ def repos_file() -> Path:
     return home() / "repos.json"
 
 
+def doing_log_file() -> Path:
+    """The home's doing log (design §4.8 *the doing log*, TD-176 slice 2): every `ao doing` call of a
+    team's sessions, one JSON line each, the last fifty per team kept when it is compacted."""
+    return home() / "doing.jsonl"
+
+
 def socket_path() -> Path:
     return home() / "agent.sock"
 

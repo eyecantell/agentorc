@@ -46,6 +46,7 @@ READS = frozenset(
         "recent_dirs",
         "usage",
         "repos",
+        "doing_log",
         "gate",
         "adapters",
         "ping",

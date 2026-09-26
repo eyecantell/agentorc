@@ -591,8 +591,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Create / kill / send / resume sessions (the only writer).
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
-- **Repo facts** (§4.5 screens 1 and 11, TD-176; the readings built by slice 1, the doing log and
-  the page not yet): for every checkout the registry lists, at the
+- **Repo facts** (§4.5 screens 1 and 11, TD-176; the readings built by slice 1, the doing log by
+  slice 2, the page not yet): for every checkout the registry lists, at the
   home, readings kept in `repos.json` beside `usage.json`, served by the `repos` RPC and pushed as
   a `repos` event when any changes (`repo: null` for a checkout the registry dropped; a node
   forwards the RPC and refuses it offline, §4.4a), the shape `usage` has. **Pull requests**: two
@@ -626,8 +626,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   done or dropped — a stale claim is the member's to clear, and the manager's cadence check
   (`briefs/manager.md`, *A round*) is what chases it. **The doing log** (§4.8): beside the record's
   one `doing` value, the host agent appends every `doing` call to a bounded log per team, the
-  last fifty, kept in memory and in `doing.jsonl`, served by the `doing` RPC and pushed as a
-  `doing` event — the feed a team card and the Repo page draw. Board counts are not here: the UI
+  last fifty, kept in memory and in `doing.jsonl`, served by the `doing_log` RPC (the `doing` RPC
+  is the write) and pushed as a `doing` event — the feed a team card and the Repo page draw. Board counts are not here: the UI
   has them from the board reader it already runs for the Inbox (`board_items`, per team). A node
   reads none of this — its checkouts are at the same absolute paths at the home (§4.4a), where
   the reads run.
@@ -929,7 +929,7 @@ the home instead (*Mail across hosts*).
 | `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below; not built — TD-147: today the row reads *served, link or no link*) | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
 | reports — `progress`, `finding`, `doing` | — | **refused** |
-| the readings — `repos`, the doing log's read (`ao repo`, TD-176) | **forwarded** while the link is up, refused offline: the readings are taken at the home (§4.4 *Repo facts*) and a node holds none | the same |
+| the readings — `repos`, the doing log's read `doing_log` (`ao repo`, TD-176) | **forwarded** while the link is up, refused offline: the readings are taken at the home (§4.4 *Repo facts*) and a node holds none | the same |
 
 **Reports are refused, not kept locally.** They are home-owned, so a claim written to the replica
 would be overwritten by the home's copy on reconnect; and a claim is a lease checked against every
@@ -2771,10 +2771,11 @@ repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references,
 **Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists:
 
-- **The doing log** (TD-176; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
+- **The doing log** (TD-176, built by slice 2 but for the manager's brief, slice 6; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
   the team — time, doer, what they are doing*): `doing` on the record stays a value, the latest
   line; the host agent also keeps, per team, the last fifty `doing` calls with their time and
-  caller (§4.4 *Repo facts*), which is what the team card's **Doing** facet and the Repo page's
+  caller (§4.4 *Repo facts*; a session with no `team` badge is in no team's log, and `--clear` is
+  not a call), which is what the team card's **Doing** facet and the Repo page's
   **Doing** section draw. Nothing reads the log but a page and `ao repo`; no wake, no policy.
   So that the feed says what a team is doing and not only what its grinders are, **the manager
   says its round too**: its brief asks for one `ao doing` at the start of each round step
