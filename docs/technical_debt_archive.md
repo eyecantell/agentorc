@@ -1659,3 +1659,44 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-26 (PR #606, `grinder-ao-2`) — `overdue_n` from `inbox_sections`, the rollup's *m overdue* in `rollup.html`, kept live from the Inbox poll in `app.js`; `test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox`. Design §4.5a *Org: rollup* carries the lasting content.
 
 **Related:** TD-176 (archived), design §4.5 screen 1 *The Org, team-first*, §4.5a **Org: rollup**.
+
+## TD-171: Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-162's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-26. Was: Open — nothing built. Design §4.8 *A role says when to message it*, §4.5a **Message** (the composer's first line, the `title`) and *team groups* (**who for what**); mockups `Main.dc.html`, `Message.dc.html`.
+
+**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `message`; the built-in presets' defaults beside their `label:`; the length check as `label:`'s), `src/agentorc/cli.py` (`ao roles` prints it), `src/agentorc/ui/app.py` (the record's view carries `message_line` resolved from its role; `team_groups` builds the header's line from the definition's roles and the sessions holding them), `src/agentorc/ui/templates/base.html` (`#mailbox`: a line under `#mailtitle`), `card.html` / `focus.html` (the Message control's `title`), `group_head.html` (the second line), `src/agentorc/ui/static/app.js` (`AO.compose` takes the line).
+
+**Why:** TD-162's *Why*: six Message buttons and no reason to pick one; the wrong pick costs a wake and a round of passing up.
+
+**Resolved:** 2026-09-26 (PR #605, `grinder-ao-2`) — `message:` in `repoconfig` (the built-ins' defaults, the check), `ao roles`, the view's `message_line`, `teamrun.role_holders` and `who_for_what` for the team header, the composer's first line (`AO.roleLine`) and the Message controls' `title`. The header draws the sentences, not the design's former example phrases (design-history §4.8). Design §4.8 *A role says when to message it* carries the lasting content.
+
+**Done when** TD-162's *Done when*: a person hovering Message on the techlead's card reads what it is for, and the composer repeats the line above the text box; and the ao-grind header reads *questions → manager-ao-1 · PRs and the architecture → techlead-ao-1 · a grinder about its own card*.
+
+**Related:** TD-162 (the design), TD-158 / TD-168 (the when-read line beneath it), TD-157 / TD-167 (the `title` as the mark), TD-160 / TD-169 (the person in the team), TD-097 (the seat card's Message…).
+
+## TD-162: When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *add info icons to each team member's message button to say when you would want to message them*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-171
+
+**Status:** Resolved 2026-09-26. Was: Designed 2026-09-25 (the designer): design §4.8 *A role says when to message it* (`message:`, one sentence, built-in defaults for the five presets — manager, techlead, grinder, hunter, auditor — and a role's own line in its `roles:` entry for a `designer`; the definition's line, never the session's), §4.5a **Message** (the composer's first line, the control's `title`) and *team groups* (the **who for what** line), mockups `Main.dc.html` (the header line) and `Message.dc.html` (the composer's line). Settled: (a) the field on the preset; (b) the composer's first line and the control's `title` — no mark on every card's Message (the Org card is quiet, TD-095; the team header answers the choice before a card is picked); (c) the team-level line, generated; (d) no, a session may not rewrite it. The design is PR #570; the no-mark-on-the-card choice was to go to Paul as a steer, but the person inbox refused it as full (Paul is away, §4.10), so the choice is on the board (the designer's line of 2026-09-25, merged as PR #571) with a Due date, and #570 merges after 2026-09-26 08:15 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-171; this entry archives with it. **What was:** nothing designed. Paul suggested the profiles as the home for the line; a profile is tool · account · model (§4.2a) and says nothing about a job, so the role preset (§4.8) is the candidate — the round confirms.
+
+**Location:** design §4.5a **Message** (the composer), §4.8 *Role names* and the presets, §4.9 (manager, techlead, members: who does what), §4.9b (an `ask` fills the seat); TD-157 (the *i* mark per control), TD-158 (what the composer says about when the message is read); `src/agentorc/ui/templates/base.html` (`#mailbox`), `src/agentorc/ui/static/app.js` (`AO.compose`).
+
+**Why:** every card's Message opens the same composer, and the design's answer to *who do I message* is spread over §4.9: the manager for what the team works on, the techlead for a PR or the architecture, a grinder only about its own card. A person at the Org sees six Message buttons and no reason to pick one over another; the wrong pick costs a wake budget and a round of passing up. The role knows its own job — the brief says it — so one sentence per role, *message me when …*, drawn where the choice is made, lets the person choose before typing. TD-158 says *when* the message will be read; this says *whether this is the one to send it to*.
+
+**What the design round has to settle:** (a) **the field** — `message:` on the role preset (built-in presets carry a default: manager, techlead, grinder, hunter, auditor, designer), overridable in org and repo `roles:`, one sentence; (b) **the surfaces** — the *i* mark on the card's Message and in `more ▾` (TD-157's mechanism), and the line at the top of the composer under the addressee's name, beside TD-158's when-read line; (c) **a team-level pointer** — on the team header, *questions to the manager; PRs to the techlead*, generated from the same fields; (d) whether a session may rewrite its own line (the entry's view: no, it is the definition's, in the spirit of §9 invariant 9 — a preset sets defaults at start and is a badge afterwards; the round decides); (e) the mockup.
+
+**Done when** a person hovering the Message *i* on the techlead's card reads what it is for, and the composer repeats the line above the text box.
+
+**Related:** §4.5a **Message**, §4.8, §4.9, §4.9b, TD-157, TD-158, TD-160 (the person in the team who needs this most).
+
+**Resolved:** 2026-09-26 — built by TD-171 (PR #605); design §4.8 *A role says when to message it* carries the lasting content.

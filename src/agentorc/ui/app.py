@@ -563,32 +563,33 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
 ICON_TTL = 5.0  # seconds a resolved role icon and label are kept, the `DEFS_TTL` idiom (design §4.5a)
 # (repo, role) → (read at, (icon name, label)). Module-level, so every open page and every delta
 # shares one read: resolving a role is a `.agentorc.yml` per repo, which must never ride the render path.
-_icon_cache: dict[tuple[str, str], tuple[float, tuple[str, str]]] = {}
+_icon_cache: dict[tuple[str, str], tuple[float, tuple[str, str, str]]] = {}
 
 
-def _look_for(repo: str, role: str, org_roles: Any) -> tuple[str, str]:
+def _look_for(repo: str, role: str, org_roles: Any) -> tuple[str, str, str]:
     """The role's icon and display label in that repo (design §4.8): the repo's own `roles:` over
     the org's over the built-in, resolved by `repoconfig` — the core never keys on a role, and the
     UI is free to (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines,
     a repo on another host: no icon, and the **default label** — the role's name, raised — never
-    nothing (§4.8 *The names*)."""
+    nothing (§4.8 *The names*). Third, its `message:` line (§4.8 *A role says when to message it*,
+    TD-171) — a built-in's default where the repo cannot be read, "" for a role with none."""
     try:
         cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
         r = repoconfig.resolve_role(cfg, role, org_roles)
-        return r.icon or "", r.display
+        return r.icon or "", r.display, r.message or ""
     except (KeyError, ValueError, OSError):
-        return "", repoconfig.default_label(role)
+        return "", repoconfig.default_label(role), str((repoconfig.PRESETS.get(role) or {}).get("message") or "")
 
 
-async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], tuple[str, str]]:
-    """The (icon, label) per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL`
+async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], tuple[str, str, str]]:
+    """The (icon, label, message) per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL`
     seconds — a role redefined by hand shows on the next load, or within that, exactly as a team
     definition does. Passed into `view`, so the record itself never carries either."""
     now = time.monotonic()
     want = {(str(s.get("repo") or ""), str(s.get("role") or "")) for s in sessions if s.get("role")}
-    if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ("", "")))[0] > ICON_TTL]:
+    if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ("", "", "")))[0] > ICON_TTL]:
 
-        def resolve() -> dict[tuple[str, str], tuple[str, str]]:
+        def resolve() -> dict[tuple[str, str], tuple[str, str, str]]:
             try:
                 org_roles = org_here()[0].roles  # read once per batch, not once per pair (review of PR #240)
             except (ValueError, OSError):
@@ -699,7 +700,7 @@ def view(
     fleet: list[dict[str, Any]] | None = None,
     *,
     fleet_known: bool = True,
-    icons: dict[tuple[str, str], tuple[str, str]] | None = None,
+    icons: dict[tuple[str, str], tuple[str, str, str]] | None = None,
     seats: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
@@ -904,7 +905,14 @@ def view(
     # shows in place of the bare key. Resolved with the icon, off the render path; a view built
     # without `icons` still says the role, by its default label, never nothing.
     look = (icons or {}).get((str(s.get("repo") or ""), str(s.get("role") or "")))
-    d["role_icon"], d["role_label"] = look or ("", repoconfig.default_label(str(s.get("role") or "")))
+    role = str(s.get("role") or "")
+    d["role_icon"], d["role_label"], d["message_line"] = look or (
+        "",
+        repoconfig.default_label(role),
+        str((repoconfig.PRESETS.get(role) or {}).get("message") or ""),
+    )
+    # §4.8 *A role says when to message it* (TD-171): the definition's line, drawn as text — the
+    # composer's first line and the Message control's `title`; "" for a role without one
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
@@ -1641,6 +1649,36 @@ def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str
     return v
 
 
+def who_for_what(roles: Collection[Mapping[str, Any]], views: Collection[Mapping[str, Any]]) -> list[str]:
+    """The team header's **who for what** line (design §4.5a *team groups*, §4.8 *A role says when to
+    message it*; TD-162, built by TD-171): one phrase per role the definition names, in its order,
+    from the role's `message:` line — the definition's words, never a session's. A role one session
+    holds reads *<line> → <name>*, and an empty seat *(on call)* after the name; a role several
+    hold reads *<Label>: <line>*, since no one name answers for them. A role with no line is left
+    out, and a team whose roles carry none has no line at all (an empty list). The line comes from
+    a view of a session holding the role, which resolved it with the repo's and the org's layers;
+    where no session holds it yet, from the built-in preset."""
+    by_name = {str(v.get("name") or ""): v for v in views}
+    out: list[str] = []
+    for r in roles:
+        role, names = str(r.get("role") or ""), [str(n) for n in r.get("names") or ()]
+        held = [by_name[n] for n in names if n in by_name]
+        line = next((str(v.get("message_line") or "") for v in held if v.get("message_line")), "")
+        line = line or str((repoconfig.PRESETS.get(role) or {}).get("message") or "")
+        if not line:
+            continue
+        if len(names) == 1:
+            v = by_name.get(names[0])
+            empty = bool(r.get("seat")) and (v is None or v.get("seat") or v.get("state") in ("exited", "closed"))
+            out.append(f"{line} → {names[0]}{' (on call)' if empty else ''}")
+        else:
+            label = next(
+                (str(v.get("role_label")) for v in held if v.get("role_label")), repoconfig.default_label(role)
+            )
+            out.append(f"{label}: {line}")
+    return out
+
+
 def team_groups(
     views: list[dict[str, Any]],
     rows: Collection[dict[str, Any]] = (),
@@ -1757,6 +1795,8 @@ def team_groups(
                 # design §4.5a team header **✉ n** (TD-071 item 2): what the fold hides of the cards'
                 # unread chips — display only, the mail stays where it is (§4.10)
                 "unread": sum(int(m.get("unread") or 0) for m in members),
+                # design §4.5a *team groups* **who for what** (§4.8, TD-171): whom to write to, by role
+                "who": who_for_what((defs.get(team) or {}).get("roles") or (), views) if team != NO_TEAM else [],
             }
         )
     # what is running is read first; *No team* is never "stopped" — nothing there starts as one

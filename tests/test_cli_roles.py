@@ -177,9 +177,12 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert "grinder   [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
     assert "brief: docs/briefs/g.md" in out and "reviewer  [repo]  lane: ui" in out
     assert "label: Grinder" in out and "label: Reviewer" in out  # what the page shows (design §4.8 *The names*)
+    # when to message it (design §4.8, TD-171): its own line under the role's, where a role has one
+    assert "  message: its own card only: the entry it holds, a finding on its PR" in out
     assert cli.main(["roles", "--json", "-d", str(root)]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["controllers"] == ["orc"] and [r["name"] for r in data["roles"]][-1] == "reviewer"
+    assert next(r for r in data["roles"] if r["name"] == "plain")["message"] is None
     assert next(r for r in data["roles"] if r["name"] == "grinder")["source"] == "built-in + repo"
     (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert cli.main(["roles"]) == 1 and "unknown grant 'fly'" in capsys.readouterr().err

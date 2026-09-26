@@ -57,6 +57,7 @@ console.log(JSON.stringify({
     focus_1: (AO.keyEntry("focus", "1") || {}).control,
   },
   labels: ["Open", "▣ Focus", "Snooze ▾", "Open board", "Dismiss"].map(AO.keyLabel),
+  role_line: [AO.roleLine({ line: "the team's work" }), AO.roleLine({ line: "x", reply: true }), AO.roleLine({})],
 }));
 """
 
@@ -171,3 +172,10 @@ def test_a_key_fires_only_when_nothing_editable_has_focus():
     assert e["focus_j"] is None  # no ring on Focus: it shows one session (§4.5 screen 2)
     assert e["focus_1"] == "Org"  # the page keys work there
     assert got["labels"] == ["Open", "Focus", "Snooze", "Open board", "Dismiss"]
+
+
+@pytest.mark.unit
+def test_the_composer_opens_on_the_roles_line_and_a_reply_shows_none():
+    """§4.5a **Message** (TD-171): the composer's first line is the addressee's role's `message:`
+    sentence, under its name; a Reply shows none, since the sender chose already."""
+    assert _probe()["role_line"] == ["Message it about the team's work", "", ""]

@@ -222,6 +222,30 @@ def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
+    """The roles a definition names, in its order — the manager, the techlead seat, the seats with a
+    trigger, then the members — each once, with the session names that hold it and whether it is a
+    seat (an empty seat reads *on call*). A person leading the team is not a role here."""
+    out: dict[str, dict[str, Any]] = {}
+
+    def add(role: str, names: list[str], seat: bool) -> None:
+        if not role:
+            return
+        got = out.setdefault(role, {"role": role, "names": [], "seat": seat})
+        got["names"] += [n for n in names if n not in got["names"]]
+
+    if t.manager.role != orgmod.PERSON:
+        add(t.manager.role, [t.manager.name], False)
+    if t.techlead:
+        add("techlead", [t.techlead.name], True)
+    for seat in t.seats:
+        add(seat.role, [seat.name], True)
+    for m in t.members:
+        if m.team is None:
+            add(m.role, m.names(), False)
+    return list(out.values())
+
+
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
     the name, the file it came from, its projects, how many sessions it starts, how many carrying
@@ -244,6 +268,9 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
                 "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
+                # the definition's roles in its order, each with the names that hold it — the team
+                # header's *who for what* line (design §4.5a *team groups*, TD-171)
+                "roles": role_holders(t),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
                 "wound_down": None if n_live else wound_down(mine, seat_names(t, mine)),
