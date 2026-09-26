@@ -1673,7 +1673,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Why:** TD-162's *Why*: six Message buttons and no reason to pick one; the wrong pick costs a wake and a round of passing up.
 
-**Resolved:** 2026-09-26 (PR #TBD, `grinder-ao-2`) — `message:` in `repoconfig` (the built-ins' defaults, the check), `ao roles`, the view's `message_line`, `teamrun.role_holders` and `who_for_what` for the team header, the composer's first line (`AO.roleLine`) and the Message controls' `title`. The header draws the sentences, not the design's former example phrases (design-history §4.8). Design §4.8 *A role says when to message it* carries the lasting content.
+**Resolved:** 2026-09-26 (PR #605, `grinder-ao-2`) — `message:` in `repoconfig` (the built-ins' defaults, the check), `ao roles`, the view's `message_line`, `teamrun.role_holders` and `who_for_what` for the team header, the composer's first line (`AO.roleLine`) and the Message controls' `title`. The header draws the sentences, not the design's former example phrases (design-history §4.8). Design §4.8 *A role says when to message it* carries the lasting content.
 
 **Done when** TD-162's *Done when*: a person hovering Message on the techlead's card reads what it is for, and the composer repeats the line above the text box; and the ao-grind header reads *questions → manager-ao-1 · PRs and the architecture → techlead-ao-1 · a grinder about its own card*.
 
@@ -1699,4 +1699,4 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Related:** §4.5a **Message**, §4.8, §4.9, §4.9b, TD-157, TD-158, TD-160 (the person in the team who needs this most).
 
-**Resolved:** 2026-09-26 — built by TD-171 (PR #TBD); design §4.8 *A role says when to message it* carries the lasting content.
+**Resolved:** 2026-09-26 — built by TD-171 (PR #605); design §4.8 *A role says when to message it* carries the lasting content.
