@@ -144,6 +144,10 @@ not mix:
 - **hook** — a tool's own event callback (Claude Code's `Stop`, `PreToolUse`…) that reports
   state to the host agent. A state from a hook is `hook` confidence; one read off the pane is
   `scraped`. — *proposed*.
+- **transcript** — the tool's own record of one conversation (Claude Code: one JSON object per
+  line under `~/.claude/projects/`), located and rendered by the adapter (design §4.3
+  `transcript_path`, `read_transcript`), read on the Transcript page and by `ao transcript` (§4.5
+  screen 9) and never copied off the host that holds it. Not the run log, which is the pane's output.
 - **anchor session** — the first agent in a checkout; every other concurrent agent works in a
   worktree (invariant 2). — *proposed*.
 - **tick** — one pass of the host agent's own loop: derived reports, policies, the doorbell's

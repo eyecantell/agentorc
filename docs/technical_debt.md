@@ -84,8 +84,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2), (4), (6) done; five remain |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed and reconciled 2026-09-25; pickable |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
-| TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
+| TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Designed 2026-09-25 (the designer) — the build is TD-165, TD-166; archives with them |
 | TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
@@ -95,6 +95,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
+| TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
+| TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 
 
 ---
@@ -1531,8 +1533,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: he resumed the designer to read what it had done)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open — nothing designed. §4.5a has no control that opens a transcript: an exited record offers **Resume**, **Resume with changes…**, **New session here** and **Forget** (*Focus (exited / closed)*), and the Resumable list is a list of things to resume.
+**Pickable:** no — designed; the build is TD-165 (the adapter's read, the RPC, the node read, the CLI) and TD-166 (the page and the button)
+**Status:** Designed 2026-09-25 (the designer): design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript**, the *Transcript* row and the Resumable **Resume** row, §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*, the glossary's *transcript*, mockup `Transcript.dc.html` (the Focus artboards gain the button). Settled: (a) a folded read-only page, VS Code beside it for the raw file — the raw file alone is not a reading surface; (b) `ao transcript <id> [-n N] [--before OFFSET] [--raw]`; (c) the record's own `adapter_id` / `dir` / `adapter` / `profile` locate it, so a superseded `closed` record still reads its own run, and a row with no record passes the tool session id and directory instead; (d) served on the record's host, a node's through `read` (`NODE_READS` gains `transcript`), never copied. The build is TD-165 and TD-166; this entry archives with them. The design is PR #558; the page-against-raw-file choice went to Paul as a steer (the shape is his to prefer), and #558 merges at its bound (12 h from 2026-09-25 18:50 MDT) unless he says otherwise — the next designer run merges it if this one has ended.
 
 **Location:** design §4.5a (*Focus (exited / closed)*, *Resumable*, the Focus header), §4.3 (`transcript_path` on the adapter contract — Claude Code's answer is the JSONL under `~/.claude/projects/`, already read for the model and the resume id), `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`), `src/agentorc/ui/` (a page or panel), `src/agentorc/cli.py` (`ao transcript <id>`).
 
@@ -1740,6 +1742,53 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
 
 **Related:** §4.5a *Focus: Copy / Paste*, §4.6 *Scrollback is tmux's* (TD-022), TD-096 (the read-only attach), TD-157 (an *i* mark for the control), ADR 2026-09-25 (where a person's preference lives).
+
+## TD-165: Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-154's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 9 *Transcript* (*The adapter renders, the core draws*; *Where it is read*; *Which record*), §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*.
+
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`, `model_in_use` — the tail read and the `isSidechain` rule to reuse), `src/agentorc/adapters/` (the contract and a neutral `Transcript` / entry model beside `Usage`), `src/sessionorc/agent.py` (`rpc_tail` is the shape; `NODE_READS`; `_route_read`), `src/agentorc/cli.py` (`cmd_tail`, the `tail` parser), `src/agentorc/skill.md` (the read-only line).
+
+**Why:** the only way to read a finished session today is to resume it (TD-154's *Why*): a live session, a lifecycle event, a close. The file is on the host and the adapter already finds it.
+
+**Fix:**
+1. **The neutral shape**, in the adapter package beside `Usage`: `Transcript(path, size, first_at, last_at, turns, before, entries)` — `before` the byte offset that asks for the entries before these (None at the file's start) — and one entry type with `kind` in *prompt · text · thought · tool · compaction · sidechain*: a prompt or text carries `text` and `at`; a thought `lines` and `text`; a tool carries `name`, the one-line `call` (the first line of its input, as the pane draws it) and its `result` (text, folded by the reader); a sidechain carries `count` and its entries, attached to the Agent call that started it; a compaction carries `at`. No field name of the tool's is on it (TD-073's rule).
+2. **`read_transcript`** on the contract and on the Claude Code adapter: reads the file backwards from `before` (the end when None) in chunks until `turns` prompts have been passed, as `model_in_use` reads its tail; a `user` entry with string content or text blocks is a prompt, one with `tool_result` blocks is the result of the tool call it answers, an `assistant` entry's blocks are text, thinking or tool calls, an `isSidechain` entry folds under the Agent call whose id it answers, a `summary` entry is a compaction; every other line type is skipped. A first line cut by the chunk boundary is skipped, as `model_in_use` skips it. The `shell` adapter returns None.
+3. **The `transcript` RPC** (`id`, `before`, `turns`, `raw`; or `adapter`, `adapter_id`, `dir`, `profile` in a record's place, for a Resumable row): served on the record's host; a record with no `adapter_id` is refused naming why (*a shell has no transcript*); `raw` returns the file's last `turns` lines as text. Ungated (§9 invariant 11). **`transcript` joins `NODE_READS`** so the home routes a node's record through `read`, refused as unreachable while the link is down, never copied. `src/sessionorc/**` is a held path: the techlead reads this PR.
+4. **`ao transcript <id> [-n N] [--before OFFSET] [--raw]`** as §4.7 *Transcript* says, `--json` the shape of step 1; the read-only line of `ao --skill` names it beside `tail` and `explain`.
+5. **Tests:** the adapter's read on a fixture transcript (a prompt, text, a thought, two tool calls with results, a sidechain of three, a compaction) — the neutral shape, the backward paging by `before`, the cut-line skip; the RPC's refusal on a record without an `adapter_id`; `NODE_READS` holds three; the CLI's text rendering of the fixture.
+
+**Done when** `ao transcript designer-ao-1` prints the designer's last twenty turns from its exited record without a session starting, `ao transcript designer-ao-1 --json` carries `before`, and a node's record reads through the link (the container node test of TD-057 is the harness).
+
+**Related:** TD-154 (the design), TD-166 (the page reads this RPC), TD-155 (why a resume misleads today), TD-091 (a manager reading a quiet worker), TD-073 (no tool field name leaves the adapter), TD-057 (`read` and `NODE_READS`).
+
+## TD-166: Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-154's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — after TD-165 (the RPC it reads)
+**Status:** Open — nothing built. Design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript** and the *Transcript* row; mockup `Transcript.dc.html` and the Focus artboards' header.
+
+**Location:** `src/agentorc/ui/app.py` (a page route beside Focus's; the editor link's template, §5 *The person's own*), `src/agentorc/ui/templates/`, `src/agentorc/ui/static/app.js` (the Focus header's buttons — VS Code, Open shell here — and `#fexited`), `src/agentorc/ui/static/app.css`.
+
+**Why:** TD-154's *Why*; the page is the reading surface, the raw file is one JSON object per line.
+
+**Fix:**
+1. **The page** at `/transcript/<id>`: the head (name, host, directory, profile and model in use, the file's path, size, first and last timestamps, the count of turns, *showing the last 20 turns · a snapshot at <time>*), then one block per turn as the mockup draws them — the prompt with `>` and its time, the assistant's text, each tool call as one mono line with its result folded under it, a thought as *thought · n lines* folded, a sidechain as *n subagent turns* folded under its Agent call, a compaction as one centred line. Reads the `transcript` RPC (TD-165) once at load; **earlier turns** at the top asks for the twenty before the first shown, with the `before` the reply carried, and prepends them. Folds are plain `<details>`, remembered nowhere. Text is text (TD-071): nothing in a turn is a link or a button.
+2. **VS Code** beside the head: the editor button's link from `open_in:` with the transcript file's path in place of the directory, on the record's host; absent at `none`.
+3. **The Focus header's Transcript button**, beside VS Code, on any state, opening the page in a new tab; drawn only when the record holds an `adapter_id`. The exited banner's hint gains the words *or read its transcript* where the button is drawn.
+4. **Tests:** the page renders the fixture reply of TD-165 (a snapshot test of the folded blocks); the header draws the button for a record with an `adapter_id` and not for a shell; the editor link carries the file path.
+
+**Done when** Paul can read the designer's last run from its exited card without a session starting (TD-154's *Done when*), and a live grinder's page shows its last twenty turns while the card still reads `working`.
+
+**Related:** TD-154 (the design), TD-165 (the RPC), TD-095 (the editor button), TD-071 (nothing on a page is a control from what a session wrote), TD-046 (a new tab beside Focus).
 
 ## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
 
