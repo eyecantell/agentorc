@@ -150,6 +150,50 @@ class RepoStore:
         _atomic_write(self.path, json.dumps(readings, indent=1))
 
 
+class DoingLogStore:
+    """The doing log (design §4.8 *the doing log*, TD-176 slice 2): the last `keep` `ao doing` calls
+    per team, in memory and in `doing.jsonl` — one line appended per call, the file rewritten from
+    the rings once it holds `compact_at` lines, so it stays bounded without a rewrite per call. A
+    missing file is an empty log; an unreadable line is skipped, never a crash."""
+
+    def __init__(self, path: Path | None = None, keep: int = 50, compact_at: int = 2000):
+        self.path = path or paths.doing_log_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.keep, self.compact_at = keep, compact_at
+        self.rings: dict[str, list[dict[str, Any]]] = {}
+        self._lines = 0
+        try:
+            # a line cut short mid-character by a crash decodes as garbage and is skipped below, never a crash
+            lines = self.path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            lines = []
+        for line in lines:
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(e, dict) and e.get("team"):
+                self._ring(str(e["team"])).append(e)
+        for team, ring in self.rings.items():
+            self.rings[team] = ring[-self.keep :]
+        self._lines = len(lines)
+
+    def _ring(self, team: str) -> list[dict[str, Any]]:
+        return self.rings.setdefault(team, [])
+
+    def append(self, entry: dict[str, Any]) -> None:
+        ring = self._ring(str(entry["team"]))
+        ring.append(entry)
+        del ring[: -self.keep]
+        if self._lines + 1 >= self.compact_at:
+            _atomic_write(self.path, "".join(json.dumps(e) + "\n" for r in self.rings.values() for e in r))
+            self._lines = sum(len(r) for r in self.rings.values())
+            return
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+        self._lines += 1
+
+
 class IdentityAlarmStore:
     """The host's **own** identity alarms (design §4.8a, TD-077 step 2): the ones about no record —
     a claim from outside every pane, an unreadable peer — which have nowhere else to live, since a

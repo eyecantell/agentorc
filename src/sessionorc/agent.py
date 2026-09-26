@@ -71,6 +71,7 @@ from sessionorc.models import (
 )
 from sessionorc.store import (
     AttentionStore,
+    DoingLogStore,
     EventQueue,
     IdentityAlarmStore,
     PersonInboxStore,
@@ -506,6 +507,8 @@ class HostAgent:
         self._repos_read_at = float("-inf")  # monotonic: the first tick reads
         self._ledger_mtime: dict[str, float | None] = {}
         self._repos_task: asyncio.Task[None] | None = None
+        # the last fifty `ao doing` calls per team (design §4.8 *the doing log*, TD-176 slice 2)
+        self.doing_log = DoingLogStore()
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
         # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
@@ -3006,6 +3009,12 @@ class HostAgent:
                 raise RpcError('ao doing needs a line: `ao doing "<what you are doing now>"`, or --clear (design §4.8)')
             s.doing = {"text": line, "at": now_iso()}
         self._save(s)
+        if s.doing and s.team:
+            # the doing log (§4.8, TD-176 slice 2): the call, beside the record's latest line — what a
+            # team card's Doing facet and the Repo page draw; nothing else reads it
+            entry = {"team": s.team, "id": s.id, "text": s.doing["text"], "at": s.doing["at"]}
+            self.doing_log.append(entry)
+            await self._broadcast({"event": "doing", "team": s.team, "entry": entry})
         await self._push_changes()
         return self._view(s)
 
@@ -4751,6 +4760,15 @@ class HostAgent:
         checkout's path: what the team card's Repo facet, the rollup and the Repo page draw. The
         home's; a node forwards it (§4.4a)."""
         return dict(self._repos)
+
+    async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
+        """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty
+        `ao doing` calls, oldest first — `{team, id, text, at}` each; one team's with `team`. The
+        home's; a node forwards it (§4.4a). A read, and not the `doing` RPC, which writes the line."""
+        rings = self.doing_log.rings
+        if team is not None:
+            return {team: list(rings.get(team, []))}
+        return {t: list(r) for t, r in rings.items()}
 
     async def rpc_usage(self) -> dict[str, dict[str, Any]]:
         """Last known usage per profile (TD-001): what the top bar shows."""

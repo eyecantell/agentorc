@@ -50,7 +50,7 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # The readings the home takes (§4.4 *Repo facts*, TD-176): a node holds none of them, so while the
 # link is down a read of one is refused rather than answered with nothing — an empty answer would
 # say *no PRs*, and the truth is *not known from here*.
-HOME_READS = frozenset({"repos"})
+HOME_READS = frozenset({"repos", "doing_log"})
 # What a session may do to itself offline, and a person to any session on this host: the node is
 # the single tmux writer for its host, whether or not home can be reached.
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
@@ -87,7 +87,7 @@ def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host
     if method in REPORTS:
         return f"reports are written at the home, and a claim is checked against sessions this host cannot see: {tail}"
     if method in HOME_READS:
-        return f"the repo facts are read at the home, and this host holds none: {tail}"
+        return f"the repo facts and the doing log are kept at the home, and this host holds neither: {tail}"
     if method in HOME_EDITS:
         return f"{method} edits what the home owns, so it waits for the link: {tail}"
     if caller is None or method not in NODE_ACTS:

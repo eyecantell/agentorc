@@ -3449,10 +3449,11 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                             }
                         )
                     )
-                elif ev.get("event") == "repos":
-                    # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176): passed
-                    # through as the agent sent it, `repo: null` for one the registry dropped; the
-                    # team card's facets and the rollup re-render from it (TD-176 slices 3 and 4).
+                elif ev.get("event") in ("repos", "doing"):
+                    # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
+                    # member said what it is doing (§4.8 *the doing log*): passed through as the agent
+                    # sent it, `repo: null` for a checkout the registry dropped; the team card's
+                    # facets and the rollup re-render from it (TD-176 slices 3 and 4).
                     await ws.send_text(json.dumps(ev))
                 elif ev.get("event") in ("gone", "usage"):
                     if ev.get("event") == "gone":

@@ -350,13 +350,23 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
         },
         "/elsewhere": {"name": "other", "root": "/elsewhere", "prs": {"error": "no gh"}, "ledger": {"error": "gone"}},
     }
-    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: reading)
+    fleet = [{"id": "g1", "team": "t", "repo": str(repo)}, {"id": "x", "team": "u", "repo": "/elsewhere"}]
+    log = {
+        "t": [
+            {"team": "t", "id": "g1", "text": "reading the ledger", "at": (now - timedelta(minutes=5)).isoformat()},
+            {"team": "t", "id": "g1", "text": "pushing TD-010", "at": now.isoformat()},
+        ],
+        "u": [{"team": "u", "id": "x", "text": "not this repo's", "at": now.isoformat()}],
+    }
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log}[rpc])
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("r  1 open PRs, oldest 3d · this week 4 opened, 5 closed (could not look")
     assert "1 open entries: 1 pickable, 0 design-first" in out
     assert "#9" in out and "pickable     TD-010  a build" in out
+    # the servicing team's doing log, newest first; another team's is not this repo's
+    assert out.index("g1: pushing TD-010") < out.index("g1: reading the ledger") and "not this repo's" not in out
     assert cli.main(["repo", "--all"]) == 0
     out = capsys.readouterr().out
     assert "other  PRs: could not look (no gh) · ledger: could not look (gone)" in out and "#9" not in out
@@ -400,3 +410,75 @@ def test_history_survives_bytes_that_are_not_utf8(repo):
     (repo / "docs" / "technical_debt.md").write_bytes(_entry("TD-002", "x").encode() + b"\xff\xfe junk\n")
     _git(repo, "commit", "-qam", "bytes", when=datetime.now(UTC))
     assert ledger.history(repo, "docs/technical_debt.md") is not None
+
+
+# -- the doing log (TD-176 slice 2, design §4.8 *the doing log*) --------------------------------------
+
+
+def test_the_doing_log_keeps_the_last_calls_per_team_and_compacts_its_file(tmp_path):
+    from sessionorc.store import DoingLogStore
+
+    f = tmp_path / "doing.jsonl"
+    log = DoingLogStore(f, keep=3, compact_at=8)
+    for i in range(5):
+        log.append({"team": "a", "id": "g", "text": f"a{i}", "at": str(i)})
+    log.append({"team": "b", "id": "h", "text": "b0", "at": "9"})
+    assert [e["text"] for e in log.rings["a"]] == ["a2", "a3", "a4"]  # the fourth call dropped the first
+    assert len(f.read_text().splitlines()) == 6  # appended, not yet compacted
+    for i in range(5, 8):
+        log.append({"team": "a", "id": "g", "text": f"a{i}", "at": str(i)})
+    assert len(f.read_text().splitlines()) <= 8  # compacted to the rings
+    f.write_text(f.read_text() + "not json\n")
+    again = DoingLogStore(f, keep=3)
+    assert [e["text"] for e in again.rings["a"]] == ["a5", "a6", "a7"] and [e["text"] for e in again.rings["b"]] == [
+        "b0"
+    ]
+
+
+async def test_a_team_members_doing_calls_are_logged_pushed_and_read(agent, tmp_path):
+    import asyncio
+
+    async with LocalClient() as person:
+        s = await person.call(
+            "create", name="doer", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="grind"
+        )
+        lone = await person.call("create", name="lone", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        events = []
+
+        async def listen():
+            async with LocalClient() as sub:
+                async for ev in sub.subscribe():
+                    if ev.get("event") == "doing":
+                        events.append(ev)
+
+        listener = asyncio.create_task(listen())
+        await asyncio.sleep(0.2)
+        async with LocalClient(caller=s["id"]) as me:
+            await me.call("doing", id=s["id"], text="reading the ledger")
+            await me.call("doing", id=s["id"], text="pushing the branch")
+            await me.call("doing", id=s["id"], clear=True)  # a clear is not a call the feed shows
+        async with LocalClient(caller=lone["id"]) as me:
+            await me.call("doing", id=lone["id"], text="on my own")  # no team: no team's feed
+        got = await person.call("doing_log")
+        assert list(got) == ["grind"]
+        assert [e["text"] for e in got["grind"]] == ["reading the ledger", "pushing the branch"]
+        assert got["grind"][0]["id"] == s["id"] and got["grind"][0]["at"]
+        assert await person.call("doing_log", team="nobody") == {"nobody": []}
+        assert [json.loads(line)["text"] for line in paths.doing_log_file().read_text().splitlines()] == [
+            "reading the ledger",
+            "pushing the branch",
+        ]
+        await asyncio.sleep(0.2)
+        assert [e["entry"]["text"] for e in events] == ["reading the ledger", "pushing the branch"]
+        assert events[0]["team"] == "grind"
+        listener.cancel()
+
+
+def test_a_doing_log_cut_short_mid_character_loads_without_it(tmp_path):
+    """Review of PR #596: a crash mid-append can leave a truncated UTF-8 sequence at the file's end;
+    the log loads, the cut line skipped."""
+    from sessionorc.store import DoingLogStore
+
+    f = tmp_path / "doing.jsonl"
+    f.write_bytes(b'{"team": "a", "id": "g", "text": "ok", "at": "1"}\n{"team": "a", "text": "caf\xc3')
+    assert [e["text"] for e in DoingLogStore(f).rings["a"]] == ["ok"]

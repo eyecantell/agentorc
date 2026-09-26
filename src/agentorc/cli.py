@@ -938,6 +938,9 @@ def _repo_line(r: dict[str, Any]) -> str:
     return f"{r.get('name') or r.get('root')}  {pr_part} · {led_part} · read {_age(str(r.get('at') or ''))} ago"
 
 
+DOING_SHOWN = 10  # `ao repo`'s doing lines; `--json` carries the whole log of the servicing teams
+
+
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs, the
@@ -954,6 +957,20 @@ def cmd_repo(args: argparse.Namespace) -> int:
         picked = [r for r in got.values() if here and str(pathlib.Path(r.get("root") or "").resolve()) == here]
         if not picked:
             raise AgentError("this directory is not in a registered repo; name one, or ao repo --all")
+    if not args.all:
+        # the doing log of the teams whose sessions work in the repo (§4.8 *the doing log*, TD-176)
+        fleet, log = call_sync("list"), call_sync("doing_log")
+        for r in picked:
+            root = pathlib.Path(r.get("root") or "").resolve()
+            teams = sorted(
+                {
+                    s["team"]
+                    for s in fleet
+                    if s.get("team") and s.get("repo") and pathlib.Path(s["repo"]).resolve() == root
+                }
+            )
+            calls = [e for t in teams for e in log.get(t, [])]
+            r["doing"] = sorted(calls, key=lambda e: str(e.get("at") or ""), reverse=True)
 
     def prose() -> None:
         if not picked:
@@ -970,6 +987,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
                 for e in ids:
                     print(f"  {kind:<12} {e['id']}  {e['title']}")
+            for e in r.get("doing", [])[:DOING_SHOWN]:
+                print(f"  doing {_age(str(e.get('at') or '')):>4} ago  {e.get('id')}: {e.get('text')}")
 
     return emit(args, picked, prose)
 
