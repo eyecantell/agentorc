@@ -202,6 +202,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-157, the designer; raised by Paul at a concluded team's card — *what do "forget" and "start" really mean?*): **screen 10, Help** — every control's paragraph by screen, reached from the *i* marks and the `?` overlay; not a tab. Build: TD-167.
 - 2026-09-25 (TD-160, the designer; Paul: *I should start having interactive sessions on the team itself*): the New session form's **Team** pick (screen 3).
 - 2026-09-25 (TD-164, the designer): screen 8's **You** lists copy on select with the terminal's face and size.
+- 2026-09-26 (after the TD-176 promote): the Org drew the new team summaries as plain text — the browser held the old `app.css` (served with no `Cache-Control`, so kept on a guessed freshness) and a hard refresh fixed it. The page's two links now carry a hash of the file.
 
 ## 4.5a Controls
 

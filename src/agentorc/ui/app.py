@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
+import hashlib
 import json
 import logging
 import math
@@ -51,6 +53,19 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 # The role badge's picture (design §4.8 *Role presets*, TD-074): the markup lives in one place and
 # the template asks for it by name, so no config file ever carries an SVG.
 templates.env.globals["role_svg"] = role_svg
+
+
+@functools.cache
+def static_url(name: str) -> str:
+    """The page's link to its own `app.css` / `app.js`, carrying a hash of the file: the server sends
+    no `Cache-Control`, so a browser keeps a copy it guesses is fresh for hours, and after a promote
+    it drew new markup with the old stylesheet (2026-09-26). The hash moves when the file does; the
+    UI restarts on every promote, so it is read once per process."""
+    digest = hashlib.sha256((HERE / "static" / name).read_bytes()).hexdigest()[:12]
+    return f"/static/{name}?v={digest}"
+
+
+templates.env.globals["static_url"] = static_url
 
 
 def suggested_answers(e: Any) -> list[str]:

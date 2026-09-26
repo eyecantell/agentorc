@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}ShiftLead{% endblock %}</title>
-<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="{{ static_url('app.css') }}">
 {% block head %}{% endblock %}
 </head>
 <body data-host="{{ host }}"{% if popped %} class="popped"{% endif %}>
@@ -73,7 +73,7 @@
   </form>
 </dialog>
 {% block body %}{% endblock %}
-<script src="/static/app.js"></script>
+<script src="{{ static_url('app.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

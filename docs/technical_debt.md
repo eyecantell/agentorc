@@ -104,11 +104,29 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-172 | Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back* | Medium | Open |
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
+| TD-178 | The Org rollup's overdue count beside *in the Inbox* (Needs you facet) | Low | Open — pickable, the one piece of TD-176's rollup not built |
 
 
 ---
 
 <!-- Entry template:
+## TD-001: Short title of the problem
+
+**Priority:** High | Medium | Low
+**Added:** YYYY-MM-DD
+**Owner:** anchor | grinder | paul | dev-cadence
+**Kind:** build | design-first | live-check | evaluation | decision
+**Pickable:** yes | no — <one clause>
+**Status:** Open
+**Location:** `path/to/file.py` (function/section)
+
+**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
+
+**Fix:** concrete direction(s), and what would count as done.
+
+**Related:** other TDs, PRs, decision docs.
+-->
+
 ## TD-002: Focus composer: Attach / drop / paste upload
 
 **Priority:** Medium
@@ -1949,3 +1967,19 @@ Two things are missing, and the design round chooses between them or takes both:
 **Status:** Open — nothing designed beyond the §10 question.
 
 **Related:** TD-176, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
+
+## TD-178: The Org rollup's overdue count beside *in the Inbox*
+
+**Priority:** Low
+**Added:** 2026-09-26
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/rollup.html` (the Needs you facet), `src/agentorc/ui/static/app.js` (where `[data-inbox-needs]` is copied from the top bar), `src/agentorc/ui/app.py` (the board reader's due items)
+
+**Why:** design §4.5 screen 1 has the rollup's **Needs you** facet show *in the Inbox* "with the overdue count"; TD-176 slice 4 (#598) drew the Inbox count, copied in from the top bar, and not the overdue count, and §4.5a's **Org: rollup** row says so. Left out of TD-176's close (#600) and found at the session's close.
+
+**Fix:** count the Needs you items past their date (a board item overdue, as the Inbox's board rows word it) and draw it beside *in the Inbox*, kept live the way the Inbox count is; drop the *not drawn yet* clause from §4.5a's row. Done when the rollup reads *n in the Inbox · m overdue* and a test covers a board item overdue and one due today.
+
+**Related:** TD-176 (archived), design §4.5 screen 1 *The Org, team-first*, §4.5a **Org: rollup**.
