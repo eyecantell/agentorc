@@ -436,6 +436,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   /* §4.5 screen 6 *Narrow* (TD-137): one column; the rail leaves the page for the sheet, a chip row
      stands under the title, and a row's controls are 44 px high as the phone's Org cards' are */
   .inboxwrap { grid-template-columns: minmax(0, 1fr); } .inboxwrap > .rail { display: none; }
+  /* the Focus composer's prompt chips (§4.5a, TD-170): one wrapping row above the text box */
+  .composer { display: flex; flex-direction: column; gap: 6px; } .composer > .row { display: contents; }
+  .composer .promptchips { order: -1; } .composer .promptchips .chip { min-height: 44px; }
   .railchips { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
   .railchips .filterschip { position: sticky; left: 0; z-index: 1; background: var(--card); }
   .railchips .chipteams { display: flex; gap: 6px; }

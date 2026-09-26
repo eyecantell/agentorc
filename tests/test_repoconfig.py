@@ -326,3 +326,32 @@ def test_a_role_says_when_to_message_it(tmp_path):
         (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
         with pytest.raises(ValueError, match=why):
             repoconfig.load(tmp_path)
+
+
+def test_a_role_has_saved_prompts_replaced_whole_per_layer(tmp_path):
+    """design §4.8 *A role has saved prompts* (TD-161, built by TD-170): `prompts:` is a list of
+    `{label, text}`, the label one line of 24 characters at most, the text non-empty and verbatim;
+    checked when the file is read, naming the role and the entry; the key replaced whole at each
+    layer, never merged; the built-ins carry none."""
+    assert repoconfig.resolve_role(repoconfig.RepoConfig(), "grinder").prompts == []
+    (tmp_path / ".agentorc.yml").write_text(
+        "roles:\n  plain:\n    prompts:\n      - {label: review PR, text: 'Review PR $n as the cadence says.'}\n"
+        "      - {label: sweep, text: /stranded-work}\n"
+    )
+    cfg = repoconfig.load(tmp_path)
+    org = {"plain": {"prompts": [{"label": "org one", "text": "from the org"}]}}
+    got = repoconfig.resolve_role(cfg, "plain", org)
+    assert got.prompts == [{"label": "review PR", "text": "Review PR $n as the cadence says."},
+                           {"label": "sweep", "text": "/stranded-work"}]  # fmt: skip
+    assert got.to_dict()["prompts"][1]["label"] == "sweep"
+    assert repoconfig.resolve_role(repoconfig.RepoConfig(), "plain", org).prompts[0]["label"] == "org one"
+    for bad, why in (
+        ("prompts: sweep", "must be a list"),
+        ("prompts: [{label: x}]", r"prompts\[0\]\.text"),
+        ("prompts: [{text: y}]", r"prompts\[0\]\.label must be one line"),
+        ("prompts: [{label: " + "x" * 25 + ", text: y}]", r"grinder\.prompts\[0\]\.label is longer than 24"),
+        ("prompts: [{label: a, text: b, run: c}]", "mapping of label and text"),
+    ):
+        (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
+        with pytest.raises(ValueError, match=why):  # the error names the role and the entry
+            repoconfig.load(tmp_path)

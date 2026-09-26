@@ -1724,6 +1724,16 @@
       tickControllers(own.length ? own : (picker.dataset.default || "").split(",").filter(Boolean));
       tickGrants((o.dataset.grants || "").split(",").filter(Boolean));
       $("[name=lane]").placeholder = o.dataset.lane || "TD-027, TD-019 · or free-pick";
+      // §4.5a *New session* **prompt chips** (TD-170): the role's saved prompts, as text
+      const chips = $("#newchips");
+      if (chips) {
+        let ps = [];
+        try { ps = JSON.parse(o.dataset.prompts || "[]"); } catch (e) { ps = []; }
+        chips.innerHTML = ps.map((p, i) => `<button type="button" class="btn sm chip" data-i="${i}" title="${esc(p.text)}">${esc(p.label)}</button>`).join("");
+        $$(".chip", chips).forEach((b) => b.addEventListener("click", () => {
+          const t = $("[name=prompt]"); if (t) { t.value = ps[Number(b.dataset.i)].text; t.focus(); }
+        }));
+      }
     }
     async function loadRoles() {
       const v = dir.value.trim(); const my = ++rseq;
@@ -1736,6 +1746,7 @@
           const opt = document.createElement("option");
           opt.value = r.name; opt.dataset.lane = r.lane.join(", "); opt.dataset.controllers = r.controllers.join(",");
           opt.dataset.grants = (r.grants || []).join(",");
+          opt.dataset.prompts = JSON.stringify(r.prompts || []);
           opt.textContent = `${r.name} [${r.source}]` + (r.grants.length ? ` · grants ${r.grants.join(", ")}` : "");
           role.appendChild(opt);
         }
@@ -1934,10 +1945,23 @@
       const text = compose.value; if (!text.trim()) return;
       try { await act(id, "send", { text }); compose.value = ""; term.focus(); } catch (e) { banner(`Send failed: ${e.message}`); }
     });
+    // design §4.5a *Focus composer* **prompt chips** (§4.8 *A role has saved prompts*, TD-170): a
+    // press is **Send** with the chip's text — the same `send`, its confirmation and its refusals —
+    // and Shift+press fills the composer for editing instead. The text is the definition's, carried
+    // on the chip, never a session's words.
+    $$("#promptchips .chip").forEach((b) => b.addEventListener("click", async (e) => {
+      const text = b.dataset.text || "";
+      if (e.shiftKey) { compose.value = text; compose.focus(); return; }
+      if (compose.disabled) { banner($("#composehint").textContent || "nothing can be sent now"); return; }
+      try { await act(id, "send", { text }); term.focus(); } catch (err) { banner(`Send failed: ${err.message}`); }
+    }));
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
     function render(v) {
       document.title = AO.focusTitle(v);
+      // the chips go with the composer on a session nothing can be sent to (§4.5a, TD-170)
+      const pc = $("#promptchips");
+      if (pc) pc.classList.toggle("hidden", ["exited", "closed", "limited", "unreachable"].includes(v.state));
       const readyNow = !!((v.ready || []).length && (v.ready || []).every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
       const cls = v.state_class, scraped = v.scraped ? " scraped" : "";
       let head = `<span class="pill s-${cls}${scraped}"><span class="dot"></span>${v.state_label}</span>`;

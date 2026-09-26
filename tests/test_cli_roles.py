@@ -184,6 +184,11 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert data["controllers"] == ["orc"] and [r["name"] for r in data["roles"]][-1] == "reviewer"
     assert next(r for r in data["roles"] if r["name"] == "plain")["message"] is None
     assert next(r for r in data["roles"] if r["name"] == "grinder")["source"] == "built-in + repo"
+    # its saved prompts (design §4.8, TD-170): the labels, on their own line; the text is the file's
+    (root / ".agentorc.yml").write_text(
+        "roles: {plain: {prompts: [{label: sweep, text: /stranded-work}, {label: ok, text: go}]}}\n"
+    )
+    assert cli.main(["roles"]) == 0 and "  prompts: sweep, ok" in capsys.readouterr().out
     (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert cli.main(["roles"]) == 1 and "unknown grant 'fly'" in capsys.readouterr().err
 
