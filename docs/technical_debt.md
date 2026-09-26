@@ -96,7 +96,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
-| TD-179 | Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for `/tmp/…/fixture2/consumer` and `fixture3/consumer` | Low | Open — the anchor removes two lines; the leak is dev-cadence's |
+| TD-179 | Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for `/tmp/…/fixture2/consumer` and `fixture3/consumer` | Low | Partly done — the roster cleaned 2026-09-26; left: tell dev-cadence about the leak |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first |
 | TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Open — design-first, Paul set the shape: the same summary as a running team |
 | TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Open — design-first, a small row change then the build |
@@ -1793,8 +1793,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (found at the promote of #600: `~/.agentorc/repos.json` named them beside the real repos)
 **Owner:** anchor
 **Kind:** build
-**Pickable:** no — the roster is a machine file outside the repo; the anchor edits it, and the leak is dev-cadence's to fix
-**Status:** Open
+**Pickable:** no — what is left is a word to dev-cadence, which is the anchor's to send, and an optional reader change
+**Status:** Partly done — (1) done 2026-09-26: Paul removed the two fixture lines from the roster, and on the next tick the host agent dropped them from `repos.json`, which now lists the six real repos. Left: (2) the note to dev-cadence, and (3) optional.
 **Location:** `~/.config/dev-cadence/repos.txt` (the `repos_registry` default, `src/sessionorc/hosts.py`); `Agent._refresh_repos` in `src/sessionorc/agent.py`
 
 **Why:** the host's repos registry is dev-cadence's machine roster, and it ends with `/tmp/tmp.4dWahA9hY9/fixture2/consumer` and `/tmp/tmp.4dWahA9hY9/fixture3/consumer`, written 2026-09-23 00:29 (the file's mtime). The temp dir holds a copy of dev-cadence (`c/`) beside the two fixtures, each a `consumer` checkout with a `src.git` origin: a sync run under a temp root that wrote to the real roster because `DEV_CADENCE_REG_DIR` / `XDG_CONFIG_HOME` were not pointed at the temp dir. No checked-in dev-cadence test names `fixture2`, so it was likely an ad-hoc run by a session that night. Since TD-176 slice 1 (#595) the host agent reads PRs and the ledger for every roster line, so it now runs `gh` in those fixtures every five minutes, keeps their readings in `repos.json`, and `_board_root` accepts their boards as boards of a known repo. Once `/tmp` is cleaned, the registry still lists them as checkouts that fail every read.
