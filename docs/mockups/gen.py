@@ -492,7 +492,7 @@ def team_desktop():
 
     def group(title, sub, cards_html, needs=0, team=False):
         flag = pill("needs", f"{needs} needs you") if needs else ""
-        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span>'
+        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
                 if team else "")
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
@@ -534,7 +534,7 @@ def team_desktop():
         grid += (f'<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #cbd0d6; border-radius: 8px; '
                  f'padding: 10px 14px; background: #eceef1;" title="defined in {source}">'
                  f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>'
-                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}</div>')
+                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}<span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></div>')
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
@@ -616,7 +616,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
       {next_act}<span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link">{ICON["term"]}Open shell here</span>{vs}
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · {"Close · " if member else ""}<span style="color: #991b1b;">Kill</span></span>
+      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · {"Close · " if member else ""}<span style="color: #991b1b;">Kill</span><span class="btn sm link" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></span>
     </div>'''
 
 def side_card(title, meta="", body="", open_=True):
@@ -1043,6 +1043,33 @@ def transcript():
 </div>
 </div>
 ''' + TAIL
+
+
+HELP = [('Start', 'team card', "Runs the team again from its definition: every check first, then the concluded sessions closed under the wrap-up's own safety check, then the manager and the members created with their briefs. Press it to run the team again — after a wind-down, or when a run has concluded and you want the next. It is not a message: a running session is mailed with Message…, and a session holding uncommitted or unpushed work refuses the start instead of being closed."), ('Wind down', 'team card', 'Sends the wrap-up to every member and then to the manager: each finishes what it holds, pushes, and exits. Press it when the team should stop after the work in hand, not in the middle of it. It kills nothing — Stop now does — and forgets nothing.'), ('Stop now', 'team card', "Kills every session carrying this team's badge, at once, whatever it holds. Press it when waiting for a wind-down is worse than losing the turn in flight. Worktrees and unpushed work stay on disk under the cards, which read exited; Forget is a separate press."), ('the fold', "*n sessions* on a stopped team's card", "Shows or hides a stopped team's cards, which are folded away by default. Press it to read their last lines or their mail, or to Forget them. It changes nothing on any record; which teams you have unfolded is remembered in this browser."), ('Forget', "a card's foot, the exited banner", "Drops this session's record: the card, its report line and its mail. Press it when a finished session's card is clutter — its work merged, or pushed and accounted for. It stops nothing, since a live session offers no Forget; the worktree and the run log stay on disk, and the conversation stays in the tool's own files, where the Resumable list finds it. On a team the seat stays: the definition names it, and Start fills it again."), ('Forget all', 'team card', "The Forget of every exited or closed card of this team, in one press. Press it when the team's run is over and everything it pushed has landed. It never forgets a card carrying work that exists only on this machine — those it names, and you forget them one at a time with the flag in view — nor a seat on call."), ('Kill', 'Focus header, *more ▾*', "Ends this session's process now and destroys its pane; the record stays, reading exited, and the worktree stays. Press it when a session is stuck or running away and a Wrap up would not be read. It is not Close, which also reaps the worktree, and not Forget, which drops the record; both are still there after it."), ('Close', "*Close session* on a card's foot, the Focus side panel, *more ▾*", 'Kills the session and reaps its worktree; the record reads closed. Press it when the work is merged and every line of Ready to close is green. It is offered only when that checklist passes — Kill always is — and it is the one press that removes a worktree.'), ('Wrap up', 'Focus header, *more ▾*', 'Sends the wrap-up prompt — the one a policy sends before a stop — so the session finishes, pushes and ledgers what it holds, then ends its turn. Press it when you want the work saved rather than the process stopped. It kills nothing: the session ends when it says it has, and a stop time does the same on a clock.'), ('Resume', 'the exited banner, a Resumable row', "Starts the conversation again under this name, on this record: the same mail, a new process at the tool's composer. Press it when you want to continue a finished session's conversation. To only read it, press Transcript instead: a resume is a start, which a manager may act on and which has to be closed again."), ('Message…', "a seat's card, *more ▾*, Focus header", "Mails a question or a note into this session's inbox; the session reads it when it next looks, and a question fills a seat on call. Press it to ask or tell a session something without typing into its terminal. It types nothing into the pane — Send does — and it starts no team: a stopped team is started by Start."), ('Switch profile…', 'a `limited` card', 'Re-launches this session under another profile with its conversation carried over. Press it when the account it runs on is capped and another is not. It is a new process on the same record; Wait leaves the session where it is until the account resets.')]
+
+def help_page():
+    """Screen 10 (TD-157): every control's paragraph, by screen — what the *i* marks point at."""
+    by_screen = [("Org — team card", ["Start", "Wind down", "Stop now", "the fold", "Forget all", "Forget", "Close", "Message…", "Switch profile…"]),
+                 ("Focus", ["Wrap up", "Kill", "Close", "Message…"]),
+                 ("Focus — the exited banner", ["Resume", "Forget"])]
+    text = {n: (w, p) for n, w, p in HELP}
+    body = ""
+    for screen, names in by_screen:
+        body += f'<div style="font-weight: 600; margin: 14px 0 6px;">{screen}</div>'
+        for n in names:
+            w, p = text[n]
+            first, rest = p.split(". ", 1)
+            body += f'<div style="padding: 6px 0 6px 14px; border-left: 2px solid #e3e6ea; margin-bottom: 8px;"><div><b>{n}</b> <span class="meta">{w}</span></div><div style="font-size: 14px; line-height: 1.5;">{first}. {rest}</div></div>'
+    return head("Help") + f'''<div style="width: 1440px; min-height: 1500px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; max-width: 900px; align-self: center; width: 100%;">
+  {page_head("Help", "every control with a paragraph, by screen — the same text as the i marks and the tooltips", "")}
+  <div class="card" style="padding: 8px 16px 14px;">{body}</div>
+  <div class="note">Design notes, not page text. One paragraph per control, three sentences — what it does, when you would press it, what it does not do (design §4.5a <i>The help text</i>, TD-157). The paragraph's first sentence is the control's hover title; an <i>i</i> mark beside a control group opens the group's paragraphs in place; this page holds all of them, reached from the <span class="mono">?</span> overlay's last line and from every mark. The text is written once, in §4.5a, and a test holds the code's copy equal to it.</div>
+</div>
+</div>
+''' + TAIL
+
 
 
 def resumable():
@@ -1530,6 +1557,7 @@ files = {
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
+    "Help.dc.html": help_page(),
     "Transcript.dc.html": transcript(),
     "Message.dc.html": message_dialogs(),
     "Commands.dc.html": commands(),
@@ -1560,6 +1588,7 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
+    ("Help.dc.html", "Help", 0),
     ("Transcript.dc.html", "Transcript", 0),
     ("Message.dc.html", "Message — when it is read", 0),
     ("Phone.dc.html", "Org — phone", 1),
@@ -1591,7 +1620,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 11 (2026-09-25, TD-157): screen 10, Help, and the i marks on the team card's header and the Focus header.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
