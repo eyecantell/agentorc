@@ -5,7 +5,7 @@
    the server. Rendered on page load and re-sent with the groups on every delta and on the
    `repos` and `doing` events; the client swaps it whole, as it swaps the header. #}
 {% set m = g.summary %}
-<div class="tsum" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
+<div class="tsum" id="tsum-{{ g.team }}" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
   {# -- Repo (§4.5a *team card: Repo facet*) -- #}
   <div class="facet frepo">
     {% if not m.repo %}

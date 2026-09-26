@@ -1,0 +1,38 @@
+{# The Org **rollup** (design §4.5 screen 1 *The Org, team-first*, §4.5a *Org: rollup*, TD-176
+   slice 4): four facets under the title, sums over every live team, every number a link. Rendered
+   on page load and re-sent with the groups on every delta and on the `repos` and `doing` events.
+   The window picker is the page's one value (the client sets it); *in the Inbox* is the top bar's
+   count, copied in by the client. #}
+{% if ro %}
+<div class="rollup">
+  <div class="facet">
+    <div class="fhead"><span class="kind">Agents ({{ ro.n_agents }})</span></div>
+    <div class="row gap wrap">{% for a in ro.agents %}<button type="button" class="pill nog s-{{ a.cls }}" data-state-filter="{{ a.word }}" title="show only the {{ a.label }} sessions — the filter box's state:{{ a.word }}">{{ a.label }} ({{ a.n }})</button>{% endfor %}</div>
+    <div class="meta">in urgency order, as the cards sort · a pill filters the page to that state</div>
+  </div>
+  <div class="facet">
+    <div class="fhead"><span class="kind">TDs in motion ({{ ro.motion }})</span></div>
+    {% if ro.phases %}
+    <div class="bar" role="img" aria-label="the references members hold, by phase">{% for p in ro.phases %}<a class="bseg phase ph-{{ p.key }}" href="{{ p.url or '#' }}" style="flex-basis: {{ p.pct }}%;" title="{{ p.n }} {{ p.key }}">{{ p.n }}</a>{% endfor %}</div>
+    <div class="legend">{% for ph in ('add', 'design', 'grind', 'review') %}<span><i class="ph-{{ ph }}"></i>{{ ph }}</span>{% endfor %}</div>
+    {% else %}<div class="meta">nothing claimed on any live team</div>{% endif %}
+  </div>
+  <div class="facet">
+    <div class="fhead"><span class="kind">PRs in motion ({{ ro.prs_open }})</span><span class="grow"></span>
+      <span class="seg" data-pick="win">{% for w in ('day', 'week', 'month') %}<button type="button" data-v="{{ w }}">{{ w }}</button>{% endfor %}</span></div>
+    {% if ro.has_repo %}
+    {% for w in ('day', 'week', 'month') %}{% set b = ro.prs[w] %}
+    <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
+      <div class="blocks"><a class="blk opened" href="{{ ro.prs_url or '#' }}" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ ro.prs_url or '#' }}" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
+    </div>
+    {% endfor %}
+    <div class="meta"{% if ro.prs_errors %} title="{{ ro.prs_errors | join('; ') }}"{% endif %}>{{ ro.prs_open }} open{% if ro.waiting %} · {{ ro.waiting }} waiting on review{% endif %}{% if ro.prs_errors %} · a read failed{% endif %}</div>
+    {% else %}<div class="meta">no live team's repo is registered here</div>{% endif %}
+  </div>
+  <div class="facet fneeds{% if ro.answer_needed %} answering{% endif %}">
+    <div class="fhead"><span class="kind">Needs you</span></div>
+    <div class="nrow"><b class="big">{{ ro.answer_needed }}</b> {% if ro.answer_team %}<a href="#tsum-{{ ro.answer_team }}" title="members waiting on a permission or a question — answered in their team's facet">answer needed</a>{% else %}<span>answer needed</span>{% endif %}</div>
+    <div class="nrow"><b class="big" data-inbox-needs>{{ person_needs or 0 }}</b> <a href="/inbox">in the Inbox</a></div>
+  </div>
+</div>
+{% endif %}

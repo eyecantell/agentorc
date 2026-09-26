@@ -155,3 +155,44 @@ def test_compact_in_marks_a_delta_by_the_fleet():
     assert ui.compact_in(dict(v), [member("x", state="exited")]).get("compact") is None
     assert ui.compact_in(dict(v), [member("x")])["compact"]
     assert ui.compact_in({**v, "team": ""}, [member("x")]).get("compact") is None
+
+
+# -- the Org rollup (TD-176 slice 4, §4.5a *Org: rollup*) --------------------------------------------
+
+
+def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
+    perm = {"kind": "permission", "text": "Bash x", "tool_use_id": "t1"}
+    a = [
+        member("g1", state="needs-you", pending=perm, progress=[claim("TD-301", 811)]),
+        member("g2", progress=[claim("TD-290")]),
+    ]
+    b = [{**member("h1", progress=[claim("TD-310")]), "team": "other"}]
+    for m in (*a, *b):
+        m.update(
+            rank=1,
+            slot={},
+            place="kmaster / samscrape",
+            pill_word="needs-you" if m["state"] == "needs-you" else "working",
+        )
+    groups = ui.team_groups([*a, *b], (), {"/r/samscrape": reading("/r/samscrape")}, {})
+    ro = ui.rollup(groups)
+    assert [(x["word"], x["n"]) for x in ro["agents"]] == [("needs-you", 1), ("working", 2)]
+    assert {p["key"]: p["n"] for p in ro["phases"]} == {"design": 1, "grind": 1, "review": 1} and ro["motion"] == 3
+    assert ro["prs"]["day"] == {"opened": 3, "closed": 2, "opct": 60.0}  # one repo, counted once
+    assert ro["prs_open"] == 1 and ro["answer_needed"] == 1 and ro["answer_team"] == "grind"
+    html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=4)
+    assert 'data-state-filter="needs-you"' in html and "needs you (1)" in html
+    assert 'href="#tsum-grind"' in html and "data-inbox-needs>4<" in html
+    assert "Agents (3)" in html and "TDs in motion (3)" in html and "PRs in motion (1)" in html
+    assert ui.rollup(None) is None and ui.rollup([g for g in groups if not g["team"]]) is None
+
+
+def test_every_card_carries_the_word_the_state_filter_matches():
+    assert ui.view({"id": "a", "name": "a", "state": "needs-you"})["pill_word"] == "needs-you"
+    assert ui.view({"id": "a", "name": "a", "state": "stalled?"})["pill_word"] == "stalled"
+    seat = ui.view({"id": "t", "name": "t", "state": "exited"}, seats={"t": "comes on the next question"})
+    assert seat["pill_word"] == "on-call"
+    html = ui.templates.get_template("card.html").render(s=ui.view({"id": "a", "name": "a", "state": "working"}))
+    assert 'data-pill="working"' in html
+    js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
+    assert "/^state:/i" in js and "c.dataset.pill" in js

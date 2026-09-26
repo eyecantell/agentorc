@@ -18,6 +18,8 @@
     <button class="btn ghost" id="mine" aria-pressed="false" title="show only your own sessions — the interactive ones; press again for everyone">{{ role_svg('person') }}mine</button>
     <label class="btn ghost"><input type="checkbox" id="showcmd"> show command runs</label>
   </div>
+  {# design §4.5a *Org: rollup* (TD-176 slice 4): sums over every live team, re-sent with the groups #}
+  <div id="rollup">{% with ro = rollup %}{% include "rollup.html" %}{% endwith %}</div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
   {# design §4.4a: a node's page says whose org it is part of and whether its link is up #}
   {% if node_banner %}<div class="warn" id="nodebanner">⚠ <b>{{ host }}</b>: {{ node_banner }}</div>{% endif %}
