@@ -1643,3 +1643,19 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Related:** §4.5a (the table; *Inbox: section heading, the i mark*; *Settings page: read-only values and the i mark*), TD-148 (the Settings page's *i* marks, the nearest built shape), TD-156 (the end-of-session review this sits beside — the same team card), TD-095 (the card's foot), §4.9a (what Start and Wind down do to a team).
 
 **Resolved:** 2026-09-26 — built by TD-167 (PR #604); design §4.5 screen 10 *Help* and §4.5a *The help text* carry the lasting content.
+
+## TD-178: The Org rollup's overdue count beside *in the Inbox*
+
+**Priority:** Low
+**Added:** 2026-09-26
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-26. Was: open
+**Location:** `src/agentorc/ui/templates/rollup.html` (the Needs you facet), `src/agentorc/ui/static/app.js` (where `[data-inbox-needs]` is copied from the top bar), `src/agentorc/ui/app.py` (the board reader's due items)
+
+**Why:** design §4.5 screen 1 has the rollup's **Needs you** facet show *in the Inbox* "with the overdue count"; TD-176 slice 4 (#598) drew the Inbox count, copied in from the top bar, and not the overdue count, and §4.5a's **Org: rollup** row says so. Left out of TD-176's close (#600) and found at the session's close.
+
+**Resolved:** 2026-09-26 (PR #606, `grinder-ao-2`) — `overdue_n` from `inbox_sections`, the rollup's *m overdue* in `rollup.html`, kept live from the Inbox poll in `app.js`; `test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox`. Design §4.5a *Org: rollup* carries the lasting content.
+
+**Related:** TD-176 (archived), design §4.5 screen 1 *The Org, team-first*, §4.5a **Org: rollup**.
