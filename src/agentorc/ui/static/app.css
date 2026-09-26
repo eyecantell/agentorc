@@ -471,8 +471,18 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .drow .dtext { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 /* the compact card (§4.5a *card: compact*): name and pill, one line, the foot — and no state glyph */
 .sc.compact { gap: 10px; padding: 12px 14px; }
-.sc.compact .pill.nog::before { content: none; }
+.pill.nog::before { content: none; }  /* no state glyph: a compact card, a count pill (§4.5a *state icon*) */
 .sc.compact .r1 .mine .ricon { vertical-align: -2px; margin-left: 4px; }
 .sc.compact .cline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tsum .lv, .tsum .wv, .tsum .fv { display: flex; flex-direction: column; gap: 5px; }
 .tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden] { display: none; }
+/* the Org rollup (§4.5a *Org: rollup*, TD-176 slice 4) */
+.rollup { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr; gap: 12px; margin: 12px 0 18px; }
+@media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 640px) { .rollup { grid-template-columns: minmax(0, 1fr); } }
+.rollup button.pill { border: 0; cursor: pointer; font-family: inherit; }
+.rollup .fneeds.answering { background: var(--warn-bg); border-color: var(--warn-line); }
+.rollup .nrow { display: flex; gap: 8px; align-items: baseline; }
+.rollup .big { font-size: var(--t-title); color: var(--needs-fg); }
+.bseg.phase { border-radius: 2px; } .legend .ph-add { background: var(--ph-add); } .legend .ph-design { background: var(--ph-design); }
+.legend .ph-grind { background: var(--ph-grind); } .legend .ph-review { background: var(--ph-review); }

@@ -835,10 +835,15 @@
     // `team:<name>` is the form the card's team badge writes: an exact match on the badge, not a
     // substring of the card's text, so a team whose name also appears in a branch stays clean.
     const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
-    const q = team === null ? raw.toLowerCase() : "";
+    // `state:<word>` is the form the rollup's Agents pills write (§4.5a **filter…**, TD-176): the
+    // card's pill word, hyphenated — `needs-you`, `working`, `on-call`
+    const state = /^state:/i.test(raw) ? raw.slice(6).trim().toLowerCase() : null;
+    const q = team === null && state === null ? raw.toLowerCase() : "";
     $$("#groups .sc").forEach((c) => {
       const hideKind = c.dataset.kind === "command" && !cmd;
-      const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team : !!q && !c.textContent.toLowerCase().includes(q);
+      const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team
+        : state !== null ? (c.dataset.pill || "") !== state
+        : !!q && !c.textContent.toLowerCase().includes(q);
       c.hidden = hideKind || miss || (mine && !c.dataset.mine);  // *mine* composes with the box (§4.5a)
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
@@ -925,6 +930,16 @@
     return { led: store.get("led:" + team, "open"), win: store.get("win", "day"), face };
   }
   function syncSummaries() {
+    // the rollup's window picker is the same one value (§4.5a *Org: rollup*), and its *in the
+    // Inbox* is the top bar's count
+    const ro = $("#rollup .rollup");
+    if (ro) {
+      const win = store.get("win", "day");
+      $$(".wv", ro).forEach((el) => (el.hidden = el.dataset.wv !== win));
+      $$(".seg[data-pick=win] button", ro).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === win ? "true" : "false"));
+      const n = $("#personneeds"), into = $("[data-inbox-needs]", ro);
+      if (n && into) into.textContent = n.textContent.trim() || "0";
+    }
     $$("#groups .tsum").forEach((sum) => {
       const st = summaryState(sum);
       $$(".lv", sum).forEach((el) => (el.hidden = el.dataset.lv !== st.led));
@@ -940,6 +955,7 @@
   function pickSummary(b) {
     const sum = b.closest(".tsum"), pick = b.closest(".seg").dataset.pick, v = b.dataset.v;
     if (pick === "win") store.set("win", v);
+    else if (!sum) return;
     else if (pick === "led") store.set("led:" + sum.dataset.team, v);
     else faceFlip[sum.dataset.team] = { key: sum.dataset.answerKey || "", face: v };
     syncSummaries();
@@ -1537,6 +1553,17 @@
       const p = e.target.closest(".tsum .seg[data-pick] button");
       if (p && !p.disabled) pickSummary(p);
     });
+    // the rollup (TD-176 slice 4): its window picker is the page's one value, and an Agents pill
+    // types `state:<word>` into the filter box — pressed again, it clears it
+    const rollupBox = $("#rollup");
+    if (rollupBox) rollupBox.addEventListener("click", (e) => {
+      const p = e.target.closest(".seg[data-pick] button");
+      if (p) return pickSummary(p);
+      const pill = e.target.closest("[data-state-filter]"); if (!pill) return;
+      const f = $("#filter"), q = "state:" + pill.dataset.stateFilter;
+      f.value = f.value.trim().toLowerCase() === q ? "" : q;
+      layout();
+    });
     layout();
     if (popChan()) popChan().postMessage({ who: true });  // the popped windows answer with their ids
     connectEvents((ev) => {
@@ -1561,15 +1588,18 @@
         // of one id, and the cause is not reproduced yet; until it is, a delta leaves one card per id.
         $$(`[id="card-${CSS.escape(ev.id)}"]`).slice(1).forEach((dup) => dup.remove());
         if (ev.groups !== undefined) syncGroups(ev.groups);
+        if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
         AO.markPopped(fresh);
         layout();
       } else if (ev.event === "gone") {
         const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
         if (ev.groups !== undefined) syncGroups(ev.groups);
+        if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
         layout();
       } else if (ev.event === "groups") {
         // the repo facts or a doing call moved (TD-176): the summaries are in the groups
         syncGroups(ev.groups);
+        if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
         layout();
       } else if (ev.event === "error") AO.toast(ev.text);
     });

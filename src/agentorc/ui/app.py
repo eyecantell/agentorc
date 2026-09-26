@@ -717,6 +717,8 @@ def view(
         d["seat_when"] += f" · {counted} of {trig.get('after')}"
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
+    # the word the Org filter's `state:` matches (§4.5a **filter…**, TD-176): the pill's, hyphenated
+    d["pill_word"] = "on-call" if d["seat"] else "unseen" if d["unseen"] else str(state).rstrip("?")
     # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, the host agent's; a
     # seat the definition names reads as one whatever the record's own `seat` says, so the pair is
     # the seat's from here (`mail.read_when` is the one function either way)
@@ -1426,6 +1428,80 @@ def team_summary(
         "face": "answer" if answers else "doing",
         # what the toggle's memory keys on: a person's flip holds until the pending set changes (§4.5a)
         "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}" for a in answers)),
+    }
+
+
+# the rollup's Agents pills, in the grid's urgency order: (the filter word, the pill's class, its label)
+ROLLUP_STATES = (
+    ("needs-you", "needs", "needs you"),
+    ("limited", "limited", "limited"),
+    ("stalled", "stalled", "stalled?"),
+    ("unreachable", "unreachable", "unreachable"),
+    ("working", "working", "working"),
+    ("unseen", "idle", "unseen"),
+    ("idle", "idle", "idle"),
+    ("on-call", "oncall", "on call"),
+    ("exited", "exited", "exited"),
+    ("closed", "closed", "closed"),
+)
+
+
+def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    """The Org **rollup** (§4.5a *Org: rollup*, TD-176 slice 4): sums over every live team — the
+    Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
+    holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
+    counted once), and Needs you's *answer needed*. None when no team is live: the page then has no
+    rollup, as it has no summaries. The Inbox's count is the top bar's, filled in by the client."""
+    live = [g for g in groups or [] if g.get("team") and g.get("summary")]
+    if not live:
+        return None
+    members = [m for g in live for m in g["members"]]
+    tally: dict[str, int] = {}
+    for m in members:
+        tally[str(m.get("pill_word") or m.get("state"))] = tally.get(str(m.get("pill_word") or m.get("state")), 0) + 1
+    agents = [{"word": w, "cls": c, "label": label, "n": tally[w]} for w, c, label in ROLLUP_STATES if tally.get(w)]
+    phases: dict[str, int] = {ph: 0 for ph in PHASES}
+    lead: dict[str, str] = {}
+    for ph in PHASES:
+        best = max(live, key=lambda g: g["summary"]["phases"].get(ph, 0))
+        phases[ph] = sum(g["summary"]["phases"].get(ph, 0) for g in live)
+        if phases[ph] and best["summary"].get("repo"):
+            lead[ph] = f"{best['summary']['repo']['url']}?phase={ph}"
+    motion = sum(phases.values())
+    repos: dict[str, dict[str, Any]] = {}
+    for g in live:
+        r = g["summary"].get("repo")
+        if r and r["name"] not in repos:
+            repos[r["name"]] = r
+    wins = {w: {"opened": 0, "closed": 0} for w in WINDOWS}
+    n_open, errors = 0, []
+    for r in repos.values():
+        p = r["prs"]
+        if p["error"]:
+            errors.append(f"{r['name']}: {p['error']}")
+        n_open += p["n"] or 0
+        for w in WINDOWS:
+            for k in ("opened", "closed"):
+                wins[w][k] += int(((p["windows"] or {}).get(w) or {}).get(k) or 0)
+    busiest = max(repos.values(), key=lambda r: r["prs"]["n"] or 0, default=None)
+    answers = [(g["team"], a) for g in live for a in g["summary"]["answers"]]
+    return {
+        "agents": agents,
+        "n_agents": len(members),
+        "phases": [
+            {"key": ph, "n": phases[ph], "pct": round(100 * phases[ph] / motion, 1), "url": lead.get(ph, "")}
+            for ph in PHASES
+            if phases[ph]
+        ],
+        "motion": motion,
+        "prs": {w: _blocks(wins[w]) for w in WINDOWS},
+        "prs_open": n_open,
+        "prs_url": f"{busiest['url']}#prs" if busiest else "",
+        "prs_errors": errors,
+        "has_repo": bool(repos),
+        "waiting": sum(int((g.get("prs_waiting") or {}).get("n") or 0) for g in live),
+        "answer_needed": len(answers),
+        "answer_team": answers[0][0] if answers else "",
     }
 
 
@@ -2558,9 +2634,22 @@ def create_app() -> FastAPI:
         its key, the member ids in order, and the header rendered by the same template the page
         uses — so the client moves cards between groups and swaps headers without composing any
         markup of its own. `None` means "flat grid", exactly as the page renders it."""
+        return (await heads(known, repos, doing))["groups"]
+
+    async def heads(
+        known: dict[str, dict[str, Any]],
+        repos: Mapping[str, Any] | None = None,
+        doing: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """What every delta carries for the page's layout: the groups (`group_heads`) and the
+        rollup's markup (§4.5a *Org: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
         fleet = list(known.values())
         seats = await seats_of(fleet)
         groups = team_groups([view(s, fleet, seats=seats) for s in fleet], await team_rows(fleet), repos, doing)
+        ro = templates.get_template("rollup.html").render(ro=rollup(groups))
+        return {"groups": render_heads(groups), "rollup": ro}
+
+    def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
         if groups is None:
             return None
         head = templates.get_template("group_head.html")
@@ -2703,6 +2792,7 @@ def create_app() -> FastAPI:
         team_rows=team_rows,
         seats_of=seats_of,
         group_heads=group_heads,
+        heads=heads,
         repo_facts=repo_facts,
         identity_info=identity_info,
         person_states=person_states,
@@ -2779,7 +2869,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": team_groups(vs, strip["teams"], repos, doing),
+                "groups": (groups := team_groups(vs, strip["teams"], repos, doing)),
+                "rollup": rollup(groups),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),
@@ -3669,7 +3760,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
 def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The two websockets: the events stream and the terminal."""
-    call, render_card, seats_of, group_heads = h.call, h.render_card, h.seats_of, h.group_heads
+    call, render_card, seats_of, heads = h.call, h.render_card, h.seats_of, h.heads
     repo_facts = h.repo_facts
 
     # -- live state ------------------------------------------------------------------------------
@@ -3723,7 +3814,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                 "rank": v["rank"],  # the view's: unseen idle sorts above idle
                                 "html": render_card(v),
                                 "session": v,
-                                "groups": await group_heads(known, repos, doing),
+                                **await heads(known, repos, doing),
                             }
                         )
                     )
@@ -3766,16 +3857,14 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         ring.append(ev["entry"])
                         del ring[:-DOING_KEPT]
                     await ws.send_text(json.dumps(ev))
-                    await ws.send_text(
-                        json.dumps({"event": "groups", "groups": await group_heads(known, repos, doing)})
-                    )
+                    await ws.send_text(json.dumps({"event": "groups", **await heads(known, repos, doing)}))
                 elif ev.get("event") in ("gone", "usage"):
                     if ev.get("event") == "gone":
                         # only a `gone` names a session; a `usage` event carries a profile, and
                         # popping on it would one day evict a live session by coincidence
                         went = str(ev.get("id") or "")
                         known.pop(went, None)
-                        await ws.send_text(json.dumps({**ev, "groups": await group_heads(known, repos, doing)}))
+                        await ws.send_text(json.dumps({**ev, **await heads(known, repos, doing)}))
                         # A card's *under* chip names another record, so the session that went
                         # is not the only card now out of date: every card listing it as a
                         # controller has to be redrawn, or it keeps naming and linking to a

@@ -7,7 +7,7 @@
    (§4.5a Org **keys**: the ring, TD-124) — apart from the amber *needs you* ring #}
 <div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}{% if s.compact %} compact{% endif %}" id="card-{{ s.id }}" tabindex="0"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
-     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}{% if not s.unattended %} data-mine="1"{% endif %}>
+     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}" data-pill="{{ s.pill_word }}"{% if s.unseen %} data-unseen="1"{% endif %}{% if not s.unattended %} data-mine="1"{% endif %}>
   <div class="sbar"></div>
   {% if s.compact %}
   {# the **compact** card (design §4.5a *card: compact*, TD-176 slice 3): a member of a live team —
