@@ -1,0 +1,19 @@
+{# design §4.5a the ***i*** mark (TD-157, built by TD-167): one mark per control group, the Inbox's
+   shape — a `<button>` labelled *About these controls*, a tooltip naming the group's controls, and
+   pressed it opens its panel in place under the group: one paragraph per control from `help.py`
+   (§4.5a *The help text*), then *every control → Help*. The panel is in the page always and closed
+   by `hidden`, since it is also the button's `aria-describedby`; which are open is remembered in
+   this browser (`AO.helpMarks`). Fixed text in the source, never a session's. #}
+
+{% macro mark(group, id) -%}
+<button class="imark helpmark" type="button" data-help="{{ group }}" data-info="help-{{ id }}" id="i-help-{{ id }}" aria-controls="help-{{ id }}" aria-expanded="false" aria-describedby="help-{{ id }}" aria-label="About these controls" title="About these controls: {{ help_names(group) }}">i</button>
+{%- endmacro %}
+
+{% macro panel(group, id) -%}
+<div class="note secinfo helppanel" id="help-{{ id }}"{% for h in help_group(group) %} data-title-{{ h.key }}="{{ help_title(h.key) }}"{% endfor %} hidden>
+  {%- for h in help_group(group) %}
+  <p><b>{{ h.name }}</b> — {{ h.text }}</p>
+  {%- endfor %}
+  <p><a href="/help#{{ help_screen(group) }}">every control → Help</a></p>
+</div>
+{%- endmacro %}

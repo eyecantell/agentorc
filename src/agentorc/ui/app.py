@@ -42,6 +42,7 @@ from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, has_control, normalize_ref, report_head, report_line, stop_note
 
+from . import help as helpmod
 from . import render as rendermod
 from . import uiconf
 from .icons import role_svg
@@ -108,6 +109,13 @@ def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
 
 
 templates.env.globals["shaped"] = shaped
+# design §4.5a *The help text* (TD-167): a control's `title` is its paragraph's first sentence, and a
+# mark's panel the group's paragraphs — every one of them from `help.py`, the one table
+templates.env.globals["help_title"] = helpmod.first_sentence
+templates.env.globals["help_group"] = lambda g: [helpmod.BY_KEY[k] for k in helpmod.GROUPS[g]]
+templates.env.globals["help_names"] = lambda g: ", ".join(helpmod.BY_KEY[k].name for k in helpmod.GROUPS[g])
+templates.env.globals["help_screen"] = lambda g: helpmod.GROUP_SCREEN[g]
+templates.env.globals["help_where"] = lambda where: Markup(rendermod.inline(where))  # the design's *emphasis*, as text
 
 
 def page_origin(request: Request) -> str:
@@ -2893,7 +2901,15 @@ def create_app() -> FastAPI:
         board_items=board_items,
         inbox_html=inbox_html,
     )
-    for register in (_pages_routes, _new_routes, _sessions_routes, _teams_routes, _inbox_routes, _stream_routes):
+    for register in (
+        _pages_routes,
+        _new_routes,
+        _sessions_routes,
+        _teams_routes,
+        _inbox_routes,
+        _help_routes,
+        _stream_routes,
+    ):
         register(app, h)
     return app
 
@@ -3580,6 +3596,29 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             msg += f" — {pending} follows when they settle"
         return JSONResponse(
             {"ok": True, "team": name, "now": now, "sessions": st.acted, "manager": pending, "text": msg}
+        )
+
+
+def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """The Help page (design §4.5 screen 10, §4.5a *Help page*; TD-157, built by TD-167)."""
+
+    @app.get("/help", response_class=HTMLResponse)
+    async def help_page(request: Request):
+        """Every control that has a paragraph in §4.5a *The help text*, by screen, each under a
+        heading whose id is the control's, so a mark's *every control → Help* lands on its group.
+        Display only — nothing on it is a control — and fixed text from `help.py`, which
+        `tests/test_help.py` holds equal to the design's list."""
+        screens = [(sid, title, [helpmod.BY_KEY[k] for k in keys]) for sid, title, keys in helpmod.SCREENS]
+        return templates.TemplateResponse(
+            request,
+            "help.html",
+            {
+                "screens": screens,
+                "host": host_name(),
+                "active": "",
+                "usage": {},
+                "volatile": hosts.local_host().volatile,
+            },
         )
 
 
