@@ -93,7 +93,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Designed 2026-09-25 (the designer) — the build is TD-170; archives with it |
 | TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Designed 2026-09-25 (the designer) — the build is TD-171; archives with it |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Designed 2026-09-25 (the designer) — the build is TD-172; archives with it |
-| TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
+| TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Designed 2026-09-25 (the designer) — the build is TD-174; archives with it |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
@@ -102,6 +102,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-170 | Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles` | Medium | Open |
 | TD-171 | Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles` | Medium | Open |
 | TD-172 | Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back* | Medium | Open |
+| TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 
 
 ---
@@ -1709,9 +1710,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *is shift-drag necessary for copy/paste in the tmux terminals or should we change it to auto-copy selected text? Ideally it would work smoothly like in vscode terminals where a selection can be made, then grown/shrunk with a shift-click*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-174
 
-**Status:** Open — nothing designed. Today the Focus terminal is a terminal emulator's: the attach sets `mouse on` on the tmux session so the wheel reaches tmux's own history (§4.6 *Scrollback is tmux's*, TD-022), and because tmux then asks for mouse tracking, a plain drag goes to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only Shift+drag selects in the browser, then **Copy**, Ctrl+C with a selection or Ctrl+Shift+C (§4.5a *Focus: Copy / Paste*; `focus.html`'s Copy tooltip and the `select text in the terminal first (Shift+drag: plain drag goes to tmux)` toast in `app.js` say so). The rule is what a tmux user expects of a real terminal, and it is the wrong rule for a browser pane that is mostly read.
+**Status:** Designed 2026-09-25 (the designer): design §4.6 *Scrollback is tmux's* (**The mouse is the browser's**) and *A read-only attach* (the carve-out goes), §4.5a *Focus: Copy / Paste* and the **copy on select** toggle row, §5 `person.terminal.copy_on_select`, §4.5 screen 8 **You**; mockup `Focus.dc.html` (the toggle). Settled: (a) no `mouse on` on the attach, no tracking, a plain drag selects; the wheel is a scroll message with a line count the bridge turns into `copy-mode -e; send-keys -X -N n scroll-up`; (b) Shift+drag still selects and Shift+click grows — xterm.js's own selection service (`shiftKey → _handleIncrementalClick`), checked in the vendored source rather than a live pane; (c) copy on select is the one toggle, **on by default**, Ctrl+C-with-selection and Copy unchanged; (d) a person's setting, `person.terminal.copy_on_select` through `set_settings` — yours everywhere, as the terminal's face, not per browser; (e) a program asking for the mouse itself gets none, and there is no per-session escape; (f) the rows, the paragraphs, the texts named for the build. The design is PR #574, stacked on #572; the default-on choice is on the board for Paul (the designer's line of 2026-09-25, extended here — the person inbox is full), and #574 merges after 2026-09-26 08:45 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-174; this entry archives with it. **What was:** nothing designed. Today the Focus terminal is a terminal emulator's: the attach sets `mouse on` on the tmux session so the wheel reaches tmux's own history (§4.6 *Scrollback is tmux's*, TD-022), and because tmux then asks for mouse tracking, a plain drag goes to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only Shift+drag selects in the browser, then **Copy**, Ctrl+C with a selection or Ctrl+Shift+C (§4.5a *Focus: Copy / Paste*; `focus.html`'s Copy tooltip and the `select text in the terminal first (Shift+drag: plain drag goes to tmux)` toast in `app.js` say so). The rule is what a tmux user expects of a real terminal, and it is the wrong rule for a browser pane that is mostly read.
 
 **Why:** the pane is where a person reads a session's output and lifts a line out of it — an error, a path, a PR number — and today the first drag they try does the wrong thing silently: tmux takes it, the clipboard stays as it was, and the toast is the only teacher. A browser can offer both gestures at once, so this need not be a setting over which drag selects; the one real choice is whether a selection copies itself.
 
@@ -1888,6 +1889,31 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-160's *Done when*: Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so); and Wind down on ao-grind with his session live names it as staying.
 
 **Related:** TD-160 (the design), TD-093 (the reader), TD-036 (controllers prefill), TD-040 (the Role pick's rebuild), TD-053 (wound down), TD-161 / TD-162 (what a person in the team presses and whom they message).
+
+## TD-174: Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-164's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.6 *Scrollback is tmux's* (**The mouse is the browser's**), *A read-only attach*, §4.5a *Focus: Copy / Paste* and **copy on select**, §5 `person:`, §4.5 screen 8 **You**; mockup `Focus.dc.html`.
+
+**Location:** `src/sessionorc/tmux.py` (the attach argv ~line 46: the chained `set-option mouse on` goes), `src/agentorc/ui/pty_bridge.py` (the scroll argv ~line 77: takes `lines`, emits `copy-mode -e -t target ; send-keys -X -N n scroll-up|scroll-down`; `WHEEL_ONLY` and its `read_only` carve-out removed), `src/agentorc/ui/static/app.js` (a `wheel` listener on `#term` batching notches per animation frame into `{scroll, lines}`; the toggle's `change` → `set_settings`; `term.onSelectionChange` copying when on and the selection has ended; the toast *select text in the terminal first (Shift+drag: plain drag goes to tmux)* reworded), `src/agentorc/ui/templates/focus.html` (the toggle beside `#tcopy`, its `title`; `#tcopy`'s tooltip reworded), `src/agentorc/ui/app.py` and `src/sessionorc/agent.py` (`settings` / `set_settings`: the `person.terminal.copy_on_select` key, default true, replicated as `person.terminal` is), the Settings page's **You** section (TD-148 builds the page; this adds the row).
+
+**Why:** TD-164's *Why*: the first drag a person tries does the wrong thing silently.
+
+**Fix:**
+1. **Tracking off**: the attach no longer sets `mouse on`; `WHEEL_ONLY` goes; a test that the attach argv carries no `set-option`.
+2. **The wheel**: `{scroll: "up"|"down", lines: n}` per animation frame; the scroll argv takes `lines`; the Shift+PageUp message keeps `lines` absent → a page, as before. A test on the argv for lines and for a page.
+3. **The selection**: nothing to build — with tracking off xterm.js selects on drag and extends on Shift+click; the PR says it was seen live.
+4. **Copy on select**: the toggle, the setting (default true), the copy on selection end when on, the disabled state without a secure context. `src/sessionorc/**` is a held path (the attach argv, the settings key): the techlead reads this PR.
+5. **The texts**: Copy's tooltip, the toast, the toggle's `title`, from §4.5a.
+6. **Tests:** the argvs; the setting's default and replication; the toggle's write under node as `test_ui_keys.py` runs `app.js`; the read-only attach still passes scroll and drops keys.
+
+**Done when** TD-164's *Done when*: Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
+
+**Related:** TD-164 (the design), TD-022 (scrollback is tmux's), TD-096 (the read-only attach), TD-146–148 (the settings file and page), TD-157 / TD-167 (the toggle's `title` as its mark), goal 12 (a pane you type into).
 
 ## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
 

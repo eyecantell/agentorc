@@ -196,6 +196,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-154, the designer; raised by Paul, who resumed the designer to read what it had done): **screen 9, Transcript** — a read-only page of a session's conversation folded as the pane draws it, from the Focus header on any state and from each Resumable row, VS Code beside it for the raw file; resuming to read was the wrong tool three times over (a live session, a lifecycle event, a close). The raw-file-only option was rejected: one JSON object per line is not a reading surface. Build: TD-165 (the adapter's read, the RPC, the node read, the CLI), TD-166 (the page and the button).
 - 2026-09-25 (TD-157, the designer; raised by Paul at a concluded team's card — *what do "forget" and "start" really mean?*): **screen 10, Help** — every control's paragraph by screen, reached from the *i* marks and the `?` overlay; not a tab. Build: TD-167.
 - 2026-09-25 (TD-160, the designer; Paul: *I should start having interactive sessions on the team itself*): the New session form's **Team** pick (screen 3).
+- 2026-09-25 (TD-164, the designer): screen 8's **You** lists copy on select with the terminal's face and size.
 
 ## 4.5a Controls
 
@@ -285,6 +286,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-161, the designer; Paul: *lets talk about adding on-demand buttons for interactive sessions*): **prompt chips** beside Send on an interactive session's composer — a press is a Send of the role's saved prompt, Shift+press fills the composer — and beside the Opening prompt on New session, where a press fills. Rejected: a chip that only fills (two presses where Paul asked for one, and on a phone the second is the hard one) and per-chip schedules or grants (a chip is a Send and nothing more).
 - 2026-09-25 (TD-162, the designer; Paul: *add info icons to each team member's message button to say when you would want to message them*): the composer's first line is the role's `message:` sentence, the same sentence is the Message control's `title`, and the team header gains a **who for what** line. Rejected: a mark on every card's Message (the Org card is quiet, TD-095: the header's line answers the choice at the team, and the control's `title` at the card) — put to Paul as the alternative.
 - 2026-09-25 (TD-163, the designer; Paul: *a button on the team card to add/remove a member*): **Members…** on the team card and the dialog's **Add member** / **Remove**.
+- 2026-09-25 (TD-164, the designer; Paul: *is shift-drag necessary for copy/paste … should we change it to auto-copy selected text?*): the Copy row says a plain drag selects and Shift+click grows; the **copy on select** toggle, on by default, a person's setting through `set_settings`. Rejected: a per-browser preference like the fold (the terminal's face and size already follow the home) and default off as VS Code has it (a pane that is mostly read is where a line is lifted out).
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
@@ -303,6 +305,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-11 (TD-029): the reconnect contract's three rules were added because the reconnect loop did not terminate: backoff had been resetting on open, the server closed 4404 only when the record already said the pane was gone, and the page waited for the next tick to learn a session was killed or closed.
 - 2026-09-16 (§4.4a): the ssh rule was revised — the UI holds the link to the home host agent only; other host agents dial the home; the protocol, backoff and `unreachable` diagnosis carry over to that link, which multiplexes requests by id. Terminal attaches to a session on another host kept their own ssh.
 - (TD-096, undated in this chunk): the read-only attach for `unattended` sessions was added, enforced in the UI process rather than the terminal widget.
+- 2026-09-25 (TD-164, the designer): **the mouse is the browser's** — no `mouse on` on the attach, no tracking, a plain drag selects, Shift+click extends (xterm.js's own, checked in the vendored source), the wheel a scroll message with a line count that the bridge turns into `copy-mode -e; send-keys -X -N n scroll-up`; the read-only attach's wheel-only carve-out goes with tracking; a program asking for the mouse itself gets none, and there is no per-session escape.
 
 ## 4.7 CLI
 - (TD-010 b): `ao new --attach` "where you would have typed `claude`" gave a terminal-started session a first-class card.
@@ -529,6 +532,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-128 reconciled, with Paul): the amount is read against the account's spend, not the profile's; `profiles.yml` carries `prices:` by token kind.
 - 2026-09-25 (TD-149 (2), (4), (6), grinder-ao-1): `promote:` accepted in `.agentorc.yml` ahead of TD-132 (it was refused as an unknown key, so writing the designed block broke `ao new` in that repo); the org `roles:` overlay checked key by key as a repo's is (it was taken raw); `AGENTORC_TICK` named as the one test knob.
 - 2026-09-25 (TD-161, the designer): the `roles:` example gains `plain: {prompts: […]}`, the person's own chips.
+- 2026-09-25 (TD-164, the designer): `person.terminal.copy_on_select`, default true.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
