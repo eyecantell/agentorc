@@ -488,3 +488,4 @@ For a §6 policy: nothing new beyond what's already carried forward — the long
 20:57  grinder-ao-1 resumed working again (still carrying the stale restart_wanted, board PR #593 already covers it).
 21:05Z  grinder-ao-2: TD-178 done → PR #606 merged (Org rollup overdue count). Cadence check pass (review SHIP, ci green, ledger named, worktree clean). No held paths.
 21:11Z  grinder-ao-2: TD-171 done → PR #605 merged (when to message whom). Cadence check pass (review FIXED 2 findings, ci green, ledger named). No held paths.
+21:18Z  grinder-ao-2: TD-170 done → PR #607 merged (prompt chips). Cadence check pass (review SHIP, ci green, ledger named). No held paths. grinder-ao-1 still cycling idle/working with the same stale restart_wanted (board PR #593 already covers it).
