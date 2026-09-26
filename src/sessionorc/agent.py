@@ -37,6 +37,7 @@ from typing import Any
 
 from sessionorc import adapters, build, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
 from sessionorc import board as board_mod
+from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
@@ -73,6 +74,7 @@ from sessionorc.store import (
     EventQueue,
     IdentityAlarmStore,
     PersonInboxStore,
+    RepoStore,
     SessionStore,
     UsageStore,
 )
@@ -202,6 +204,8 @@ def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[
     placed = {e.id for e in out}
     left = sorted((e for e in found.values() if e.id not in placed), key=lambda e: (e.at, e.id))
     return out + left  # boxes that disagree (never expected) still lose nothing
+
+
 # What the home pushes a node about each of its records (§4.4a "The home pushes each node its
 # records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
 # inbox, outbox, threads, wakes and `mail_decided` stay the home's, and no message body ever reaches
@@ -227,6 +231,10 @@ REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state
 # minutes, not one** (TD-087): the shortest window the endpoint reports is five hours, so a
 # minute buys nothing and spends an allowance shared with the tool itself.
 USAGE_EVERY = 300.0
+# Seconds between reads of the repo facts (design §4.4 *Repo facts*, TD-176): each registered
+# checkout's PRs through `gh` and its ledger's git history, in a thread. The ledger itself is
+# re-read on any tick its file's mtime moved, since that read is a local file.
+REPOS_EVERY = 300.0
 USAGE_BACKOFF_MAX = 3600.0  # the ceiling a 429 doubles up to, when the endpoint sends no Retry-After
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
@@ -491,6 +499,13 @@ class HostAgent:
         self._usage_checked: dict[str, float] = {}
         self._usage_wait: dict[str, float] = {}
         self._usage_task: asyncio.Task[None] | None = None
+        # The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), kept across a
+        # restart in `repos.json`; the home's alone — a node reads none of this (§4.4a).
+        self.repos_store = RepoStore()
+        self._repos: dict[str, dict[str, Any]] = self.repos_store.load()
+        self._repos_read_at = float("-inf")  # monotonic: the first tick reads
+        self._ledger_mtime: dict[str, float | None] = {}
+        self._repos_task: asyncio.Task[None] | None = None
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
         # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
@@ -626,6 +641,9 @@ class HostAgent:
             if day != self._backed_up and (self._backup_task is None or self._backup_task.done()):
                 self._backed_up = day  # tried once a day: a failure is a log line and tomorrow's retry
                 self._backup_task = asyncio.create_task(self._backup(day))
+        if self.mode == "home" and (self._repos_task is None or self._repos_task.done()):
+            # detached as the usage refresh is: `gh` talks to the network (§4.4 *Repo facts*)
+            self._repos_task = asyncio.create_task(self._refresh_repos())
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
@@ -1112,6 +1130,115 @@ class HostAgent:
             and not git.get("unpushed")
             and not s.pending
         )
+
+    async def _refresh_repos(self) -> None:
+        """The repo facts (design §4.4 *Repo facts*, TD-176): for every checkout the repos registry
+        lists, the PRs and the ledger with its history every `REPOS_EVERY`, and the ledger alone on
+        any tick its file's mtime moved. The PRs are read once per remote, so two checkouts of one
+        repo are one `gh` read. A read that failed keeps the last reading with `error` and
+        `failed_at` beside it — an outage is never zero PRs. A changed reading is saved and pushed
+        as a `repos` event; a checkout the registry no longer lists is dropped with `repo: null`."""
+        try:
+            due = time.monotonic() - self._repos_read_at >= REPOS_EVERY
+            roots = hosts.local_host().repos()
+            mtimes = await asyncio.to_thread(self._ledger_mtimes, roots)
+            todo = [r for r in roots if due or mtimes.get(r) != self._ledger_mtime.get(r) or r not in self._repos]
+            gone = [r for r in self._repos if r not in roots]
+            if not (todo or gone):
+                return
+            prev = {r: self._repos.get(r) or {} for r in todo}
+            # a checkout read for the first time gets the whole reading at once, not in five minutes
+            full = {r for r in todo if due or r not in self._repos}
+            got = await asyncio.to_thread(self._read_repos, todo, prev, full) if todo else {}
+            if due:
+                self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
+            for root in todo:
+                self._ledger_mtime[root] = mtimes.get(root)
+            changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
+            for r in gone:
+                self._repos.pop(r, None)
+                self._ledger_mtime.pop(r, None)
+            self._repos.update(changed)
+            if changed or gone:
+                self.repos_store.save(self._repos)
+            for r, v in changed.items():
+                await self._broadcast({"event": "repos", "root": r, "repo": v})
+            for r in gone:
+                await self._broadcast({"event": "repos", "root": r, "repo": None})
+        except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
+            log.exception("reading the repo facts failed")
+
+    @staticmethod
+    def _ledger_mtimes(roots: list[str]) -> dict[str, float | None]:
+        out: dict[str, float | None] = {}
+        for root in roots:
+            try:
+                out[root] = (Path(root) / ledger_mod.ledger_path(root)).stat().st_mtime
+            except OSError:
+                out[root] = None
+        return out
+
+    @staticmethod
+    def _read_repos(roots: list[str], prev: dict[str, dict[str, Any]], full: set[str]) -> dict[str, dict[str, Any]]:
+        """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
+        `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
+        the rest carried from `prev`. One checkout's read that raises keeps its last reading with
+        the error beside it and never costs the others theirs."""
+        now = datetime.now(UTC)
+        stamp = now.isoformat()
+        by_remote: dict[str, dict[str, Any]] = {}
+        out: dict[str, dict[str, Any]] = {}
+        for root in roots:
+            old = prev.get(root) or {}
+            try:
+                out[root] = HostAgent._read_repo(root, old, root in full, now, by_remote)
+            except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
+                log.exception("reading the repo facts of %s failed", root)
+                why = f"the read failed: {type(e).__name__}"
+                out[root] = {
+                    "name": Path(root).name,
+                    "root": root,
+                    "remote": str(old.get("remote") or ""),
+                    "ledger": {**(old.get("ledger") or {}), "error": why, "failed_at": stamp},
+                    "prs": {**(old.get("prs") or {}), "error": why, "failed_at": stamp},
+                    "at": str(old.get("at") or stamp),
+                }
+        return out
+
+    @staticmethod
+    def _read_repo(
+        root: str, old: dict[str, Any], due: bool, now: datetime, by_remote: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
+        pass, so two checkouts of one remote are one `gh` read."""
+        stamp = now.isoformat()
+        remote = reports._git(root, "remote", "get-url", "origin") if due else None
+        remote = (remote or "").strip() if due else str(old.get("remote") or "")
+        led = ledger_mod.reading(root, now, with_history=due)
+        old_led = old.get("ledger") or {}
+        if "error" in led:
+            led = {**old_led, "error": led["error"], "failed_at": stamp}
+        elif not due:
+            led.update({k: old_led[k] for k in ("windows", "recent", "history_error") if k in old_led})
+        elif "history_error" in led:
+            led.update({k: old_led[k] for k in ("windows", "recent") if k in old_led})
+        prs = old.get("prs")
+        if due:
+            if remote and remote in by_remote:
+                prs = by_remote[remote]
+            else:
+                fresh = reports.pr_reading(root, now)
+                prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
+                if remote:
+                    by_remote[remote] = prs
+        return {
+            "name": Path(root).name,
+            "root": root,
+            "remote": remote,
+            "ledger": led,
+            "prs": prs,
+            "at": stamp if due else str(old.get("at") or stamp),
+        }
 
     async def _count_seats(self, records: list[Session]) -> None:
         """`seat_count` for every supervised `prs:` seat (§6 rule 3): the PRs merged to the seat's repo
@@ -4282,9 +4409,7 @@ class HostAgent:
             self._close_entry(e.id, "expired", stamp)
 
     @staticmethod
-    def _keep(
-        e: MailEntry, now: datetime, *, inbox: bool, person: bool = False, dead_since: str | None = None
-    ) -> bool:
+    def _keep(e: MailEntry, now: datetime, *, inbox: bool, person: bool = False, dead_since: str | None = None) -> bool:
         """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window from
         `read_at` — or, for an `ask`, from when it closed or expired — and an open `ask` is never
         pruned. The sender's copy runs from `at`, and a sent reply carrying a `source` is kept
@@ -4620,6 +4745,12 @@ class HostAgent:
     async def rpc_recent_dirs(self) -> list[str]:
         p = paths.recent_dirs_file()
         return p.read_text().splitlines() if p.is_file() else []
+
+    async def rpc_repos(self) -> dict[str, dict[str, Any]]:
+        """The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), keyed by the
+        checkout's path: what the team card's Repo facet, the rollup and the Repo page draw. The
+        home's; a node forwards it (§4.4a)."""
+        return dict(self._repos)
 
     async def rpc_usage(self) -> dict[str, dict[str, Any]]:
         """Last known usage per profile (TD-001): what the top bar shows."""
@@ -6259,6 +6390,8 @@ class HostAgent:
                     await writer.drain()
                     for prof, u in self._usage.items():  # the top bar's figure, before the cards
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
+                    for root, r in self._repos.items():  # the repo facts, as a change would push them
+                        await self._send(writer, json.dumps({"event": "repos", "root": root, "repo": r}))
                     await self._push_changes()
                     continue
                 writer.write(_reply_line(req, await self._dispatch(req, peer=_peer_pid(writer), conn=writer)))

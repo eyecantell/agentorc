@@ -64,6 +64,13 @@ def usage_file() -> Path:
     return home() / "usage.json"
 
 
+def repos_file() -> Path:
+    """The home's repo facts (design §4.4 *Repo facts*, TD-176): the last reading of each registered
+    checkout's PRs and ledger, kept across a restart so the page has numbers before the first read,
+    and an outage keeps saying *could not look* with the last reading beside it."""
+    return home() / "repos.json"
+
+
 def socket_path() -> Path:
     return home() / "agent.sock"
 

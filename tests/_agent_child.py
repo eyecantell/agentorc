@@ -16,12 +16,15 @@ import sys
 
 from _stubs import HookFedStub
 
-from sessionorc import adapters
+from sessionorc import adapters, hosts
 from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
 
 
 async def _run(socket_name: str) -> None:
+    # never the person's dev-cadence roster: the home reads repo facts (`gh`, git) for every repo
+    # on it (design §4.4 *Repo facts*), as conftest's `_no_real_repos_registry` says for this process
+    hosts.DEFAULT_REPOS_REGISTRY = os.path.join(os.environ["AGENTORC_HOME"], "no-roster", "repos.txt")
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     await serve_until_signal(

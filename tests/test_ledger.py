@@ -12,27 +12,29 @@ import pathlib
 import re
 from collections import Counter
 
+from sessionorc import ledger
+
 DOCS = pathlib.Path(__file__).parents[1] / "docs"
 OPEN = DOCS / "technical_debt.md"
 ARCHIVE = DOCS / "technical_debt_archive.md"
 
-HEADING = re.compile(r"^## (TD-\d{3}):", re.M)
 ROW = re.compile(r"^\| (TD-\d{3}) \|", re.M)
 
 
 def text(path):
     # The entry template lives in an HTML comment and is headed TD-001, which is a real id.
-    return re.sub(r"<!--.*?-->", "", path.read_text(), flags=re.S)
+    return ledger.strip_comments(path.read_text())
 
 
 def headings(path):
-    return HEADING.findall(text(path))
+    # the reader's own regex (design §4.4 *Repo facts*, TD-176): these tests read what the page counts
+    return [tid for tid, _ in ledger.HEADING.findall(text(path))]
 
 
 def entries(path):
     """(id, body) for each entry, the body running to the next heading."""
     t = text(path)
-    return list(zip(HEADING.findall(t), re.split(r"^## TD-\d{3}:", t, flags=re.M)[1:], strict=True))
+    return list(zip(headings(path), re.split(r"^## TD-\d{3}:", t, flags=re.M)[1:], strict=True))
 
 
 def test_no_id_is_used_twice_anywhere_in_the_ledger():
