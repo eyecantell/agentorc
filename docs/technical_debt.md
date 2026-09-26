@@ -90,7 +90,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
-| TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Open — design-first |
+| TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Designed 2026-09-25 (the designer) — the build is TD-170; archives with it |
 | TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Open — design-first |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
@@ -99,28 +99,12 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 | TD-167 | Build the help: `help.py` as the one table, the *i* marks on the team card, the Focus header and the exited banner, the `title` tooltips from it, the Help page, the overlay's link, and the test that holds it to §4.5a | Medium | Open |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
+| TD-170 | Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles` | Medium | Open |
 
 
 ---
 
 <!-- Entry template:
-## TD-001: Short title of the problem
-
-**Priority:** High | Medium | Low
-**Added:** YYYY-MM-DD
-**Owner:** anchor | grinder | paul | dev-cadence
-**Kind:** build | design-first | live-check | evaluation | decision
-**Pickable:** yes | no — <one clause>
-**Status:** Open
-**Location:** `path/to/file.py` (function/section)
-
-**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
-
-**Fix:** concrete direction(s), and what would count as done.
-
-**Related:** other TDs, PRs, decision docs.
--->
-
 ## TD-002: Focus composer: Attach / drop / paste upload
 
 **Priority:** Medium
@@ -381,7 +365,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.10 (the whole section), §4.5a, §4.7, §9 invariants 5, 11 and 13, §10 (the 2026-09-14 entry, and the 2026-09-13 one it answers); TD-039 (the conflict half — a `conflict` message and its exchange, which step 6 bounds), TD-049 (the wake, absorbed by step 3), TD-036 (the graph the gate reads), TD-028 (the report channels the Inbox sits beside and deliberately is not).
 
-
 ## TD-053: A team never winds down when it runs out of work — build design §4.9a
 
 **Priority:** Medium
@@ -409,7 +392,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.9a (the whole section), §4.9 (the stop sequence this reuses, and `ao team start` already being the restart), §4.8 (the `progress` channel and the role presets that carry the tests), §6 (the clock-and-cap stoppers this is orthogonal to), §9 invariant 14, §10 (the 2026-09-14 entry); TD-032 (a stood-down worker sitting `idle` for 20 h with nothing noticing — the same blind spot from the other side); TD-042 (a brief describes the job, not the run — why the test lives in a repeatable template); TD-052 (mail is how *there is work now* reaches an out-of-work session that is still alive, §4.10's wake budget); TD-026 (the schedule that would start a wound-down team again).
 
-
 ## TD-055: Rename to the glossary's decided words — `lead`, `director`, the `control` grant, `round`, and the retired synonyms
 
 **Priority:** Medium
@@ -436,7 +418,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** no live text in `docs/design.md`, `src/` or the briefs uses *orchestrator* for a position, bare *agent* for the daemon, *tick* for a lead's loop, or *nudge*/*supervisor*/*fleet* in prose; `ao new --role lead` and `ao grant <id> control` work; and `--role orchestrator`, `orchestrate` in a config and `orchestrate` on an existing record still work with their deprecation line.
 
 **Related:** `docs/glossary.md`; ADR `docs/decisions/2026-09-13-org-teams-projects.md` (the Org/Team/Project/Role vocabulary this extends); design §4.8 (role presets, grants, *Orc-of-orcs is not a special case*), §4.9 (team definitions), §6 (policies), §9 invariants 1, 9 and 11.
-
 
 ## TD-057: Sessions on different hosts cannot talk — build the home and node split (design §4.4a)
 
@@ -552,7 +533,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** PR #174 (where it was seen), TD-058; docs/cadence.md §1 (worktrees, hydrate), the memory section; §9 invariant 2; memory `agentorc-td-grind-mechanics`.
 
-
 ## TD-062: A merged RPC change breaks `ao` on the live system until the host agent restarts
 
 **Priority:** Medium
@@ -600,7 +580,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** each has either a deterministic wait or failure diagnostics, and neither fails in ten consecutive CI runs. **Still open:** the PR #192 hang, which no longer has a way to recur unnoticed (the 15-minute cap ends it and `-vv` names it), so the next occurrence closes this entry one way or the other.
 
 **Related:** TD-033 (archived: the same class, two other tests), TD-025 (archived: `test_cli.py` idle-wait diagnostics).
-
 
 ## TD-064: Claude Code's peer messages reach a session around the mail gates, and block an unattended one
 
@@ -664,7 +643,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.10 (kinds, bounds, *a reply is mail, not a send*), §4.4 (board write-back), TD-069 (the page these sit on), TD-052, dev-cadence `docs/cadence.md` §3 (the entry format).
 
-
 ## TD-071: Org page review, 2026-09-18 — what was built, and the ideas that were not
 
 **Priority:** Low
@@ -692,7 +670,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** each idea is either built (its own PR, §4.5a first) or struck here.
 
 **Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
-
 
 ## TD-075: A go-between for what needs the person — answer what is written down, pass up the rest with a recommendation
 
@@ -834,7 +811,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a worker that ends its run with work left is back at work, with fresh context, without a person — and one that is truly finished still is never restarted.
 
 **Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
-
 
 ## TD-091: Nothing says how much context a session has left, or that it has just compacted
 
@@ -988,7 +964,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the briefs say a usage stop is a restart declaration, the design says when a team's group collapses and which control it carries, the page matches, and a team stopped for the window reads as one on the live page.
 
 **Related:** TD-083 (a run ends with a declaration), TD-095 (the header), TD-091 (the usage gate and the compaction rule are the same kind of stop).
-
 
 ## TD-100: The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page
 
@@ -1292,8 +1267,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-151 (the build), TD-100 (the usage gate), TD-122 (one reading per account), TD-112 (the second adapter), [ADR 2026-09-24](decisions/2026-09-24-paperclip.md) item 3, [ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md) (dollars at list price were not wanted *on a subscription*; this is the case where they are the bill).
 
-**Review rounds (the reconciliation, 2026-09-25; Sonnet, a fresh reviewer each round, read-only against the repo; every finding adopted):** **Round 1 — NOT READY, 0 BLOCK, 4 FIX, 5 NOTE.** FIX: TD-151's Related still said a metered reading is per profile; TD-128's Fix paragraph still said two token kinds and a sum per profile (now marked superseded); the contract's path is `src/sessionorc/adapters.py`, not the empty `agentorc/adapters/__init__.py`; the never-`limited` rule had no mechanism — `_cap()` in `_refresh_usage_inner` marks any window at 100, so the exception is keyed on the profile's `billing`, read before the windows. NOTE: how `since` starts (now: the first tick that finds the profile metered); what a price change does to stored `cost` (written once, never rewritten); whose midnight (the host agent's zone, `resets` carrying its offset); `_refresh_usage_inner` named; `RESUME_MIN` on a roll. Verified: link.py's frame rule, modes.py untouched, settings.py's parsers, rpc_gate's label check, invariant 9, no leftover per-profile wording. **Round 2 — NOT READY, 1 BLOCK, 3 FIX, 2 NOTE.** BLOCK: *never counted twice* held only against a lost request; a lost reply resent would double-bill — a cursor held at the home, the reply carrying it, a resend dropped. FIX: the Settings row's slice number; how the home knows a node's accounts (from its own `spend` calls) and a push of the reading on `hello`; the mockup's badge matched to the text. NOTE: the node's offline figure is never written; the placeholder. Verified: the settled decisions carried consistently, the chip's and the card's amount rule, TD-151's arithmetic. **Round 3 — NOT READY, 1 BLOCK, 1 FIX.** BLOCK: a cursor by time per account per host drops a late turn from a second transcript directory on the same account — the cursor is now a byte offset per transcript, `Turn` names its `source` and `offset`, the drop test is per transcript. FIX: §4.4a's trigger list. **Round 4 — NOT READY, 1 BLOCK, 3 FIX.** BLOCK: no rule for a cursor past a rewritten transcript's end (a compaction) — the adapter reads it from 0 and the home drops what it ledgered by the transcript's last `at`. FIX: `cursors` plural in §4.4a and the history; a transcript first seen later starts at 0. **Round 5 — NOT READY, 1 BLOCK.** BLOCK: two entries can share a timestamp, so a drop by `at` alone loses the unledgered twin — `Turn` carries the entry's `id`, the ledger keeps the last entry's `at` and `id`, the drop at that `at` runs in file order through that `id`. **Round 6 — NOT READY, 1 FIX.** FIX: when the rewrite removed the anchor entry itself, the two natural readings diverge — decided: every entry at that `at` counts as billed, a survivor being old and a new turn at that millisecond a coincidence worth cents. **Round 7 — NOT READY, 2 FIX.** FIX: the sentence *neither re-bills nor loses a turn* contradicted the concession beside it — now *never re-bills, and loses at most that one coincidence*; this record was a placeholder. **Round 8 — the fact-check, posted on the PR as the evidence comment.** Six of the seven rounds bit on the spend ledger's exactly-once mechanics, which #547 left as *the home sums*; the rest of the design has stood since round 2.
-
 ## TD-130: The pages set 13 px body text, 12 px mail bodies and 11 px small print: small for comfortable reading
 
 **Priority:** Medium
@@ -1325,6 +1298,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** the question is right and early; answering it now, with the trigger named, means the next person to feel the need knows what was decided and why.
 
 **Related:** TD-129 (the rail's counts, the text search), TD-127 (what a row shows), TD-125 (retention and the FYI), TD-057 (nodes and where mail lives).
+
 ## TD-132: Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row
 
 **Priority:** Medium
@@ -1673,9 +1647,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *lets talk about adding on-demand buttons for interactive sessions and what that might look like*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-170
 
-**Status:** Open — nothing designed.
+**Status:** Designed 2026-09-25 (the designer): design §4.8 *A role has saved prompts* (`prompts:` — `{label, text}`, layered as every key is, replaced whole per layer, verbatim text, no substitution), §5 (the `roles:` example's `plain: {prompts: …}`), §4.5a *Focus composer* **prompt chips** (a press is a Send of the text, reading as Send reads; Shift+press fills the composer) and *New session* **prompt chips** (a press fills the Opening prompt), §4.5 *Phone layout* (the chips' row above the composer); mockups `Focus.dc.html` and `NewSession.dc.html`. Settled: (a) the text lives on the preset, in `org.yml` or the repo's `.agentorc.yml`, nowhere else; (b) chips beside Send, interactive sessions only, a press sends; (c) the same list fills the opening prompt on New session; (d) a chip is a Send and nothing more. The design is PR #568; the press-sends-against-press-fills choice went to Paul as a steer, and #568 merges at its bound (12 h from 2026-09-25 19:55 MDT) unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-170; this entry archives with it. **What was:** nothing designed.
 
 **Location:** design §4.5a *Focus composer* (**Send**, **Attach**), §4.5a *Inbox row: state* (*Reopen and push* — the precedent: a first prompt the page wrote, fixed text in the source, never anything a session said), §4.8 role presets, §5 (`roles:` in `.agentorc.yml` and `org.yml`), §4.5 screen 5 (Commands — the button that runs a script, phase 4, TD-123); `src/agentorc/ui/templates/focus.html` (the composer), `src/agentorc/ui/static/app.js`.
 
@@ -1815,6 +1789,31 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-157's *Done when*: a person at a concluded team's card can learn, without leaving the page, that Forget drops the record and keeps the worktree, and that Start closes the concluded sessions and runs the team again from its definition — and the sentence they read is §4.5a's, held so by the test.
 
 **Related:** TD-157 (the design), TD-148 (the Settings page's marks, the nearest built shape), TD-162 (which session to message: its own line per role, on the Message composer), TD-124 (the `?` overlay), TD-095 (the card's quiet foot: no mark on it), TD-071 (fixed text in the source, never a session's).
+
+## TD-170: Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-161's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.8 *A role has saved prompts*, §5 `roles:`, §4.5a *Focus composer* **prompt chips** and *New session* **prompt chips**, §4.5 *Phone layout*; mockups `Focus.dc.html`, `NewSession.dc.html`.
+
+**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `prompts`; the shape check — a list of `{label, text}`, label one line ≤ 24 characters, text non-empty; `resolve_role`'s layering, the key replaced whole), `src/agentorc/cli.py` (`ao roles`: the labels per role), `src/agentorc/ui/app.py` (`/api/roles` carries `prompts`; the Focus route puts the record's role's list on the page), `src/agentorc/ui/templates/focus.html` (the chips in the composer's button row, before Attach), `new.html` (a row before Opening prompt), `src/agentorc/ui/static/app.js` (a chip press → the Send path with the text; Shift → fill and focus; the role pick rebuilds New session's chips), `app.css` (the wrapping row in narrow mode).
+
+**Why:** TD-161's *Why*: the browser and the phone have no keyboard worth typing a prompt into; the prompts a person repeats are a list in a file.
+
+**Fix:**
+1. **The key**: `prompts` in `ROLE_KEYS`, validated when the file is read (an error naming the role and the entry, as every preset error is), layered as `label:` is, replaced whole per layer.
+2. **`/api/roles`** and the Focus page carry the list; `ao roles` prints `prompts: review PR, sweep, waiting on me` per role.
+3. **Focus**: the chips in the composer's row, drawn only when the composer is open and the list is non-empty; a press calls the same `send` the Send button calls, with the chip's text, and takes the same confirmation and refusals; Shift+press writes the text into `#compose` and focuses it. The chip's `title` is the text. Narrow mode: the row wraps above the composer.
+4. **New session**: the chips beside Opening prompt from the picked role, rebuilt on the Role pick; a press sets the field's value.
+5. **Tests:** the shape check (a bad label, a missing text, a non-list); layering (repo replaces org); `/api/roles` carries them; the Focus page draws them for an interactive record with a role that has them and not for one without, nor for an unattended record; the send path under node as `test_ui_keys.py` runs `app.js`; `ao roles` output.
+
+**Done when** TD-161's *Done when*: Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
+
+**Related:** TD-161 (the design), TD-160 / TD-169 (the person's session the chips are for), TD-027 (send's confirmation), TD-096 (the composer closed on an unattended session), TD-003 (the phone's narrow Focus), TD-157 / TD-167 (the chip's `title` as its mark).
+
 ## TD-173: Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line
 
 **Priority:** Medium
