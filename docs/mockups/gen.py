@@ -1558,14 +1558,12 @@ def darken(html):
 
 files = {
     "Main.dc.html": team_desktop(),
-    "MainTeamFirst.dc.html": team_desktop(team_first=True),
     "MainDark.dc.html": darken(team_desktop()),
     "Phone.dc.html": team_phone(),
     "Focus.dc.html": focus(),
     "FocusOrc.dc.html": focus_orchestrator(),
     "FocusReady.dc.html": focus_ready(),
     "NewSession.dc.html": new_session(),
-    "Repo.dc.html": repo_page(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Message.dc.html": message_dialogs(),
@@ -1588,7 +1586,7 @@ for n, s in files.items():
 # a bug waiting for the next screen to change size.
 LAYOUT = [
     # (file, title, column)
-    ("Main.dc.html", "Org — desktop", 0),
+    ("Main.dc.html", "Org — desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)", 0),
     ("Inbox.dc.html", "Inbox", 0),
     ("InboxRail.dc.html", "Inbox — filtered", 0),
     ("InboxMessage.dc.html", "Inbox — message", 0),
@@ -1601,12 +1599,12 @@ LAYOUT = [
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
-    ("Repo.dc.html", "Repo", 1),
+    ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
     ("MainDark.dc.html", "Org — dark", 2),
-    ("MainTeamFirst.dc.html", "Org — team-first (compared 2026-09-25, not the design)", 2),
+    ("OrgTeamFirst.dc.html", "Org — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
     ("Type.dc.html", "Type scale", 2),
     ("TypeDark.dc.html", "Type scale — dark", 2),
 ]

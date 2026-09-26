@@ -206,8 +206,12 @@ not mix:
   *Not:* attention list. — *proposed*.
 - **ledger** — `docs/technical_debt.md`: known issues and deferred work as `TD-NNN` entries. —
   *proposed*.
-- **repo strip** — the line under a team's header that says what each repo the team services holds: open PRs, pickable and design-first ledger entries, board items for the person, and what the members are on now (design §4.5 screen 9). — *proposed 2026-09-25*.
-- **Repo page** — `/repo/<name>`: the strip's numbers as lists, one repo at a time (design §4.5 screen 9). *Not:* dashboard — no charts, no history. — *proposed 2026-09-25*.
+- **rollup** — the row of four facets under the Org's title: Agents, TDs in motion, PRs in motion, Needs you, summed over every live team (design §4.5 screen 1). — *proposed 2026-09-26*.
+- **summary (team card)** — the three facets between a team's header and its members: Repo, TDs in motion, Answer needed / Doing (design §4.5 screen 1). *Not:* dashboard. — *proposed 2026-09-26*.
+- **TDs in motion** — the ledger entries a team's members hold, each with its **phase**: *add* (a hunter filing it), *design* (a designer holds a design-first entry), *grind* (a claim, no PR), *review* (a claim with an open PR); derived from the records, never declared. — *proposed 2026-09-26*.
+- **answer needed** — a member waiting on a permission or a question from a person; the team card's facet of that name. *Not:* needs you, which is the wider word (the Inbox's section, the rollup's facet: answers, board items, states stopped on a person). — *proposed 2026-09-26*.
+- **doing log** — the last fifty `ao doing` calls of a team, with time and caller, kept by the host agent for the Doing feed; the record itself keeps only the latest line (design §4.8). — *proposed 2026-09-26*.
+- **Repo page** — `/repo/<name>`: the servicing team's three facets, then the lists behind the numbers, one repo at a time (design §4.5 screen 9). *Not:* dashboard — no history beyond the window. — *proposed 2026-09-25, reshaped 2026-09-26*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
 - **run window** — the hours unattended sessions may work (design §6). — *proposed*.
 - **setting** — a value the person turns without redefining anything: a reserve, a team's stop time or priority, a schedule, the promote's `auto`, the person's own editor and terminal. Every setting lives in the home's `settings.yml` (design §5), written only through `set_settings`, and the Settings page (§4.5 screen 8) is where it is turned. *Not:* definition, option, config. — *proposed* 2026-09-25 (Paul's line).

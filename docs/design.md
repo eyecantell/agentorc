@@ -584,23 +584,38 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Create / kill / send / resume sessions (the only writer).
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
-- **Repo facts** (§4.5 screen 9, TD-170): for every checkout the registry lists, at the home,
-  two readings kept in `repos.json` beside `usage.json` and served by the `repos` RPC — pushed
-  as a `repos` event when either changes, the shape `usage` has. **Open PRs**: `gh pr list
-  --state open --json number,title,url,createdAt,headRefName,author,isDraft` in the checkout,
-  **every five minutes** in a thread, never per tick, once per remote (two checkouts of one
-  repo are one read), kept as `{prs: [...], n, oldest, at}`; a read that failed keeps the last
-  reading and records `error` and `failed_at`, so the strip can say *could not look* — an
-  outage is never zero PRs, the rule `_count_seats` already follows for merges. **The ledger**:
-  the repo's `ledger:` file (`.agentorc.yml`, default `docs/technical_debt.md`) read when its
-  mtime moves, by `sessionorc.ledger` — the one reader of the entry's header fields (`## TD-NNN:
-  title`, `**Priority:**`, `**Owner:**`, `**Kind:**`, `**Pickable:**`), kept as `{entries: [...],
-  pickable, design_first, at}`; an entry counts while its section is in the file. The reader is
-  agentorc's because nothing in dev-cadence reads those fields today (its readers are the board's
-  and the sweep's, §4.5 screen 6 *never a second parser* is about the board); TD-159 weighs
-  whether it belongs there. Board counts are not here: the UI has them from the board reader it
-  already runs for the Inbox (`board_items`, per team). A node reads neither — its checkouts are
-  at the same absolute paths at the home (§4.4a), where the reads run.
+- **Repo facts** (§4.5 screens 1 and 9, TD-170): for every checkout the registry lists, at the
+  home, readings kept in `repos.json` beside `usage.json`, served by the `repos` RPC and pushed as
+  a `repos` event when any changes, the shape `usage` has. **Pull requests**: `gh pr list --state
+  all --json number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft
+  --limit 200` in the checkout, **every five minutes** in a thread, never per tick, once per
+  remote (two checkouts of one repo are one read); kept as the open list plus, per window (day,
+  week, month, in the home's clock), the counts *opened* (`createdAt` in the window) and *closed*
+  (`closedAt` or `mergedAt` in it, a merge being a close); a read that failed keeps the last
+  reading and records `error` and `failed_at`, so the page can say *could not look* — an outage
+  is never zero PRs, the rule `_count_seats` already follows for merges (`merged_prs` answers
+  `None`, never `[]`). **The ledger**: the repo's `ledger:` file (`.agentorc.yml`, default
+  `docs/technical_debt.md`) read when its mtime moves, by `sessionorc.ledger` — the one reader of
+  the entry's header fields (`## TD-NNN: title`, `**Priority:**`, `**Owner:**`, `**Kind:**`,
+  `**Pickable:**`), kept as `{entries: [...], by_priority, by_kind, at}`; an entry counts while
+  its section is in the file, and its kind for the page is *pickable* (`Pickable: yes`),
+  *design-first* (`Kind: design-first`), *for you* (`Owner: paul` or `Kind: decision`), else
+  *other*. **Opened and closed in a window** come from the ledger file's git history in the same
+  checkout (`git log --format=%H,%cI -- <ledger>` and the section headings of each version): an
+  entry is *opened* at the first commit whose file holds its section and *closed* at the first
+  commit whose file no longer does (archived, or done and removed); a file rewritten without a
+  history reads as opened at its first commit. The reader is agentorc's because nothing in
+  dev-cadence reads those fields (its readers are the board's and the sweep's; screen 6's *never
+  a second parser* is about the board); TD-159 weighs whether it belongs there. **Phases** are
+  derived on the view from the members' `progress` and the entries (§4.5 screen 1): a claim on a
+  design-first entry is *design*, a claim with a PR *review*, without one *grind*, and *add* is
+  reserved for a hunter's filing (TD-160 and later). **The doing log** (§4.8): beside the record's
+  one `doing` value, the host agent appends every `doing` call to a bounded log per team, the
+  last fifty, kept in memory and in `doing.jsonl`, served by the `doing` RPC and pushed as a
+  `doing` event — the feed a team card and the Repo page draw. Board counts are not here: the UI
+  has them from the board reader it already runs for the Inbox (`board_items`, per team). A node
+  reads none of this — its checkouts are at the same absolute paths at the home (§4.4a), where
+  the reads run.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
 - Usage: each **account** a live agent session's profile names is asked its adapter's `usage_for`
   **every five minutes** in a thread, never per tick — once per `(adapter, account)`, through one
@@ -1501,6 +1516,55 @@ Screens:
    hosts get one banner row. Command-kind sessions are hidden unless "show command runs" is on.
    Two shortcuts next to **New session**: **Shell** (host + directory, nothing else) — and on
    Focus, **Open shell here** (a shell in the same directory as the session being viewed).
+   **The Org, team-first (TD-170; Paul, 2026-09-26, four rounds on a design canvas).** Once a
+   team runs smoothly the unit a person watches is the team, and the questions are the team's:
+   is anyone stuck, is review keeping up, what waits on me. So the Org leads with a **rollup**,
+   each team's card carries a **summary**, and a team member's card is **compact**; the full
+   six-row card above stays for the sessions a person drives alone (*No team*). Rendered:
+   `docs/mockups/reviews/2026-09-26-org-team-first-design.png`; the artboard is
+   `docs/mockups/OrgTeamFirst.dc.html`.
+
+   - **The rollup**, one row of four facets under the title, every number a link (§4.5a *Org
+     rollup*): **Agents (n)** — every state's count as a plain coloured pill, *needs you (1)*,
+     *working (5)*, in the grid's urgency order, the count in parentheses after the word as
+     everywhere; **TDs in motion (n)** — a stacked bar by phase (below) with a legend; **PRs in
+     motion (n)** — the window picker (day · week · month) and two sized blocks, *opened* and
+     *closed* in the window, with the open count and how many wait on review under them; **Needs
+     you (n)** — *answer needed* (a permission or question on a member) and *in the Inbox* (the
+     Inbox's Needs you count) with the overdue count. No feed at this level: the person goes to a
+     team for that. Sums over every live team.
+   - **A team's card**: the header (name, `host / repo`, the session count, *answered for you*,
+     Wind down / Stop now) — no state chips, the member cards say it — then **three facets**,
+     then the members. **Repo** (§4.5a *team card: Repo facet*): the repo's name, a link to its
+     page; **Technical debt (n open)** with its own selector *open · day · week · month* — on
+     *open* two stacked bars, the open entries by priority (High, Medium, Low, one hue darkened
+     by priority, the counts inside) and by kind (pickable, design-first, for you, other, the
+     numbers inside and a legend under), on a period two sized blocks, entries *opened* and
+     *closed* in it; **Pull requests (n open)** with the window picker and the two blocks; under
+     them the oldest PR's age and how many wait on review, and when the readings were taken.
+     **TDs in motion (n)** (§4.5a *team card: TDs in motion*): every reference a member holds,
+     one row each — its **phase**, the reference, the entry's title, the member, its PR when it
+     has one; a person's own session on the team marked with the person glyph. **Answer needed
+     (n)** / **Doing** (§4.5a *team card: Answer needed / Doing*): one facet with a toggle. While
+     a member waits on a permission or a question, the facet opens on **Answer needed**, tinted,
+     with the member, what it asks, Allow / Deny and the *why?* box, or the question's text;
+     otherwise it opens on **Doing**, the team's live feed of `ao doing` calls (time, doer,
+     words), newest first, the last fifty kept (§4.8 *the doing log*). The toggle is a person's
+     to flip either way. A **phase** is derived from the record, never declared: **add** — a
+     hunter is filing the entry (the role is TD-160's and later; the phase is named now so the
+     bar does not change shape when it comes); **design** — a designer holds a design-first
+     entry; **grind** — a claim with no PR; **review** — a claim with an open PR.
+   - **A member's compact card** (§4.5a *card: compact*): the name and, on a person's own session,
+     the person glyph; the state pill at the right, **word and colour only** — the state glyphs
+     (§4.5a *state icon*) leave the compact card and every count pill, since the summary above
+     says what a page of glyphs was for; one line of its own — the role and its claim with the
+     PR (*Grinder · TD-301 → #811*), or its ending (*out of work*), or the seat's word (*last
+     came 2h ago*), or *Manager · round 41*; and the foot, the same rule as the full card's
+     (the next act outlined first, the rest plain, *more* at the right). A `needs-you` member
+     keeps the amber ring and its foot leads with Focus; the answer is given in the facet.
+   - **No team** keeps the full card, and **a team with nothing live**, or concluded, is one row:
+     name, place, the counts, *stopped* / *concluded <t> ago*, Start, the fold and Forget all.
+
 2. **Focus**: embedded terminal (full conversation; **on an `interactive` session the keyboard
    passes through**, so menus and questions are answered exactly as in VS Code — there are no
    answer buttons under the terminal; **on an `unattended` session Focus watches**, below; a
@@ -1892,67 +1956,47 @@ Screens:
    mode (§4.8a), and any definition. A **Settings** tab in the top bar once the page is built
    (TD-123: a tab exists only for a built page), last, after Inbox; the host chip's hover names the
    page until then.
-9. **Repo** (`/repo/<name>`; designed 2026-09-25 with Paul — TD-170 builds it; mockups
-   `Repo.dc.html`, and the strip on `Main.dc.html`): **what a repo holds, at a glance** — what is
-   outstanding, what is in progress, what waits on the person — so a person can see whether a
-   team is balanced (Paul: *the grinders are outpacing the techlead*) before a policy is asked to
-   act on it. Two parts, one set of numbers.
+9. **Repo** (`/repo/<name>`; designed 2026-09-25 with Paul, reshaped 2026-09-26 on the canvas —
+   TD-170 builds it; the artboard is `docs/mockups/RepoPage.dc.html`, rendered as
+   `docs/mockups/reviews/2026-09-26-repo-page-design.png`): **what a repo holds** — what is
+   outstanding, what is in motion, what waits on the person — so a person can see whether a team
+   is balanced (Paul: *the grinders are outpacing the techlead*) before a policy is asked to act
+   on it (§10, TD-171). Reached from a team card's Repo facet, a link and no tab (TD-123).
 
-   **The repo strip (team card).** Under a team's header and above its cards, one quiet line per
-   repo the team services (the repos of its projects, §4.9; a team a repo's own `.agentorc.yml`
-   defines has that one repo), in the header's style, each number a link. **A repo two teams
-   share is drawn on one card**: the first team's in definition order, the convention the Inbox
-   already follows for a board row's team badge (`repo_teams`, §4.5 screen 6), so the strip's *for
-   you* and the Inbox it links to count the same rows; the Repo page names every team that
-   services the repo. The other team's card does not repeat the line.
-
-   > `agentorc` · **4 open PRs** · oldest 2d · **7 pickable** · **3 design-first** · **2 for you**
-   > · 1 overdue · **on now** TD-168 (grinder-ao-1, #574 in review) · TD-164 (designer-ao-1)
-
-   The numbers are the repo's, not the sessions': the header keeps its state counts and the
-   reader's *n PRs waiting* (§4.9b), the strip says what the repo holds whoever is working on it.
-   *For you* is the repo's board items that are due — `n for you`, and *· n overdue* when any is
-   past its date — and links to the Inbox filtered to the team and to board items (the rail's
-   URL, `team` and `kind`, §4.5a *the rail*; a team with two repos sees both repos' rows there, the
-   Inbox knowing teams and not repos). Every other number opens the Repo page at its section.
-   *On now* lists what the members hold: each `claimed` progress entry's reference, the member's
-   name and its PR when it has one, up to three, then *+n*. **A count that could not be read says
-   so** — *PRs: could not look*, dimmed, with the error on hover — the rule the seat counter
-   follows (§4.4): an outage is never zero. No strip on *No team*, and none on a team whose
-   definition names no repo on this host. It rides the `repos` event (§4.4), so a merge or a
-   ledger commit changes the line without a reload.
-
-   **The Repo page.** One centred column as the Inbox (TD-082), titled by the repo — `agentorc` —
-   with its host and path under it, the team(s) that service it, and when each number was last
-   read; reached from the strip, a link and no tab (TD-123). A section is a heading with its count
-   and its *i* mark, a row is a card; the sections are the strip's numbers, in the strip's order:
-   1. **Open PRs** — one row per open PR on the repo's remote, newest last: number, title, its
-      author (the session whose branch it is, by name and a link to its Focus, else the GitHub
-      login), age, *draft* when it is, and beside it its standing with the team's reader,
-      matched by number against the reader seat's inbox entries carrying `pr` — the entries
-      `prs_waiting` counts (§4.9b), read through the `inbox` RPC as a person's read, which marks
-      nothing (§4.10): *held by the reader · 40m* while the `ask` is unanswered, *read* once it
-      carries a reply, and nothing when no entry names the PR — a PR outside the reader's `held:`
-      globs, one asked of nobody, or a team with no reader all read the same blank. A PR is
-      GitHub's: the row links to it and carries no control.
-   2. **Technical debt** — the ledger's entries that are **pickable** and the ones that are
-      **design-first**, two lists under one heading, each row the entry's id, title, priority,
-      owner and, when a member's `progress` claims its reference, *held by <name>*; sorted by
-      priority, then id. The heading carries **Open ledger** through the person's `open_in` (§5)
-      when one is set, since an entry is edited in its file and never here.
-   3. **Waiting on you** — the repo's board items that are due, the Inbox's own board rows with
-      their Snooze, Done and Reply (§4.5a *Inbox board row*): the same rows, filtered to the
-      repo, so acting here is acting on the board. The heading links to the Inbox filtered as the
-      strip's *for you* does.
-   4. **On now** — every member of the servicing team(s) that holds a claim or says what it is
-      doing: name (a link to Focus), state, each claimed reference with its PR, and the *doing*
-      line with its age (§4.8). A member with neither is not a row; a team with no member on
-      anything reads *nobody is on anything*, which is the answer a person asking is after.
-   The page re-reads on the Inbox's poll and takes the `repos` event as the strip does. Narrow
-   (below 720 px): the same column, as the Inbox is. **Not a dashboard**: no charts, no history —
-   the numbers are today's and the lists are the things themselves. Where the numbers come from is
-   §4.4 *Repo facts*; the CLI's read is `ao repo` (§4.7); what a manager may do with them is a
-   question, §10 (2026-09-25), and TD-171.
+   **The page opens with the team's three facets**, exactly as the team card draws them (screen
+   1 *The Org, team-first*): Repo, TDs in motion, Answer needed / Doing — the same numbers, the
+   same selectors, so nothing is learned twice. Under them, at the Org's width, the lists behind
+   the numbers, a section a heading with its count and its *i* mark (§4.5a *Inbox: section
+   heading, the i mark*), a row a line in one divided list:
+   1. **Open PRs** — every open PR on the remote, newest last: number (a link to GitHub), title,
+      its author (the session whose branch it is, a link to its Focus, else the GitHub login),
+      age, *draft* when it is, and beside it its standing with the team's techlead, matched by
+      number against the techlead seat's inbox entries carrying `pr` — the entries `prs_waiting`
+      counts (§4.9b *The reader*) — read through the `inbox` RPC as a person's read, which marks
+      nothing (§4.10): *waiting on review · 40m* while the `ask` is unanswered, *reviewed* once it
+      carries a reply, and nothing when no entry names the PR (a PR outside `held:`, one asked of
+      nobody, or a team with no techlead all read the same blank). A PR is GitHub's: no control.
+   2. **Technical debt** — the ledger's open entries in four lists under one heading: **pickable**
+      (`Pickable: yes`), **design-first** (`Kind: design-first`), **for you** (`Owner: paul` or
+      `Kind: decision`), and **other**; each row the id, title, priority and owner, *held by
+      <name>* when a member claims it, sorted by priority then id, a list folded past four rows
+      with *+n more*. The heading carries **Open ledger** through the person's `open_in` (§5) —
+      an entry is edited in its file, never here — and the count line the card's kind bar has.
+   3. **Waiting on you** — the repo's board items that are due: the Inbox's own board rows with
+      their Snooze, Done and Reply (§4.5a *Inbox board row*), filtered to the repo, so acting here
+      is acting on the board; the heading links to the Inbox filtered to the team and to board
+      items (the rail's URL, `?team=<team>&kind=board`, §4.5a *the rail*; a team with two repos
+      sees both repos' rows there, the Inbox knowing teams and not repos).
+   4. **Doing** — the team's `ao doing` calls in the window, newest first, with one row of
+      **filter chips** above it: *all (n)* and one per agent that appears in the window with its
+      count, *orc-1 (12)*; a chip shows that agent's calls alone, *all* the lot (§4.5a *Repo page:
+      doing filters*).
+   The page re-reads on the Inbox's poll and takes the `repos` and `doing` events as the card
+   does. Narrow (below 720 px): one column, the facets stacked. **Not a dashboard**: no history
+   beyond the window, and the lists are the things themselves. **A repo two teams share** is on
+   the first team's card, in definition order (`repo_teams`, screen 6), and its page names every
+   servicing team. Where the numbers come from is §4.4 *Repo facts*; the CLI's read is `ao repo`
+   (§4.7).
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Never a bare public
 port.** The UI is reached over a private network or through an authenticated tunnel, and holds
@@ -2120,11 +2164,18 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*, TD-070; up to four, 80 characters each, format characters stripped). Drawn apart from the row's own controls — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm |
 | Inbox row: answered for you | **Overrule**, **Dismiss** | an FYI the home files when a reply carries a `source` (§4.9b, TD-075): the question, the answer, the source, who asked and who answered — all text, the answer in its shape (its first line the verdict, the rest under *details*; TD-127). The group is a fold under *Waiting on them* and above FYI, uncounted, newest first, open until the person folds it (remembered in the browser) and drawn only when it holds something. The row keys on the FYI's `answered` (which carries the `source`), never on who sent it; names the asker by the name it is known by and opens it; draws the question set off as a quotation. **Overrule** is the page's Reply to that entry with the compose naming the asker — a reply to the asker on the question's own thread, a copy to the answerer, marked `[person]` (the home's reply-path branch does the addressing); **Dismiss** ends the row. Neither is offered on anything but this kind |
 | Inbox row: passed up | the row's own kind's controls (**Reply** and **suggested answers**; a `steer`'s **Pause** and ***Go with it***) | the asker's question, from the asker, under its own heading (§4.9b, TD-075) — an `ask` in *Needs you*, a `steer` in *Steering* with the time it has left — with one addition: *`<techlead>` recommends: `<line>`*, labelled and drawn as text, and the techlead's suggested answers as the row's answer buttons, its recommendation first. A reply goes to the asker. The line keys on `passed_up` with a structured `recommend` and names the passer by the name it is known by; the suggested-answers group reads *suggested by `<passer>`* on such a row, since the answers are the passer's |
-| team card | **repo strip** | one line per repo the team services, under the header and above the cards (§4.5 screen 9, TD-170): the repo's name; **n open PRs · oldest `<age>`**; **n pickable**; **n design-first**; **n for you** (the repo's board items due, *· n overdue* when any is past its date); **on now** with up to three claimed references, each with its member and PR, then *+n*. Every number is a link: PRs, pickable, design-first and on now open the Repo page at that section; *for you* opens the Inbox filtered to the team and to board items (the rail's URL, `?team=<team>&kind=board`). A reading that failed reads *could not look*, dimmed, the error on hover. Display and links only; re-rendered on the `repos` event. Not drawn on *No team* or on a team with no repo on this host |
+| Org | **rollup** | one row of four facets under the title (§4.5 screen 1 *The Org, team-first*, TD-170), sums over every live team, every number a link: **Agents (n)** — a plain coloured pill per state with its count in parentheses, in the grid's urgency order, no glyph; a pill filters the page to that state (the Org filter's `state:` word). **TDs in motion (n)** — a stacked bar by phase, *add · design · grind · review*, a legend under; a segment opens the Repo page of the team holding the most of that phase, filtered to it. **PRs in motion (n)** — the window picker *day · week · month* (remembered per browser), two sized blocks *opened* and *closed* in the window, the open count and how many wait on review under them; a block opens the Repo page's Open PRs of the team with the most. **Needs you (n)** — *answer needed* (members waiting on a permission or a question; scrolls to the first team's Answer needed facet) and *in the Inbox* (the Inbox's Needs you count, with the overdue count; opens the Inbox). Display and links; re-rendered on every delta and on the `repos` event |
+| team card | **summary** | between the header and the members, three facets in one row (§4.5 screen 1): **Repo**, **TDs in motion**, **Answer needed / Doing** — the rows below. The header carries no state chips (the member cards say it). On a team whose definition names no repo on this host, the Repo facet reads *no repo here* and the other two stand |
+| team card | **Repo facet** | the repo's name (a link to its page) and *open →*; **Technical debt (n open)** with its selector *open · day · week · month*: on *open*, two stacked bars — open entries by priority (High, Medium, Low; one hue darkened by priority; the counts inside) and by kind (pickable, design-first, for you, other; the numbers inside, a legend under) — on a period, two sized blocks, entries *opened* and *closed* in it (§4.4 *Repo facts*, the ledger's history); **Pull requests (n open)** with the window picker *day · week · month* and two sized blocks *opened* and *closed*; under them the oldest open PR's age, how many wait on review (*waiting on review (techlead-1)*), and when the readings were taken. Every segment and block is a link to the Repo page's list filtered to it; both selectors are remembered per browser. A reading that failed reads *could not look*, dimmed, the error on hover. Re-rendered on the `repos` event |
+| team card | **TDs in motion (n)** | one row per reference a member of the team holds (its `progress` claims), each: the **phase** — *add*, *design*, *grind*, *review* (§4.5 screen 1; derived, never declared) — the reference, the entry's title from the ledger reading, the member's name (a link to its Focus; the person glyph on the person's own session) and its PR when it has one (a link to GitHub); a row links to the entry on the Repo page. The heading's line counts the phases. Display and links |
+| team card | **Answer needed / Doing** | one facet, a toggle at its right (*answer · doing*), remembered until the next change of state. While any member waits on a permission or a question it opens on **Answer needed (n)**, tinted amber: the member, *permission · <tool>* with the command, **Allow**, **Deny** and the *why?* box — the same hook channel as the card's (§4.5a card **Allow / Deny**) — or the question's text with a link to Focus; several members, several blocks. Otherwise it opens on **Doing**: the team's `ao doing` calls newest first, time · doer (a link to Focus) · words, the last fifty (§4.8 *the doing log*), re-rendered on the `doing` event. The toggle is the person's to flip either way; a new pending permission flips it back to *answer* |
+| card | **compact** (a team member's card) | the shape every member of a live team has (§4.5 screen 1): the name, the person glyph on the person's own session, the state pill (word and colour, no glyph), one line of its own — the role and its claim with the PR, or its ending, or the seat's *last came*, or the manager's round — and the foot with the full card's rule (the next act outlined, the rest plain, *more* at the right; a `needs-you` member's foot leads with Focus, the answer being the facet's). Every control of the full card's *more* is here too. The full card stays on *No team* and wherever a card is drawn outside a team |
+| Repo page | **the team's facets** | the page opens with the servicing team's three facets, the rows above, drawn by the same partial — the same numbers, selectors and links; a repo two teams share names every team and draws the first's |
 | Repo page | **Open ledger** | the Technical debt heading's button, through the person's `open_in` on the ledger file (§5); drawn only when `open_in` is set and not `none` — an entry is edited in its file, never on the page |
 | Repo page | **board rows: Snooze / Done / Reply** | the Inbox's own board rows (§4.5a *Inbox board row*, *Due strip / Inbox board row*), filtered to the repo — the same partial, the same routes, the same write-back (§4.4); nothing on this page is a second way to edit the board |
-| Repo page | **section heading, the *i* mark** | as the Inbox's (§4.5a *Inbox: section heading, the i mark*): what the section counts and where it is read from — the remote every five minutes, the ledger file, the board, the members' records — and when it was last read |
-| Repo page | **links** | display: a PR row to its GitHub page; an author or member name to its Focus; the *Waiting on you* heading to the Inbox filtered as the strip's *for you*; the team name to the Org filtered to that team |
+| Repo page | **doing filters** | one row of chips above the Doing section: *all (n)* and one per agent that appears in the window, *orc-1 (12)*, each with its count; a chip shows that agent's calls alone, *all* every call; remembered per browser as the rail's picks are (§4.5a *the rail*) |
+| Repo page | **section heading, the *i* mark** | as the Inbox's (§4.5a *Inbox: section heading, the i mark*): what the section counts and where it is read from — the remote every five minutes, the ledger file and its history, the board, the members' records, the doing log — and when it was last read |
+| Repo page | **links** | display: a PR number to its GitHub page; an author, member or doer name to its Focus; an entry id to its row in the Technical debt list; the *Waiting on you* heading to the Inbox filtered as the facet's *in the Inbox* is; the team name to the Org filtered to that team; *← Org* back |
 | team header | **PRs waiting** count | built (TD-093 slice 3, #479; the field slice 1; §4.9b *The reader*): *`n` PRs waiting · oldest `<age>`* from the seat's `prs_waiting: {n, oldest}` — a count and a time, never the entries; display only, not pressable (the entries are `ao inbox <seat>`'s), and never a board line — a held PR's wait is here and in the reader's inbox, nowhere else (§4.9a, TD-125). Absent without a seat, or when no session of the team carries `review`. And on the person's Inbox, an `ask` that carries `pr` (a `reader: person` repo) draws `#<n>` as a link to the PR beside its text — the number is a structured field, the text stays text |
 | team header | **answered for you** count | the number of *answered for you* entries from this team's sessions since the person last opened that group (TD-075) — a mark, never pressable; the group is reached from the Inbox. *Since the person last opened that group* is this browser's memory, as FYI's *new* mark is — the newest row seen while the Inbox's group is open and the tab in view — so the home keeps no read state for it; the poll gives each row's team and time (`answered_marks`), never its text, and the header's mark is filled in by the page (the Org reads the poll at load for it) |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text in its shape (first paragraph, *details*; TD-127), the default it will take, and the time left; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and is counted while paused — a session is held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused |
@@ -2138,8 +2189,8 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (the create RPC refuses the same way) |
-| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; a team with something live is never folded; between the header and the cards sits the **repo strip** (its own row, below) — the repo's numbers, which the header's session counts are not — and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. A **concluded** team is drawn like a stopped one **and never folds** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live session carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — the rest exited or closed, and its seats (§4.9b) either absent or `idle` (a seat never declares; a `working` seat is answering somebody). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is not offered (above); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. A team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own |
-| card, team header | **state icon** | every state pill opens with a glyph, so a page of cards is read by shape before it is read by word: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; not built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
+| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; a team with something live is never folded; between the header and the cards sits the **summary** (its own row, below: the Repo, TDs in motion and Answer needed / Doing facets), the header carrying no state chips since the member cards say it (TD-170, 2026-09-26), and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. A **concluded** team is drawn like a stopped one **and never folds** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live session carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — the rest exited or closed, and its seats (§4.9b) either absent or `idle` (a seat never declares; a `working` seat is answering somebody). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is not offered (above); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. A team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own |
+| card, team header | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Org rollup's, a team header's): there the summary above says what the glyphs were for, and the word and colour carry the state (TD-170; Paul, 2026-09-26: *are those icons serving a real purpose?*). The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; not built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
 | Org | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.agentorc.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above); the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, or an idle seat — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it |
 | Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1) |
 | Org | team header **✉ n** | display only: on a folded team's header, the sum of its folded sessions' unread counts — the count each card's **unread** chip shows, which the fold hides; nothing at zero, and gone while the team is unfolded or a filter shows its cards. The mail stays where it is: unread never ages out (§4.10 *The lifecycle of an entry*), and a start under the same name moves the old record's mail to the new session (§4.10, TD-081), so what a folded team holds unread is what its next run reads first. Unfold to read or dismiss it (TD-071 item 2) |
@@ -2528,6 +2579,15 @@ repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references,
 **Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists:
 
+- **The doing log** (TD-170; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
+  the team — time, doer, what they are doing*): `doing` on the record stays a value, the latest
+  line; the host agent also keeps, per team, the last fifty `doing` calls with their time and
+  caller (§4.4 *Repo facts*), which is what the team card's **Doing** facet and the Repo page's
+  **Doing** section draw. Nothing reads the log but a page and `ao repo`; no wake, no policy.
+  So that the feed says what a team is doing and not only what its grinders are, **the manager
+  says its round too**: its brief asks for one `ao doing` at the start of each round step
+  (*round 41: reading four members, two claims to re-check*), which is also the line its card and
+  the TDs in motion facet show under the manager.
 - `control` (`orchestrate`, its old name, is an unknown grant — TD-107): the session may act on *other* sessions — `send`, `keys`, wrap-up,
   `kill`, `close`, `mode`, `new`, `remove`, `decide` (`ao allow` / `ao deny`: answering another
   session's permission prompt is the same class of act as typing at it — TD-116), and `set_grants`
