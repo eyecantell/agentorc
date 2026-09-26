@@ -606,7 +606,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
     line: the next act outlined first (Close session, Take over, or none), the plain ones, more ▾
     at the right with Kill last. Until 2026-09-25 this was one wrapping row, the buttons at its
     tail, which broke over three lines on Paul's screen with the buttons split between two."""
-    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span><span class="btn" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span>' if editor else ""
+    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span>' if editor else ""
     return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
