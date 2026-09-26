@@ -3704,8 +3704,10 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
-                    team = str(s.get("team") or "")
-                    was_live = team_live(team, known.values())
+                    # the record's team now and before this delta: a re-badge moves a card between
+                    # two teams, and either may come alive or wind down by it (review of TD-176 slice 3)
+                    teams = {str(s.get("team") or ""), str((known.get(s["id"]) or {}).get("team") or "")} - {""}
+                    was_live = {t: team_live(t, known.values()) for t in teams}
                     known[s["id"]] = s
                     v = view(s, list(known.values()), icons=await role_icons([s]), seats=await seats_of([s]))
                     compact_in(v, known.values())
@@ -3725,10 +3727,11 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                             }
                         )
                     )
-                    if team and was_live != team_live(team, known.values()):
-                        # the team came alive or wound down: its other members' cards change shape,
+                    flipped = {t for t in teams if was_live[t] != team_live(t, known.values())}
+                    if flipped:
+                        # a team came alive or wound down: its other members' cards change shape,
                         # compact ↔ full (§4.5a *card: compact*, TD-176), so each is redrawn
-                        for other in [o for o in known.values() if o.get("team") == team and o["id"] != s["id"]]:
+                        for other in [o for o in known.values() if o.get("team") in flipped and o["id"] != s["id"]]:
                             ov = view(
                                 other,
                                 list(known.values()),

@@ -1650,3 +1650,34 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     closure, which the node probe cannot reach, so the rule is pinned where it is written."""
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
     assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js
+
+
+def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
+    """TD-176 slice 3 (§4.5a *card: compact*): a member of a live team is a compact card; when the
+    team's last live session goes, the stream redraws its other members' cards in the full shape —
+    and it keys on the record's team before the delta as well as after (review of slice 3)."""
+    from sessionorc.client import call_sync
+
+    made = [
+        call_sync("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="wind")["id"]
+        for n in ("w1", "w2")
+    ]
+    call_sync("kill", id=made[1])
+    wait_state(client, made[1], "exited")
+    assert " compact" in client.get("/").text.split(f'id="card-{made[1]}"')[0].rsplit("<div", 1)[-1]
+    with client.websocket_connect("/events") as ws:
+        call_sync("kill", id=made[0])
+        # the subscribe's snapshot comes first (w1 still live, w2 compact); the redraw follows w1's exit
+        gone, redrawn = False, None
+        for _ in range(80):
+            ev = json.loads(ws.receive_text())
+            if ev.get("event") != "session":
+                continue
+            if ev["id"] == made[0] and ev["state"] == "exited":
+                gone = True
+            elif gone and ev["id"] == made[1]:
+                redrawn = ev
+                break
+        assert redrawn and " compact" not in redrawn["html"].split(">", 1)[0]
+    for sid in made:
+        client.post(f"/api/sessions/{sid}/remove")
