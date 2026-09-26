@@ -92,7 +92,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
 | TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Designed 2026-09-25 (the designer) — the build is TD-170; archives with it |
 | TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Designed 2026-09-25 (the designer) — the build is TD-171; archives with it |
-| TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
+| TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Designed 2026-09-25 (the designer) — the build is TD-172; archives with it |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
@@ -101,6 +101,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-170 | Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles` | Medium | Open |
 | TD-171 | Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles` | Medium | Open |
+| TD-172 | Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back* | Medium | Open |
 
 
 ---
@@ -1688,9 +1689,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the team definition*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-172
 
-**Status:** Open — nothing designed. It crosses a line drawn today: the settings audit (ADR 2026-09-25 §5) says *a definition says what a team is and belongs in its file, by hand or by PR; a setting is a number a person turns* — and its §2 calls the org file *a team editor in waiting*. This is the first control that edits a definition from the page, and the round has to say so in the ADR's terms.
+**Status:** Designed 2026-09-25 (the designer): design §4.9 *Add or remove a member from the team card* (the four points), §4.9a *One member back, today* (f), §4.5a *team card: Members…* and the *Members dialog* rows, the settings audit ADR's dated addendum before its open decisions, mockup `Members.dc.html` and the headers of `Main.dc.html`. Settled: (a) `org.yml`'s `members` edited as text in place — a `count:` bumped or one line added or removed, comments kept, re-parsed, refused when not one line; a repo-defined team is a PR's; (b) at once on a live team — one member's create under the manager, one member's wind-down — and the definition only on a stopped one; (c) **Members…** on the team card, not the Settings page; (d) the record stays until Forget; (e) the mockup; (f) written in §4.9a, and the build puts it on the exited banner and in `ao team --skill`. The design is PR #572; the card-against-Settings-page choice is on the board for Paul (the designer's line of 2026-09-25, extended here — the person inbox is full), and #572 merges after 2026-09-26 08:30 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-172; this entry archives with it. **What was:** nothing designed. It crosses a line drawn today: the settings audit (ADR 2026-09-25 §5) says *a definition says what a team is and belongs in its file, by hand or by PR; a setting is a number a person turns* — and its §2 calls the org file *a team editor in waiting*. This is the first control that edits a definition from the page, and the round has to say so in the ADR's terms.
 
 **Location:** ADR `docs/decisions/2026-09-25-settings-audit.md` §5 and its open decisions, design §4.5 screen 8 (Settings: **Teams** — schedule, until, reserve; no members), §4.5a *Org: team card* (Start / Wind down / Stop now, Forget all), §4.9 (a team definition: manager, techlead, members with role, name, lane, brief), §5 (`org.yml` `teams:`; a repo's `.agentorc.yml` `teams:`), §4.4a (the org file is read per call, clients only, never the agent); `~/.agentorc/org.yml`; TD-146–148 (the settings file, replica and page).
 
@@ -1839,6 +1840,30 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-162's *Done when*: a person hovering Message on the techlead's card reads what it is for, and the composer repeats the line above the text box; and the ao-grind header reads *questions → manager-ao-1 · PRs and the architecture → techlead-ao-1 · a grinder about its own card*.
 
 **Related:** TD-162 (the design), TD-158 / TD-168 (the when-read line beneath it), TD-157 / TD-167 (the `title` as the mark), TD-160 / TD-169 (the person in the team), TD-097 (the seat card's Message…).
+
+## TD-172: Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back*
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-163's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.9 *Add or remove a member from the team card*, §4.9a *One member back, today*, §4.5a *team card: Members…* and *Members dialog*, ADR 2026-09-25 (the addendum); mockups `Members.dc.html`, `Main.dc.html`.
+
+**Location:** `src/agentorc/org.py` (`load`; a new `edit_members(path, team, add=…|remove=…) -> str` that edits the text, re-parses, restores on failure — the one writer of `org.yml`), `src/agentorc/teams.py` (`plan`; a `plan_member(org, team, name, host)` that returns the one spec), `src/agentorc/ui/app.py` (`/api/teams/<t>/members` GET and POST; the create of one member as the start route creates one; the wind-down of one as Wrap up does; `team_groups`: the button's presence, the repo-defined note), `src/agentorc/ui/templates/group_head.html` (**Members…**), `base.html` (the dialog), `src/agentorc/ui/static/app.js`, `focus.html` / `app.js` (the exited banner's line: *to bring it back into the team unattended: Resume with changes… and tick Unattended*), `src/agentorc/team_skill.md` (§6 *Stop it*: one member back).
+
+**Why:** TD-163's *Why*: a third grinder or a second designer is a hand edit and a restart today, with nothing on the page saying the definition and the run differ.
+
+**Fix:**
+1. **`edit_members`**: locate the team's `members:` block by lines (the team key at its indent, `members:` under it, the `- ` items at one deeper indent, until the indent drops); add: the line whose `role:` matches and carries `count:` → the number bumped in place, else a new `- {role, name, lane}` line after the last item at its indent; remove: `count:` decremented (to 1 keeps the line; from 1 deletes it) or the line whose `name:` matches deleted. Refuse: no such team in `org.yml`; the item is multi-line; a `- {team: …}` item; the file fails to re-parse (bytes restored). Tests on a fixture with comments above and beside each line: the bytes outside the one line are identical after each edit.
+2. **`plan_member`** and the route's create: the member's spec from the definition as `plan` builds it, created under the manager with the same checks; the reply is the record. Remove on a live member: the `send` RPC with `wrapup=True` and the wrap-up prompt — Focus's Wrap up's own path, which stamps `wrapup_at` and lets the tick finish the session — never `set_stop`, which schedules a later stop.
+3. **The dialog**: the listing, Add member (role select from `/api/roles`, name default from the team's pattern, lane default), Remove with its confirm text; refusals in place. **Members…** drawn on a team defined in `org.yml`, the note on a repo-defined team.
+4. **The two sentences** for *one member back*: the exited banner's hint on a record carrying a `team` badge, and `team_skill.md` §6.
+5. **Tests:** the edit's cases; the route on a stopped team (definition only) and a live one (a create); the note on a repo-defined team; the banner's line; the skill text.
+
+**Done when** TD-163's *Done when*: Paul adds a grinder to ao-grind from its card while it runs, the member appears under the manager without a restart, and `org.yml` shows the member with the comment block above it intact.
+
+**Related:** TD-163 (the design), ADR 2026-09-25 §5, TD-146–148 (the Settings page keeps to settings), TD-157 / TD-167 (Forget on a defined member), TD-160 / TD-169 (a person as a member), TD-081 (Resume in place), §4.9a (Start on a concluded team).
 
 ## TD-173: Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line
 

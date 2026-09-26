@@ -498,7 +498,7 @@ def team_desktop():
 
     def group(title, sub, cards_html, needs=0, team=False):
         flag = pill("needs", f"{needs} needs you") if needs else ""
-        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
+        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm ghost" title="the definition\'s members: add one, remove one (design §4.9, TD-163)">Members…</span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
                 if team else "")
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
         # who for what (design §4.5a *team groups*, TD-162): each role's `message:` line, with the session holding it
@@ -544,7 +544,7 @@ def team_desktop():
         grid += (f'<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #cbd0d6; border-radius: 8px; '
                  f'padding: 10px 14px; background: #eceef1;" title="defined in {source}">'
                  f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>'
-                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}<span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></div>')
+                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm ghost">Members…</span><span class="btn sm primary">Start</span>{fold}<span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span></div>')
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
@@ -1086,6 +1086,49 @@ def help_page():
 
 
 
+def members_dialog():
+    """The team card's **Members…** dialog (design §4.9 *Add or remove a member from the team card*,
+    TD-163): the definition as the file holds it, the session holding each entry, Add member and Remove."""
+    def row(role, name, lane, count, holder, state, removable=True, note=""):
+        st = pill(state) if state else '<span class="muted">not live</span>'
+        rm = '<span class="btn sm ghost">Remove</span>' if removable else f'<span class="meta">{note}</span>'
+        cnt = f' · count {count}' if count else ""
+        return f'''<div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge">{role_icon(role)}{ROLE_LABEL.get(role, role.capitalize())}</span>
+  <span class="mono">{name}</span><span class="meta">lane {lane}{cnt}</span>
+  <span style="flex-grow: 1;"></span>
+  <span class="mono muted" style="font-size: 12px;">{holder}</span>{st}{rm}
+</div>'''
+    rows = "".join([
+        row("manager", "manager-ao-1", "—", 0, "ao-agentorc-manager-ao-1", "working", False, "the manager: a different definition, by hand"),
+        row("techlead", "techlead-ao-1", "—", 0, "seat", "oncall", False, "the seat: by hand"),
+        row("grinder", "grinder-ao", "free-pick", 2, "grinder-ao-1 · grinder-ao-2", "working"),
+        row("designer", "designer-ao-1", "design-first", 0, "ao-agentorc-designer-ao-1", "idle"),
+    ])
+    return head("Members") + f'''<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.agentorc/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div class="note">The definition as the file holds it, with the session holding each entry. <b>Add</b> edits one line of the file (a <span class="mono">count:</span> bumped, or one member line added) and, while the team runs, creates the member under the manager at once; <b>Remove</b> edits the line the same way and winds that one session down — never a kill — and its card stays until Forget. Comments in the file are kept: the edit is one line, never a rewrite.</div>
+    {rows}
+    <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-weight: 600;">Add member</span>
+      <span class="input" style="width: 150px;">grinder ▾</span>
+      <span class="input mono" style="width: 170px;">grinder-ao</span><span class="meta">→ grinder-ao-3</span>
+      <span class="input mono" style="width: 150px;">free-pick</span>
+      <span style="flex-grow: 1;"></span>
+      <span class="btn primary">Add and start</span>
+    </div>
+    <div class="note" style="color: #7c3d00;">{ICON["warn"]}Remove grinder-ao-2? Edits org.yml (count: 2 → 1) and winds down grinder-ao-2 — it finishes what it holds and exits; its card stays until Forget.</div>
+  </div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.agentorc.yml</span> shows no Members…: that file is a PR's.</div>
+</div>
+</div>
+''' + TAIL
+
+
+
 def resumable():
     def r(host, repo, path, s):
         sid, nm, where, span, started, ended, board, live = s
@@ -1571,6 +1614,7 @@ files = {
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
+    "Members.dc.html": members_dialog(),
     "Help.dc.html": help_page(),
     "Transcript.dc.html": transcript(),
     "Message.dc.html": message_dialogs(),
@@ -1602,6 +1646,7 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
+    ("Members.dc.html", "Members — the team card's dialog", 0),
     ("Help.dc.html", "Help", 0),
     ("Transcript.dc.html", "Transcript", 0),
     ("Message.dc.html", "Message — when it is read", 0),
@@ -1634,7 +1679,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 11 (2026-09-25, TD-157): screen 10, Help, and the i marks on the team card's header and the Focus header.\nRound 13 (2026-09-25, TD-160): New session gains the Team pick, with the reader it brings.\nRound 14 (2026-09-25, TD-161): prompt chips beside Send on Focus and beside the opening prompt on New session.\nRound 15 (2026-09-25, TD-162): the team header's who-for-what line and the composer's role line.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 11 (2026-09-25, TD-157): screen 10, Help, and the i marks on the team card's header and the Focus header.\nRound 13 (2026-09-25, TD-160): New session gains the Team pick, with the reader it brings.\nRound 14 (2026-09-25, TD-161): prompt chips beside Send on Focus and beside the opening prompt on New session.\nRound 15 (2026-09-25, TD-162): the team header's who-for-what line and the composer's role line.\nRound 16 (2026-09-25, TD-163): Members… on the team card and its dialog.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
