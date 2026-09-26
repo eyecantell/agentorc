@@ -2,7 +2,7 @@
    slice 4): four facets under the title, sums over every live team, every number a link. Rendered
    on page load and re-sent with the groups on every delta and on the `repos` and `doing` events.
    The window picker is the page's one value (the client sets it); *in the Inbox* is the top bar's
-   count, copied in by the client. #}
+   count, copied in by the client, and *m overdue* beside it the Inbox poll's `overdue_n` (TD-178). #}
 {% if ro %}
 <div class="rollup">
   <div class="facet">
@@ -32,7 +32,8 @@
   <div class="facet fneeds{% if ro.answer_needed %} answering{% endif %}">
     <div class="fhead"><span class="kind">Needs you</span></div>
     <div class="nrow"><b class="big">{{ ro.answer_needed }}</b> {% if ro.answer_team %}<a href="#tsum-{{ ro.answer_team }}" title="members waiting on a permission or a question — answered in their team's facet">answer needed</a>{% else %}<span>answer needed</span>{% endif %}</div>
-    <div class="nrow"><b class="big" data-inbox-needs>{{ person_needs or 0 }}</b> <a href="/inbox">in the Inbox</a></div>
+    <div class="nrow"><b class="big" data-inbox-needs>{{ person_needs or 0 }}</b> <a href="/inbox">in the Inbox</a>{#- §4.5 screen 1 (TD-178): the board items past their date among them, kept live from the Inbox's poll as the count is -#}
+      <span class="meta overdue{% if not person_overdue %} hidden{% endif %}" title="board items in Needs you whose Due: date has passed">· <span data-inbox-overdue>{{ person_overdue or 0 }}</span> overdue</span></div>
   </div>
 </div>
 {% endif %}
