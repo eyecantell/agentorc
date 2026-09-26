@@ -108,10 +108,11 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
             {"id": "techlead-1", "text": "read #805", "at": _iso(NOW)},
         ]
     }
+    # the standing ages against the clock when the page renders, not the module's import time
     inbox = {
         "techlead-1": {
             "entries": [
-                {"kind": "ask", "pr": 811, "at": _iso(NOW - timedelta(minutes=40))},
+                {"kind": "ask", "pr": 811, "at": _iso(datetime.now(UTC) - timedelta(minutes=40))},
                 {"kind": "ask", "pr": 805, "at": _iso(NOW), "closed_by": "m-1"},
             ]
         }
