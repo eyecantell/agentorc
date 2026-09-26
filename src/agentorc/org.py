@@ -580,6 +580,24 @@ def _members_block(lines: list[str], team: str) -> tuple[int, list[tuple[int, di
     return m_at, items
 
 
+def _set_count(line: str, body: dict[str, Any], n: int) -> str:
+    """`line` with its entry's `count:` set to `n` — the one `count: <digits>` whose replacement makes
+    the entry parse as it did with only its count changed, since a name or a lane may hold the same
+    characters (review of PR #608). None fits: a ValueError, and the file is not written."""
+    it = _ITEM.match(line.rstrip("\r\n"))
+    want = {**body, "count": n}
+    for m in _COUNT.finditer(line):
+        cand = line[: m.start(2)] + str(n) + line[m.end(2) :]
+        got = _ITEM.match(cand.rstrip("\r\n"))
+        try:
+            parsed = yaml.safe_load(got["body"]) if got else None
+        except yaml.YAMLError:
+            continue
+        if parsed == want and it is not None:
+            return cand
+    raise ValueError("this member's count: cannot be edited as one field of its line — edit it by hand")
+
+
 def edit_members(
     path: Path, team: str, *, add: dict[str, Any] | None = None, remove: int | None = None, role: str = ""
 ) -> str:
@@ -612,7 +630,7 @@ def edit_members(
         if hit is not None:
             i, body, _ = hit
             n = body["count"]
-            lines[i] = _COUNT.sub(lambda mm: f"{mm.group(1)}{n + 1}", lines[i], count=1)
+            lines[i] = _set_count(lines[i], body, n + 1)
             did = f"{body.get('name') or want} count: {n} → {n + 1}"
         else:
             entry = {"role": want}
@@ -647,7 +665,7 @@ def edit_members(
             raise ValueError(f"team {team}'s member entry {remove + 1} is not a {role} any more — reload and try again")
         n = body.get("count", 1)
         if isinstance(n, int) and n > 1:
-            lines[i] = _COUNT.sub(lambda mm: f"{mm.group(1)}{n - 1}", lines[i], count=1)
+            lines[i] = _set_count(lines[i], body, n - 1)
             did = f"{body.get('name') or body.get('role')} count: {n} → {n - 1}"
         else:
             del lines[i]
