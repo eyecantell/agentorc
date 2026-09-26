@@ -1869,7 +1869,7 @@ Screens:
    lines (§6 *Usage gate*); **Repos** — a card per registered checkout with its `.agentorc.yml`
    values read-only and the one setting a person flips, the promote's **auto** (§6 *Promote*), which
    this round moves out of the checked-in file; **You** — *yours everywhere*: `open_in` and the
-   terminal's size and face (§5 `person:`), and *this browser*: theme, *mine*, the folds, with
+   terminal's size, face and copy on select (§5 `person:`; TD-164), and *this browser*: theme, *mine*, the folds, with
    **Reset this browser**; **Hosts**, **Profiles**, **Org** — read-only. **Every read-only value
    carries an *i* mark** that says which file it comes from, when that file is re-read, and whether
    a change needs the host agent restarted (§5; a host's name, its `home:` and its identity mode are
@@ -2065,7 +2065,7 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Working** | display only: what the session says it is doing — the `doing` line (§4.8) in its own words with *says · <age> ago* in the heading — drawn only while it says something, kept current from the delta; it left the header for this card (TD-156, Paul: *we already have a Reports card for finished work*) |
 | Focus | **Kill** | in the header's *more ▾*, last and red, never the only stop in sight (TD-156); confirms, then kills the tmux session; worktree kept; state `exited` with `pane: false` — unlike a natural exit, whose dead pane is kept, a kill destroys it, so the card offers Details and Focus / `ao focus` refuse without calling tmux (TD-023) |
 | Focus (exited / closed) | **Resume** / **Resume with changes…** / **New session here** / **Forget** | the exited banner. **Resume** is one press and no form (TD-081), on an `exited` or `closed` record holding a tool session id: a `create` on the record's host with its own `name`, `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane` and `controllers`, **its `repo` when it has one** — the scope the name is checked in (§4.1): a session in a worktree is scoped by its repo, and a resume that sent the worktree directory alone computed a different id, so a second record appeared beside the one being resumed (TD-145) — and `resume` = the tool's session id — the name check answers `supersede`, the new session takes the bare name and the record's id, the old record is replaced in place and its mail stays with it (§4.10 *Resume carries mail forward*); a live team finds its member by the same name. **Never carried: `unattended`** — the session a press starts is attended, whatever the record was: an unattended session answers its own permission prompts, and a press with no form is no place to grant that; its prompts come to the Inbox. To make it unattended again use **Resume with changes…**, where *Unattended* and its stop time are on the form together. Also not carried: `run_until` and `wrapup_prompt` (a passed deadline is not one; an attended session has none, §6), `prompt`, and `capabilities` — the page takes the grants of the record's `role` from the role presets, as the form does. `controllers` are carried as they were: a controller that is gone is a wake that goes nowhere; `supervised` (§6) is carried the same way and is inert while the session is attended. A person's act — no `caller`, no attenuation (§4.8 create rule); no CLI form beyond `ao new --resume`. **When it cannot be silent it is not a guess:** no tool session id (a `shell`, a command), a name a *live* record holds, a directory that is gone, a profile or role that no longer exists, or a host not connected — the press lands on the form, filled in, with the reason on it. **Resume with changes…** is that same filled-in form, asked for, *Unattended* as the record had it; a worktree record lands with **Where** = new worktree, the worktree's name and the repo in the directory field — the fields the form's own Start sends back, so the create checks the name in the record's scope. **New session here** prefills the directory only; **Forget** removes the record (pane and run log readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
-| Focus | **Copy / Paste** | in the header's *more ▾*, each naming its keys (TD-156). Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
+| Focus | **Copy / Paste** | in the header's *more ▾*, each naming its keys (TD-156). Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection — made by a plain drag, grown or shrunk by Shift+click, once TD-174 lands (§4.6 *The mouse is the browser's*, TD-164; until then Shift+drag, since a plain drag goes to tmux) — (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** ("steers the turn in flight") while the session is `working` and **Send** ("starts a new turn") when idle (§4.3) — one control, labelled for the job it is doing. `stalled?` steers too — a `working` session that stopped producing output (§4.2) is a turn in flight; `limited` says the cap holds what you send, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Closed, composer and all, on an `unattended` session (TD-096, *Focus watches*: typing is the disruption; Take over opens it). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn (TD-047), and the host agent refuses `send` and `keys` to an `exited` or `closed` record the same, in words with the exit code, whoever sends (TD-078) — the record's own state, not a screen rule |
 | Focus composer | **prompt chips** | (TD-161; designed 2026-09-25, not built — TD-170) one chip per entry of the session's role `prompts:` (§4.8), beside Send, drawn only where the composer is open — an interactive session — and in the same order as the file. A press is **Send** with that text: it pastes the prompt and presses Enter through `send`'s own path, confirmed as Send is, and reads as Send reads — a chip steers while a turn is in flight, since it is a Send; Shift+press fills the composer with the text instead, for editing, and focuses it. The chip's `title` is its text. Hidden when the role has none, and on `exited`, `closed`, `limited` and `unreachable` with the composer. Fixed text from the definition (§4.2): never a session's words, no substitution, nothing on the record. On the phone (§4.5 *Phone layout*) the chips wrap in one row above the composer — the point of them: a turn steered without a keyboard |
@@ -2312,19 +2312,41 @@ it is why the terminal rides the host agent's pipe and why the adapter contract 
   terminal shows tmux's scrollback (`history-limit`) only; the run log is a download, never a
   terminal source.
 - **Scrollback is tmux's, reached through tmux (TD-022).** tmux repaints the client in place and
-  keeps the history itself, so xterm.js runs with no local buffer. The attach sets `mouse on` on
-  the session (a session option, never the person's global one): the wheel reaches tmux, which
-  enters copy mode over its history and leaves it on scrolling back to the live screen.
-  Shift+PageUp / Shift+PageDown do the same by a bridge message the UI turns into
-  `copy-mode -e -u` / `page-down` against the session (there is no escape sequence for copy
-  mode). Mouse tracking means plain drag goes to tmux; Shift+drag selects in the browser.
+  keeps the history itself, so xterm.js runs with no local buffer. Shift+PageUp / Shift+PageDown
+  scroll it by a bridge message the UI turns into `copy-mode -e -u` / `page-down` against the
+  session (there is no escape sequence for copy mode). **The mouse is the browser's (TD-164;
+  designed 2026-09-25, not built — TD-174).** Until then the attach set `mouse on` on the session
+  so the wheel reached tmux's copy mode, and because tmux then asked for mouse tracking a plain
+  drag went to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only
+  Shift+drag selected in the browser: a real terminal's rule, and the wrong one for a pane that is
+  mostly read. Now the attach sets no mouse option, tmux asks for no tracking, and xterm.js keeps
+  the mouse: **a plain drag selects in the browser**, Shift+drag does the same (with no tracking,
+  Shift is nothing to xterm.js, so the habit costs nothing and needs no setting), and
+  **Shift+click grows or shrinks the selection** — xterm.js's own selection service does it
+  (`shiftKey → _handleIncrementalClick`, read in the vendored source), as VS Code's terminal
+  does. **The wheel still scrolls tmux's history**: the page catches `wheel` on the terminal and
+  sends the scroll message Shift+PageUp sends, with a line count — `{scroll: up|down, lines: n}`,
+  the notches of one animation frame batched into one message — which the bridge turns into
+  `copy-mode -e` then `send-keys -X -N n scroll-up` / `scroll-down` against the session, so a
+  notch is lines, not a page, and `-e` leaves copy mode at the bottom as before. The wheel is a
+  tmux command per frame down the bridge, never a mouse report: the read-only attach passes it as
+  it passes every scroll message, and its carve-out for wheel-only report frames goes (below).
+  **What is lost, and simply so**: a program in the pane that asks for mouse tracking itself
+  (htop, a mouse-enabled `less`) gets no mouse, since tmux forwards none with its mouse off — a
+  runtime fact `man tmux` does not state, so TD-174's PR checks it in a live pane and says so;
+  Claude Code asks for none, and a person who needs the mouse in such a program has `ao focus` in
+  a real terminal. No per-session escape: a setting over which drag selects is the thing this
+  removes. **Copy on select** is the one choice left, and it is the person's (§4.5a *Focus:
+  copy on select*, §5 `person.terminal.copy_on_select`).
 - **Run-log retention.** A session's log is bounded by its lifetime; retention is by age: logs
   of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the agent's
   tick. Live logs are never truncated, so invariant 3 holds while the session exists.
 - **A read-only attach (TD-096).** The attach is opened read-only when the record says
   `unattended` at open: the pump drops key frames (str and bytes) and passes resize and scroll —
-  and a frame that is only mouse-wheel reports, which tmux's `mouse on` turns into scrolling its
-  history, never typing (`WHEEL_ONLY`; a click is dropped with the keys) — and the page is told
+  until TD-174 lands, also a frame that is only mouse-wheel reports, which tmux's `mouse on`
+  turned into scrolling its history, never typing (`WHEEL_ONLY`; a click is dropped with the
+  keys); with the mouse the browser's (TD-164) the wheel is a scroll message and that carve-out
+  goes — and the page is told
   so in the first frame, a text frame `{"read_only": true}` that is not pane output and resets no
   backoff (TD-029). The rule is enforced in the UI process, not by the terminal widget — a
   client setting can be undone from a devtools console, and the point is that a person cannot
@@ -4998,7 +5020,8 @@ repos:                                        # per registered checkout, by its 
   agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
-  terminal: {size: 13, face: "JetBrains Mono"}   # goal 12: ligatures off regardless, monospace always the fallback
+  terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
+             copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a, TD-164; default on)
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
