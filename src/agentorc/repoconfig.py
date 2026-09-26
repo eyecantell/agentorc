@@ -42,7 +42,7 @@ DEFAULT_WORKTREES = ".claude/worktrees"
 DEFAULT_ANCHOR = "main-checkout-single"
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
-ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "message")
+ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "message", "prompts")
 # A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
 # ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
 # label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
@@ -57,6 +57,9 @@ LABEL_CAP = 40
 # When to message a role (design §4.8 *A role says when to message it*, TD-162, built by TD-171): one
 # sentence, drawn where a person chooses whom to write to. The definition's line, never the session's.
 MESSAGE_CAP = 120
+# A role's saved prompts (design §4.8 *A role has saved prompts*, TD-161, built by TD-170): the chips a
+# person presses in place of typing — `{label, text}`, the label one line of at most this many.
+PROMPT_LABEL_CAP = 24
 LANE_PLACEHOLDER = "{lane}"
 # The team's techlead seat (design §4.9b): its session id, filled at launch as `{lane}` is; `none`
 # where the team has none, or the session was started by hand, so a brief reads right either way.
@@ -169,6 +172,7 @@ class Role:
     icon: str | None = None  # one name from `ICONS` (§4.8), or None: the badge draws no picture
     label: str | None = None  # the display label (§4.8 *The names*); None is the default, `display`
     message: str | None = None  # when to message it (§4.8, TD-171): one sentence, or None for none
+    prompts: list[dict[str, str]] = field(default_factory=list)  # saved prompts (§4.8, TD-170), in file order
     controllers: list[str] = field(default_factory=list)
     review: dict[str, Any] | None = None  # who reads its PRs (design §4.9b *The reader*, TD-093)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
@@ -253,6 +257,7 @@ class Role:
             "icon": self.icon,
             "label": self.display,
             "message": self.message,
+            "prompts": [dict(p) for p in self.prompts],
             "controllers": list(self.controllers),
             "source": self.source,
         }
@@ -451,6 +456,8 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             if isinstance(v, str) and len(v.strip()) > MESSAGE_CAP:
                 raise ValueError(f"{here}.message is longer than {MESSAGE_CAP} characters")
             out[k] = v.strip() or None if isinstance(v, str) else None
+        elif k == "prompts":
+            out[k] = _prompts(v, f"{here}.prompts")
         elif k == "review":
             # §4.9b *The reader* (TD-093): checked by the one function the host agent also applies,
             # so a typo is a line naming the key when the file is read, never a PR nobody holds
@@ -466,6 +473,31 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             out[k] = grants
         else:  # lane, controllers
             out[k] = _str_list(v, f"{here}.{k}")
+    return out
+
+
+def _prompts(v: Any, here: str) -> list[dict[str, str]]:
+    """A `prompts:` list (design §4.8 *A role has saved prompts*, TD-170), checked when the file is
+    read: a list of `{label, text}`, the label one line of at most `PROMPT_LABEL_CAP` characters,
+    the text non-empty and kept verbatim — no substitution, what is typed is what the file says.
+    `null` is no prompts."""
+    if v is None:
+        return []
+    if not isinstance(v, list):
+        raise ValueError(f"{here} must be a list of {{label, text}}")
+    out: list[dict[str, str]] = []
+    for i, p in enumerate(v):
+        at = f"{here}[{i}]"
+        if not isinstance(p, dict) or set(p) - {"label", "text"}:
+            raise ValueError(f"{at} must be a mapping of label and text")
+        label, text = p.get("label"), p.get("text")
+        if not isinstance(label, str) or not label.strip() or "\n" in label:
+            raise ValueError(f"{at}.label must be one line of text")
+        if len(label.strip()) > PROMPT_LABEL_CAP:
+            raise ValueError(f"{at}.label is longer than {PROMPT_LABEL_CAP} characters")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"{at}.text must be the prompt, not empty")
+        out.append({"label": label.strip(), "text": text})
     return out
 
 
@@ -507,6 +539,8 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             role.label = block["label"]
         if "message" in block:
             role.message = block["message"]
+        if "prompts" in block:  # replaced whole at each layer, never merged (§4.8): a repo's list is the list
+            role.prompts = [dict(p) for p in block["prompts"]]
         if "review" in block:
             # every layer through the one check — the org's `roles:` is checked when read too (TD-149), and
             # `normalize_review` is idempotent, so a second pass over its output changes nothing

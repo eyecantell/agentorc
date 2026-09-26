@@ -42,7 +42,7 @@
          from its template, the lane's default, its grants and its profile; the list is the built-ins
          plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}
       <div class="field"><label>Role</label>
-        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == (prefill.role or 'plain') %} selected{% endif %} data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
+        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == (prefill.role or 'plain') %} selected{% endif %} data-prompts='{{ (r.prompts or []) | tojson }}' data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
         <span class="note" id="rolenote">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span>
       </div>
       {# design §4.5a New session **Grants** checkboxes (§4.8): the capabilities the session starts
@@ -70,6 +70,9 @@
           <input class="input mono" name="worktree" value="{{ prefill.worktree }}" placeholder="worktree name (default: the session name)" style="width: 280px;"></label>
       </div>
     </div>
+    {#- design §4.5a *New session* **prompt chips** (§4.8, TD-161, built by TD-170): the picked role's
+        `prompts:`, rebuilt with the Role pick; a press fills the Opening prompt — nothing runs yet -#}
+    <div class="row gap wrap promptchips" id="newchips" role="group" aria-label="saved prompts of the picked role"></div>
     <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt."></textarea></div>
     {# design §6 / §4.5a New session **Until** field (TD-026): a session started here with no stop
        time is exactly the hand-started worker nothing ever stopped, so the field sits beside the

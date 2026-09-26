@@ -1763,3 +1763,38 @@ def test_the_definition_names_its_roles_in_order_with_their_holders():
         and not got[2]["seat"]
         and got[2]["names"] == orgmod.MemberDef(role="grinder", count=2, name="grinder-ao").names()
     )
+
+
+def test_a_roles_saved_prompts_are_chips_on_focus_and_new_session(tmp_path, monkeypatch):
+    """design §4.5a *Focus composer* and *New session* **prompt chips** (§4.8, TD-161, built by
+    TD-170): the role's `prompts:` in the file's order, each a chip whose `title` and `data-text` are
+    its text — the definition's words, escaped; none for a record whose role has none; `/api/roles`
+    and New session's options carry them for the Role pick."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    from agentorc.ui import app as uiapp
+
+    (tmp_path / ".agentorc.yml").write_text(
+        "roles:\n  plain:\n    prompts:\n      - {label: review PR, text: 'Review PR <9> now.'}\n"
+        "      - {label: sweep, text: /stranded-work}\n"
+    )
+    rec = {"id": "ao-p", "name": "mine", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+           "repo": str(tmp_path), "state": "idle", "role": "plain", "unattended": False, "pane": True, "tail": [],
+           "since": "2026-09-19T16:00:00Z", "created": "2026-09-19T15:00:00Z", "confidence": "hook"}  # fmt: skip
+    prompts = uiapp.role_prompts(rec)
+    assert [p["label"] for p in prompts] == ["review PR", "sweep"]
+    assert uiapp.role_prompts({**rec, "role": "grinder"}) == [] and uiapp.role_prompts({**rec, "role": ""}) == []
+    v = uiapp.view(rec)
+    html = uiapp.templates.get_template("focus.html").render(
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Org", prompts=prompts
+    )
+    chips = html[html.index('id="promptchips"') : html.index('id="send"')]
+    assert chips.index(">review PR<") < chips.index(">sweep<")  # the file's order
+    assert 'data-text="Review PR &lt;9&gt; now." title="Review PR &lt;9&gt; now."' in chips
+    bare = uiapp.templates.get_template("focus.html").render(
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Org"
+    )
+    assert 'id="promptchips"' not in bare  # a role without prompts, or an unattended record: no chips
+    roles = {r.name: r for r in uiapp.repoconfig.roles(uiapp.repoconfig.load(tmp_path))}
+    assert roles["plain"].to_dict()["prompts"][1]["text"] == "/stranded-work"
+    new = (uiapp.HERE / "templates" / "new.html").read_text()  # the Role pick's options carry the list
+    assert 'id="newchips"' in new and "data-prompts='{{ (r.prompts or []) | tojson }}'" in new

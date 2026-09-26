@@ -581,6 +581,24 @@ def _look_for(repo: str, role: str, org_roles: Any) -> tuple[str, str, str]:
         return "", repoconfig.default_label(role), str((repoconfig.PRESETS.get(role) or {}).get("message") or "")
 
 
+def role_prompts(s: Mapping[str, Any]) -> list[dict[str, str]]:
+    """A record's role's `prompts:` (design §4.8 *A role has saved prompts*, TD-170), layered as the
+    icon is — the repo's own `roles:` over the org's over the built-in, the list replaced whole per
+    layer. A record with no role, a repo that cannot be read, a role nothing defines: no chips."""
+    role, repo = str(s.get("role") or ""), str(s.get("repo") or "")
+    if not role:
+        return []
+    try:
+        try:
+            org_roles = org_here()[0].roles
+        except (ValueError, OSError):
+            org_roles = None
+        cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
+        return repoconfig.resolve_role(cfg, role, org_roles).prompts
+    except (KeyError, ValueError, OSError):
+        return []
+
+
 async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], tuple[str, str, str]]:
     """The (icon, label, message) per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL`
     seconds — a role redefined by hand shows on the next load, or within that, exactly as a team
@@ -3137,6 +3155,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "popped": window == "1",
                 # §4.5a **Reports** (TD-150): the base a claim in review's PR number links from
                 "pr_base": await asyncio.to_thread(reviewmod.repo_web, s.get("repo") or s.get("dir")),
+                # §4.5a *Focus composer* **prompt chips** (TD-170): the role's saved prompts, for a
+                # session whose composer is open — an interactive one — and none otherwise
+                "prompts": [] if s.get("unattended") else await asyncio.to_thread(role_prompts, s),
             },
         )
 

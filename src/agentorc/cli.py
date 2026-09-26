@@ -548,6 +548,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
             if r.message:  # when to message it (design §4.8, TD-171): its own line, since it is a sentence
                 print(f"{'':<{w}}  message: {r.message}")
+            if r.prompts:  # its saved prompts (design §4.8, TD-170): the labels, the text is the file's
+                print(f"{'':<{w}}  prompts: {', '.join(p['label'] for p in r.prompts)}")
 
     return emit(args, result, prose)
 

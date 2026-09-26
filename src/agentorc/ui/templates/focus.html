@@ -113,6 +113,16 @@
       <div class="row gap">
         <span class="note" id="composehint"></span>
         <span class="grow"></span>
+        {#- design §4.5a *Focus composer* **prompt chips** (§4.8, TD-161, built by TD-170): the role's
+            `prompts:` in the file's order, beside Send; a press is Send with the chip's text, and
+            its `title` is that text — the definition's words, never a session's -#}
+        {%- if prompts %}
+        <span class="row gap wrap promptchips" id="promptchips" role="group" aria-label="saved prompts">
+          {%- for p in prompts %}
+          <button type="button" class="btn sm chip" data-text="{{ p.text }}" title="{{ p.text }}">{{ p.label }}</button>
+          {%- endfor %}
+        </span>
+        {%- endif %}
         <button class="btn primary" id="send">→ Send</button>
       </div>
     </div>
