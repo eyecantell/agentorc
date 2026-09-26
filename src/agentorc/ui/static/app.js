@@ -1649,6 +1649,9 @@
       if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
       const more = e.target.closest("[data-unfold]");
       if (more) return unfold(more.dataset.unfold);
+      // a board row's team badge: here it opens the Org filtered to that team (in the Inbox it picks the rail)
+      const badge = e.target.closest(".mailrow .badge.team[data-team]");
+      if (badge && badge.dataset.team) { location.href = "/?team=" + encodeURIComponent(badge.dataset.team); return; }
       const i = e.target.closest(".imark");
       if (i) { const panel = document.getElementById(i.getAttribute("aria-controls")); if (panel) { panel.hidden = !panel.hidden; i.setAttribute("aria-expanded", panel.hidden ? "false" : "true"); } }
     });

@@ -2987,6 +2987,15 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if first:
             summary = first["summary"]
             members = first["members"]
+        elif named:
+            # a team the definitions give this repo, with nothing live now (between runs, stopped):
+            # its facets still stand — its members' claims, its doing log — with the repo's own
+            # numbers, since no live member points the summary at the repo (review of slice 5)
+            members = [v for v in vs if v.get("team") == named]
+            summary = team_summary(named, members, {}, doing, prs_waiting(members), now)
+            summary["repo"] = repo_facet(r, now, prs_waiting(members))
+            summary["motion"] = motion_rows(members, r)
+            summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
         else:
             summary = {
                 "team": "",

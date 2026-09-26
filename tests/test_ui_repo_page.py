@@ -156,3 +156,18 @@ def test_the_ledger_lists_sort_by_priority_then_id_and_the_chips_count():
         [{"kind": "ask", "pr": 5, "at": _iso(NOW), "closed_reason": "expired"}, {"kind": "note", "pr": 6}], NOW
     )
     assert got == {}  # an expired ask stands for nothing; a note is not a request for review
+
+
+def test_a_team_given_the_repo_with_nothing_live_keeps_its_facets(tmp_path, monkeypatch):
+    """Review of slice 5: a team the definitions assign to the repo, all its sessions exited, is
+    still the servicing team — the header and the facets agree, and its claims and feed stand."""
+    root = str(tmp_path / "samscrape")
+    fleet = [rec("g1", root, state="exited", progress=[{"ref": "TD-301", "status": "claimed", "pr": 811}])]
+    doing = {"grind": [{"id": "g1", "text": "stopped for the night", "at": _iso(NOW)}]}
+    c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet, doing))
+    from agentorc.ui import app as ui
+
+    monkeypatch.setattr(ui, "repo_teams", lambda org, host: {str(tmp_path.joinpath("samscrape").resolve()): "grind"})
+    html = c.get("/repo/samscrape").text
+    assert "serviced by" in html and "no team services this repo" not in html
+    assert "TDs in motion (1)" in html and "stopped for the night" in html and "Technical debt (7 open)" in html
