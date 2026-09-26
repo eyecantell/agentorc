@@ -939,12 +939,64 @@ def _repo_line(r: dict[str, Any]) -> str:
 
 
 DOING_SHOWN = 10  # `ao repo`'s doing lines; `--json` carries the whole log of the servicing teams
+BOARD_SCRIPT = pathlib.Path("scripts") / "nudge_user_attention.py"  # dev-cadence's reader, as the Inbox runs it
+BOARD_FILE = pathlib.Path("docs") / "user_attention.md"
+
+
+def _board_due(root: pathlib.Path) -> dict[str, Any]:
+    """The repo's board items due today or overdue, read by dev-cadence's reader as the Inbox reads
+    them (§4.5 screen 6): `{items}`, `{error}` when the reader could not say, `{}` with no board."""
+    board, script = root / BOARD_FILE, root / BOARD_SCRIPT
+    if not board.is_file():
+        return {}
+    if not script.is_file():
+        return {"error": f"no {BOARD_SCRIPT} in the repo to read it"}
+    try:
+        cp = subprocess.run(
+            [sys.executable, str(script), "--report", "--due-only", "--json", "--board", str(board)],
+            capture_output=True, text=True, errors="replace", timeout=20,
+        )  # fmt: skip
+        report = json.loads(cp.stdout) if cp.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired, ValueError) as e:
+        return {"error": f"the board reader did not answer ({type(e).__name__})"}
+    if not isinstance(report, dict):
+        return {"error": f"the board reader exited {cp.returncode}"}
+    items = [
+        it
+        for b in report.get("boards") or []
+        if isinstance(b, dict)
+        for it in b.get("items") or []
+        if isinstance(it, dict)
+    ]
+    return {"items": items}
+
+
+def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
+    """Each PR's standing with the servicing team's techlead (§4.9b *The reader*), by number: from
+    the seat's inbox entries carrying a `pr`. A session's `ao repo` may not read another's inbox,
+    so from a session this is empty — the page's read is a person's."""
+    out: dict[str, str] = {}
+    for m in members:
+        if not (m.get("seat") or m.get("role") == "techlead"):
+            continue
+        try:
+            entries = (call_sync("inbox", id=m["id"]) or {}).get("entries") or []
+        except AgentError:
+            continue
+        for e in sorted((e for e in entries if isinstance(e, dict)), key=lambda e: str(e.get("at") or "")):
+            if isinstance(e.get("pr"), int) and e.get("kind") == "ask":
+                if e.get("closed_by"):
+                    out[str(e["pr"])] = f"reviewed by {m['id']}"
+                elif not e.get("closed_reason"):
+                    out[str(e["pr"])] = f"waiting on review by {m['id']} · {_age(str(e.get('at') or ''))}"
+    return out
 
 
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
-    registered repo — the current one without a name — as text or `--json`: its open PRs, the
-    window counts, and the ledger's entries by kind. A read, never a write."""
+    registered repo — the current one without a name — as text or `--json`: its open PRs with their
+    ages and the reader's standing, the window counts, the pickable and design-first entries, what
+    the servicing team's members hold and say, and the board items due. A read, never a write."""
     got: dict[str, dict[str, Any]] = call_sync("repos")
     if args.all:
         picked = list(got.values())
@@ -958,19 +1010,27 @@ def cmd_repo(args: argparse.Namespace) -> int:
         if not picked:
             raise AgentError("this directory is not in a registered repo; name one, or ao repo --all")
     if not args.all:
-        # the doing log of the teams whose sessions work in the repo (§4.8 *the doing log*, TD-176)
+        # what the servicing teams hold and say (§4.8 *the doing log*), the reader's standing on
+        # each open PR (§4.9b), and the board items due (§4.4) — TD-176 slice 6
         fleet, log = call_sync("list"), call_sync("doing_log")
         for r in picked:
             root = pathlib.Path(r.get("root") or "").resolve()
-            teams = sorted(
-                {
-                    s["team"]
-                    for s in fleet
-                    if s.get("team") and s.get("repo") and pathlib.Path(s["repo"]).resolve() == root
-                }
-            )
+            members = [
+                s for s in fleet if s.get("team") and s.get("repo") and pathlib.Path(s["repo"]).resolve() == root
+            ]
+            teams = sorted({s["team"] for s in members})
             calls = [e for t in teams for e in log.get(t, [])]
+            r["teams"] = teams
             r["doing"] = sorted(calls, key=lambda e: str(e.get("at") or ""), reverse=True)
+            r["holds"] = [
+                {"id": s["id"], "ref": p.get("ref"), "pr": p.get("pr") or p.get("review_pr")}
+                for s in members
+                if s.get("state") not in ("exited", "closed")
+                for p in s.get("progress") or []
+                if isinstance(p, dict) and p.get("status") == "claimed"
+            ]
+            r["standing"] = _pr_standing(members)
+            r["board"] = _board_due(root)
 
     def prose() -> None:
         if not picked:
@@ -983,10 +1043,20 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 draft = " (draft)" if p.get("draft") else ""
                 age = _age(p.get("created") or "")
                 print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
+                if st := (r.get("standing") or {}).get(str(p["number"])):
+                    print(f"         {st}")
             for kind in ("pickable", "design-first"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
                 for e in ids:
                     print(f"  {kind:<12} {e['id']}  {e['title']}")
+            for h in r.get("holds", []):
+                pr = f" → #{h['pr']}" if h.get("pr") else ""
+                print(f"  holds        {h['ref']}{pr}  {h['id']}")
+            board = r.get("board") or {}
+            if board.get("error"):
+                print(f"  board: could not look — {board['error']}")
+            for it in board.get("items", []):
+                print(f"  due          {it.get('due_tag') or it.get('due') or ''}  {it.get('text')}")
             for e in r.get("doing", [])[:DOING_SHOWN]:
                 print(f"  doing {_age(str(e.get('at') or '')):>4} ago  {e.get('id')}: {e.get('text')}")
 
