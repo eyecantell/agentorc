@@ -2431,7 +2431,7 @@ own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it
 `attention_snooze` and `inbox_dismiss` (TD-079).
 
 **`ao repo [name]`** (§4.5 screen 9, §4.4 *Repo facts*; designed 2026-09-25, not built — TD-170):
-the strip's numbers for one registered repo — the current one without a name — as text or
+the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
 entries, the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
@@ -5624,7 +5624,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
 - [ ] **What may a manager do with the repo's numbers?** (raised 2026-09-25, Paul: *if I want to
       make sure the team is balanced, I can make sure the PR count is not growing too much — the
       grinders outpacing the techlead; this may lead to automatic checks by the manager*). The
-      numbers come first, visible on the strip and readable by `ao repo` (§4.5 screen 9, §4.7),
+      numbers come first, visible on the team card and the rollup and readable by `ao repo` (§4.5 screens 1 and 9, §4.7),
       so a person watches them before any rule keys on them. The rule under consideration
       (TD-171, design-first): a per-team **balance** setting — open PRs above `n`, or the oldest
       past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out
