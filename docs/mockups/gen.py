@@ -381,8 +381,8 @@ def where_row(host, repo, name, where, in_team):
         parts.append(f"under <b>{e['under']}</b>")
     return " · ".join(parts)
 
-def team_desktop():
-    def card(host, repo, s, in_team):
+def team_desktop(team_first=False):
+    def card(host, repo, s, in_team, compact=False):
         name, tool, state, age, where, flag, conf, pending, tag = s
         e = EXTRA.get(name, {})
         unseen = state == "idle" and e.get("unseen")
@@ -466,6 +466,14 @@ def team_desktop():
         ring = (" ring" if state == "needs" else "") + (" kring" if e.get("kring") else "")
         off = " off" if state == "unreachable" else ""
         bar = BAR["idle"] if unseen else BAR[state]
+        if compact:
+            # the team-first shape compared 2026-09-25 (Paul): a member's card is its name, its
+            # state and its buttons — the team's summary block above carries the rest
+            return f'''<div class="card ac{ring}{off}" style="grid-template-rows: 26px 32px; min-height: 0;">
+  <div class="sbar" style="background: {bar};"></div>
+  <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
+  <div class="foot">{first}{rest}{editor}<span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;">{ICON["more"]}</span></div>
+</div>'''
         return f'''<div class="card ac{ring}{off}">
   <div class="sbar" style="background: {bar};"></div>
   <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
@@ -496,7 +504,7 @@ def team_desktop():
     GRID = "display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"
     WORDS = {"needs": "needs you", "stalled": "stalled?", "done": "closed"}
 
-    def group(title, sub, cards_html, needs=0, team=False):
+    def group(title, sub, cards_html, needs=0, team=False, strip=""):
         flag = pill("needs", f"{needs} needs you") if needs else ""
         acts = ('<span style="flex-grow: 1;"></span><span class="btn sm ghost" title="the definition\'s members: add one, remove one (design §4.9, TD-163)">Members…</span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
                 if team else "")
@@ -508,8 +516,43 @@ def team_desktop():
                 f'<div style="display: flex; align-items: center; gap: 10px;">'
                 f'<span style="font-weight: 600; font-size: 15px;">{title}</span>'
                 f'<span class="meta">{sub}</span>{flag}{acts}</div>'
-                f'{who}'
+                f'{who}{strip}'
                 f'<div style="{GRID}">{cards_html}</div></div>')
+
+    # design §4.5 screen 11 / §4.5a **team card: repo strip** (TD-176): one quiet line per repo the
+    # team services, between the header and the cards — the repo's numbers, every one a link; the
+    # header keeps the sessions' counts. A reading that failed reads *could not look*, dimmed.
+    def strip(repo, prs, oldest, pickable, design_first, for_you, overdue, on_now, failed=False):
+        n = lambda k, v: f'<a href="#" style="font-weight: 600;">{v} {k}</a>'
+        prs_part = ('<span class="meta" style="opacity: .6;" title="gh could not be asked at 20:05 — the last reading is 3 open PRs, 14:40">PRs: could not look</span>'
+                    if failed else f'{n("open PRs", prs)} <span class="meta">· oldest {oldest}</span>')
+        fy = f'{n("for you", for_you)}' + (f' <span class="meta">· {overdue} overdue</span>' if overdue else "")
+        now = " · ".join(on_now[:3]) + (f' <span class="meta">+{len(on_now) - 3}</span>' if len(on_now) > 3 else "")
+        return (f'<div class="meta" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; white-space: normal;">'
+                f'<a href="#" class="mono" style="color: #1c2128; font-weight: 500;">{repo}</a><span>·</span>{prs_part}<span>·</span>'
+                f'{n("pickable", pickable)}<span>·</span>{n("design-first", design_first)}<span>·</span>{fy}<span>·</span>'
+                f'<a href="#" style="font-weight: 600;">on now</a> <span class="mono" style="font-size: 12px;">{now}</span></div>')
+
+    STRIPS = {"samscrape-grind": strip("samscrape", 4, "3d", 7, 3, 2, 1,
+                                       ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3, #812)"])}
+
+    # the team-first shape (compared 2026-09-25): the team card carries a **summary block** — the
+    # repo strip, the whole *on now* list, the reader's queue, the manager's word — and its members
+    # shrink to name, state and buttons. Not the design; one of two shapes Paul is choosing between.
+    def summary(team):
+        if team != "samscrape-grind":
+            return ""
+        row = lambda k, v: (f'<div style="display: flex; gap: 10px; align-items: baseline;"><span class="kind" style="width: 92px; flex-shrink: 0;">{k}</span>'
+                            f'<span style="font-size: 13px; min-width: 0;">{v}</span></div>')
+        return (f'<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: #fff; border: 1px solid #dfe3e8; border-radius: 6px;">'
+                + STRIPS[team]
+                + row("on now", '<span class="mono">TD-301</span> tdgrind-1 → <a href="#">#811</a> <span class="meta">pushing the branch for review · 14s</span> &nbsp;·&nbsp; '
+                                '<span class="mono">TD-296</span> tdgrind-2 → <a href="#">#437</a> <span class="meta">no output 47m</span> &nbsp;·&nbsp; '
+                                '<span class="mono">TD-290</span> tdgrind-3 <span class="meta">limited · resets 02:00</span>')
+                + row("reader", '<a href="#">2 PRs waiting</a> <span class="meta">· oldest 40m · techlead-1 on call, last came 2h ago</span>')
+                + row("manager", 'round 41: reading four members, two claims to re-check <span class="meta">· says 2m ago</span>')
+                + row("needs you", 'tdgrind-1 · permission · Bash git push -u origin td301-fix <span class="meta">· 9m 12s left</span> — <a href="#">Allow</a> · <a href="#">Deny</a>')
+                + '</div>')
 
     grid = ""
     for team, source, lead, live, repo in TEAMS:
@@ -530,7 +573,8 @@ def team_desktop():
             if x[2] != "needs":
                 counts[w] = counts.get(w, 0) + 1
         tally = " · ".join(f"{n} {w}" for w, n in counts.items())
-        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True) for h, r, x in members), needs, team=True)
+        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True, compact=team_first) for h, r, x in members), needs, team=True,
+                      strip=summary(team) if team_first else STRIPS.get(team, ""))
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
     for team, source, lead, live, repo in TEAMS:
@@ -1637,7 +1681,7 @@ for n, s in files.items():
 # a bug waiting for the next screen to change size.
 LAYOUT = [
     # (file, title, column)
-    ("Main.dc.html", "Org — desktop", 0),
+    ("Main.dc.html", "Org — desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)", 0),
     ("Inbox.dc.html", "Inbox", 0),
     ("InboxRail.dc.html", "Inbox — filtered", 0),
     ("InboxMessage.dc.html", "Inbox — message", 0),
@@ -1653,10 +1697,12 @@ LAYOUT = [
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
+    ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
     ("MainDark.dc.html", "Org — dark", 2),
+    ("OrgTeamFirst.dc.html", "Org — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
     ("Type.dc.html", "Type scale", 2),
     ("TypeDark.dc.html", "Type scale — dark", 2),
 ]

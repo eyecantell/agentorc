@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repo, samscrape</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+body { margin: 0; background: #f3f4f6; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
+.mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+.meta { color: #5b6470; font-size: 12px; }
+.cap { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #5b6470; white-space: nowrap; }
+.cap b { color: #1c2128; font-weight: 600; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1.4; }
+.pill.g::before { font-size: 11px; line-height: 1; }
+.s-working { background: #dcfce7; color: #166534; } .g.s-working::before { content: "∿"; }
+.s-stalled { background: #fee2e2; color: #991b1b; } .g.s-stalled::before { content: "?"; }
+.s-limited { background: #ede9fe; color: #5b21b6; } .g.s-limited::before { content: "◔"; }
+.due-over { background: #fde68a; color: #7c3d00; }
+.due-today { background: #dbeafe; color: #1e40af; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; font-family: inherit; cursor: pointer; }
+.btn.sm { height: 24px; padding: 0 8px; }
+.btn.fill { background: #1c2128; color: #fff; border-color: #1c2128; }
+.btn svg { width: 13px; height: 13px; }
+.seg { display: inline-flex; border: 1px solid #cbd0d6; border-radius: 4px; overflow: hidden; background: #fff; flex-shrink: 0; }
+.seg button { height: 22px; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 11px; color: #5b6470; cursor: pointer; }
+.seg button.on { background: #1c2128; color: #fff; }
+.facet { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fh { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.stack { display: flex; gap: 2px; height: 22px; border-radius: 3px; overflow: hidden; background: #f3f4f6; }
+.stack .s { display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; min-width: 0; white-space: nowrap; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #5b6470; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.blocks { display: flex; gap: 2px; height: 34px; }
+.blocks .b { display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 3px; font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; color: #fff; min-width: 0; white-space: nowrap; }
+.blocks .b small { font-family: "IBM Plex Sans", sans-serif; font-weight: 500; font-size: 11px; opacity: .9; }
+.rowl { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; }
+.rowl .ref { font-family: "JetBrains Mono", monospace; font-weight: 600; white-space: nowrap; }
+.rowl .who { font-family: "JetBrains Mono", monospace; color: #1c2128; white-space: nowrap; }
+.rowl .say { color: #5b6470; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
+.phase { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; white-space: nowrap; width: 52px; text-align: center; flex-shrink: 0; }
+.ph-add { background: #fce7f3; color: #9d174d; } .ph-design { background: #ede9fe; color: #5b21b6; } .ph-grind { background: #dbeafe; color: #1e40af; } .ph-review { background: #fef3c7; color: #92400e; }
+.mine { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 12px; }
+.sec { display: flex; flex-direction: column; gap: 10px; }
+.sech { display: flex; align-items: baseline; gap: 10px; }
+.sech .h { font-size: 16px; font-weight: 600; }
+.list { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-top: 1px solid #eceef1; min-width: 0; }
+.row:first-child { border-top: 0; }
+.row .id { font-family: "JetBrains Mono", monospace; font-weight: 600; width: 64px; flex-shrink: 0; }
+.row .t { flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .m { color: #5b6470; font-size: 12px; white-space: nowrap; font-family: "JetBrains Mono", monospace; }
+.tag { display: inline-flex; align-items: center; padding: 1px 7px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 11px; color: #5b6470; white-space: nowrap; font-family: "JetBrains Mono", monospace; }
+.tag.held { border-color: #f0c96b; color: #7c3d00; background: #fffbea; }
+.sub { padding: 8px 14px 2px; }
+.imark { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px solid #cbd0d6; border-radius: 50%; font-size: 11px; color: #5b6470; font-family: "JetBrains Mono", monospace; background: #fff; }
+.feedl .row { display: grid; grid-template-columns: 52px 110px minmax(0, 1fr); gap: 12px; font-size: 13px; }
+.feedl .t { font-family: "JetBrains Mono", monospace; color: #5b6470; font-variant-numeric: tabular-nums; }
+.feedl .w { font-family: "JetBrains Mono", monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feedl .x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</helmet>
+<div style="width: 1440px; height: 1860px; box-sizing: border-box; display: flex; flex-direction: column; background: #f3f4f6; overflow: hidden;">
+
+  <div style="height: 48px; background: #1b2028; color: #e6e9ee; display: flex; align-items: center; gap: 14px; padding: 0 20px; box-sizing: border-box;">
+    <span class="mono" style="font-size: 16px; font-weight: 500;">Shift<span style="color: #9ec5ff;">Lead</span></span>
+    <span style="padding: 4px 10px; background: #2a3140; border-radius: 4px; font-weight: 500;">Org</span>
+    <span style="color: #b9c0cc;">Inbox <b style="color: #fff;">4</b> · 2</span>
+    <span style="flex-grow: 1;"></span>
+    <button class="btn" style="background: #2a3140; border-color: #3a4252; color: #e6e9ee;">⌘ Shell</button>
+    <button class="btn" style="background: #fff; color: #1c2128;">+ New session</button>
+  </div>
+
+  <div style="padding: 20px 20px 28px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; flex-grow: 1; overflow: hidden;">
+
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <a href="OrgTeamFirst.dc.html" class="meta">← Org</a>
+        <span class="mono" style="font-size: 22px; font-weight: 600;">samscrape</span>
+        <span class="meta mono">kmaster · /home/kmaster/samscrape</span>
+        <span style="flex-grow: 1;"></span>
+        <span class="meta">serviced by <a href="OrgTeamFirst.dc.html">samscrape-grind</a></span>
+      </div>
+      <div class="meta">PRs read 2m ago · ledger at its last commit, 14m ago · board read 30s ago</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px;">
+      <div class="facet">
+        <div class="fh"><span class="cap">Technical debt <b>(24 open)</b></span><span style="flex-grow: 1;"></span>
+          <span class="seg" role="group" aria-label="which entries"><button class="on">open</button><button>day</button><button>week</button><button>month</button></span></div>
+        <div class="stack" title="open entries by priority">
+          <span class="s" style="flex: 3; background: #1d4f8f; color: #fff;">3 High</span>
+          <span class="s" style="flex: 14; background: #2a78d6; color: #fff;">14 Medium</span>
+          <span class="s" style="flex: 7; background: #7fb0ea; color: #0b2a4f;">7 Low</span>
+        </div>
+        <div class="stack" title="open entries by kind">
+          <span class="s" style="flex: 7; background: #2a78d6; color: #fff;">7</span>
+          <span class="s" style="flex: 3; background: #4a3aa7; color: #fff;">3</span>
+          <span class="s" style="flex: 2; background: #eda100; color: #3b2600;">2</span>
+          <span class="s" style="flex: 12; background: #e9ebef; color: #5b6470;">12</span>
+        </div>
+        <div class="legend"><span><i class="sw" style="background: #2a78d6;"></i>pickable</span><span><i class="sw" style="background: #4a3aa7;"></i>design-first</span><span><i class="sw" style="background: #eda100;"></i>for you</span><span><i class="sw" style="background: #e9ebef; border: 1px solid #dfe3e8;"></i>other</span></div>
+        <div class="fh" style="margin-top: 2px;"><span class="cap">Pull requests <b>(5 open)</b></span><span style="flex-grow: 1;"></span>
+          <span class="seg" role="group" aria-label="window"><button class="on">day</button><button>week</button><button>month</button></span></div>
+        <div class="blocks">
+          <span class="b" style="flex: 3; background: #2a78d6;">3<small>opened</small></span>
+          <span class="b" style="flex: 2; background: #008300;">2<small>closed</small></span>
+        </div>
+        <div class="meta">oldest 3d · 2 waiting on review (techlead-1)</div>
+      </div>
+
+      <div class="facet">
+        <div class="fh"><span class="cap">TDs in motion <b>(5)</b></span><span class="meta">1 design · 2 grind · 2 review</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="rowl"><span class="phase ph-review">review</span><span class="ref">TD-301</span><span class="say">recover stuck notices without a restart</span><span class="who">tdgrind-1</span><a href="#" class="mono" style="font-size: 12px;">#811</a></div>
+          <div class="rowl"><span class="phase ph-review">review</span><span class="ref">TD-296</span><span class="say">the sweep reads worktrees too</span><span class="who">tdgrind-2</span><a href="#" class="mono" style="font-size: 12px;">#437</a></div>
+          <div class="rowl"><span class="phase ph-grind">grind</span><span class="ref">TD-290</span><span class="say">one measure of pushed</span><span class="who">tdgrind-3</span></div>
+          <div class="rowl"><span class="phase ph-grind">grind</span><span class="ref">TD-303</span><span class="say">the keep-half snapshot</span><span class="who">main</span><span class="mine"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg></span></div>
+          <div class="rowl"><span class="phase ph-design">design</span><span class="ref">TD-310</span><span class="say">what the composer says about when a message is read</span><span class="who">designer-1</span></div>
+        </div>
+        <div class="meta" style="margin-top: auto;">the same card as the team's; every row links to its entry below</div>
+      </div>
+
+      <div class="facet" style="border-color: #f0c96b; background: #fffbea;">
+        <div class="fh"><span class="cap" style="color: #7c3d00;">Answer needed <b>(1)</b></span><span style="flex-grow: 1;"></span>
+          <span class="seg" role="group" aria-label="this card shows"><button class="on">answer</button><button>doing</button></span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div class="rowl"><span class="who">tdgrind-1</span><span style="font-size: 13px;">permission · Bash</span><span class="meta">via hook · 9m 12s left</span></div>
+          <div class="mono" style="font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">git push -u origin td301-fix</div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn sm fill">Allow</button>
+            <button class="btn sm">Deny</button>
+            <input type="text" id="why1" placeholder="why? (optional)" aria-label="reason for Deny, optional" style="height: 24px; flex-grow: 1; min-width: 0; padding: 0 8px; border: 1px solid #cbd0d6; border-radius: 4px; font: inherit; font-size: 12px;">
+          </div>
+        </div>
+        <div class="meta" style="margin-top: auto;">the full doing feed for the window is the last section below</div>
+      </div>
+    </div>
+
+    <div class="sec" id="prs">
+      <div class="sech"><span class="h">Open PRs</span><span class="meta">5 · newest last</span><span class="imark" title="open PRs on the repo's remote, read every five minutes; the tag says whether the team's techlead has been asked to review it and has answered">i</span></div>
+      <div class="list">
+        <div class="row"><a href="#" class="id">#805</a><span class="t">docs: the cadence week</span><span class="m">eyecantell · 3d</span></div>
+        <div class="row"><a href="#" class="id">#811</a><span class="t">TD-301: recover stuck notices without a restart</span><span class="m"><a href="#">tdgrind-1</a> · 2d</span><span class="tag held">waiting on review · 40m</span></div>
+        <div class="row"><a href="#" class="id">#437</a><span class="t">TD-296: the sweep reads worktrees too</span><span class="m"><a href="#">tdgrind-2</a> · 1d</span><span class="tag">reviewed</span></div>
+        <div class="row"><a href="#" class="id">#812</a><span class="t">TD-290: one measure of pushed</span><span class="m"><a href="#">tdgrind-3</a> · 6h</span><span class="tag">draft</span><span class="tag held">waiting on review · 12m</span></div>
+        <div class="row"><a href="#" class="id">#814</a><span class="t">TD-303: the keep-half snapshot, step 1</span><span class="m"><a href="#">main</a> · 20m</span></div>
+      </div>
+    </div>
+
+    <div class="sec" id="tds">
+      <div class="sech"><span class="h">Technical debt</span><span class="meta">7 pickable · 3 design-first · 2 for you · 12 other</span><span class="imark" title="the ledger's entries by their header: Pickable: yes; Kind: design-first; Owner: paul or Kind: decision is for you; the rest are other">i</span><span style="flex-grow: 1;"></span><button class="btn sm"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>Open ledger</button></div>
+      <div class="list">
+        <div class="sub cap">Pickable · 7</div>
+        <div class="row"><span class="id">TD-302</span><span class="t">The reaper keeps a worktree with ignored files and says nothing</span><span class="m"><span style="color: #991b1b;">High</span> · grinder</span></div>
+        <div class="row"><span class="id">TD-299</span><span class="t">Snooze on the state rows the tool's clock does not own</span><span class="m">Medium · grinder</span></div>
+        <div class="row"><span class="id">TD-288</span><span class="t">A notice's markdown is rendered twice</span><span class="m">Medium · grinder</span></div>
+        <div class="row"><span class="m" style="padding-left: 76px;">+4 more</span></div>
+        <div class="sub cap" style="border-top: 1px solid #eceef1;">Design-first · 3</div>
+        <div class="row"><span class="id">TD-308</span><span class="t">Add or remove a member from the team card</span><span class="m">Medium · designer</span></div>
+        <div class="row"><span class="id">TD-297</span><span class="t">An i mark on every control</span><span class="m">Low · designer</span></div>
+        <div class="row"><span class="m" style="padding-left: 76px;">+1 in motion, above</span></div>
+        <div class="sub cap" style="border-top: 1px solid #eceef1;">For you · 2</div>
+        <div class="row"><span class="id">TD-283</span><span class="t">Decide: one trail row or two for a permission answered twice</span><span class="m">Medium · decision</span></div>
+        <div class="row"><span class="id">TD-271</span><span class="t">Turn the signup → CM board writer on</span><span class="m">Low · paul</span></div>
+        <div class="sub cap" style="border-top: 1px solid #eceef1;">Other · 12</div>
+        <div class="row"><span class="id">TD-305</span><span class="t">The reaper's ignored-file check on a nested clone</span><span class="m">Medium · anchor</span></div>
+        <div class="row"><span class="id">TD-300</span><span class="t">The usage chip on a metered profile</span><span class="m">Low · anchor</span></div>
+        <div class="row"><span class="m" style="padding-left: 76px;">+10 more</span></div>
+      </div>
+    </div>
+
+    <div class="sec" id="board">
+      <div class="sech"><span class="h">Waiting on you</span><span class="meta">2 due · 1 overdue</span><span class="imark" title="the repo's board items that are due — the Inbox's own rows; Snooze, Done and Reply write the board as they do there">i</span><span style="flex-grow: 1;"></span><a href="#" class="meta">open in the Inbox →</a></div>
+      <div class="list">
+        <div class="row" style="background: #fffdf5;"><span class="pill due-over">3d overdue</span><span class="t">Merged, live look pending: the Org's new card (TD-095) — every card the same height, six rows…</span><span class="m">tdgrind-1</span><button class="btn sm">Reply</button><button class="btn sm">Snooze ▾</button><button class="btn sm">Done</button></div>
+        <div class="row"><span class="pill due-today">due today</span><span class="t">Decide: two trail rows or one for a permission answered twice (TD-079)</span><span class="m">orc-1</span><button class="btn sm">Reply</button><button class="btn sm">Snooze ▾</button><button class="btn sm">Done</button></div>
+      </div>
+    </div>
+
+    <div class="sec feedl" id="doing">
+      <div class="sech"><span class="h">Doing</span><span class="meta">the team's <span class="mono">ao doing</span> calls · today · newest first</span><span class="imark" title="every ao doing call by a member of the servicing team, in the window; the record keeps only the latest, the feed keeps the last 50">i</span></div>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="meta">show</span><button class="btn sm fill">all (37)</button><button class="btn sm">orc-1 (12)</button><button class="btn sm">tdgrind-1 (9)</button><button class="btn sm">tdgrind-2 (6)</button><button class="btn sm">designer-1 (5)</button><button class="btn sm">main (3)</button><button class="btn sm">tdgrind-3 (2)</button></div>
+      <div class="list">
+        <div class="row"><span class="t">21:58</span><span class="w">tdgrind-1</span><span class="x">pushing the branch for review</span></div>
+        <div class="row"><span class="t">21:56</span><span class="w">orc-1</span><span class="x">round 41: reading four members, two claims to re-check</span></div>
+        <div class="row"><span class="t">21:55</span><span class="w">main</span><span class="x">TD-303: the keep-half snapshot, reading the array's layout</span></div>
+        <div class="row"><span class="t">21:40</span><span class="w">designer-1</span><span class="x">TD-310: drafting the composer's sentence per kind</span></div>
+        <div class="row"><span class="t">21:11</span><span class="w">tdgrind-2</span><span class="x">TD-296: waiting on review for #437</span></div>
+        <div class="row"><span class="t">20:58</span><span class="w">orc-1</span><span class="x">round 40: tdgrind-3 limited until 02:00, nothing to reassign</span></div>
+        <div class="row"><span class="m">+31 more today</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1860}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

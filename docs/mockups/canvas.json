@@ -2,7 +2,7 @@
   "artboards": [
     {
       "file": "Main.dc.html",
-      "title": "Org \u2014 desktop",
+      "title": "Org \u2014 desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)",
       "x": 0,
       "y": 0,
       "w": 1440,
@@ -129,10 +129,18 @@
       "h": 1180
     },
     {
+      "file": "RepoPage.dc.html",
+      "title": "Repo \u2014 the page (checked in from the canvas, 2026-09-26)",
+      "x": 1540,
+      "y": 4040,
+      "w": 1440,
+      "h": 900
+    },
+    {
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 4040,
+      "y": 5040,
       "w": 1440,
       "h": 820
     },
@@ -140,7 +148,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 4960,
+      "y": 5960,
       "w": 1440,
       "h": 2320
     },
@@ -161,10 +169,18 @@
       "h": 1560
     },
     {
+      "file": "OrgTeamFirst.dc.html",
+      "title": "Org \u2014 team-first (the design, 2026-09-26; checked in from the canvas)",
+      "x": 3120,
+      "y": 4080,
+      "w": 1440,
+      "h": 900
+    },
+    {
       "file": "Type.dc.html",
       "title": "Type scale",
       "x": 3120,
-      "y": 4080,
+      "y": 5080,
       "w": 1440,
       "h": 760
     },
@@ -172,7 +188,7 @@
       "file": "TypeDark.dc.html",
       "title": "Type scale \u2014 dark",
       "x": 3120,
-      "y": 4940,
+      "y": 5940,
       "w": 1440,
       "h": 760
     }

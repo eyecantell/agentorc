@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Org, team-first</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+body { margin: 0; background: #f3f4f6; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
+.mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+.meta { color: #5b6470; font-size: 12px; }
+.cap { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #5b6470; white-space: nowrap; }
+.cap b { color: #1c2128; font-weight: 600; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1.4; }
+.pill.g::before { font-size: 11px; line-height: 1; }
+.s-working { background: #dcfce7; color: #166534; } .g.s-working::before { content: "∿"; }
+.s-idle { background: #dbeafe; color: #1e40af; } .g.s-idle::before { content: "›_"; letter-spacing: -1px; }
+.s-needs { background: #fde68a; color: #7c3d00; } .g.s-needs::before { content: "▲"; }
+.s-stalled { background: #fee2e2; color: #991b1b; } .g.s-stalled::before { content: "?"; }
+.s-limited { background: #ede9fe; color: #5b21b6; } .g.s-limited::before { content: "◔"; }
+.s-oncall { background: #e5e7eb; color: #4b5563; } .g.s-oncall::before { content: "◇"; }
+.s-exited { background: #e5e7eb; color: #4b5563; } .g.s-exited::before { content: "◌"; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; font-family: inherit; cursor: pointer; }
+.btn.sm { height: 24px; padding: 0 8px; }
+.btn.next { border-color: #6b7280; }
+.btn.link { border-color: transparent; background: transparent; padding: 0 6px; }
+.btn.fill { background: #1c2128; color: #fff; border-color: #1c2128; }
+.btn.danger { color: #991b1b; border-color: #e5b4b4; }
+.btn svg { width: 13px; height: 13px; }
+.seg { display: inline-flex; border: 1px solid #cbd0d6; border-radius: 4px; overflow: hidden; background: #fff; flex-shrink: 0; }
+.seg button { height: 22px; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 11px; color: #5b6470; cursor: pointer; }
+.seg button.on { background: #1c2128; color: #fff; }
+.facet { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fh { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.stack { display: flex; gap: 2px; height: 22px; border-radius: 3px; overflow: hidden; background: #f3f4f6; }
+.stack .s { display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; min-width: 0; white-space: nowrap; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #5b6470; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.blocks { display: flex; gap: 2px; height: 34px; }
+.blocks .b { display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 3px; font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; color: #fff; min-width: 0; white-space: nowrap; }
+.blocks .b small { font-family: "IBM Plex Sans", sans-serif; font-weight: 500; font-size: 11px; opacity: .9; }
+.rowl { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; }
+.rowl .ref { font-family: "JetBrains Mono", monospace; font-weight: 600; white-space: nowrap; }
+.rowl .who { font-family: "JetBrains Mono", monospace; color: #1c2128; white-space: nowrap; }
+.rowl .say { color: #5b6470; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
+.phase { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; white-space: nowrap; width: 52px; text-align: center; flex-shrink: 0; }
+.ph-add { background: #fce7f3; color: #9d174d; } .ph-design { background: #ede9fe; color: #5b21b6; } .ph-grind { background: #dbeafe; color: #1e40af; } .ph-review { background: #fef3c7; color: #92400e; }
+.feed { display: flex; flex-direction: column; gap: 6px; }
+.feed .f { display: grid; grid-template-columns: 44px 84px minmax(0, 1fr); gap: 8px; font-size: 12px; align-items: baseline; }
+.feed .f .t { font-family: "JetBrains Mono", monospace; color: #5b6470; font-variant-numeric: tabular-nums; }
+.feed .f .w { font-family: "JetBrains Mono", monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed .f .x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1c2128; }
+.member { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 10px 12px 10px 14px; position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.member .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 6px 0 0 6px; }
+.member .name { font-family: "JetBrains Mono", monospace; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.member.ring { outline: 2px solid #f59e0b; outline-offset: 1px; }
+.mine { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 12px; }
+.big { font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 600; line-height: 1.1; }
+</style>
+</helmet>
+<div style="width: 1440px; height: 1480px; box-sizing: border-box; display: flex; flex-direction: column; background: #f3f4f6; overflow: hidden;">
+
+  <div style="height: 48px; background: #1b2028; color: #e6e9ee; display: flex; align-items: center; gap: 14px; padding: 0 20px; box-sizing: border-box;">
+    <span class="mono" style="font-size: 16px; font-weight: 500;">Shift<span style="color: #9ec5ff;">Lead</span></span>
+    <span style="padding: 4px 10px; background: #2a3140; border-radius: 4px; font-weight: 500;">Org</span>
+    <span style="color: #b9c0cc;">Inbox <b style="color: #fff;">4</b> · 2</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="mono" style="font-size: 12px; color: #b9c0cc;">grind · week 58% · paul · 5h 41% · hosts: kmaster ● vps ● host1 ● laptop ◐</span>
+    <button class="btn" style="background: #2a3140; border-color: #3a4252; color: #e6e9ee;">⌘ Shell</button>
+    <button class="btn" style="background: #fff; color: #1c2128;">+ New session</button>
+  </div>
+
+  <div style="padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box; flex-grow: 1; overflow: hidden;">
+
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span style="font-size: 20px; font-weight: 600;">Org</span>
+      <span class="meta">2 teams live · 3 sessions of your own</span>
+      <span style="flex-grow: 1;"></span>
+      <span style="display: inline-flex; align-items: center; height: 30px; width: 240px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #9ca3af; box-sizing: border-box;">filter… (team:name)</span>
+      <button class="btn link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>mine</button>
+      <label class="meta" style="display: inline-flex; align-items: center; gap: 6px;"><input type="checkbox" id="showcmd" style="margin: 0;"> show command runs</label>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); gap: 12px;">
+      <div class="facet">
+        <div class="fh"><span class="cap">Agents <b>(13)</b></span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <a href="#" class="pill s-needs">needs you (1)</a>
+          <a href="#" class="pill s-stalled">stalled? (1)</a>
+          <a href="#" class="pill s-limited">limited (1)</a>
+          <a href="#" class="pill s-working">working (5)</a>
+          <a href="#" class="pill s-idle">idle (3)</a>
+          <a href="#" class="pill s-oncall">on call (2)</a>
+        </div>
+        <div class="meta" style="margin-top: auto;">in urgency order, as the cards sort · a pill filters the page to that state</div>
+      </div>
+      <div class="facet">
+        <div class="fh"><span class="cap">TDs in motion <b>(6)</b></span></div>
+        <div class="stack" title="by phase">
+          <span class="s" style="flex: 1; background: #db2777; color: #fff;">1</span>
+          <span class="s" style="flex: 1; background: #4a3aa7; color: #fff;">1</span>
+          <span class="s" style="flex: 3; background: #2a78d6; color: #fff;">3</span>
+          <span class="s" style="flex: 1; background: #eda100; color: #3b2600;">1</span>
+        </div>
+        <div class="legend"><span><i class="sw" style="background: #db2777;"></i>add</span><span><i class="sw" style="background: #4a3aa7;"></i>design</span><span><i class="sw" style="background: #2a78d6;"></i>grind</span><span><i class="sw" style="background: #eda100;"></i>review</span></div>
+      </div>
+      <div class="facet">
+        <div class="fh"><span class="cap">PRs in motion <b>(6)</b></span><span style="flex-grow: 1;"></span><span class="seg" role="group" aria-label="window"><button class="on">day</button><button>week</button><button>month</button></span></div>
+        <div class="blocks" title="opened and closed in the window, every team">
+          <span class="b" style="flex: 7; background: #2a78d6;">7<small>opened</small></span>
+          <span class="b" style="flex: 7; background: #008300;">7<small>closed</small></span>
+        </div>
+        <div class="meta">6 open · 2 waiting on review</div>
+      </div>
+      <div class="facet" style="border-color: #f0c96b; background: #fffbea;">
+        <div class="fh"><span class="cap" style="color: #7c3d00;">Needs you <b>(4)</b></span></div>
+        <div style="display: flex; flex-direction: column; gap: 3px; font-size: 13px;">
+          <div style="display: flex; gap: 8px; align-items: baseline;"><span class="big" style="color: #7c3d00;">1</span><a href="#">answer needed</a><span class="meta">permission</span></div>
+          <div style="display: flex; gap: 8px; align-items: baseline;"><span class="big" style="color: #7c3d00;">3</span><a href="#">in the Inbox</a><span class="meta">1 overdue</span></div>
+        </div>
+      </div>
+    </div>
+
+    <section style="background: #e9ebef; border: 1px solid #d3d8df; border-radius: 8px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 16px; font-weight: 600;">samscrape-grind</span>
+        <span class="meta mono">kmaster / samscrape · 7 sessions</span>
+        <span style="flex-grow: 1;"></span>
+        <span class="meta">7 answered for you</span>
+        <button class="btn sm">Wind down</button>
+        <button class="btn sm danger">Stop now</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px;">
+        <div class="facet">
+          <div class="fh"><span class="cap">Repo</span><a href="RepoPage.dc.html" class="mono" style="font-weight: 600; color: #1c2128;">samscrape</a><span style="flex-grow: 1;"></span><a href="RepoPage.dc.html" class="meta">open →</a></div>
+
+          <div class="fh"><span class="cap">Technical debt <b>(24 open)</b></span><span style="flex-grow: 1;"></span>
+            <span class="seg" role="group" aria-label="which entries"><button class="on">open</button><button>day</button><button>week</button><button>month</button></span></div>
+          <div class="stack" title="open entries by priority">
+            <span class="s" style="flex: 3; background: #1d4f8f; color: #fff;">3 High</span>
+            <span class="s" style="flex: 14; background: #2a78d6; color: #fff;">14 Medium</span>
+            <span class="s" style="flex: 7; background: #7fb0ea; color: #0b2a4f;">7 Low</span>
+          </div>
+          <div class="stack" title="open entries by kind">
+            <span class="s" style="flex: 7; background: #2a78d6; color: #fff;">7</span>
+            <span class="s" style="flex: 3; background: #4a3aa7; color: #fff;">3</span>
+            <span class="s" style="flex: 2; background: #eda100; color: #3b2600;">2</span>
+            <span class="s" style="flex: 12; background: #e9ebef; color: #5b6470;">12</span>
+          </div>
+          <div class="legend"><span><i class="sw" style="background: #2a78d6;"></i>pickable</span><span><i class="sw" style="background: #4a3aa7;"></i>design-first</span><span><i class="sw" style="background: #eda100;"></i>for you</span><span><i class="sw" style="background: #e9ebef; border: 1px solid #dfe3e8;"></i>other</span></div>
+
+          <div class="fh" style="margin-top: 2px;"><span class="cap">Pull requests <b>(5 open)</b></span><span style="flex-grow: 1;"></span>
+            <span class="seg" role="group" aria-label="window"><button class="on">day</button><button>week</button><button>month</button></span></div>
+          <div class="blocks" title="PRs opened and closed in the window">
+            <span class="b" style="flex: 3; background: #2a78d6;">3<small>opened</small></span>
+            <span class="b" style="flex: 2; background: #008300;">2<small>closed</small></span>
+          </div>
+          <div class="meta">oldest 3d · 2 waiting on review (techlead-1) · PRs read 2m ago · ledger at its last commit</div>
+        </div>
+
+        <div class="facet">
+          <div class="fh"><span class="cap">TDs in motion <b>(5)</b></span><span class="meta">1 design · 2 grind · 2 review</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="rowl"><span class="phase ph-review">review</span><span class="ref">TD-301</span><span class="say">recover stuck notices without a restart</span><span class="who">tdgrind-1</span><a href="#" class="mono" style="font-size: 12px;">#811</a></div>
+            <div class="rowl"><span class="phase ph-review">review</span><span class="ref">TD-296</span><span class="say">the sweep reads worktrees too</span><span class="who">tdgrind-2</span><a href="#" class="mono" style="font-size: 12px;">#437</a></div>
+            <div class="rowl"><span class="phase ph-grind">grind</span><span class="ref">TD-290</span><span class="say">one measure of pushed</span><span class="who">tdgrind-3</span></div>
+            <div class="rowl"><span class="phase ph-grind">grind</span><span class="ref">TD-303</span><span class="say">the keep-half snapshot</span><span class="who">main</span><span class="mine"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg></span></div>
+            <div class="rowl"><span class="phase ph-design">design</span><span class="ref">TD-310</span><span class="say">what the composer says about when a message is read</span><span class="who">designer-1</span></div>
+          </div>
+          <div class="meta" style="margin-top: auto;">add — a hunter filing one · design — a designer holds a design-first entry · grind — a claim, no PR · review — a claim with an open PR</div>
+        </div>
+
+        <div class="facet" style="border-color: #f0c96b; background: #fffbea;">
+          <div class="fh"><span class="cap" style="color: #7c3d00;">Answer needed <b>(1)</b></span><span style="flex-grow: 1;"></span>
+            <span class="seg" role="group" aria-label="this card shows"><button class="on">answer</button><button>doing</button></span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div class="rowl"><span class="who">tdgrind-1</span><span style="font-size: 13px;">permission · Bash</span><span class="meta">via hook · 9m 12s left</span></div>
+            <div class="mono" style="font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">git push -u origin td301-fix</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn sm fill">Allow</button>
+              <button class="btn sm">Deny</button>
+              <input type="text" id="why1" placeholder="why? (optional)" aria-label="reason for Deny, optional" style="height: 24px; flex-grow: 1; min-width: 0; padding: 0 8px; border: 1px solid #cbd0d6; border-radius: 4px; font: inherit; font-size: 12px;">
+            </div>
+          </div>
+          <div class="meta" style="margin-top: auto;">a permission or a question from a member, answered here; the doing feed is behind the toggle meanwhile</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+        <div class="member"><span class="bar" style="background: #2563eb;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">orc-1</span><span style="flex-grow: 1;"></span><span class="pill s-idle">idle</span></div>
+          <div class="meta">Manager · round 41</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member ring"><span class="bar" style="background: #f59e0b;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-1</span><span style="flex-grow: 1;"></span><span class="pill s-needs">needs you</span></div>
+          <div class="meta">Grinder · TD-301 → #811</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #dc2626;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-2</span><span style="flex-grow: 1;"></span><span class="pill s-stalled">stalled?</span></div>
+          <div class="meta">Grinder · TD-296 → #437</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #7c3aed;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-3</span><span style="flex-grow: 1;"></span><span class="pill s-limited">limited</span></div>
+          <div class="meta">Grinder · TD-290 · resets 02:00</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Switch profile…</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #2563eb;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-4</span><span style="flex-grow: 1;"></span><span class="pill s-idle">idle</span></div>
+          <div class="meta">Grinder · out of work</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm link">Focus</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #16a34a;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">main</span><span class="mine"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg></span><span style="flex-grow: 1;"></span><span class="pill s-working">working</span></div>
+          <div class="meta"><b style="color: #1c2128;">interactive</b> · TD-303</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #9ca3af;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">techlead-1</span><span style="flex-grow: 1;"></span><span class="pill s-oncall">on call</span></div>
+          <div class="meta">Tech Lead · last came 2h ago</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Message…</button><button class="btn sm link">Details</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background: #e9ebef; border: 1px solid #d3d8df; border-radius: 8px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 16px; font-weight: 600;">dc-grind</span>
+        <span class="meta mono">kmaster / dev-cadence · 3 sessions</span>
+        <span style="flex-grow: 1;"></span>
+        <button class="btn sm">Wind down</button>
+        <button class="btn sm danger">Stop now</button>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px;">
+        <div class="facet">
+          <div class="fh"><span class="cap">Repo</span><a href="#" class="mono" style="font-weight: 600; color: #1c2128;">dev-cadence</a><span style="flex-grow: 1;"></span><a href="#" class="meta">open →</a></div>
+          <div class="fh"><span class="cap">Technical debt <b>(9 open)</b></span><span style="flex-grow: 1;"></span>
+            <span class="seg" role="group" aria-label="which entries"><button>open</button><button>day</button><button class="on">week</button><button>month</button></span></div>
+          <div class="blocks" title="entries opened and closed this week">
+            <span class="b" style="flex: 1; background: #2a78d6;">1<small>opened</small></span>
+            <span class="b" style="flex: 4; background: #008300;">4<small>closed</small></span>
+          </div>
+          <div class="meta">this week · the priority and kind bars show on <i>open</i></div>
+          <div class="fh" style="margin-top: 2px;"><span class="cap">Pull requests <b>(1 open)</b></span><span style="flex-grow: 1;"></span>
+            <span class="seg" role="group" aria-label="window"><button>day</button><button class="on">week</button><button>month</button></span></div>
+          <div class="blocks">
+            <span class="b" style="flex: 4; background: #2a78d6;">4<small>opened</small></span>
+            <span class="b" style="flex: 5; background: #008300;">5<small>closed</small></span>
+          </div>
+          <div class="meta">6h · reviewed · PRs read 1m ago · ledger at its last commit</div>
+        </div>
+        <div class="facet">
+          <div class="fh"><span class="cap">TDs in motion <b>(1)</b></span><span class="meta">1 grind</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="rowl"><span class="phase ph-grind">grind</span><span class="ref">TD-055</span><span class="say">the common-dir shim for the hooks</span><span class="who">grinder-dc-1</span></div>
+          </div>
+          <div class="meta" style="margin-top: auto;">2 pickable entries wait for the next claim</div>
+        </div>
+        <div class="facet">
+          <div class="fh"><span class="cap">Doing</span><span class="meta">live · the team's <span class="mono">ao doing</span> calls</span><span style="flex-grow: 1;"></span>
+            <span class="seg" role="group" aria-label="this card shows"><button>answer</button><button class="on">doing</button></span></div>
+          <div class="feed">
+            <div class="f"><span class="t">21:58</span><span class="w">grinder-dc-1</span><span class="x">reading sync.sh and the hooks to design the common-dir shim</span></div>
+            <div class="f"><span class="t">21:57</span><span class="w">manager-dc-1</span><span class="x">round 3: grinder merged TD-037 (#145, cadence pass), now on TD-055</span></div>
+            <div class="f"><span class="t">21:49</span><span class="w">grinder-dc-1</span><span class="x">TD-037: cadence check passed, merging #145</span></div>
+            <div class="f"><span class="t">21:31</span><span class="w">grinder-dc-1</span><span class="x">TD-037: review evidence posted, waiting on CI</span></div>
+            <div class="f"><span class="t">21:12</span><span class="w">techlead-dc-1</span><span class="x">read #145: one nit, approved</span></div>
+            <div class="f"><span class="t">20:58</span><span class="w">manager-dc-1</span><span class="x">round 2: one claim, one PR in review, nothing stalled</span></div>
+          </div>
+          <div class="meta" style="margin-top: auto;">nothing waits on an answer · the feed keeps the last 50 calls</div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+        <div class="member"><span class="bar" style="background: #16a34a;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">manager-dc-1</span><span style="flex-grow: 1;"></span><span class="pill s-working">working</span></div>
+          <div class="meta">Manager · round 3</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #16a34a;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">grinder-dc-1</span><span style="flex-grow: 1;"></span><span class="pill s-working">working</span></div>
+          <div class="meta">Grinder · TD-055 · 1/2 done</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #9ca3af;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">techlead-dc-1</span><span style="flex-grow: 1;"></span><span class="pill s-oncall">on call</span></div>
+          <div class="meta">Tech Lead · last came 9m ago</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Message…</button><button class="btn sm link">Details</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">No team</span><span class="meta">3 sessions · yours, on their own · full cards, as today</span></div>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+        <div class="member"><span class="bar" style="background: #2563eb;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">error_examine</span><span class="mine"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg></span><span style="flex-grow: 1;"></span><span class="pill s-idle">idle</span></div>
+          <div class="meta">kmaster / samscrape · ready to close ✓</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Close session</button><button class="btn sm link">Focus</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #16a34a;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">attention-fix</span><span class="mine"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg></span><span style="flex-grow: 1;"></span><span class="pill s-working">working</span></div>
+          <div class="meta">vps / dev-cadence · gemini-cli</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><button class="btn sm link">VS Code</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+        <div class="member"><span class="bar" style="background: #16a34a;"></span>
+          <div style="display: flex; align-items: center; gap: 8px;"><span class="name">pve</span><span class="mine"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg></span><span style="flex-grow: 1;"></span><span class="pill s-working">working</span></div>
+          <div class="meta">host1 / ~/proxmox · shell</div>
+          <div style="display: flex; gap: 4px; align-items: center;"><button class="btn sm next">Focus</button><span style="flex-grow: 1;"></span><button class="btn sm link" aria-label="more">⋯</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; background: #e9ebef; border: 1px solid #d3d8df; border-radius: 8px; padding: 8px 16px;">
+      <span style="font-size: 16px; font-weight: 600;">samscrape-night</span><span class="meta mono">kmaster / samscrape</span><span class="meta">3 idle · 1 on call</span><span style="flex-grow: 1;"></span><span class="meta">concluded 2d ago · out of work</span><button class="btn sm">Start</button><button class="btn sm link">▸ 4 sessions</button><button class="btn sm link">Forget all</button>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1480}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
