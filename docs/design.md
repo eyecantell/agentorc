@@ -2609,7 +2609,7 @@ covers both and the host agent knows who is blocked and decides mail wakes (§4.
 own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (TD-069),
 `attention_snooze` and `inbox_dismiss` (TD-079).
 
-**`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25; TD-176 slice 1 built its first form — the open PRs with their ages, the week's counts and the ledger by kind, *could not look* where a read failed — and slice 6 adds the reader standing, the board items and the members):
+**`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, built by TD-176 slices 1, 2 and 6; the reader standing is read from the techlead seat's inbox, which a session may not read, so a session's `ao repo` shows none and a person's does):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
 entries, the board items due, and what the servicing team's members hold; `--all` prints every
@@ -2772,7 +2772,7 @@ repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references,
 **Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists:
 
-- **The doing log** (TD-176, built by slice 2 but for the manager's brief, slice 6; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
+- **The doing log** (TD-176, built by slices 2 and 6; Paul, 2026-09-26: *a live feed that shows the `ao doing` calls for
   the team — time, doer, what they are doing*): `doing` on the record stays a value, the latest
   line; the host agent also keeps, per team, the last fifty `doing` calls with their time and
   caller (§4.4 *Repo facts*; a session with no `team` badge is in no team's log, and `--clear` is

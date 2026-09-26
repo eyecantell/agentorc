@@ -350,7 +350,25 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
         },
         "/elsewhere": {"name": "other", "root": "/elsewhere", "prs": {"error": "no gh"}, "ledger": {"error": "gone"}},
     }
-    fleet = [{"id": "g1", "team": "t", "repo": str(repo)}, {"id": "x", "team": "u", "repo": "/elsewhere"}]
+    fleet = [
+        {
+            "id": "g1",
+            "team": "t",
+            "repo": str(repo),
+            "state": "working",
+            "progress": [{"ref": "TD-010", "status": "claimed", "pr": 9}],
+        },
+        {"id": "tl", "team": "t", "repo": str(repo), "state": "exited", "role": "techlead"},
+        {"id": "x", "team": "u", "repo": "/elsewhere"},
+    ]
+    inbox = {"entries": [{"kind": "ask", "pr": 9, "at": (now - timedelta(minutes=40)).isoformat()}]}
+    (repo / "docs").mkdir(exist_ok=True)
+    (repo / "docs" / "user_attention.md").write_text("## Needs the user\n")
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "nudge_user_attention.py").write_text(
+        "import json\n"
+        "print(json.dumps({'boards': [{'items': [{'text': 'decide TD-283', 'due_tag': '3d overdue'}]}]}))\n"
+    )
     log = {
         "t": [
             {"team": "t", "id": "g1", "text": "reading the ledger", "at": (now - timedelta(minutes=5)).isoformat()},
@@ -358,13 +376,18 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
         ],
         "u": [{"team": "u", "id": "x", "text": "not this repo's", "at": now.isoformat()}],
     }
-    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log}[rpc])
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log, "inbox": inbox}[rpc]
+    )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("r  1 open PRs, oldest 3d · this week 4 opened, 5 closed (could not look")
     assert "1 open entries: 1 pickable, 0 design-first" in out
     assert "#9" in out and "pickable     TD-010  a build" in out
+    # slice 6: the reader's standing on each open PR, what members hold, the board items due
+    assert "waiting on review by tl · 40m" in out and "holds        TD-010 → #9  g1" in out
+    assert "due          3d overdue  decide TD-283" in out
     # the servicing team's doing log, newest first; another team's is not this repo's
     assert out.index("g1: pushing TD-010") < out.index("g1: reading the ledger") and "not this repo's" not in out
     assert cli.main(["repo", "--all"]) == 0
