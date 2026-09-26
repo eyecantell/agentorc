@@ -496,3 +496,168 @@ def _no_cycles(org: Org, label: str) -> None:
                 continue
             seen.append(t)
             stack.extend(m.team for m in org.teams[t].members if m.team is not None and m.team in org.teams)
+
+
+# ── Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ──
+
+_KEY = re.compile(r"^(?P<ind>[ \t]*)(?P<key>[^\s#:][^:#]*?):[ \t]*(?P<rest>[^\n]*?)\s*$")
+_ITEM = re.compile(r"^(?P<ind>[ \t]*)- (?P<body>.*?)\s*$")
+_COUNT = re.compile(r"(\bcount:\s*)(\d+)")
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" \t"))
+
+
+def _quiet(line: str) -> bool:
+    """A blank line or a comment: neither ends a block nor belongs to it."""
+    return not line.strip() or line.lstrip().startswith("#")
+
+
+def _members_block(lines: list[str], team: str) -> tuple[int, list[tuple[int, dict[str, Any], bool]]]:
+    """Where `teams.<team>.members` is in the text, and its items: `(members line index, [(line index,
+    the item parsed, whether it is one line)])`. Raises ValueError with the reason when the team or
+    its block cannot be edited as one line (design §4.9)."""
+    top = next(
+        (i for i, ln in enumerate(lines) if _indent(ln) == 0 and re.match(r"^teams:\s*(#.*)?$", ln.rstrip())), None
+    )
+    if top is None:
+        raise ValueError(f"org.yml has no teams: block to find {team} in")
+    t_at = t_ind = child = None
+    for i in range(top + 1, len(lines)):
+        ln = lines[i]
+        if _quiet(ln):
+            continue
+        if _indent(ln) == 0:
+            break
+        child = _indent(ln) if child is None else child  # the teams' own keys sit at the first indent
+        if _indent(ln) != child:
+            continue
+        m = _KEY.match(ln.rstrip("\n"))
+        if m and m["key"].strip().strip("'\"") == team:
+            t_at, t_ind = i, _indent(ln)
+            if m["rest"] and not m["rest"].startswith("#"):
+                raise ValueError(f"team {team} is written on one line in org.yml — edit it by hand")
+            break
+    if t_at is None:
+        raise ValueError(f"org.yml does not define a team {team}")
+    m_at = m_ind = None
+    for i in range(t_at + 1, len(lines)):
+        ln = lines[i]
+        if _quiet(ln):
+            continue
+        if _indent(ln) <= t_ind:
+            break
+        m = _KEY.match(ln.rstrip("\n"))
+        if m and m["key"].strip() == "members":
+            if m["rest"] and not m["rest"].startswith("#"):
+                raise ValueError(f"team {team}'s members: is written on one line — edit it by hand")
+            m_at, m_ind = i, _indent(ln)
+            break
+    if m_at is None:
+        raise ValueError(f"team {team} has no members: block in org.yml — add the first member by hand")
+    items: list[tuple[int, dict[str, Any], bool]] = []
+    dash = None  # the items' own indent: a dash deeper than it is inside an item, not a new one
+    for i in range(m_at + 1, len(lines)):
+        ln = lines[i]
+        if _quiet(ln):
+            continue
+        if _indent(ln) < m_ind or (_indent(ln) == m_ind and not ln.lstrip().startswith("- ")):
+            break
+        it = _ITEM.match(ln.rstrip("\n"))
+        if dash is None and it is not None:
+            dash = _indent(ln)
+        if it is None or _indent(ln) != dash:
+            if items:
+                items[-1] = (items[-1][0], items[-1][1], False)  # a continuation: that item is multi-line
+                continue
+            raise ValueError(f"team {team}'s members: block is not a list of - items")
+        try:
+            body = yaml.safe_load(it["body"])
+        except yaml.YAMLError:
+            body = None
+        items.append((i, body if isinstance(body, dict) else {}, isinstance(body, dict)))
+    return m_at, items
+
+
+def edit_members(
+    path: Path, team: str, *, add: dict[str, Any] | None = None, remove: int | None = None, role: str = ""
+) -> str:
+    """Add or remove one member of `team` in `org.yml`, **as text, in place** (design §4.9 *Add or
+    remove a member from the team card*): comments, order and spacing stay, because nothing is
+    re-serialised. **Add** (`{role, name, lane}`) bumps the `count:` of the member line of that
+    role that carries a count above one — the name pattern gives the next member — else appends one
+    `- {role, name, lane}` line after the block's last item. **Remove** (`remove`, the entry's index
+    in the block, `role` its role, checked) decrements that entry's `count:` — the highest-numbered
+    member goes — or deletes its one line. Refused with the reason when the edit cannot be one
+    line: a multi-line member, a `{team: …}` member, a team without a `members:` block. After the
+    write the file is parsed again; a parse that fails restores the bytes and refuses, so a
+    definition is never left unreadable. Returns what was done, in words."""
+    raw = path.read_bytes()
+    text = raw.decode("utf-8")
+    lines = text.splitlines(keepends=True)
+    m_at, items = _members_block(lines, team)
+    if add is not None:
+        want = str(add.get("role") or "")
+        if not want:
+            raise ValueError("a member needs a role")
+        hit = next(
+            (
+                x
+                for x in items
+                if x[2] and x[1].get("role") == want and isinstance(x[1].get("count"), int) and x[1]["count"] > 1
+            ),
+            None,
+        )
+        if hit is not None:
+            i, body, _ = hit
+            n = body["count"]
+            lines[i] = _COUNT.sub(lambda mm: f"{mm.group(1)}{n + 1}", lines[i], count=1)
+            did = f"{body.get('name') or want} count: {n} → {n + 1}"
+        else:
+            entry = {"role": want}
+            if add.get("name"):
+                entry["name"] = str(add["name"])
+            lane = [str(x) for x in add.get("lane") or [] if str(x).strip()]
+            if lane:
+                entry["lane"] = lane
+            flow = yaml.safe_dump(entry, default_flow_style=True, sort_keys=False, width=10_000).strip()
+            if items:
+                last = items[-1][0]
+                ind = " " * _indent(lines[last])
+                at = last + 1
+                while at < len(lines) and not _quiet(lines[at]) and _indent(lines[at]) > _indent(lines[last]):
+                    at += 1  # past a multi-line last item's continuation
+            else:
+                ind = " " * (_indent(lines[m_at]) + 2)
+                at = m_at + 1
+            if at > 0 and not lines[at - 1].endswith("\n"):
+                lines[at - 1] += "\n"
+            lines.insert(at, f"{ind}- {flow}\n")
+            did = f"added {entry.get('name') or want} ({want})"
+    elif remove is not None:
+        if not 0 <= remove < len(items):
+            raise ValueError(f"team {team} has no member entry {remove + 1} — reload and try again")
+        i, body, one = items[remove]
+        if not one:
+            raise ValueError(f"team {team}'s member entry {remove + 1} spans several lines — edit it by hand")
+        if "team" in body:
+            raise ValueError(f"member entry {remove + 1} is the nested team {body['team']} — edit it by hand")
+        if role and body.get("role") != role:
+            raise ValueError(f"team {team}'s member entry {remove + 1} is not a {role} any more — reload and try again")
+        n = body.get("count", 1)
+        if isinstance(n, int) and n > 1:
+            lines[i] = _COUNT.sub(lambda mm: f"{mm.group(1)}{n - 1}", lines[i], count=1)
+            did = f"{body.get('name') or body.get('role')} count: {n} → {n - 1}"
+        else:
+            del lines[i]
+            did = f"removed {body.get('name') or body.get('role')}"
+    else:
+        raise ValueError("nothing to edit: add or remove")
+    path.write_text("".join(lines), encoding="utf-8")
+    try:
+        load(path)
+    except Exception as e:
+        path.write_bytes(raw)  # restored: a definition is never left unreadable (design §4.9)
+        raise ValueError(f"the edit would not parse, so org.yml is as it was: {e}") from e
+    return did

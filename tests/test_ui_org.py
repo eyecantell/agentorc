@@ -918,3 +918,22 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
         s={**plain, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Org"
     )
     assert 'class="badge gated hidden" id="fgated"' in html
+
+
+def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
+    """§4.5a *team card: Members…* (TD-172): beside Start or Wind down on a team `org.yml` defines;
+    on a team a repo defines, the note *defined in the repo — edit it by PR* instead; never on *No
+    team*. The exited banner's *one member back* line and the team skill's say the same thing."""
+    from agentorc.ui.app import templates
+
+    head = templates.get_template("group_head.html")
+    base = {"team": "ao-grind", "label": "ao-grind", "defined": True, "stopped": True, "members": [], "live": 0}
+    assert 'data-members="ao-grind"' in head.render(g={**base, "in_org": True})
+    repo = head.render(g={**base, "in_org": False, "source": "/r/.agentorc.yml"})
+    assert "data-members" not in repo and "defined in the repo — edit it by PR" in repo
+    assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
+    ui_dir = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+    js = (ui_dir / "static" / "app.js").read_text()
+    assert "To bring it back into ${esc(v.team)} unattended: <b>Resume with changes…</b>" in js
+    skill = (ui_dir.parent / "team_skill.md").read_text()
+    assert "**One member back**" in skill and "**Members…** on the team card" in skill
