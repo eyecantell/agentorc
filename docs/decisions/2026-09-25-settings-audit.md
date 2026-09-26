@@ -161,6 +161,13 @@ unbuilt and free to move) and `repos.<repo>.promote.auto`. No override layer for
 definitions layer already (built-in preset → org `roles:` → repo `roles:`; org `teams:` over a
 repo's), and that stays as it is.
 
+**2026-09-25, later (TD-163, the designer): the first definition edit from the page.** Paul asked
+for a button on the team card to add or remove a member. The line above holds: a member is a
+definition, so the control is the team card's **Members…** (design §4.9 *Add or remove a member from
+the team card*), which edits `org.yml` as text in place — one line, comments kept, re-parsed, refused
+when it cannot be one line — and never the Settings page, which keeps to settings. *A team editor
+in waiting* (§2) has its first key.
+
 ## Open decisions (Paul, 2026-09-25: *agreed on the three*)
 
 1. The `ui.yml` fold into `settings.yml`, and with it **the person's own following the home** rather
