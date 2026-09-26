@@ -17,7 +17,9 @@
 {% elif not g.manager and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
 {% elif not g.members and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech Lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
 {% if not g.members and g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
-{% if g.counts %}<span class="meta counts">· {{ g.counts | join(' · ') }}</span>{% endif %}
+{# a live team's header carries no state chips: its compact member cards say it (TD-176, §4.5a *team card: summary*) #}
+{% if g.summary %}<span class="meta">· {{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</span>
+{% elif g.counts %}<span class="meta counts">· {{ g.counts | join(' · ') }}</span>{% endif %}
 {% endif %}
 {# design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, which the
    fold hides — so drawn only while folded (CSS), display only; the mail stays where it is (§4.10) #}

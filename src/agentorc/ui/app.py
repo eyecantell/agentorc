@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -1233,7 +1234,243 @@ def prs_waiting(members: Collection[dict[str, Any]], now: datetime | None = None
     return {"n": n, "age": _age(oldest, now or datetime.now(UTC))}
 
 
-def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = ()) -> list[dict[str, Any]] | None:
+# -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
+
+PHASES = ("add", "design", "grind", "review")
+DOING_KEPT = 50  # the doing log's ring per team (§4.8), as the host agent keeps it
+WINDOWS = ("day", "week", "month")
+LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
+PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))
+KIND_BARS = (("pickable", "pickable"), ("design-first", "design-first"), ("for-you", "for you"), ("other", "other"))
+
+
+def _https(remote: str) -> str:
+    """A git remote as the web page it names — `git@github.com:o/r.git` and
+    `https://github.com/o/r.git` both `https://github.com/o/r` — or "" for anything else."""
+    m = re.match(r"^(?:git@([^:]+):|https?://(?:[^@/]+@)?([^/]+)/)(.+?)(?:\.git)?/?$", remote.strip())
+    return f"https://{m.group(1) or m.group(2)}/{m.group(3)}" if m else ""
+
+
+def team_repo(members: Collection[dict[str, Any]], repos: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The repo a team services, as the home read it (§4.4 *Repo facts*): the registered checkout
+    most of its members work in (`repo` on the record, a worktree's main checkout), or None when no
+    member's repo is registered here — the facet then reads *no repo here*."""
+    by_root = {str(Path(root).resolve()): r for root, r in (repos or {}).items() if isinstance(r, dict)}
+    tally: dict[str, int] = {}
+    for m in members:
+        if m.get("repo"):
+            key = str(Path(str(m["repo"])).resolve())
+            if key in by_root:
+                tally[key] = tally.get(key, 0) + 1
+    if not tally:
+        return None
+    return by_root[max(sorted(tally), key=lambda k: tally[k])]
+
+
+def _bars(counts: Mapping[str, Any], labels: tuple[tuple[str, str], ...]) -> list[dict[str, Any]]:
+    """A stacked bar's segments, zeros left out: `{key, label, n, pct}` with the widths summing to 100."""
+    total = sum(int(counts.get(k) or 0) for k, _ in labels)
+    return [
+        {"key": k, "label": label, "n": int(counts.get(k) or 0), "pct": round(100 * int(counts.get(k) or 0) / total, 1)}
+        for k, label in labels
+        if total and int(counts.get(k) or 0)
+    ]
+
+
+def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Two sized blocks, *opened* and *closed* in a window: the counts and each one's share."""
+    o, c = int((win or {}).get("opened") or 0), int((win or {}).get("closed") or 0)
+    return {"opened": o, "closed": c, "opct": round(100 * o / (o + c), 1) if o + c else 50.0}
+
+
+def repo_facet(r: Mapping[str, Any], now: datetime, waiting: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The team card's **Repo** facet (§4.5a *team card: Repo facet*): the repo's name and page, the
+    ledger's open entries as two bars and its windows as blocks, the PRs' windows as blocks, the
+    oldest open PR's age, how many wait on review, and the readings' age. A reading that failed is
+    `error`, drawn *could not look*; its last numbers, when there are any, stay beside it."""
+    led, prs = r.get("ledger") or {}, r.get("prs") or {}
+    entries = led.get("entries")
+    open_ = prs.get("open")
+    oldest = _age(open_[0].get("created"), now) if open_ else ""
+    return {
+        "name": str(r.get("name") or ""),
+        "url": f"/repo/{r.get('name') or ''}",
+        "web": _https(str(r.get("remote") or "")),
+        "ledger": {
+            "n": len(entries) if isinstance(entries, list) else None,
+            "error": led.get("error") or "",
+            "history_error": led.get("history_error") or "",
+            "priority": _bars(led.get("by_priority") or {}, PRIORITY_BARS),
+            "kind": _bars(led.get("by_kind") or {}, KIND_BARS),
+            "windows": {w: _blocks((led.get("windows") or {}).get(w)) for w in WINDOWS} if led.get("windows") else None,
+        },
+        "prs": {
+            "n": len(open_) if isinstance(open_, list) else None,
+            "error": prs.get("error") or "",
+            "windows": {w: _blocks((prs.get("windows") or {}).get(w)) for w in WINDOWS} if prs.get("windows") else None,
+            "oldest": oldest,
+            "waiting": waiting,
+            "truncated": bool(prs.get("truncated")),
+        },
+        "read": _age(r.get("at"), now),
+    }
+
+
+def _pr_states(r: Mapping[str, Any] | None) -> dict[int, dict[str, Any]]:
+    """Every PR the reading knows, by number: its state and page."""
+    prs = (r or {}).get("prs") or {}
+    out: dict[int, dict[str, Any]] = {}
+    for p in [*(prs.get("recent") or []), *(prs.get("open") or [])]:
+        if isinstance(p, dict) and isinstance(p.get("number"), int):
+            out[p["number"]] = p
+    return out
+
+
+def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
+    a `claimed` progress entry, with its **phase** derived here, never declared — *design* on a
+    design-first entry, *review* with a PR (its own `pr`, or the tick's `review_pr`), *grind*
+    without one; a PR that is no longer open keeps *review*, marked *merged* / *closed*, until the
+    member marks the claim done or dropped. A reference two members hold is one row naming both.
+    Rows in phase order, then by reference."""
+    entries = {e["id"]: e for e in ((r or {}).get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
+    prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
+    rows: dict[str, dict[str, Any]] = {}
+    for m in members:
+        for p in m.get("progress") or []:
+            if not isinstance(p, dict) or p.get("status") != "claimed" or not p.get("ref"):
+                continue
+            ref = str(p["ref"])
+            row = rows.setdefault(ref, {"ref": ref, "members": [], "pr": None})
+            row["members"].append({"id": m["id"], "name": m.get("name") or m["id"], "mine": not m.get("unattended")})
+            pr = p.get("pr") or p.get("review_pr")
+            if isinstance(pr, int) and not row["pr"]:
+                row["pr"] = pr
+    out = []
+    for ref, row in rows.items():
+        e = entries.get(ref) or {}
+        pr = row["pr"]
+        known = prs.get(pr) if pr else None
+        state = str((known or {}).get("state") or "")
+        row["phase"] = "design" if e.get("for_page") == "design-first" else "review" if pr else "grind"
+        row["title"] = str(e.get("title") or "")
+        row["pr_state"] = state if state in ("merged", "closed") else ""
+        row["pr_url"] = str((known or {}).get("url") or (f"{web}/pull/{pr}" if pr and web else ""))
+        out.append(row)
+    out.sort(key=lambda x: (PHASES.index(x["phase"]), x["ref"]))
+    return out
+
+
+def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+    """**Answer needed** (§4.5a *team card: Answer needed / Doing*): each member waiting on a
+    permission or a question — the permission with Allow / Deny when the hook gave something to
+    answer (`tool_use_id`), a question as its text with Focus."""
+    out = []
+    for m in members:
+        kind = state_kind(m)
+        if kind not in NEEDS_YOU_ROWS:
+            continue
+        pend = m.get("pending") if isinstance(m.get("pending"), dict) else {}
+        out.append(
+            {
+                "id": m["id"],
+                "name": m.get("name") or m["id"],
+                "kind": kind,
+                "text": str(pend.get("text") or ""),
+                "deadline": m.get("deadline") or "",
+            }
+        )
+    return out
+
+
+def doing_rows(team: str, doing: Mapping[str, Any] | None, names: Mapping[str, str]) -> list[dict[str, Any]]:
+    """**Doing** (§4.8 *the doing log*): the team's `ao doing` calls newest first — time, doer, words."""
+    rows = []
+    for e in reversed(list((doing or {}).get(team) or [])):
+        if not isinstance(e, dict):
+            continue
+        at = _instant(e.get("at"))
+        rows.append(
+            {
+                "at": e.get("at") or "",
+                "hm": at.astimezone().strftime("%H:%M") if at else "",
+                "id": str(e.get("id") or ""),
+                "name": names.get(str(e.get("id") or ""), str(e.get("id") or "")),
+                "text": str(e.get("text") or ""),
+            }
+        )
+    return rows
+
+
+def team_summary(
+    team: str,
+    members: list[dict[str, Any]],
+    repos: Mapping[str, Any] | None,
+    doing: Mapping[str, Any] | None,
+    waiting: dict[str, Any] | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """A live team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and
+    Answer needed / Doing — the facet opening on *answer* while any member waits on one."""
+    now = now or datetime.now(UTC)
+    r = team_repo(members, repos or {})
+    motion = motion_rows(members, r)
+    answers = answer_blocks(members)
+    return {
+        "team": team,
+        "repo": repo_facet(r, now, waiting) if r else None,
+        "motion": motion,
+        "phases": {ph: sum(1 for x in motion if x["phase"] == ph) for ph in PHASES},
+        "answers": answers,
+        "doing": doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}),
+        "face": "answer" if answers else "doing",
+        # what the toggle's memory keys on: a person's flip holds until the pending set changes (§4.5a)
+        "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}" for a in answers)),
+    }
+
+
+def compact_line(v: dict[str, Any]) -> str:
+    """A compact card's one line of its own (§4.5a *card: compact*): the seat's *last came*, an
+    ending, the role and its claim with the PR, what it says it is doing, or the role alone."""
+    role = str(v.get("role_label") or v.get("role") or ("interactive" if not v.get("unattended") else ""))
+    slot = v.get("slot") or {}
+    if v.get("seat"):
+        what = slot.get("caption") or slot.get("text") or "on call"
+    elif v.get("state") in DEAD or v.get("out_of_work") or v.get("restart_wanted"):
+        what = str(slot.get("text") or v.get("state") or "")
+    else:
+        claims = [p for p in v.get("progress") or [] if isinstance(p, dict) and p.get("status") == "claimed"]
+        doing = (v.get("doing") or {}).get("text") if isinstance(v.get("doing"), dict) else ""
+        if claims:
+            pr = claims[0].get("pr") or claims[0].get("review_pr")
+            what = f"{claims[0]['ref']} → #{pr}" if pr else str(claims[0]["ref"])
+        elif doing:
+            what = str(doing)
+        else:
+            what = ""
+    return " · ".join(x for x in (role, what) if x)
+
+
+def team_live(team: str, fleet: Collection[dict[str, Any]]) -> bool:
+    """Whether any session of `team` in `fleet` is neither exited nor closed."""
+    return bool(team) and any(f.get("team") == team and f.get("state") not in DEAD for f in fleet)
+
+
+def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str, Any]:
+    """Mark `v` compact when it is a member of a live team (§4.5a *card: compact*): a `team` badge,
+    and some session of that team in `fleet` not exited or closed. The full card stays on *No team*
+    and on a team with nothing live."""
+    if team_live(str(v.get("team") or ""), fleet):
+        v["compact"], v["compact_line"] = True, compact_line(v)
+    return v
+
+
+def team_groups(
+    views: list[dict[str, Any]],
+    rows: Collection[dict[str, Any]] = (),
+    repos: Mapping[str, Any] | None = None,
+    doing: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
     (`teamrun.rows`). `None` when no session carries a badge and nothing is defined — the page then
@@ -1251,7 +1488,11 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
     A manager carrying a different badge from its members — which `ao team start` never produces, but a
     hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
     only inside the group (review of PR #117). Its card stays where its own badge puts it; the
-    header names it and says so, because moving the card would contradict the badge."""
+    header names it and says so, because moving the card would contradict the badge.
+
+    A team with something live carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*)
+    from `repos` (the home's repo facts) and `doing` (its doing log), and its members are marked
+    compact; its header then drops the state counts, which the member cards say."""
     defs = {str(r["name"]): r for r in rows}
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
@@ -1286,6 +1527,11 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
         concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
         dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
+        waiting = prs_waiting(members) if team != NO_TEAM else None
+        summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM and live else None
+        if summary:
+            for m in members:
+                m["compact"], m["compact_line"] = True, compact_line(m)
         groups.append(
             {
                 "team": team,
@@ -1299,7 +1545,8 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "ids": [m["id"] for m in members],
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
-                "prs_waiting": prs_waiting(members) if team != NO_TEAM else None,
+                "prs_waiting": waiting,
+                "summary": summary,
                 "live": live,
                 # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the
                 # team's sessions are, once, and how many are in each state — never its manager's
@@ -2290,17 +2537,34 @@ def create_app() -> FastAPI:
         while nobody is in one (TD-097). Every page that draws a pill asks, so they agree."""
         return teamrun.seat_ids(await defs(), fleet)
 
-    async def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
+    async def repo_facts() -> tuple[dict[str, Any], dict[str, Any]]:
+        """The home's repo facts and doing log (§4.4 *Repo facts*, TD-176), each `{}` when the agent
+        cannot give it — an older agent, a node whose link is down: the facets then read *no repo
+        here* and an empty feed rather than taking the page down."""
+        repos: dict[str, Any] = {}
+        doing: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            repos = await call("repos")
+        with contextlib.suppress(Exception):
+            doing = await call("doing_log")
+        return repos, doing
+
+    async def group_heads(
+        known: dict[str, dict[str, Any]],
+        repos: Mapping[str, Any] | None = None,
+        doing: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]] | None:
         """The team groups as the events stream ships them (design §4.5a **team groups**): per group
         its key, the member ids in order, and the header rendered by the same template the page
         uses — so the client moves cards between groups and swaps headers without composing any
         markup of its own. `None` means "flat grid", exactly as the page renders it."""
         fleet = list(known.values())
         seats = await seats_of(fleet)
-        groups = team_groups([view(s, fleet, seats=seats) for s in fleet], await team_rows(fleet))
+        groups = team_groups([view(s, fleet, seats=seats) for s in fleet], await team_rows(fleet), repos, doing)
         if groups is None:
             return None
         head = templates.get_template("group_head.html")
+        summary = templates.get_template("team_summary.html")
         return [
             {
                 "team": g["team"],
@@ -2308,6 +2572,8 @@ def create_app() -> FastAPI:
                 "live": g["live"],  # what the fold keys on: only a team with nothing live folds (TD-156)
                 "ids": g["ids"],
                 "html": head.render(g=g),
+                # the summary's facets (TD-176 slice 3), swapped by the client as the header is
+                "summary": summary.render(g=g) if g.get("summary") else "",
             }
             for g in groups
         ]
@@ -2437,6 +2703,7 @@ def create_app() -> FastAPI:
         team_rows=team_rows,
         seats_of=seats_of,
         group_heads=group_heads,
+        repo_facts=repo_facts,
         identity_info=identity_info,
         person_states=person_states,
         person_view=person_view,
@@ -2452,6 +2719,7 @@ def create_app() -> FastAPI:
 def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The Org page and Focus (design §4.5)."""
     call, seats_of, identity_info, board_items = h.call, h.seats_of, h.identity_info, h.board_items
+    repo_facts = h.repo_facts
 
     @app.get("/", response_class=HTMLResponse)
     async def org(request: Request):
@@ -2486,6 +2754,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
         vs = sorted((view(s, sessions, icons=icons, seats=seats) for s in sessions), key=card_order)
+        repos, doing = ({}, {}) if agent_down else await repo_facts()
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
@@ -2510,7 +2779,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": team_groups(vs, strip["teams"]),
+                "groups": team_groups(vs, strip["teams"], repos, doing),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),
@@ -3401,6 +3670,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
 def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The two websockets: the events stream and the terminal."""
     call, render_card, seats_of, group_heads = h.call, h.render_card, h.seats_of, h.group_heads
+    repo_facts = h.repo_facts
 
     # -- live state ------------------------------------------------------------------------------
 
@@ -3423,6 +3693,9 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             known: dict[str, dict[str, Any]] = {}
             with contextlib.suppress(Exception):
                 known = {o["id"]: o for o in await call("list")}
+            # the repo facts and the doing log (TD-176): seeded once, then kept by their own events,
+            # so a session delta redraws the summaries without asking the agent again
+            repos, doing = await repo_facts()
             acct_of: dict[str, str] = {}  # profile → the account chip it is drawn on (TD-122)
             with contextlib.suppress(Exception):
                 for name, acc in usage_accounts(await call("usage")).items():
@@ -3431,8 +3704,13 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
+                    # the record's team now and before this delta: a re-badge moves a card between
+                    # two teams, and either may come alive or wind down by it (review of TD-176 slice 3)
+                    teams = {str(s.get("team") or ""), str((known.get(s["id"]) or {}).get("team") or "")} - {""}
+                    was_live = {t: team_live(t, known.values()) for t in teams}
                     known[s["id"]] = s
                     v = view(s, list(known.values()), icons=await role_icons([s]), seats=await seats_of([s]))
+                    compact_in(v, known.values())
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
                     # `controllers` change on one record can move a card, change a lead, or turn
                     # grouping on or off for the whole page, and only the server sees the fleet.
@@ -3445,23 +3723,59 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                 "rank": v["rank"],  # the view's: unseen idle sorts above idle
                                 "html": render_card(v),
                                 "session": v,
-                                "groups": await group_heads(known),
+                                "groups": await group_heads(known, repos, doing),
                             }
                         )
                     )
+                    flipped = {t for t in teams if was_live[t] != team_live(t, known.values())}
+                    if flipped:
+                        # a team came alive or wound down: its other members' cards change shape,
+                        # compact ↔ full (§4.5a *card: compact*, TD-176), so each is redrawn
+                        for other in [o for o in known.values() if o.get("team") in flipped and o["id"] != s["id"]]:
+                            ov = view(
+                                other,
+                                list(known.values()),
+                                icons=await role_icons([other]),
+                                seats=await seats_of([other]),
+                            )
+                            compact_in(ov, known.values())
+                            await ws.send_text(
+                                json.dumps(
+                                    {
+                                        "event": "session",
+                                        "id": other["id"],
+                                        "state": other["state"],
+                                        "rank": ov["rank"],
+                                        "html": render_card(ov),
+                                        "session": ov,
+                                    }
+                                )
+                            )
                 elif ev.get("event") in ("repos", "doing"):
                     # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
-                    # member said what it is doing (§4.8 *the doing log*): passed through as the agent
-                    # sent it, `repo: null` for a checkout the registry dropped; the team card's
-                    # facets and the rollup re-render from it (TD-176 slices 3 and 4).
+                    # member said what it is doing (§4.8 *the doing log*): kept here, passed through
+                    # as the agent sent it (`repo: null` for a checkout the registry dropped), and
+                    # the groups re-sent, so the team cards' summaries redraw (TD-176 slice 3).
+                    if ev["event"] == "repos":
+                        if ev.get("repo") is None:
+                            repos.pop(str(ev.get("root")), None)
+                        else:
+                            repos[str(ev.get("root"))] = ev["repo"]
+                    elif isinstance(ev.get("entry"), dict):
+                        ring = doing.setdefault(str(ev.get("team")), [])
+                        ring.append(ev["entry"])
+                        del ring[:-DOING_KEPT]
                     await ws.send_text(json.dumps(ev))
+                    await ws.send_text(
+                        json.dumps({"event": "groups", "groups": await group_heads(known, repos, doing)})
+                    )
                 elif ev.get("event") in ("gone", "usage"):
                     if ev.get("event") == "gone":
                         # only a `gone` names a session; a `usage` event carries a profile, and
                         # popping on it would one day evict a live session by coincidence
                         went = str(ev.get("id") or "")
                         known.pop(went, None)
-                        await ws.send_text(json.dumps({**ev, "groups": await group_heads(known)}))
+                        await ws.send_text(json.dumps({**ev, "groups": await group_heads(known, repos, doing)}))
                         # A card's *under* chip names another record, so the session that went
                         # is not the only card now out of date: every card listing it as a
                         # controller has to be redrawn, or it keeps naming and linking to a
@@ -3474,6 +3788,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     icons=await role_icons([other]),
                                     seats=await seats_of([other]),
                                 )
+                                compact_in(ov, known.values())
                                 await ws.send_text(
                                     json.dumps(
                                         {

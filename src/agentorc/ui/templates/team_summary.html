@@ -1,0 +1,92 @@
+{# A live team's **summary** (design §4.5 screen 1 *The Org, team-first*, §4.5a *team card: summary*,
+   TD-176 slice 3): three facets between the header and the members — Repo, TDs in motion, Answer
+   needed / Doing. Every variant a selector can show is rendered here and the client picks one by
+   the section's data attributes (`data-led`, `data-win`, `data-face`), so a selector never asks
+   the server. Rendered on page load and re-sent with the groups on every delta and on the
+   `repos` and `doing` events; the client swaps it whole, as it swaps the header. #}
+{% set m = g.summary %}
+<div class="tsum" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
+  {# -- Repo (§4.5a *team card: Repo facet*) -- #}
+  <div class="facet frepo">
+    {% if not m.repo %}
+    <div class="fhead"><span class="kind">Repo</span></div>
+    <div class="meta" title="no member of this team works in a checkout this host's repos registry lists (design §4.4 Repo facts)">no repo here</div>
+    {% else %}{% set r = m.repo %}
+    <div class="fhead"><span class="kind">Repo</span> <a class="strong" href="{{ r.url }}">{{ r.name }}</a><span class="grow"></span><a class="meta" href="{{ r.url }}">open →</a></div>
+    {% set led = r.ledger %}
+    <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span><span class="grow"></span>
+      <span class="seg" data-pick="led">{% for w in ('open', 'day', 'week', 'month') %}<button type="button" data-v="{{ w }}"{% if w != 'open' and not led.windows %} disabled title="the ledger's history could not be read{% if led.history_error %}: {{ led.history_error }}{% endif %}"{% endif %}>{{ w }}</button>{% endfor %}</span></div>
+    {% if led.n is none %}
+    <div class="meta dim" title="{{ led.error or 'not read yet' }}">could not look</div>
+    {% else %}
+    <div class="lv" data-lv="open">
+      <div class="bar" role="img" aria-label="open entries by priority">{% for b in led.priority %}<a class="bseg p-{{ b.key }}" href="{{ r.url }}#debt" style="flex-basis: {{ b.pct }}%;" title="{{ b.n }} {{ b.label }}">{{ b.n }} {{ b.label }}</a>{% else %}<span class="meta">no open entries</span>{% endfor %}</div>
+      <div class="bar" role="img" aria-label="open entries by kind">{% for b in led.kind %}<a class="bseg k-{{ b.key }}" href="{{ r.url }}#debt-{{ b.key }}" style="flex-basis: {{ b.pct }}%;" title="{{ b.n }} {{ b.label }}">{{ b.n }}</a>{% endfor %}</div>
+      <div class="legend">{% for k, label in (('pickable', 'pickable'), ('design-first', 'design-first'), ('for-you', 'for you'), ('other', 'other')) %}<span><i class="k-{{ k }}"></i>{{ label }}</span>{% endfor %}</div>
+    </div>
+    {% if led.windows %}{% for w in ('day', 'week', 'month') %}{% set b = led.windows[w] %}
+    <div class="lv" data-lv="{{ w }}" hidden>
+      <div class="blocks"><a class="blk opened" href="{{ r.url }}#debt-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}#debt-closed" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
+    </div>
+    {% endfor %}{% endif %}
+    {% if led.error %}<div class="meta dim" title="{{ led.error }}">the last read failed — these are the numbers before it</div>{% endif %}
+    {% endif %}
+    {% set p = r.prs %}
+    <div class="fhead"><span class="kind">Pull requests{% if p.n is not none %} ({{ p.n }} open){% endif %}</span><span class="grow"></span>
+      <span class="seg" data-pick="win">{% for w in ('day', 'week', 'month') %}<button type="button" data-v="{{ w }}">{{ w }}</button>{% endfor %}</span></div>
+    {% if p.n is none %}
+    <div class="meta dim" title="{{ p.error or 'not read yet' }}">could not look</div>
+    {% else %}
+    {% if p.windows %}{% for w in ('day', 'week', 'month') %}{% set b = p.windows[w] %}
+    <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
+      <div class="blocks"><a class="blk opened" href="{{ r.url }}#prs-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}#prs-closed" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed{% if p.truncated and w == 'month' %}+{% endif %}</a></div>
+    </div>
+    {% endfor %}{% endif %}
+    <div class="meta{% if p.error %} dim{% endif %}"{% if p.error %} title="the last read failed: {{ p.error }}"{% endif %}>{% if p.oldest %}oldest {{ p.oldest }} · {% endif %}{% if p.waiting %}{{ p.waiting.n }} waiting on review · {% endif %}{% if p.error %}could not look — {% endif %}read {{ r.read }} ago</div>
+    {% endif %}
+    {% endif %}
+  </div>
+  {# -- TDs in motion (§4.5a *team card: TDs in motion*) -- #}
+  <div class="facet fmotion">
+    <div class="fhead"><span class="kind">TDs in motion ({{ m.motion | length }})</span> <span class="meta">{% for ph in ('add', 'design', 'grind', 'review') %}{% if m.phases[ph] %}{{ m.phases[ph] }} {{ ph }}{{ ' · ' if not loop.last }}{% endif %}{% endfor %}</span></div>
+    {% for x in m.motion %}
+    <div class="mrow">
+      <span class="phase ph-{{ x.phase }}">{{ x.phase }}</span>
+      <a class="mono strong" href="{{ m.repo.url if m.repo else '#' }}#{{ x.ref }}">{{ x.ref }}</a>
+      <span class="mtitle" title="{{ x.title }}">{{ x.title }}</span>
+      <span class="mwho">{% for w in x.members %}<a class="name" href="/focus/{{ w.id }}">{{ w.name }}</a>{% if w.mine %}{{ role_svg('person') }}{% endif %}{{ ', ' if not loop.last }}{% endfor %}</span>
+      {% if x.pr %}{% if x.pr_url %}<a href="{{ x.pr_url }}" target="_blank" rel="noopener">#{{ x.pr }}</a>{% else %}<span>#{{ x.pr }}</span>{% endif %}{% if x.pr_state %} <span class="meta">{{ x.pr_state }}</span>{% endif %}{% endif %}
+    </div>
+    {% else %}
+    <div class="meta">nothing claimed{% if m.repo and m.repo.ledger.kind %}{% for b in m.repo.ledger.kind if b.key == 'pickable' %} · {{ b.n }} pickable entr{{ 'y waits' if b.n == 1 else 'ies wait' }} for the next claim{% endfor %}{% endif %}</div>
+    {% endfor %}
+  </div>
+  {# -- Answer needed / Doing (§4.5a *team card: Answer needed / Doing*) -- #}
+  <div class="facet fface{% if m.face == 'answer' %} answering{% endif %}">
+    <div class="fv" data-fv="answer"{% if m.face != 'answer' %} hidden{% endif %}>
+      <div class="fhead"><span class="kind">Answer needed ({{ m.answers | length }})</span><span class="grow"></span>
+        <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
+      {% for a in m.answers %}
+      <div class="ablock">
+        <div><a class="name" href="/focus/{{ a.id }}">{{ a.name }}</a> <span class="meta">{{ a.kind }}{% if a.deadline %} · <span class="countdown" data-deadline="{{ a.deadline }}"></span>{% endif %}</span></div>
+        <div class="mono atext" title="{{ a.text }}">{{ a.text }}</div>
+        {% if a.kind == 'permission' %}<div class="row gap"><button class="btn sm primary" data-act="allow" data-id="{{ a.id }}">Allow</button><button class="btn sm next" data-act="deny" data-id="{{ a.id }}">Deny</button><input class="denywhy" type="text" maxlength="200" data-id="{{ a.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"></div>
+        {% else %}<div><a class="btn sm next" href="/focus/{{ a.id }}">▣ Focus</a> <span class="meta">answered in the terminal</span></div>{% endif %}
+      </div>
+      {% else %}
+      <div class="meta">nothing waits on an answer</div>
+      {% endfor %}
+    </div>
+    <div class="fv" data-fv="doing"{% if m.face != 'doing' %} hidden{% endif %}>
+      <div class="fhead"><span class="kind">Doing</span> <span class="meta">the team's ao doing calls</span><span class="grow"></span>
+        <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
+      <div class="dfeed">
+      {% for d in m.doing %}
+      <div class="drow" title="{{ d.at }}"><span class="meta mono">{{ d.hm }}</span> <a class="name" href="/focus/{{ d.id }}">{{ d.name }}</a> <span class="dtext" title="{{ d.text }}">{{ d.text }}</span></div>
+      {% else %}
+      <div class="meta">no ao doing calls yet — a member's word for what it is on lands here</div>
+      {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

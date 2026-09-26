@@ -871,6 +871,14 @@
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
         head.innerHTML = g.html;
       } else if (head) head.remove();
+      // a live team's summary (TD-176 slice 3): swapped whole, between the header and the grid
+      let sum = $(".tsum", sec);
+      if (g.summary) {
+        const tpl = document.createElement("template"); tpl.innerHTML = g.summary.trim();
+        const fresh = tpl.content.firstElementChild;
+        if (sum) { const kept = AO.denyWhys(sum); sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept); }
+        else { const h = $(".ghead", sec); if (h) h.after(fresh); else sec.prepend(fresh); }
+      } else if (sum) sum.remove();
       const grid = $(".grid", sec);
       (g.ids || []).forEach((id) => { const c = $(`#card-${CSS.escape(id)}`); if (c && c.parentElement !== grid) grid.appendChild(c); });
       box.appendChild(sec);  // in the server's order
@@ -902,6 +910,39 @@
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
     $$("#groups .ghead [data-forget-all]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.forgetAll)));
     syncAnsweredMarks();  // …nor lose the answered-for-you mark the browser counted (§4.9b)
+    syncSummaries();
+  }
+  // ---- a team's summary: its selectors (design §4.5a *team card: Repo facet*, *Answer needed /
+  // Doing*, TD-176 slice 3). Every variant is in the markup; these pick which shows. The window
+  // picker is **one value per browser** for every picker on the page; the Technical debt selector
+  // is remembered per team; the answer / doing toggle is the person's until the set of pending
+  // answers changes, and a new one flips it back to *answer*.
+  const faceFlip = {};  // team → {key, face}: a flip, held while the pending answers are the same
+  function summaryState(sum) {
+    const team = sum.dataset.team, key = sum.dataset.answerKey || "";
+    const flip = faceFlip[team];
+    const face = flip && flip.key === key ? flip.face : sum.dataset.faceDefault || "doing";
+    return { led: store.get("led:" + team, "open"), win: store.get("win", "day"), face };
+  }
+  function syncSummaries() {
+    $$("#groups .tsum").forEach((sum) => {
+      const st = summaryState(sum);
+      $$(".lv", sum).forEach((el) => (el.hidden = el.dataset.lv !== st.led));
+      $$(".wv", sum).forEach((el) => (el.hidden = el.dataset.wv !== st.win));
+      $$(".fv", sum).forEach((el) => (el.hidden = el.dataset.fv !== st.face));
+      $(".fface", sum)?.classList.toggle("answering", st.face === "answer" && !!sum.dataset.answerKey);
+      $$(".seg[data-pick]", sum).forEach((seg) => {
+        const v = st[seg.dataset.pick];
+        $$("button", seg).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === v ? "true" : "false"));
+      });
+    });
+  }
+  function pickSummary(b) {
+    const sum = b.closest(".tsum"), pick = b.closest(".seg").dataset.pick, v = b.dataset.v;
+    if (pick === "win") store.set("win", v);
+    else if (pick === "led") store.set("led:" + sum.dataset.team, v);
+    else faceFlip[sum.dataset.team] = { key: sum.dataset.answerKey || "", face: v };
+    syncSummaries();
   }
   // design §4.5a team card **Forget all** (TD-071 item 1): the Forget each card carries, one after
   // another — the same route and the same `remove` — so a record the agent refuses (a suspended one,
@@ -1493,6 +1534,8 @@
       if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
       const f = e.target.closest("[data-fold]");
       if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
+      const p = e.target.closest(".tsum .seg[data-pick] button");
+      if (p && !p.disabled) pickSummary(p);
     });
     layout();
     if (popChan()) popChan().postMessage({ who: true });  // the popped windows answer with their ids
@@ -1523,6 +1566,10 @@
       } else if (ev.event === "gone") {
         const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
         if (ev.groups !== undefined) syncGroups(ev.groups);
+        layout();
+      } else if (ev.event === "groups") {
+        // the repo facts or a doing call moved (TD-176): the summaries are in the groups
+        syncGroups(ev.groups);
         layout();
       } else if (ev.event === "error") AO.toast(ev.text);
     });
@@ -2259,7 +2306,13 @@
     }
     let root = document;
     if (k.ring) { root = page === "msg" ? $(".msgentry") : ringed(page); if (!root) return; }
-    const el = k.ring ? AO.keyControl(root, k, RINGS[page]) || (k.alt && AO.keyControl(root, k.alt, RINGS[page])) : $(k.sel);
+    let el = k.ring ? AO.keyControl(root, k, RINGS[page]) || (k.alt && AO.keyControl(root, k.alt, RINGS[page])) : $(k.sel);
+    // a compact card's permission is answered in its team's facet (§4.5a *card: compact*, TD-176):
+    // `a` / `d` on the ringed card press that facet's Allow / Deny for it
+    if (!el && k.ring && page === "org" && root && root.classList.contains("compact") && /data-act="(allow|deny)"/.test(k.sel)) {
+      const sec = root.closest(".tgroup");
+      el = sec && $$(`.tsum ${k.sel}`, sec).find((b) => b.dataset.id === root.dataset.id && !b.disabled);
+    }
     if (!el) return;
     if (k.focus) { el.focus(); return; }
     el.click();

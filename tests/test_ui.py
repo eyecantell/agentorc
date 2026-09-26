@@ -1297,7 +1297,8 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     (g,) = team_groups([view(r, records) for r in records])
     head = templates.get_template("group_head.html").render(g=g)
     assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
-    assert g["counts"] == ["1 working", "1 unseen"] and "· 1 working · 1 unseen" in head
+    # the counts stay in the group (a stopped team's row draws them), not on a live team's header (TD-176)
+    assert g["counts"] == ["1 working", "1 unseen"] and "· 2 sessions" in head and "1 working" not in head
     assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
     card = templates.get_template("card.html").render(s=g["members"][0])
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
@@ -1417,7 +1418,9 @@ def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, mo
     v = view(base)
     assert v["flag"] == "", "308 ahead of origin/main is unmerged, not unpushed (TD-080)"
     assert ("branch pushed", True) in v["ready"]
-    html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Org")  # noqa: E501
+    html = templates.get_template("focus.html").render(
+        s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Org"
+    )  # noqa: E501
     assert "308 ahead" in html and "unpushed" not in html.split('id="gitline"')[1].split("</span>")[0]
 
     only_here = view({**base, "git": {**base["git"], "unpushed": 2}})
@@ -1646,4 +1649,35 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     `#359 → #359` — on the Focus Reports panel as on the card. The panel is drawn inside `AO.focus`'s
     closure, which the node probe cannot reach, so the rule is pinned where it is written."""
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
-    assert "(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class=\"st\">→ ${prLink(p.pr)}</span>` : \"\")" in js
+    assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js
+
+
+def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
+    """TD-176 slice 3 (§4.5a *card: compact*): a member of a live team is a compact card; when the
+    team's last live session goes, the stream redraws its other members' cards in the full shape —
+    and it keys on the record's team before the delta as well as after (review of slice 3)."""
+    from sessionorc.client import call_sync
+
+    made = [
+        call_sync("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="wind")["id"]
+        for n in ("w1", "w2")
+    ]
+    call_sync("kill", id=made[1])
+    wait_state(client, made[1], "exited")
+    assert " compact" in client.get("/").text.split(f'id="card-{made[1]}"')[0].rsplit("<div", 1)[-1]
+    with client.websocket_connect("/events") as ws:
+        call_sync("kill", id=made[0])
+        # the subscribe's snapshot comes first (w1 still live, w2 compact); the redraw follows w1's exit
+        gone, redrawn = False, None
+        for _ in range(80):
+            ev = json.loads(ws.receive_text())
+            if ev.get("event") != "session":
+                continue
+            if ev["id"] == made[0] and ev["state"] == "exited":
+                gone = True
+            elif gone and ev["id"] == made[1]:
+                redrawn = ev
+                break
+        assert redrawn and " compact" not in redrawn["html"].split(">", 1)[0]
+    for sid in made:
+        client.post(f"/api/sessions/{sid}/remove")
