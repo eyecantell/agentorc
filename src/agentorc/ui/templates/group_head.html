@@ -55,4 +55,8 @@
    `ao inbox <seat>`'s #}
 {% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
+{#- design §4.5a *team groups* **who for what** (§4.8, TD-162, built by TD-171): a second line, whom to
+    write to by role, from each role's `message:` line — the definition's words, display only, and
+    drawn only when a role carries one #}
+{% if g.who %}<div class="meta whofor" title="who for what: each role's message: line (design §4.8) — write to the one whose line fits">{{ g.who | join(' · ') }}</div>{% endif %}
 {% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{{ hm2.panel('team', 'team-' ~ g.team) }}{% endif %}

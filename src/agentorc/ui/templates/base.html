@@ -44,6 +44,9 @@
 <dialog id="mailbox" class="card pad maildlg">
   <form method="dialog" class="col gap">
     <div class="h2" id="mailtitle">Message</div>
+    {#- §4.8 *A role says when to message it* (TD-171): the addressee's role's `message:` line, first —
+        *whether this is the one to write to*, above *when it will be read*; none on a Reply -#}
+    <div class="note" id="mailrole" hidden></div>
     <div class="row gap" id="mailkindrow">
       <label class="field">kind <select class="input" id="mailkind"><option value="ask" selected>ask — needs an answer</option><option value="note">note — no reply expected</option></select></label>
       <label class="field">about <input class="input" id="mailabout" placeholder="TD-052, a PR, a session (optional)"></label>

@@ -212,10 +212,15 @@
     return t ? `When it is read: ${t}.` : "";
   };
 
+  AO.roleLine = (o) => (!o.reply && o.line ? `Message it about ${o.line}` : "");
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
     $("#mailkindrow").hidden = !!o.reply;
+    // §4.8 (TD-171): the role's line, the definition's words as text; a Reply shows none — the
+    // sender chose already
+    const rl = $("#mailrole");
+    if (rl) { rl.textContent = AO.roleLine(o); rl.hidden = !rl.textContent; }
     $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
     $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = "";  // an ask by default (§4.5a **Message**, 2026-09-25)
     // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
@@ -331,7 +336,7 @@
       // design §4.5a **Message**, Focus Inbox **Reply** and delete (§4.10): mail, never a send
       if (action === "message" || action === "reply") {
         const m = await AO.compose({
-          to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote,
+          to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote, line: b.dataset.line || "",
           when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" },
         });
         if (!m) return;

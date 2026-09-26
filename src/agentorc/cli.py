@@ -546,6 +546,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
             if r.review:  # who reads its PRs (design §4.9b *The reader*)
                 bits.append(f"review: {r.review['reader']} on {', '.join(r.review['held'])}, {r.review['bound']}")
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
+            if r.message:  # when to message it (design §4.8, TD-171): its own line, since it is a sentence
+                print(f"{'':<{w}}  message: {r.message}")
 
     return emit(args, result, prose)
 

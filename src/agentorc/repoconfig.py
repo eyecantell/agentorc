@@ -42,7 +42,7 @@ DEFAULT_WORKTREES = ".claude/worktrees"
 DEFAULT_ANCHOR = "main-checkout-single"
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
-ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label", "review")
+ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "message")
 # A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
 # ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
 # label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
@@ -54,6 +54,9 @@ RESERVED_ICONS = {"person": "reserved for the card's mark of an interactive sess
 # A role's display label (design §4.8 *The names*, TD-076): what the role badge, a team header and
 # an Inbox row show in place of the bare key. A person's text, drawn escaped; nothing keys on it.
 LABEL_CAP = 40
+# When to message a role (design §4.8 *A role says when to message it*, TD-162, built by TD-171): one
+# sentence, drawn where a person chooses whom to write to. The definition's line, never the session's.
+MESSAGE_CAP = 120
 LANE_PLACEHOLDER = "{lane}"
 # The team's techlead seat (design §4.9b): its session id, filled at launch as `{lane}` is; `none`
 # where the team has none, or the session was started by hand, so a brief reads right either way.
@@ -76,15 +79,51 @@ NO_REPO = "none"
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
 # None names a profile: profile names are the person's (§4.2a, §4.9).
 PRESETS: dict[str, dict[str, Any]] = {
-    "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": [], "icon": "wrench", "label": "Grinder"},
-    "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": [], "icon": "search", "label": "Hunter"},
-    "manager": {"brief": "manager.md", "lane": [], "grants": ["control"], "icon": "flag", "label": "Manager"},
+    "grinder": {
+        "brief": "grinder.md",
+        "lane": ["free-pick"],
+        "grants": [],
+        "icon": "wrench",
+        "label": "Grinder",
+        "message": "its own card only: the entry it holds, a finding on its PR",
+    },
+    "hunter": {
+        "brief": "hunter.md",
+        "lane": ["free"],
+        "grants": [],
+        "icon": "search",
+        "label": "Hunter",
+        "message": "an area to look at; it files, never fixes",
+    },
+    "manager": {
+        "brief": "manager.md",
+        "lane": [],
+        "grants": ["control"],
+        "icon": "flag",
+        "label": "Manager",
+        "message": "the team's work: what it picks, its pace, a member that is stuck or should stop",
+    },
     # The go-between (design §4.9b, TD-075): answers teammates' questions from the record, passes the
     # rest up. No grants — it acts on no session; the design's `alarms` grant is not built.
-    "techlead": {"brief": "techlead.md", "lane": [], "grants": [], "icon": "book", "label": "Tech Lead"},
+    "techlead": {
+        "brief": "techlead.md",
+        "lane": [],
+        "grants": [],
+        "icon": "book",
+        "label": "Tech Lead",
+        "message": "a PR on a held path, the architecture, or a question that is answered somewhere in the docs"
+        " — an ask fills the seat",
+    },
     # A seat with a trigger (design §4.9b, TD-098): hunter-shaped — checks one area every n merged
     # PRs or every so often, files what it finds, and ends. The area is its brief's, never a lane.
-    "auditor": {"brief": "auditor.md", "lane": [], "grants": [], "icon": "eye", "label": "Auditor"},
+    "auditor": {
+        "brief": "auditor.md",
+        "lane": [],
+        "grants": [],
+        "icon": "eye",
+        "label": "Auditor",
+        "message": "what its trigger counts: the last n PRs, the period",
+    },
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
@@ -129,6 +168,7 @@ class Role:
     profile: str | None = None
     icon: str | None = None  # one name from `ICONS` (§4.8), or None: the badge draws no picture
     label: str | None = None  # the display label (§4.8 *The names*); None is the default, `display`
+    message: str | None = None  # when to message it (§4.8, TD-171): one sentence, or None for none
     controllers: list[str] = field(default_factory=list)
     review: dict[str, Any] | None = None  # who reads its PRs (design §4.9b *The reader*, TD-093)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
@@ -212,6 +252,7 @@ class Role:
             "profile": self.profile,
             "icon": self.icon,
             "label": self.display,
+            "message": self.message,
             "controllers": list(self.controllers),
             "source": self.source,
         }
@@ -402,6 +443,14 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             if isinstance(v, str) and len(v.strip()) > LABEL_CAP:
                 raise ValueError(f"{here}.label is longer than {LABEL_CAP} characters")
             out[k] = v.strip() if isinstance(v, str) else None
+        elif k == "message":
+            # §4.8 *A role says when to message it* (TD-171): one sentence, checked as `label:` is;
+            # `null` (or an empty string) takes a built-in's default away
+            if v is not None and (not isinstance(v, str) or "\n" in v):
+                raise ValueError(f"{here}.message must be one line of text")
+            if isinstance(v, str) and len(v.strip()) > MESSAGE_CAP:
+                raise ValueError(f"{here}.message is longer than {MESSAGE_CAP} characters")
+            out[k] = v.strip() or None if isinstance(v, str) else None
         elif k == "review":
             # §4.9b *The reader* (TD-093): checked by the one function the host agent also applies,
             # so a typo is a line naming the key when the file is read, never a PR nobody holds
@@ -456,6 +505,8 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             role.icon = block["icon"]
         if "label" in block:
             role.label = block["label"]
+        if "message" in block:
+            role.message = block["message"]
         if "review" in block:
             # every layer through the one check — the org's `roles:` is checked when read too (TD-149), and
             # `normalize_review` is idempotent, so a second pass over its output changes nothing

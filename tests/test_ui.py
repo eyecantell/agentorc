@@ -1696,3 +1696,70 @@ def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
         assert redrawn and " compact" not in redrawn["html"].split(">", 1)[0]
     for sid in made:
         client.post(f"/api/sessions/{sid}/remove")
+
+
+def test_a_roles_message_line_is_on_the_view_the_titles_and_the_team_header(tmp_path, monkeypatch):
+    """design §4.8 *A role says when to message it*, §4.5a **Message** and *team groups* **who for
+    what** (TD-162, built by TD-171): the view carries the role's `message:` line, resolved as the
+    label is; the Message controls carry it as their `title`'s head and as `data-line` for the
+    composer; the team header's line names, in the definition's order, the session holding each
+    role — *(on call)* for an empty seat — and a role several sessions hold by its label."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import asyncio
+
+    from agentorc.ui import app as uiapp
+
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {message: its own card}\n")
+    base = {"kind": "agent", "adapter": "claude-code", "dir": str(tmp_path), "repo": str(tmp_path),
+            "state": "idle", "since": "2026-09-20T16:00:00Z", "team": "ao-grind"}  # fmt: skip
+    records = [
+        {**base, "id": "ao-m", "name": "manager-ao-1", "role": "manager", "capabilities": ["control"]},
+        {**base, "id": "ao-g1", "name": "grinder-ao-1", "role": "grinder", "controllers": ["ao-m"]},
+        {**base, "id": "ao-g2", "name": "grinder-ao-2", "role": "grinder", "controllers": ["ao-m"]},
+        {**base, "id": "ao-p", "name": "mine", "role": "plain", "team": None},
+    ]
+    uiapp._icon_cache.clear()
+    icons = asyncio.run(uiapp.role_icons(records))
+    views = [uiapp.view(r, records, icons=icons) for r in records]
+    assert views[0]["message_line"].startswith("the team's work") and views[1]["message_line"] == "its own card"
+    assert views[3]["message_line"] == ""  # plain: none
+    card = uiapp.templates.get_template("card.html").render(s=views[1])
+    assert 'data-line="its own card" title="for its own card — Mails a question' in card
+    assert 'data-line="" title="Mails a question' in uiapp.templates.get_template("card.html").render(s=views[3])
+    roles = [
+        {"role": "manager", "names": ["manager-ao-1"], "seat": False},
+        {"role": "techlead", "names": ["techlead-ao-1"], "seat": True},
+        {"role": "grinder", "names": ["grinder-ao-1", "grinder-ao-2"], "seat": False},
+        {"role": "plain", "names": ["x"], "seat": False},
+    ]
+    who = uiapp.who_for_what(roles, views)
+    assert who[0] == f"{views[0]['message_line']} → manager-ao-1"
+    assert who[1].endswith("— an ask fills the seat → techlead-ao-1 (on call)")  # nobody holds the seat
+    assert who[2] == "Grinder: its own card" and len(who) == 3  # plain carries no line
+    row = {"name": "ao-grind", "roles": roles, "live": 3, "source": None, "projects": [], "manager": "manager-ao-1",
+           "techlead": "techlead-ao-1", "seats": [], "members": 2, "wound_down": None, "concluded": None}  # fmt: skip
+    (g,) = [g for g in uiapp.team_groups(views, [row]) if g["team"] == "ao-grind"]
+    head = uiapp.templates.get_template("group_head.html").render(g=g)
+    assert '<div class="meta whofor"' in head and "manager-ao-1 · " in head and "Grinder: its own card" in head
+    assert uiapp.who_for_what([{"role": "plain", "names": ["a"], "seat": False}], views) == []  # no line at all
+
+
+def test_the_definition_names_its_roles_in_order_with_their_holders():
+    """`teamrun.role_holders` (TD-171): the manager, the techlead seat, the seats, then the members,
+    each role once with the names holding it; a person leading the team is not a role."""
+    from agentorc import org as orgmod
+    from agentorc import teamrun
+
+    t = orgmod.TeamDef(
+        name="ao-grind",
+        manager=orgmod.ManagerDef(role="manager", name="manager-ao-1"),
+        techlead=orgmod.TechleadDef(name="techlead-ao-1"),
+        members=[orgmod.MemberDef(role="grinder", count=2, name="grinder-ao")],
+    )
+    got = teamrun.role_holders(t)
+    assert [r["role"] for r in got] == ["manager", "techlead", "grinder"]
+    assert (
+        got[1]["seat"]
+        and not got[2]["seat"]
+        and got[2]["names"] == orgmod.MemberDef(role="grinder", count=2, name="grinder-ao").names()
+    )

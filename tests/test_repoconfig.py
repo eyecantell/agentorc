@@ -293,3 +293,36 @@ def test_promote_is_accepted_and_checked_ahead_of_its_build(tmp_path):
     ):
         with pytest.raises(ValueError, match=names):
             repoconfig.load_text(text, tmp_path)
+
+
+def test_a_role_says_when_to_message_it(tmp_path):
+    """design §4.8 *A role says when to message it* (TD-162, built by TD-171): the built-ins carry a
+    `message:` default, `plain` none; a layer overrides it per key, `null` takes the default away;
+    one line of 120 characters at most, checked when the file is read; `to_dict` carries it."""
+    cfg = repoconfig.RepoConfig()
+    want = {
+        "manager": "the team's work: what it picks, its pace, a member that is stuck or should stop",
+        "grinder": "its own card only: the entry it holds, a finding on its PR",
+        "hunter": "an area to look at; it files, never fixes",
+        "auditor": "what its trigger counts: the last n PRs, the period",
+    }
+    for name, line in want.items():
+        assert repoconfig.resolve_role(cfg, name).message == line
+    assert repoconfig.resolve_role(cfg, "techlead").message.endswith("— an ask fills the seat")
+    assert repoconfig.resolve_role(cfg, "plain").message is None
+    (tmp_path / ".agentorc.yml").write_text(
+        "roles:\n  grinder: {message: the ledger entry it claimed}\n  designer: {message: a design-first entry}\n"
+        "  hunter: {message: null}\n"
+    )
+    loaded = repoconfig.load(tmp_path)
+    assert repoconfig.resolve_role(loaded, "grinder").message == "the ledger entry it claimed"
+    assert repoconfig.resolve_role(loaded, "designer").to_dict()["message"] == "a design-first entry"
+    assert repoconfig.resolve_role(loaded, "hunter").message is None
+    for bad, why in (
+        ("message: 7", "one line"),
+        ('message: "a\\nb"', "one line"),
+        ("message: " + "x" * 121, "longer than 120"),
+    ):
+        (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
+        with pytest.raises(ValueError, match=why):
+            repoconfig.load(tmp_path)

@@ -90,7 +90,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
 | TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Designed 2026-09-25 (the designer) — the build is TD-170; archives with it |
-| TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Designed 2026-09-25 (the designer) — the build is TD-171; archives with it |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Designed 2026-09-25 (the designer) — the build is TD-172; archives with it |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Designed 2026-09-25 (the designer) — the build is TD-174; archives with it |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
@@ -98,7 +97,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-170 | Build prompt chips: `prompts:` on the preset through the layers and `/api/roles`, the chips beside Send (a press sends, Shift+press fills) and beside the Opening prompt, `ao roles` | Medium | Open |
-| TD-171 | Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles` | Medium | Open |
 | TD-172 | Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back* | Medium | Open |
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
@@ -1662,26 +1660,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** §4.5a *Focus composer*, *Inbox row: state* (Reopen and push), §4.8, TD-123 (Commands, the other button), TD-160 (the session the chips are for), TD-157 (an *i* mark per chip is the same mechanism).
 
-## TD-162: When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder
-
-**Priority:** Medium
-**Added:** 2026-09-25 (raised by Paul: *add info icons to each team member's message button to say when you would want to message them*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-171
-
-**Status:** Designed 2026-09-25 (the designer): design §4.8 *A role says when to message it* (`message:`, one sentence, built-in defaults for the five presets — manager, techlead, grinder, hunter, auditor — and a role's own line in its `roles:` entry for a `designer`; the definition's line, never the session's), §4.5a **Message** (the composer's first line, the control's `title`) and *team groups* (the **who for what** line), mockups `Main.dc.html` (the header line) and `Message.dc.html` (the composer's line). Settled: (a) the field on the preset; (b) the composer's first line and the control's `title` — no mark on every card's Message (the Org card is quiet, TD-095; the team header answers the choice before a card is picked); (c) the team-level line, generated; (d) no, a session may not rewrite it. The design is PR #570; the no-mark-on-the-card choice was to go to Paul as a steer, but the person inbox refused it as full (Paul is away, §4.10), so the choice is on the board (the designer's line of 2026-09-25, merged as PR #571) with a Due date, and #570 merges after 2026-09-26 08:15 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-171; this entry archives with it. **What was:** nothing designed. Paul suggested the profiles as the home for the line; a profile is tool · account · model (§4.2a) and says nothing about a job, so the role preset (§4.8) is the candidate — the round confirms.
-
-**Location:** design §4.5a **Message** (the composer), §4.8 *Role names* and the presets, §4.9 (manager, techlead, members: who does what), §4.9b (an `ask` fills the seat); TD-157 (the *i* mark per control), TD-158 (what the composer says about when the message is read); `src/agentorc/ui/templates/base.html` (`#mailbox`), `src/agentorc/ui/static/app.js` (`AO.compose`).
-
-**Why:** every card's Message opens the same composer, and the design's answer to *who do I message* is spread over §4.9: the manager for what the team works on, the techlead for a PR or the architecture, a grinder only about its own card. A person at the Org sees six Message buttons and no reason to pick one over another; the wrong pick costs a wake budget and a round of passing up. The role knows its own job — the brief says it — so one sentence per role, *message me when …*, drawn where the choice is made, lets the person choose before typing. TD-158 says *when* the message will be read; this says *whether this is the one to send it to*.
-
-**What the design round has to settle:** (a) **the field** — `message:` on the role preset (built-in presets carry a default: manager, techlead, grinder, hunter, auditor, designer), overridable in org and repo `roles:`, one sentence; (b) **the surfaces** — the *i* mark on the card's Message and in `more ▾` (TD-157's mechanism), and the line at the top of the composer under the addressee's name, beside TD-158's when-read line; (c) **a team-level pointer** — on the team header, *questions to the manager; PRs to the techlead*, generated from the same fields; (d) whether a session may rewrite its own line (the entry's view: no, it is the definition's, in the spirit of §9 invariant 9 — a preset sets defaults at start and is a badge afterwards; the round decides); (e) the mockup.
-
-**Done when** a person hovering the Message *i* on the techlead's card reads what it is for, and the composer repeats the line above the text box.
-
-**Related:** §4.5a **Message**, §4.8, §4.9, §4.9b, TD-157, TD-158, TD-160 (the person in the team who needs this most).
-
 ## TD-163: Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it
 
 **Priority:** Medium
@@ -1790,31 +1768,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-161's *Done when*: Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
 
 **Related:** TD-161 (the design), TD-160 / TD-169 (the person's session the chips are for), TD-027 (send's confirmation), TD-096 (the composer closed on an unattended session), TD-003 (the phone's narrow Focus), TD-157 / TD-167 (the chip's `title` as its mark).
-
-## TD-171: Build when to message whom: `message:` on the preset with the built-in defaults, the composer's first line, the Message control's `title`, the team header's who-for-what line, `ao roles`
-
-**Priority:** Medium
-**Added:** 2026-09-25 (the designer, from TD-162's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.8 *A role says when to message it*, §4.5a **Message** (the composer's first line, the `title`) and *team groups* (**who for what**); mockups `Main.dc.html`, `Message.dc.html`.
-
-**Location:** `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `message`; the built-in presets' defaults beside their `label:`; the length check as `label:`'s), `src/agentorc/cli.py` (`ao roles` prints it), `src/agentorc/ui/app.py` (the record's view carries `message_line` resolved from its role; `team_groups` builds the header's line from the definition's roles and the sessions holding them), `src/agentorc/ui/templates/base.html` (`#mailbox`: a line under `#mailtitle`), `card.html` / `focus.html` (the Message control's `title`), `group_head.html` (the second line), `src/agentorc/ui/static/app.js` (`AO.compose` takes the line).
-
-**Why:** TD-162's *Why*: six Message buttons and no reason to pick one; the wrong pick costs a wake and a round of passing up.
-
-**Fix:**
-1. **The key** and the five presets' defaults (manager, techlead, grinder, hunter, auditor; `plain` none — a `designer` is an org or repo role, not a preset, and carries its own line in its `roles:` entry), resolved where `label:` is; `ao roles` prints `message:` per role.
-2. **The view**: `message_line` on every record with a role that has one; the seat placeholder's from the seat's role.
-3. **The composer**: `AO.compose` draws the line first, under the title; Reply shows none (the sender chose already).
-4. **The `title`**: the card's *more ▾* Message entry, the seat card's **Message…** and the Focus header's button carry the line, joined to what the title says today with ` — `.
-5. **The header**: *who for what* from the definition's roles in the definition's order, each with the name of the session holding the role (*(on call)* for an empty seat), hidden when no role carries a line.
-6. **Tests:** the default per built-in; an override in a repo's `roles:`; the length check; the view's `message_line`; the header line for a definition with a manager, a techlead seat on call and two grinders; the composer's line under node as `test_ui_keys.py` runs `app.js`.
-
-**Done when** TD-162's *Done when*: a person hovering Message on the techlead's card reads what it is for, and the composer repeats the line above the text box; and the ao-grind header reads *questions → manager-ao-1 · PRs and the architecture → techlead-ao-1 · a grinder about its own card*.
-
-**Related:** TD-162 (the design), TD-158 / TD-168 (the when-read line beneath it), TD-157 / TD-167 (the `title` as the mark), TD-160 / TD-169 (the person in the team), TD-097 (the seat card's Message…).
 
 ## TD-172: Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back*
 

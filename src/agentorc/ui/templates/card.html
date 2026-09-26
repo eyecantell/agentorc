@@ -106,7 +106,7 @@
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>
     {% elif next_act == 'message' %}
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
-      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="{{ help_title('message') }}">Message…</button>
+      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }} — {% endif %}{{ help_title('message') }}">Message…</button>
     {% elif next_act == 'close' %}
       <button class="btn sm next" data-act="close" data-id="{{ s.id }}" title="{{ help_title('close') }}">Close session</button>
     {% endif %}
@@ -119,7 +119,7 @@
     <details class="more">
       <summary class="btn sm link" title="more">⋯</summary>
       <div class="menu">
-        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="{{ help_title('message') }}">Message…</button>
+        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }} — {% endif %}{{ help_title('message') }}">Message…</button>
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
         <button data-act="wrapup" data-id="{{ s.id }}" title="{{ help_title('wrap-up') }}">Wrap up</button>
