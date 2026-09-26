@@ -1815,25 +1815,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-157's *Done when*: a person at a concluded team's card can learn, without leaving the page, that Forget drops the record and keeps the worktree, and that Start closes the concluded sessions and runs the team again from its definition — and the sentence they read is §4.5a's, held so by the test.
 
 **Related:** TD-157 (the design), TD-148 (the Settings page's marks, the nearest built shape), TD-162 (which session to message: its own line per role, on the Message composer), TD-124 (the `?` overlay), TD-095 (the card's quiet foot: no mark on it), TD-071 (fixed text in the source, never a session's).
-## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
-
-**Priority:** Medium
-**Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** yes
-
-**Status:** Open — nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
-
-**Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
-
-**What the design round has to settle:** (a) **whether the round line is kept at all** — as a printed line in the turn it is already in the run log, and `ao progress` is the declared record; (b) **where a restart-surviving narrative lives** if it is wanted — the record's own trail (§4.5a's trail rows), a home-owned per-session notes file under `~/.agentorc/` beside the run logs and pruned with them (`runs_keep_days`, §4.6), or a `note` to itself; never a git branch; (c) **the launch branch's role** — a launch artefact the manager never commits to, as the grinder's is, and what becomes of the 196 commits on `manager-ao-1` (left; §4.1 supersedes the record at the next start under its name, and the branch is the launch's artefact); (d) the template's step 5 and the wind-down's step (4), and the supplement's *the one thing you commit to it* line, which is dev-cadence's shape of a supplement (§4.8, TD-114) and changes with the template; (e) whether Ready to close should ever read a launch branch's own commits as unpushed work, or that is exactly right and the log is what is wrong — the round decides.
-
-**Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
-
-**Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
-**Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.
-
 ## TD-173: Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line
 
 **Priority:** Medium
@@ -1857,3 +1838,22 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-160's *Done when*: Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so); and Wind down on ao-grind with his session live names it as staying.
 
 **Related:** TD-160 (the design), TD-093 (the reader), TD-036 (controllers prefill), TD-040 (the Role pick's rebuild), TD-053 (wound down), TD-161 / TD-162 (what a person in the team presses and whom they message).
+
+## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
+
+**Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
+
+**What the design round has to settle:** (a) **whether the round line is kept at all** — as a printed line in the turn it is already in the run log, and `ao progress` is the declared record; (b) **where a restart-surviving narrative lives** if it is wanted — the record's own trail (§4.5a's trail rows), a home-owned per-session notes file under `~/.agentorc/` beside the run logs and pruned with them (`runs_keep_days`, §4.6), or a `note` to itself; never a git branch; (c) **the launch branch's role** — a launch artefact the manager never commits to, as the grinder's is, and what becomes of the 196 commits on `manager-ao-1` (left; §4.1 supersedes the record at the next start under its name, and the branch is the launch's artefact); (d) the template's step 5 and the wind-down's step (4), and the supplement's *the one thing you commit to it* line, which is dev-cadence's shape of a supplement (§4.8, TD-114) and changes with the template; (e) whether Ready to close should ever read a launch branch's own commits as unpushed work, or that is exactly right and the log is what is wrong — the round decides.
+
+**Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
+
+**Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
+**Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.
