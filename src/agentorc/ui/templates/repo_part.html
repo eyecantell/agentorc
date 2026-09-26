@@ -1,0 +1,70 @@
+{% import "inbox_row.html" as ir with context %}
+<div class="row gap wrap rhead">
+  <a class="meta" href="/">← Org</a>
+  <span class="h1 mono">{{ name }}</span>
+  <span class="meta mono">{{ host }} · {{ r.root }}</span>
+  <span class="grow"></span>
+  {% if teams %}<span class="meta">serviced by {% for t in teams %}<a href="/?team={{ t }}" data-team-link="{{ t }}">{{ t }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>
+  {% else %}<span class="meta">no team services this repo</span>{% endif %}
+</div>
+{% include "team_summary.html" %}
+
+{# (1) Open PRs — every open PR on the remote, newest last; a PR is GitHub's: no control #}
+<section class="rsec" id="prs">
+  <div class="row gap rsh"><span class="h2">Open PRs</span> <span class="meta">{{ prs | length }} · newest last</span>
+    <button class="imark" type="button" aria-expanded="false" aria-controls="info-prs" title="About this list">i</button></div>
+  <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ g.summary.repo.read ~ ' ago' if g.summary.repo else '' }}); the standing is the techlead seat's inbox — <i>waiting on review</i> while its ask is open, <i>reviewed</i> once answered</div>
+  <div class="rlist">
+  {% for p in prs %}
+    <div class="rrow"><a class="mono strong" href="{{ p.url }}" target="_blank" rel="noopener">#{{ p.number }}</a><span class="rtitle">{{ p.title }}</span><span class="grow"></span>
+      {% if p.author %}<a class="mono" href="/focus/{{ p.author.id }}">{{ p.author.name }}</a>{% else %}<span class="mono meta">{{ p.login }}</span>{% endif %}<span class="meta">· {{ p.age }}</span>
+      {% if p.draft %}<span class="tag">draft</span>{% endif %}{% if p.standing %}<span class="tag {{ p.standing.cls }}">{{ p.standing.word }}</span>{% endif %}</div>
+  {% else %}
+    <div class="rrow meta">{% if r.prs and r.prs.open is not none %}no open PRs{% else %}could not look{% if r.prs and r.prs.error %} — {{ r.prs.error }}{% endif %}{% endif %}</div>
+  {% endfor %}
+  </div>
+</section>
+
+{# (2) Technical debt — the ledger's open entries in four lists; an entry is edited in its file #}
+<section class="rsec" id="debt">
+  <div class="row gap rsh"><span class="h2">Technical debt</span>
+    <span class="meta">{% for l in lists %}{{ l.rows | length }} {{ l.label }}{{ ' · ' if not loop.last }}{% endfor %}</span>
+    <button class="imark" type="button" aria-expanded="false" aria-controls="info-debt" title="About this list">i</button>
+    <span class="grow"></span>
+    {% if ledger_editor %}<a class="btn sm ghost" href="{{ ledger_editor.url }}">‹› Open ledger</a>{% endif %}</div>
+  <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes; <i>held by</i> is a member's claim</div>
+  <div class="rlist">
+  {% if r.ledger and r.ledger.entries is none %}<div class="rrow meta">could not look — {{ r.ledger.error or 'not read yet' }}</div>{% endif %}
+  {% for l in lists %}{% if l.rows %}
+    <div class="rlh" id="debt-{{ l.key }}">{{ l.label }} · {{ l.rows | length }}</div>
+    {% for e in l.rows %}
+    <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
+      {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span></div>
+    {% endfor %}
+    {% if l.fold %}<button class="rrow meta mono more" type="button" data-unfold="{{ l.key }}">+{{ l.fold }} more</button>{% endif %}
+  {% endif %}{% endfor %}
+  </div>
+</section>
+
+{# (3) Waiting on you — the Inbox's own board rows, filtered to the repo: acting here is acting on the board #}
+<section class="rsec" id="waiting">
+  <div class="row gap rsh"><span class="h2">Waiting on you</span> <span class="meta">{{ boards | length }} due</span>
+    <button class="imark" type="button" aria-expanded="false" aria-controls="info-wait" title="About this list">i</button>
+    <span class="grow"></span>{% if teams %}<a class="meta" href="/inbox?team={{ teams[0] }}&kind=board">open in the Inbox →</a>{% endif %}</div>
+  <div class="secinfo meta" id="info-wait" hidden>the repo's board items due today or overdue, as the Inbox shows them — Reply, Snooze and Done write the board</div>
+  <div class="inboxpage"><div class="inboxrows">
+  {% for e in boards %}{{ ir.row(e, 'needs') }}{% else %}<div class="rrow meta">nothing on the board is due</div>{% endfor %}
+  </div></div>
+</section>
+
+{# (4) Doing — the team's ao doing calls, newest first, with a chip per doer #}
+<section class="rsec" id="doing">
+  <div class="row gap rsh"><span class="h2">Doing</span> <span class="meta">the team's ao doing calls · newest first</span>
+    <button class="imark" type="button" aria-expanded="false" aria-controls="info-doing" title="About this list">i</button></div>
+  <div class="secinfo meta" id="info-doing" hidden>every <code>ao doing</code> call of the servicing team's members, the last fifty (design §4.8)</div>
+  {% if doing %}<div class="row gap wrap dchips"><span class="meta">show</span>{% for c in chips %}<button type="button" class="chip" data-who="{{ c.who }}" aria-pressed="{{ 'true' if not c.who else 'false' }}">{{ c.label }} ({{ c.n }})</button>{% endfor %}</div>{% endif %}
+  <div class="rlist">
+  {% for d in doing %}<div class="rrow drow" data-who="{{ d.name }}" title="{{ d.at }}"><span class="meta mono">{{ d.hm }}</span><a class="mono" href="/focus/{{ d.id }}">{{ d.name }}</a><span class="rtitle">{{ d.text }}</span></div>
+  {% else %}<div class="rrow meta">{{ 'no team services this repo' if not teams else 'no ao doing calls yet' }}</div>{% endfor %}
+  </div>
+</section>

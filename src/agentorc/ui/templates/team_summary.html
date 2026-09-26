@@ -58,10 +58,11 @@
       {% if x.pr %}{% if x.pr_url %}<a href="{{ x.pr_url }}" target="_blank" rel="noopener">#{{ x.pr }}</a>{% else %}<span>#{{ x.pr }}</span>{% endif %}{% if x.pr_state %} <span class="meta">{{ x.pr_state }}</span>{% endif %}{% endif %}
     </div>
     {% else %}
-    <div class="meta">nothing claimed{% if m.repo and m.repo.ledger.kind %}{% for b in m.repo.ledger.kind if b.key == 'pickable' %} · {{ b.n }} pickable entr{{ 'y waits' if b.n == 1 else 'ies wait' }} for the next claim{% endfor %}{% endif %}</div>
+    <div class="meta">{% if m.noteam %}no team services this repo{% else %}nothing claimed{% endif %}{% if m.repo and not m.noteam and m.repo.ledger.kind %}{% for b in m.repo.ledger.kind if b.key == 'pickable' %} · {{ b.n }} pickable entr{{ 'y waits' if b.n == 1 else 'ies wait' }} for the next claim{% endfor %}{% endif %}</div>
     {% endfor %}
   </div>
-  {# -- Answer needed / Doing (§4.5a *team card: Answer needed / Doing*) -- #}
+  {# -- Answer needed / Doing (§4.5a *team card: Answer needed / Doing*); none on a repo no team services -- #}
+  {% if not m.noteam %}
   <div class="facet fface{% if m.face == 'answer' %} answering{% endif %}">
     <div class="fv" data-fv="answer"{% if m.face != 'answer' %} hidden{% endif %}>
       <div class="fhead"><span class="kind">Answer needed ({{ m.answers | length }})</span><span class="grow"></span>
@@ -89,4 +90,5 @@
       </div>
     </div>
   </div>
+  {% endif %}
 </div>

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} · ShiftLead{% endblock %}
+{% block body %}
+{# design §4.5 screen 11 **Repo** (TD-176 slice 5): what a repo holds — the servicing team's three
+   facets, then the lists behind the numbers. Reached from a team card's Repo facet; no tab. The
+   content is `repo_part.html`, which the page re-reads on its poll and on the repos and doing events. #}
+<div class="page repopage" id="repopage" data-repo="{{ name }}">{% include "repo_part.html" %}</div>
+{% endblock %}
+{% block scripts %}<script>AO.repo();</script>{% endblock %}
