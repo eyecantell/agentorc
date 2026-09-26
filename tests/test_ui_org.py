@@ -753,7 +753,8 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
     # the default card is dirty: Close in more is disabled, and says why
     assert 'data-confirm="Close w?" disabled title="not ready to close — tree clean' in working
     clean = {"branch": "w", "dirty": 0, "unpushed": 0}
-    assert 'data-confirm="Close w?">Close</button>' in foot(_card(git=clean))
+    closes = 'title="Kills the session and reaps its worktree; the record reads closed.">Close</button>'  # TD-167
+    assert f'data-confirm="Close w?" {closes}' in foot(_card(git=clean))
 
 
 def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count():

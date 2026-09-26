@@ -64,18 +64,18 @@
        right holds what is rarely pressed, Kill last and red, as the card's foot does (§4.5a). #}
     <div class="row gap" id="facts">
       <button class="btn sm next{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."
-              title="the checklist passes: kill it and reap its worktree (design §4.2) — the same Close as the card's">Close session</button>
+              title="{{ help_title('close') }}">Close session</button>
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
          Take over an unattended session (read-only until then) is the next act here; Hand back and
          Switch to unattended, the same toggle the other way, sit in more ▾ (TD-156). #}
       <button class="btn sm {{ 'link' if s.own and s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
-      <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail a note or an ask into this session's inbox — it lands and types nothing (Send, below, types)">✉ Message</button>
+      <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="{{ help_title('message') }}">✉ Message</button>
       {# design §4.5a Focus **Wrap up** (TD-156, *What Wrap up promises*): a person's Wrap up is only
          the prompt; the hover and the press's toast say that the close is theirs #}
       <button class="btn sm link" data-act="wrapup" data-id="{{ s.id }}"
-              title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</button>
+              title="{{ help_title('wrap-up') }}">Wrap up</button>
       <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" title="a shell session in this session's directory">⌘ Open shell here</button>
       {% if s.editor %}<a class="btn sm link editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
       <span class="grow"></span>
@@ -92,11 +92,19 @@
           {# Close for a team member (TD-156, Paul): its team's Wind down or Start closes it, so the
              act is here and not on the acts line; enabled only when Ready to close passes #}
           <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."{% if not (s.ready_ok and s.state in ('idle', 'exited')) %} disabled{% endif %}
-                  title="kill it and reap its worktree once Ready to close passes — a team member is normally closed by its team's Wind down or Start">Close</button>
-          <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="kills the tmux session and keeps the worktree — Close, when the checklist passes, reaps it too">✕ Kill</button>
+                  title="{{ help_title('close') }}">Close</button>
+          <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
         </div>
       </details>
+      {#- design §4.5a the ***i*** mark (TD-157, built by TD-167): after the header's Kill, the group
+          Wrap up, Kill, Close and Message…; its panel opens under the acts line -#}
+      {% import "help_mark.html" as hm %}{{ hm.mark('focus', 'focus') }}
     </div>
+    {{ hm.panel('focus', 'focus') }}
+    {#- the exited banner's group (Resume, Forget): the banner is the script's, so its mark is added
+        there (`AO.focus`) and points at this panel, which is in the page always -#}
+    {{ hm.panel('exited', 'exited') }}
+    <template id="exitedmark">{{ hm.mark('exited', 'exited') }}</template>
     <div class="inline-banner hidden" id="fbanner"></div>
     <div class="inline-banner hidden" id="fexited"></div>
     <div id="term" class="termbox"></div>

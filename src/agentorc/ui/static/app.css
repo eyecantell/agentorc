@@ -191,14 +191,24 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
 /* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
    thing in a heading — everything bordered is a control, and this is one (§4.5a) */
-.inboxpage .imark, .reports .imark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
-.inboxpage .imark:hover, .reports .imark:hover { background: var(--hover); color: var(--fg); }
-.inboxpage .imark[aria-expanded="true"], .reports .imark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
+.inboxpage .imark, .reports .imark, .helpmark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
+.inboxpage .imark:hover, .reports .imark:hover, .helpmark:hover { background: var(--hover); color: var(--fg); }
+.inboxpage .imark[aria-expanded="true"], .reports .imark[aria-expanded="true"], .helpmark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
 /* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
    missing one), opened **in place** under the heading so it pushes the rows down, never covers one */
 .inboxpage .isec { position: relative; }
 .inboxpage .secinfo { margin: 0; max-width: 90ch; }
 .inboxpage .secinfo[hidden] { display: none; }
+/* design §4.5a the ***i*** mark's panel (TD-167): under its group, full width, pushing the rows down */
+.helppanel { flex-basis: 100%; margin: 4px 0 0; max-width: 90ch; } .helppanel[hidden] { display: none; }
+.helppanel p { margin: 0 0 .5em; } .helppanel p:last-child { margin-bottom: 0; }
+/* §4.5 screen 10 *Help*: one column, a heading per control, nothing pressable but the page's own links */
+.helppage { max-width: 760px; width: 100%; margin: 0 auto; }
+.helppage .helpscreen { display: flex; flex-direction: column; gap: 10px; }
+.helppage .helpscreen > .h2 { margin: 12px 0 0; }
+.helppage .helpname { margin: 0; font-size: var(--t-body); font-weight: 600; }
+.helppage .helpitem p { margin: 4px 0 0; }
+.helppage .helpwhere { font-weight: 400; color: var(--muted); font-size: var(--t-small); }
 /* the **keyboard** half of *a tooltip on hover and keyboard focus* (§4.5a): the same paragraph,
    floated over the rows instead of pushing them down — a press is what pushes them. `!important`
    because it has to beat the UA's `[hidden] { display: none }` on the very node it floats. */

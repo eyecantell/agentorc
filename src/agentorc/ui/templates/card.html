@@ -103,12 +103,12 @@
       {# Deny's optional reason (§4.5a, TD-117): one line the session reads with the refusal #}
       <input class="denywhy" type="text" maxlength="200" data-id="{{ s.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
     {% elif next_act == 'forget' %}
-      <button class="btn sm next" data-act="remove" data-id="{{ s.id }}">Forget</button>
+      <button class="btn sm next" data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>
     {% elif next_act == 'message' %}
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
-      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail a question into its inbox — that is what fills the seat (design §4.9b)">Message…</button>
+      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="{{ help_title('message') }}">Message…</button>
     {% elif next_act == 'close' %}
-      <button class="btn sm next" data-act="close" data-id="{{ s.id }}">Close session</button>
+      <button class="btn sm next" data-act="close" data-id="{{ s.id }}" title="{{ help_title('close') }}">Close session</button>
     {% endif %}
     {# `data-focus`: while this browser holds the session popped out, it reads *Focus window* and
        raises that window (§4.5a **Focus**, TD-046) — a plain click only; a modifier is the browser's #}
@@ -119,13 +119,13 @@
     <details class="more">
       <summary class="btn sm link" title="more">⋯</summary>
       <div class="menu">
-        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail into its inbox — lands, types nothing">Message…</button>
+        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="{{ help_title('message') }}">Message…</button>
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
-        <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
-        <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">Kill</button>
+        <button data-act="wrapup" data-id="{{ s.id }}" title="{{ help_title('wrap-up') }}">Wrap up</button>
+        <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">Kill</button>
         {# enabled only when Ready to close passes (§4.5): dimmed here means disabled, and says why #}
-        <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% endif %}>Close</button>
+        <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% else %} title="{{ help_title('close') }}"{% endif %}>Close</button>
         <button data-act="shell-here" data-id="{{ s.id }}">Open shell here</button>
         {# design §4.5a **Pop out** (TD-046): client-side, nothing is written to the record #}
         <button data-act="popout" data-id="{{ s.id }}" title="open its Focus in its own browser window, for alt-tab — a second press raises it">Pop out</button>

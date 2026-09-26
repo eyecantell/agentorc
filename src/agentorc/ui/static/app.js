@@ -875,6 +875,7 @@
       if (g.html) {
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
         head.innerHTML = g.html;
+        AO.applyHelpMarks(head);  // the header's *i* panel comes back as this browser left it
       } else if (head) head.remove();
       // a live team's summary (TD-176 slice 3): swapped whole, between the header and the grid
       let sum = $(".tsum", sec);
@@ -2064,6 +2065,15 @@
               + `<button class="btn sm" data-act="resume-form" data-id="${id}">Resume with changes…</button> `
             : "")
           + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`;
+        // §4.5a *The help text* (TD-167): Resume's and Forget's titles and the banner's *i* mark, all
+        // from the page's own fixed text (`#help-exited`, `#exitedmark`), never composed here
+        const hp = $("#help-exited");
+        if (hp) {
+          $$('[data-act="resume"]', ex).forEach((b) => { b.title = hp.dataset.titleResume || ""; });
+          $$('[data-act="remove"]', ex).forEach((b) => { b.title = hp.dataset.titleForget || ""; });
+        }
+        const mk = $("#exitedmark");
+        if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");
       } else ex.classList.add("hidden");
       $("#adapter_id").textContent = v.adapter_id || "—";
@@ -2414,5 +2424,26 @@
   // rather than in any one page's init (the script tag is at the end of the body: the DOM is up).
   window.addEventListener?.("resize", fitUsage);  // `?.`: the node probe of test_ui_inbox has no real window
   fitUsage();
+  // design §4.5a the ***i*** mark (TD-157, built by TD-167): the team card's, the Focus header's and
+  // the exited banner's. One delegated press for all of them — a header or a banner is redrawn by
+  // the stream, which would drop a listener bound to the button — and which are open is this
+  // browser's memory, as the Inbox's marks are; a redraw puts it back (`applyHelpMarks`).
+  const HELP_OPEN = (id) => "helpmark:" + id;
+  AO.applyHelpMarks = function (root) {
+    $$(".helpmark", root || document).forEach((b) => {
+      const p = document.getElementById(b.dataset.info); if (!p) return;
+      const on = !!store.get(HELP_OPEN(b.dataset.info), false);
+      p.hidden = !on; b.setAttribute("aria-expanded", on ? "true" : "false");
+    });
+  };
+  document.addEventListener?.("click", (e) => {
+    const b = e.target.closest && e.target.closest(".helpmark"); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const p = document.getElementById(b.dataset.info); if (!p) return;
+    const on = p.hidden;
+    p.hidden = !on; b.setAttribute("aria-expanded", on ? "true" : "false");
+    store.set(HELP_OPEN(b.dataset.info), on);
+  });
+  AO.applyHelpMarks();
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 })();

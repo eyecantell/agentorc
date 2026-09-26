@@ -30,17 +30,21 @@
 {% else %}<span class="meta">stopped</span>{% endif %}{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
    control sits on the thing it acts on, and only a team with a definition has either. #}
-{% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the manager (`ao team stop`)">Wind down</button>
-<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
-{% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
+{% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}">Wind down</button>
+<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}">Stop now</button>
+{% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
 {# the fold (design §4.5a **team groups**, TD-156 (f)): only a team with nothing live folds — a
    concluded team's idle cards wait for a person's Close and stay in view — and the control sits
    beside Start, a chevron and the count; the client keeps the choice per team and sets the glyph #}
-{% if g.team and not g.live and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="a stopped team's cards are folded away: its sessions have exited and are waiting for Forget — click to show or hide them">▸ {{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
+{% if g.team and not g.live and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="{{ help_title('fold') }}">▸ {{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
 {# design §4.5a team card **Forget all** (TD-071 item 1; beside Start and the fold since TD-156 (f)): on a team with nothing live, one confirm,
    then each card's own Forget — never a card with the dirty / unpushed flag, which the confirm
    names apart, since forgetting the record loses unpushed work's only pointer #}
-{% if g.forget %}{% set kept = g.forget_kept | map(attribute='name') | list %}<button class="btn sm ghost forgetall" data-forget-all="{{ g.team }}" data-ids="{{ g.forget | map(attribute='id') | join(' ') }}" title="forget every exited or closed card of this team at once — the worktrees stay{% if kept %}; not {{ kept | join(', ') }}, which carry work that exists only on this machine{% endif %}" data-confirm="Forget {{ g.forget | length }} session{{ '' if g.forget | length == 1 else 's' }} of {{ g.team }}: {{ g.forget | map(attribute='name') | join(', ') }}? Each record goes, as its own Forget does; the worktrees stay.{% if kept %} Not forgotten — work that exists only on this machine, forget each by its own Forget with the flag in view: {% for m in g.forget_kept %}{{ m.name }} ({{ m.flag }}){{ ', ' if not loop.last }}{% endfor %}.{% endif %}">Forget all</button>{% endif %}
+{% if g.forget %}{% set kept = g.forget_kept | map(attribute='name') | list %}<button class="btn sm ghost forgetall" data-forget-all="{{ g.team }}" data-ids="{{ g.forget | map(attribute='id') | join(' ') }}" title="{{ help_title('forget-all') }}{% if kept %}; not {{ kept | join(', ') }}, which carry work that exists only on this machine{% endif %}" data-confirm="Forget {{ g.forget | length }} session{{ '' if g.forget | length == 1 else 's' }} of {{ g.team }}: {{ g.forget | map(attribute='name') | join(', ') }}? Each record goes, as its own Forget does; the worktrees stay.{% if kept %} Not forgotten — work that exists only on this machine, forget each by its own Forget with the flag in view: {% for m in g.forget_kept %}{{ m.name }} ({{ m.flag }}){{ ', ' if not loop.last }}{% endfor %}.{% endif %}">Forget all</button>{% endif %}
+{# design §4.5a the ***i*** mark (TD-157, built by TD-167): after the team card's controls, for a
+   team with a definition — the group is its Start, Wind down, Stop now, Forget all and fold, and the
+   cards' Forget, Resume, Close and Message…; the panel opens under the header, full width #}
+{% if g.team and g.defined %}{% import "help_mark.html" as hm %}{{ hm.mark('team', 'team-' ~ g.team) }}{% endif %}
 {# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
    team's sessions gave from the record since this browser last opened the Inbox's group — a
    **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
@@ -51,3 +55,4 @@
    `ao inbox <seat>`'s #}
 {% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
+{% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{{ hm2.panel('team', 'team-' ~ g.team) }}{% endif %}

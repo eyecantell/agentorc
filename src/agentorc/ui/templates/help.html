@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Help · ShiftLead{% endblock %}
+{# design §4.5 screen 10 *Help*, §4.5a *Help page* (TD-157, built by TD-167; mockup `Help.dc.html`):
+   every control that has a paragraph in §4.5a *The help text*, by screen, each under its own heading
+   whose id is the control's — *what it does · when you would press it · what it does not do*. The
+   page the *i* marks and the **?** overlay point at. Nothing on it is a control, and a control
+   without a paragraph is not on it. Fixed text from `help.py`. #}
+{% block body %}
+<div class="page helppage">
+  <span class="h1">Help</span>
+  <p class="note">What each control does, when you would press it, and what it does not do. On the page, the <b>i</b> beside a group of controls opens the same paragraphs where the controls are; hovering a control shows its first sentence.</p>
+  {%- for sid, title, items in screens %}
+  <section class="helpscreen" id="{{ sid }}">
+    <h2 class="h2">{{ title }}</h2>
+    {%- for h in items %}
+    <div class="helpitem" id="{{ h.key }}">
+      <h3 class="helpname">{{ h.name }} <span class="helpwhere">{{ help_where(h.where) }}</span></h3>
+      <p>{{ h.text }}</p>
+    </div>
+    {%- endfor %}
+  </section>
+  {%- endfor %}
+</div>
+{% endblock %}
