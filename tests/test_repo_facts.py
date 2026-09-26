@@ -363,3 +363,40 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["--json", "repo", "other"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["root"] == "/elsewhere"
     assert cli.main(["repo", "nope"]) != 0
+
+
+async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
+    """Review of PR #595: a read that raises (not a `gh` outage — a surprise) is that checkout's
+    error, its last reading kept; the other checkouts are read; and the clock does not advance past
+    a pass that raised, so the next tick tries again."""
+    await park_ticks(agent)
+    a, b = tmp_path / "a", tmp_path / "b"
+    for root in (a, b):
+        root.mkdir()
+    _register(a, b)
+
+    def pr(d, now, **kw):
+        if Path(d) == a:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        return {"open": [], "windows": {}, "recent": [], "at": now.isoformat()}
+
+    monkeypatch.setattr(reports, "pr_reading", pr)
+    await agent._refresh_repos()
+    got = agent._repos
+    assert got[str(b)]["prs"]["open"] == [] and "error" not in got[str(b)]["prs"]
+    assert got[str(a)]["prs"]["error"] == "the read failed: UnicodeDecodeError"
+    assert got[str(a)]["prs"].get("open") is None  # nothing before it: *could not look*, never zero
+
+    # a checkout registered between two due reads is read whole at once
+    c = tmp_path / "c"
+    c.mkdir()
+    _register(a, b, c)
+    await agent._refresh_repos()
+    assert agent._repos[str(c)]["prs"]["open"] == []
+
+
+def test_history_survives_bytes_that_are_not_utf8(repo):
+    _commit(repo, _entry("TD-002", "caf\xe9"), datetime.now(UTC))
+    (repo / "docs" / "technical_debt.md").write_bytes(_entry("TD-002", "x").encode() + b"\xff\xfe junk\n")
+    _git(repo, "commit", "-qam", "bytes", when=datetime.now(UTC))
+    assert ledger.history(repo, "docs/technical_debt.md") is not None

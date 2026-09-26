@@ -1146,10 +1146,12 @@ class HostAgent:
             gone = [r for r in self._repos if r not in roots]
             if not (todo or gone):
                 return
-            if due:
-                self._repos_read_at = time.monotonic()
             prev = {r: self._repos.get(r) or {} for r in todo}
-            got = await asyncio.to_thread(self._read_repos, todo, prev, due) if todo else {}
+            # a checkout read for the first time gets the whole reading at once, not in five minutes
+            full = {r for r in todo if due or r not in self._repos}
+            got = await asyncio.to_thread(self._read_repos, todo, prev, full) if todo else {}
+            if due:
+                self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             for root in todo:
                 self._ledger_mtime[root] = mtimes.get(root)
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
@@ -1177,44 +1179,66 @@ class HostAgent:
         return out
 
     @staticmethod
-    def _read_repos(roots: list[str], prev: dict[str, dict[str, Any]], due: bool) -> dict[str, dict[str, Any]]:
-        """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. `due` reads
-        the PRs and the ledger's history; otherwise the ledger's entries alone, the rest carried
-        from `prev`."""
+    def _read_repos(roots: list[str], prev: dict[str, dict[str, Any]], full: set[str]) -> dict[str, dict[str, Any]]:
+        """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
+        `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
+        the rest carried from `prev`. One checkout's read that raises keeps its last reading with
+        the error beside it and never costs the others theirs."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
         out: dict[str, dict[str, Any]] = {}
         for root in roots:
             old = prev.get(root) or {}
-            remote = reports._git(root, "remote", "get-url", "origin") if due else None
-            remote = (remote or "").strip() if due else str(old.get("remote") or "")
-            led = ledger_mod.reading(root, now, with_history=due)
-            old_led = old.get("ledger") or {}
-            if "error" in led:
-                led = {**old_led, "error": led["error"], "failed_at": stamp}
-            elif not due:
-                led.update({k: old_led[k] for k in ("windows", "recent", "history_error") if k in old_led})
-            elif "history_error" in led:
-                led.update({k: old_led[k] for k in ("windows", "recent") if k in old_led})
-            prs = old.get("prs")
-            if due:
-                if remote and remote in by_remote:
-                    prs = by_remote[remote]
-                else:
-                    fresh = reports.pr_reading(root, now)
-                    prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
-                    if remote:
-                        by_remote[remote] = prs
-            out[root] = {
-                "name": Path(root).name,
-                "root": root,
-                "remote": remote,
-                "ledger": led,
-                "prs": prs,
-                "at": stamp if due else str(old.get("at") or stamp),
-            }
+            try:
+                out[root] = HostAgent._read_repo(root, old, root in full, now, by_remote)
+            except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
+                log.exception("reading the repo facts of %s failed", root)
+                why = f"the read failed: {type(e).__name__}"
+                out[root] = {
+                    "name": Path(root).name,
+                    "root": root,
+                    "remote": str(old.get("remote") or ""),
+                    "ledger": {**(old.get("ledger") or {}), "error": why, "failed_at": stamp},
+                    "prs": {**(old.get("prs") or {}), "error": why, "failed_at": stamp},
+                    "at": str(old.get("at") or stamp),
+                }
         return out
+
+    @staticmethod
+    def _read_repo(
+        root: str, old: dict[str, Any], due: bool, now: datetime, by_remote: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
+        pass, so two checkouts of one remote are one `gh` read."""
+        stamp = now.isoformat()
+        remote = reports._git(root, "remote", "get-url", "origin") if due else None
+        remote = (remote or "").strip() if due else str(old.get("remote") or "")
+        led = ledger_mod.reading(root, now, with_history=due)
+        old_led = old.get("ledger") or {}
+        if "error" in led:
+            led = {**old_led, "error": led["error"], "failed_at": stamp}
+        elif not due:
+            led.update({k: old_led[k] for k in ("windows", "recent", "history_error") if k in old_led})
+        elif "history_error" in led:
+            led.update({k: old_led[k] for k in ("windows", "recent") if k in old_led})
+        prs = old.get("prs")
+        if due:
+            if remote and remote in by_remote:
+                prs = by_remote[remote]
+            else:
+                fresh = reports.pr_reading(root, now)
+                prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
+                if remote:
+                    by_remote[remote] = prs
+        return {
+            "name": Path(root).name,
+            "root": root,
+            "remote": remote,
+            "ledger": led,
+            "prs": prs,
+            "at": stamp if due else str(old.get("at") or stamp),
+        }
 
     async def _count_seats(self, records: list[Session]) -> None:
         """`seat_count` for every supervised `prs:` seat (§6 rule 3): the PRs merged to the seat's repo

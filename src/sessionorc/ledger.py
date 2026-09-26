@@ -170,7 +170,7 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
                 "git", "log", "--first-parent", "--diff-merges=first-parent", "--reverse", "--no-renames",
                 "--format=%x00C %H %cI", "-p", "--unified=0", "--", rel,
             ],
-            capture_output=True, text=True, timeout=timeout, cwd=str(root),
+            capture_output=True, text=True, errors="replace", timeout=timeout, cwd=str(root),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired):
         return None
