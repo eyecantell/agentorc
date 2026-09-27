@@ -183,3 +183,22 @@ async def test_a_crash_on_a_paused_profile_waits_for_the_gate(agent, tmp_path):
         await agent._keep_running(datetime.now(UTC))
         assert agent.sessions[sid] is not created
         await person.call("kill", id=sid)
+
+
+async def test_a_teams_reserve_priority_holds_its_crashed_member_where_a_plain_one_restarts(agent, tmp_path):
+    """TD-146: the line rule 1 reads is the one the gate would pause at — grind at 30, ao-grind's
+    priority 10, the profile at 65% — so a teamed member is not restarted into a pause on the next
+    tick, while a plain member on the same profile is."""
+    await park_ticks(agent)
+    agent._usage[""] = {"windows": [{"label": "5h", "pct": 65, "resets": None}], "reason": "ok"}
+    async with LocalClient() as person:
+        await person.call("set_settings", profile="", reserves={"5h": 30}, teams={"ao-grind": {"reserve": 10}})
+        plain = await _member(person, tmp_path, name="p")
+        teamed = await _member(person, tmp_path, name="t", team="ao-grind")
+        _crash(agent, plain)
+        _crash(agent, teamed)
+        before = {sid: agent.sessions[sid] for sid in (plain, teamed)}
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[plain] is not before[plain], "65% is under the profile's 70%: restarted"
+        assert agent.sessions[teamed] is before[teamed], "65% is over ao-grind's 60%: held"
+        await person.call("kill", id=plain)

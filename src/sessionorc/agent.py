@@ -226,7 +226,7 @@ FILE_CAP = 256 * 1024
 # relative to AGENTORC_HOME — the org's records and the files that say what the org is — and how
 # many days are kept. Nothing else: never a node's `env`, a token, a run log or a socket.
 BACKUP_KEEP = 7
-BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml")
+BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml", "settings.yml")
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 # Seconds between usage polls per account (TD-001, TD-122): a slow cadence, never per tick. **Five
 # minutes, not one** (TD-087): the shortest window the endpoint reports is five hours, so a
@@ -719,8 +719,13 @@ class HostAgent:
         nothing, so the mark stands and the send lands after the dialog clears. The resume is the
         `resume_prompt`, typed when every window is under its line and no sooner than `RESUME_MIN`
         after the pause; the mark goes with it. Interactive sessions are never gated: a session a
-        person took over loses its mark on the next tick, with nothing typed."""
-        doc = settings_mod.reserves(settings_mod.load())
+        person took over loses its mark on the next tick, with nothing typed.
+
+        A session carrying a team's badge whose team has a **reserve priority** (`teams.<team>.
+        reserve`, TD-146) pauses at its profile's line lowered by that much, on every window with a
+        reserve, and its mark carries `team_extra: {team, n}` so the card can say which line it was."""
+        whole = settings_mod.load()
+        doc = settings_mod.reserves(whole)
         changed = False
         for s in list(self.sessions.values()):
             if not s.unattended or s.state in ("exited", "closed"):
@@ -734,7 +739,8 @@ class HostAgent:
             windows = reading.get("windows")
             if windows is None and by_label:
                 continue  # no reading: the last word stands, whatever it was (§6: a failure never gates)
-            rows = settings_mod.lines(by_label or {}, windows, now)
+            extra = settings_mod.team_extra(whole, s.team)
+            rows = settings_mod.lines(by_label or {}, windows, now, extra)
             over = settings_mod.crossed(rows)
             if over is not None:
                 mark = {
@@ -746,6 +752,7 @@ class HostAgent:
                     "next": over["next"],
                     "resets": over["resets"],  # so a card can say *resets* when `next` is the reset
                     "sent_at": (s.gated or {}).get("sent_at"),
+                    **({"team_extra": {"team": s.team, "n": extra}} if extra else {}),
                 }
                 if mark != s.gated:
                     if not s.gated:
@@ -827,18 +834,22 @@ class HostAgent:
             and not s.suspended
             and not s.restart_ceiling
             and not s.superseded_by
-            and not self._profile_gated(s.profile, now)
+            and not self._profile_gated(s.profile, now, s.team)
         )
 
-    def _profile_gated(self, profile: str, now: datetime) -> bool:
+    def _profile_gated(self, profile: str, now: datetime, team: str = "") -> bool:
         """Whether `profile` is over a usage line now (§6 *Usage gate*): the gate's own reading, for a
         record the gate no longer marks — it clears `gated` on an exited one — so a policy does not
-        restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates)."""
+        restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates).
+        `team` is the record's: its reserve priority lowers the line exactly as it does at the gate
+        (TD-146), or a teamed member would be restarted at 65% and paused on the next tick."""
         windows = (self._usage.get(profile) or {}).get("windows")
         if windows is None:
             return False
-        by_label = settings_mod.reserves(settings_mod.load()).get(profile) or {}
-        return settings_mod.crossed(settings_mod.lines(by_label, windows, now)) is not None
+        whole = settings_mod.load()
+        by_label = settings_mod.reserves(whole).get(profile) or {}
+        extra = settings_mod.team_extra(whole, team)
+        return settings_mod.crossed(settings_mod.lines(by_label, windows, now, extra)) is not None
 
     async def _crash_restart(self, s: Session, now: datetime) -> None:
         """Rule 1 (design §6 *Keeping a team running*): restart a member that crashed by replaying
@@ -879,7 +890,7 @@ class HostAgent:
         closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "wanted"
         if not (s.state == "idle" or (s.state == "exited" and s.pane) or closed_by_tick):
             return
-        if (s.run_until and now >= _parse(s.run_until)) or self._profile_gated(s.profile, now):
+        if (s.run_until and now >= _parse(s.run_until)) or self._profile_gated(s.profile, now, s.team):
             return
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
@@ -949,7 +960,7 @@ class HostAgent:
             return  # this stretch was nudged already: never a second before the first is answered
         if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
             return
-        if s.gated or self._profile_gated(s.profile, now):
+        if s.gated or self._profile_gated(s.profile, now, s.team):
             return
         line = self._nudge_line(s)
         if line and await self._policy_send(s, line):
@@ -1089,7 +1100,7 @@ class HostAgent:
         the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
         team badge). The seat whose fill tripped it gets `restart_ceiling` and the Inbox row; its
         fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`."""
-        if s.restart_ceiling or self._profile_gated(s.profile, now):
+        if s.restart_ceiling or self._profile_gated(s.profile, now, s.team):
             return
         mine = set(self._ctl(s))
         fellows = [
@@ -4791,19 +4802,112 @@ class HostAgent:
             }
         return {"profiles": out, "file": str(settings_mod.settings_file())}
 
+    async def rpc_settings(self, caller: Any = None) -> dict[str, Any]:
+        """`ao settings` and the Settings page's read (design §5, §4.7, TD-146): the home's
+        `settings.yml`, each key as its reader keeps it, with what it makes today — each profile's
+        lines against its last reading (as `gate` answers), each team's stop time with whether it
+        has passed and its reserve priority. `migrate` names a `ui.yml` still on disk, which is no
+        longer read. **A person's own**, refused to a session as `set_settings` is: `person:` is
+        theirs, and what a session needs of the gate `gate` answers."""
+        if not mail.is_person(caller):
+            raise RpcError("settings is a person's own: refused to a session (design §5 settings.yml)")
+        doc, now = settings_mod.load(), datetime.now(UTC)
+        gate = (await self.rpc_gate())["profiles"]
+        teams = {
+            name: {**t, **({"passed": _parse(t["until"]) <= now} if "until" in t else {})}
+            for name, t in settings_mod.teams(doc).items()
+        }
+        out = {
+            "file": str(settings_mod.settings_file()),
+            "usage_gate": gate,
+            "teams": teams,
+            "repos": settings_mod.repos(doc),
+            "person": settings_mod.person(doc),
+            "migrate": [],
+        }
+        if settings_mod.ui_yml().exists():
+            out["migrate"].append(
+                f"{settings_mod.ui_yml()}: ui.yml is no longer read — its open_in lives under person:"
+            )
+        return out
+
     async def rpc_set_settings(
-        self, profile: str, reserves: dict[str, Any] | None = None, caller: Any = None
+        self,
+        profile: str = "",
+        reserves: dict[str, Any] | None = None,
+        teams: dict[str, Any] | None = None,
+        repos: dict[str, Any] | None = None,
+        person: dict[str, Any] | None = None,
+        caller: Any = None,
     ) -> dict[str, Any]:
-        """Set or clear a profile's usage-gate reserves in this host's `settings.yml` (design §5,
-        §4.7 `ao gate`, TD-100): `reserves` maps a window label to a flat percent, to `{per_day:
-        N}`, or to None, which clears that window's reserve. **A person's own**, refused to a
-        session as `inbox_pause` is. A label the profile's adapter does not report is refused, with
-        the reported ones named, so a typo is not a silent no-op — except before the profile has any
-        reading, when nothing can be checked and the reply says `unchecked`. Takes effect on the
-        next tick. Served on a node, link or no link: the file is this host's own."""
+        """Write the home's `settings.yml` (design §5, §4.7 `ao gate` / `ao team until` / `ao team
+        reserve`, the Settings page; TD-100, TD-146): any subset of its keys, each validated before
+        anything is written, then the whole file rewritten. **A person's own**, refused to a session
+        as `inbox_pause` is. Takes effect on the next tick. Served on a node, link or no link: the
+        file is this host's own (TD-147 replicates it).
+
+        - `profile` + `reserves`: a window label to a flat percent, to `{per_day: N}`, or to None,
+          which clears that window's reserve. A label the profile's adapter does not report is
+          refused, with the reported ones named — except before the profile has any reading, when
+          nothing can be checked and the reply says `unchecked`.
+        - `teams`: `{team: {schedule?, until?, reserve?} | None}` — a field set to None is cleared, a
+          team set to None removed. The team's name is the client's to check against the org's
+          definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
+        - `repos`: `{repo: {promote: {auto: bool}} | None}`.
+        - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}}`, a None clearing that key
+          (or that terminal field)."""
         if not mail.is_person(caller):
             raise RpcError("set_settings is a person's own: refused to a session (design §5 settings.yml)")
-        prof = str(profile or "")
+        if reserves is None and teams is None and repos is None and person is None:
+            raise RpcError("set_settings needs reserves, teams, repos or person (design §5 settings.yml)")
+        doc = settings_mod.load()
+        out: dict[str, Any] = {}
+        if reserves is not None:
+            out.update(self._reserves_change(doc, str(profile or ""), reserves))
+        now = datetime.now(UTC)
+        for key, value, parse, known in (
+            ("teams", teams, settings_mod.parse_team, settings_mod.TEAM_KEYS),
+            ("repos", repos, settings_mod.parse_repo, ("promote",)),
+        ):
+            if value is None:
+                continue
+            if not isinstance(value, dict) or not value:
+                raise RpcError(f"set_settings: {key} is a mapping of names (design §5 settings.yml)")
+            change: dict[str, Any] = {}
+            for name, fields in value.items():
+                if not str(name or "").strip():
+                    raise RpcError(f"set_settings: {key} needs a name")
+                if fields is None:
+                    change[str(name)] = None
+                    continue
+                if not isinstance(fields, dict):
+                    raise RpcError(f"{key}.{name}: a mapping of fields, or null to remove it")
+                if unknown := sorted(set(map(str, fields)) - set(known)):
+                    # a clear of a mistyped key is refused too: a typo is never a silent no-op
+                    raise RpcError(f"{key}.{name}: unknown key {', '.join(unknown)} (known: {', '.join(known)})")
+                kept = {k: v for k, v in fields.items() if v is not None}
+                try:
+                    parsed = parse(kept)
+                except ValueError as e:
+                    raise RpcError(f"{key}.{name}: {e}") from None
+                if "until" in parsed and _parse(parsed["until"]) <= now:
+                    raise RpcError(f"{key}.{name}: until {parsed['until']} has passed — a stop time is ahead (§6)")
+                change[str(name)] = {**{k: None for k in fields if fields[k] is None}, **parsed}
+            doc[key] = settings_mod.merge(doc.get(key), change)
+            out[key] = getattr(settings_mod, key)(doc)
+        if person is not None:
+            doc["person"] = self._person_change(doc.get("person"), person)
+            out["person"] = settings_mod.person(doc)
+        for key in ("teams", "repos", "person"):
+            if key in doc and not doc[key]:
+                doc.pop(key)
+        settings_mod.save(doc)
+        held = [k for k in ("usage_gate", "teams", "repos", "person") if k in doc]
+        log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
+        return out
+
+    def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any) -> dict[str, Any]:
+        """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file)."""
         if not isinstance(reserves, dict) or not reserves:
             raise RpcError("set_settings needs reserves: {label: percent | {per_day: N} | null}")
         windows = (self._usage.get(prof) or {}).get("windows")
@@ -4819,7 +4923,6 @@ class HostAgent:
                 parsed[str(label)] = None if value is None else settings_mod.parse_reserve(value)
             except ValueError as e:
                 raise RpcError(f"{label}: {e}") from None
-        doc = settings_mod.load()
         gate = doc.get("usage_gate") if isinstance(doc.get("usage_gate"), dict) else {}
         mine = dict(gate.get(prof) or {}) if isinstance(gate.get(prof), dict) else {}
         for label, value in parsed.items():
@@ -4832,15 +4935,50 @@ class HostAgent:
         else:
             gate.pop(prof, None)
         doc["usage_gate"] = gate
-        settings_mod.save(doc)
         log.info("usage gate for profile %s set to %s", prof or "(default)", mine or "no reserves")
-        now = datetime.now(UTC)
         return {
             "profile": prof,
             "reserves": mine,
-            "windows": settings_mod.lines(mine, windows, now),
+            "windows": settings_mod.lines(mine, windows, datetime.now(UTC)),
             "unchecked": windows is None,
         }
+
+    @staticmethod
+    def _person_change(current: Any, change: Any) -> dict[str, Any]:
+        """`person:` with `change` laid over it: a key set to None cleared; `terminal` merged field by
+        field, a field set to None cleared. Validated whole before it is returned."""
+        if not isinstance(change, dict) or not change:
+            raise RpcError("set_settings: person is a mapping of open_in and terminal (design §5)")
+        if unknown := sorted(set(map(str, change)) - {"open_in", "terminal"}):
+            raise RpcError(f"person: unknown key {', '.join(unknown)} (known: open_in, terminal)")
+        term_change = change.get("terminal")
+        if isinstance(term_change, dict) and (
+            bad := sorted(set(map(str, term_change)) - set(settings_mod.TERMINAL_KEYS))
+        ):
+            raise RpcError(
+                f"person.terminal: unknown key {', '.join(bad)} (known: {', '.join(settings_mod.TERMINAL_KEYS)})"
+            )
+        out = dict(current) if isinstance(current, dict) else {}
+        for key, value in change.items():
+            if value is None:
+                out.pop(key, None)
+            elif key == "terminal" and isinstance(value, dict):
+                term = dict(out.get("terminal") or {}) if isinstance(out.get("terminal"), dict) else {}
+                for f, v in value.items():
+                    if v is None:
+                        term.pop(f, None)
+                    else:
+                        term[f] = v
+                out["terminal"] = term
+                if not term:
+                    out.pop("terminal")
+            else:
+                out[key] = value
+        try:
+            settings_mod.parse_person(out)
+        except ValueError as e:
+            raise RpcError(f"person: {e}") from None
+        return out
 
     async def rpc_adapters(self) -> list[str]:
         return adapters.names()
