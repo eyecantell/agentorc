@@ -108,7 +108,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
 | TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
 | TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
-| TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note per new entry through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
+| TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 
 
 ---
@@ -2011,7 +2011,7 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 
 **Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).
 
-## TD-195: Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note per new entry through the doorbell
+## TD-195: Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell
 
 **Priority:** Medium
 **Added:** 2026-09-26 (the designer, from TD-187's design)
@@ -2019,7 +2019,7 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Kind:** build
 **Pickable:** yes
 **Status:** Open — nothing built. Design §6 *Keeping a team running* rule 6, §4.9a, §4.4a. Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
-**Location:** `src/sessionorc/agent.py` (`_keep_running`: a sixth pass beside the nudge's; the `system` note through the path the lapse's note takes), `src/sessionorc/models.py` (`lane_seen` on the record, home-owned, carried across a supersede as `out_of_work` is and cleared where `out_of_work` is cleared), `src/sessionorc/ledger.py` (the reading already keeps `kind` and `pickable` per entry: a `lane_matches(lane, entry)` beside `kind_of`), `src/sessionorc/modes.py` (the field in the home's table)
+**Location:** `src/sessionorc/agent.py` (`_keep_running`: a sixth pass beside the nudge's; the `system` note through the path the lapse's note takes), `src/sessionorc/models.py` (`lane_seen` on the record and in `HOME_OWNED`, carried across a supersede as `out_of_work` is and cleared where `out_of_work` is cleared), `src/sessionorc/ledger.py` (the reading already keeps `kind` and `pickable` per entry: a `lane_matches(lane, entry)` beside `kind_of`)
 
 **Why:** TD-187's *Why*: the doorbell rings only for mail, filing an entry sends none, and the manager never sends to a finished member.
 
