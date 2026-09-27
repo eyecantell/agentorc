@@ -102,9 +102,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
-| TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | Medium | Open — design-first |
+| TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Open — design-first |
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
-| TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — after TD-186 and TD-188's design rows |
+| TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
 
 
@@ -1876,7 +1876,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 ## TD-187: A member that declared out of work is never woken when its lane gains entries
 
-**Priority:** Medium
+**Priority:** High (raised from Medium 2026-09-26, Paul: so the designer takes it next)
 **Added:** 2026-09-26 (Paul: *will the designer wake on its own or is it necessary for us to intercede?*)
 **Owner:** designer
 **Kind:** design-first
@@ -1921,7 +1921,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Owner:** grinder
 **Kind:** build
 **Pickable:** no — after TD-186 (a restart must not trip the ceiling) and TD-188's design rows (the measure, where the bound lives, the note's words)
-**Status:** Open
+**Status:** Open — step 1 done 2026-09-26 (the anchor's Sonnet pass, read-only). Corpus: 136 grinder, 3 designer, 20 manager and 48 techlead transcripts on kmaster (55.6k grinder calls). Cost weighted at Anthropic's cache rates: a read at 0.1× input, a write at 1.25×. **Grinder** (n = 1,775 work units, where a unit is the calls between successive `gh pr create` / `gh pr merge` / `ao progress done`, so a PR's create and merge can be two units and the per-unit figures are rough): median weighted cost per unit is 346k below 100k context, 483k at 100–200k, 571k at 200–300k, 612k at 300–400k and **1.00M past 400k**. An idle turn with no tool call costs 15.7k → 17.5k → 27.1k → 36.8k → **62.8k** across the same buckets, about 4× from the bottom to the top (the cleanest, highest-n signal). A fresh run's start-up (first call to first edit or claim) is a median 342k. The break-even sits **around 300k**, between the 200–300k and 300–400k buckets: past it, continuing costs more per unit than a restart would. Closed-unmerged PRs (4 in all) appear only past 200k, and retry and error text clusters at 200–400k (90 hits against 16 at 100–200k), though call volume per bucket confounds the latter. Only 5 compactions were seen in 136 grinder transcripts, so the bound has to be an external restart. **Recommended bounds:** grinder **200–250k**; designer ~300k, provisional (3 transcripts); manager 200k; techlead none needed (its runs never passed 140k in 48 transcripts). Published guidance agrees: Anthropic's Claude Code material on context rot recommends a new session per task and calls compaction unreliable late in a long session. **Caveat:** the strong evidence is cost; the quality evidence outside grinders is too small to be a rate.
 **Location:** the Claude Code adapter (a context reading from the transcript: the last assistant message's `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`), `src/sessionorc/agent.py` (the tick), role presets / `org.yml` `roles:` (the bound), `src/agentorc/briefs/grinder.md` (*A run that ends with work left*)
 
 **Why:** TD-188: grinder-ao-1 ran to 462k tokens of context and 187M input tokens in one run, because *your context is long* is the grinder's own judgement and has no number. Paul chose the mechanism: a restart past a bound, the bound configurable, 200k to start.
