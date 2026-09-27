@@ -5260,7 +5260,7 @@ person:                                       # the person's own — nothing her
   **`ui.yml` is retired**: its one key, `open_in:`, lives under `person:`; a `ui.yml` still on disk
   is not read: the agent's `settings` read names it (`migrate`), and the Org's teams line — the
   Settings page too, once built — says *migrate: ui.yml is no longer read* (TD-146). The UI reads
-  `person:` through that read, at most every five seconds, before it draws a page, and keeps the
+  `person:` through that read, at most every five seconds, before it serves a request, and keeps the
   last answer when a read fails. What `person.open_in` takes is what `ui.yml` took, the editor button of the card, the
   Focus header, *edit yml* and the Settings page's **Open file**:
   - **`vscode`** — the default, and what a missing file means:
