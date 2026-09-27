@@ -174,18 +174,38 @@ def test_bridge_argv_shapes():
     from agentorc.ui.pty_bridge import attach_argv, scroll_argv
 
     a = attach_argv("ao-x", socket_name="s")
-    assert a[:6] == ["tmux", "-L", "s", "attach", "-t", "=ao-x:"]  # attach first: a chain stops at a failure
-    assert a[6:] == [";", "set-option", "-t", "=ao-x:", "mouse", "on"]  # a session option, never -g
+    # the mouse is the browser's (§4.6, TD-174): the attach sets no option on the session
+    assert a == ["tmux", "-L", "s", "attach", "-t", "=ao-x:"] and "set-option" not in a
     assert attach_argv("ao-x")[0:2] == ["tmux", "attach"]
+    # a page, the keyboard's: no `lines`
     assert scroll_argv("ao-x", "up", socket_name="s")[3:] == ["copy-mode", "-e", "-u", "-t", "=ao-x:"]
     assert scroll_argv("ao-x", "down")[1:] == ["send-keys", "-X", "-t", "=ao-x:", "page-down"]
-    with pytest.raises(ValueError):
-        scroll_argv("ao-x", "sideways")
+    # lines, the wheel's: copy mode (a no-op when in it), then that many lines
+    t = "=ao-x:"
+    assert scroll_argv("ao-x", "up", 3)[1:] == [
+        "copy-mode",
+        "-e",
+        "-t",
+        t,
+        ";",
+        "send-keys",
+        "-X",
+        "-N",
+        "3",
+        "-t",
+        t,
+        "scroll-up",
+    ]
+    assert scroll_argv("ao-x", "down", 1)[-1] == "scroll-down" and scroll_argv("ao-x", "up", 9999)[9] == "500"
+    for bad in (("sideways", None), ("up", 0), ("up", -2), ("up", True)):
+        with pytest.raises(ValueError):
+            scroll_argv("ao-x", *bad)
 
 
 def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
-    """TD-022: the attach sets `mouse on` on the session, and a `scroll` bridge message moves tmux
-    into copy mode over its history (up) and back out on reaching the live screen (down)."""
+    """TD-022: a `scroll` bridge message moves tmux into copy mode over its history (up) and back
+    out on reaching the live screen (down); the wheel's `lines` scroll lines (TD-174). The attach
+    sets no mouse option: the mouse is the browser's (§4.6)."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "scroll"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
@@ -201,17 +221,19 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
         while time.time() < deadline and b"SCROLL-DONE" not in buf:
             buf += ws.receive_bytes()
         assert b"SCROLL-DONE" in buf
-        # both of these were read once, which races the attach (TD-033): the option is set by the
-        # attach and the pane leaves whatever mode it started in, so wait for each
-        assert wait_for(
-            lambda: tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == "mouse on"
-        ), "the attach never set `mouse on`"
+        # read once, this raced the attach (TD-033): the pane leaves whatever mode it started in
         assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
+        assert tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == ""
         ws.send_text(json.dumps({"scroll": "up"}))
         assert wait_for(lambda: mode() == "1"), "scroll up did not enter copy mode"
         ws.send_text(json.dumps({"scroll": "sideways"}))  # ignored, the bridge stays up
         ws.send_text(json.dumps({"scroll": "down"}))
         assert wait_for(lambda: mode() == "0"), "scroll down to the live screen did not leave copy mode"
+        # the wheel (TD-174): lines up enter copy mode, as many lines down leave it at the bottom
+        ws.send_text(json.dumps({"scroll": "up", "lines": 3}))
+        assert wait_for(lambda: mode() == "1"), "the wheel's lines did not enter copy mode"
+        ws.send_text(json.dumps({"scroll": "down", "lines": 3}))
+        assert wait_for(lambda: mode() == "0"), "the wheel back to the bottom did not leave copy mode"
         ws.send_text("echo STILL-$((1+1))\r")
         buf = b""
         deadline = time.time() + 8
@@ -599,10 +621,10 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
         assert json.loads(ws.receive_text()) == {"read_only": True}
         ws.send_text("echo TYPED-$((40+2))\r")
         ws.send_bytes(b"echo BYTES-$((40+3))\r")
-        ws.send_text("\x1b[<0;5;5M\x1b[<0;5;5m")  # a click is not the wheel: dropped with the keys
-        assert wait_for(lambda: tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip())
+        ws.send_text("\x1b[<0;5;5M\x1b[<0;5;5m")  # a click: dropped with the keys
+        ws.send_text("\x1b[<64;5;5M")  # a wheel report too, since TD-174: the wheel is a scroll message
         assert wait_for(lambda: in_mode() == "0")
-        ws.send_text("\x1b[<64;5;5M")  # the wheel, up: tmux enters copy mode over its history
+        ws.send_text(json.dumps({"scroll": "up", "lines": 2}))  # the wheel, up: tmux enters copy mode
         assert wait_for(lambda: in_mode() == "1"), "the wheel did not reach tmux on a read-only attach"
     time.sleep(0.3)
     assert "TYPED-42" not in pane() and "BYTES-43" not in pane() and "echo TYPED" not in pane()
@@ -1816,3 +1838,31 @@ def test_the_page_reads_person_through_the_agents_settings_read(client, tmp_path
         assert 'id="migratenote"' in r.text
     finally:
         uiconf.set_read({"person": {}, "migrate": []})
+
+
+def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
+    """design §4.5a *Focus: copy on select*, §5 `person.terminal.copy_on_select` (TD-164, built by
+    TD-174): the toggle in Focus's *more ▾* is drawn checked until the person turns it off; a press
+    writes `settings.yml` through `set_settings`, the next page draws it off, and only a boolean is
+    taken."""
+    from agentorc.ui import uiconf
+    from sessionorc.client import call_sync
+
+    uiconf.set_read({"person": {}, "migrate": []})
+    assert uiconf.copy_on_select() is True  # nothing written: on
+    uiconf.set_read({"person": {"terminal": {"copy_on_select": "yes"}}, "migrate": []})
+    assert uiconf.copy_on_select() is True  # not a boolean: the default
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "cos"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    page = client.get(f"/focus/{sid}").text
+    assert re.search(r'<input type="checkbox" id="tcopysel" checked>', page) and "Copy on select" in page
+    assert "Shift+click to grow or shrink it" in page  # Copy's tooltip (§4.5a *Focus: Copy / Paste*)
+    for bad in ({"terminal": {"copy_on_select": "no"}}, {"terminal": {"size": 14}}, {}):
+        assert client.post("/api/settings/person", json=bad).status_code == 400
+    assert client.post("/api/settings/person", json={"terminal": {"copy_on_select": False}}).json()["ok"]
+    assert call_sync("settings")["person"]["terminal"]["copy_on_select"] is False
+    assert re.search(r'<input type="checkbox" id="tcopysel">', client.get(f"/focus/{sid}").text)
+    assert client.post("/api/settings/person", json={"terminal": {"copy_on_select": True}}).json()["ok"]
+    assert 'id="tcopysel" checked' in client.get(f"/focus/{sid}").text
+    client.post(f"/api/sessions/{sid}/kill")

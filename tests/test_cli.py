@@ -262,7 +262,7 @@ def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp
     out = json.loads(capsys.readouterr().out)
     sid = out["id"]
     assert out["attach"][:6] == ["tmux", "-L", subprocess_agent.sock_name, "attach", "-t", f"={sid}:"]
-    assert out["attach"][6:] == [";", "set-option", "-t", f"={sid}:", "mouse", "on"]  # TD-022
+    assert "set-option" not in out["attach"]  # the mouse is the browser's (TD-174)
     wait_state(sid, "idle")
     assert cli.main(["--json", "focus", sid]) == 0
     out = json.loads(capsys.readouterr().out)
