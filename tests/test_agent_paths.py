@@ -53,7 +53,7 @@ async def test_forget_leaves_no_side_table_entry(agent, hookstub, tmp_path):
 
 
 async def test_closed_sessions_are_forgotten_after_keep(agent, tmp_path, monkeypatch):
-    monkeypatch.setattr("sessionorc.agent.CLOSED_KEEP", timedelta(seconds=0))
+    monkeypatch.setattr("sessionorc.agent_common.CLOSED_KEEP", timedelta(seconds=0))
     async with LocalClient() as c, LocalClient() as sub:
         s = await c.call("create", name="c", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         await sub.call("subscribe")

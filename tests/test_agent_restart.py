@@ -38,11 +38,11 @@ async def stop(task: asyncio.Task) -> None:
 
 async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
+    monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", 0.3)
     # Long enough that no tick can judge the paneless record below `exited` before the migration
     # is asserted, however loaded the machine is; the second half of the test shortens it on
     # purpose to exercise the grace passing (TD-078).
-    monkeypatch.setattr("sessionorc.agent.CREATE_GRACE", timedelta(seconds=300))
+    monkeypatch.setattr("sessionorc.agent_common.CREATE_GRACE", timedelta(seconds=300))
     tmux = Tmux(socket_name=private_socket_name())
     try:
         first, task = await start(tmux)
@@ -79,7 +79,7 @@ async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
             # no pane behind the old record: it is judged exited once the grace has passed — which
             # is now made to happen rather than waited out, so the test bounds on the rule and not
             # on a race between one second of grace and the machine's load (TD-078)
-            monkeypatch.setattr("sessionorc.agent.CREATE_GRACE", timedelta(seconds=0))
+            monkeypatch.setattr("sessionorc.agent_common.CREATE_GRACE", timedelta(seconds=0))
             await wait_state(c, "ao-old-prompt", "exited")
             with pytest.raises(AgentError, match="kill it first"):
                 await c.call("remove", id=cmd["id"])
@@ -259,7 +259,7 @@ async def test_a_wait_rides_out_a_restart_and_returns_the_change(tmp_path, monke
     lands while nobody is connected is still ahead of it, and the remade wait returns it at once.
     Here the change lands **while the agent is down**, which is the case that matters."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
+    monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", 0.3)
     tmux = Tmux(socket_name=private_socket_name())
     try:
         _, task = await start(tmux)

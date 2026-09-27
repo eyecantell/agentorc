@@ -185,7 +185,7 @@ async def test_a_ring_that_will_not_submit_is_tried_once_more_then_recorded(
     """A pane that swallows every Enter: the first ring sticks, the retry finds the line still in
     the composer and types nothing more, and the failure is written to the record — once, charged
     once."""
-    monkeypatch.setattr("sessionorc.agent.SUBMIT_SECONDS", 0.3)
+    monkeypatch.setattr("sessionorc.agent_common.SUBMIT_SECONDS", 0.3)
     async with LocalClient() as c:
         w = await _worker(agent, c, tmp_path, "w", adapter="composer2")
         lead = await _lead(c, tmp_path, w)
