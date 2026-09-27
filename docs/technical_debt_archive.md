@@ -1920,3 +1920,37 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Done when** TD-164's *Done when*: Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
 
 **Related:** TD-164 (the design), TD-022 (scrollback is tmux's), TD-096 (the read-only attach), TD-146–148 (the settings file and page), TD-157 / TD-167 (the toggle's `title` as its mark), goal 12 (a pane you type into).
+
+## TD-182: A card's report line keeps a merged PR as `TD-066 → #158` with no mark
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the dc-grind wind-down: Paul read the grinder's card as *they have a PR outstanding*; #158 had merged at 17:00 UTC)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-193
+**Status:** Designed 2026-09-26 (the designer): design §4.5a *card: report line* (**the PR's mark**), *card: compact* (an ended member keeps its last reference after the ending), §4.5 screen 1, §4.7 (`ao status -v`); mockup `OrgTeamFirst.dc.html` (a compact line with the mark). Settled: the word after the number, *merged* or *closed*, from the repo readings; unmarked when the readings do not hold the PR; `ao status -v` shows it too, by one `repos` read per call; the record and `--json` are unchanged; the Focus Reports panel marks its PR links the same way. The build is TD-193; this entry archives with it.
+**Location:** `src/sessionorc/models.py` (`report_line`), the card's report line in `src/agentorc/ui/templates/card.html`; the PR states are in the repo facts (`repos.json`, TD-176 slice 1)
+
+**Why:** §4.5a's **card: report line** row draws `TD-027 → PR #59 · 1/2 done` from the record alone. TDs in motion marks a PR *merged* / *closed* once it is no longer open (§4.5a, TD-176). The member card doesn't, so an exited grinder's last report reads as work in flight. The same line is in `ao status -v` and the Members list.
+
+**Resolved:** 2026-09-27 (PR #PRNUM, TD-193's build). The design is design §4.5a card **report line** (**the PR's mark**) and §4.5 screen 1 *A PR that is no longer open says so*.
+
+**Related:** TD-181 (the summary would have shown it), TD-176, TD-095 (the card's anatomy), design §4.5a **card: report line**, **TDs in motion**.
+
+## TD-193: Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel
+
+**Priority:** Low
+**Added:** 2026-09-26 (the designer, from TD-182's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5a *card: report line* (**the PR's mark**), *card: compact*, §4.7 (`ao status -v`). Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
+**Location:** `src/sessionorc/models.py` (`report_line`: a second argument, the readings' PRs by number, default none), `src/agentorc/ui/app.py` (`_pr_states` is the lookup TDs in motion already uses; the card's `report`, `compact_line`, the Members rows), `src/agentorc/cli.py` (`ao status -v`: one `repos` read per call, its failure swallowed), `src/agentorc/ui/static/app.js` (`renderReports`: the word after the PR link, from a structured field the page passes, never from text)
+
+**Why:** TD-182's *Why*: an exited grinder's last report reads as work in flight.
+
+**Resolved:** 2026-09-27 (PR #PRNUM). Design §4.5a card **report line** (**the PR's mark**), *card: compact* and §4.7 `ao status -v` now read as built. `report_ref`, `report_line(session, prs)` and `pr_marks` are in `src/sessionorc/models.py`. `view(…, repos=)`, `pr_marks` on the view and `compact_line` are in `src/agentorc/ui/app.py`, `renderReports` is in `app.js`, and the `repos` read is in `cmd_status`. The tests are `tests/test_models.py`, `tests/test_ui_team_summary.py` and `tests/test_cli.py` (`test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses`).
+
+**Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
+
+**Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).

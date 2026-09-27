@@ -95,14 +95,12 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first; waits on Paul's answer (ask `m-d20bbf79bdbe`) |
-| TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Designed 2026-09-26 — the build is TD-193 |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Open |
-| TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Open — pickable: capture the event first |
@@ -1751,22 +1749,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** design §4.5 screen 11 (the Repo page) and §4.5a **Open ledger**; §4.5 screen 1 (the *add* phase, the hunter); §4.10 (`ask`); §4.4 (the board write-back's **add**, the one precedent for the UI writing a repo file); §4.5a **Put on the board** (a UI form that writes a repo file); TD-126 (a reply back from the board); TD-160 (the hunter role named as *later*).
 
-## TD-182: A card's report line keeps a merged PR as `TD-066 → #158` with no mark
-
-**Priority:** Low
-**Added:** 2026-09-26 (found at the dc-grind wind-down: Paul read the grinder's card as *they have a PR outstanding*; #158 had merged at 17:00 UTC)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-193
-**Status:** Designed 2026-09-26 (the designer): design §4.5a *card: report line* (**the PR's mark**), *card: compact* (an ended member keeps its last reference after the ending), §4.5 screen 1, §4.7 (`ao status -v`); mockup `OrgTeamFirst.dc.html` (a compact line with the mark). Settled: the word after the number, *merged* or *closed*, from the repo readings; unmarked when the readings do not hold the PR; `ao status -v` shows it too, by one `repos` read per call; the record and `--json` are unchanged; the Focus Reports panel marks its PR links the same way. The build is TD-193; this entry archives with it.
-**Location:** `src/sessionorc/models.py` (`report_line`), the card's report line in `src/agentorc/ui/templates/card.html`; the PR states are in the repo facts (`repos.json`, TD-176 slice 1)
-
-**Why:** §4.5a's **card: report line** row draws `TD-027 → PR #59 · 1/2 done` from the record alone. TDs in motion marks a PR *merged* / *closed* once it is no longer open (§4.5a, TD-176). The member card doesn't, so an exited grinder's last report reads as work in flight. The same line is in `ao status -v` and the Members list.
-
-**Fix:** design: the report line marks its PR *merged* or *closed* the way TDs in motion does, reading the same repo facts. The PR number stays; a PR the readings don't cover is left unmarked, never guessed. Decide whether `ao status -v` shows the mark too (the host agent holds the readings, so it can). Build it, with a test for an open, a merged and an unknown PR. Done when the dc-grind grinder's card would read `TD-066 → #158 merged`.
-
-**Related:** TD-181 (the summary would have shown it), TD-176, TD-095 (the card's anatomy), design §4.5a **card: report line**, **TDs in motion**.
-
 ## TD-185: Export `AGENT_NAME` into every session at launch, for dev-cadence's co-author hook
 
 **Priority:** Medium
@@ -1892,29 +1874,6 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-175's *Done when*: the manager template's round step commits nothing, a restarted manager can read what its previous run did with `ao log --tail`, and a manager's card shows no unpushed count from its own log.
 
 **Related:** TD-175 (the design), TD-110 (the night report: the person's read), TD-114 (the supplement's shape), TD-103 (the tick took the mechanical rounds), §4.6 (run logs), §4.8 (`doing`, the own-record rule), §4.10 (the name carries its mail).
-
-## TD-193: Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel
-
-**Priority:** Low
-**Added:** 2026-09-26 (the designer, from TD-182's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.5a *card: report line* (**the PR's mark**), *card: compact*, §4.7 (`ao status -v`). Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
-**Location:** `src/sessionorc/models.py` (`report_line`: a second argument, the readings' PRs by number, default none), `src/agentorc/ui/app.py` (`_pr_states` is the lookup TDs in motion already uses; the card's `report`, `compact_line`, the Members rows), `src/agentorc/cli.py` (`ao status -v`: one `repos` read per call, its failure swallowed), `src/agentorc/ui/static/app.js` (`renderReports`: the word after the PR link, from a structured field the page passes, never from text)
-
-**Why:** TD-182's *Why*: an exited grinder's last report reads as work in flight.
-
-**Fix:**
-1. **The formatter**: `report_line(session, prs=None)` appends ` merged` or ` closed` after `#<n>` when the readings hold the PR in that state; an open PR, an unknown PR and `prs=None` leave the line as it is today.
-2. **The page**: the card, the Members list and the compact line pass the readings of the record's repo; a member that has ended and holds a report reads *<role> · <ending> · <reference> → #<n> <mark>*.
-3. **The CLI**: `ao status -v` reads `repos` once; refused or failed, the lines are unmarked. `--json` is unchanged.
-4. **The Reports panel**: each row's PR link carries the same word.
-5. **Tests:** an open, a merged, a closed and an unknown PR through `report_line`; the compact line of an exited member; `ao status -v` with the read refused.
-
-**Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
-
-**Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).
 
 ## TD-195: Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell
 
