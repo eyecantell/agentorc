@@ -101,6 +101,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Open — design-first, a small row change then the build |
 | TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
+| TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
+| TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | Medium | Open — design-first |
+| TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Open — design-first |
 
 
 ---
@@ -1869,3 +1872,57 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** the host agent exports `AGENT_NAME=<the session's name>` beside `AGENTORC_SESSION` for every session it starts, whatever the adapter. The export sits in the tool-neutral launch path, so a Codex or shell session gets it too. For a session started without a name it is left unset, not faked. Add one sentence to the design where the launch environment is described. Done when a commit made in a team member's worktree, with dev-cadence's hook synced, carries `Co-Authored-By: grinder-ao-1 <grinder-ao-1@shiftlead.placeholder>`, and a test checks the env on a named and an unnamed launch. A squash merge keeps the trailer as long as the merge writes no body of its own (cadence's `gh pr merge <n> --squash` writes none).
 
 **Related:** dev-cadence TD-067 (the hook) and TD-068 (the roster guard, from TD-179); design §4.3 (adapters: the export is not the adapter's), §4.8 (the session's name).
+
+## TD-186: A restart's own race trips the restart ceiling, and the ceiling mark never lifts
+
+**Priority:** High
+**Added:** 2026-09-26 (found when Paul asked why ao-grind read *running* with every member idle)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_crash_restart`, `_wanted_restart`, `RESTART_CEILING` / `RESTART_WINDOW`, `_replay`)
+
+**Why:** grinder-ao-1's record carries three restarts in four seconds: `{2026-09-25T20:14:19Z, wanted}`, then `{20:14:21Z, crash, error: "…/worktrees/grinder-ao-1 already has agent session grinder-ao-1 (claude-code, outside agentorc, busy); anchor rule"}` and the same again at 20:14:23Z. So the wanted restart worked: the new run is the record created at 20:14:19Z, and it went on to merge #580–#592. But on the next two ticks the crash rule read the record as crashed, and its replay was refused because the fresh run it had just started already held the worktree. Two failed replays count toward the ceiling by design, so `restart_ceiling {at: 20:14:25Z, count: 3}` was written into a healthy session. That mark is never cleared (`_wanted_restart` returns on any `s.restart_ceiling`, and §4.5a says the tick never lifts it). When the member declared `restart_wanted` at 23:05Z with its work pushed, the tick skipped it. It sat for a day, grinder-ao-2 went out of work behind it (the remaining grinder entries are in grinder-ao-1's files), and the team read *running* with all members idle.
+
+**Fix:** (1) The crash rule must not fire on a record a restart just created. Hold it until the new run's first hook, or for a grace period like the exit-hook grace. A replay refused by the anchor rule because *this record's own session* holds the directory is not a failure and must not count. (2) The ceiling mark lifts once `RESTART_WINDOW` has passed with no new restart, or at least a later `restart_wanted` with clean git is acted on when the window holds fewer than `RESTART_CEILING` restarts. The ceiling guards against a crash loop, not against a member that has worked for hours since. Update §6 *Keeping a team running* and the §4.5a *Inbox row: restart* sentence *`restart_ceiling` is never lifted by the tick* in the same PR. Tests: a replay followed at once by a tick produces no crash entry; a ceiling older than the window doesn't block a clean `restart_wanted`. Done when both tests pass and a wanted restart followed by its next tick leaves one entry in `restarts`.
+
+**Related:** TD-103 (the restart rules, slice 5 the Inbox row), TD-083 (`restart_wanted`), TD-115 (the exit-hook grace), TD-187, TD-188; design §6 *Keeping a team running*, §4.5a *Inbox row: restart*, §9 invariant 2 (the anchor rule).
+
+## TD-187: A member that declared out of work is never woken when its lane gains entries
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul: *will the designer wake on its own or is it necessary for us to intercede?*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.9a (*finished means declared*), §4.10 (the doorbell), `src/agentorc/briefs/manager.md` (*Out of work*: *a finished member is never sent to and never restarted*)
+
+**Why:** designer-ao-1 declared `out_of_work` at 20:49Z on 2026-09-26. Within the next two hours TD-180, 181, 182 and 183 were filed: four `design-first` entries owned by the designer, all pickable. Nothing woke it. The doorbell rings only for new mail (§4.10), filing an entry sends none, and the manager's brief forbids sending to a finished member. The only way in is a person's message. The same happens to a grinder when a grinder-owned entry lands after its `none`. The design says mail is how *there is work now* reaches a finished member (§4.10), but nothing sends that mail.
+
+**Fix:** decide who notices and how. Options: (a) the tick, which already reads the ledger (TD-176's ledger reader), compares each finished member's lane with the ledger after every change and sends a `system` note (*your lane has n new entries: TD-…*) to a finished, idle member whose lane gained one. It sends once per entry, within the wake budget, never past a stop or into a wind-down. (b) The manager's round does the same and the brief's *never sent to* rule changes. (c) Whoever files the entry sends it (`ao msg`), which relies on every filer remembering. (a) keeps it mechanical and matches the policy-of-the-tick direction (TD-103). Also decide what happens to a team that has already wound down (members closed): does new work restart it, or wait for Start? Done when an entry filed into a finished member's lane wakes it within a tick, and a test covers it.
+
+**Related:** TD-176 (the ledger reader), TD-103 (the tick's policies), TD-053 (wind-down), TD-186; design §4.9a, §4.10 *The doorbell*.
+
+## TD-188: Unattended members' context grows unbounded — decide the bound
+
+**Priority:** High
+**Added:** 2026-09-26 (Paul: *460k tokens is a lot. Let's take a look at our restart strategy for our grinders … evaluate if it would make sense to use the compact skill, or another method to limit how big the context gets*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open — the evaluation below is the anchor's starting point, not a decision.
+
+**Why:** a grinder decides for itself when *your context is long* and declares `restart` (`src/agentorc/briefs/grinder.md`, *A run that ends with work left*). There is no number. grinder-ao-1's run from 2026-09-25 20:14Z made 662 model calls with no compaction. Its context reached 462,133 tokens (Opus 5.5, whose 1M window leaves auto-compact far off), and the calls together read 187M input tokens, about 283k per call. Most of that is cache reads, but every read counts against the one account's usage windows that all three profiles share: the week line gated every team on 2026-09-26. Each idle turn afterwards (reading a peer's claim note and replying *nothing for me*) re-read the full 460k. The run merged seven PRs, so the work was fine, but the second half of it cost roughly twice what a fresh run would have. The long history also holds stale design readings and diffs that the next entry doesn't need.
+
+**The evaluation so far:**
+- **A restart per entry** (the first plan) gives the smallest context but pays the start-up reading (brief, `ao --skill`, design sections) on every entry, and it hits the ceiling rule quickly (TD-186).
+- **A restart after several entries** (today) is right in kind: the ledger, the PR and the pushed branch are the durable record (§4.8), so a fresh run loses nothing that matters. What's missing is a threshold a machine can see.
+- **`/compact`** keeps the session and needs no restart, but the summary is lossy and keeps a residue of work that is already merged. A session can't type a slash command for itself, so the host agent would send it at an entry boundary. A manual `/compact` fires no hook (design line on `SessionStart source: compact`, TD-090), so state tracking has to allow for it. Claude-only as well, which TD-185's direction (Codex, on-prem) argues against as the main mechanism.
+- **Earlier auto-compaction** (Claude Code's auto-compact threshold, if it can be set per launch in the `--settings` layer or the environment; to verify) is cheap to try, and also Claude-only.
+- **The recommendation to weigh:** the host agent measures each session's context from its transcript (the last call's input + cache tokens; TD-165's transcript read) and shows it on the card. A per-role bound (e.g. `context_bound: 200k` on the role preset) makes the tick send a `system` note at the next entry boundary: *finish, push, then `ao progress restart`*. Restart stays the mechanism for grinders, because it is tool-neutral. Compaction is the fallback for sessions that shouldn't restart (a manager mid-round, a person's own session), and only on adapters that support it.
+
+**Fix:** settle: the measure (where it's read, per adapter), the bound (per role or per profile, default), who acts on it (the tick's note, the session itself, or both), whether compaction has a place and for which roles, and the brief's wording in place of *your context is long*. Then a build TD. Done when the design names the bound and a grinder's run ends near it.
+
+**Related:** TD-186 (restarts must work first), TD-083 (`restart_wanted`), TD-165 (transcript read), TD-090 (compaction and state), TD-100 (the usage gate), TD-185 (tool-neutral direction); `src/agentorc/briefs/grinder.md`; design §4.8, §4.9a, §6.
