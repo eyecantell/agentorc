@@ -1490,8 +1490,10 @@ def team_summary(
     waiting: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """A live team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and
-    Answer needed / Doing — the facet opening on *answer* while any member waits on one."""
+    """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
+    needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
+    live has one too (TD-192): its claims as the members' last records hold them, and Doing, since
+    nobody can be waiting."""
     now = now or datetime.now(UTC)
     r = team_repo(members, repos or {})
     motion = motion_rows(members, r)
@@ -1529,8 +1531,9 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
     Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
     holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
     counted once), and Needs you's *answer needed*. None when no team is live: the page then has no
-    rollup, as it has no summaries. The Inbox's count is the top bar's, filled in by the client."""
-    live = [g for g in groups or [] if g.get("team") and g.get("summary")]
+    rollup — a wound-down team's summary (TD-192) is not summed. The Inbox's count is the top bar's,
+    filled in by the client."""
+    live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
     if not live:
         return None
     members = [m for g in live for m in g["members"]]
@@ -1682,16 +1685,11 @@ def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def team_live(team: str, fleet: Collection[dict[str, Any]]) -> bool:
-    """Whether any session of `team` in `fleet` is neither exited nor closed."""
-    return bool(team) and any(f.get("team") == team and f.get("state") not in DEAD for f in fleet)
-
-
 def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str, Any]:
-    """Mark `v` compact when it is a member of a live team (§4.5a *card: compact*): a `team` badge,
-    and some session of that team in `fleet` not exited or closed. The full card stays on *No team*
-    and on a team with nothing live."""
-    if team_live(str(v.get("team") or ""), fleet):
+    """Mark `v` compact when it is a member of a team (§4.5a *card: compact*): a `team` badge, live
+    or not — a team with nothing live draws its summary and compact cards too, once unfolded
+    (TD-192). The full card stays on *No team*. `fleet` is kept for the callers' shape."""
+    if v.get("team"):
         v["compact"], v["compact_line"] = True, compact_line(v)
     return v
 
@@ -1751,9 +1749,10 @@ def team_groups(
     only inside the group (review of PR #117). Its card stays where its own badge puts it; the
     header names it and says so, because moving the card would contradict the badge.
 
-    A team with something live carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*)
-    from `repos` (the home's repo facts) and `doing` (its doing log), and its members are marked
-    compact; its header then drops the state counts, which the member cards say."""
+    A team carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*) from `repos` (the
+    home's repo facts) and `doing` (its doing log), live or not — a team with nothing live shows what
+    it left once unfolded (TD-192) — and its members are marked compact; its header then drops the
+    state counts, which the member cards say, but for the fold."""
     defs = {str(r["name"]): r for r in rows}
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
@@ -1789,7 +1788,7 @@ def team_groups(
         dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
-        summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM and live else None
+        summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM else None
         if summary:
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m)
@@ -2866,7 +2865,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "manager": (g["manager"] or {}).get("id", ""),
-                "live": g["live"],  # what the fold keys on: only a team with nothing live folds (TD-156)
+                "live": g["live"],  # what the fold's default keys on: nothing live opens folded (TD-194)
                 "ids": g["ids"],
                 "html": head.render(g=g),
                 # the summary's facets (TD-176 slice 3), swapped by the client as the header is
@@ -4163,10 +4162,6 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
-                    # the record's team now and before this delta: a re-badge moves a card between
-                    # two teams, and either may come alive or wind down by it (review of TD-176 slice 3)
-                    teams = {str(s.get("team") or ""), str((known.get(s["id"]) or {}).get("team") or "")} - {""}
-                    was_live = {t: team_live(t, known.values()) for t in teams}
                     known[s["id"]] = s
                     v = view(s, list(known.values()), icons=await role_icons([s]), seats=await seats_of([s]))
                     compact_in(v, known.values())
@@ -4186,30 +4181,6 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                             }
                         )
                     )
-                    flipped = {t for t in teams if was_live[t] != team_live(t, known.values())}
-                    if flipped:
-                        # a team came alive or wound down: its other members' cards change shape,
-                        # compact ↔ full (§4.5a *card: compact*, TD-176), so each is redrawn
-                        for other in [o for o in known.values() if o.get("team") in flipped and o["id"] != s["id"]]:
-                            ov = view(
-                                other,
-                                list(known.values()),
-                                icons=await role_icons([other]),
-                                seats=await seats_of([other]),
-                            )
-                            compact_in(ov, known.values())
-                            await ws.send_text(
-                                json.dumps(
-                                    {
-                                        "event": "session",
-                                        "id": other["id"],
-                                        "state": other["state"],
-                                        "rank": ov["rank"],
-                                        "html": render_card(ov),
-                                        "session": ov,
-                                    }
-                                )
-                            )
                 elif ev.get("event") in ("repos", "doing"):
                     # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
                     # member said what it is doing (§4.8 *the doing log*): kept here, passed through

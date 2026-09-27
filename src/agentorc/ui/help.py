@@ -60,9 +60,9 @@ HELP: tuple[Help, ...] = (
         "*n sessions* on a team's card, and a click on its header",
         (
             "Shows or hides a team's cards and its summary; a stopped team's are folded away by default. "
-            "Press it to read their "
-            "last lines or their mail, or to Forget them. It changes nothing on any record; which teams you "
-            "have unfolded is remembered in this browser."
+            "Press it to see what the team left — its repo's numbers, the claims still held, what each member "
+            "last said it was doing — to read their mail, or to Forget them. It changes nothing on any record; "
+            "which teams you have unfolded is remembered in this browser."
         ),
     ),
     Help(
