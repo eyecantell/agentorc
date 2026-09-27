@@ -48,6 +48,16 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# Claude Code's own rule (TD-11), read from its bundle (2.1.283: `k`, `qx`, `Le`, `KJ`):
+#   n = path.replace(/[^a-zA-Z0-9]/g, "-")      # per UTF-16 code unit
+#   n.length <= 200 ? n : n.slice(0, 200) + "-" + Math.abs(javaHash(path)).toString(36)
+# Parity (§7): check_claude_memory.sh's ENCODED calls this function for any path its sed
+# fast path cannot get right (non-ASCII, or past the cap); tests/test_list_sessions.sh
+# holds the expectations, taken from that JS run under node. Not modelled: Claude Code's
+# CLAUDE_CODE_PROJECT_DIR_NAME override (honoured only with CLAUDE_CONFIG_DIR set), and
+# a caller passing a Path has already had `//` collapsed, where the JS sees the raw string.
+PROJECT_DIR_MAX = 200
+
 
 def munge(path: Path) -> str:
     """Path -> Claude Code's project-dir name.
@@ -60,8 +70,29 @@ def munge(path: Path) -> str:
     project dirs" — indistinguishable from a repo that genuinely has no
     sessions. The character class is a superset of the old behavior ('-' maps
     to itself), so it changes nothing for paths that already worked.
+
+    JavaScript strings are UTF-16, so the replace counts code units: an accented
+    letter (NFC) is one '-', a decomposed one is its base letter plus one '-', and a
+    character outside the BMP (an emoji) is TWO. A name past 200 units is cut there
+    and suffixed with a base-36 hash of the whole path (TD-11).
     """
-    return re.sub(r"[^a-zA-Z0-9]", "-", str(path))
+    s = str(path)
+    units = s.encode("utf-16-le", "surrogatepass")
+    out = "".join(c if c.isascii() and c.isalnum() else "-" * (len(c.encode("utf-16-le", "surrogatepass")) // 2)
+                  for c in s)
+    if len(out) <= PROJECT_DIR_MAX:
+        return out
+    h = 0
+    for i in range(0, len(units), 2):   # Java's String.hashCode, as int32
+        h = (h * 31 + int.from_bytes(units[i:i + 2], "little")) & 0xFFFFFFFF
+    h = abs(h - (1 << 32) if h >= 1 << 31 else h)
+    digits = ""
+    while True:
+        h, r = divmod(h, 36)
+        digits = "0123456789abcdefghijklmnopqrstuvwxyz"[r] + digits
+        if not h:
+            break
+    return f"{out[:PROJECT_DIR_MAX]}-{digits}"
 
 
 def short_path(p: Path) -> str:
