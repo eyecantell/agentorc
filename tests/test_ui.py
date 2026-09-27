@@ -576,6 +576,24 @@ def test_the_profile_line_says_which_model_is_in_use(tmp_path, monkeypatch):
     assert view({**s, "adapter": "shell", "profile": ""})["profile_line"] == "shell"
 
 
+def test_the_card_draws_the_context_reading_after_the_model(tmp_path, monkeypatch):
+    """TD-190, design §4.5 *The card's anatomy* row 4: *· 231k* after tool · account · model, the
+    window on hover and in Focus; nothing where the adapter cannot tell."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = {
+        "id": "ao-r-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-11T16:00:00Z", "confidence": "hook", "tail": [], "model": "claude-opus-5-5",
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert view(s)["context_short"] == "" and 'class="context"' not in card.render(s=view(s))
+    read = view({**s, "context": {"tokens": 231_203, "at": "2026-09-27T20:00:00Z", "window": 1_000_000}})
+    assert (read["context_short"], read["context_line"]) == ("231k", "231k of 1M")
+    html = card.render(s=read)
+    assert "· opus-5-5 · <span" in html and ">231k</span>" in html and "context 231k of 1M" in html
+
+
 def test_a_dead_attach_is_final(client, subprocess_agent, tmp_path):
     """TD-029, the reproduction: a record that still claims a pane whose tmux session is gone (a
     tmux server restart, or a close the record has not caught up with) used to let `/term/` run

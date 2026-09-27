@@ -43,6 +43,7 @@ from sessionorc.containers import attach_argv_in
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
+    context_reading,
     has_control,
     normalize_ref,
     pr_marks,
@@ -867,6 +868,10 @@ def view(
         elif declared:
             line += f" · {declared} (profile)"
         d["profile_line"] = line
+    # the context reading after the model (design §4.5 row 4, TD-190): *231k* on the card, *231k of
+    # 1M* in Focus; absent where the adapter cannot tell
+    d["context_short"] = context_reading(s, of_window=False)
+    d["context_line"] = context_reading(s)
     # A record whose `pending` is not a dict — another build, a hand repair — costs its card its
     # pending line and nothing more, the rule `doing` and `out_of_work` already follow: every
     # reader below (the card, the Focus header, `state_kind`) gets one shape (review of PR #251).

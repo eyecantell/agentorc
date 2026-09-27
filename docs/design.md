@@ -490,12 +490,14 @@ class Adapter(Protocol):
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
-    def context(self, session_id: str, cwd: Path, profile: Profile | None) -> Context | None
-                                                          # the session's context size now — Context(tokens, at, window) — from the
+    def context(self, session_id: str, cwd: Path, profile: str) -> dict | None
+                                                          # the session's context size now — {tokens, at, window}, keyed by the
+                                                          # profile *name* as `model_in_use` is — from the
                                                           # tool's own records: Claude Code, the last top-level `assistant` entry's
                                                           # `usage` (input + cache_read + cache_creation), the tail read `model_in_use`
                                                           # makes, `window` the model's when known; None when it cannot tell (§6
-                                                          # rule 5, TD-188). Read on the tick for unattended records, never a grep
+                                                          # rule 5, TD-188). Read on the tick for unattended records once a minute,
+                                                          # never a grep (built — TD-190 slice 1)
     def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
                         before: int | None = None, turns: int = 20) -> Transcript | None
                                                           # the tool's transcript as neutral entries — a prompt, text, a thought, a
@@ -1448,7 +1450,7 @@ Screens:
       sits at the right.
    4. **What runs it, and what it reports**: tool · account · model at the left, on every card
       (a team's members commonly differ), then the **context reading** — *· 231k*, red past the
-      role's bound, absent where the adapter cannot tell (§6 rule 5, TD-188; not built — TD-190); the report line at the right — progress, and the
+      role's bound, absent where the adapter cannot tell (§6 rule 5, TD-188; the reading built, the red waits on the bound — TD-190); the report line at the right — progress, and the
       findings count beside it — **a reference shown once** (`#359 · 1/2 done`, never
       `#359 → #359`).
    5. **The slot**, always two lines and a caption; a longer text is clamped, whole on hover and
@@ -2618,7 +2620,7 @@ for another's, since the channels are ungated:
   line**, TD-182; built — TD-193): the CLI reads `repos` once per call, and where that read is
   refused (a node offline) or holds no such PR the line is printed unmarked. The mark is in the
   text only; `--json` carries the entries as the record holds them.
-- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k* — and `--json` the `context` field (§6 rule 5, TD-188; not built — TD-190).
+- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k* — and `--json` the `context` field (§6 rule 5, TD-188; the reading and the field built, *bound* waits on the preset key — TD-190).
 
 **A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, not built — TD-173: today it sets the badge and nothing else) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
 

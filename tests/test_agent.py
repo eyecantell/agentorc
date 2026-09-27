@@ -1293,6 +1293,43 @@ async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp
         assert sid not in agent._model_checked  # no key outlives the record
 
 
+async def test_the_context_reading_is_read_on_the_tick_for_unattended_records(agent, tmp_path, monkeypatch):
+    """TD-190, design §6 rule 5: the tick asks the adapter for each unattended record's context
+    reading and keeps it on the record; an attended session is a person's and is not read, and a
+    reading the adapter cannot make leaves the last one alone."""
+    reading = {"tokens": 231_000, "at": "2026-09-27T20:00:00Z", "window": 1_000_000}
+    asked: list[str] = []
+
+    def context(session_id, cwd, profile=""):
+        asked.append(session_id)
+        return reading
+
+    monkeypatch.setattr(adapters.get("shell"), "context", context, raising=False)
+    async with LocalClient() as person:
+        att = await person.call("create", name="att", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        un = await person.call(
+            "create", name="un", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+        )
+        for s in (att, un):
+            await person.call("hook", session=s["id"], adapter_id=f"conv-{s['name']}")
+        agent._context_checked.clear()
+        await agent.tick()
+        assert asked == ["conv-un"]
+        assert (await person.call("get", id=un["id"]))["context"] == reading
+        assert (await person.call("get", id=att["id"]))["context"] is None
+        # read once per CONTEXT_EVERY, not on every tick
+        await agent.tick()
+        assert asked == ["conv-un"]
+        monkeypatch.setattr(adapters.get("shell"), "context", lambda *a, **kw: None, raising=False)
+        agent._context_checked.clear()
+        await agent.tick()
+        assert (await person.call("get", id=un["id"]))["context"] == reading
+        for s in (att, un):
+            await person.call("kill", id=s["id"])
+            await person.call("remove", id=s["id"])
+        assert un["id"] not in agent._context_checked  # no key outlives the record
+
+
 async def test_one_name_one_session(agent, tmp_path, monkeypatch):
     """Design §4.1, §9 invariant 12, TD-030: within a scope a name identifies one session — a live
     holder refuses (and says which id to switch to), an exited or closed one is superseded and its

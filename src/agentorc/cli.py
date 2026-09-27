@@ -25,7 +25,7 @@ from sessionorc import mail as mailmod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, pr_marks, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, context_reading, pr_marks, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -263,6 +263,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      title:  {title}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
+            if reading := context_reading(s):
+                print(f"{'':<{w}}      context: {reading}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
