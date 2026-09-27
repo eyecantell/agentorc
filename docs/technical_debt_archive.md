@@ -1898,7 +1898,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Done when** Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
 
-**Resolved:** 2026-09-27 (PR #PRNUM, TD-174's build) — the design is design §4.6 *The mouse is the browser's* and §4.5a *Focus: copy on select*.
+**Resolved:** 2026-09-27 (PR #646, TD-174's build) — the design is design §4.6 *The mouse is the browser's* and §4.5a *Focus: copy on select*.
 
 **Related:** §4.5a *Focus: Copy / Paste*, §4.6 *Scrollback is tmux's* (TD-022), TD-096 (the read-only attach), TD-157 (an *i* mark for the control), ADR 2026-09-25 (where a person's preference lives).
 
@@ -1915,7 +1915,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Why:** TD-164's *Why*: the first drag a person tries does the wrong thing silently.
 
-**Resolved:** 2026-09-27 (PR #PRNUM) — design §4.6 *The mouse is the browser's* and *A read-only attach*, and §4.5a *Focus: copy on select*, now read as built. The attach argv is in `src/sessionorc/tmux.py`, `scroll_argv` and the pump in `src/agentorc/ui/pty_bridge.py`, the wheel, `AO.wheelStep` and copy on select in `app.js`, and `POST /api/settings/person` in `app.py`. The tests are in `tests/test_ui.py` (`test_bridge_argv_shapes`, `test_terminal_scrollback_reaches_tmux`, `test_focus_watches_an_unattended_session`, `test_copy_on_select_is_the_persons_and_on_by_default`). Three things only a live pane can show, a plain drag selecting, Shift+click growing the selection and htop getting no mouse, are on `docs/user_attention.md`. The Settings page's You row is TD-148's.
+**Resolved:** 2026-09-27 (PR #646) — design §4.6 *The mouse is the browser's* and *A read-only attach*, and §4.5a *Focus: copy on select*, now read as built. The attach argv is in `src/sessionorc/tmux.py`, `scroll_argv` and the pump in `src/agentorc/ui/pty_bridge.py`, the wheel, `AO.wheelStep` and copy on select in `app.js`, and `POST /api/settings/person` in `app.py`. The tests are in `tests/test_ui.py` (`test_bridge_argv_shapes`, `test_terminal_scrollback_reaches_tmux`, `test_focus_watches_an_unattended_session`, `test_copy_on_select_is_the_persons_and_on_by_default`). Three things only a live pane can show, a plain drag selecting, Shift+click growing the selection and htop getting no mouse, are on `docs/user_attention.md`. The Settings page's You row is TD-148's.
 
 **Done when** TD-164's *Done when*: Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
 
