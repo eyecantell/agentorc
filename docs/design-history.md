@@ -555,6 +555,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-161, the designer): the `roles:` example gains `plain: {prompts: […]}`, the person's own chips.
 - 2026-09-25 (TD-164, the designer): `person.terminal.copy_on_select`, default true.
 - 2026-09-26 (TD-149 (7), (8), grinder-ao-1): the `hosts.yml` field list names what `sessionorc.hosts` reads (`local`, `identity`, `person`, `home:`, `nodes:`, `link:` were missing; `transport` and `ssh` were listed though nothing reads them before TD-004); `AGENTORC_PROFILE`, exported to every Claude Code pane since the rename and read by nothing, left the launch environment; the UI's bind and port defaults, three literals, became one.
+- 2026-09-26 (TD-149 (5), grinder-ao-1): a hand edit of `hosts.yml`'s `local.name`, `home:` or `local.identity` under a running agent had the agent (start-only) and the UI (per request) silently disagreeing; the Org page now names each moved value as *restart pending*. Reading the agent's snapshot everywhere instead was the other shape the audit offered; the line was chosen because the page's per-request reads stay correct for everything else in the file.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 

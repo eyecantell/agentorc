@@ -312,6 +312,30 @@ def test_the_teams_line_says_the_identity_mode_unless_the_host_enforces_it(tmp_p
     assert 'id="identitynote"' not in page(identity_note({"mode": "enforce"}))
 
 
+def test_the_org_says_restart_pending_when_hosts_yml_moved_under_the_agent(tmp_path, monkeypatch):
+    """design §5 (TD-149 (5)): `local.name`, `home:` and `local.identity` are the agent's from its
+    start and the page's per request, so a hand edit since is named — each value that moved, what
+    the agent runs as against what the file says — and nothing is said while they agree."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("home: hub\nlocal:\n  name: box\n  identity: enforce\n")
+    from agentorc.ui.app import restart_note, templates
+
+    agrees = {"host": "box", "home": "hub"}
+    assert restart_note(agrees, {"mode": "enforce"}) == ""
+    assert restart_note(None, None) == "" and restart_note({}, {}) == ""  # nothing answered: nothing compared
+    note = restart_note({"host": "kmaster", "home": "kmaster"}, {"mode": "observe"})
+    assert "name kmaster → box" in note and "home kmaster → hub" in note and "identity observe → enforce" in note
+    assert "restart pending" in note
+    assert restart_note(agrees, {"mode": "observe"}).count("→") == 1
+
+    html = templates.get_template("org.html").render(
+        sessions=[], groups=None, strip={"teams": [{"name": "t"}], "source": "x", "notes": [], "elsewhere": ""},
+        counts={}, host="box", active="Org", agent_down=False, volatile=False, usage={},
+        person_needs=0, node_banner="", identity_note="", restart_note=note,
+    )  # fmt: skip
+    assert 'id="restartnote"' in html and "restart pending" in html
+
+
 def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     """TD-073: the top bar's chip is one span per profile showing that profile's **worst** window —
     the label and number the adapter gave — with every window on hover. No field name of any one
