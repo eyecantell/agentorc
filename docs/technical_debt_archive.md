@@ -1933,7 +1933,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Why:** §4.5a's **card: report line** row draws `TD-027 → PR #59 · 1/2 done` from the record alone. TDs in motion marks a PR *merged* / *closed* once it is no longer open (§4.5a, TD-176). The member card doesn't, so an exited grinder's last report reads as work in flight. The same line is in `ao status -v` and the Members list.
 
-**Resolved:** 2026-09-27 (PR #PRNUM, TD-193's build). The design is design §4.5a card **report line** (**the PR's mark**) and §4.5 screen 1 *A PR that is no longer open says so*.
+**Resolved:** 2026-09-27 (PR #648, TD-193's build). The design is design §4.5a card **report line** (**the PR's mark**) and §4.5 screen 1 *A PR that is no longer open says so*.
 
 **Related:** TD-181 (the summary would have shown it), TD-176, TD-095 (the card's anatomy), design §4.5a **card: report line**, **TDs in motion**.
 
@@ -1949,7 +1949,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Why:** TD-182's *Why*: an exited grinder's last report reads as work in flight.
 
-**Resolved:** 2026-09-27 (PR #PRNUM). Design §4.5a card **report line** (**the PR's mark**), *card: compact* and §4.7 `ao status -v` now read as built. `report_ref`, `report_line(session, prs)` and `pr_marks` are in `src/sessionorc/models.py`. `view(…, repos=)`, `pr_marks` on the view and `compact_line` are in `src/agentorc/ui/app.py`, `renderReports` is in `app.js`, and the `repos` read is in `cmd_status`. The tests are `tests/test_models.py`, `tests/test_ui_team_summary.py` and `tests/test_cli.py` (`test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses`).
+**Resolved:** 2026-09-27 (PR #648). Design §4.5a card **report line** (**the PR's mark**), *card: compact* and §4.7 `ao status -v` now read as built. `report_ref`, `report_line(session, prs)` and `pr_marks` are in `src/sessionorc/models.py`. `view(…, repos=)`, `pr_marks` on the view and `compact_line` are in `src/agentorc/ui/app.py`, `renderReports` is in `app.js`, and the `repos` read is in `cmd_status`. The tests are `tests/test_models.py`, `tests/test_ui_team_summary.py` and `tests/test_cli.py` (`test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses`).
 
 **Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
 
