@@ -1885,7 +1885,7 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Owner:** grinder
 **Kind:** build
 **Pickable:** no — built; what is left is the live check after a promote
-**Status:** Built 2026-09-27 (grinder-ao-1, PR #TBD): `ledger.lane_matches`, `lane_seen` (home-owned, cleared with `out_of_work` and reset by a second `none`), and `_lane_news`, the keep-running tick's sixth pass, which writes one `system` note through `_system_note`. **Left:** the *done when*'s live half, a finished member woken within a tick of an entry filed into its lane, after the promote. Design §6 *Keeping a team running* rule 6, §4.9a, §4.4a.
+**Status:** Built 2026-09-27 (grinder-ao-1, PR #656): `ledger.lane_matches`, `lane_seen` (home-owned, cleared with `out_of_work` and reset by a second `none`), and `_lane_news`, the keep-running tick's sixth pass, which writes one `system` note through `_system_note`. **Left:** the *done when*'s live half, a finished member woken within a tick of an entry filed into its lane, after the promote. Design §6 *Keeping a team running* rule 6, §4.9a, §4.4a.
 **Location:** `src/sessionorc/agent.py` (`_keep_running`: a sixth pass beside the nudge's; the `system` note through the path the lapse's note takes), `src/sessionorc/models.py` (`lane_seen` on the record and in `HOME_OWNED`, carried across a supersede as `out_of_work` is and cleared where `out_of_work` is cleared), `src/sessionorc/ledger.py` (the reading already keeps `kind` and `pickable` per entry: a `lane_matches(lane, entry)` beside `kind_of`)
 
 **Why:** TD-187's *Why*: the doorbell rings only for mail, filing an entry sends none, and the manager never sends to a finished member.
