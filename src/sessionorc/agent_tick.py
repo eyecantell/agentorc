@@ -759,7 +759,7 @@ class TickMixin:
         for root in roots:
             old = prev.get(root) or {}
             try:
-                out[root] = HostAgent._read_repo(root, old, root in full, now, by_remote)
+                out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
                 log.exception("reading the repo facts of %s failed", root)
                 why = f"the read failed: {type(e).__name__}"
