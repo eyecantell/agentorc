@@ -921,6 +921,7 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
     # under a team's reserve priority the line is the team's, and the words say whose (§6, TD-146)
     team = gated_view({**mark, "line": 60, "team_extra": {"team": "ao-grind", "n": 10}})["text"]
     assert team.startswith("paused · usage (ao-grind +10) — grind week 75% ≥ 60%")
+    assert "teams.ao-grind.reserve" in gated_view({**mark, "team_extra": {"team": "ao-grind", "n": 10}})["full"]
     assert gated_view({**mark, "team_extra": {"team": "t", "n": True}})["text"].startswith("paused · usage — ")
     # one malformed record costs its card the mark, never the grid
     assert all(

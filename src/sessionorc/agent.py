@@ -4861,9 +4861,9 @@ class HostAgent:
         if reserves is not None:
             out.update(self._reserves_change(doc, str(profile or ""), reserves))
         now = datetime.now(UTC)
-        for key, value, parse in (
-            ("teams", teams, settings_mod.parse_team),
-            ("repos", repos, settings_mod.parse_repo),
+        for key, value, parse, known in (
+            ("teams", teams, settings_mod.parse_team, settings_mod.TEAM_KEYS),
+            ("repos", repos, settings_mod.parse_repo, ("promote",)),
         ):
             if value is None:
                 continue
@@ -4878,6 +4878,9 @@ class HostAgent:
                     continue
                 if not isinstance(fields, dict):
                     raise RpcError(f"{key}.{name}: a mapping of fields, or null to remove it")
+                if unknown := sorted(set(map(str, fields)) - set(known)):
+                    # a clear of a mistyped key is refused too: a typo is never a silent no-op
+                    raise RpcError(f"{key}.{name}: unknown key {', '.join(unknown)} (known: {', '.join(known)})")
                 kept = {k: v for k, v in fields.items() if v is not None}
                 try:
                     parsed = parse(kept)

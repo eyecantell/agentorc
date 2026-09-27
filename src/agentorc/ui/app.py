@@ -1059,7 +1059,12 @@ def gated_view(raw: Any) -> dict[str, str] | None:
         "its reserve makes (design §6), so the session was asked to pause"
         + ("" if raw.get("sent_at") else " — the ask is not typed yet, it waits for a clear composer")
         + ". It resumes by itself when every window is back under its line; to go on now, Take over, "
-        "or lower the reserve with `ao gate`."
+        + (
+            f"or lower the reserve with `ao gate`, or {te.get('team')}'s priority in settings.yml "
+            f"(teams.{te.get('team')}.reserve — the line is the profile's less {n})."
+            if team
+            else "or lower the reserve with `ao gate`."
+        )
     )
     return {"text": text, "full": full}
 

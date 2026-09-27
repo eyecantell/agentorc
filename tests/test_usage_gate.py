@@ -148,6 +148,8 @@ async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it
         assert settings.person(settings.load())["open_in"] == "none"
         with pytest.raises(AgentError, match="has passed"):
             await person.call("set_settings", teams={"ao-grind": {"until": "2020-01-01T00:00:00Z"}})
+        with pytest.raises(AgentError, match="unknown key resrve"):
+            await person.call("set_settings", teams={"ao-grind": {"resrve": None}})
         with pytest.raises(AgentError, match="needs reserves, teams, repos or person"):
             await person.call("set_settings")
         await person.call("set_settings", teams={"ao-grind": {"until": None}}, person={"terminal": {"size": None}})
