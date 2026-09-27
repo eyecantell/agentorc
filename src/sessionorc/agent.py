@@ -653,12 +653,87 @@ class HostAgent:
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
+        await self._team_stop_times(snapshot_at)
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
         await self._keep_running(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._ring_doorbells()
+
+    async def _team_stop_times(self, now: datetime) -> None:
+        """Design §6 *Team stop time* (TD-146): each live, unattended session carrying a team's badge
+        — members and seats, this host's and every node's — whose `run_until` is unset or later than
+        its team's `teams.<team>.until` takes the team's instant, exactly as `set_stop` gives one. A
+        session's own earlier stop time is kept. A record created after the instant had passed is not
+        given it: a team started again after its stop time is the person's word, not a stop.
+        **At the home**, whose file it is; a node's record takes it through `set_stop` over the link,
+        and waits for the link when it is down."""
+        if self.mode != "home":
+            return
+        untils = {t: v["until"] for t, v in settings_mod.teams(settings_mod.load()).items() if v.get("until")}
+        if not untils:
+            return
+        changed = False
+        for s in [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]:
+            inst = untils.get(s.team) if s.team else None
+            if not inst or not s.unattended or s.state in ("exited", "closed") or s.superseded_by:
+                continue
+            if s.run_until and _parse(s.run_until) <= _parse(inst):
+                continue  # its own earlier stop time, or the team's already
+            with contextlib.suppress(TypeError, ValueError):
+                if _parse(s.created) >= _parse(inst):
+                    continue
+            if s.host == self.host:
+                self._take_stop(s, inst)
+                changed = True
+            elif s.host in self._link_muxes:
+                try:
+                    await self._route_act("set_stop", {"id": self._address(s), "run_until": inst}, None, s.host)
+                except Exception as e:  # noqa: BLE001 — tried again on the next tick
+                    log.warning("%s: the team's stop time did not reach %s: %s", s.id, s.host, e)
+        if changed:
+            await self._push_changes()
+
+    def _team_stamp(self, team: str, unattended: bool, run_until: str | None) -> str | None:
+        """What a create's `run_until` is under its team's stop time (§6 *Team stop time*): the
+        earlier of the two while the team's is still ahead; its own, or none, otherwise — a start
+        after the instant has passed is not stopped by it."""
+        if not (team and unattended):
+            return run_until
+        inst = (settings_mod.teams(settings_mod.load()).get(team) or {}).get("until")
+        if not inst or _parse(inst) <= datetime.now(UTC):
+            return run_until
+        return inst if not run_until or _parse(inst) < _parse(run_until) else run_until
+
+    def _take_stop(self, s: Session, when: str | None) -> None:
+        """A stop time given by a policy as `set_stop` gives one: a new time is a new run, so a wrap-up
+        already asked is spent."""
+        if when != s.run_until:
+            s.wrapup_sent_at = None
+        s.run_until = when
+        self._save(s)
+
+    async def _restamp_team(self, team: str, old: str | None, new: str | None) -> None:
+        """A team's stop time moved or was cleared (TD-146): the live members that carry the old
+        instant took it from the team, so they follow — to the new one, or to none on **Clear**. A
+        member's own earlier stop time is another instant and is not touched."""
+        if not old or old == new:
+            return
+        changed = False
+        for s in [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]:
+            if s.team != team or s.run_until != old or s.state in ("exited", "closed") or s.superseded_by:
+                continue
+            if s.host == self.host:
+                self._take_stop(s, new)
+                changed = True
+            elif s.host in self._link_muxes:
+                try:
+                    await self._route_act("set_stop", {"id": self._address(s), "run_until": new}, None, s.host)
+                except Exception as e:  # noqa: BLE001 — the tick's pass gives a new instant again; a clear waits
+                    log.warning("%s: the team's changed stop time did not reach %s: %s", s.id, s.host, e)
+        if changed:
+            await self._push_changes()
 
     async def _enforce_stop_times(self, now: datetime) -> None:
         """Stop the unattended sessions whose time is up (design §6, TD-026 gap 1).
@@ -2174,7 +2249,7 @@ class HostAgent:
                 ledger=(str(ledger).strip() or None) if ledger else None,
                 team=str(team or ""),  # badges (§4.9): stored as given, never validated here
                 project=str(project or ""),
-                run_until=_stop_time(run_until),
+                run_until=self._team_stamp(str(team or ""), bool(unattended), _stop_time(run_until)),
                 wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
                 pause_prompt=(str(pause_prompt).strip() or None) if pause_prompt else None,
                 resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
@@ -4890,6 +4965,7 @@ class HostAgent:
         if reserves is None and teams is None and repos is None and person is None:
             raise RpcError("set_settings needs reserves, teams, repos or person (design §5 settings.yml)")
         doc = settings_mod.load()
+        before_teams = settings_mod.teams(doc)
         out: dict[str, Any] = {}
         if reserves is not None:
             out.update(self._reserves_change(doc, str(profile or ""), reserves))
@@ -4931,6 +5007,14 @@ class HostAgent:
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
+        if teams is not None:
+            after = settings_mod.teams(doc)
+            for name in teams:
+                await self._restamp_team(
+                    str(name),
+                    (before_teams.get(str(name)) or {}).get("until"),
+                    (after.get(str(name)) or {}).get("until"),
+                )
         held = [k for k in ("usage_gate", "teams", "repos", "person") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         return out
