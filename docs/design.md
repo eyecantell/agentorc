@@ -2242,6 +2242,7 @@ noted). If a control is not in this table it does not exist.
 | card | **doing** line (the card's slot) | display only. The slot's order is §4.5 *The card's anatomy*, row 5 (TD-095): (a) what needs a person or explains a stop, (b) an ending — *exited · code N*, *closed by you*, *out of work*, *restart wanted* — (c) this line, (d) the tail or *at prompt*. *ready to close ✓* is the slot's caption and its Close button the foot's first; neither is slot text. The team's header does not show its manager's line. Within (c)/(d), first that applies: what needs a person (pending permission or question, hook channel, §4.2); the session's `doing` line (§4.8) with its age, *says · 11m ago*; the pane's tail — three lines while working, one when idle. The line replaces the tail only; the record keeps it either way. A session whose adapter's tail *is* the work (`shell`, a command run) has no `doing` line and keeps the tail; a TUI session that has said nothing falls back to it. Nothing here is a control and nothing parses it (TD-071 item 8) |
 | card / Focus header | **title** — the session's name as its tool holds it | display only, beside the session name, whenever the adapter's `title()` gives one (§4.3) and it differs from the session's name (on Focus too since TD-156) (TD-095: a team's members are titled by their names, and the same word twice is noise). Claude Code sets its terminal title to the conversation's name — the one a person gave it with the tool's own rename (*Error Checker*), else the tool's summary — and tmux holds it as `#{pane_title}`, read with the pane list each tick. Set in the tool, not here: agentorc has no rename of its own, since a second name kept in the record would drift from the one the tool shows in its own picker and resume list. A name and not a status, so it is always shown and is not a fallback for the doing line. The filter box matches it (TD-074) |
 | card | **report line** | row 4, at the right (§4.5 *The card's anatomy*, TD-095); a reference is shown once — `#359 · 1/2 done` where the entry's reference is the PR itself, never `#359 → #359` (the card's and `ao status -v`'s line is `report_line`'s). Shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, a manager's `last round 20:10 · 2 wrapped up`; an entry the host agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed`. **The PR's mark** (TD-182; not built — TD-193): a PR that is no longer open carries one word after its number, *merged* or *closed* — `TD-066 → #158 merged · 3/3 done` — read from the repo readings of the record's repo (§4.4 *Repo facts*: the open list and the month's `recent`), as *team card: TDs in motion* marks its rows; an open PR carries no word, and a PR the readings do not hold (older than the month, another repo's, a reading that never succeeded) is left unmarked, never guessed. The mark is display only and changes nothing on the record. One formatter: `report_line` takes the readings' PRs beside the record, so the card, the compact card's line, the Members list and `ao status -v` say the same; the Focus **Reports** panel marks each row's PR link with the same word |
+| Focus side panel, **Session** card | **rounds** line | display only (§4.8 *A session's round log*, TD-175; not built — TD-191): one line of the Session card, under *run log*, holding the session's last two round-log lines with their stamps, *from an earlier run* where a line is older than this record's start, and *no round log* when there is none; the whole log is `ao log --tail`. Text a session wrote is only text (TD-071); no fold of its own, so the side panel's fold order is unchanged |
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived (dashed). **Grouped by state** (TD-143; designed 2026-09-25; built by TD-150 — the groups, the *i* mark, Drop behind **more ▾** with its confirm, the route's refusal of a drop on a claim with a PR, the branch's PR as `review_pr`, and the `system` note; a declared claim's own `pr` is refused merged or open alike, since only `review_pr` knows it merged): *in progress* (claimed, no PR), *in review* (claimed with a PR — the entry's own `pr`, else the PR `sessionorc.reports` finds for the record's `tdNNN-*` branch, carried beside the claim as `review_pr` (§4.8); a derived entry never shares a declared one's reference, §9 invariant 10, so there is no third — drawn as *claimed · in review #532*, the number a link from a structured field), *done*, *dropped*, so a claim in review never reads as a claim not started, which is how two design PRs' claims were let go on 2026-09-24. The panel's explanation is the **i** mark at its heading (§4.5 screen 6's pattern), read before a press, not a note under the list. **Drop** sits behind the panel's **more ▾** on an *in progress* row only — never a primary button, and not offered while a PR from that claim is open — and its confirm names the consequence: *let go of TD-127's claim: the lease ends and another session may take it; its branch and any work on it stay; only designer-ao-1 can claim it again* — no branch by name, since a declared entry carries none and the session's checked-out branch may be another claim's. It is a host-agent RPC recorded as dropped by the person — a *declaration*, so the tick cannot undo it — and **the session is told** by a `system` note (§4.10): *your claim on TD-127 was dropped by the person — the lease is gone; claim again if you still hold the work* (no *from Focus*: the RPC cannot tell Focus from a person's `ao progress drop`), waking it as a person's act does; the session's own drop files none. A drop never has an open PR now, so its `why` is *dropped from Focus* and names none |
 | Focus side panel, Session card | **grants** chip | (in the header until TD-156) lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes), each with what the grant allows on its confirm |
 | Focus side panel, Session card | **controllers** chip | (in the header until TD-156) the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the host agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning (TD-036) |
@@ -2513,6 +2514,9 @@ it is why the terminal rides the host agent's pipe and why the adapter contract 
   a real terminal. No per-session escape: a setting over which drag selects is the thing this
   removes. **Copy on select** is the one choice left, and it is the person's (§4.5a *Focus:
   copy on select*, §5 `person.terminal.copy_on_select`).
+- **The round log** (§4.8 *A session's round log*, TD-175; not built — TD-191) sits beside the run
+  log, `~/.agentorc/runs/<name>.rounds.log`, keyed by the record's name in its repo so a start under
+  the name continues it, and is pruned with the run logs of that name by the rule below.
 - **Run-log retention.** A session's log is bounded by its lifetime; retention is by age: logs
   of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the agent's
   tick. Live logs are never truncated, so invariant 3 holds while the session exists.
@@ -2583,6 +2587,7 @@ for another's, since the channels are ungated:
 - `ao progress none --why "..."` — the session found no work it may pick (§4.9a, TD-053);
 - `ao progress restart --why "..."` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*, TD-083);
 - `ao finding TD-029 --priority low`;
+- `ao log "<line>"` appends one stamped line to the session's round log, `ao log --tail n` reads it back (§4.8 *A session's round log*, TD-175; not built — TD-191): the manager's memory across runs, its own record only, never a report;
 - `ao status -v` prints the same report line the card will, and `--json` the entries. A PR that
   is no longer open is marked as the card marks it, `TD-066 → #158 merged` (§4.5a card **report
   line**, TD-182; not built — TD-193): the CLI reads `repos` once per call, and where that read is
@@ -2863,6 +2868,35 @@ manager controls.** Prior art: [ADR 2026-09-12](decisions/2026-09-12-orchestrato
 - **Editing the list is itself an acting RPC.** `set_controllers` is gated on the *target*, like
   `set_grants`: a person at a terminal or the UI always may; a session only if it already
   controls that target. Control is handed on, never seized.
+
+**A session's round log: `ao log`, never a commit (TD-175; designed 2026-09-26, not built —
+TD-191).** Paul, at a manager's card reading *18 unpushed*: *is making round-by-round commits on the
+manager's branch the right design?* It was not: the manager template's round step appended one line
+per round to a file on its launch branch and committed it — a save-point branch by another name, a
+git write into the checkout's shared object store every round, a file nobody reads from git, and a
+count under Ready to close's unpushed signal, which exists for work at risk. **The round line
+stays; git goes.** The narrative it gives — one line per round that outlives a run, which the run
+log (§4.6) does not, since a restart starts a fresh one — has a git-free home: **`ao log "<line>"`**
+appends the line, stamped, to the session's **round log**, a file the host agent that runs the
+session keeps beside its run log (`~/.agentorc/runs/<name>.rounds.log`, keyed by the record's
+**name in its repo** rather than by the run, so a start under the same name — a restart, a resume,
+the next night's `ao team start` — continues the file, as the name carries its mail, §4.10), and
+pruned with the run logs (`runs_keep_days`). A restarted manager's first read is **`ao log --tail
+n`** — its own words from the previous run, in the place `ao inbox` and `ao status` already are,
+so nothing is replayed from a run log or a branch. Its own record only, as `doing` is (§9 invariant
+14); a line is text, never a control (TD-071); `--json` prints the entries. **It is not a report**:
+`progress` and `findings` stay the declared record (§4.8), `out_of_work` the ending, the board what
+waits on the person, and the night report (TD-110) the person's morning read — the round log is
+the manager's memory across runs and nothing else's, and a person who wants it has the **rounds** line
+on the Focus Session card (§4.5a), display only. **The launch branch is a launch artefact** the manager
+commits nothing to, as a grinder's is (this repo's grinder supplement, `docs/briefs/grinder-ao-1.md`:
+*a launch artefact, never commit to it*; a branch carries a PR and is never a save-point);
+the template's round step says `ao log`, its wind-down sequence pushes nothing, and a repo's
+supplement (§4.8, TD-114) says the worktree is the launch's and nothing is committed to it. The
+commits already on `manager-ao-1`'s branch are left where they are: nothing keys on them, and the
+anchor may reset the branch to `origin/main` once, a person's act. **Ready to close was right**: a
+launch branch's own commits *are* unpushed work by its rule, and a manager that commits none shows
+none — the log was the thing that was wrong, not the signal.
 
 **Waking a manager** (TD-049). A polling manager is up to a round stale on every event that
 matters, and a quiet team pays for polls that find nothing on the same usage budget as the work.

@@ -90,7 +90,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Designed 2026-09-25 (the designer) — the build is TD-174; archives with it |
-| TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
+| TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
@@ -105,6 +105,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
+| TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Open |
 | TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
 | TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
@@ -1750,9 +1751,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-191
 
-**Status:** Open — nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
+**Status:** Designed 2026-09-26 (the designer): design §4.8 *A session's round log: `ao log`, never a commit*, §4.7 (the verb), §4.6 (the file beside the run log), §4.5a *Focus side panel, Session card: rounds line*; mockup `Focus.dc.html` (the rounds line). Settled: (a) the round line stays, the commit goes; (b) the narrative lives in a host-agent file beside the run log, keyed by the record's name in its repo so a restart continues it, written by `ao log` and read by `ao log --tail n` — never a branch, never mail, not the trail; (c) the launch branch is a launch artefact the manager commits nothing to; the existing commits are left, and the anchor may reset the branch once; (d) the template's round step becomes `ao log`, the wind-down pushes nothing, the supplement's line changes with it; (e) Ready to close was right and the log wrong. The file-beside-the-run-log choice (against the record's trail) is on the board for Paul (the person inbox is full); the design is PR #603, which merges after 2026-09-27 03:00 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-191; this entry archives with it. **What was:** nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
 
 **Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
 
@@ -1948,6 +1949,30 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-188's *Done when*: the design names the bound and a grinder's run ends near it — a grinder past 200k is told between entries, declares `restart`, and its card showed the reading climbing.
 
 **Related:** TD-188 (the design), TD-186 (restarts must work first — the ceiling's race), TD-083 (`restart_wanted`), TD-165 (the transcript read), TD-090 (compaction and state), TD-128 / TD-151 (the same `usage` fields, read for spend), TD-185 (the tool-neutral direction).
+
+## TD-191: Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-175's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.8 *A session's round log: `ao log`, never a commit*, §4.7 *Reporting*, §4.6 *The round log*, §4.5a *Focus side panel, Session card: rounds line*; mockup `Focus.dc.html`.
+
+**Location:** `src/sessionorc/agent.py` (a `log` RPC: append for the caller's own record — `--id` refused, as `doing`'s own-record rule — and a `log_tail` read, ungated; the file under `paths.runs_dir()` named by the record's name in its repo; the prune beside `runs_keep_days`'s), `src/sessionorc/paths.py`, `src/agentorc/cli.py` (`ao log "<line>"`, `ao log --tail n`, `--json`), `src/agentorc/skill.md` (one clause), `src/agentorc/briefs/manager.md` (step 5 → `ao log`; the wind-down pushes nothing; a first read of `ao log --tail 20` on a restart), `docs/briefs/manager-ao-1.md` (*the one thing you commit to it* → *you commit nothing to it*), `src/agentorc/ui/app.py` and `templates/focus.html` (the Session card's rounds line, display only), `src/agentorc/ui/static/app.js`.
+
+**Why:** TD-175's *Why*: a save-point branch by another name, tripping the unpushed signal, for a narrative that has no git-free home.
+
+**Fix:**
+1. **The file and the RPC**: `<runs_dir>/<name>.rounds.log`, one line `YYYY-MM-DDTHH:MMZ <line>`; `log {text}` appends for the caller's record only (a person may not write one: it is the session's memory); `log_tail {id, n}` reads the last n, ungated; both served where the session runs (a node's own, as the run log is). Pruned when the last record of that name is past `runs_keep_days`.
+2. **`ao log`**: `ao log "<line>"` and `ao log --tail n` (default 20), `--json` the entries; the skill's read-only line names `--tail`.
+3. **The template**: step 5 becomes *`ao log "HH:MM  <member>: <state> → <what you did>"`; nothing is committed*; the quiet-rounds folding stays; the wind-down sequence's push step goes; a restart's first read adds `ao log --tail 20`. The supplement's *the one thing you commit to it is your log* becomes *you commit nothing to it*. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads this PR.
+4. **Focus**: the *rounds* line on the Session card, under *run log*: the last two lines with their stamps, *from an earlier run* on a line older than the record's `created`; *no round log* when empty. No fold of its own.
+5. **Tests:** the RPC's own-record rule; the file's name from the record's name and repo; a second record under the same name continues it; the prune; the CLI's text and `--json`; the template text under `tests/test_briefs*`; the Session card's rounds line.
+
+**Done when** TD-175's *Done when*: the manager template's round step commits nothing, a restarted manager can read what its previous run did with `ao log --tail`, and a manager's card shows no unpushed count from its own log.
+
+**Related:** TD-175 (the design), TD-110 (the night report: the person's read), TD-114 (the supplement's shape), TD-103 (the tick took the mechanical rounds), §4.6 (run logs), §4.8 (`doing`, the own-record rule), §4.10 (the name carries its mail).
 
 ## TD-192: Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards
 
