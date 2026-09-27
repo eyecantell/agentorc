@@ -97,6 +97,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-128, the designer): `spend(profile)` — per-turn tokens and cost from the tool's own records for a metered profile; the prices are the profile's, never the core's.
 - 2026-09-25 (TD-128 reconciled, with Paul): `spend(profile, cursors)` with four token kinds — cache reads folded into input would report a bill several times the real one — read from a byte cursor per transcript across the profile's config directory, sessions agentorc did not start included.
 - 2026-09-25 (TD-154, the designer): `read_transcript` joined the contract beside `transcript_path` — the adapter renders its file into neutral entries and the core draws them, so a second adapter's transcript draws on the same page.
+- 2026-09-26 (TD-188, the designer): `context` on the contract — the session's context size from the tool's records, Claude Code's from the last assistant entry's `usage`.
 
 ## 4.4 Host agent
 
@@ -203,6 +204,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-160, the designer; Paul: *I should start having interactive sessions on the team itself*): the New session form's **Team** pick (screen 3).
 - 2026-09-25 (TD-164, the designer): screen 8's **You** lists copy on select with the terminal's face and size.
 - 2026-09-26 (after the TD-176 promote): the Org drew the new team summaries as plain text — the browser held the old `app.css` (served with no `Cache-Control`, so kept on a guessed freshness) and a hard refresh fixed it. The page's two links now carry a hash of the file.
+- 2026-09-26 (TD-188, the designer): the card's row 4 gains the context reading.
 
 ## 4.5a Controls
 
@@ -350,6 +352,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-168, grinder-ao-1): `ao msg`'s *when it is read* built — the reply's last lines, `<id>: <sentence>`, one per addressee named (copies not), `read_when` under `--json`; the skill's `ao msg` line says so.
 - 2026-09-25 (TD-154, the designer): `ao transcript <id> [-n N] [--before OFFSET] [--raw]`, a read-only verb beside `tail` and `explain`.
 - 2026-09-25 (TD-160, the designer): `ao new --team` documented as the terminal's form of the Team pick — the badge, the group, the manager, the team's reader.
+- 2026-09-26 (TD-188, the designer): `ao status -v` prints the context reading and the bound.
 
 ## 4.8 Capabilities, report channels, and role presets
 
@@ -388,6 +391,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-162, the designer): `message:` on a preset, with built-in defaults for the five presets from §4.9 / §4.9b (a `designer` is not a preset and writes its own in `roles:`); the definition's line, never the session's — Paul's first thought was the profile, which is tool · account · model and says nothing about a job.
 - 2026-09-26 (TD-171, grinder-ao-2): *A role says when to message it* built — `message:` in `ROLE_KEYS` with the five built-in defaults and the 120-character check, `ao roles`, the view's `message_line`, the composer's first line (*Message it about <line>*), the Message controls' `title` head, and the team header's **who for what** from `teamrun.role_holders`. The header's example phrases (*questions → manager-ao-1 · PRs and the architecture → …*) were not derivable from the designed sentences; the header draws the sentences themselves, *<Label>: <line>* for a role several sessions hold (a steer to the techlead, whose answer was the design's sentence over its example: a shorter field would be a design change). The paragraph's example is replaced by the rule.
 - 2026-09-26 (TD-170, grinder-ao-2): *A role has saved prompts* built — `prompts:` in `ROLE_KEYS` (a list of `{label, text}`, the label one line of 24 characters at most, checked when read and named by role and entry, replaced whole per layer; the built-ins carry none), `ao roles`' labels, `/api/roles` and New session's options, the chips beside Focus's Send (a press is `send` with the text, Shift+press fills the composer; hidden with the composer on `exited`, `closed`, `limited` and `unreachable`; none on an unattended record), and New session's chips filling the Opening prompt. On the phone the composer's row is laid out as a column with the chips first, so they wrap above the text box.
+- 2026-09-26 (TD-188, the designer; Paul: *460k tokens is a lot … evaluate the compact skill or another method*): `context: {bound}` on a preset, 200k for the worker presets, none for manager, techlead and plain; a definition, not a setting.
 
 ## 4.8a Who is calling: identity on one host
 
@@ -446,6 +450,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-23 (TD-125, Paul reading the 23:47Z board line: *is all of this text just to point me to a PR?*; the designer): *A wind-down is announced* rewritten — the report became an FYI `note` to the person inbox, two lines (what the run merged, what each member did not find), uncounted; a board line only for what waits on the person (a passed-up question unanswered, a member left open with unpushed work, a refused start or close); a held PR never on the board, since its wait is `prs_waiting` on the seat and the reader's own inbox. Was, from 2026-09-14: one board line naming what each member searched — three such lines landed on 2026-09-23 alone, each a diagnostic plus a pointer at a PR waiting on the anchor, and each closed by the anchor after doing the thing it pointed at.
 - 2026-09-24 (TD-072, the designer): `ao progress none` and `restart` refused while the session has unread mail, naming the count and the command — the three parts proposed to Paul on 2026-09-18 designed beside TD-079 as built (the person's 2026-09-20 condition); the parked build on branch `td072-mail-before-winddown` (2026-09-20) is taken as written, its design text adopted with the *outcomes* refusal beside it. Considered and not taken: the Stop-hook refusal of every turn's end (multi-agent-shogun, TD-059). Steered to Paul as a default. The build is TD-141.
 - 2026-09-25 (TD-141, grinder-ao-1): built — `ao progress none` and `restart` refused while mail is unread (after the owed-outcome check), the *mail read* row, an unread `note` or `reply` on an exited record aging out from the exit. From the parked branch of 2026-09-20 (`td072-mail-before-winddown`), which refused `none` only and predated the restart word.
+- 2026-09-26 (TD-188, the designer): *A run that ends with work left* gains **When** — the tick's rule 5 names the number the brief's *your context is long* never had.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
@@ -571,6 +576,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-128, the designer): a metered profile's reserve is an amount per window (money with prices, tokens without), the line the amount, the same pause at it and one FYI note at eight tenths; a spent window comes back only when it rolls.
 - 2026-09-25 (TD-128 reconciled, with Paul): the amount made the window's 100 so a team's reserve priority (#544, merged the evening before) means one thing on both billings — the line `100 − team priority`, nine tenths of the amount for a team at 10; the eight-tenths note fixed, not a setting (a `warn:` knob was offered and not taken).
 - 2026-09-25 (TD-026, the designer; Paul 2026-09-25: *keep start_at and a scheduled state for one session as well; design those next*): **Start time** designed as the stop time's twin — the record created at once with its launch record and the directory's slot held, the session created at the instant by the tick from that record under the restart ceiling; `--at` needs `--unattended`; Cancel forgets a record that ran nothing. The other shapes TD-026 listed — overrides with an expiry, calendar windows, one-off runs — dropped on the same answer. Steered to Paul on two defaults: the slot held from creation, and Cancel forgetting. The build is TD-152.
+- 2026-09-26 (TD-188, the designer): **rule 5, the context bound** — the reading from the adapter on the tick, the fixed line between entries, the clause on a busy member's `ao` replies, the member's own `restart`; compaction rejected as the mechanism (no settable threshold, no external trigger, no hook before it, lossy, one tool's) and left to a person's own session; a restart per entry rejected (the start-up reading on every entry, and the ceiling).
 
 ## 7. Phases
 
