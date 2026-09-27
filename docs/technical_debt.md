@@ -108,6 +108,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Open — design-first |
 | TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | Open — pickable |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Open — pickable: capture the event first |
+| TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
+| TD-204 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
+| TD-205 | Scrolling the Doing list jumps back to the top: every group delta replaces the team summary whole, and the list's scroll position is not carried over | Medium | Open — pickable |
 
 
 ---
@@ -2009,3 +2012,51 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `UserPromptSubmit`, leaves the session `idle`; a stalled session with a resting composer reads `idle`. Done when the cause is named and an idle grinder with mail is rung.
 
 **Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
+
+## TD-203: TDs in motion shows no priority
+
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *add priority to "TDs in Motion" list on the teams card*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/app.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** a row reads *phase · reference · title · holder · PR*. Whether the team has its High entries in hand or is grinding Lows is not visible without opening the ledger. The ledger reading already carries each entry's `priority` (`sessionorc/ledger.py`), so the data is there.
+
+**Fix:** design where the priority sits (a short mark before the reference: *H / M / L*, or the priority bar's hue on the phase pill) and whether rows sort by priority within a phase (§4.5a says phase order, then reference). Then build it in `motion_rows` and the template, and extend the rollup's TDs in motion if the design says so. Done when a row shows its entry's priority and a test covers an entry with none (a foreign or archived reference: no mark).
+
+**Related:** TD-197 (the same rows' phases), TD-202 (grinders picking by priority), TD-176 (archived: TDs in motion).
+
+## TD-204: The Doing list's times are clock times cut short, and its fields run together
+
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
+
+**Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
+
+**Fix:** design (1) the time as a fuzzy age (*just now*, *5m*, *1h*, *2d*), the page's existing `_age` shape, with the exact time on hover, and refreshed as it ages without a server round trip; (2) three columns with a fixed-width time, the doer at its full name or a width that fits the team's longest, and the words taking the rest and wrapping or ellipsed with hover. Do the same on the Repo page's Doing section. Then build it. Done when the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns.
+
+**Related:** TD-205 (the same list's scrolling), TD-176 slice 2 (the doing log), §4.8 *the doing log*.
+
+## TD-205: Scrolling the Doing list jumps back to the top
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *there is an issue with scrolling in the doing list (on the teams card) — it seems to redraw while scrolling, popping back up to the top*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the group delta: `tpl.innerHTML = g.summary.trim(); … sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept)`, around line 908 at filing), `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** the team summary is re-sent with the groups on every delta and on the `repos` and `doing` events, and the client swaps it whole (`team_summary.html`'s header says so). The swap carries over the Deny *why?* boxes a person was typing (`denyWhys`), but nothing else. The Doing list is a scrolled box, so every delta (any member's state change, any `ao doing`) snaps it back to the top. On a busy team that is every few seconds.
+
+**Fix:** carry each scrolled facet's `scrollTop` across the swap as `denyWhys` does, keyed by the facet (`.facet.fface` for Doing, `.facet.fmotion` for TDs in motion), and keep the person's position unless it was at the top, where new rows should show. Better still, re-render only the facet whose data changed. Test in the page's JS tests if they cover the swap, or a note in the PR on how it was checked by hand. Done when a person can scroll the Doing list while the team works and stay where they scrolled.
+
+**Related:** TD-204 (the same list), TD-176 slice 3 (the summary and its swap).
