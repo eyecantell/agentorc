@@ -635,7 +635,11 @@ class HostAgent(
                 # Ours win, whatever an adapter sets. AGENTORC_HOME is explicit because the tmux
                 # server may predate this agent and carry a different environment; a hook script
                 # inside the session must find *this* agent's socket (found the hard way, 2026-09-06).
-                env = {**spec.env, "AGENTORC_SESSION": sid, "AGENTORC_HOME": str(paths.home())}
+                # AGENT_NAME is the name the Org shows, for whatever in the session signs its work —
+                # dev-cadence's commit hook writes it as a co-author (TD-185). Tool-neutral: every
+                # adapter's session gets it, and a blank name was given its automatic one above.
+                shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
+                env = {**spec.env, "AGENTORC_SESSION": sid, "AGENTORC_HOME": str(paths.home()), "AGENT_NAME": shown}
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
                 try:
                     await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
@@ -646,7 +650,7 @@ class HostAgent(
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
             s = Session(
                 id=sid,
-                name=name if sid == base else name + sid[len(base) :],  # a shown suffix, never a hidden one
+                name=shown,
                 kind=kind,  # type: ignore[arg-type]
                 adapter=adapter,
                 dir=str(directory),

@@ -95,7 +95,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first; waits on Paul's answer (ask `m-d20bbf79bdbe`) |
-| TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
+| TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Built — the live commit check waits on the promote |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
@@ -1758,8 +1758,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (Paul: *include the name of the agent, e.g. grinder-ao-1, as a coauthor for PRs*; the git hook chosen over Claude Code's `attribution` setting because it is generic, and the plan is to go beyond Claude: Codex, on-prem models)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — built (PR #TBD); what is left is one commit in a worktree after the promote
+**Status:** Built 2026-09-27 (grinder-ao-1, PR #TBD): `AGENT_NAME` is set beside `AGENTORC_SESSION` in the launch env for every adapter, the shown name (the automatic one for a blank name — every session agentorc starts has one, so the *left unset* case never arises). **Left:** the *done when* — a commit in a team member's worktree carrying the trailer — needs the promote and dev-cadence's hook synced.
 **Location:** `src/sessionorc/agent.py` (the launch env: `env = {**spec.env, "AGENTORC_SESSION": sid, "AGENTORC_HOME": …}`), design §4.3 / §4.4 where the session's environment is named
 
 **Why:** dev-cadence's TD-067 (filed 2026-09-26, dev-cadence PR #161) adds a `prepare-commit-msg` hook that appends `Co-Authored-By: <AGENT_NAME> <AGENT_NAME@<domain>>` to a normal commit when `AGENT_NAME` is set. The domain comes from git config `cadence.agentDomain`, then `AGENT_DOMAIN` in the environment, then the default `shiftlead.placeholder`. The hook adds nothing when `AGENT_NAME` is unset. agentorc sets only `AGENTORC_SESSION`, which is the tmux id (`ao-agentorc-grinder-ao-1`), not the short name the Org shows (`grinder-ao-1`), so the hook has nothing to read. The two sides agreed on the name `AGENT_NAME` (the dev-cadence anchor, 2026-09-26).

@@ -252,7 +252,9 @@ need them without agentorc; only the wiring for agentorc's own sessions lives he
 The hook script (`agentorc-hook`) knows its session from `AGENTORC_SESSION` and its agent from
 `AGENTORC_HOME`; the host agent sets both on the tmux session at creation, explicitly, because the
 tmux server may predate the host agent and carry another environment
-([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). An event it cannot deliver because nothing
+([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). Beside them it sets `AGENT_NAME`, the name the Org shows
+(the automatic one for a blank name, with any shown suffix), for every adapter's session: dev-cadence's
+`prepare-commit-msg` hook writes it into a commit as a co-author (TD-185). An event it cannot deliver because nothing
 answers on the socket is appended to `events/<session>.jsonl`, stamped with when it happened, and
 the tick applies the file on its next pass — **except a queued state older than one that reached
 the record live meanwhile**, which is skipped (its session id, model and subagent count still
