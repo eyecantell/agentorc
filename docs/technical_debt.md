@@ -103,7 +103,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | Medium | Open — design-first |
-| TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Open — design-first |
+| TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Open — design-first; direction set: restart at a configurable bound, default 200k (TD-189) |
+| TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — after TD-186 and TD-188's design rows |
 
 
 ---
@@ -1912,7 +1913,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** yes
-**Status:** Open — the evaluation below is the anchor's starting point, not a decision.
+**Status:** Open — direction set 2026-09-26 by Paul: restart after a context bound, 200k by default and configurable, built as TD-189; a Sonnet research pass on where the bound should sit comes first. The round settles the design rows and the rest of the evaluation below.
 
 **Why:** a grinder decides for itself when *your context is long* and declares `restart` (`src/agentorc/briefs/grinder.md`, *A run that ends with work left*). There is no number. grinder-ao-1's run from 2026-09-25 20:14Z made 662 model calls with no compaction. Its context reached 462,133 tokens (Opus 5.5, whose 1M window leaves auto-compact far off), and the calls together read 187M input tokens, about 283k per call. Most of that is cache reads, but every read counts against the one account's usage windows that all three profiles share: the week line gated every team on 2026-09-26. Each idle turn afterwards (reading a peer's claim note and replying *nothing for me*) re-read the full 460k. The run merged seven PRs, so the work was fine, but the second half of it cost roughly twice what a fresh run would have. The long history also holds stale design readings and diffs that the next entry doesn't need.
 
@@ -1926,3 +1927,26 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** settle: the measure (where it's read, per adapter), the bound (per role or per profile, default), who acts on it (the tick's note, the session itself, or both), whether compaction has a place and for which roles, and the brief's wording in place of *your context is long*. Then a build TD. Done when the design names the bound and a grinder's run ends near it.
 
 **Related:** TD-186 (restarts must work first), TD-083 (`restart_wanted`), TD-165 (transcript read), TD-090 (compaction and state), TD-100 (the usage gate), TD-185 (tool-neutral direction); `src/agentorc/briefs/grinder.md`; design §4.8, §4.9a, §6.
+
+## TD-189: Restart an unattended member once its context passes a configurable bound (default 200k)
+
+**Priority:** High
+**Added:** 2026-09-26 (Paul: *log a TD for the restart after 200k (configurable) plan. We may want to have Sonnet do some research on where the context sweet-spot is*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — after TD-186 (a restart must not trip the ceiling) and TD-188's design rows (the measure, where the bound lives, the note's words)
+**Status:** Open
+**Location:** the Claude Code adapter (a context reading from the transcript: the last assistant message's `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`), `src/sessionorc/agent.py` (the tick), role presets / `org.yml` `roles:` (the bound), `src/agentorc/briefs/grinder.md` (*A run that ends with work left*)
+
+**Why:** TD-188: grinder-ao-1 ran to 462k tokens of context and 187M input tokens in one run, because *your context is long* is the grinder's own judgement and has no number. Paul chose the mechanism: a restart past a bound, the bound configurable, 200k to start.
+
+**Fix:**
+1. **Research first (Sonnet):** where is the sweet spot? Weigh (a) usage cost per entry against context size, from this machine's transcripts: input tokens per call and per merged PR, across grinder runs of different lengths; (b) the fixed start-up cost of a fresh run (brief, `ao --skill`, design reading), from each run's first calls; (c) quality, as far as the transcripts show it: reviews that found problems, reverts, entries dropped, against the context size when the PR was written; (d) what's published on long-context quality and compaction for the models in use. Output: a recommended default per role (grinder, designer, manager) with the numbers behind it, as a short note in `docs/decisions/` or on this entry.
+2. **Measure:** the adapter reports each session's context size (the tool-neutral field on the record, `context_size: {tokens, at}`, not `context`, which already names a techlead seat's primer; an adapter that can't read one leaves it absent). The card shows it next to the report line.
+3. **Bound:** `context_bound:` on the role preset and overridable per member in `org.yml` (TD-188 decides the layer, per the settings audit's definition-versus-setting rule), default `200k`, `none` to switch off.
+4. **Act:** when a supervised unattended member's context passes its bound, the tick sends one `system` note at the member's next idle: *your context is past <bound>: finish the entry in hand, push, then `ao progress restart --why "context <n>"`*. It sends once per run and never interrupts a turn. The existing rule 2 (TD-103) does the restart once the work is pushed. The grinder brief's *your context is long* becomes *past your context bound (the note says so)*.
+5. **Tests:** a reading past the bound sends the note once; a restart resets it; a missing reading sends nothing.
+
+Done when a grinder whose context passes 200k finishes its entry, declares `restart`, and comes back fresh within a tick, and the card showed the size on the way.
+
+**Related:** TD-188 (the design round and the evaluation), TD-186 (restarts must not trip the ceiling), TD-103 (rule 2, the wanted restart), TD-083 (`restart_wanted`), TD-165 (the transcript read), TD-185 (tool-neutral: the reading is per adapter, the bound and the note are not); `docs/decisions/2026-09-25-settings-audit.md`.
