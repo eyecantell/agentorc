@@ -25,10 +25,11 @@ async def test_shell_lifecycle(agent, tmp_path):
         # the session's environment names this agent's home, so hooks inside it reach this socket
         env = await c.call("tail", id=sid, lines=1)  # warm-up; the real check is below
         assert env is not None
-        await c.call("send", id=sid, text="echo HOME=$AGENTORC_HOME SESSION=$AGENTORC_SESSION")
+        # and the name the Org shows, for dev-cadence's co-author hook (TD-185)
+        await c.call("send", id=sid, text='echo HOME=$AGENTORC_HOME SESSION=$AGENTORC_SESSION NAME="$AGENT_NAME".')
         for _ in range(30):
             tail = await c.call("tail", id=sid, lines=6)
-            if any(f"HOME={paths.home()} SESSION={sid}" in line for line in tail):
+            if any(f"HOME={paths.home()} SESSION={sid} NAME=my shell." in line for line in tail):
                 break
             await asyncio.sleep(0.1)
         else:
@@ -1854,4 +1855,23 @@ async def test_a_tool_event_that_wakes_an_idle_session_is_logged(agent, tmp_path
             await c.call("hook", session=s["id"], state="idle")
             await c.call("hook", session=s["id"], state="working", event="PreToolUse:Read")
         assert f"{s['id']}: PreToolUse:Read turned a hook-confirmed idle session working" in caplog.text
+
+
+async def test_a_session_started_without_a_name_exports_the_one_it_was_given(agent, tmp_path):
+    """TD-185: `AGENT_NAME` is the name the Org shows — for a blank name, the automatic one — so
+    dev-cadence's commit hook signs with what a person sees on the card, whatever the adapter."""
+    out = tmp_path / "name.txt"
+    async with LocalClient() as c:
+        s = await c.call(
+            "create",
+            name="",
+            dir=str(tmp_path),
+            adapter="command",
+            argv=["bash", "-c", f'echo "$AGENT_NAME" > {out}; sleep 30'],
+        )
+        for _ in range(50):
+            if out.exists() and out.read_text().strip():
+                break
+            await asyncio.sleep(0.1)
+        assert s["name"] and out.read_text().strip() == s["name"]
         await c.call("kill", id=s["id"])
