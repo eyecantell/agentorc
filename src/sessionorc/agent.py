@@ -834,18 +834,22 @@ class HostAgent:
             and not s.suspended
             and not s.restart_ceiling
             and not s.superseded_by
-            and not self._profile_gated(s.profile, now)
+            and not self._profile_gated(s.profile, now, s.team)
         )
 
-    def _profile_gated(self, profile: str, now: datetime) -> bool:
+    def _profile_gated(self, profile: str, now: datetime, team: str = "") -> bool:
         """Whether `profile` is over a usage line now (§6 *Usage gate*): the gate's own reading, for a
         record the gate no longer marks — it clears `gated` on an exited one — so a policy does not
-        restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates)."""
+        restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates).
+        `team` is the record's: its reserve priority lowers the line exactly as it does at the gate
+        (TD-146), or a teamed member would be restarted at 65% and paused on the next tick."""
         windows = (self._usage.get(profile) or {}).get("windows")
         if windows is None:
             return False
-        by_label = settings_mod.reserves(settings_mod.load()).get(profile) or {}
-        return settings_mod.crossed(settings_mod.lines(by_label, windows, now)) is not None
+        whole = settings_mod.load()
+        by_label = settings_mod.reserves(whole).get(profile) or {}
+        extra = settings_mod.team_extra(whole, team)
+        return settings_mod.crossed(settings_mod.lines(by_label, windows, now, extra)) is not None
 
     async def _crash_restart(self, s: Session, now: datetime) -> None:
         """Rule 1 (design §6 *Keeping a team running*): restart a member that crashed by replaying
@@ -886,7 +890,7 @@ class HostAgent:
         closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "wanted"
         if not (s.state == "idle" or (s.state == "exited" and s.pane) or closed_by_tick):
             return
-        if (s.run_until and now >= _parse(s.run_until)) or self._profile_gated(s.profile, now):
+        if (s.run_until and now >= _parse(s.run_until)) or self._profile_gated(s.profile, now, s.team):
             return
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
@@ -956,7 +960,7 @@ class HostAgent:
             return  # this stretch was nudged already: never a second before the first is answered
         if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
             return
-        if s.gated or self._profile_gated(s.profile, now):
+        if s.gated or self._profile_gated(s.profile, now, s.team):
             return
         line = self._nudge_line(s)
         if line and await self._policy_send(s, line):
@@ -1096,7 +1100,7 @@ class HostAgent:
         the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
         team badge). The seat whose fill tripped it gets `restart_ceiling` and the Inbox row; its
         fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`."""
-        if s.restart_ceiling or self._profile_gated(s.profile, now):
+        if s.restart_ceiling or self._profile_gated(s.profile, now, s.team):
             return
         mine = set(self._ctl(s))
         fellows = [
@@ -4945,6 +4949,15 @@ class HostAgent:
         field, a field set to None cleared. Validated whole before it is returned."""
         if not isinstance(change, dict) or not change:
             raise RpcError("set_settings: person is a mapping of open_in and terminal (design §5)")
+        if unknown := sorted(set(map(str, change)) - {"open_in", "terminal"}):
+            raise RpcError(f"person: unknown key {', '.join(unknown)} (known: open_in, terminal)")
+        term_change = change.get("terminal")
+        if isinstance(term_change, dict) and (
+            bad := sorted(set(map(str, term_change)) - set(settings_mod.TERMINAL_KEYS))
+        ):
+            raise RpcError(
+                f"person.terminal: unknown key {', '.join(bad)} (known: {', '.join(settings_mod.TERMINAL_KEYS)})"
+            )
         out = dict(current) if isinstance(current, dict) else {}
         for key, value in change.items():
             if value is None:

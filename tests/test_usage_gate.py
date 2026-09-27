@@ -72,12 +72,14 @@ def test_the_four_keys_read_what_is_valid_and_parse_refuses_the_rest(tmp_path):
         "  ao-grind: {until: '2026-09-26T06:00:00-06:00', reserve: 10, schedule: {start: reset}}\n"
         "  bad: {reserve: 130, until: tomorrow}\n"
         "  odd: {colour: red}\n"
+        "  stray: {reserve: 5, colour: red}\n"
         "repos:\n  agentorc: {promote: {auto: false}}\n  x: {promote: {auto: maybe}}\n"
         "person:\n  open_in: none\n  terminal: {size: 13, face: JetBrains Mono, copy_on_select: 7}\n"
     )
     doc = settings.load(f)
     assert settings.teams(doc) == {
-        "ao-grind": {"until": "2026-09-26T12:00:00Z", "reserve": 10, "schedule": {"start": "reset"}}
+        "ao-grind": {"until": "2026-09-26T12:00:00Z", "reserve": 10, "schedule": {"start": "reset"}},
+        "stray": {"reserve": 5},  # one stray key costs that key, not the team
     }
     assert settings.repos(doc) == {"agentorc": {"promote": {"auto": False}}}
     assert settings.person(doc) == {"open_in": "none", "terminal": {"size": 13, "face": "JetBrains Mono"}}
@@ -148,6 +150,10 @@ async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it
         assert settings.person(settings.load())["open_in"] == "none"
         with pytest.raises(AgentError, match="has passed"):
             await person.call("set_settings", teams={"ao-grind": {"until": "2020-01-01T00:00:00Z"}})
+        with pytest.raises(AgentError, match="person: unknown key theme"):
+            await person.call("set_settings", person={"theme": None})
+        with pytest.raises(AgentError, match="person.terminal: unknown key sise"):
+            await person.call("set_settings", person={"terminal": {"sise": None}})
         with pytest.raises(AgentError, match="unknown key resrve"):
             await person.call("set_settings", teams={"ao-grind": {"resrve": None}})
         with pytest.raises(AgentError, match="needs reserves, teams, repos or person"):

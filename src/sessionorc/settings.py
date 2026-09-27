@@ -218,10 +218,14 @@ def person(doc: dict[str, Any]) -> dict[str, Any]:
         return {}
 
 
-def _fields(value: Any, keys: tuple[str, ...], what: str) -> dict[str, Any]:
+def _fields(value: Any, keys: tuple[str, ...], what: str, drop: bool = False) -> dict[str, Any]:
+    """`value` as a mapping of `keys`. An unknown key is refused — or, with `drop` (the reader's side),
+    left out, so one stray hand-edited key costs that key and not the entry."""
     if not isinstance(value, dict):
         raise ValueError(f"{what} is a mapping of {', '.join(keys)}, not {value!r}")
     if unknown := sorted(set(map(str, value)) - set(keys)):
+        if drop:
+            return {k: v for k, v in value.items() if k in keys}
         raise ValueError(f"{what}: unknown key {', '.join(unknown)} (known: {', '.join(keys)})")
     return value
 
@@ -267,7 +271,7 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"schedule is a mapping (§6 *Schedule*), not {v!r}")
         return dict(v)
 
-    value = _fields(value, TEAM_KEYS, "a team's settings")
+    value = _fields(value, TEAM_KEYS, "a team's settings", drop)
     return _each(value, {"schedule": schedule, "until": instant, "reserve": _pct}, drop)
 
 
@@ -281,7 +285,7 @@ def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"promote.auto is true or false, not {v.get('auto')!r}")
         return {"auto": v["auto"]}
 
-    value = _fields(value, ("promote",), "a repo's settings")
+    value = _fields(value, ("promote",), "a repo's settings", drop)
     return _each(value, {"promote": promote}, drop)
 
 
@@ -299,7 +303,7 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
     """`person:` — `open_in` and `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164)."""
 
     def terminal(v: Any) -> dict[str, Any]:
-        v = _fields(v, TERMINAL_KEYS, "terminal")
+        v = _fields(v, TERMINAL_KEYS, "terminal", drop)
 
         def size(n: Any) -> int:
             lo, hi = TERMINAL_SIZE
@@ -319,7 +323,7 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
 
         return _each(v, {"size": size, "face": face, "copy_on_select": flag}, drop)
 
-    value = _fields(value, ("open_in", "terminal"), "person")
+    value = _fields(value, ("open_in", "terminal"), "person", drop)
     return _each(value, {"open_in": parse_open_in, "terminal": terminal}, drop)
 
 
