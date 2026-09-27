@@ -1375,6 +1375,38 @@ def cmd_doing(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: doing — {s['doing']['text']}"))
 
 
+def cmd_log(args: argparse.Namespace) -> int:
+    """`ao log "<line>"` and `ao log --tail n` (design §4.8 *A session's round log*, TD-191): one
+    stamped line appended to this session's round log, or its last lines read back — the manager's
+    memory across runs, kept beside the run logs and keyed by the name, so a restart reads what the
+    run before it wrote. Never a report and never a commit. Only the session writes its own; a
+    read may name another with `--id`."""
+    if args.tail is not None:
+        if args.words:
+            return fail(args, "ao log --tail takes no line", 2)
+        sid = args.id or _own_session(args)
+        if sid is None:
+            return 2
+        entries = call_sync("log_tail", id=sid, n=args.tail)
+
+        def human() -> None:
+            if not entries:
+                print(f"{sid}: no round log")
+            for e in entries:
+                print(f"{e['at']}  {e['text']}")
+
+        return emit(args, entries, human)
+    if args.id:
+        return fail(args, "ao log writes to your own round log only: --id goes with --tail", 2)
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    if not args.words:
+        return fail(args, 'ao log needs a line: ao log "<what this round did>", or --tail n', 2)
+    e = call_sync("log", id=sid, text=" ".join(args.words))
+    return emit(args, e, lambda: print(f"{sid}: logged {e['at']}  {e['text']}"))
+
+
 def cmd_whoami(args: argparse.Namespace) -> int:
     """`ao whoami` (design §4.8a): what the host agent takes this process to be — a session (and by
     which signal: ancestry, session id or terminal), *outside* every pane, or *unknown* — read from
@@ -2187,6 +2219,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
     p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")
     p.set_defaults(fn=cmd_doing)
+    p = add("log", help="append a line to this session's round log, or read it back with --tail (design §4.8)")
+    p.add_argument("words", nargs="*", metavar="line", help="one line, stamped to the minute")
+    p.add_argument("--tail", type=int, metavar="N", nargs="?", const=20, help="print the last N lines (default 20)")
+    p.add_argument("--id", help="with --tail: the session whose round log to read (default: your own)")
+    p.set_defaults(fn=cmd_log)
 
     p = add("finding", help="declare a reference this session filed on the side (design §4.8)")
     p.add_argument("ref")

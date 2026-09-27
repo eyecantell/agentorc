@@ -40,6 +40,7 @@ READS = frozenset(
         "list",
         "get",
         "tail",
+        "log_tail",
         "explain",
         "occupancy",
         "name_check",

@@ -98,7 +98,10 @@ class TickMixin:
             self._pruned_at = snapshot_at
             # the live set is read here, on the loop (the class's one-writer rule); only the file
             # work goes to the thread
-            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
+            ended = ("exited", "closed")
+            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
+            # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
+            live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
             await asyncio.to_thread(self._prune_runs, snapshot_at, live)
         if self.mode == "home":
             self._supervise_containers()

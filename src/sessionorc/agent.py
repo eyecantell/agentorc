@@ -81,6 +81,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     RESTART_SETTLE,  # noqa: F401
     RESTART_WINDOW,  # noqa: F401
     RESUME_MIN,  # noqa: F401
+    ROUND_LINE_CAP,  # noqa: F401
     SEAT_IDLE_GRACE,  # noqa: F401
     SEND_STALL_SECONDS,  # noqa: F401
     SETTLED,  # noqa: F401
@@ -1564,6 +1565,55 @@ class HostAgent(
             await self._broadcast({"event": "doing", "team": s.team, "entry": entry})
         await self._push_changes()
         return self._view(s)
+
+    def _rounds_log(self, s: Session) -> Path:
+        """The record's round log (§4.8, TD-191): keyed by its name in its repo, never by the run."""
+        return paths.rounds_log(naming.base_id(s.dir, s.repo, s.name))
+
+    async def rpc_log(self, id: str, text: str = "", caller: Any = None) -> dict[str, Any]:
+        """`ao log "<line>"` (design §4.8 *A session's round log*, TD-191): one line, stamped to the
+        minute, appended to the session's round log beside its run logs — the manager's memory
+        across runs, never a report and never a commit. Only the session itself writes it (§9
+        invariant 14, as `doing`): a person may not, since it is the session's own memory. Served
+        where the session runs, as the run log is: a node writes its own. A line is text, never a
+        control (TD-071): control bytes stripped, one line, capped at `ROUND_LINE_CAP`."""
+        s = self._get(id)
+        if mail.is_person(caller) or str(caller) != s.id:
+            raise RpcError(f"only {s.id} may write its round log: it is the session's own memory (design §4.8)")
+        line = _clean(str(text or "").split("\n", 1)[0], ROUND_LINE_CAP).strip()
+        if not line:
+            raise RpcError('ao log needs a line: `ao log "<what this round did>"` (design §4.8)')
+        entry = {"at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%MZ"), "text": line}
+        path = self._rounds_log(s)
+
+        def append() -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write(f"{entry['at']} {line}\n")
+
+        await asyncio.to_thread(append)
+        return entry
+
+    async def rpc_log_tail(self, id: str, n: int = 20) -> list[dict[str, str]]:
+        """`ao log --tail n` (design §4.8, TD-191): the last `n` lines of the session's round log as
+        `{at, text}`, oldest first; empty when it has none. A read, ungated (§9 invariant 11), and
+        routed to the node a record runs on, whose disk holds the file."""
+        s = self._get(id)
+        path = self._rounds_log(s)
+        n = max(0, min(int(n), 1000))
+
+        def read() -> list[str]:
+            try:
+                return path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except FileNotFoundError:
+                return []
+
+        lines = [x for x in await asyncio.to_thread(read) if x.strip()]
+        out = []
+        for x in lines[-n:] if n else []:
+            at, _, text = x.partition(" ")
+            out.append({"at": at, "text": text})
+        return out
 
     async def rpc_finding(
         self, id: str, ref: str, priority: str | None = None, source: str = "declared"
