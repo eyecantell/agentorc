@@ -1,6 +1,6 @@
-"""The person's own bookkeeping on their inbox (TD-108 step 1): design §4.10 and TD-069 step 0 — delete,
-snooze, dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgent` inherits. Moved as
-written; the state it reads is the agent's.
+"""The person's own bookkeeping on their inbox (TD-108 step 1): design §4.10 and TD-069 step 0 — snooze,
+dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgent` inherits (delete is mail's,
+`agent_mail.py`). Moved as written; the state it reads is the agent's.
 """
 
 from __future__ import annotations
