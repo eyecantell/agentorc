@@ -62,6 +62,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     ID_RECHECK,  # noqa: F401
     IDLE_NUDGE,  # noqa: F401
     INTENT_FIELDS,  # noqa: F401
+    LANE_NEWS_NAMED,  # noqa: F401
     LAUNCH_KEYS,  # noqa: F401
     LEASE_TTL,  # noqa: F401
     MODEL_EVERY,  # noqa: F401
@@ -1426,6 +1427,7 @@ class HostAgent(
             # a session that claims something went on after all — both endings are taken back
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
             s.out_of_work = s.restart_wanted = None
+            s.lane_seen = None  # rule 6's memory goes with the declaration it was about (TD-195)
         if applied and status == "dropped" and entry.source == "declared" and mail.is_person(caller):
             # §4.5a *Reports* → Drop, §4.10 (TD-150 slice 3): the session is told its lease went, by a
             # `system` note that wakes it as a person's act does — else it works on, holding nothing
@@ -1510,6 +1512,7 @@ class HostAgent(
             )
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
+            s.lane_seen = None  # a second `none` is a declaration like the first: the tick looks afresh
         else:
             # The word stands whenever it is said — it is the session's — but one said inside
             # `RESTART_EARLY` of this record's own start is marked, and a controller does not act

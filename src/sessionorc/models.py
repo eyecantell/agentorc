@@ -107,6 +107,7 @@ HOME_OWNED = frozenset(
         "progress",
         "findings",
         "out_of_work",
+        "lane_seen",
         "restart_wanted",
         "suspended",
         "doing",
@@ -705,6 +706,11 @@ class Session:
     # session itself writes it and nothing derives it (§9 invariant 14); a later declared claim
     # clears it, since the session has work again.
     out_of_work: dict[str, str] | None = None
+    # `{at, ids}` while `out_of_work` stands: the ledger entries matching the session's lane that it
+    # has been told of — at first the ones its repo's reading held when the tick first saw the
+    # declaration, then each new one as a `system` note names it (design §6 rule 6, TD-195), so an
+    # entry is told once. The home's; cleared wherever `out_of_work` is set or cleared.
+    lane_seen: dict[str, Any] | None = None
     # `{at, why, early?}` once the session has declared that **its run is over and its lane is
     # not** (`ao progress restart --why`, design §4.9a *A run that ends with work left*, TD-083):
     # start me again, under this name and this brief, with nothing of this conversation. A fact,

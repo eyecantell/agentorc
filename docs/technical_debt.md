@@ -101,7 +101,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Partly done — the reading built (slice 1); the bound, rule 5 and the briefs left |
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Open |
-| TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
+| TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
 | TD-202 | *Choose by priority* is one clause in the grinder template, with no order, no tool and no check; `scripts/ledger.py --pickable` sorts by priority but does not filter the header lines | Low | Open — pickable |
@@ -1884,8 +1884,8 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Added:** 2026-09-26 (the designer, from TD-187's design)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §6 *Keeping a team running* rule 6, §4.9a, §4.4a. Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
+**Pickable:** no — built; what is left is the live check after a promote
+**Status:** Built 2026-09-27 (grinder-ao-1, PR #TBD): `ledger.lane_matches`, `lane_seen` (home-owned, cleared with `out_of_work` and reset by a second `none`), and `_lane_news`, the keep-running tick's sixth pass, which writes one `system` note through `_system_note`. **Left:** the *done when*'s live half, a finished member woken within a tick of an entry filed into its lane, after the promote. Design §6 *Keeping a team running* rule 6, §4.9a, §4.4a.
 **Location:** `src/sessionorc/agent.py` (`_keep_running`: a sixth pass beside the nudge's; the `system` note through the path the lapse's note takes), `src/sessionorc/models.py` (`lane_seen` on the record and in `HOME_OWNED`, carried across a supersede as `out_of_work` is and cleared where `out_of_work` is cleared), `src/sessionorc/ledger.py` (the reading already keeps `kind` and `pickable` per entry: a `lane_matches(lane, entry)` beside `kind_of`)
 
 **Why:** TD-187's *Why*: the doorbell rings only for mail, filing an entry sends none, and the manager never sends to a finished member.
