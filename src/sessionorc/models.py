@@ -470,7 +470,7 @@ def normalize_ref(ref: str) -> str:
 
 # What counts as something worth waking a manager for (design §4.8 "Waking a manager", TD-049). The
 # vocabulary is deliberately short, and the exclusions are the point: `last_output`, `tail`,
-# `since`, `seen_at`, `git`, `subagents` and `model` move on almost every tick of a healthy
+# `since`, `seen_at`, `git`, `subagents`, `model` and `context` move on almost every tick of a healthy
 # session, so a digest over the whole record would wake a lead continuously and be worth less
 # than the poll it replaces. What is left is what a lead acts on: the state it may have to answer
 # or restart, the pending thing it would answer, what the session has claimed or finished, what it
