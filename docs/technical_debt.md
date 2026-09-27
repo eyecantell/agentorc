@@ -97,8 +97,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first |
-| TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Open — design-first, Paul set the shape: the same summary as a running team |
-| TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Open — design-first, a small row change then the build |
+| TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Designed 2026-09-26 — the build is TD-192 |
+| TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Designed 2026-09-26 — the build is TD-193 |
 | TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
@@ -106,6 +106,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
+| TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
+| TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 
 
 ---
@@ -1800,8 +1802,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (Paul, at the dc-grind card after its wind-down: *the unfolded card should show the same info as the running team — some items will become stale and that's ok*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open — Paul set the shape; the design rows and the build remain.
+**Pickable:** no — designed; the build is TD-192
+**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups* and the fold's help text. Settled: the same three facets and compact members as a running team; the third facet opens on Doing; nothing is marked stale, the header's *stopped* / *wound down <t> ago* dates it; folded, the one row is unchanged; the rollup still sums live teams only. Obvious from Paul's words and the entry's *Fix*, so landed with a note to him. The build is TD-192; this entry archives with it. **What was:** Paul set the shape; the design rows and the build remained.
 **Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`), `src/agentorc/ui/templates/team_summary.html`, `org.html`
 
 **Why:** the team summary (TD-176 slice 3) is built only for a team with a live member. When dc-grind wound down on 2026-09-26 all three sessions exited. The card folded to one row as §4.5 screen 1 says, and pressing *3 sessions* unfolded the member cards with no summary: no TD or PR bars, no TDs in motion, no Doing. samscrape-grind, concluded but with idle members, kept its summary right below. The repo facts don't depend on anyone being live, and a wound-down team is when the person most wants to see what it left behind. Because the summary wasn't there, a merged PR on the grinder's report line read as outstanding (TD-182).
@@ -1816,8 +1818,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (found at the dc-grind wind-down: Paul read the grinder's card as *they have a PR outstanding*; #158 had merged at 17:00 UTC)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-193
+**Status:** Designed 2026-09-26 (the designer): design §4.5a *card: report line* (**the PR's mark**), *card: compact* (an ended member keeps its last reference after the ending), §4.5 screen 1, §4.7 (`ao status -v`); mockup `OrgTeamFirst.dc.html` (a compact line with the mark). Settled: the word after the number, *merged* or *closed*, from the repo readings; unmarked when the readings do not hold the PR; `ao status -v` shows it too, by one `repos` read per call; the record and `--json` are unchanged; the Focus Reports panel marks its PR links the same way. The build is TD-193; this entry archives with it.
 **Location:** `src/sessionorc/models.py` (`report_line`), the card's report line in `src/agentorc/ui/templates/card.html`; the PR states are in the repo facts (`repos.json`, TD-176 slice 1)
 
 **Why:** §4.5a's **card: report line** row draws `TD-027 → PR #59 · 1/2 done` from the record alone. TDs in motion marks a PR *merged* / *closed* once it is no longer open (§4.5a, TD-176). The member card doesn't, so an exited grinder's last report reads as work in flight. The same line is in `ao status -v` and the Members list.
@@ -1961,3 +1963,49 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-188's *Done when*: the design names the bound and a grinder's run ends near it — a grinder past 200k is told between entries, declares `restart`, and its card showed the reading climbing.
 
 **Related:** TD-188 (the design), TD-186 (restarts must work first — the ceiling's race), TD-083 (`restart_wanted`), TD-165 (the transcript read), TD-090 (compaction and state), TD-128 / TD-151 (the same `usage` fields, read for spend), TD-185 (the tool-neutral direction).
+
+## TD-192: Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-181's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups*.
+**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`, and the `compact` flags set under it), `src/agentorc/ui/templates/org.html` and `team_summary.html` (the summary inside the fold), `src/agentorc/ui/static/app.js` (`syncTeams`: the fold hides the summary with the cards), `src/agentorc/ui/help.py` (the fold's text)
+
+**Why:** TD-181's *Why*: a wound-down team is when the person most wants to see what it left, and the summary is built only while a member is live.
+
+**Fix:**
+1. **The builder**: drop the `live` condition (keep *No team* out); the members of such a team are compact, as a live team's are.
+2. **The fold**: the summary is folded and unfolded with the cards; folded, the team is its one row and no summary is drawn.
+3. **The facets on exited records**: TDs in motion from the members' `claimed` entries as they stand (*nothing claimed* when none); the third facet opens on Doing, since nobody can be waiting; the Repo facet unchanged.
+4. **The help text** of the fold, as the design's.
+5. **Tests:** a team whose members have all exited yields a summary with the three facets and compact members; *No team* yields none; the rollup's sums are unchanged by such a team.
+
+**Done when** TD-181's *Done when*: an unfolded wound-down team shows the three facets, and a test covers a team whose members have all exited.
+
+**Related:** TD-181 (the design), TD-193 (the mark its cards carry), TD-183 (the fold's target), TD-176 (archived: the summary).
+
+## TD-193: Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel
+
+**Priority:** Low
+**Added:** 2026-09-26 (the designer, from TD-182's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5a *card: report line* (**the PR's mark**), *card: compact*, §4.7 (`ao status -v`). Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
+**Location:** `src/sessionorc/models.py` (`report_line`: a second argument, the readings' PRs by number, default none), `src/agentorc/ui/app.py` (`_pr_states` is the lookup TDs in motion already uses; the card's `report`, `compact_line`, the Members rows), `src/agentorc/cli.py` (`ao status -v`: one `repos` read per call, its failure swallowed), `src/agentorc/ui/static/app.js` (`renderReports`: the word after the PR link, from a structured field the page passes, never from text)
+
+**Why:** TD-182's *Why*: an exited grinder's last report reads as work in flight.
+
+**Fix:**
+1. **The formatter**: `report_line(session, prs=None)` appends ` merged` or ` closed` after `#<n>` when the readings hold the PR in that state; an open PR, an unknown PR and `prs=None` leave the line as it is today.
+2. **The page**: the card, the Members list and the compact line pass the readings of the record's repo; a member that has ended and holds a report reads *<role> · <ending> · <reference> → #<n> <mark>*.
+3. **The CLI**: `ao status -v` reads `repos` once; refused or failed, the lines are unmarked. `--json` is unchanged.
+4. **The Reports panel**: each row's PR link carries the same word.
+5. **Tests:** an open, a merged, a closed and an unknown PR through `report_line`; the compact line of an exited member; `ao status -v` with the read refused.
+
+**Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
+
+**Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).
