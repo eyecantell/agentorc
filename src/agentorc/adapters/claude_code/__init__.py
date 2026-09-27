@@ -287,7 +287,7 @@ class ClaudeCodeAdapter:
             if prompt.startswith("-"):
                 argv.append("--")  # a pasted brief that starts with '-' is a prompt, not an option
             argv.append(prompt)
-        env = {"AGENTORC_PERMISSION_WAIT": str(prof.permission_wait), "AGENTORC_PROFILE": prof.name}
+        env = {"AGENTORC_PERMISSION_WAIT": str(prof.permission_wait)}
         if prof.config_dir:
             env["CLAUDE_CONFIG_DIR"] = str(prof.config_dir)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id)

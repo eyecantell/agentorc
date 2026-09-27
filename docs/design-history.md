@@ -549,6 +549,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-149 (2), (4), (6), grinder-ao-1): `promote:` accepted in `.agentorc.yml` ahead of TD-132 (it was refused as an unknown key, so writing the designed block broke `ao new` in that repo); the org `roles:` overlay checked key by key as a repo's is (it was taken raw); `AGENTORC_TICK` named as the one test knob.
 - 2026-09-25 (TD-161, the designer): the `roles:` example gains `plain: {prompts: […]}`, the person's own chips.
 - 2026-09-25 (TD-164, the designer): `person.terminal.copy_on_select`, default true.
+- 2026-09-26 (TD-149 (7), (8), grinder-ao-1): the `hosts.yml` field list names what `sessionorc.hosts` reads (`local`, `identity`, `person`, `home:`, `nodes:`, `link:` were missing; `transport` and `ssh` were listed though nothing reads them before TD-004); `AGENTORC_PROFILE`, exported to every Claude Code pane since the rename and read by nothing, left the launch environment; the UI's bind and port defaults, three literals, became one.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 

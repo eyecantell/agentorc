@@ -19,6 +19,10 @@ from pathlib import Path
 
 UNIT_DIR = Path("~/.config/systemd/user").expanduser()
 UNITS = ("agentorc-agent", "agentorc-ui")
+# Where the UI listens (design §4.5: localhost, never the LAN) — the one source `ao ui`, `agentorc-ui`
+# and `ao service install` default to (TD-149 (7)); the unit carries whatever the install was given.
+DEFAULT_BIND = "127.0.0.1"
+DEFAULT_PORT = 8765
 
 
 def _bin(name: str) -> str:
@@ -42,7 +46,7 @@ def _path_env() -> str:
     return ":".join(dict.fromkeys(parts))
 
 
-def unit_text(name: str, *, bind: str = "127.0.0.1", port: int = 8765, home: str | None = None) -> str:
+def unit_text(name: str, *, bind: str = DEFAULT_BIND, port: int = DEFAULT_PORT, home: str | None = None) -> str:
     env = [f"PATH={_path_env()}"]
     if home:
         env.append(f"AGENTORC_HOME={home}")
@@ -85,7 +89,9 @@ def _systemctl(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["systemctl", "--user", *args], capture_output=True, text=True)
 
 
-def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = None, start: bool = True) -> list[str]:
+def install(
+    *, bind: str = DEFAULT_BIND, port: int = DEFAULT_PORT, home: str | None = None, start: bool = True
+) -> list[str]:
     UNIT_DIR.mkdir(parents=True, exist_ok=True)
     written = []
     for name in UNITS:

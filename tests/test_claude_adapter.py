@@ -188,6 +188,7 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert spec.argv[-1] == "do it" and "--model" in spec.argv and "--name" in spec.argv
     assert "CLAUDE_CONFIG_DIR" not in spec.env or spec.env["CLAUDE_CONFIG_DIR"].endswith(".claude")
     assert spec.env["AGENTORC_PERMISSION_WAIT"] == "600"
+    assert "AGENTORC_PROFILE" not in spec.env  # read by nothing (TD-149 (8)); the record carries the profile
     hooks_path = Path(spec.argv[spec.argv.index("--settings") + 1])
     assert json.loads(hooks_path.read_text())["hooks"]["Stop"]
 
