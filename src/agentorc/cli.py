@@ -17,7 +17,7 @@ from importlib import resources
 from typing import Any
 
 from agentorc import org as orgmod
-from agentorc import repoconfig, teamrun, teams
+from agentorc import repoconfig, service, teamrun, teams
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
@@ -1636,8 +1636,6 @@ def cmd_decide(args: argparse.Namespace) -> int:
 
 
 def cmd_service(args: argparse.Namespace) -> int:
-    from agentorc import service
-
     if args.action == "install":
         written = service.install(bind=args.bind, port=args.port, start=not args.no_start)
         status = service.status()
@@ -2112,8 +2110,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_inbox)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
-    p.add_argument("--bind", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--bind", default=service.DEFAULT_BIND)
+    p.add_argument("--port", type=int, default=service.DEFAULT_PORT)
     p.set_defaults(fn=cmd_ui)
 
     p = add("host", help="a container node: bring it up, rebuild it, forget it, or read its state (design §4.4a)")
@@ -2130,8 +2128,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
     p.add_argument("action", choices=["install", "uninstall", "status"])
-    p.add_argument("--bind", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--bind", default=service.DEFAULT_BIND)
+    p.add_argument("--port", type=int, default=service.DEFAULT_PORT)
     p.add_argument(
         "--no-start",
         action="store_true",

@@ -4370,9 +4370,11 @@ def main(argv: list[str] | None = None) -> int:
 
     import uvicorn
 
+    from agentorc.service import DEFAULT_BIND, DEFAULT_PORT
+
     ap = argparse.ArgumentParser(prog="agentorc-ui")
-    ap.add_argument("--bind", default="127.0.0.1", help="address to listen on (design §4.5: never the LAN)")
-    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--bind", default=DEFAULT_BIND, help="address to listen on (design §4.5: never the LAN)")
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = ap.parse_args(argv)
     # lifespan="off": the app has no startup/shutdown handlers, and with lifespan on, Ctrl+C makes
     # uvicorn log a CancelledError traceback from starlette's lifespan task (seen 2026-09-06).

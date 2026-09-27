@@ -15,6 +15,25 @@ def test_unit_text_shapes():
     assert "KillMode" not in u
 
 
+def test_the_ui_address_has_one_source(monkeypatch):
+    """`ao ui`, `agentorc-ui` and `ao service install` default to the same bind and port, read from
+    one place (TD-149 (7)): three literals once had to be kept in step by hand."""
+    import uvicorn
+
+    from agentorc import cli
+    from agentorc.ui import app
+
+    p = cli.build_parser()
+    for argv in (["ui"], ["service", "status"]):
+        a = p.parse_args(argv)
+        assert (a.bind, a.port) == (service.DEFAULT_BIND, service.DEFAULT_PORT)
+    seen = {}
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: seen.update(k))
+    assert app.main([]) == 0
+    assert (seen["host"], seen["port"]) == (service.DEFAULT_BIND, service.DEFAULT_PORT)
+    assert f"--bind {service.DEFAULT_BIND} --port {service.DEFAULT_PORT}" in service.unit_text("agentorc-ui")
+
+
 def test_install_writes_the_wheel_before_it_restarts_the_units(tmp_path, monkeypatch):
     """The restarted agent takes its nodes' `hello`s at once and compares their build with the
     newest wheel (design §4.4a "The home supervises it"): written after the restart, the wheel

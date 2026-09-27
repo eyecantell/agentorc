@@ -2096,7 +2096,9 @@ no credential beyond the host ssh keys. The concrete options, any of which satis
   carries the websockets;
 - the LAN address at home only.
 
-Default until one of those is set up: the UI binds to `127.0.0.1` and the laptop reaches it
+Default until one of those is set up: the UI binds to `127.0.0.1` — port 8765, one default that
+`ao ui`, `agentorc-ui` and `ao service install` share (`agentorc.service`), the unit carrying
+whatever its install was given — and the laptop reaches it
 through `ssh -L 8765:127.0.0.1:8765 kmaster`.
 
 Phone layout (not built: phase 2, with the phone's route in — WireGuard or the tunnel; until
@@ -5177,13 +5179,16 @@ session is never woken by mail at all.
 ## 5. Configuration
 
 - Hosts: `~/.agentorc/hosts.yml` on every host — the UI host's copy lists the hosts; each host
-  agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). Fields: `name`,
-  `transport: ssh|local`, `ssh` target, `vscode_host`, `volatile: true|false`, `repos_registry`
-  path, `runs_keep_days`. The UI process may run on a laptop; only the session hosts need to stay
-  awake. The parser is `sessionorc.hosts`, shared by the UI and the host agent (TD-004; there are
+  agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
+  fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
+  you sit at), `volatile: true|false`, `repos_registry` path, `runs_keep_days`, `identity` (§4.8a)
+  and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). The UI
+  host's entries for other hosts — `transport: ssh|local` and an `ssh` target each — arrive with
+  the ssh transport (TD-004, phase 2); nothing reads them today. The UI process may run on a
+  laptop; only the session hosts need to stay awake. The parser is `sessionorc.hosts`, shared by the UI and the host agent (TD-004; there are
   no env-var overrides). A field the *agent* acts on (`runs_keep_days`) is read on the session host
-  from its own file's `local` entry, so every session host carries its own copy; the ssh entries
-  are the node→home link of §4.4a (built for a container node; a machine node is not yet in use, TD-057). **`home:`** names the host whose agent holds the org's graph
+  from its own file's `local` entry, so every session host carries its own copy; a node's `link:`
+  key is the node→home link of §4.4a (built for a container node; a machine node is not yet in use, TD-057). **`home:`** names the host whose agent holds the org's graph
   and mail; an agent whose file names no `home:`, or names itself, is the home. On Paul's machines
   it is `home: kmaster`.
 - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
