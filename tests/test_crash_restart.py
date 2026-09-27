@@ -11,7 +11,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import paths
-from sessionorc.agent import RESTART_CEILING, RESTART_WINDOW
+from sessionorc.agent import RESTART_CEILING, RESTART_SETTLE, RESTART_WINDOW
 from sessionorc.client import AgentError, LocalClient
 
 pytestmark = pytest.mark.integration
@@ -63,9 +63,12 @@ async def test_a_member_that_exited_on_its_own_is_restarted_from_its_launch_reco
             True,
         )
         assert [r["why"] for r in new.restarts] == ["crash"] and "error" not in new.restarts[0]
-        # the count survives the restart it counts: a second crash appends to the same list
+        # an exit read at once is the replaced run ending, not the new one's crash (TD-186): held
         _crash(agent, sid)
         await agent._keep_running(now)
+        assert [r["why"] for r in agent.sessions[sid].restarts] == ["crash"]
+        # the count survives the restart it counts: a later crash appends to the same list
+        await agent._keep_running(now + RESTART_SETTLE + timedelta(seconds=1))
         assert [r["why"] for r in agent.sessions[sid].restarts] == ["crash", "crash"]
         # a person's own Resume or fresh start of the name starts the count again
         await person.call("kill", id=sid)

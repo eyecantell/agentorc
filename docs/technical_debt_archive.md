@@ -1797,3 +1797,19 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Related:** TD-176 (the repo facts), design §4.4 *Repo facts*; `docs/claude-memory/scratch-worktree-tests-import-main-checkout.md` (the same pattern: test state reaching the live machine).
 
 **Resolved:** 2026-09-26 (PR #612 recorded the cleanup): Paul removed the two fixture lines from the roster and the host agent dropped them from `repos.json`. The leak went to dev-cadence as its TD-068 (dev-cadence PR #161): `sync.sh` refuses to add a consumer under a temp dir to a roster outside one, and the readers skip a roster path that no longer exists. That covers step (3) from the source side, so agentorc's reader keeps its current behaviour.
+
+## TD-186: A restart's own race trips the restart ceiling, and the ceiling mark never lifts
+
+**Priority:** High
+**Added:** 2026-09-26 (found when Paul asked why ao-grind read *running* with every member idle)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`_crash_restart`, `_wanted_restart`, `RESTART_CEILING` / `RESTART_WINDOW`, `_replay`)
+
+**Why:** grinder-ao-1's record carries three restarts in four seconds: `{2026-09-25T20:14:19Z, wanted}`, then `{20:14:21Z, crash, error: "…/worktrees/grinder-ao-1 already has agent session grinder-ao-1 (claude-code, outside agentorc, busy); anchor rule"}` and the same again at 20:14:23Z. So the wanted restart worked: the new run is the record created at 20:14:19Z, and it went on to merge #580–#592. But on the next two ticks the crash rule read the record as crashed, and its replay was refused because the fresh run it had just started already held the worktree. Two failed replays count toward the ceiling by design, so `restart_ceiling {at: 20:14:25Z, count: 3}` was written into a healthy session. That mark is never cleared (`_wanted_restart` returns on any `s.restart_ceiling`, and §4.5a says the tick never lifts it). When the member declared `restart_wanted` at 23:05Z with its work pushed, the tick skipped it. It sat for a day, grinder-ao-2 went out of work behind it (the remaining grinder entries are in grinder-ao-1's files), and the team read *running* with all members idle.
+
+**Resolved:** 2026-09-26 (PR #628) — an exit event carrying another run's tool id is ignored (`_apply_event`), rule 1 waits `RESTART_SETTLE` after a restart that succeeded (`_just_restarted`), and a clean `restart_wanted` runs past a ceiling whose window has emptied (`_window_full`); design §6 rules 1–2 and the §4.5a *Inbox row: restart* say so; tests in `tests/test_wanted_and_nudge.py` and `tests/test_crash_restart.py`.
+
+**Related:** TD-103 (the restart rules, slice 5 the Inbox row), TD-083 (`restart_wanted`), TD-115 (the exit-hook grace), TD-187, TD-188; design §6 *Keeping a team running*, §4.5a *Inbox row: restart*, §9 invariant 2 (the anchor rule).
