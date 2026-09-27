@@ -58,6 +58,15 @@ console.log(JSON.stringify({
   },
   labels: ["Open", "▣ Focus", "Snooze ▾", "Open board", "Dismiss"].map(AO.keyLabel),
   role_line: [AO.roleLine({ line: "the team's work" }), AO.roleLine({ line: "x", reply: true }), AO.roleLine({})],
+  // the fold's default and the stored choice (TD-194): `get` is the store's, (key, default)
+  folded: [
+    AO.teamFolded("t", "2", (k, d) => d),
+    AO.teamFolded("t", "0", (k, d) => d),
+    AO.teamFolded("t", "2", (k, d) => (k === "fold:t" ? true : d)),
+    AO.teamFolded("t", "0", (k, d) => (k === "fold:t" ? false : d)),
+    AO.teamFolded("", "0", (k, d) => d),
+  ],
+  org_f: AO.keyEntry("org", "f"),
 }));
 """
 
@@ -179,3 +188,14 @@ def test_the_composer_opens_on_the_roles_line_and_a_reply_shows_none():
     """§4.5a **Message** (TD-171): the composer's first line is the addressee's role's `message:`
     sentence, under its name; a Reply shows none, since the sender chose already."""
     assert _probe()["role_line"] == ["Message it about the team's work", "", ""]
+
+
+@pytest.mark.unit
+def test_a_team_opens_as_its_state_says_until_a_choice_is_stored():
+    """§4.5a *team card: fold* (TD-194): a live team — a concluded one is live — opens unfolded and
+    one with nothing live folded; a stored `fold:<team>` wins whatever the team's state; *No team*
+    never folds. `f` on the Org is the ringed card's fold."""
+    got = _probe()
+    assert got["folded"] == [False, True, True, False, False]
+    f = got["org_f"]
+    assert f["ring"] and f["fold"] and f["sel"] == "[data-fold]" and f["control"].startswith("fold its team")

@@ -3,6 +3,7 @@ of three facets — Repo, TDs in motion, Answer needed / Doing — and its membe
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 from agentorc.ui import app as ui
@@ -141,7 +142,9 @@ def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
     assert by["g1"]["compact_line"] == "Grinder · TD-301 → #811"
     assert by["g2"]["compact_line"] == "exited · code 0"
     head = ui.templates.get_template("group_head.html").render(g=g)
-    assert "· 2 sessions" in head and "working" not in head
+    # the chips come back only for the fold (TD-194): drawn as `foldonly`, which CSS shows while folded
+    unfolded = re.sub(r'<span class="meta counts foldonly">[^<]*</span>', "", head)
+    assert "· 2 sessions" in head and "working" not in unfolded and "1 working" in head
     # a team with nothing live: no summary, full cards
     dead = [{**m, "state": "exited"} for m in ms]
     for m in dead:

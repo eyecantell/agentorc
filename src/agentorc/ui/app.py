@@ -1827,8 +1827,8 @@ def team_groups(
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
                 # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
-                # stopped team — folded, sorted with them, Start alone — since a wind-down would
-                # only wake the manager to find nothing to wind down
+                # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
+                # since a wind-down would only wake the manager to find nothing to wind down
                 "concluded": concluded,
                 "concluded_age": row.get("concluded_age") if concluded else "",
                 "stopped": not live or concluded is not None,
