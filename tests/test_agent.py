@@ -1838,3 +1838,20 @@ async def test_a_mode_change_is_pushed_at_the_press(agent, tmp_path, monkeypatch
     assert view["unattended"] is True and pushed
     monkeypatch.setattr(agent, "_push_changes", push)
     await agent.rpc_kill(sid)
+
+
+async def test_a_tool_event_that_wakes_an_idle_session_is_logged(agent, tmp_path, caplog):
+    """TD-201's capture: a hook turned an idle grinder `working` four seconds after its Stop, with no
+    turn behind it, and nothing recorded which event it was. The adapter names a tool event in
+    `event`; the agent logs the one that wakes a hook-confirmed idle session, and only that one."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="woken", dir=str(tmp_path), adapter="shell")
+        with caplog.at_level("INFO", logger="agentorc.agent"):
+            await c.call("hook", session=s["id"], state="idle")
+            await c.call("hook", session=s["id"], state="working")  # a prompt's own start: unnamed
+            await c.call("hook", session=s["id"], state="working", event="PreToolUse:Bash")  # already working
+            assert "turned a hook-confirmed idle session working" not in caplog.text
+            await c.call("hook", session=s["id"], state="idle")
+            await c.call("hook", session=s["id"], state="working", event="PreToolUse:Read")
+        assert f"{s['id']}: PreToolUse:Read turned a hook-confirmed idle session working" in caplog.text
+        await c.call("kill", id=s["id"])

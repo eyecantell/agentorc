@@ -238,7 +238,9 @@ first entry of `git worktree list --porcelain`, computed live, so it holds in a 
 runner finds its children beside itself, and a consumer's copy is what its last sync carried — and falls back to the directory's own copy outside a git repo (dev-cadence
 TD-055 (b), 2026-09-25): a worktree on an older branch runs the current hook set against itself, where
 `$CLAUDE_PROJECT_DIR` alone ran that branch's copy. One known limit, recorded and not fixed since the bytes are the pair: a consumer that is itself a git submodule gets its parent's `.git/modules` gitdir as the first entry, so the set silently does not run there. An unattended launch's layer also refuses the tool's own peer
-messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064). It uses the cadence line when
+messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064) and turns off the tool's
+suggested next prompt (`promptSuggestionEnabled: false`, TD-201): nobody reads one at an unattended pane, generating
+it spends usage after every turn, and it is the suspect for the event that woke an idle session after its `Stop`. It uses the cadence line when
 the session directory's own `.claude/settings.json` — the worktree's copy, the file the tool loads
 — does not already run those hooks (either shape of the line counts as wired, so nothing runs twice); a directory
 that wires nothing gets the current set, and the line is a no-op outside a dev-cadence consumer. A directory that wires them
@@ -279,6 +281,7 @@ State transitions (Claude Code adapter):
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
 | `SessionStart` with `source: compact` (a compaction ends by firing it; a manual `/compact` fires nothing after) | no state change — the session is what it was, idle after a `/compact`, working mid-turn (TD-090) |
 | `SessionStart` with `source: resume` (`claude --resume` prints the conversation and waits at the composer; no `Stop` follows) | `idle` — a prompt given with the resume reports `working` through its own `UserPromptSubmit` (TD-155) |
+| `PreToolUse`, `PostToolUse` from inside a subagent (the tool sets `agent_id` only there) | no state change — a background agent runs on after its caller's `Stop`, and says nothing about the main composer (TD-201) |
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
 | `Stop` | `idle` |
@@ -287,6 +290,11 @@ State transitions (Claude Code adapter):
 | `SessionEnd`, or tmux session gone | `exited` — the record's `pane` says whether a dead pane is still there to read (natural exit: yes; killed, or the tmux server restarted: no) |
 | person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
 | host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
+
+A tool event names itself to the host agent (`event`: `PreToolUse:Bash`), and the host agent logs the
+one that turns a hook-confirmed `idle` session `working`: an event that is not a turn's start once
+did that four seconds after a `Stop`, and the session read `stalled?` unrung for 13 hours (TD-201).
+The line is how the next one is named; a turn's own `UserPromptSubmit` is never logged.
 
 `unreachable` shows at the host level first: the host chip in the top bar goes hollow and one
 banner row in the Org says "laptop unreachable since 14:02 · 2 sessions". A `volatile` host asleep

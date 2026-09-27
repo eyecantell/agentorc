@@ -167,12 +167,13 @@ def hooks_file(profile: Profile, cadence_line: bool = False, unattended: bool = 
 def hooks_settings(
     profile: Profile, hook_cmd: str = "agentorc-hook", cadence_line: bool = False, unattended: bool = False
 ) -> dict:
-    """The settings layer passed with `--settings`. Hooks, and one setting; the profile's own settings
+    """The settings layer passed with `--settings`. Hooks, and two settings; the profile's own settings
     still apply. With `cadence_line`, SessionStart also runs dev-cadence's hook runner
     (CADENCE_HOOK_LINE). With `unattended`, the tool's own peer messages are refused (design §4.10
     *The tool's own peer channel*, TD-064): its default holds one behind a deliver-or-deny panel that
     no hook reports and nobody at an unattended pane answers; the sender is told, and `ao msg` is the
-    channel. An interactive launch keeps the tool's default — its person is there to answer."""
+    channel, and its prompt suggestions are off (TD-201). An interactive launch keeps the tool's
+    defaults — its person is there to answer, and to read a suggestion."""
     hooks: dict[str, list] = {}
     for ev in HOOK_EVENTS:
         # PermissionRequest may block for the whole permission wait; the others must be instant.
@@ -185,6 +186,10 @@ def hooks_settings(
     layer: dict = {"hooks": hooks}
     if unattended:
         layer["crossSessionInbound"] = "refuse"
+        # Nobody reads a suggested next prompt at an unattended pane, its generation spends usage
+        # after every turn, and it is the suspect for the event that woke an idle grinder four
+        # seconds after its Stop (TD-201).
+        layer["promptSuggestionEnabled"] = False
     return layer
 
 
