@@ -5220,7 +5220,8 @@ session is never woken by mail at all.
   and mail; an agent whose file names no `home:`, or names itself, is the home. On Paul's machines
   it is `home: kmaster`.
 - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
-  audit](decisions/2026-09-25-settings-audit.md); TD-146 builds the file, TD-147 the replica, TD-148
+  audit](decisions/2026-09-25-settings-audit.md); the file's four keys, their readers and `set_settings` / `settings` are built — TD-146 slice 1;
+  the team stop time's tick pass, the CLI and `ui.yml`'s retirement in the UI are TD-146's rest, TD-147 the replica, TD-148
   the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
   owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
   written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
@@ -5705,9 +5706,9 @@ teams:
   rises as the week goes**, so a team paused on a Wednesday at 60% resumes on the Thursday when the
   line moves to 70%, and one paused on the last day resumes at the reset, when the window empties. A
   window with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`. **A
-  team's reserve priority** (§5 `teams.<team>.reserve`, the Settings page; 2026-09-25, not built —
-  TD-146) is a flat percent added to the profile's reserve for the sessions carrying that team's
-  badge on every window: with grind at 30 on the session window and ao-grind at 10, ao-grind's
+  team's reserve priority** (§5 `teams.<team>.reserve`, the Settings page; 2026-09-25, built —
+  TD-146 slice 1; `ao team reserve` is not) is a flat percent added to the profile's reserve for the sessions carrying that team's
+  badge on every window that has one (it lowers a line and never makes one), the mark carrying `team_extra: {team, n}`: with grind at 30 on the session window and ao-grind at 10, ao-grind's
   sessions pause at 60% and the profile's others at 70%, so two teams on one profile pause at
   different lines and the one the person cares about runs longest; the chip still shows the
   profile's line, and a session paused under its team's line says *paused · usage (ao-grind +10)*.

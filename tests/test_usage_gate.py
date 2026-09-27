@@ -61,6 +61,111 @@ def test_reserves_drop_whatever_is_not_one(tmp_path):
     assert settings.crossed(settings.lines({"wk": 11}, [{"label": "wk", "pct": 88}], NOW)) is None
 
 
+@pytest.mark.unit
+def test_the_four_keys_read_what_is_valid_and_parse_refuses_the_rest(tmp_path):
+    """design §5 (TD-146): `teams`, `repos` and `person` beside `usage_gate` — the readers drop
+    whatever a hand edit made invalid, field by field; the parsers, which `set_settings` writes
+    through, refuse it naming the key."""
+    f = tmp_path / "settings.yml"
+    f.write_text(
+        "teams:\n"
+        "  ao-grind: {until: '2026-09-26T06:00:00-06:00', reserve: 10, schedule: {start: reset}}\n"
+        "  bad: {reserve: 130, until: tomorrow}\n"
+        "  odd: {colour: red}\n"
+        "repos:\n  agentorc: {promote: {auto: false}}\n  x: {promote: {auto: maybe}}\n"
+        "person:\n  open_in: none\n  terminal: {size: 13, face: JetBrains Mono, copy_on_select: 7}\n"
+    )
+    doc = settings.load(f)
+    assert settings.teams(doc) == {
+        "ao-grind": {"until": "2026-09-26T12:00:00Z", "reserve": 10, "schedule": {"start": "reset"}}
+    }
+    assert settings.repos(doc) == {"agentorc": {"promote": {"auto": False}}}
+    assert settings.person(doc) == {"open_in": "none", "terminal": {"size": 13, "face": "JetBrains Mono"}}
+    assert settings.team_extra(doc, "ao-grind") == 10 and settings.team_extra(doc, "") == 0
+    assert settings.team_extra(doc, "bad") == 0
+    for bad in ({"reserve": 101}, {"until": "2026-09-26T06:00:00"}, {"schedule": "reset"}, {"colour": 1}, "x"):
+        with pytest.raises(ValueError):
+            settings.parse_team(bad)
+    for bad in ({"promote": {"auto": "yes"}}, {"promote": {"run": "x"}}, {"auto": True}):
+        with pytest.raises(ValueError):
+            settings.parse_repo(bad)
+    for bad in ({"open_in": ""}, {"open_in": {"label": "Z"}}, {"terminal": {"size": 99}}, {"theme": "dark"}):
+        with pytest.raises(ValueError):
+            settings.parse_person(bad)
+    # a team's reserve priority lowers every line its profile's reserve makes, and makes none
+    rows = settings.lines({"5h": 30}, [{"label": "5h", "pct": 61}, {"label": "wk", "pct": 99}], NOW, extra=10)
+    assert [(r["label"], r["line"], r["extra"]) for r in rows] == [("5h", 60, 10)]
+    assert settings.crossed(rows)["label"] == "5h"
+    assert settings.merge({"t": {"until": "a", "reserve": 5}}, {"t": {"until": None}}) == {"t": {"reserve": 5}}
+    assert settings.merge({"t": {"reserve": 5}}, {"t": None, "u": {"reserve": 1}}) == {"u": {"reserve": 1}}
+    from sessionorc.agent import BACKUP_MEMBERS
+
+    assert "settings.yml" in BACKUP_MEMBERS  # the nightly backup carries the person's settings
+
+
+@pytest.mark.integration
+async def test_a_teams_reserve_priority_pauses_its_sessions_first(agent, tmp_path):
+    """§6 *Usage gate* (TD-146): grind at 30 and ao-grind's priority at 10 — the team's session
+    pauses at 60%, the profile's plain one at 70%, and the team's mark says whose line it was."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        plain = await _worker(person, tmp_path, name="p")
+        teamed = await _worker(person, tmp_path, name="t", team="ao-grind")
+        agent._usage[""] = {"windows": [{"label": "5h", "pct": 65, "resets": None}], "reason": "ok"}
+        await person.call("set_settings", profile="", reserves={"5h": 30}, teams={"ao-grind": {"reserve": 10}})
+        await agent._enforce_usage_gate(datetime.now(UTC))
+        assert agent.sessions[plain].gated is None, "65% is under the profile's 70% line"
+        g = agent.sessions[teamed].gated
+        assert g and g["line"] == 60 and g["team_extra"] == {"team": "ao-grind", "n": 10}
+        assert (await person.call("gate"))["profiles"][""]["windows"][0]["line"] == 70  # the chip: the profile's
+        for s in (plain, teamed):
+            await person.call("kill", id=s)
+            await person.call("remove", id=s)
+
+
+@pytest.mark.integration
+async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it_makes(agent, tmp_path):
+    """§5 (TD-146): teams, repos and person through one RPC, each validated before anything is
+    written; a field set to null cleared; a past stop time refused; `settings` a person's own read,
+    naming a `ui.yml` left on disk as *migrate*."""
+    from sessionorc import paths
+
+    await park_ticks(agent)
+    later = _iso(datetime.now(UTC).replace(microsecond=0) + timedelta(hours=2))
+    async with LocalClient() as person:
+        got = await person.call(
+            "set_settings",
+            teams={"ao-grind": {"until": later, "reserve": 10}},
+            repos={"agentorc": {"promote": {"auto": False}}},
+            person={"open_in": "none", "terminal": {"size": 14}},
+        )
+        assert got["teams"] == {"ao-grind": {"until": later, "reserve": 10}}
+        assert got["repos"] == {"agentorc": {"promote": {"auto": False}}}
+        assert got["person"] == {"open_in": "none", "terminal": {"size": 14}}
+        # nothing is written when any part is refused
+        with pytest.raises(AgentError, match="teams.ao-grind: .*whole percent"):
+            await person.call("set_settings", teams={"ao-grind": {"reserve": 130}}, person={"open_in": "vscode"})
+        assert settings.person(settings.load())["open_in"] == "none"
+        with pytest.raises(AgentError, match="has passed"):
+            await person.call("set_settings", teams={"ao-grind": {"until": "2020-01-01T00:00:00Z"}})
+        with pytest.raises(AgentError, match="needs reserves, teams, repos or person"):
+            await person.call("set_settings")
+        await person.call("set_settings", teams={"ao-grind": {"until": None}}, person={"terminal": {"size": None}})
+        doc = settings.load()
+        assert settings.teams(doc) == {"ao-grind": {"reserve": 10}} and settings.person(doc) == {"open_in": "none"}
+        read = await person.call("settings")
+        assert read["teams"] == {"ao-grind": {"reserve": 10}} and read["migrate"] == []
+        (paths.home() / "ui.yml").write_text("open_in: none\n")
+        assert "ui.yml is no longer read" in (await person.call("settings"))["migrate"][0]
+        sid = await _worker(person, tmp_path)
+        async with LocalClient(caller=sid) as itself:
+            for method, kw in (("settings", {}), ("set_settings", {"teams": {"t": {"reserve": 1}}})):
+                with pytest.raises(AgentError, match="a person's own"):
+                    await itself.call(method, **kw)
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
 async def _worker(person, tmp_path, name="w", **kw):
     return (
         await person.call(
