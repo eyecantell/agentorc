@@ -1312,8 +1312,10 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     (g,) = team_groups([view(r, records) for r in records])
     head = templates.get_template("group_head.html").render(g=g)
     assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
-    # the counts stay in the group (a stopped team's row draws them), not on a live team's header (TD-176)
-    assert g["counts"] == ["1 working", "1 unseen"] and "· 2 sessions" in head and "1 working" not in head
+    # the counts stay in the group (a stopped team's row draws them), and on a live team's header
+    # only for its fold (TD-176, TD-194): unfolded, CSS hides them, since the compact cards say it
+    assert g["counts"] == ["1 working", "1 unseen"] and "· 2 sessions" in head
+    assert 'class="meta counts foldonly">· 1 working · 1 unseen<' in head
     assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
     card = templates.get_template("card.html").render(s=g["members"][0])
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card

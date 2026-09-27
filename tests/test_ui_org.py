@@ -84,7 +84,7 @@ def test_a_stopped_team_offers_forget_all_but_never_on_a_card_with_unpushed_work
 
 def test_a_folded_team_says_how_much_unread_mail_its_cards_hold():
     """Design §4.5a team header **✉ n** (TD-071 item 2): the sum of the folded cards' unread chips,
-    nothing at zero, and only on a team that folds — a live team's cards show their own."""
+    nothing at zero, drawn on any team (TD-194) and shown only while it is folded (CSS)."""
     head = templates.get_template("group_head.html")
     mailed = {**sess("ao-a", "a", team="t", state="exited"), "unread": 19}
     (g,) = team_groups([mailed, sess("ao-b", "b", team="t", state="exited")])
@@ -92,7 +92,21 @@ def test_a_folded_team_says_how_much_unread_mail_its_cards_hold():
     (quiet,) = team_groups([sess("ao-a", "a", team="t", state="exited")])
     assert "foldmail" not in head.render(g=quiet)
     (live,) = team_groups([{**sess("ao-a", "a", team="t", state="working"), "unread": 2}])
-    assert "foldmail" not in head.render(g=live)
+    assert "✉ 2" in head.render(g=live)  # a folded live team hides its cards too
+
+
+def test_a_folded_live_teams_header_carries_its_counts_by_state():
+    """Design §4.5a *team card: fold* (TD-194): a live team's header shows the session count while
+    its compact cards say the states, and the counts by state, *n ready to close* among them, for
+    when it is folded; CSS picks one by the fold. The needs-you pill is on the header either way."""
+    head = templates.get_template("group_head.html")
+    members = [sess("ao-a", "a", team="t", state="needs-you"), sess("ao-b", "b", team="t", state="working")]
+    (g,) = team_groups(members)
+    assert g["summary"]
+    html = head.render(g=g)
+    assert 'class="meta unfoldonly">· 2 sessions<' in html
+    assert 'class="meta counts foldonly">·' in html and "1 working" in html
+    assert "1 needs you" in html and 'data-fold="t" data-n="2" aria-expanded="true"' in html
 
 
 def test_two_teams_each_with_a_lead():
@@ -798,8 +812,10 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
     team, none = groups
     head = templates.get_template("group_head.html").render(g=team)
-    # a live team's header carries no state chips since TD-176: its compact cards say it
-    assert "kmaster / agentorc" in head and "· 2 sessions" in head and "1 working" not in head and " live<" not in head
+    # a live team's header carries no state chips since TD-176: its compact cards say it — but
+    # folded it does, so they are drawn for the fold alone and CSS shows them only then (TD-194)
+    assert "kmaster / agentorc" in head and "· 2 sessions" in head and " live<" not in head
+    assert head.count("1 working") == 1 and 'class="meta counts foldonly">· 1 working · 1 idle<' in head
     nohead = templates.get_template("group_head.html").render(g=none)
     assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
 

@@ -909,16 +909,34 @@
       sec.remove();
     });
   }
-  // ---- a team's card: the fold, and a request in flight (design §4.5a **team groups**) ----
-  // A team with nothing live folds its cards away: they have exited and are waiting for Forget, and
-  // a page of them buries what is running. The choice is kept per team; a live team never folds.
+  // ---- a team's card: the fold, and a request in flight (design §4.5a *team card: fold*) ----
+  // Any team with sessions folds to its header, by the header's row or its *n sessions* button. A
+  // team opens as it did before anyone chose — open while something is live (a concluded team is
+  // live), folded with nothing live — and a person's choice, once pressed, wins whatever the team's
+  // state becomes (TD-194). *No team* is a section, not a card, and never folds.
   const foldKey = (team) => "fold:" + team;
+  const FOLD_SKIP = "button, a, input, select, textarea, summary, label, .badge, .pill, .helppanel, .answeredmark, .prswaiting";
+  AO.teamFolded = (team, live, get) => !!team && !!get(foldKey(team), !+live);
+  const isFolded = (sec) => !!$(".ghead .fold", sec) && AO.teamFolded(sec.dataset.team, sec.dataset.live, store.get);
+  function toggleFold(sec) {
+    store.set(foldKey(sec.dataset.team), !isFolded(sec));
+    syncTeams();
+  }
   function syncTeams() {
     sections().forEach((sec) => {
-      const team = sec.dataset.team, b = $(".ghead .fold", sec);
-      const folded = !!team && !+sec.dataset.live && !!b && store.get(foldKey(team), true);
+      const team = sec.dataset.team, b = $(".ghead .fold", sec), head = $(".ghead", sec);
+      const folded = isFolded(sec);
       sec.classList.toggle("folded", folded);
-      if (b) b.textContent = `${folded ? "▸" : "▾"} ${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"}`;
+      // what the button shows and hides: the card's body, the summary and the grid, by id
+      const body = [$(".tsum", sec), $(".grid", sec)].filter(Boolean);
+      body.forEach((el, i) => (el.id = `tbody-${team}-${i}`));
+      if (b) {
+        b.textContent = `${folded ? "▸" : "▾"} ${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"}`;
+        b.setAttribute("aria-expanded", folded ? "false" : "true");
+        b.setAttribute("aria-controls", body.map((el) => el.id).join(" "));
+      }
+      // a folded team's header is a stop in the ring in place of its cards (§4.5a *Org: keys*)
+      if (head) { if (b) head.tabIndex = folded ? 0 : -1; else head.removeAttribute("tabindex"); }
     });
     // a header re-rendered for a delta must not re-arm a request in flight
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
@@ -1627,7 +1645,13 @@
       const fa = e.target.closest("[data-forget-all]");
       if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
       const f = e.target.closest("[data-fold]");
-      if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
+      if (f) return toggleFold(f.closest(".tgroup"));
+      // the header's row is the fold's mouse target (TD-194): not a press on its controls, links,
+      // inputs or marks, nor one that ends a text selection, so a name can still be copied
+      const head = e.target.closest(".tgroup > .ghead");
+      if (head && $(".fold", head) && !e.target.closest(FOLD_SKIP) && !String(window.getSelection ? window.getSelection() : "")) {
+        return toggleFold(head.parentElement);
+      }
       const p = e.target.closest(".tsum .seg[data-pick] button");
       if (p && !p.disabled) pickSummary(p);
     });
@@ -2399,6 +2423,9 @@
     { keys: ["Shift+Enter"], page: "org", ring: true, control: "Pop out", sel: '[data-act="popout"]' },
     { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]' },
     { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },
+    // the fold (§4.5a *team card: fold*, TD-194): on a card it folds the card's team and the ring
+    // goes to the header; on a folded team's header, as `Enter` there, it opens it
+    { keys: ["f"], page: "org", ring: true, control: "fold its team (on a folded team's header, open it)", sel: "[data-fold]", fold: true },
     { keys: ["j", "ArrowDown"], page: "inbox", control: "ring the next row", move: 1 },
     { keys: ["k", "ArrowUp"], page: "inbox", control: "ring the previous row", move: -1 },
     // `Enter` is the ringed row's page where it has one — a mail row — else Open; `o` is Open always
@@ -2420,7 +2447,9 @@
   ];
   AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/inbox/") ? "msg" : path.startsWith("/focus/") ? "focus" : "other");
   // the message page's one row is its entry: its keys press that row's controls, never a thread's
-  const RINGS = { org: "#groups .sc", inbox: ".inboxpage .mailrow", msg: ".msgentry" };
+  // A folded team's header takes its cards' place in the Org's ring (TD-194): the cards are hidden,
+  // so `shown` skips them, and the header is found in the page's order where they were.
+  const RINGS = { org: "#groups .sc, #groups .tgroup.folded:not(.filtering) > .ghead", inbox: ".inboxpage .mailrow", msg: ".msgentry" };
   // The event's name in the table, or null when the page must not take it: focus in anything
   // editable (a composer, the filter, a reply box, the *why?* box, the terminal's own textarea), or
   // a modifier other than Shift held — those keys are the browser's and the terminal's.
@@ -2434,6 +2463,8 @@
   const shown = (el) => el.getClientRects().length > 0;
   const ringables = (page) => (RINGS[page] ? $$(RINGS[page]).filter(shown) : []);
   const ringed = (page) => (RINGS[page] && document.activeElement && document.activeElement.closest ? document.activeElement.closest(RINGS[page]) : null);
+  // a team header that holds the ring after it was opened, where the ring stays (TD-194)
+  const ringedHead = () => (document.activeElement && document.activeElement.closest ? document.activeElement.closest("#groups .tgroup > .ghead") : null);
   const ringTo = (el) => { if (!el) return; el.focus({ preventScroll: true }); el.scrollIntoView({ block: "nearest" }); };
   // A ringed card or row that is about to leave the page hands the ring to its neighbour.
   AO.handRing = function (el) {
@@ -2477,7 +2508,9 @@
     }
     if (!dest) return;
     const card = $$(".sc", dest).find(shown);
+    const head = dest.matches(".folded:not(.filtering)") ? $(".ghead", dest) : null;
     if (card) ringTo(card);
+    else if (head) ringTo(head);  // a folded team: its header is the stop (TD-194)
     else { const b = $(".ghead button", dest); if (b) b.focus(); dest.scrollIntoView({ block: "nearest" }); }
   }
   document.addEventListener("keydown", (ev) => {
@@ -2502,10 +2535,28 @@
     if (k.step) return AO.entryStep(k.step);
     if (k.move) {
       const all = ringables(page), cur = ringed(page), i = all.indexOf(cur);
+      if (i < 0 && page === "org") {
+        // the ring on a header just opened is no longer a stop: move from where it stands
+        const at = document.activeElement && document.activeElement.closest && document.activeElement.closest("#groups .ghead");
+        if (at) {
+          const after = (el) => at.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING;
+          return ringTo(k.move > 0 ? all.find(after) : all.filter((el) => !after(el)).pop());
+        }
+      }
       return ringTo(i < 0 ? all[0] : all[Math.min(Math.max(i + k.move, 0), all.length - 1)]);
     }
     let root = document;
-    if (k.ring) { root = page === "msg" ? $(".msgentry") : ringed(page); if (!root) return; }
+    if (k.ring) { root = page === "msg" ? $(".msgentry") : ringed(page) || (k.fold && ringedHead()); if (!root) return; }
+    // a team's fold by key (TD-194): `f` on a card folds its team and rings the header; `f` or
+    // `Enter` on a ringed header opens or folds it, the ring staying on the header
+    if (page === "org" && (k.fold || name === "Enter") && root.matches && root.matches(".ghead")) {
+      toggleFold(root.parentElement); root.focus({ preventScroll: true }); return;
+    }
+    if (k.fold) {
+      const sec = root.closest(".tgroup"), head = sec && $(".ghead", sec);
+      if (!head || !$(".fold", head)) return;
+      toggleFold(sec); ringTo(head); return;
+    }
     let el = k.ring ? AO.keyControl(root, k, RINGS[page]) || (k.alt && AO.keyControl(root, k.alt, RINGS[page])) : $(k.sel);
     // a compact card's permission is answered in its team's facet (§4.5a *card: compact*, TD-176):
     // `a` / `d` on the ringed card press that facet's Allow / Deny for it
