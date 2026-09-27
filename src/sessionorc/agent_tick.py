@@ -31,6 +31,7 @@ from sessionorc.agent_common import (
     FILL_WINDOW,
     GIT_EVERY,
     IDLE_NUDGE,
+    LANE_NEWS_NAMED,
     LAUNCH_KEYS,
     MODEL_EVERY,
     PRUNE_EVERY,
@@ -329,10 +330,11 @@ class TickMixin:
 
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
-        restart; rule 3, the seats; rule 4, the idle nudge. **The restarts run at the home** (§4.4a: policies that start
-        run at the home), over this host's records and every node's — a member on a host whose link
-        is down is left as it is and looked at again on the next tick, refused rather than queued.
-        **Each record's pass is isolated**: one's exception is logged and the tick goes on to the next."""
+        restart; rule 3, the seats; rule 4, the idle nudge; rule 6, new work in a lane (TD-195).
+        **The restarts run at the home** (§4.4a: policies that start run at the home), over this
+        host's records and every node's — a member on a host whose link is down is left as it is and
+        looked at again on the next tick, refused rather than queued. **Each record's pass is
+        isolated**: one's exception is logged and the tick goes on to the next."""
         if self.mode != "home":
             return
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
@@ -342,6 +344,7 @@ class TickMixin:
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
                 await self._idle_nudge(s, now)
+                self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
         if (
@@ -523,6 +526,49 @@ class TickMixin:
             log.info("%s: idle %s with work open — nudged", s.id, IDLE_NUDGE)
             self._save(s)
             await self._push_changes()
+
+    def _lane_news(self, s: Session, now: datetime) -> None:
+        """Rule 6 (design §6, TD-195): a supervised member, not a seat, that declared out of work is
+        told when its lane gains entries. The first tick that sees the declaration writes
+        `lane_seen` — the ids in its repo's ledger reading that match its lane; a later reading
+        holding a matching id not in it, while the member is live, not winding down, not gated and
+        not suspended, becomes one `note` from `system` naming the new ids, which are then added,
+        so each is told once. The doorbell does the waking; nothing is typed here. No reading —
+        the repo not in this home's registry, or its file unreadable — writes nothing."""
+        if not (s.supervised and s.out_of_work) or s.seat is not None or s.superseded_by:
+            return
+        led = (self._repos.get(s.repo or "") or {}).get("ledger") or {}
+        if "error" in led or not isinstance(led.get("entries"), list):
+            return
+        ids = [
+            str(e["id"])
+            for e in led["entries"]
+            if isinstance(e, dict) and e.get("id") and any(ledger_mod.lane_matches(w, e) for w in s.lane)
+        ]
+        if s.lane_seen is None:
+            s.lane_seen = {"at": now_iso(), "ids": ids}
+            self._save(s)
+            return
+        seen = set(s.lane_seen.get("ids") or [])
+        new = [i for i in ids if i not in seen]
+        if not new or s.state in ("exited", "closed") or s.suspended:
+            return
+        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+            return
+        if s.gated or self._profile_gated(s.profile, now, s.team):
+            return
+        s.lane_seen = {"at": now_iso(), "ids": [*s.lane_seen.get("ids", []), *new]}
+        named = ", ".join(new[:LANE_NEWS_NAMED]) + (
+            f" and {len(new) - LANE_NEWS_NAMED} more" if len(new) > LANE_NEWS_NAMED else ""
+        )
+        count = f"{len(new)} entr{'y' if len(new) == 1 else 'ies'}"
+        self._system_note(
+            self._address(s),
+            f"your lane gained {count} since you declared out of work: {named} — read the ledger on "
+            "`origin/main`, then claim one or declare again",
+        )
+        self._save(s)
+        log.info("%s: told of %s new in its lane", self._address(s), count)
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:

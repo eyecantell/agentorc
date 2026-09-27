@@ -846,7 +846,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
   `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `restarts`, `restart_ceiling`, `restart_blocked`,
-  `lane_seen` (§6 rule 6, TD-187; not built — TD-195),
+  `lane_seen` (§6 rule 6, TD-187, TD-195),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
@@ -3860,7 +3860,7 @@ pace by design — a wake is bounded (§4.10), and the doorbell rings once.
 plenty. The manager winds the team down when **every** member is finished; until then an
 out-of-work member is simply not sent to and not restarted — by its manager; the one thing
 that reaches it is the host agent's note that its lane gained entries (§6 *Keeping a team
-running* rule 6, TD-187; not built — TD-195). The wind-down itself is `ao team
+running* rule 6, TD-187, TD-195). The wind-down itself is `ao team
 stop`'s sequence and nothing new — wrap up the members, wait for them to settle, then the
 manager — so there is one code path and the order is the order (§4.9).
 
@@ -3996,8 +3996,7 @@ more likely failed to look.
 **Out of work does not mean out of reach.** An out-of-work session that is still alive keeps its
 inbox, and mail may wake it within the wake budget (§4.10, §9 invariant 13): a message is exactly
 how *there is work now* would arrive, and the host agent sends it when the member's lane gains an
-entry (§6 rule 6, TD-187; not built — TD-195: until then nobody sends it, and a person's
-message is the only way in). A session that has exited has no inbox, and the way to
+entry (§6 rule 6, TD-187, TD-195). A session that has exited has no inbox, and the way to
 bring it back is the way it started — `ao team start`, which is already the restart (§4.9). A
 wound-down team is only its definition again, as a stopped team is.
 
@@ -5647,7 +5646,7 @@ code and needs no grant; a session doing the same work does.
      every adapter can do, and compaction stays what a person types into their own session. The
      reading is drawn whether or not a bound is set (§4.5 *The card's anatomy* row 4, `ao status -v`):
      *460k is a lot* was seen on a card that said nothing.
-  6. **New work in a lane** (TD-187; designed 2026-09-26, not built — TD-195). A member that
+  6. **New work in a lane** (TD-187; designed 2026-09-26, built — TD-195). A member that
      declared `out_of_work` is never sent to (§4.9a), and filing a ledger entry sends no mail, so
      nothing told a finished member that its lane had gained work: the designer slept through
      four entries filed within two hours of its declaration. The tick tells it. For a supervised
