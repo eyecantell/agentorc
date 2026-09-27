@@ -834,6 +834,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
   `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `restarts`, `restart_ceiling`, `restart_blocked`,
+  `lane_seen` (§6 rule 6, TD-187; not built — TD-195),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
@@ -3794,7 +3795,9 @@ pace by design — a wake is bounded (§4.10), and the doorbell rings once.
 
 **One member's exhaustion is not the team's.** A grinder out of work sits beside a hunter with
 plenty. The manager winds the team down when **every** member is finished; until then an
-out-of-work member is simply not sent to and not restarted. The wind-down itself is `ao team
+out-of-work member is simply not sent to and not restarted — by its manager; the one thing
+that reaches it is the host agent's note that its lane gained entries (§6 *Keeping a team
+running* rule 6, TD-187; not built — TD-195). The wind-down itself is `ao team
 stop`'s sequence and nothing new — wrap up the members, wait for them to settle, then the
 manager — so there is one code path and the order is the order (§4.9).
 
@@ -3929,7 +3932,9 @@ more likely failed to look.
 
 **Out of work does not mean out of reach.** An out-of-work session that is still alive keeps its
 inbox, and mail may wake it within the wake budget (§4.10, §9 invariant 13): a message is exactly
-how *there is work now* would arrive. A session that has exited has no inbox, and the way to
+how *there is work now* would arrive, and the host agent sends it when the member's lane gains an
+entry (§6 rule 6, TD-187; not built — TD-195: until then nobody sends it, and a person's
+message is the only way in). A session that has exited has no inbox, and the way to
 bring it back is the way it started — `ao team start`, which is already the restart (§4.9). A
 wound-down team is only its definition again, as a stopped team is.
 
@@ -5568,6 +5573,35 @@ code and needs no grant; a session doing the same work does.
      every adapter can do, and compaction stays what a person types into their own session. The
      reading is drawn whether or not a bound is set (§4.5 *The card's anatomy* row 4, `ao status -v`):
      *460k is a lot* was seen on a card that said nothing.
+  6. **New work in a lane** (TD-187; designed 2026-09-26, not built — TD-195). A member that
+     declared `out_of_work` is never sent to (§4.9a), and filing a ledger entry sends no mail, so
+     nothing told a finished member that its lane had gained work: the designer slept through
+     four entries filed within two hours of its declaration. The tick tells it. For a supervised
+     member, not a seat, carrying `out_of_work`, the tick keeps **`lane_seen: {at, ids}`**
+     (home-owned) — written on the first tick after the declaration as the ids of the entries in
+     its repo's ledger reading (§4.4 *Repo facts*) that **match its lane**, and cleared with
+     `out_of_work`. **A lane word matches by the entry's header, never its prose**:
+     `design-first` matches an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
+     matches one with `Pickable: yes` that is not design-first; a lane of references gains
+     nothing, and any other lane word matches nothing until a role gives it a meaning here. When
+     a later reading holds a matching id that `lane_seen` does not — an entry filed since, or one
+     whose `Pickable` has become `yes` — and the member is **live** (not `exited`, not `closed`),
+     with no wrap-up asked, no stop time passed, not gated and not suspended, the home delivers
+     **one `note` from `system`** into its inbox: *your lane gained n entries since you declared
+     out of work: TD-180, TD-181, TD-183 — read the ledger on `origin/main`, then claim one or
+     declare again* — the ids from the reading, five at most and *and n more*, nothing a session
+     wrote — and adds them to `lane_seen`, so an entry is told once. It is mail, so the doorbell
+     is what wakes the member, under every rule the doorbell has (§4.10: hook-confirmed idle, an
+     empty composer, a pending stop beats it, **one unit of the wake budget**), and a node's
+     member is reached as any mail reaches it. What the member does is its own: a claim clears
+     `out_of_work` as it always has (§4.9a), and a second `none` is a declaration like the first.
+     **Not covered, on purpose**: an entry that was in the ledger when the member declared —
+     one a sibling held and dropped, one that came off the board — is not new by this rule; that
+     reading is judgement, and it stays the manager's second reading of the ledger. **An exited
+     or closed member is not written to and not restarted**: a team that has wound down is its
+     definition again (§4.9a), and new work waits for a person's Start — starting on work
+     appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
+     at the home, so an entry counts from the moment that checkout holds it.
 
 - **Promote** (TD-120 step 2; designed 2026-09-24, not built — TD-132): a repo's live copy — the
   host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`

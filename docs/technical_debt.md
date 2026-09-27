@@ -102,12 +102,13 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
-| TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Open — design-first |
+| TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
 | TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
 | TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
+| TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note per new entry through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 
 
 ---
@@ -1882,8 +1883,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (Paul: *will the designer wake on its own or is it necessary for us to intercede?*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-195
+**Status:** Designed 2026-09-26 (the designer): design §6 *Keeping a team running* rule 6 (**New work in a lane**), §4.9a (*One member's exhaustion is not the team's*, *Out of work does not mean out of reach*), §4.4a (`lane_seen` among the home's fields). Settled: the tick notices (the entry's option (a)); the match is by the ledger reading's header fields — `design-first` is `Kind: design-first` with `Pickable: yes`, `free-pick` is `Pickable: yes` and not design-first — never prose; one `note` from `system` naming the new ids, once per entry, woken through the doorbell at one unit of the wake budget; never past a stop, into a wrap-up, a gate pause or a suspension; an exited or closed member is not written to, and a wound-down team waits for a person's Start (§4.9a: starting on work appearing is a schedule, TD-026). Not covered on purpose: an entry that was already there and became free. Obvious from the entry's *Fix* and §4.9a, so landed with a note to Paul. The build is TD-195; this entry archives with it.
 **Location:** design §4.9a (*finished means declared*), §4.10 (the doorbell), `src/agentorc/briefs/manager.md` (*Out of work*: *a finished member is never sent to and never restarted*)
 
 **Why:** designer-ao-1 declared `out_of_work` at 20:49Z on 2026-09-26. Within the next two hours TD-180, 181, 182 and 183 were filed: four `design-first` entries owned by the designer, all pickable. Nothing woke it. The doorbell rings only for new mail (§4.10), filing an entry sends none, and the manager's brief forbids sending to a finished member. The only way in is a person's message. The same happens to a grinder when a grinder-owned entry lands after its `none`. The design says mail is how *there is work now* reaches a finished member (§4.10), but nothing sends that mail.
@@ -2009,3 +2010,25 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
 
 **Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).
+
+## TD-195: Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note per new entry through the doorbell
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-187's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §6 *Keeping a team running* rule 6, §4.9a, §4.4a. Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
+**Location:** `src/sessionorc/agent.py` (`_keep_running`: a sixth pass beside the nudge's; the `system` note through the path the lapse's note takes), `src/sessionorc/models.py` (`lane_seen` on the record, home-owned, carried across a supersede as `out_of_work` is and cleared where `out_of_work` is cleared), `src/sessionorc/ledger.py` (the reading already keeps `kind` and `pickable` per entry: a `lane_matches(lane, entry)` beside `kind_of`), `src/sessionorc/modes.py` (the field in the home's table)
+
+**Why:** TD-187's *Why*: the doorbell rings only for mail, filing an entry sends none, and the manager never sends to a finished member.
+
+**Fix:**
+1. **`lane_matches`**: `design-first` → `kind == "design-first"` and `pickable == "yes"`; `free-pick` → `pickable == "yes"` and `kind != "design-first"`; a reference or any other word → no match.
+2. **`lane_seen`**: written on the first tick that finds `out_of_work` without it, as the matching ids of the repo's reading then; no reading, no write, and the tick looks again.
+3. **The note**: when the reading holds a matching id not in `lane_seen` and the member is live, supervised, not a seat, with no wrap-up asked, no stop time passed, not gated and not suspended — one `note` from `system`, the fixed sentence of the design with up to five ids and *and n more*, then the ids added. The doorbell does the rest; nothing is typed by this rule.
+4. **Tests:** an entry filed after the declaration raises one note and a second tick raises none; an entry that turns `Pickable: yes` does; an entry present at the declaration does not; a reference lane, a seat, an exited member, a gated one and one past its stop get nothing; a claim clears `lane_seen` with `out_of_work`; a failed ledger reading writes nothing.
+
+**Done when** TD-187's *Done when*: an entry filed into a finished member's lane wakes it within a tick of the reading that holds it, and the tests above pass.
+
+**Related:** TD-187 (the design), TD-176 (the ledger reader), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-026 (a team that starts on work appearing: not this).
