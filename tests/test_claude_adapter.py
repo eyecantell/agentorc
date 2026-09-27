@@ -68,6 +68,23 @@ def test_a_resume_lands_at_the_composer():
     assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
 
 
+def test_a_subagents_tool_events_leave_the_state_alone():
+    """TD-201: the tool sets `agent_id` only on an event from inside a subagent. A background agent
+    runs on after its caller's Stop, so its tool events read as `working` held an idle session unrung;
+    they carry the session id and no state. The main thread's own tool events name themselves in
+    `event`, which the host agent logs when one wakes a hook-confirmed idle session."""
+    ev = {"hook_event_name": "PreToolUse", "session_id": "u1", "tool_name": "Bash", "tool_input": {}}
+    assert translate(ev) == {"adapter_id": "u1", "state": "working", "pending": None, "event": "PreToolUse:Bash"}
+    assert translate({**ev, "hook_event_name": "PostToolUse"})["event"] == "PostToolUse:Bash"
+    assert translate({"hook_event_name": "PostToolUse"})["event"] == "PostToolUse"  # no tool name: the event's own
+    assert translate({**ev, "agent_id": "a97a5f"}) == {"adapter_id": "u1"}
+    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) is None
+    assert "event" not in translate({"hook_event_name": "UserPromptSubmit"})  # a turn's start is not named
+    # a question asked from inside a subagent still stops the session for the person
+    ask = {**ev, "agent_id": "a1", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "q?"}]}}
+    assert translate(ask)["state"] == "needs-you"
+
+
 def test_translate_permission_and_questions():
     p = translate(
         {
@@ -165,6 +182,9 @@ def test_an_unattended_layer_refuses_the_tools_peer_messages(tmp_path, monkeypat
     prof = profiles.Profile(name="p")
     assert "crossSessionInbound" not in hooks_settings(prof)
     assert hooks_settings(prof, unattended=True)["crossSessionInbound"] == "refuse"
+    # nobody reads a suggested next prompt at an unattended pane (TD-201); a person's session keeps them
+    assert hooks_settings(prof, unattended=True)["promptSuggestionEnabled"] is False
+    assert "promptSuggestionEnabled" not in hooks_settings(prof)
     bare = tmp_path / "bare"
     bare.mkdir()
     att, un = write_hooks_file(prof, bare), write_hooks_file(prof, bare, unattended=True)

@@ -1299,6 +1299,10 @@ class TickMixin:
                 # and its answer still wins (verified 2026-09-06). Keep Allow / Deny up.
                 pass
             else:
+                if state == "working" and s.state == "idle" and s.confidence == "hook" and event.get("event"):
+                    # An event that is not a turn's start woke a session its Stop left idle: the
+                    # capture TD-201 asks for, since the one that did it once is not yet named.
+                    log.info("%s: %s turned a hook-confirmed idle session working", sid, event["event"])
                 s.set_state(state, confidence="hook", pending=pending)
         self.store.save(s)
 
