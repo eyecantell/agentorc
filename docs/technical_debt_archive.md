@@ -1813,3 +1813,37 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-26 (PR #628) — an exit event carrying another run's tool id is ignored (`_apply_event`), rule 1 waits `RESTART_SETTLE` after a restart that succeeded (`_just_restarted`), and a clean `restart_wanted` runs past a ceiling whose window has emptied (`_window_full`); design §6 rules 1–2 and the §4.5a *Inbox row: restart* say so; tests in `tests/test_wanted_and_nudge.py` and `tests/test_crash_restart.py`.
 
 **Related:** TD-103 (the restart rules, slice 5 the Inbox row), TD-083 (`restart_wanted`), TD-115 (the exit-hook grace), TD-187, TD-188; design §6 *Keeping a team running*, §4.5a *Inbox row: restart*, §9 invariant 2 (the anchor rule).
+
+## TD-183: Clicking the team card collapses or expands it
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul: *have the team cards themselves be clickable to expand or collapse them*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-194
+**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Any team folds, and its header is the press*), §4.5a *team card: fold* (the new row), *team groups*, *Org: keys*, *team header ✉ n* (the fold's help text changes with the build); mockup `OrgTeamFirst.dc.html` (a live team folded, the fold button on the live headers), rendered `docs/mockups/reviews/2026-09-26-td183-folded-live-team.png`. Settled: the header row is the press, its controls, links and marks excepted; the *n sessions* button stays as the keyboard's control; any team folds; a folded live row keeps the counts and every mark; the choice is per team, per browser, and stands across state changes; `f` and a header stop in the ring. **One choice is Paul's to turn**: a needs-you member rings the folded row and does not open it (the alternative: the row opens itself) — sent as a steer (`m-db0c6cb316ac`), which lapsed at its bound on 2026-09-27 with no word against, so the default stands. The build is TD-194; this entry archives with it.
+**Location:** `src/agentorc/ui/static/app.js` (`syncTeams`, the fold keyed `fold:<team>`), `src/agentorc/ui/templates/group_head.html`
+
+**Why:** the only fold today is the *n sessions* button (§4.5a *the fold*), and `syncTeams` folds only a team with nothing live: *a live team never folds*. A page with several running teams can't be tidied, and the fold is a small button when the whole header is the natural target.
+
+**Resolved:** 2026-09-27 (PR #641, TD-194's build) — the design is design §4.5 screen 1 *Any team folds, and its header is the press* and §4.5a *team card: fold*.
+
+**Related:** TD-181 (what an unfolded team shows), design §4.5 screen 1, §4.5a **team groups**, *the fold*, *Org: keys*.
+
+## TD-194: Build the team card's fold: a click on the header folds any team, the folded live row with its counts and marks, the ring's header stop and `f`
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-183's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 1 (*Any team folds, and its header is the press*), §4.5a *team card: fold*, *Org: keys*, *team header ✉ n*; mockup `OrgTeamFirst.dc.html`.
+**Location:** `src/agentorc/ui/static/app.js` (`syncTeams`: `folded` loses its `!+sec.dataset.live` clause and takes the default from the team's state when nothing is stored; the header's click handler, which ignores a press that lands on a button, a link, an input or a mark, or that ends a text selection; the keys table), `src/agentorc/ui/templates/group_head.html` (the fold button on every team with sessions, `aria-expanded` / `aria-controls`; the counts and the ✉ mark on any folded team), `src/agentorc/ui/static/app.css` (the pointer, the hover tint, the amber ring on a folded row), `src/agentorc/ui/help.py` (the fold's text)
+
+**Why:** TD-183's *Why*: a page with several running teams cannot be tidied, and the fold is a small button where the whole header is the natural target.
+
+**Resolved:** 2026-09-27 (PR #641) — design §4.5a *team card: fold* now reads as built; `AO.teamFolded`, the header's press and the `f` key are in `src/agentorc/ui/static/app.js`, the header's markup in `group_head.html`, and `tests/test_ui_keys.py` holds the default and the stored choice. The live look is on `docs/user_attention.md`.
+
+**Done when** TD-183's *Done when*: a click on a team's header folds and unfolds it, live or not, and the choice survives a reload.
+
+**Related:** TD-183 (the design), TD-192 (what an unfolded wound-down team shows), TD-156 (f) (where the button sits), TD-124 (the keys).
