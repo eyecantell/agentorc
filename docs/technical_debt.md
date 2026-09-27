@@ -97,7 +97,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first; waits on Paul's answer (ask `m-d20bbf79bdbe`) |
-| TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Designed 2026-09-26 — the build is TD-192 |
 | TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Designed 2026-09-26 — the build is TD-193 |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
@@ -105,7 +104,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Open |
-| TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
 | TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
@@ -1797,22 +1795,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** design §4.5 screen 11 (the Repo page) and §4.5a **Open ledger**; §4.5 screen 1 (the *add* phase, the hunter); §4.10 (`ask`); §4.4 (the board write-back's **add**, the one precedent for the UI writing a repo file); §4.5a **Put on the board** (a UI form that writes a repo file); TD-126 (a reply back from the board); TD-160 (the hunter role named as *later*).
 
-## TD-181: An unfolded team with nothing live shows its member cards but no summary
-
-**Priority:** Medium
-**Added:** 2026-09-26 (Paul, at the dc-grind card after its wind-down: *the unfolded card should show the same info as the running team — some items will become stale and that's ok*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-192
-**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups* (the fold's help text changes with the build, TD-192 step 4). Settled: the same three facets and compact members as a running team; the third facet opens on Doing; nothing is marked stale, the header's *stopped* / *wound down <t> ago* dates it; folded, the one row is unchanged; the rollup still sums live teams only. Obvious from Paul's words and the entry's *Fix*, so landed with a note to him. The build is TD-192; this entry archives with it. **What was:** Paul set the shape; the design rows and the build remained.
-**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`), `src/agentorc/ui/templates/team_summary.html`, `org.html`
-
-**Why:** the team summary (TD-176 slice 3) is built only for a team with a live member. When dc-grind wound down on 2026-09-26 all three sessions exited. The card folded to one row as §4.5 screen 1 says, and pressing *3 sessions* unfolded the member cards with no summary: no TD or PR bars, no TDs in motion, no Doing. samscrape-grind, concluded but with idle members, kept its summary right below. The repo facts don't depend on anyone being live, and a wound-down team is when the person most wants to see what it left behind. Because the summary wasn't there, a merged PR on the grinder's report line read as outstanding (TD-182).
-
-**Fix:** design: §4.5 screen 1 (*a team with nothing live, or concluded, is one row*) and §4.5a's **team card: summary** row say that unfolding such a team draws the same summary a running team's card does: the Repo facet (live readings), TDs in motion from the members' last records, and Answer needed / Doing from the doing log. Anything read from an exited record may be stale, and that's accepted. The folded one-row form is unchanged. Build: drop the `live` condition from the summary (keep it off *No team*), and keep the members' full cards or switch to the compact ones as a live team does. Done when an unfolded wound-down team shows the three facets, and a test covers a team whose members have all exited.
-
-**Related:** TD-176 (archived), TD-182, TD-183, design §4.5 screen 1, §4.5a **team card: summary**, **team groups**, *the fold*.
-
 ## TD-182: A card's report line keeps a merged PR as `TD-066 → #158` with no mark
 
 **Priority:** Low
@@ -1954,29 +1936,6 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-175's *Done when*: the manager template's round step commits nothing, a restarted manager can read what its previous run did with `ao log --tail`, and a manager's card shows no unpushed count from its own log.
 
 **Related:** TD-175 (the design), TD-110 (the night report: the person's read), TD-114 (the supplement's shape), TD-103 (the tick took the mechanical rounds), §4.6 (run logs), §4.8 (`doing`, the own-record rule), §4.10 (the name carries its mail).
-
-## TD-192: Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards
-
-**Priority:** Medium
-**Added:** 2026-09-26 (the designer, from TD-181's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups*.
-**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`, and the `compact` flags set under it), `src/agentorc/ui/templates/org.html` and `team_summary.html` (the summary inside the fold), `src/agentorc/ui/static/app.js` (`syncTeams`: the fold hides the summary with the cards), `src/agentorc/ui/help.py` (the fold's text)
-
-**Why:** TD-181's *Why*: a wound-down team is when the person most wants to see what it left, and the summary is built only while a member is live.
-
-**Fix:**
-1. **The builder**: drop the `live` condition (keep *No team* out); the members of such a team are compact, as a live team's are.
-2. **The fold**: the summary is folded and unfolded with the cards; folded, the team is its one row and no summary is drawn.
-3. **The facets on exited records**: TDs in motion from the members' `claimed` entries as they stand (*nothing claimed* when none); the third facet opens on Doing, since nobody can be waiting; the Repo facet unchanged.
-4. **The help text** of the fold, in the design's list (§4.5a, the *i* marks' texts) and `help.py` together — `tests/test_help.py` holds the two word for word, so the design PR left both alone: *Shows or hides a stopped team's cards and its summary, which are folded away by default. Press it to see what the team left — its repo's numbers, the claims still held, what each member last said it was doing — to read their mail, or to Forget them.* with the sentences after it unchanged.
-5. **Tests:** a team whose members have all exited yields a summary with the three facets and compact members; *No team* yields none; the rollup's sums are unchanged by such a team.
-
-**Done when** TD-181's *Done when*: an unfolded wound-down team shows the three facets, and a test covers a team whose members have all exited.
-
-**Related:** TD-181 (the design), TD-193 (the mark its cards carry), TD-183 (the fold's target), TD-176 (archived: the summary).
 
 ## TD-193: Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel
 
