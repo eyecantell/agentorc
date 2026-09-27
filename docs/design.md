@@ -2668,12 +2668,14 @@ ones are named, so a typo is not a silent no-op. A change takes effect on the ne
 restart; under `--json` the reply is the file's key as written and the computed lines.
 
 **`ao team until <team> <06:00|+8h|ISO> | --clear`** and **`ao team reserve <team> <n>`** (TD-100 (4);
-§6 *Team stop time*, *Usage gate*; designed 2026-09-25, not built — TD-146): the team's stop time,
+§6 *Team stop time*, *Usage gate*; built — TD-146 slice 3): the team's stop time,
 parsed in the caller's clock as `ao until` parses it, and its reserve priority, written to
 `teams.<team>` through `set_settings`, refused to a session; a team the org does not define is
 refused, naming the defined ones. **`ao settings`** prints the home's `settings.yml` as the page
 draws it — each key with the line or instant it makes today — and, with `--where`, where every
-other configured value lives and when it is re-read, which is the page's *i* marks in text.
+other configured value lives and when it is re-read, which is the page's *i* marks in text. `ao team
+reserve <team> 0` clears the priority; `ao schedule`'s key path (`teams.<team>.schedule`) is TD-133's,
+with the schedule itself.
 
 **`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; designed, not built — TD-132): the
 press from a terminal. `ao promote [<repo>] [--sha <commit>]` promotes the registered checkout —

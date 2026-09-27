@@ -358,6 +358,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-154, the designer): `ao transcript <id> [-n N] [--before OFFSET] [--raw]`, a read-only verb beside `tail` and `explain`.
 - 2026-09-25 (TD-160, the designer): `ao new --team` documented as the terminal's form of the Team pick — the badge, the group, the manager, the team's reader.
 - 2026-09-26 (TD-188, the designer): `ao status -v` prints the context reading and the bound.
+- 2026-09-26 (TD-146 slice 3, grinder-ao-1): `ao team until`, `ao team reserve` and `ao settings [--where]` built; the team's name is checked against the org's definitions by the client, as §4.7 said, and `reserve 0` clears the key rather than storing a zero. `ao schedule` is not built yet (TD-133), so its new key path waits with it.
 
 ## 4.8 Capabilities, report channels, and role presets
 
