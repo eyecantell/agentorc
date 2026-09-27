@@ -5222,7 +5222,7 @@ session is never woken by mail at all.
 - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
   audit](decisions/2026-09-25-settings-audit.md); the file's four keys, their readers and `set_settings` / `settings` are built — TD-146 slice 1;
   and the UI reads `person:` through that read with `ui.yml` retired — TD-146 slice 1;
-  the team stop time's tick pass and the CLI are TD-146's rest, TD-147 the replica, TD-148
+  the team stop time — slice 2; the CLI is TD-146's rest, TD-147 the replica, TD-148
   the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
   owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
   written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
@@ -5691,12 +5691,16 @@ teams:
   (TD-101: not wanted yet), calendar-shaped windows and one-off runs — TD-026 holds them for the
   person's word on scope.
 - **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7;
-  2026-09-25, not built — TD-146): the team-wide form of a session's `run_until`. On every tick,
+  2026-09-25, built — TD-146 slice 2; `ao team until` is slice 3): the team-wide form of a session's `run_until`. On every tick,
   each live session carrying the team's badge — members and seats — whose `run_until` is unset or
   later than the team's takes the team's instant, exactly as `set_stop` would give it
   (`wrapup_sent_at` reset, the wrap-up then the kill as the stop time's own rule says), and a start
-  the team makes after the instant is set stamps it on what it creates. **Clear** removes the key; a
-  session's own later `ao until` is kept as the earlier of the two. A stop time in the past is
+  the team makes after the instant is set stamps it on what it creates — while the instant is
+  still ahead: a session created after it has passed is not given it, since starting the team again
+  after its stop time is the person's word. It runs at the home, whose file it is; a node's member
+  takes it through `set_stop` over the link, and waits for the link. **Clear** removes the key and
+  takes the team's instant back from the members that carry it, and a moved instant moves them with
+  it; a session's own `ao until` is kept as the earlier of the two, and a Clear leaves it alone. A stop time in the past is
   refused when set, as `ao until`'s is. **Run window** (Not built — phase 3, the tdgrind port):
   start missing workers inside the window; wrap-up-then-kill outside, by setting a stop time.
   **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on a
