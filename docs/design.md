@@ -5221,7 +5221,8 @@ session is never woken by mail at all.
   it is `home: kmaster`.
 - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
   audit](decisions/2026-09-25-settings-audit.md); the file's four keys, their readers and `set_settings` / `settings` are built — TD-146 slice 1;
-  the team stop time's tick pass, the CLI and `ui.yml`'s retirement in the UI are TD-146's rest, TD-147 the replica, TD-148
+  and the UI reads `person:` through that read with `ui.yml` retired — TD-146 slice 1;
+  the team stop time's tick pass and the CLI are TD-146's rest, TD-147 the replica, TD-148
   the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
   owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
   written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
@@ -5257,8 +5258,10 @@ person:                                       # the person's own — nothing her
   last settings a node was sent stay in force until its next dial; `set_settings` at a node is
   forwarded while the link is up and refused offline in the words the home-owned edits use.
   **`ui.yml` is retired**: its one key, `open_in:`, lives under `person:`; a `ui.yml` still on disk
-  is read once more, named on the Settings page as *migrate: ui.yml is no longer read*, and ignored
-  (TD-146). What `person.open_in` takes is what `ui.yml` took, the editor button of the card, the
+  is not read: the agent's `settings` read names it (`migrate`), and the Org's teams line — the
+  Settings page too, once built — says *migrate: ui.yml is no longer read* (TD-146). The UI reads
+  `person:` through that read, at most every five seconds, before it serves a request, and keeps the
+  last answer when a read fails. What `person.open_in` takes is what `ui.yml` took, the editor button of the card, the
   Focus header, *edit yml* and the Settings page's **Open file**:
   - **`vscode`** — the default, and what a missing file means:
     `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on

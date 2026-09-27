@@ -2785,6 +2785,22 @@ def create_app() -> FastAPI:
     def render_card(v: dict[str, Any]) -> str:
         return templates.get_template("card.html").render(s=v)
 
+    settings_at = {"at": 0.0}
+
+    @app.middleware("http")
+    async def person_settings(request: Request, call_next: Any) -> Any:
+        """The person's own (`person:` in the home's `settings.yml`, design §5, TD-146) read through
+        the agent's `settings` read at most once in `DEFS_TTL` seconds, before a page is drawn — the
+        editor button every card and Focus header draws comes from it. A failed read keeps the last."""
+        now = time.monotonic()
+        if now - settings_at["at"] > DEFS_TTL and not request.url.path.startswith("/static"):
+            settings_at["at"] = now
+            try:
+                uiconf.set_read(await call("settings"))
+            except Exception:  # noqa: BLE001 — a read that failed keeps the last answer; it never costs the page
+                log.debug("the settings read failed; the last person: stands", exc_info=True)
+        return await call_next(request)
+
     defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
 
     async def defs() -> orgmod.Org:
@@ -3085,6 +3101,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "identity_note": identity_note(id_info),
                 "restart_note": "" if agent_down else restart_note(info, id_info),
                 "editor_note": uiconf.open_in().error,
+                "migrate_note": uiconf.migrate_note(),
             },
         )
 

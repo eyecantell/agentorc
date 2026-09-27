@@ -1,10 +1,12 @@
-"""The person's `open_in:` (design §5 *The person's own*, TD-095): the editor button's label and
-link, from `ui.yml` in the agentorc home — the default, `none`, a template of the person's own, and
-every way a value is refused (named on the page, the default drawn)."""
+"""The person's `open_in:` (design §5 *The person's own*, TD-095, TD-146): the editor button's label
+and link, from `person:` in the home's `settings.yml` as the agent's `settings` read answers it — the
+default, `none`, a template of the person's own, and every way a value is refused (named on the page,
+the default drawn); `ui.yml` is retired and named as *migrate*."""
 
 from __future__ import annotations
 
 import pytest
+import yaml
 
 from agentorc.ui import uiconf
 
@@ -14,13 +16,18 @@ pytestmark = pytest.mark.unit
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    uiconf._cache.clear()
-    return tmp_path
+    uiconf.set_read({"person": {}, "migrate": []})
+    yield tmp_path
+    uiconf.set_read({"person": {}, "migrate": []})
 
 
 def write(home, text):
-    (home / "ui.yml").write_text(text)
-    uiconf._cache.clear()  # the cache keys on mtime, which a fast test can leave unchanged
+    """`person:` as the `settings` read hands it over: what a YAML line of the person's makes."""
+    try:
+        doc = yaml.safe_load(text) or {}
+    except yaml.YAMLError:
+        doc = {"open_in": object()}  # the agent's reader drops what does not parse; a stand-in for it
+    uiconf.set_read({"person": doc, "migrate": []})
 
 
 def test_no_file_is_vscode_and_its_two_forms(home):
@@ -57,13 +64,13 @@ def test_a_template_fills_path_and_remote_and_its_label_is_the_persons(home):
         ("{label: X, url: 'no scheme here'}", "is not scheme://"),
         ("{url: 'zed://{path}'}", "needs a label"),
         ("emacs", "is not vscode, none"),
-        ("[unclosed", "could not be read"),
+        ("[unclosed", "is not vscode, none"),
     ],
 )
 def test_a_refused_value_is_named_and_the_default_is_drawn(home, value, why):
     write(home, f"open_in: {value}\n")
     o = uiconf.open_in()
-    assert why in o.error and str(home / "ui.yml") in o.error
+    assert why in o.error and o.error.startswith("settings.yml person.open_in: ")
     assert uiconf.editor_link("/r", local=True, remote="km")["url"].startswith("vscode://file/r")
 
 
@@ -102,3 +109,24 @@ def test_the_card_and_focus_draw_the_persons_label_escaped_and_none_draws_nothin
         "editor"
         not in templates.get_template("card.html").render(s=view(rec)).split('class="sc-foot"')[1].split("<details")[0]
     )
+
+
+def test_a_failed_read_keeps_the_last_and_a_retired_ui_yml_is_named(home):
+    """TD-146: None from the agent (down, or too old for the read) keeps the last answer, so a blip
+    never flips the button; a `ui.yml` left on disk comes back as the read's `migrate` line."""
+    write(home, "open_in: none\n")
+    uiconf.set_read(None)
+    assert uiconf.open_in().kind == "none"
+    assert uiconf.migrate_note() == ""
+    uiconf.set_read(
+        {"person": {}, "migrate": ["/h/ui.yml: ui.yml is no longer read — its open_in lives under person:"]}
+    )
+    assert "no longer read" in uiconf.migrate_note() and uiconf.open_in() == uiconf.OpenIn()
+    from agentorc.ui.app import templates
+
+    html = templates.get_template("org.html").render(
+        sessions=[], groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
+        agent_down=False, volatile=False, usage={}, editor_note="", migrate_note=uiconf.migrate_note(),
+    )  # fmt: skip
+    assert 'id="migratenote"' in html and "ui.yml is no longer read" in html
