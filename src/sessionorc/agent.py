@@ -136,6 +136,9 @@ RESUME_MIN = timedelta(minutes=10)
 # exit inside the window is the person's.
 RESTART_CEILING = 3
 RESTART_WINDOW = timedelta(hours=2)
+# A record a tick restart has just created is not judged crashed for this long (TD-186): the run it
+# replaced may still be ending, and what it reports then is not the new run's.
+RESTART_SETTLE = timedelta(seconds=60)
 # §6 rule 3 (TD-103 slice 3): six fills an hour over all seats sharing a controller, and how long a
 # seat must sit hook-confirmed idle with nothing due before the tick closes it — so a seat just
 # filled, idle for a moment before its prompt lands, is not closed on the tick that filled it.
@@ -835,7 +838,15 @@ class HostAgent:
             and not s.restart_ceiling
             and not s.superseded_by
             and not self._profile_gated(s.profile, now, s.team)
+            and not self._just_restarted(s, now)
         )
+
+    @staticmethod
+    def _just_restarted(s: Session, now: datetime) -> bool:
+        """Whether the tick's last restart of `s` succeeded less than `RESTART_SETTLE` ago (TD-186):
+        the record is the new run, whatever the ending run it replaced reports meanwhile."""
+        last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else None
+        return bool(last and not last.get("error") and _recent(last.get("at"), now, RESTART_SETTLE))
 
     def _profile_gated(self, profile: str, now: datetime, team: str = "") -> bool:
         """Whether `profile` is over a usage line now (§6 *Usage gate*): the gate's own reading, for a
@@ -884,7 +895,12 @@ class HostAgent:
         rw = s.restart_wanted
         if not (rw and s.supervised and s.unattended) or s.seat is not None or rw.get("early"):
             return
-        if s.superseded_by or s.suspended or s.restart_ceiling or s.gated:
+        if s.superseded_by or s.suspended or s.gated:
+            return
+        # A ceiling guards against a crash loop, not a member that has worked since (TD-186): a clean
+        # declaration is acted on once the window holds fewer than the ceiling's restarts; the new
+        # record carries no mark. Inside the window the mark stands, as it does for rule 1.
+        if s.restart_ceiling and self._window_full(s, now):
             return
         # the tick's own close, then a replay that failed, leaves it `closed`: still the tick's to retry
         closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "wanted"
@@ -924,6 +940,11 @@ class HostAgent:
                 await self._push_changes()
                 return
         await self._replay(s, "wanted")
+
+    @staticmethod
+    def _window_full(s: Session, now: datetime) -> bool:
+        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+        return len(recent) >= RESTART_CEILING
 
     async def _restart_held(self, s: Session, now: datetime, dirty: int, unpushed: int) -> None:
         """Rule 2 with work left: one fixed send, once, naming the counts from the record and never a
@@ -1717,10 +1738,18 @@ class HostAgent:
             return
         at = event.get("at") if queued else None  # a queue written before the stamp is applied as it was
         stale = isinstance(at, int | float) and at < self._live_hook_at.get(sid, 0.0)
+        aid = event.get("adapter_id")
+        if aid and s.adapter_id and aid != s.adapter_id and event.get("state") in ("exited", "closed"):
+            # The end of a run this record no longer holds (TD-186): a restart closed the old run and
+            # created this one under the same id, and the old run's SessionEnd landed after it. It is
+            # not this run's exit, and its tool id is not this run's — applied, it marked a live run
+            # `exited` and made its own tool session read as *outside agentorc* to the anchor rule.
+            log.info("%s: ignored the end of a previous run (%s; this run is %s)", sid, aid, s.adapter_id)
+            return
         if not queued:
             self._live_hook_at[sid] = time.time()
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
-        if aid := event.get("adapter_id"):
+        if aid:
             s.adapter_id = aid
         if model := event.get("model"):
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)

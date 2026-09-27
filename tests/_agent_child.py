@@ -13,10 +13,12 @@ import asyncio
 import logging
 import os
 import sys
+from datetime import timedelta
 
 from _stubs import HookFedStub
 
 from sessionorc import adapters, hosts
+from sessionorc import agent as agent_mod
 from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
 
@@ -27,6 +29,9 @@ async def _run(socket_name: str) -> None:
     hosts.DEFAULT_REPOS_REGISTRY = os.path.join(os.environ["AGENTORC_HOME"], "no-roster", "repos.txt")
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
+    if settle := os.environ.get("AO_TEST_RESTART_SETTLE"):
+        # a crash loop run against the clock: the settle after a restart (TD-186) in seconds, not 60
+        agent_mod.RESTART_SETTLE = timedelta(seconds=float(settle))
     await serve_until_signal(
         HostAgent(tmux=Tmux(socket_name=socket_name), identity_mode=os.environ.get("AO_TEST_IDENTITY", "off"))
     )

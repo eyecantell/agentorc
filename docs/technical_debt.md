@@ -101,7 +101,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Designed 2026-09-26 — the build is TD-193 |
 | TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
-| TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
@@ -1861,22 +1860,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** the host agent exports `AGENT_NAME=<the session's name>` beside `AGENTORC_SESSION` for every session it starts, whatever the adapter. The export sits in the tool-neutral launch path, so a Codex or shell session gets it too. For a session started without a name it is left unset, not faked. Add one sentence to the design where the launch environment is described. Done when a commit made in a team member's worktree, with dev-cadence's hook synced, carries `Co-Authored-By: grinder-ao-1 <grinder-ao-1@shiftlead.placeholder>`, and a test checks the env on a named and an unnamed launch. A squash merge keeps the trailer as long as the merge writes no body of its own (cadence's `gh pr merge <n> --squash` writes none).
 
 **Related:** dev-cadence TD-067 (the hook) and TD-068 (the roster guard, from TD-179); design §4.3 (adapters: the export is not the adapter's), §4.8 (the session's name).
-
-## TD-186: A restart's own race trips the restart ceiling, and the ceiling mark never lifts
-
-**Priority:** High
-**Added:** 2026-09-26 (found when Paul asked why ao-grind read *running* with every member idle)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`_crash_restart`, `_wanted_restart`, `RESTART_CEILING` / `RESTART_WINDOW`, `_replay`)
-
-**Why:** grinder-ao-1's record carries three restarts in four seconds: `{2026-09-25T20:14:19Z, wanted}`, then `{20:14:21Z, crash, error: "…/worktrees/grinder-ao-1 already has agent session grinder-ao-1 (claude-code, outside agentorc, busy); anchor rule"}` and the same again at 20:14:23Z. So the wanted restart worked: the new run is the record created at 20:14:19Z, and it went on to merge #580–#592. But on the next two ticks the crash rule read the record as crashed, and its replay was refused because the fresh run it had just started already held the worktree. Two failed replays count toward the ceiling by design, so `restart_ceiling {at: 20:14:25Z, count: 3}` was written into a healthy session. That mark is never cleared (`_wanted_restart` returns on any `s.restart_ceiling`, and §4.5a says the tick never lifts it). When the member declared `restart_wanted` at 23:05Z with its work pushed, the tick skipped it. It sat for a day, grinder-ao-2 went out of work behind it (the remaining grinder entries are in grinder-ao-1's files), and the team read *running* with all members idle.
-
-**Fix:** (1) The crash rule must not fire on a record a restart just created. Hold it until the new run's first hook, or for a grace period like the exit-hook grace. A replay refused by the anchor rule because *this record's own session* holds the directory is not a failure and must not count. (2) The ceiling mark lifts once `RESTART_WINDOW` has passed with no new restart, or at least a later `restart_wanted` with clean git is acted on when the window holds fewer than `RESTART_CEILING` restarts. The ceiling guards against a crash loop, not against a member that has worked for hours since. Update §6 *Keeping a team running* and the §4.5a *Inbox row: restart* sentence *`restart_ceiling` is never lifted by the tick* in the same PR. Tests: a replay followed at once by a tick produces no crash entry; a ceiling older than the window doesn't block a clean `restart_wanted`. Done when both tests pass and a wanted restart followed by its next tick leaves one entry in `restarts`.
-
-**Related:** TD-103 (the restart rules, slice 5 the Inbox row), TD-083 (`restart_wanted`), TD-115 (the exit-hook grace), TD-187, TD-188; design §6 *Keeping a team running*, §4.5a *Inbox row: restart*, §9 invariant 2 (the anchor rule).
 
 ## TD-187: A member that declared out of work is never woken when its lane gains entries
 

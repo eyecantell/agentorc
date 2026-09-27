@@ -140,6 +140,7 @@ class Home:
             "AGENTORC_HOME": str(self.dir),
             "AGENTORC_TICK": str(FAST_TICK),
             "CLAUDE_CONFIG_DIR": str(self.dir / "c"),
+            "AO_TEST_RESTART_SETTLE": "0",  # the crash-loop test runs three restarts inside its bound
         }
         return {**os.environ, **ours}
 

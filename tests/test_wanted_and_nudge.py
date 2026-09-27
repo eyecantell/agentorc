@@ -192,3 +192,62 @@ async def test_a_wanted_restart_counts_toward_the_ceiling_and_a_failed_close_is_
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["wanted", "wanted"]
         await person.call("kill", id=sid)
+
+
+async def test_a_wanted_restart_and_its_next_ticks_leave_one_entry(agent, composerstubs, tmp_path):
+    """TD-186: the run a wanted restart closed may end after the new one is created under the same
+    id. Its `SessionEnd`, carrying the old run's tool id, is not the new run's exit and is ignored;
+    and a crash read inside `RESTART_SETTLE` of a restart is not judged. So the ticks that follow
+    leave the one `wanted` entry, where they once wrote two failed crash replays and a ceiling."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        first = agent.sessions[sid]
+        first.adapter_id = "old-run"
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        first.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        first.git = dict(CLEAN)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not first and [r["why"] for r in new.restarts] == ["wanted"]
+        new.adapter_id = "new-run"
+        await agent.rpc_hook(sid, state="exited", adapter_id="old-run")  # the old run's late SessionEnd
+        assert new.state != "exited" and new.adapter_id == "new-run"
+        # even an exit read at once (a tool with no id to tell the runs apart) waits out the settle
+        new.state, new.pane = "exited", True
+        for tick in (now, now + timedelta(seconds=2), now + timedelta(seconds=4)):
+            await agent._keep_running(tick)
+        assert agent.sessions[sid] is new and [r["why"] for r in new.restarts] == ["wanted"]
+        assert new.restart_ceiling is None
+        # the run's own exit still lands: same tool id
+        new.state, new.pane = "idle", True
+        await agent.rpc_hook(sid, state="exited", adapter_id="new-run")
+        assert new.state == "exited"
+        await person.call("kill", id=sid)
+
+
+async def test_a_ceiling_whose_window_emptied_lets_a_clean_wanted_restart_run(agent, composerstubs, tmp_path):
+    """TD-186: the ceiling guards against a crash loop, not a member that has worked for hours
+    since. Inside the window it holds a clean `restart_wanted`; once the window holds fewer than
+    `RESTART_CEILING` restarts, the declaration is acted on and the new record carries no mark."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        stamps = [now - timedelta(minutes=m) for m in (30, 20, 10)]
+        rec.restarts = [{"at": _iso(t), "why": "crash"} for t in stamps]
+        rec.restart_ceiling = {"at": _iso(stamps[-1]), "count": RESTART_CEILING}
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        rec.git = dict(CLEAN)
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is rec, "three restarts inside two hours: the ceiling holds"
+        later = now + timedelta(hours=2)
+        await _idle_for(agent, sid, later, timedelta(minutes=1))
+        await agent._keep_running(later)
+        new = agent.sessions[sid]
+        assert new is not rec and new.restart_ceiling is None
+        assert [r["why"] for r in new.restarts][-1] == "wanted"
+        await person.call("kill", id=sid)
