@@ -480,6 +480,12 @@ class Adapter(Protocol):
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
+    def context(self, session_id: str, cwd: Path, profile: Profile | None) -> Context | None
+                                                          # the session's context size now — Context(tokens, at, window) — from the
+                                                          # tool's own records: Claude Code, the last top-level `assistant` entry's
+                                                          # `usage` (input + cache_read + cache_creation), the tail read `model_in_use`
+                                                          # makes, `window` the model's when known; None when it cannot tell (§6
+                                                          # rule 5, TD-188). Read on the tick for unattended records, never a grep
     def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
                         before: int | None = None, turns: int = 20) -> Transcript | None
                                                           # the tool's transcript as neutral entries — a prompt, text, a thought, a
@@ -1430,7 +1436,8 @@ Screens:
       `<controller>`*** ends the row where it is drawn at all (below). The dirty / unpushed flag
       sits at the right.
    4. **What runs it, and what it reports**: tool · account · model at the left, on every card
-      (a team's members commonly differ); the report line at the right — progress, and the
+      (a team's members commonly differ), then the **context reading** — *· 231k*, red past the
+      role's bound, absent where the adapter cannot tell (§6 rule 5, TD-188; not built — TD-190); the report line at the right — progress, and the
       findings count beside it — **a reference shown once** (`#359 · 1/2 done`, never
       `#359 → #359`).
    5. **The slot**, always two lines and a caption; a longer text is clamped, whole on hover and
@@ -2560,6 +2567,7 @@ for another's, since the channels are ungated:
 - `ao progress restart --why "..."` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*, TD-083);
 - `ao finding TD-029 --priority low`;
 - `ao status -v` prints the same report line the card will, and `--json` the entries.
+- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k* — and `--json` the `context` field (§6 rule 5, TD-188; not built — TD-190).
 
 **A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, not built — TD-173: today it sets the badge and nothing else) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
 
@@ -3067,6 +3075,14 @@ field for every role the team defines, in the definition's order: a role one ses
 *<line> → <name>* (*(on call)* after an empty seat's), a role several hold *<Label>: <line>* — the
 sentences themselves, since no other field is designed (the shorter phrases this paragraph once
 gave as its example, *questions → manager-ao-1*, are not derivable from them). `ao roles` prints it.
+
+**A role has a context bound (TD-188; designed 2026-09-26, not built — TD-190).** A preset or a
+`roles:` entry may carry **`context: {bound: 200k}`** — the reading past which §6 rule 5 tells a
+supervised member to end its run: the built-in worker presets (`grinder`, `hunter`, `auditor`) carry
+200k, Paul's number from grinder-ao-1's 462k run, and `manager`, `techlead` and `plain` carry none
+(a manager restarts on its own rules, a seat is short, a plain session is often a person's).
+Layered as every preset key is; `none` removes it. A definition, not a setting: it is part of what
+the role is, as `review:` is, and changes by PR or by hand in `org.yml`.
 
 **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** (one line,
 40 characters at most, checked when the file is read) — *Manager*, *Tech Lead*, *Grinder*,
@@ -3839,6 +3855,10 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   as `none` is — a fresh start does not carry the conversation the debt was made in, so the
   debt is settled (`blocked` is an outcome) before the run ends; and it and `none` refuse each
   other: a session is out of work or it wants another run at it, never both.
+- **When.** *Your context is long* is not a number a session can see; §6 rule 5 gives it one: the
+  tick tells a supervised member, between entries, that its context reading is over its role's bound,
+  and a busy one reads it at the end of every `ao` reply (TD-188; not built — TD-190). The
+  declaration stays the member's.
 - **What a controller does with it.** A member carrying `restart_wanted` that is `idle`, or
   `exited` by a natural exit — a kill or a Close is never undone (§6 rule 2) — **with nothing
   uncommitted and nothing unpushed** on its record's git
@@ -5500,6 +5520,27 @@ code and needs no grant; a session doing the same work does.
   performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
   does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
   background because a tool call is capped at ten minutes.
+  5. **Context bound** (TD-188; designed 2026-09-26, not built — TD-190). A supervised member whose
+     **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
+     kept beside the tokens, since the model may change mid-run) is over its role's
+     **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,
+     auditor — none for `manager`, `techlead` and `plain`) is told so **once it is hook-confirmed
+     `idle` and holds no claim in progress** — between entries, never mid-turn — by **one fixed line**
+     through `send`'s path, as rule 4's is: *[agentorc] context 231k, over your 200k bound — take
+     nothing new: push, ledger, then `ao progress restart --why "context bound"`*; `context_sent_at`
+     marks it, and it is sent again after twenty minutes if the member is still idle and over. A
+     member that is `working` past the bound is not interrupted: every `ao` reply it makes ends with
+     *(context 231k over the 200k bound)* beside the unread line (§4.10 *Busy for hours*), and its brief
+     says what that means — finish the entry in hand, then declare. The declaration is the member's
+     (§4.9a *A run that ends with work left*, §9 invariant 14) and rule 2 restarts it; the line is
+     the trigger the brief's *your context is long* never had. Ordered as the doorbell is: a wrap-up
+     under way or a gate pause beats it. **Not compaction**: Claude Code documents no settable
+     auto-compact threshold, no way for another process to send `/compact`, and no hook before it,
+     its summary is lossy and keeps merged work, and it is one tool's — so the bound restarts, which
+     every adapter can do, and compaction stays what a person types into their own session. The
+     reading is drawn whether or not a bound is set (§4.5 *The card's anatomy* row 4, `ao status -v`):
+     *460k is a lot* was seen on a card that said nothing.
+
 - **Promote** (TD-120 step 2; designed 2026-09-24, not built — TD-132): a repo's live copy — the
   host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`
   by **a person's press or this policy, never by a session** (CLAUDE.md: a worker never promotes;

@@ -103,30 +103,14 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-186 | A restart's own race trips the restart ceiling, and the ceiling mark never lifts: grinder-ao-1's later `restart_wanted` waited a day for a person | High | Open — pickable, a bug in the tick's restart rules |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | Medium | Open — design-first |
-| TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Open — design-first; direction set: restart at a configurable bound, default 200k (TD-189) |
+| TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — after TD-186 and TD-188's design rows |
+| TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Open |
 
 
 ---
 
 <!-- Entry template:
-## TD-001: Short title of the problem
-
-**Priority:** High | Medium | Low
-**Added:** YYYY-MM-DD
-**Owner:** anchor | grinder | paul | dev-cadence
-**Kind:** build | design-first | live-check | evaluation | decision
-**Pickable:** yes | no — <one clause>
-**Status:** Open
-**Location:** `path/to/file.py` (function/section)
-
-**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
-
-**Fix:** concrete direction(s), and what would count as done.
-
-**Related:** other TDs, PRs, decision docs.
--->
-
 ## TD-002: Focus composer: Attach / drop / paste upload
 
 **Priority:** Medium
@@ -1914,6 +1898,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Kind:** design-first
 **Pickable:** yes
 **Status:** Open — direction set 2026-09-26 by Paul: restart after a context bound, 200k by default and configurable, built as TD-189; a Sonnet research pass on where the bound should sit comes first. The round settles the design rows and the rest of the evaluation below.
+**Pickable:** no — designed; the build is TD-190
+**Status:** Designed 2026-09-26 (the designer): design §6 *Keeping a team running* rule 5 *Context bound*, §4.3 `context` on the contract, §4.8 *A role has a context bound*, §4.9a *A run that ends with work left* **When**, §4.5 *The card's anatomy* row 4, §4.7 `ao status -v`; mockup `Focus.dc.html` (the Session card's reading). Settled: the measure is the adapter's `context` from the tool's records — Claude Code's last top-level assistant entry's `usage`, input + cache_read + cache_creation (checked on a live transcript: the fields are there, whatever the docs say) — read on the tick and kept on the record; the bound is a preset key, `context: {bound: 200k}` on the worker presets, none for manager, techlead and plain, a definition not a setting; the tick acts (one fixed line between entries; a clause on every `ao` reply while busy) and the member declares `restart`; compaction has no place as the mechanism (no settable threshold, no external trigger, no hook before it, lossy, Claude-only) and stays a person's own act; the brief's *your context is long* becomes *the host agent tells you*. Obvious from Paul's own number and the entry's evaluation; the design is PR #617, landed with a note. The build is TD-190; this entry archives with it. **What was:** the evaluation below is the anchor's starting point, not a decision.
 
 **Why:** a grinder decides for itself when *your context is long* and declares `restart` (`src/agentorc/briefs/grinder.md`, *A run that ends with work left*). There is no number. grinder-ao-1's run from 2026-09-25 20:14Z made 662 model calls with no compaction. Its context reached 462,133 tokens (Opus 5.5, whose 1M window leaves auto-compact far off), and the calls together read 187M input tokens, about 283k per call. Most of that is cache reads, but every read counts against the one account's usage windows that all three profiles share: the week line gated every team on 2026-09-26. Each idle turn afterwards (reading a peer's claim note and replying *nothing for me*) re-read the full 460k. The run merged seven PRs, so the work was fine, but the second half of it cost roughly twice what a fresh run would have. The long history also holds stale design readings and diffs that the next entry doesn't need.
 
@@ -1950,3 +1936,28 @@ Two things are missing, and the design round chooses between them or takes both:
 Done when a grinder whose context passes 200k finishes its entry, declares `restart`, and comes back fresh within a tick, and the card showed the size on the way.
 
 **Related:** TD-188 (the design round and the evaluation), TD-186 (restarts must not trip the ceiling), TD-103 (rule 2, the wanted restart), TD-083 (`restart_wanted`), TD-165 (the transcript read), TD-185 (tool-neutral: the reading is per adapter, the bound and the note are not); `docs/decisions/2026-09-25-settings-audit.md`.
+
+## TD-190: Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording
+
+**Priority:** High
+**Added:** 2026-09-26 (the designer, from TD-188's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §6 *Keeping a team running* rule 5, §4.3 `context`, §4.8 *A role has a context bound*, §4.9a *When*, §4.5 row 4, §4.7; mockup `Focus.dc.html`.
+
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`context()` beside `model_in_use`: the same tail read, the `usage` of the last top-level `assistant` entry; the model's window from a small table, else None), `src/agentorc/adapters/` (the contract, a `Context` shape beside `Usage`), `src/sessionorc/models.py` (`context: {tokens, at}`, node-owned, and `context_sent_at`), `src/sessionorc/agent.py` (the tick reads it for unattended records once a minute; rule 5's line through `send`'s path with the doorbell's precedence; the per-command reply clause beside the unread line), `src/agentorc/repoconfig.py` (`ROLE_KEYS` gains `context`; the built-ins' defaults; `none`), `src/agentorc/cli.py` (`ao status -v`, `--json`), `src/agentorc/ui/templates/card.html` and `focus.html` (the reading, red past the bound), `src/agentorc/briefs/grinder.md`, `hunter.md`, `auditor.md` (*A run that ends with work left*: the line and the clause, in place of *your context is long*).
+
+**Why:** TD-188's *Why*: a 462k-token run cost about twice what a fresh one would, and nothing on any card said so.
+
+**Fix:**
+1. **The measure**: `context()` and the `Context` shape; the tick's read for unattended records, throttled; the field on the record and in the pushed view.
+2. **The reading**: the card's row 4 and the Focus Session card (*context 231k of 1M*, red past the bound), `ao status -v` and `--json`.
+3. **The bound**: the preset key with defaults, layered, `none`; on the record at start as `review` is.
+4. **Rule 5**: the fixed line once hook-idle with no open claim and over the bound, `context_sent_at`, the twenty-minute repeat, the doorbell's precedence; the clause on every `ao` reply while over. `src/sessionorc/**` is a held path: the techlead reads this PR.
+5. **The briefs**: the three worker presets' *A run that ends with work left* name the line and the clause; `docs/briefs/` supplements untouched.
+6. **Tests:** `context()` on a fixture transcript (a sidechain entry ignored, a cut line skipped); the record field; the line's conditions (idle, no open claim, over, precedence, the repeat); the reply clause; the preset defaults and `none`; the card and the CLI.
+
+**Done when** TD-188's *Done when*: the design names the bound and a grinder's run ends near it — a grinder past 200k is told between entries, declares `restart`, and its card showed the reading climbing.
+
+**Related:** TD-188 (the design), TD-186 (restarts must work first — the ceiling's race), TD-083 (`restart_wanted`), TD-165 (the transcript read), TD-090 (compaction and state), TD-128 / TD-151 (the same `usage` fields, read for spend), TD-185 (the tool-neutral direction).
