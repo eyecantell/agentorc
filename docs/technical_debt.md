@@ -96,10 +96,10 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
-| TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first |
+| TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first; waits on Paul's answer (ask `m-d20bbf79bdbe`) |
 | TD-181 | An unfolded team with nothing live shows its member cards but no summary: no Repo facet, no TDs in motion, no Answer needed / Doing | Medium | Designed 2026-09-26 — the build is TD-192 |
 | TD-182 | A card's report line keeps a merged PR as `TD-066 → #158` with no mark, so a wound-down member reads as having a PR outstanding | Low | Designed 2026-09-26 — the build is TD-193 |
-| TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Open — design-first |
+| TD-183 | Clicking the team card collapses or expands it: today only the *n sessions* button folds, and only a team with nothing live | Medium | Designed 2026-09-26 — the build is TD-194 |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Open — pickable |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
@@ -108,6 +108,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Open |
 | TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
 | TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
+| TD-194 | Build the team card's fold: a click on the header folds any team, the folded live row with its counts and marks, the ring's header stop and `f` | Medium | Open — pickable |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 
@@ -1785,8 +1786,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (Paul: *it will look like the user giving short info, then an agent fleshing it out — asking questions as needed, then generating the TD*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open — nothing designed.
+**Pickable:** no — waits on Paul's answer to the designer's ask
+**Status:** Open — nothing designed. **Asked 2026-09-26** (the designer, ask `m-d20bbf79bdbe` in the person inbox): who drafts the entry — an on-call seat on the repo's team filled by the form's message (recommended: it reuses the seat fill, the Inbox's `ask` and the outcome debt, and costs one line in `org.yml` per team), the team's designer by mail, a one-shot session per press, or no agent and a stub. The round runs on his answer; the door proposed is **Add entry…** beside **Open ledger** on the Repo page, with `ao td add` beside it.
 
 **Why:** a TD reaches the ledger today only through a session. The person tells a session in its terminal, which writes the entry on a branch and opens a PR. The UI has no way in: §4.5a's **Open ledger** row says *an entry is edited in its file, never on the page*, and the Repo page's Technical debt lists are read-only. A thought the person has while looking at the Org or the Repo page has to wait until they open a session and explain it there. Most of what makes an entry good is work the person should not have to do: the next number, the Owner/Kind/Pickable lines, the evidence, the file locations, and the link to the design section and its neighbours. An agent can do all of that, and it only needs the person for the *why* and the choice between options.
 
@@ -1836,8 +1837,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (Paul: *have the team cards themselves be clickable to expand or collapse them*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open — nothing designed.
+**Pickable:** no — designed; the build is TD-194
+**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Any team folds, and its header is the press*), §4.5a *team card: fold* (the new row), *team groups*, *Org: keys*, *team header ✉ n* (the fold's help text changes with the build); mockup `OrgTeamFirst.dc.html` (a live team folded, the fold button on the live headers), rendered `docs/mockups/reviews/2026-09-26-td183-folded-live-team.png`. Settled: the header row is the press, its controls, links and marks excepted; the *n sessions* button stays as the keyboard's control; any team folds; a folded live row keeps the counts and every mark; the choice is per team, per browser, and stands across state changes; `f` and a header stop in the ring. **One choice is Paul's to turn**: a needs-you member rings the folded row and does not open it (the alternative: the row opens itself) — sent as a steer, and the PR merges at its bound unless he says otherwise; the next designer run merges it if this one has ended. The build is TD-194; this entry archives with it.
 **Location:** `src/agentorc/ui/static/app.js` (`syncTeams`, the fold keyed `fold:<team>`), `src/agentorc/ui/templates/group_head.html`
 
 **Why:** the only fold today is the *n sessions* button (§4.5a *the fold*), and `syncTeams` folds only a team with nothing live: *a live team never folds*. A page with several running teams can't be tidied, and the fold is a small button when the whole header is the natural target.
@@ -2019,6 +2020,30 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
 
 **Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).
+
+## TD-194: Build the team card's fold: a click on the header folds any team, the folded live row with its counts and marks, the ring's header stop and `f`
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-183's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 1 (*Any team folds, and its header is the press*), §4.5a *team card: fold*, *Org: keys*, *team header ✉ n*; mockup `OrgTeamFirst.dc.html`.
+**Location:** `src/agentorc/ui/static/app.js` (`syncTeams`: `folded` loses its `!+sec.dataset.live` clause and takes the default from the team's state when nothing is stored; the header's click handler, which ignores a press that lands on a button, a link, an input or a mark, or that ends a text selection; the keys table), `src/agentorc/ui/templates/group_head.html` (the fold button on every team with sessions, `aria-expanded` / `aria-controls`; the counts and the ✉ mark on any folded team), `src/agentorc/ui/static/app.css` (the pointer, the hover tint, the amber ring on a folded row), `src/agentorc/ui/help.py` (the fold's text)
+
+**Why:** TD-183's *Why*: a page with several running teams cannot be tidied, and the fold is a small button where the whole header is the natural target.
+
+**Fix:**
+1. **The press**: the header row folds and unfolds; the button is the same press.
+2. **Any team**: live, concluded or stopped; the default open for a live or concluded team and folded for one with nothing live; the stored choice wins.
+3. **The folded live row**: counts by state in place of the session count, every mark, the controls; the amber ring while a member needs the person; never unfolded by the page.
+4. **Keys**: a folded team's header is a stop in the ring; `f` folds the ringed card's team; `f` or `Enter` on a ringed header opens it; the `?` overlay gains the row from the same table.
+5. **The help text** of the fold, in the design's list and `help.py` together (`tests/test_help.py` holds the two word for word): its *where* becomes *n sessions on a team's card, and a click on its header*, and its first sentence *Shows or hides a team's cards and its summary; a stopped team's are folded away by default.*
+6. **Tests:** the header's markup on a live, a concluded and a stopped team (the server-side renders of `tests/test_ui_org.py` and `tests/test_ui_teams.py`); the keys table's node-run tests (`tests/test_ui_keys.py`), extended with `f`; `syncTeams` has no test that runs it today — only markup and one source-text check — so the fold's default and its stored choice get a node-run test of their own; the filter still hides a folded team with no match.
+
+**Done when** TD-183's *Done when*: a click on a team's header folds and unfolds it, live or not, and the choice survives a reload.
+
+**Related:** TD-183 (the design), TD-192 (what an unfolded wound-down team shows), TD-156 (f) (where the button sits), TD-124 (the keys).
 
 ## TD-195: Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell
 

@@ -64,7 +64,7 @@ a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-deco
 .big { font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 600; line-height: 1.1; }
 </style>
 </helmet>
-<div style="width: 1440px; height: 1480px; box-sizing: border-box; display: flex; flex-direction: column; background: #f3f4f6; overflow: hidden;">
+<div style="width: 1440px; height: 1620px; box-sizing: border-box; display: flex; flex-direction: column; background: #f3f4f6; overflow: hidden;">
 
   <div style="height: 48px; background: #1b2028; color: #e6e9ee; display: flex; align-items: center; gap: 14px; padding: 0 20px; box-sizing: border-box;">
     <span class="mono" style="font-size: 16px; font-weight: 500;">Shift<span style="color: #9ec5ff;">Lead</span></span>
@@ -128,13 +128,14 @@ a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-deco
     </div>
 
     <section style="background: #e9ebef; border: 1px solid #d3d8df; border-radius: 8px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px;">
-      <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" title="click the header to fold or unfold the team (TD-183)">
         <span style="font-size: 16px; font-weight: 600;">samscrape-grind</span>
         <span class="meta mono">kmaster / samscrape · 7 sessions</span>
         <span style="flex-grow: 1;"></span>
         <span class="meta">7 answered for you</span>
         <button class="btn sm">Wind down</button>
         <button class="btn sm danger">Stop now</button>
+        <button class="btn sm link">▾ 7 sessions</button>
       </div>
 
       <div style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px;">
@@ -233,12 +234,13 @@ a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-deco
     </section>
 
     <section style="background: #e9ebef; border: 1px solid #d3d8df; border-radius: 8px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px;">
-      <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" title="click the header to fold or unfold the team (TD-183)">
         <span style="font-size: 16px; font-weight: 600;">dc-grind</span>
         <span class="meta mono">kmaster / dev-cadence · 3 sessions</span>
         <span style="flex-grow: 1;"></span>
         <button class="btn sm">Wind down</button>
         <button class="btn sm danger">Stop now</button>
+        <button class="btn sm link">▾ 3 sessions</button>
       </div>
       <div style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px;">
         <div class="facet">
@@ -298,6 +300,10 @@ a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-deco
       </div>
     </section>
 
+    <div style="display: flex; align-items: center; gap: 12px; background: #e9ebef; border: 1px solid #d3d8df; border-radius: 8px; padding: 8px 16px; cursor: pointer; box-shadow: 0 0 0 2px #f59e0b;" title="a live team, folded by a click on its header (TD-183): the counts and the marks stay, and a member that needs you rings the row">
+      <span style="font-size: 16px; font-weight: 600;">ao-grind</span><span class="meta mono">kmaster / agentorc</span><span class="meta">1 needs you · 2 working · 1 idle · 1 on call</span><span style="flex-grow: 1;"></span><span class="meta">✉ 2 · 3 answered for you · 1 PR waiting</span><button class="btn sm">Wind down</button><button class="btn sm danger">Stop now</button><button class="btn sm link">▸ 5 sessions</button>
+    </div>
+
     <div style="display: flex; flex-direction: column; gap: 10px;">
       <div style="display: flex; align-items: baseline; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">No team</span><span class="meta">3 sessions · yours, on their own · full cards, as today</span></div>
       <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
@@ -326,7 +332,7 @@ a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-deco
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1480}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1620}}'>
 class Component extends DCLogic {
   renderVals() { return {}; }
 }
