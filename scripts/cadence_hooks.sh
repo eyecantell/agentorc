@@ -33,8 +33,8 @@
 #     slow child cannot starve the rest (it is the ceiling, not a sum of the children's
 #     per-call bounds: cadence_changes.py's calls could exceed it only if every one hung);
 #     without coreutils `timeout` the child runs unbounded and stderr says so once;
-#     the settings line's own timeout must exceed children × child timeout (5 × 25 = 125;
-#     the seeded line uses 150);
+#     the settings line's own timeout must exceed the sum of the children's bounds
+#     (5 × 25 + check_base.py's 10 = 135; the seeded line uses 150);
 #   - stdout of every child passes through (SessionStart output is context for the model);
 #   - the runner itself always exits 0: these are detectors, never a gate (cadence §7).
 #
@@ -88,9 +88,10 @@ fi
 
 run_child() {
     # $1 = the child as installed in a consumer (scripts/<name>), resolved beside this
-    # runner; the rest = its arguments
+    # runner; the rest = its arguments. A caller may set `bound=S` for one child that
+    # needs less than the default ceiling (check_base.py: offline, git only).
     local rel="$1"; shift
-    local f="$here/${rel#scripts/}" rc=0
+    local f="$here/${rel#scripts/}" rc=0 child_timeout="${bound:-$child_timeout}"
     [ -x "$f" ] || return 0
     if [ -z "$out_file" ]; then   # no temp file: unframed, as before, rather than silent
         printf '%s' "$payload" | "$f" "$@"
@@ -121,6 +122,7 @@ case "${1:-}" in
         run_child scripts/check_anchor.py --hook
         run_child scripts/hydrate_worktree.sh --hook
         run_child scripts/nudge_user_attention.py --report --due-only --fetch
+        bound=10 run_child scripts/check_base.py --hook
         run_child scripts/cadence_changes.py --hook
         ;;
     --list)
@@ -130,6 +132,7 @@ case "${1:-}" in
             "scripts/check_anchor.py --hook" \
             "scripts/hydrate_worktree.sh --hook" \
             "scripts/nudge_user_attention.py --report --due-only --fetch" \
+            "scripts/check_base.py --hook" \
             "scripts/cadence_changes.py --hook"
         ;;
     *)

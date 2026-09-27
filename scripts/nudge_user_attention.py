@@ -71,7 +71,9 @@ session's proposed answers) and ``Decided: <text> (YYYY-MM-DD).`` (written by
 board and stays due, but it waits on a session, not the person: the reports
 mark it so and list it first, ``--due-only`` shows it whether or not it is due,
 the nudge never pushes it as due, and ``--json`` carries ``answers``,
-``decided`` and ``waiting_on`` per item.
+``default``, ``decided`` and ``waiting_on`` per item. One answer may end in
+`` (default)`` — the one the session recommends (TD-066): stripped from the answer's
+text, carried as ``default``, and shown in the reports' tag.
 
 Usage:
     nudge_user_attention.py [--board PATH] [--dry-run] [--force-weekly]
@@ -105,6 +107,14 @@ def _default_boards() -> list[Path]:
     return boards
 
 ITEM_RE = re.compile(r"^\s*-\s*\[ \]\s+(?P<text>.+)$")
+# TD-062: the board is append-only — closing an item ticks it and appends
+#   … Closed: YYYY-MM-DD — why.
+# (board_edit.py done writes it), never deletes it; a sweep archives closed items once
+# ARCHIVE_AT of them sit on the board, in a PR of its own (cadence.md §3). Parity (§7):
+# the board's Format: lines, board_edit.py and the stranded-work skill write these.
+CLOSED_ITEM_RE = re.compile(r"^\s*-\s*\[[xX]\]\s+(?P<text>.+)$")
+CLOSED_RE = re.compile(r"(?:^|(?<=[.?!]\s))Closed:\s*(?P<date>\d{4}-\d{2}-\d{2})\b.*$")
+ARCHIVE_AT = 10
 DUE_RE = re.compile(r"\bDue:\s*(?P<due>\d{4}-\d{2}-\d{2})\b", re.IGNORECASE)
 # TD-036: two optional TRAILING fields, in this order, after Due: —
 #   … Due: YYYY-MM-DD. Answers: approve | hold. Decided: approve (YYYY-MM-DD).
@@ -133,13 +143,29 @@ def _trailer(text: str) -> str:
     return text[m.end():] if m else text
 
 
-def parse_answers(text: str) -> list[str]:
-    """The item's `Answers:` list, in order; [] when it has none."""
+# TD-066: at most one answer ends in " (default)" — the asker's recommendation, as a
+# steer's `default`. Parity (§7): the board's Format: lines write it.
+DEFAULT_MARK_RE = re.compile(r"\s*\(default\)$", re.IGNORECASE)
+
+
+def _raw_answers(text: str) -> list[str]:
     m = ANSWERS_RE.search(_trailer(text))
     if not m:
         return []
     parts = (a.replace("\\|", "|").strip() for a in ANSWER_SPLIT_RE.split(m.group("answers")))
     return [a for a in parts if a]
+
+
+def parse_answers(text: str) -> list[str]:
+    """The item's `Answers:` list, in order, any ` (default)` mark stripped; [] when none."""
+    return [DEFAULT_MARK_RE.sub("", a) or a for a in _raw_answers(text)]
+
+
+def parse_default(text: str) -> str | None:
+    """The answer marked ` (default)`, its text without the mark; None when no answer is
+    marked, or more than one is (no single recommendation to show)."""
+    marked = [DEFAULT_MARK_RE.sub("", a) for a in _raw_answers(text) if DEFAULT_MARK_RE.search(a)]
+    return marked[0] if len(marked) == 1 and marked[0] else None
 
 
 def parse_decided(text: str) -> tuple[str, date] | None:
@@ -159,8 +185,9 @@ class BoardItem:
     due: date | None
     line: int = 0  # 1-based line in the board file; 0 when parsed from a string with no file
     answers: list[str] = field(default_factory=list)
+    default: str | None = None  # the answer marked ` (default)` (TD-066)
     # A decided item is NOT done (TD-036): it stays on the board, and stays due, until a
-    # session acts on it and removes it — but it is no longer the person's to-do.
+    # session acts on it and closes it — but it is no longer the person's to-do.
     decided: tuple[str, date] | None = None
     bad_due: str | None = None  # the text after "Due:" when it is not a date (TD-053)
 
@@ -171,12 +198,60 @@ class BoardItem:
         return (today - self.due).days
 
 
+def item_key(line: str) -> str:
+    """An item line with what a tool may change on it taken out — the tick, the Closed:,
+    Decided: and Due: fields (board_edit.py may also end the sentence before them) — so
+    the open and the closed copy of one item, or a snoozed one, compare equal.
+
+    Load-bearing twice: check_cadence.py's direct-commit audit, and parse_board, where a
+    match HIDES an open item — so indentation is kept (a re-indented line is not a tool
+    edit) and a collision needs the whole `date (session …) — text` equal."""
+    line = re.sub(r"^(\s*-\s*)\[[ xX]\]", r"\1[ ]", line)
+    line = re.sub(r"\s*" + CLOSED_RE.pattern, "", line)
+    line = re.sub(r"\s*" + DECIDED_RE.pattern, "", line)
+    line = re.sub(r"\s*(?:" + DUE_RE.pattern + r")\.?", "", line, flags=re.IGNORECASE)
+    return line.rstrip(" .")
+
+
+def closed_items(content: str) -> list[str]:
+    """The board's closed (`- [x]`) item lines."""
+    return [ln for ln in content.splitlines() if CLOSED_ITEM_RE.match(ln)]
+
+
+def archive_note(content: str) -> str | None:
+    """TD-062: the prompt to archive closed items, once ARCHIVE_AT or more are on the board."""
+    n = len(closed_items(content))
+    if n < ARCHIVE_AT:
+        return None
+    return (f"⚠ {n} closed item(s) on the board — move them to docs/user_attention_archive.md "
+            "in a PR of its own (cadence.md §3)")
+
+
+def twin_note(content: str) -> str | None:
+    """TD-062: open items that appear twice (item_key equal) — a merge kept both copies of
+    an in-place edit (a snooze, a Decided:), which only a reader of the two can settle."""
+    seen: dict[str, int] = {}
+    for ln in content.splitlines():
+        if ITEM_RE.match(ln):
+            k = item_key(ln)
+            seen[k] = seen.get(k, 0) + 1
+    n = sum(1 for c in seen.values() if c > 1)
+    if not n:
+        return None
+    return (f"⚠ {n} open item(s) appear twice — a merge kept both copies of a snooze or "
+            "Decided:; keep the right one, drop the other (cadence.md §3)")
+
+
 def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
-    """Extract unchecked items and their optional Due: dates from board markdown."""
+    """Extract unchecked items and their optional Due: dates from board markdown.
+
+    An open item whose closed twin is also on the board (item_key equal) is closed: a
+    merge that took both sides of a close keeps both lines, and the tick wins (TD-062)."""
     items = []
+    closed = {item_key(ln) for ln in closed_items(content)}
     for lineno, line in enumerate(content.splitlines(), start=1):
         m = ITEM_RE.match(line)
-        if not m:
+        if not m or (closed and item_key(line) in closed):
             continue
         text = m.group("text").strip()
         due = None
@@ -191,6 +266,7 @@ def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
         if due is None and (am := DUE_ATTEMPT_RE.search(text)):
             bad = am.group("raw")
         items.append(BoardItem(text=text, due=due, line=lineno, answers=parse_answers(text),
+                               default=parse_default(text),
                                decided=parse_decided(text), bad_due=bad))
     return items
 
@@ -215,11 +291,13 @@ def due_tag(item: BoardItem, today: date) -> str:
 
 
 def item_tag(item: BoardItem, today: date) -> str:
-    """due_tag, or — for a decided item (TD-036) — who it now waits on and since when."""
+    """due_tag (with the recommended answer, TD-066), or — for a decided item (TD-036) —
+    who it now waits on and since when."""
     if item.decided is None:
         if item.bad_due is not None:
             return f"⚠ unparseable due date {_clip(item.bad_due)} — write Due: YYYY-MM-DD"
-        return due_tag(item, today)
+        rec = f" · default: {_clip(item.default)}" if item.default else ""
+        return due_tag(item, today) + rec
     text, on = item.decided
     age = (today - on).days
     since = f", {age}d ago" if age > 0 else ""
@@ -1085,6 +1163,7 @@ def _item_json(item: BoardItem, today: date) -> dict:
         "overdue_days": item.overdue_days(today),
         "due_tag": due_tag(item, today),
         "answers": item.answers,
+        "default": item.default,
         "decided": ({"text": item.decided[0], "date": item.decided[1].isoformat()}
                     if item.decided else None),
         # TD-036: a decided item has stopped being the person's to-do
@@ -1207,7 +1286,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                          # report only, never --due-only (a session start pays no gh call)
                          "settings": (settings_line(root, json_gh_spent)
                                       if fr is not None and root is not None and not due_only else None),
-                         "sweep": None, "items": []}
+                         "sweep": None, "archive": None, "items": []}
             if board is not None:
                 try:
                     content = read_board(i, board)
@@ -1216,6 +1295,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                     content = None
                 if content is not None:
                     row["sweep"] = sweep_note_for(content, today, root)
+                    row["archive"] = " ".join(n for n in (archive_note(content), twin_note(content)) if n) or None
                     row["items"] = [_item_json(it, today) for it in parse_board(content, warn=False)
                                     if not due_only or surfaces_at_start(it, today)]
             out_rows.append(row)
@@ -1296,6 +1376,9 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 sweep = sweep_note_for(content, today, root)
                 if sweep:
                     body.append(f"  {sweep}")
+                for extra in (archive_note(content), twin_note(content)):
+                    if extra:
+                        body.append(f"  {extra}")
         if note:
             body.append(f"  note: {note}")
         if fr is not None:

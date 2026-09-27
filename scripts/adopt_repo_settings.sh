@@ -3,7 +3,7 @@
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Check (default) or apply the GitHub repo settings the cadence assumes (TD-034).
 #
-#   adopt_repo_settings.sh [--check|--apply] [--no-auto-delete] [owner/repo]
+#   adopt_repo_settings.sh [--check|--apply [--yes]] [--no-auto-delete] [owner/repo]
 #
 # The cadence mandates squash merges (cadence.md §4) and recommends GitHub's
 # "Automatically delete head branches" (§4, "Give the rule teeth"). Both live
@@ -16,7 +16,11 @@
 #             0 when clean, 2 when gh cannot answer (not authenticated, offline,
 #             not a GitHub repo). Mutates nothing.
 #   --apply   PATCH the drifted settings, then re-read and confirm. Idempotent:
-#             a clean repo is left untouched (no API write at all).
+#             a clean repo is left untouched (no API write at all). Before the write it
+#             asks, naming the repo, when stdin is a terminal; with no terminal it refuses
+#             (exit 2, naming --yes) — the repo came from `origin`'s URL, and a write to
+#             another repo's settings is not something to do on a guess (TD-058).
+#   --yes     apply without asking: the flag unattended callers pass.
 #
 #   --no-auto-delete   leave "Automatically delete head branches" out of both the check
 #             and the apply (a repo that stacks PRs, below).
@@ -37,11 +41,13 @@ set -u
 MODE=check
 REPO=""
 NO_AUTO_DELETE=0
+YES=0
 for a in "$@"; do
     case "$a" in
         --check) MODE=check ;;
         --apply) MODE=apply ;;
         --no-auto-delete) NO_AUTO_DELETE=1 ;;
+        --yes|-y) YES=1 ;;
         -h|--help) awk 'NR>3 && /^[^#]/ {exit} NR>3 {sub(/^# ?/, ""); print}' "$0"; exit 0 ;;
         -*) echo "unknown option: $a" >&2; exit 2 ;;
         *) REPO="$a" ;;
@@ -109,6 +115,18 @@ if [ "$MODE" = check ]; then
     exit 1
 fi
 
+if [ "$YES" = 0 ]; then
+    if [ ! -t 0 ]; then
+        echo "not applied: --apply writes $REPO's settings and asks first, but there is no terminal to ask — re-run with --yes to apply unattended" >&2
+        exit 2
+    fi
+    printf 'apply these to %s? [y/N] ' "$REPO"
+    read -r answer || answer=""
+    case "$answer" in
+        y|Y|yes|YES) ;;
+        *) echo "not applied: nothing changed"; exit 1 ;;
+    esac
+fi
 echo "applying: gh api -X PATCH repos/$REPO ${DRIFT[*]}"
 if ! gh api -X PATCH "repos/$REPO" "${DRIFT[@]}" >/dev/null; then
     echo "apply failed: gh api PATCH repos/$REPO returned non-zero (need admin on the repo?)" >&2; exit 2

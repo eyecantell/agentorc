@@ -12,6 +12,34 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-09-26 — a board question marks the answer you recommend with ` (default)`
+Do: end at most one answer in `Answers:` with ` (default)` — `Answers: merge (default) | hold.` — instead of saying "my default first" in prose; `/attention` shows it and `--json` carries it as `default`. The board never falls to it: a fall-through is a `steer`.
+See: cadence.md §3 (A question lists its answers); TD-066.
+
+## 2026-09-26 — a ledger entry's dependencies go in one `**Blocked by:**` field; pickable is derived
+Do: write `**Blocked by:** TD-NNN` or `decision (<who>)` under an entry's Status instead of "needs TD-N first" / "Pickable now" prose; pick from `scripts/ledger.py --pickable`; never edit a dependent when its blocker is archived.
+See: cadence.md §2 (Dependencies); TD-064.
+
+## 2026-09-26 — the attention board is append-only: close an item by ticking it, never delete it
+Do: close with `scripts/board_edit.py done --why "<why>"` (ticks it, appends `Closed: <date> — <why>.`); resolve a board merge conflict by keeping both sides; when `/attention` reports 10+ closed items, move them to `docs/user_attention_archive.md` in a PR touching only those two files, merged at once.
+See: cadence.md §3 (The board is append-only); TD-062.
+
+## 2026-09-25 — the worktree reaper removes a worktree that landed and was edited on main since
+Do: nothing new to run — `reap_worktrees.sh` reports such a worktree `landed=since` and reaps it like a landed one (same other gates); keep scratch out of worktrees you are done with, as before.
+See: cadence.md §1 (Reaping worktrees); `scripts/reap_worktrees.sh` (since_edited); TD-059.
+
+## 2026-09-25 — `adopt_repo_settings.sh --apply` asks before writing; unattended callers pass `--yes`
+Do: run `--apply` at a terminal and answer the prompt naming the repo; a script or unattended session passes `--yes` (without a terminal and without it, `--apply` refuses, exit 2).
+See: `scripts/adopt_repo_settings.sh` header; TD-058.
+
+## 2026-09-25 — cloud sessions: no hooks warning, a note instead; the sweep lists PRs AWAITING REVIEW
+Do: in a claude.ai/code session, open your PR early and say in its body what waits on whom; if `/cadence` fails there (gh missing or proxy-limited), run `/cadence <n>` from a machine with `gh`. `/stranded-work` now lists open PRs past a day with no `cadence-review:` comment.
+See: cadence.md §4 (Cloud sessions); `scripts/check_claude_memory.sh` (check 4); stranded-work quick check 3; TD-063.
+
+## 2026-09-25 — SessionStart tells a resumed session about its own base (landed, conflicting, far behind)
+Do: when the `check_base.py` hook says your branch has LANDED, stop — start new work on a fresh branch off origin/main; never test landedness with `git log origin/main..<branch>` (a squash merge reads as pending forever).
+See: cadence.md §1 (Worktree lifecycle); `scripts/check_base.py`; TD-061.
+
 ## 2026-09-25 — git hooks run from the main checkout in every worktree: shims in `.git/hooks`, not `core.hooksPath`
 Do: run `scripts/install_git_hooks.sh` once per clone (sync.sh does it) when the SessionStart guard says the hooks are not installed or `core.hooksPath` is relative; it never clobbers a hook of the clone's own — heed its WARN lines.
 See: cadence.md §4 (Give the rule teeth); `scripts/install_git_hooks.sh`; TD-055.

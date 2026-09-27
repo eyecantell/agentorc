@@ -62,7 +62,7 @@ suffix, not the root — classified as
 
     stamp         only Swept:/Swept-deep: lines on docs/user_attention.md
     board-append  whole `- [ ]` items with a Due:, under a `## Needs…` heading, nothing removed
-    board-edit    one item's tick, Due: or Decided: changed, under board_edit.py's fixed
+    board-edit    one item's tick (+ Closed:), Due: or Decided: changed, under board_edit.py's fixed
                   message (BOARD_EDIT_MSG_RE — a parity pair with board_edit.py, cadence §7)
     fail          anything else: landed without review (the files it touched are named)
 
@@ -406,9 +406,12 @@ def fetch_once(root):
         git(["fetch", "-q", "origin"], cwd=root)
 
 
-def landed(root, wt, branch):
-    """cadence §1 scoped diff: the branch's own files identical to origin/<default>."""
-    fetch_once(root)
+def landed(root, wt, branch, fetch=True):
+    """cadence §1 scoped diff: the branch's own files identical to origin/<default>.
+    fetch=False reads origin/<default> as it stands (check_base.py at SessionStart,
+    which must not touch the network — the attention hook fetched just before it)."""
+    if fetch:
+        fetch_once(root)
     ref = default_ref(root)
     base = git(["merge-base", ref, branch], cwd=root)
     if not base:
@@ -528,7 +531,7 @@ def row_worktree(pr, root):
             "worktree",
             "pass",
             f"{wt} is clean and landed, and main has edited its files since (TD-059) — "
-            "the reaper keeps it (its test is the strict one); remove it by hand",
+            "reapable (the reaper asks the same question)",
         )
     if since == "reverted":
         return row(
@@ -651,16 +654,13 @@ def _board_diff(root, sha):
 
 
 def _edit_key(line):
-    """An item line with what a tool-made edit may change taken out: the tick, the Due:
-    date, the Decided: field (board_edit.py may also end the sentence before them). The
-    field patterns are the board reader's own (cadence §7), imported, never re-typed."""
+    """An item line with what a tool-made edit may change taken out: the tick, the
+    Closed:, Due: and Decided: fields — the board reader's own item_key (cadence §7),
+    imported, never re-typed."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import nudge_user_attention as N  # sibling SYNC script, as board_edit.py imports it
 
-    line = ANY_ITEM_RE.sub(r"\1[ ]", line)
-    line = re.sub(r"\s*" + N.DECIDED_RE.pattern, "", line)
-    line = re.sub(r"\s*(?:" + N.DUE_RE.pattern + r")\.?", "", line, flags=re.IGNORECASE)
-    return line.rstrip(" .")
+    return N.item_key(line)
 
 
 def classify_direct(root, sha, subject, files):
@@ -688,7 +688,7 @@ def classify_direct(root, sha, subject, files):
     if len(removed) == 1 and len(new) == 1 and OPEN_ITEM_RE.match(removed[0]) \
             and ANY_ITEM_RE.match(new[0]) and _edit_key(removed[0]) == _edit_key(new[0]):
         if BOARD_EDIT_MSG_RE.match(subject):
-            return "board-edit", "one item's Due:/tick/Decided:, under board_edit.py's message"
+            return "board-edit", "one item's Due:/tick/Closed:/Decided:, under board_edit.py's message"
         return "fail", "a one-item board edit without board_edit.py's fixed message"
     return "fail", f"board change outside the carve-outs (-{len(removed)} +{len(new)} lines)"
 

@@ -24,7 +24,8 @@
 # marker left by a crashed session would.
 #
 # WHAT COUNTS AS REAPABLE — all five, or it is left alone
-#   landed   the branch's own files are identical to origin/main
+#   landed   the branch's own files are identical to origin/main — or it landed and main
+#            has edited those files since (TD-059, below)
 #   clean    no modified, no untracked AND no ignored files (scratch must never
 #            be reaped), bar a short allowlist of derived paths — see IGNORED
 #   idle     no live Claude session has its cwd inside the worktree
@@ -109,8 +110,16 @@
 #   git diff --stat main topic          -> shows g, an unrelated file main gained
 #   git diff --stat main topic -- f     -> empty; topic's own file did land
 #
-# If main later edits those same files differently the test says "not landed"
-# and the worktree survives. That is the correct direction to be wrong in.
+# If main later edits those same files, the scoped test says "not landed" forever.
+# So a second question is asked then (TD-059, decided 2026-09-25): did the branch land
+# on main, which has edited its files since? That is check_cadence.py's
+# landed_since_edited() — the PR's squash matched by patch-id among main's first-parent
+# commits, offline — called by import, never copied, so the reaper, the cadence check
+# and the sweep share ONE definition. "yes" reports landed=since and counts as landed;
+# "reverted" (main undid it) and anything it cannot answer (no python3, no
+# check_cadence.py beside the reaper) stay "no", and the worktree survives. Known limit
+# of the predicate: a PARTIAL revert still reads "since"; the other four gates are
+# unchanged.
 #
 # BRANCHES WITHOUT A WORKTREE (TD-032) get their own report section and gates —
 # see ORPHAN BRANCHES below the worktree loop.
@@ -161,6 +170,7 @@ sibling() {
     printf '%s\n' "$CLONE_ROOT/scripts/$1"
 }
 HYDRATE="$(sibling hydrate_worktree.sh)"
+CADENCE_PY="$(sibling check_cadence.py)"
 ANCHOR_DIR="$(dirname "$(sibling check_anchor.py)")"
 
 # Default branch — cadence.md §9 "Default-branch rule". Parity: this function is copied
@@ -288,7 +298,7 @@ ignored_blockers() {
     return 0
 }
 
-# landed_of <branch>: yes | empty | no — the scoped landed test (header: THE LANDED
+# landed_of <branch>: yes | since | empty | no — the scoped landed test (header: THE LANDED
 # TEST IS SCOPED), shared by the worktree loop and the orphan-branch pass so there is
 # ONE implementation of it and its traps (comments in the worktree loop below).
 landed_of() {
@@ -301,9 +311,27 @@ landed_of() {
         echo empty
     elif git diff --quiet "$BASE" "$branch" -- "${files[@]}" 2>/dev/null; then
         echo yes
+    elif [[ "$(since_edited "$branch")" == yes ]]; then
+        echo since
     else
         echo no
     fi
+}
+
+# since_edited <rev>: yes | reverted | no — TD-059's second question, answered by
+# check_cadence.py's landed_since_edited() (header: THE LANDED TEST IS SCOPED). Any
+# failure to answer is "no": the direction that keeps the worktree.
+since_edited() {
+    local r
+    [[ -f "$CADENCE_PY" ]] || { echo no; return; }
+    r="$(python3 - "$(dirname "$CADENCE_PY")" "$CLONE_ROOT" "$1" <<'PY' 2>/dev/null
+import sys
+sys.path.insert(0, sys.argv[1])
+from check_cadence import landed_since_edited
+print(landed_since_edited(sys.argv[2], sys.argv[3]))
+PY
+)"
+    case "$r" in yes|reverted) echo "$r" ;; *) echo no ;; esac
 }
 
 reapable=()
@@ -356,7 +384,7 @@ while read -r path; do
         fi
         # Ignored scratch (header: IGNORED FILES), only where it can decide the
         # verdict. A failing scan reads as not clean, never as nothing found.
-        if [[ "$clean" == "yes" && "$landed" == "yes" ]]; then
+        if [[ "$clean" == "yes" && ( "$landed" == "yes" || "$landed" == "since" ) ]]; then
             if ! blockers="$(ignored_blockers "$path")"; then
                 clean="no"; blockers="(git status --ignored failed)"
             elif [[ -n "$blockers" ]]; then
@@ -399,7 +427,7 @@ while read -r path; do
         nested="no"
     fi
 
-    if [[ "$landed" == "yes" && "$clean" == "yes" && "$idle" == "yes" && "$unlocked" == "yes" \
+    if [[ ( "$landed" == "yes" || "$landed" == "since" ) && "$clean" == "yes" && "$idle" == "yes" && "$unlocked" == "yes" \
           && ( "$nested" == "ok" || "$nested" == "n/a" ) ]]; then
         verdict="REAPABLE"
         # Two parallel arrays rather than "$path|$branch" packing: a literal `|`
@@ -439,7 +467,7 @@ done < <(git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}'
 #     name is in rebase-merge/ or rebase-apply/head-name, or BISECT_START);
 #   - contained: every commit already on origin/<default> (`rev-list BASE..b` is 0) —
 #     stricter than the worktree loop's `empty` (no net file change), because commits
-#     that net to nothing are still history someone made — OR landed=yes by the same
+#     that net to nothing are still history someone made — OR landed=yes or since by the same
 #     scoped predicate the worktree loop uses (landed_of).
 # `--reap` deletes with `git update-ref -d <ref> <sha seen here>`: a compare-and-delete,
 # so a branch that gained a commit between this report and the delete survives.
@@ -466,7 +494,7 @@ while IFS=' ' read -r ob osha; do
         state="$(landed_of "$osha")"
         [[ "$state" == "empty" ]] && state="net-empty"   # commits, no net change: kept
     fi
-    if [[ "$state" == "contained" || "$state" == "yes" ]]; then
+    if [[ "$state" == "contained" || "$state" == "yes" || "$state" == "since" ]]; then
         verdict="DELETABLE"; orphans+=("$ob"); orphan_sha+=("$osha")
     else
         verdict="keep"

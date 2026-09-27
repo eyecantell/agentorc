@@ -11,6 +11,7 @@
 #   3. The git hooks not installed in this clone → the pre-push main guard is silently
 #      OFF (a per-clone setting a fresh clone lacks), or installed the old way, as a
 #      relative core.hooksPath, which each worktree resolves on its own branch (TD-055).
+#      Skipped in a cloud session (CLAUDE_CODE_REMOTE=true), which gets one note instead (TD-063).
 #   4. The memory directory isn't version-controlled at all (autoMemoryDirectory
 #      points outside any git repo) → memory is machine-local and dies with it.
 #
@@ -250,7 +251,15 @@ root_dir="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)"
 case "$here_dir/" in
   "$root_dir"/*) [ -f "$here_dir/git-hooks/pre-push" ] && HOOKS_REL="${here_dir#"$root_dir"/}/git-hooks" ;;
 esac
-if [ -f "$REPO_ROOT/$HOOKS_REL/pre-push" ]; then
+# A cloud session (claude.ai/code: CLAUDE_CODE_REMOTE=true, never true locally — the value
+# Anthropic's cloud-environments docs say to test for, TD-063) runs in a harness
+# clone where the hooks are never installed and the guard is pointless — the harness
+# pushes only the session's own claude/* branch — so the warning would be always wrong
+# there. It gets one line about what differs instead, printed even when all is well.
+cloud_note=""
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+  cloud_note="cloud session (CLAUDE_CODE_REMOTE): the pre-push guard does not apply here (the harness pushes only this session's branch). gh may be missing or limited — its GitHub proxy serves only a pinned set of GraphQL operations — so if /cadence or check_cadence.py fails here, run /cadence <n> on your PR from a machine with gh. Your PR is the one signal the org sees — open it early, and say in its body what waits on whom (cadence.md §4)."
+elif [ -f "$REPO_ROOT/$HOOKS_REL/pre-push" ]; then
   installer="${HOOKS_REL%/git-hooks}/install_git_hooks.sh"
   hookspath=$(git -C "$REPO_ROOT" config core.hooksPath 2>/dev/null || true)
   if [ -z "$hookspath" ]; then
@@ -400,6 +409,7 @@ PY
   [ -n "$roster_warn" ] && warns+=("$roster_warn")
 fi
 
+[ -n "$cloud_note" ] && echo "ℹ $cloud_note"
 if [ "${#warns[@]}" -eq 0 ]; then
   if [ "$HOOK_MODE" -eq 0 ]; then
     n=$(find "$MEM_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')

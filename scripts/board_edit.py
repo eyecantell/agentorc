@@ -4,16 +4,18 @@
 """Make one tool-made edit to one attention-board item, the same way for every tool (TD-036).
 
     board_edit.py snooze --board PATH --line N --expect HEAD --to YYYY-MM-DD
-    board_edit.py done   --board PATH --line N --expect HEAD
+    board_edit.py done   --board PATH --line N --expect HEAD [--why TEXT]
     board_edit.py decide --board PATH --line N --expect HEAD --answer TEXT
         [--tool NAME] [--session NAME] [--no-commit]
 
 snooze  sets the item's ``Due:`` date (adds one when it has none).
-done    ticks the item: ``- [ ]`` becomes ``- [x]``, and the readers stop listing it.
+done    closes the item: ``- [ ]`` becomes ``- [x]`` and ``Closed: YYYY-MM-DD[ — TEXT].``
+        is appended (``--why``), and the readers stop listing it. The line stays on the
+        board — closing never deletes (TD-062); a sweep archives closed items later.
 decide  records the person's answer: ``Decided: TEXT (today).`` at the end of the line,
         replacing an earlier one. TEXT may be one of the item's ``Answers:`` or any
         free text. A decided item stays on the board, and stays due, until a session
-        acts on it and removes it — it is the session's work order now (cadence.md §3).
+        acts on it and closes it — it is the session's work order now (cadence.md §3).
 
 ``--line`` is the 1-based line ``nudge_user_attention.py --report --json`` prints for
 the item, and ``--expect`` the start of its text (or of the raw line) as the tool last
@@ -73,13 +75,19 @@ def _trailing_field_start(body: str) -> int | None:
 
 
 def edit_line(body: str, action: str, *, to: date | None = None, answer: str | None = None,
-              today: date | None = None) -> str:
+              why: str | None = None, today: date | None = None) -> str:
     """The item line `body` (no line ending) after `action`; raises Refused."""
     today = today or date.today()  # noqa: DTZ011  # local civil date, as the readers use
     if action == "done":
-        new = re.sub(r"^(\s*-\s*)\[ \]", r"\1[x]", body, count=1)
-        if N.ITEM_RE.match(new):
-            raise Refused("the item still reads as open after ticking it")
+        why = " ".join((why or "").split()).rstrip(".?!")  # the field supplies its one period
+        field = f"Closed: {today.isoformat()}{f' — {why}' if why else ''}."
+        head = re.sub(r"^(\s*-\s*)\[ \]", r"\1[x]", body, count=1).rstrip()
+        new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {field}"
+        m = N.CLOSED_RE.search(new)
+        if N.ITEM_RE.match(new) or not N.CLOSED_ITEM_RE.match(new) or not m \
+                or m.group("date") != today.isoformat() or N.item_key(new) != N.item_key(body):
+            raise Refused("the reader would not read the item back as closed today with its "
+                          "text unchanged")
         return new
     text = N.ITEM_RE.match(body).group("text")
     if action == "snooze":
@@ -132,6 +140,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expect", required=True, help="the start of the item's text as last shown")
     ap.add_argument("--to", help="snooze: the new Due: date, YYYY-MM-DD")
     ap.add_argument("--answer", help="decide: the person's answer")
+    ap.add_argument("--why", help="done: why it is closed, for the Closed: field")
     ap.add_argument("--tool", default="board_edit", help="names the tool in the commit message")
     ap.add_argument("--session", help="the session named in the commit message (default: the item's)")
     ap.add_argument("--no-commit", action="store_true", help="edit the file only")
@@ -151,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("decide needs --answer")
     if a.action != "decide" and a.answer is not None:
         ap.error("--answer is for decide only")
+    if a.action != "done" and a.why is not None:
+        ap.error("--why is for done only")
     if not a.expect.strip():
         ap.error("--expect is empty — pass the item's text as the tool showed it")
 
@@ -185,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
             if r.returncode != 0 or r.stdout.strip():
                 raise Refused(f"{board} has uncommitted changes; the carve-out commit would carry "
                               "them — commit or discard them first")
-        new_body = edit_line(body, a.action, to=to, answer=a.answer)
+        new_body = edit_line(body, a.action, to=to, answer=a.answer, why=a.why)
     except Refused as e:
         print(f"board_edit: refused: {e}", file=sys.stderr)
         return 3
