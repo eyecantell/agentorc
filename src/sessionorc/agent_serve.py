@@ -1,4 +1,4 @@
-"""Serving clients (TD-108 step 1): one org to a client (design §4.4a *A node's records at the home), the
+"""Serving clients (TD-108 step 1): one org to a client (design §4.4a *A node's records at the home*), the
 event stream, and the socket's connection handling — the JSON-lines RPC, the identity check at the door, the
 reply line — as a mixin `HostAgent` inherits. Moved as written; the state it reads is the agent's.
 """
