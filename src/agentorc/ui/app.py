@@ -383,6 +383,26 @@ def node_banner(info: dict[str, Any] | None) -> str:
     )
 
 
+def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) -> str:
+    """The Org's line when `hosts.yml` moved under a running host agent (design §5, TD-149 (5)):
+    `local.name`, `home:` and `local.identity` are read by the agent once, at its start, and by
+    this page on every request, so a hand edit leaves the two disagreeing until a restart. This
+    says which of the three the file has moved on — the agent's value from its `host` and
+    `identity` answers against the file's — and that the restart applies them. A value the agent
+    did not answer is not compared."""
+    info, id_info = info or {}, id_info or {}
+    local = hosts.local_host()
+    pairs = (
+        ("name", info.get("host"), local.name),
+        ("home", info.get("home"), hosts.home_name()),
+        ("identity", id_info.get("mode"), identity.mode_of(local.identity)),
+    )
+    moved = [f"{k} {ran} → {filed}" for k, ran, filed in pairs if ran and str(ran) != filed]
+    if not moved:
+        return ""
+    return f"hosts.yml changed: {', '.join(moved)} — restart pending: the host agent applies it when it restarts"
+
+
 def identity_note(info: dict[str, Any] | None) -> str:
     """The Org's teams line on who is calling (design §4.8a: *`ao status -v` and the Org's teams
     line say which mode a host is in, since `observe` is a host that is not yet protected*). It
@@ -3054,6 +3074,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
                 "identity_note": identity_note(id_info),
+                "restart_note": "" if agent_down else restart_note(info, id_info),
                 "editor_note": uiconf.open_in().error,
             },
         )

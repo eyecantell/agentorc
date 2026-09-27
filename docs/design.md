@@ -5187,7 +5187,12 @@ session is never woken by mail at all.
   the ssh transport (TD-004, phase 2); nothing reads them today. The UI process may run on a
   laptop; only the session hosts need to stay awake. The parser is `sessionorc.hosts`, shared by the UI and the host agent (TD-004; there are
   no env-var overrides). A field the *agent* acts on (`runs_keep_days`) is read on the session host
-  from its own file's `local` entry, so every session host carries its own copy; a node's `link:`
+  from its own file's `local` entry, so every session host carries its own copy. `local.name`, `home:` and `local.identity`
+  are read by the host agent **once, at its start**, and by the UI on every request, so a hand edit
+  of one leaves the two disagreeing until the agent restarts: the Org page then says so in one line
+  under the node banner — *hosts.yml changed: name kmaster → box — restart pending* — naming each
+  value that moved, the agent's (from its `host` and `identity` answers) against the file's (TD-149).
+  A node's `link:`
   key is the node→home link of §4.4a (built for a container node; a machine node is not yet in use, TD-057). **`home:`** names the host whose agent holds the org's graph
   and mail; an agent whose file names no `home:`, or names itself, is the home. On Paul's machines
   it is `home: kmaster`.
