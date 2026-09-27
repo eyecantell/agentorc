@@ -2062,8 +2062,8 @@ Screens:
    design), the terminal's colours (goal 12), a density switch (§4.5 *Type scale*), live identity
    mode (§4.8a), and any definition. A **Settings** tab in the top bar, last, after Inbox (TD-123:
    a tab exists only for a built page, and this one is).
-9. **Transcript** (`/transcript/<id>`; TD-154, designed 2026-09-25 — the build is TD-165 and
-   TD-166; mockup `Transcript.dc.html`): **a read of what a session said and did, without resuming
+9. **Transcript** (`/transcript/<id>`; TD-154, designed 2026-09-25 — the read, the RPC and `ao transcript`
+   are built (TD-165); the page and its button are TD-166; mockup `Transcript.dc.html`): **a read of what a session said and did, without resuming
    it.** Resuming was the only way to read a finished session, and it is the wrong tool three times
    over: it creates a live session and a record, it is a lifecycle event a manager may act on, and
    it has to be closed again. The transcript is a file on the session's host that its adapter
@@ -2644,7 +2644,12 @@ offset `--before` takes for the turns before them; `--raw` prints the file's own
 the last N of them, for a reader that wants the tool's shape. A record with no tool session id is
 refused with what it is (*a shell has no transcript*). A read-only verb, listed beside `tail` and
 `explain` in `ao --skill`: what a manager reads before deciding a quiet member has stalled
-(TD-091's moment), and what a person reads instead of Resume.
+(TD-091's moment), and what a person reads instead of Resume. Built (TD-165). The offset `--before` takes is given only
+when an earlier prompt exists — the read goes back as far as the prompt before the ones it holds, so
+*earlier turns* never opens on nothing but the tool's bookkeeping — and Claude Code's subagents,
+which the tool now writes to their own files beside the session, are read from there and folded
+under the Agent call whose id their record names (an older file's inline sidechain entries fold
+under the Agent call before them).
 
 **Reporting (§4.8, §4.9a).** Each is a small RPC on the calling session's own record — `--id`
 for another's, since the channels are ungated:

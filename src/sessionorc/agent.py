@@ -94,6 +94,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     TITLE_CAP,  # noqa: F401
     TRAIL_FLOOR,  # noqa: F401
     TRAIL_KEEP,  # noqa: F401
+    TRANSCRIPT_TURNS_MAX,
     USAGE_BACKOFF_MAX,  # noqa: F401
     USAGE_EVERY,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
@@ -1436,6 +1437,46 @@ class HostAgent(
     async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
         self._get(id)
         return await asyncio.to_thread(self.tmux.capture_tail, id, lines)
+
+    async def rpc_transcript(
+        self,
+        id: str = "",
+        before: int | None = None,
+        turns: int = 20,
+        raw: bool = False,
+        adapter: str = "",
+        adapter_id: str = "",
+        dir: str = "",
+        profile: str = "",
+    ) -> dict[str, Any]:
+        """`ao transcript` and the Transcript page's read (design §4.5 screen 9, §4.7, TD-165): the
+        record's tool transcript as the adapter's neutral entries — the last `turns` prompts before
+        byte `before`, with the offset that asks for earlier ones — or, with `raw`, the file's last
+        `turns` lines. Located from the record's own `adapter_id`, `dir`, `adapter` and `profile`, so
+        an exited or superseded record reads the run it held; a Resumable row with no record passes
+        those four instead of `id`. Served here, on the record's host — a node's record reaches its
+        node through `read` (`NODE_READS`) — and never copied. A read: never gated (§9 invariant 11)."""
+        if id:
+            s = self._get(id)
+            adapter, adapter_id, dir, profile = s.adapter, s.adapter_id or "", s.dir, s.profile
+            if not adapter_id:
+                why = "a shell has no transcript" if adapter in ("shell", "command") else "its hook never reported one"
+                raise RpcError(f"{id} carries no tool session id: {why} (design §4.5 screen 9)")
+        elif not (adapter and adapter_id and dir):
+            raise RpcError("transcript needs id, or adapter, adapter_id and dir (design §4.7)")
+        try:
+            fn = getattr(adapters.get(adapter), "read_transcript", None)
+        except KeyError:
+            raise RpcError(f"no adapter {adapter}") from None
+        if fn is None:
+            raise RpcError(f"the {adapter} adapter reads no transcript (design §4.3)")
+        if before is not None and (isinstance(before, bool) or not isinstance(before, int) or before < 0):
+            raise RpcError(f"before is a byte offset, not {before!r}")
+        turns = max(1, min(int(turns or 20), TRANSCRIPT_TURNS_MAX))
+        t = await asyncio.to_thread(fn, adapter_id, Path(dir), profile, before=before, turns=turns, raw=bool(raw))
+        if t is None:
+            raise RpcError(f"no transcript for {id or adapter_id}: the tool's file is not on {self.host}")
+        return t.to_dict()
 
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads

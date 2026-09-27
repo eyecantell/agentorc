@@ -137,7 +137,8 @@ HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
-NODE_READS = frozenset({"tail", "explain", "log_tail"})
+NODE_READS = frozenset({"tail", "explain", "log_tail", "transcript"})  # a transcript is on its host too (TD-165)
+TRANSCRIPT_TURNS_MAX = 500  # prompts one transcript read may ask for: a page is twenty
 
 
 def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[MailEntry]:

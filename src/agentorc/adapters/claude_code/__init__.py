@@ -23,10 +23,12 @@ from pathlib import Path
 from agentorc import profiles as profiles_mod
 from agentorc.profiles import Profile
 from sessionorc import paths
-from sessionorc.adapters import ExternalSession, LaunchSpec
+from sessionorc.adapters import ExternalSession, LaunchSpec, Transcript
 from sessionorc.models import Confidence, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
+
+from . import transcript as transcript_mod
 
 HOOK_EVENTS = (
     "SessionStart",
@@ -453,6 +455,33 @@ class ClaudeCodeAdapter:
             window = next((w for prefix, w in CONTEXT_WINDOWS if model.startswith(prefix)), None)
             return {"tokens": tokens, "at": d.get("timestamp"), "window": window}
         return None
+
+    def read_transcript(
+        self,
+        session_id: str,
+        cwd: Path,
+        profile: str = "",
+        *,
+        before: int | None = None,
+        turns: int = 20,
+        raw: bool = False,
+    ) -> Transcript | None:
+        """The session's transcript as neutral entries (design §4.3 `read_transcript`, TD-165), read
+        backwards from `before` — its subagents from the directory the tool writes beside it. None
+        when there is no file, or the profile is unknown (never another account's directory)."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        p = self.transcript_path(session_id, cwd, prof)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.read(
+                p, before=before, turns=turns, raw=raw, subagents=p.with_suffix("") / "subagents"
+            )
+        except OSError:
+            return None
 
     @staticmethod
     def short_model(model: str) -> str:

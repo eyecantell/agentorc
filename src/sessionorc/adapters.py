@@ -65,6 +65,13 @@ class Adapter(Protocol):
     #                                                      cannot tell (design §4.3, §6 rule 5, TD-190).
     #                                                      Keyed by the profile *name*, like `model_in_use`
     #   short_model(model: str) -> str                     that name as a display shortens it
+    #   read_transcript(session_id: str, cwd: Path, profile: str, *, before: int | None, turns: int,
+    #                   raw: bool) -> Transcript | None   the tool's transcript as the neutral shape below —
+    #                                                      the last `turns` prompts and what followed them,
+    #                                                      before byte `before` (None: the file's end); with
+    #                                                      `raw`, the file's last `turns` lines as text. None
+    #                                                      when there is no file. No field name of the tool's
+    #                                                      leaves it (design §4.3, §4.5 screen 9, TD-165)
     #   account_for(profile: str) -> str | None           the account the profile runs under (§4.2a, TD-122):
     #                                                      usage is polled, cached and backed off once per
     #                                                      `(adapter, account)`; None, or no method, keys on
@@ -99,6 +106,79 @@ class Adapter(Protocol):
     #                                                      (§4.2a, TD-151): the home reads it before the cap
     #                                                      rule, and prices the turns with it. No method, or
     #                                                      None: a subscription — never guessed
+
+
+# -- the transcript's neutral shape (design §4.5 screen 9 *The adapter renders, the core draws*) --
+
+ENTRY_KINDS = ("prompt", "text", "thought", "tool", "compaction", "sidechain")
+
+
+@dataclass
+class TranscriptEntry:
+    """One entry of a transcript as every client draws it. `kind` is one of `ENTRY_KINDS`: a
+    `prompt` or `text` carries `text` and `at`; a `thought` its `text` and `lines`; a `tool` its
+    `name`, the one-line `call` (its input's first line, as the pane draws it), its `result` (None
+    until one came back) and, for a call that started a subagent, `sidechain`; a `sidechain` its
+    `count` and `entries`; a `compaction` its `at`. Nothing here is named after a tool's field."""
+
+    kind: str
+    at: str | None = None
+    text: str = ""
+    lines: int = 0
+    name: str = ""
+    call: str = ""
+    result: str | None = None
+    count: int = 0
+    entries: list[TranscriptEntry] = field(default_factory=list)
+    sidechain: TranscriptEntry | None = None
+
+    def to_dict(self) -> dict:
+        """The entry with only the fields its kind carries: what the RPC and `--json` hand over."""
+        out: dict = {"kind": self.kind}
+        if self.at:
+            out["at"] = self.at
+        if self.kind in ("prompt", "text", "thought"):
+            out["text"] = self.text
+        if self.kind == "thought":
+            out["lines"] = self.lines
+        if self.kind == "tool":
+            out.update(name=self.name, call=self.call, result=self.result)
+            if self.sidechain is not None:
+                out["sidechain"] = self.sidechain.to_dict()
+        if self.kind == "sidechain":
+            out.update(count=self.count, entries=[e.to_dict() for e in self.entries])
+        return out
+
+
+@dataclass
+class Transcript:
+    """What `read_transcript` returns: the file's `path` and `size`, its `first_at` and this read's
+    `last_at`, the prompts in this read (`turns`), `before` — the byte offset that asks for the
+    entries before these, None at the file's start — and the `entries`, oldest first. `raw` is the
+    file's own lines when they were asked for instead."""
+
+    path: str
+    size: int
+    first_at: str | None = None
+    last_at: str | None = None
+    turns: int = 0
+    before: int | None = None
+    entries: list[TranscriptEntry] = field(default_factory=list)
+    raw: str | None = None
+
+    def to_dict(self) -> dict:
+        out = {
+            "path": self.path,
+            "size": self.size,
+            "first_at": self.first_at,
+            "last_at": self.last_at,
+            "turns": self.turns,
+            "before": self.before,
+            "entries": [e.to_dict() for e in self.entries],
+        }
+        if self.raw is not None:
+            out["raw"] = self.raw
+        return out
 
 
 def short_model(adapter: str, model: str | None) -> str:
