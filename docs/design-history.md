@@ -215,7 +215,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-11 (name field → holder): `/api/name_check` → the `name_check` RPC landed.
 - 2026-09-12 (**report line**): landed; any session can have one — a plain interactive session that files a TD gets `1 filed`.
 - 2026-09-12 (**Reports** panel, **grants** chip): landed.
-- 2026-09-26 (TD-181, the designer): *team card: summary*, *card: compact* and *team groups* say a team with nothing live carries the summary and compact cards behind its fold; the fold's help text names what it shows.
+- 2026-09-26 (TD-181, the designer): *team card: summary*, *card: compact* and *team groups* say a team with nothing live carries the summary and compact cards behind its fold; the fold's help text is left to the build, since `help.py` carries it word for word.
 - 2026-09-26 (TD-182, the designer): *card: report line* gained **the PR's mark**, one formatter for the card, the compact line, the Members list, `ao status -v` and the Reports panel. Settled: `ao status -v` shows it too (one `repos` read per call), unmarked where the reading does not hold the PR; the record is not changed, so `--json` is as before.
 - 2026-09-13 (TD-036 step 3: **controllers** chip, **under `<controller>`** chip, **Members** list, **Controllers** picker): landed; the picker's prefill from the preset's or the repo's `controllers:` landed the same day (TD-036 step 4 / TD-040 step a).
 - 2026-09-13 (TD-040 step a, **Role** preset): landed — the pick-list rebuilt from `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaulting to the role's, the brief filled at Start when the prompt is empty.

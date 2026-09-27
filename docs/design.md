@@ -2352,10 +2352,9 @@ whose consequence is least visible:
 - **Stop now** (team card) — Kills every session carrying this team's badge, at once, whatever it
   holds. Press it when waiting for a wind-down is worse than losing the turn in flight. Worktrees
   and unpushed work stay on disk under the cards, which read exited; Forget is a separate press.
-- **the fold** (*n sessions* on a stopped team's card) — Shows or hides a stopped team's cards
-  and its summary, which are folded away by default. Press it to see what the team left — its
-  repo's numbers, the claims still held, what each member last said it was doing — to read their
-  mail, or to Forget them. It changes nothing on any record; which teams you have unfolded is remembered in this
+- **the fold** (*n sessions* on a stopped team's card) — Shows or hides a stopped team's cards,
+  which are folded away by default. Press it to read their last lines or their mail, or to Forget
+  them. It changes nothing on any record; which teams you have unfolded is remembered in this
   browser.
 - **Forget** (a card's foot, the exited banner) — Drops this session's record: the card, its report
   line and its mail. Press it when a finished session's card is clutter — its work merged, or pushed
