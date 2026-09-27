@@ -1812,3 +1812,36 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys,
     assert "a person's own" in capsys.readouterr().err
     monkeypatch.delenv("AGENTORC_SESSION")
     assert cli.main(["kill", rec["id"]]) == 0
+
+
+def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-146 slice 3 end to end (design §4.7): `ao team until` and `ao team reserve` write
+    `teams.<team>` through `set_settings`, a team the org does not define is refused naming the
+    defined ones, `ao settings` prints each key with what it makes, and `--where` names the files."""
+    from sessionorc import paths
+
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (paths.home() / "org.yml").write_text(
+        f"projects:\n  ao: {{repos: {{ao: {{kmaster: {tmp_path}}}}}}}\n"
+        "teams:\n  ao-grind:\n    projects: [ao]\n    manager: {role: manager, name: m}\n"
+        "    members: [{role: grinder, name: g}]\n"
+    )
+    assert cli.main(["team", "until", "nope", "+2h"]) != 0
+    assert "no team 'nope': the org defines ao-grind" in capsys.readouterr().err
+    assert cli.main(["team", "until", "ao-grind", "+2h"]) == 0
+    assert capsys.readouterr().out.startswith("ao-grind: members stop ")
+    assert cli.main(["team", "reserve", "ao-grind", "10"]) == 0
+    assert "reserve priority +10" in capsys.readouterr().out
+    assert cli.main(["settings"]) == 0
+    out = capsys.readouterr().out
+    assert "teams:\n  ao-grind: members stop " in out and "reserve priority +10" in out
+    assert "open_in: vscode (default)" in out and "every repo promotes by hand" in out
+    assert cli.main(["--json", "settings"]) == 0
+    assert json.loads(capsys.readouterr().out)["teams"]["ao-grind"]["reserve"] == 10
+    assert cli.main(["team", "until", "ao-grind", "--clear"]) == 0
+    assert cli.main(["team", "reserve", "ao-grind", "0"]) == 0
+    assert "no stop time · no reserve priority" in capsys.readouterr().out.splitlines()[-1]
+    assert cli.main(["settings", "--where"]) == 0
+    where = capsys.readouterr().out
+    assert "settings.yml" in where and "at the host agent's start" in where and "ao service install" in where
