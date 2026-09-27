@@ -35,3 +35,21 @@ def test_no_agent_module_imports_a_patched_constant_by_name():
                 assert not bare, f"{f.name} imports {sorted(bare)} by name: read them as agent_common.X"
             if isinstance(node, ast.Name) and node.id in PATCHED:
                 raise AssertionError(f"{f.name} reads {node.id} bare: read it as agent_common.{node.id}")
+
+
+def test_the_agent_re_exports_every_name_agent_common_defines():
+    """`from sessionorc.agent import X` keeps working for every name the split moved (TD-108): the
+    re-export block is the contract, whatever `agent.py` itself still reads after a section moves."""
+    from sessionorc import agent, agent_common
+
+    tree = ast.parse(Path(agent_common.__file__).read_text(encoding="utf-8"))
+    defined = set()
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            defined.add(node.name)
+        elif isinstance(node, ast.Assign):
+            defined |= {x.id for t in node.targets for x in ast.walk(t) if isinstance(x, ast.Name)}
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            defined.add(node.target.id)
+    missing = sorted(n for n in defined if getattr(agent, n, None) is not getattr(agent_common, n))
+    assert not missing, f"sessionorc.agent no longer re-exports {missing}"

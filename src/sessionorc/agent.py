@@ -51,89 +51,91 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _ESC_OTHER,  # noqa: F401
     _LINE_BREAKS,  # noqa: F401
     _OSC,  # noqa: F401
-    ACT_TIMEOUT,
+    ACT_TIMEOUT,  # noqa: F401
     BACKUP_KEEP,  # noqa: F401
     BACKUP_MEMBERS,  # noqa: F401
-    BOARD_REPLY_NOTE,
+    BOARD_REPLY_NOTE,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401
-    COMPOSER_LINES,
+    COMPOSER_LINES,  # noqa: F401
     CREATE_GRACE,  # noqa: F401
-    DERIVE_EVERY,
-    DOORBELL_TRIES,
+    DERIVE_EVERY,  # noqa: F401
+    DOORBELL_TRIES,  # noqa: F401
     FILE_CAP,  # noqa: F401
     FILES_MAX,  # noqa: F401
-    FILL_CEILING,
-    FILL_WINDOW,
-    GIT_EVERY,
-    HOME_EDITS,
+    FILL_CEILING,  # noqa: F401
+    FILL_WINDOW,  # noqa: F401
+    GIT_EVERY,  # noqa: F401
+    HOME_EDITS,  # noqa: F401
     ID_RECHECK,  # noqa: F401
-    IDLE_NUDGE,
-    INTENT_FIELDS,
-    LAUNCH_KEYS,
-    LEASE_TTL,
-    MODEL_EVERY,
-    NODE_ACTS,
-    NODE_READS,
-    PASTE_SHOW_SECONDS,
-    PRUNE_EVERY,
-    PUSH_OPEN,
-    REMOVED_GUARD_SECONDS,
+    IDLE_NUDGE,  # noqa: F401
+    INTENT_FIELDS,  # noqa: F401
+    LAUNCH_KEYS,  # noqa: F401
+    LEASE_TTL,  # noqa: F401
+    MODEL_EVERY,  # noqa: F401
+    NODE_ACTS,  # noqa: F401
+    NODE_READS,  # noqa: F401
+    PASTE_SHOW_SECONDS,  # noqa: F401
+    PRUNE_EVERY,  # noqa: F401
+    PUSH_OPEN,  # noqa: F401
+    REMOVED_GUARD_SECONDS,  # noqa: F401
+    REPORT_EVERY,  # noqa: F401
     REPORT_WRITE,  # noqa: F401
-    REPOS_EVERY,
-    RESTART_CEILING,
-    RESTART_EARLY,
+    REPOS_EVERY,  # noqa: F401
+    RESTART_CEILING,  # noqa: F401
+    RESTART_EARLY,  # noqa: F401
     RESTART_SETTLE,  # noqa: F401
-    RESTART_WINDOW,
-    RESUME_MIN,
-    SEAT_IDLE_GRACE,
+    RESTART_WINDOW,  # noqa: F401
+    RESUME_MIN,  # noqa: F401
+    SEAT_IDLE_GRACE,  # noqa: F401
     SEND_STALL_SECONDS,  # noqa: F401
-    SETTLED,
-    STALL_AFTER,
+    SETTLED,  # noqa: F401
+    STALL_AFTER,  # noqa: F401
     SUBMIT_SECONDS,  # noqa: F401
-    TAIL_LINES,
+    TAIL_LINES,  # noqa: F401
     TICK_SECONDS,  # noqa: F401
     TITLE_CAP,  # noqa: F401
-    TRAIL_FLOOR,
+    TRAIL_FLOOR,  # noqa: F401
     TRAIL_KEEP,  # noqa: F401
-    USAGE_BACKOFF_MAX,
+    USAGE_BACKOFF_MAX,  # noqa: F401
     USAGE_EVERY,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
-    RpcError,
-    _alarm_report,
-    _alarm_since,
-    _alarm_words,
-    _cap,
-    _clean,
-    _clean_answer,
-    _controllers,
-    _drop_unknown,
-    _duration,
-    _ended_by,
-    _falsy,
-    _grants,
-    _is_branch_claim,
-    _lane,
-    _older,
-    _oldest_first,
-    _pane_title,
-    _parse,
-    _peer_pid,
-    _pr,
-    _prune_tallies,
+    RpcError,  # noqa: F401
+    _alarm_report,  # noqa: F401
+    _alarm_since,  # noqa: F401
+    _alarm_words,  # noqa: F401
+    _cap,  # noqa: F401
+    _clean,  # noqa: F401
+    _clean_answer,  # noqa: F401
+    _controllers,  # noqa: F401
+    _drop_unknown,  # noqa: F401
+    _duration,  # noqa: F401
+    _ended_by,  # noqa: F401
+    _falsy,  # noqa: F401
+    _grants,  # noqa: F401
+    _is_branch_claim,  # noqa: F401
+    _lane,  # noqa: F401
+    _older,  # noqa: F401
+    _oldest_first,  # noqa: F401
+    _pane_title,  # noqa: F401
+    _parse,  # noqa: F401
+    _peer_pid,  # noqa: F401
+    _pr,  # noqa: F401
+    _prune_tallies,  # noqa: F401
     _read_capped,  # noqa: F401
-    _recent,
-    _ref,
-    _reply_line,
-    _review,
-    _source,
-    _stop_time,
-    _usage_checked_at,
-    _usage_key,
-    _Wait,
-    backup_store,
-    launch_params,
-    log,
-    read_checkout,
+    _recent,  # noqa: F401
+    _ref,  # noqa: F401
+    _reply_line,  # noqa: F401
+    _review,  # noqa: F401
+    _source,  # noqa: F401
+    _stop_time,  # noqa: F401
+    _urgent,  # noqa: F401
+    _usage_checked_at,  # noqa: F401
+    _usage_key,  # noqa: F401
+    _Wait,  # noqa: F401
+    backup_store,  # noqa: F401
+    launch_params,  # noqa: F401
+    log,  # noqa: F401
+    read_checkout,  # noqa: F401
 )
 from sessionorc.agent_link import LinkMixin
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
