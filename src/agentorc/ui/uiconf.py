@@ -1,10 +1,11 @@
-"""The person's own UI configuration (design §5 *The person's own*, TD-095 second pass): `ui.yml`
-beside `hosts.yml` and `org.yml` in the agentorc home, read by the UI process and by nothing else —
-no session and no policy reads it, and nothing here reaches a host agent.
+"""The person's own UI configuration (design §5 *The person's own*, TD-095, TD-146): `person:` in the
+home's `settings.yml`, which the UI reads **through the host agent's `settings` read** — never the
+file, since the UI need not run on the home — and keeps here between reads (`set_read`). No session
+and no policy reads it, and nothing here reaches a host agent.
 
 Its first key is **`open_in:`**, the editor button of the card and the Focus header:
 
-- `vscode` — the default, and what a missing file or key means: today's two forms;
+- `vscode` — the default, and what a missing key, or no read yet, means: today's two forms;
 - `none` — no button anywhere;
 - `{label: "…", url: "…"}` — a template of the person's own, which is how any other editor is
   reached. `{path}` is the directory, percent-encoded (TD-011); `{remote}` is the host's
@@ -13,18 +14,17 @@ Its first key is **`open_in:`**, the editor button of the card and the Focus hea
 
 A value that does not parse, or is refused, is **named on the page** and the default button drawn:
 the file is the person's own, and a pasted bad line must still not become a link that runs.
+
+**`ui.yml` is retired** (TD-146): it is no longer read, and one still on disk is named — the agent's
+`settings` read carries the line (`migrate`), drawn where a refused value is.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from typing import Any
 from urllib.parse import quote
-
-import yaml
-
-from sessionorc import paths
 
 REFUSED_SCHEMES = ("javascript", "data", "vbscript", "file")
 _SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*)://")
@@ -49,10 +49,6 @@ class OpenIn:
     error: str = ""
 
 
-def ui_file() -> Path:
-    return paths.home() / "ui.yml"
-
-
 def parse_open_in(raw: object) -> OpenIn:
     """One `open_in:` value, read as §5 says. Never raises: a refusal is the default with a reason."""
     if raw is None or raw == "vscode":
@@ -73,29 +69,31 @@ def parse_open_in(raw: object) -> OpenIn:
     return OpenIn(error=f"open_in: {raw!r} is not vscode, none or {{label, url}}")
 
 
-_cache: dict[str, tuple[float, OpenIn]] = {}
+WHERE = "settings.yml person.open_in"
+_read: dict[str, Any] = {"person": {}, "migrate": []}  # the last `settings` answer's two parts
+
+
+def set_read(answer: dict[str, Any] | None) -> None:
+    """Keep the agent's `settings` answer (design §5): its `person` and its `migrate` lines. None —
+    the agent down, or too old to answer — keeps the last one, so a blip never flips the button."""
+    if not isinstance(answer, dict):
+        return
+    person = answer.get("person")
+    migrate = answer.get("migrate")
+    _read["person"] = dict(person) if isinstance(person, dict) else {}
+    _read["migrate"] = [str(m) for m in migrate] if isinstance(migrate, list) else []
 
 
 def open_in() -> OpenIn:
-    """The person's `open_in:`, re-read when the file changes. A file that is missing is the
-    default; one that does not parse is named, and the default drawn."""
-    f = ui_file()
-    try:
-        mtime = f.stat().st_mtime
-    except OSError:
-        return OpenIn()
-    hit = _cache.get(str(f))
-    if hit and hit[0] == mtime:
-        return hit[1]
-    try:
-        data = yaml.safe_load(f.read_text()) or {}
-        got = parse_open_in(data.get("open_in")) if isinstance(data, dict) else OpenIn(error=f"{f} is not a mapping")
-    except (OSError, yaml.YAMLError) as e:
-        got = OpenIn(error=f"{f} could not be read: {e.__class__.__name__}")
-    if got.error and not got.error.startswith(str(f)):
-        got = OpenIn(error=f"{f}: {got.error}")
-    _cache[str(f)] = (mtime, got)
-    return got
+    """The person's `open_in:` as last read. None read yet, or no key, is the default; a value
+    that does not parse is named, and the default drawn."""
+    got = parse_open_in(_read["person"].get("open_in"))
+    return OpenIn(error=f"{WHERE}: {got.error}") if got.error else got
+
+
+def migrate_note() -> str:
+    """The line naming a retired `ui.yml` still on disk, or ""."""
+    return _read["migrate"][0] if _read["migrate"] else ""
 
 
 def editor_link(directory: str, *, local: bool, remote: str, reach: str = "") -> dict[str, str] | None:

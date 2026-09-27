@@ -1798,3 +1798,21 @@ def test_a_roles_saved_prompts_are_chips_on_focus_and_new_session(tmp_path, monk
     assert roles["plain"].to_dict()["prompts"][1]["text"] == "/stranded-work"
     new = (uiapp.HERE / "templates" / "new.html").read_text()  # the Role pick's options carry the list
     assert 'id="newchips"' in new and "data-prompts='{{ (r.prompts or []) | tojson }}'" in new
+
+
+def test_the_page_reads_person_through_the_agents_settings_read(client, tmp_path):
+    """design §5 (TD-146): the editor button comes from `person.open_in` in the home's settings.yml,
+    read through the agent's `settings` read before a page is drawn — never from the file, and never
+    from a retired ui.yml, which the Org names as *migrate*."""
+    from agentorc.ui import uiconf
+    from sessionorc import paths
+    from sessionorc.client import call_sync
+
+    try:
+        call_sync("set_settings", person={"open_in": "none"})
+        (paths.home() / "ui.yml").write_text("open_in: vscode\n")
+        r = client.get("/")
+        assert r.status_code == 200 and uiconf.open_in().kind == "none"
+        assert 'id="migratenote"' in r.text
+    finally:
+        uiconf.set_read({"person": {}, "migrate": []})
