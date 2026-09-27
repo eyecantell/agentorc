@@ -40,7 +40,17 @@ from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
-from sessionorc.models import GRANTS, STATE_RANK, has_control, normalize_ref, report_head, report_line, stop_note
+from sessionorc.models import (
+    GRANTS,
+    STATE_RANK,
+    has_control,
+    normalize_ref,
+    pr_marks,
+    report_head,
+    report_line,
+    report_ref,
+    stop_note,
+)
 
 from . import help as helpmod
 from . import render as rendermod
@@ -740,6 +750,7 @@ def view(
     fleet_known: bool = True,
     icons: dict[tuple[str, str], tuple[str, str, str]] | None = None,
     seats: Mapping[str, str] | None = None,
+    repos: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
@@ -870,7 +881,12 @@ def view(
     # scraped state is; the `~` in the text says *which* entry, the dash says "not from the session".
     findings = s.get("findings") or []
     head = report_head(s)
-    d["report"] = report_line(s)
+    # **the PR's mark** (§4.5a card **report line**, TD-193): from the readings of the record's own
+    # repo, `repos` — none passed, none marked; `pr_marks` rides for the Reports panel's links
+    marks = pr_marks(s, repos)
+    d["pr_marks"] = {str(n): w for n, w in marks.items()}
+    d["report"] = report_line(s, marks)
+    d["report_ref"] = report_ref(s, marks)
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
     d["findings_line"] = f"{len(findings)} filed" if findings else ""
     # design §4.5a card / Focus header **out of work** chip (§4.9a, TD-053 step 6). Not a state —
@@ -990,7 +1006,7 @@ def view(
             "name": o.get("name") or o["id"],
             "state": o.get("state"),
             "lane": ", ".join(o.get("lane") or []),
-            "report": report_line(o),
+            "report": report_line(o, pr_marks(o, repos)),
         }
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
@@ -1594,13 +1610,16 @@ def compact_line(v: dict[str, Any]) -> str:
     if v.get("seat"):
         what = slot.get("caption") or slot.get("text") or "on call"
     elif v.get("state") in DEAD or v.get("out_of_work") or v.get("restart_wanted"):
-        what = str(slot.get("text") or v.get("state") or "")
+        # an ending, and the last reference after it with its PR's mark (TD-193): *Grinder · exited ·
+        # TD-066 → #158 merged*, so a wound-down team's cards say what each member left
+        what = " · ".join(x for x in (str(slot.get("text") or v.get("state") or ""), v.get("report_ref") or "") if x)
     else:
         claims = [p for p in v.get("progress") or [] if isinstance(p, dict) and p.get("status") == "claimed"]
         doing = (v.get("doing") or {}).get("text") if isinstance(v.get("doing"), dict) else ""
         if claims:
             pr = claims[0].get("pr") or claims[0].get("review_pr")
-            what = f"{claims[0]['ref']} → #{pr}" if pr else str(claims[0]["ref"])
+            mark = (v.get("pr_marks") or {}).get(str(pr), "") if pr else ""
+            what = f"{claims[0]['ref']} → #{pr}{' ' + mark if mark else ''}" if pr else str(claims[0]["ref"])
         elif doing:
             what = str(doing)
         else:
@@ -2852,7 +2871,9 @@ def create_app() -> FastAPI:
         rollup's markup (§4.5a *Org: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
         fleet = list(known.values())
         seats = await seats_of(fleet)
-        groups = team_groups([view(s, fleet, seats=seats) for s in fleet], await team_rows(fleet), repos, doing)
+        groups = team_groups(
+            [view(s, fleet, seats=seats, repos=repos) for s in fleet], await team_rows(fleet), repos, doing
+        )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
 
@@ -3059,8 +3080,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             sessions, agent_down = [], True
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
-        vs = sorted((view(s, sessions, icons=icons, seats=seats) for s in sessions), key=card_order)
         repos, doing = ({}, {}) if agent_down else await repo_facts()
+        vs = sorted((view(s, sessions, icons=icons, seats=seats, repos=repos) for s in sessions), key=card_order)
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
@@ -3196,7 +3217,14 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             request,
             "focus.html",
             {
-                "s": view(s, fleet, fleet_known=known, icons=await role_icons([s]), seats=await seats_of([s])),
+                "s": view(
+                    s,
+                    fleet,
+                    fleet_known=known,
+                    icons=await role_icons([s]),
+                    seats=await seats_of([s]),
+                    repos=(await repo_facts())[0],  # the PR's mark on the report line (TD-193)
+                ),
                 "host": host_name(),
                 "active": "Org",
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
@@ -4184,7 +4212,13 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if ev.get("event") == "session":
                     s = ev["session"]
                     known[s["id"]] = s
-                    v = view(s, list(known.values()), icons=await role_icons([s]), seats=await seats_of([s]))
+                    v = view(
+                        s,
+                        list(known.values()),
+                        icons=await role_icons([s]),
+                        seats=await seats_of([s]),
+                        repos=repos,
+                    )
                     compact_in(v, known.values())
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
                     # `controllers` change on one record can move a card, change a lead, or turn
@@ -4236,6 +4270,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     list(known.values()),
                                     icons=await role_icons([other]),
                                     seats=await seats_of([other]),
+                                    repos=repos,
                                 )
                                 compact_in(ov, known.values())
                                 await ws.send_text(

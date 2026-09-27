@@ -2293,8 +2293,12 @@
       card.classList.toggle("hidden", !(progress.length || findings.length));
       $("#reportscount").textContent = [progress.length ? `${progress.length} progress` : "", findings.length ? `${findings.length} filed` : ""].filter(Boolean).join(" · ");
       const base = card.dataset.prBase || "", name = card.dataset.name || v.name || "this session";
-      // the PR number as a link from a structured field — never from text a session wrote
-      const prLink = (n) => (base ? `<a class="ref" href="${esc(base)}/pull/${encodeURIComponent(n)}" target="_blank" rel="noopener">#${esc(n)}</a>` : `#${esc(n)}`);
+      // the PR number as a link from a structured field — never from text a session wrote — and
+      // **the PR's mark** after it, *merged* or *closed*, from the view's `pr_marks` (the readings of
+      // the record's repo, §4.5a card **report line**, TD-193); an open or unknown PR has none
+      const marks = v.pr_marks || {};
+      const prLink = (n) => (base ? `<a class="ref" href="${esc(base)}/pull/${encodeURIComponent(n)}" target="_blank" rel="noopener">#${esc(n)}</a>` : `#${esc(n)}`)
+        + (marks[String(n)] ? ` <span class="st prmark">${esc(marks[String(n)])}</span>` : "");
       const row = (p) => {
         const derived = (p.source || "declared") !== "declared";
         // a reference is shown once (§4.5a **report line**, TD-095): an entry whose reference is
