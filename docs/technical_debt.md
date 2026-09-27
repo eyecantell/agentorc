@@ -104,7 +104,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Open — pickable: capture the event first |
-| TD-202 | A free-pick grinder is never told to pick by priority: the template has no order, and `scripts/ledger.py --pickable` sorts by priority but does not filter the header lines | Medium | Open — pickable |
+| TD-202 | *Choose by priority* is one clause in the grinder template, with no order, no tool and no check; `scripts/ledger.py --pickable` sorts by priority but does not filter the header lines | Low | Open — pickable |
 
 
 ---
@@ -572,7 +572,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **And why a hang had no evidence at all, 2026-09-21 (found by `tdgrind-ao-2`, built in PR #315):** `LocalClient.call` had **no bound**. Every bound in a test is on the test's own side — `wait_state` at 6 s, each `asyncio.wait_for` at 5 — so a test *cannot* hang inside its own assertions; it can only hang in `await self._reader.readline()`, waiting for a reply that is never coming. That is why the two sightings named a neighbour rather than a line. A call now waits `CALL_TIMEOUT` (120 s, the bound the agent already gives an act over its own link) and then raises **naming the method**, so the next one says which RPC never answered; the calls that mean to block pass their own — `wait` its timeout plus slack, `send --wait` the same — which is the shape `HostAgent._route_act` gives those two between hosts, applied one layer down where the reply is read. And **a call that timed out is not a connection that dropped** (review of PR #315): `AgentStuck` is a subclass of `AgentUnavailable`, so every handler is unchanged, and the one caller that reconnects re-raises it rather than remaking — a wedged agent hidden behind a *nothing changed* at the deadline would be worse than the hang. **It is not only a test fix**: a live worker sitting in `ao send` never came back while its lead read it as `working`.
 
-**Watch (added 2026-09-27; check by 2026-10-04, main's CI runs: `gh run list --branch main`):** `tests/test_mail.py::test_the_debt_has_a_bound_of_its_own_and_is_never_pruned` failed once on the 3.12 runner (run 36325996046, main at `744c4d99`, a ledger-only commit, `KeyError: 'm-738fe5195113'`). It passed on 3.13, on the rerun, and five times locally. A second failure makes it this entry's fourth flake, named here with its run.
+**Watch (added 2026-09-27; check by 2026-10-04, main's CI runs: `gh run list --branch main`):** `tests/test_mail.py::test_the_debt_has_a_bound_of_its_own_and_is_never_pruned` failed once on the 3.12 runner (run 36325996046, main at `744c4d99`, a ledger-only commit, `KeyError: 'm-738fe5195113'`). It passed on 3.13, on the rerun, and five times locally. A second failure makes it this entry's fifth flake, named here with its run.
 
 **Location:** `tests/test_cli.py::test_send_wait`, `tests/test_agent.py::test_the_tick_retires_a_branch_claim_the_session_abandoned`, `tests/conftest.py` (`derived`), `src/sessionorc/agent.py` (`_reconcile`, `rpc_kill`, `_killed_at`)
 
@@ -1942,20 +1942,18 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
 
-## TD-202: A free-pick grinder is never told to pick by priority
+## TD-202: *Choose by priority* is one clause in the grinder template, with no order, no tool and no check
 
-**Priority:** Medium
+**Priority:** Low
 **Added:** 2026-09-27 (Paul: *when a grinder chooses a TD, are they working them by priority (critical/high) first? Seems like they should be*)
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
 **Status:** Open
-**Location:** `src/agentorc/briefs/grinder.md` (the package's grinder template: *Lane*, *Out of work*), `docs/briefs/grinder-ao-*.md` (this repo's supplements), design §4.8 (the `free-pick` lane); `scripts/ledger.py` is dev-cadence's (SYNCED)
+**Location:** `src/agentorc/briefs/grinder.md` (*Lane*, line 12 at filing: *a `free-pick` lane means scan the ledger and choose by priority*), design §4.8 (the `free-pick` lane); `scripts/ledger.py` is dev-cadence's (SYNCED)
 
-**Why:** the grinder template says what a pick may be (nothing the brief excludes, nothing a live sibling holds, nothing parked on the board) and how to see it through, but not in what order. So a free-pick grinder picks by its own judgement, and a High entry can wait behind Low ones. The ledger's levels are High, Medium and Low; there is no Critical. dev-cadence's `scripts/ledger.py --pickable` already sorts the pickable list by priority, then by Summary-table order, and drops what a `Blocked by:` holds. But it does not read the Owner, Kind and Pickable lines (TD-118), so on its own it lists designer and anchor entries a grinder may not take, and the template never mentions it. dc-grind's grinder used it; ao-grind's grinders filter the header by hand.
+**Why:** the answer to Paul's question is yes, in one clause: the template says *choose by priority*. That is all it says. It doesn't give the order (High, then Medium, then Low; the ledger has no Critical), the tie-break, or what counts as a reason to pass a higher entry over (a sibling's lease, the brief's exclusions, a `Blocked by:`). It names no tool, and nothing checks the pick. dev-cadence's `scripts/ledger.py --pickable` sorts by priority, then Summary-table order, and drops what a `Blocked by:` holds. But it does not read the Owner, Kind and Pickable lines (TD-118), so on its own it lists designer and anchor entries a grinder may not take, and the template never mentions it. A grinder's claim note doesn't give the entry's priority, so the page can't show whether a High was passed over.
 
-**Fix:** (1) the template's *Lane* section says: on `free-pick`, take the highest-priority entry you may pick (High, then Medium, then Low; ties in the Summary table's order), unless a sibling's lease or the brief says otherwise, and say why when you pass over a higher one. (2) Name the tool. Either `ledger.py --pickable` gains `--owner` / `--kind` filters on the header lines (a dev-cadence TD, through its anchor), or the template gives the one-line filter to run. (3) Add the sentence to design §4.8's `free-pick` in the same PR. Done when a grinder's claim note names the entry's priority, and a test on the template (or the tool) shows High sorted first.
+**Fix:** (1) spell out the clause in the template: High, then Medium, then Low, ties in Summary-table order, and say why when passing over a higher one. (2) Name the tool: either `ledger.py --pickable` gains `--owner` / `--kind` filters on the header lines (a dev-cadence TD, through its anchor), or the template gives the one-line filter to run. (3) Put the entry's priority in the claim note, which TD-203 would then show. Add the sentence to design §4.8's `free-pick` in the same PR. A running grinder keeps the brief it started with, so the change reaches each grinder at its next start. Done when a grinder's claim note names the entry's priority and a test on the template (or the tool) shows High sorted first.
 
-A running grinder keeps the brief it started with, so the change reaches each grinder at its next start.
-
-**Related:** TD-118 (the header lines), dev-cadence's TD-064 (`ledger.py --pickable`; not this ledger's TD-064), design §4.8.
+**Related:** TD-118 (the header lines), TD-203 (priority on TDs in motion, on the parked branch at filing), dev-cadence's TD-064 (`ledger.py --pickable`; not this ledger's TD-064), design §4.8.
