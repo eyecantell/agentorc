@@ -1956,4 +1956,6 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Fix:** (1) the template's *Lane* section says: on `free-pick`, take the highest-priority entry you may pick (High, then Medium, then Low; ties in the Summary table's order), unless a sibling's lease or the brief says otherwise, and say why when you pass over a higher one. (2) Name the tool. Either `ledger.py --pickable` gains `--owner` / `--kind` filters on the header lines (a dev-cadence TD, through its anchor), or the template gives the one-line filter to run. (3) Add the sentence to design §4.8's `free-pick` in the same PR. Done when a grinder's claim note names the entry's priority, and a test on the template (or the tool) shows High sorted first.
 
-**Related:** TD-118 (the header lines), dev-cadence's TD-064 (`ledger.py --pickable`; not this ledger's TD-064), TD-199 (a running member keeps its start brief, so the change reaches grinders at their next start), design §4.8.
+A running grinder keeps the brief it started with, so the change reaches each grinder at its next start.
+
+**Related:** TD-118 (the header lines), dev-cadence's TD-064 (`ledger.py --pickable`; not this ledger's TD-064), design §4.8.
