@@ -1847,3 +1847,37 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Done when** TD-183's *Done when*: a click on a team's header folds and unfolds it, live or not, and the choice survives a reload.
 
 **Related:** TD-183 (the design), TD-192 (what an unfolded wound-down team shows), TD-156 (f) (where the button sits), TD-124 (the keys).
+
+## TD-181: An unfolded team with nothing live shows its member cards but no summary
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul, at the dc-grind card after its wind-down: *the unfolded card should show the same info as the running team — some items will become stale and that's ok*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-192
+**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups* (the fold's help text changes with the build, TD-192 step 4). Settled: the same three facets and compact members as a running team; the third facet opens on Doing; nothing is marked stale, the header's *stopped* / *wound down <t> ago* dates it; folded, the one row is unchanged; the rollup still sums live teams only. Obvious from Paul's words and the entry's *Fix*, so landed with a note to him. The build is TD-192; this entry archives with it. **What was:** Paul set the shape; the design rows and the build remained.
+**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`), `src/agentorc/ui/templates/team_summary.html`, `org.html`
+
+**Why:** the team summary (TD-176 slice 3) is built only for a team with a live member. When dc-grind wound down on 2026-09-26 all three sessions exited. The card folded to one row as §4.5 screen 1 says, and pressing *3 sessions* unfolded the member cards with no summary: no TD or PR bars, no TDs in motion, no Doing. samscrape-grind, concluded but with idle members, kept its summary right below. The repo facts don't depend on anyone being live, and a wound-down team is when the person most wants to see what it left behind. Because the summary wasn't there, a merged PR on the grinder's report line read as outstanding (TD-182).
+
+**Resolved:** 2026-09-27 (PR #644, TD-192's build) — the design is design §4.5 screen 1 *Unfolded, it is a running team's card* and §4.5a *team card: summary*, *card: compact*.
+
+**Related:** TD-176 (archived), TD-182, TD-183, design §4.5 screen 1, §4.5a **team card: summary**, **team groups**, *the fold*.
+
+## TD-192: Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-181's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups*.
+**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`, and the `compact` flags set under it), `src/agentorc/ui/templates/org.html` and `team_summary.html` (the summary inside the fold), `src/agentorc/ui/static/app.js` (`syncTeams`: the fold hides the summary with the cards), `src/agentorc/ui/help.py` (the fold's text)
+
+**Why:** TD-181's *Why*: a wound-down team is when the person most wants to see what it left, and the summary is built only while a member is live.
+
+**Resolved:** 2026-09-27 (PR #644) — design §4.5a *team card: summary* and *card: compact* now read as built; `team_groups` and `compact_in` in `src/agentorc/ui/app.py`, the rollup's `live` filter, and `tests/test_ui_team_summary.py` (`test_a_wound_down_team_shows_what_it_left`). The live look is on `docs/user_attention.md`.
+
+**Done when** TD-181's *Done when*: an unfolded wound-down team shows the three facets, and a test covers a team whose members have all exited.
+
+**Related:** TD-181 (the design), TD-193 (the mark its cards carry), TD-183 (the fold's target), TD-176 (archived: the summary).

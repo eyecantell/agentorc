@@ -1669,10 +1669,11 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js
 
 
-def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
-    """TD-176 slice 3 (§4.5a *card: compact*): a member of a live team is a compact card; when the
-    team's last live session goes, the stream redraws its other members' cards in the full shape —
-    and it keys on the record's team before the delta as well as after (review of slice 3)."""
+def test_a_team_winding_down_keeps_its_cards_compact_and_its_summary(client, tmp_path):
+    """§4.5a *card: compact*, *team card: summary* (TD-176 slice 3; TD-181, built by TD-192): a
+    member of a team is a compact card, live or not, so a team whose last live session goes changes
+    no card's shape — the exit's own delta is compact, and the groups it carries still hold the
+    team's summary, now drawn behind the fold."""
     from sessionorc.client import call_sync
 
     made = [
@@ -1684,19 +1685,16 @@ def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
     assert " compact" in client.get("/").text.split(f'id="card-{made[1]}"')[0].rsplit("<div", 1)[-1]
     with client.websocket_connect("/events") as ws:
         call_sync("kill", id=made[0])
-        # the subscribe's snapshot comes first (w1 still live, w2 compact); the redraw follows w1's exit
-        gone, redrawn = False, None
         for _ in range(80):
             ev = json.loads(ws.receive_text())
-            if ev.get("event") != "session":
-                continue
-            if ev["id"] == made[0] and ev["state"] == "exited":
-                gone = True
-            elif gone and ev["id"] == made[1]:
-                redrawn = ev
+            if ev.get("event") == "session" and ev["id"] == made[0] and ev["state"] == "exited":
                 break
-        assert redrawn and " compact" not in redrawn["html"].split(">", 1)[0]
+        assert " compact" in ev["html"].split(">", 1)[0]
+        (g,) = [g for g in ev["groups"] if g["team"] == "wind"]
+        assert g["live"] == 0 and 'class="tsum' in g["summary"]
+    page = client.get("/").text
     for sid in made:
+        assert " compact" in page.split(f'id="card-{sid}"')[0].rsplit("<div", 1)[-1]
         client.post(f"/api/sessions/{sid}/remove")
 
 

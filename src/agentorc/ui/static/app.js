@@ -927,9 +927,10 @@
       const team = sec.dataset.team, b = $(".ghead .fold", sec), head = $(".ghead", sec);
       const folded = isFolded(sec);
       sec.classList.toggle("folded", folded);
-      // what the button shows and hides: the card's body, the summary and the grid, by id
+      // what the button shows and hides: the card's body, the summary and the grid, by id — the
+      // summary keeps the server's `tsum-<team>`, which the rollup's links land on
       const body = [$(".tsum", sec), $(".grid", sec)].filter(Boolean);
-      body.forEach((el, i) => (el.id = `tbody-${team}-${i}`));
+      body.forEach((el) => { if (!el.id) el.id = `tgrid-${team}`; });
       if (b) {
         b.textContent = `${folded ? "▸" : "▾"} ${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"}`;
         b.setAttribute("aria-expanded", folded ? "false" : "true");

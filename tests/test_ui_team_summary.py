@@ -145,17 +145,44 @@ def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
     # the chips come back only for the fold (TD-194): drawn as `foldonly`, which CSS shows while folded
     unfolded = re.sub(r'<span class="meta counts foldonly">[^<]*</span>', "", head)
     assert "· 2 sessions" in head and "working" not in unfolded and "1 working" in head
-    # a team with nothing live: no summary, full cards
-    dead = [{**m, "state": "exited"} for m in ms]
-    for m in dead:
-        m.pop("compact", None)
-    (g,) = ui.team_groups(dead, (), {}, {})
-    assert g["summary"] is None and not any(m.get("compact") for m in g["members"])
 
 
-def test_compact_in_marks_a_delta_by_the_fleet():
+def test_a_wound_down_team_shows_what_it_left():
+    """§4.5a *team card: summary*, *card: compact* (TD-181, built by TD-192): a team whose members
+    have all exited carries the three facets — the Repo facet from the live readings, TDs in motion
+    from the claims the last records hold, and Doing, since nobody can be waiting — and its members
+    are compact; *No team* has neither, and the rollup sums only live teams."""
+    perm = {"kind": "permission", "text": "Bash x", "tool_use_id": "t1"}
+    ms = [
+        member("g1", state="exited", progress=[claim("TD-301", 811)], role_label="Grinder", pending=perm),
+        member("g2", state="closed"),
+        {**member("n1", state="exited"), "team": ""},
+    ]
+    for m in ms:
+        m.update(rank=1, slot={"text": "exited · code 0", "caption": ""}, place="kmaster / samscrape")
+    doing = {"grind": [{"at": "2026-09-26T09:00:00Z", "id": "g1", "text": "TD-301: the last test"}]}
+    groups = ui.team_groups(ms, (), {"/r/samscrape": reading("/r/samscrape")}, doing)
+    g = next(x for x in groups if x["team"] == "grind")
+    none = next(x for x in groups if not x["team"])
+    assert g["live"] == 0 and g["summary"] and all(m["compact"] for m in g["members"])
+    s = g["summary"]
+    assert s["repo"] and s["repo"]["name"] == "samscrape"
+    assert [x["ref"] for x in s["motion"]] == ["TD-301"]  # the claim as the last record holds it
+    assert s["face"] == "doing" and not s["answers"]  # nobody can be waiting
+    html = ui.templates.get_template("team_summary.html").render(g=g)
+    assert "TD-301" in html and "TD-301: the last test" in html
+    assert none["summary"] is None and not any(m.get("compact") for m in none["members"])
+    assert ui.rollup(groups) is None  # nothing live: no rollup, whatever the summaries hold
+    # nothing claimed: the facet says so
+    (quiet,) = ui.team_groups([member("q", state="exited", rank=1, slot={}, place="x")], (), {}, {})
+    assert quiet["summary"]["motion"] == [] and "nothing claimed" in ui.templates.get_template(
+        "team_summary.html"
+    ).render(g=quiet)
+
+
+def test_compact_in_marks_every_team_member_and_no_team_none():
     v = member("g1")
-    assert ui.compact_in(dict(v), [member("x", state="exited")]).get("compact") is None
+    assert ui.compact_in(dict(v), [member("x", state="exited")])["compact"]  # a wound-down team too (TD-192)
     assert ui.compact_in(dict(v), [member("x")])["compact"]
     assert ui.compact_in({**v, "team": ""}, [member("x")]).get("compact") is None
 
@@ -186,8 +213,16 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
     html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=4)
     assert 'data-state-filter="needs-you"' in html and "needs you (1)" in html
     assert 'href="#tsum-grind"' in html and "data-inbox-needs>4<" in html
+    # …and the fold's `aria-controls` never renames the summary the link lands on (TD-194)
+    js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
+    assert "if (!el.id) el.id = `tgrid-${team}`" in js
     assert "Agents (3)" in html and "TDs in motion (3)" in html and "PRs in motion (1)" in html
     assert ui.rollup(None) is None and ui.rollup([g for g in groups if not g["team"]]) is None
+    # a wound-down team beside them carries a summary now (TD-192), and adds nothing to the sums
+    gone = [{**member("z1", state="exited", progress=[claim("TD-290")]), "team": "gone", "rank": 1, "slot": {}}]
+    more = ui.team_groups([*a, *b, *gone], (), {"/r/samscrape": reading("/r/samscrape")}, {})
+    assert next(g for g in more if g["team"] == "gone")["summary"]
+    assert ui.rollup(more) == ro
 
 
 def test_every_card_carries_the_word_the_state_filter_matches():
