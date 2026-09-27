@@ -331,7 +331,7 @@ async def test_the_detached_check_follows_the_tmux_server_it_is_about(agent, mon
 
     monkeypatch.setattr(agent_mod.identity, "detached_check", check)
     monkeypatch.setattr(agent.tmux, "server_pid", lambda: pid)
-    monkeypatch.setattr(agent_mod, "ID_RECHECK", 0.0)  # every tick, so the test is not a sleep
+    monkeypatch.setattr("sessionorc.agent_common.ID_RECHECK", 0.0)  # every tick, so the test is not a sleep
 
     await agent._id_recheck_detached()
     assert checks == [50] and agent._id_detached  # on, against this server

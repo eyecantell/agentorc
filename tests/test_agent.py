@@ -291,7 +291,7 @@ async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
     adapter labels, and **any** of them at 100% is the cap — the core names none of them."""
     from datetime import UTC, datetime, timedelta
 
-    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
     soon = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     async with LocalClient() as c, LocalClient() as sub:
         s = await c.call("create", name="cap", dir=str(tmp_path), adapter="hookstub", profile="p1")
@@ -351,7 +351,7 @@ async def test_limited_from_one_daily_window(agent, hookstub, tmp_path, monkeypa
     once no live session runs under it."""
     from datetime import UTC, datetime, timedelta
 
-    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
     soon = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     async with LocalClient() as c:
         s = await c.call("create", name="daily", dir=str(tmp_path), adapter="hookstub", profile="pd")
@@ -372,7 +372,7 @@ async def test_limited_from_one_daily_window(agent, hookstub, tmp_path, monkeypa
 async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
     """TD-016: `send(wait=True)` returns the settled record, or errors prompt-stalled / timeout.
     Hook events stand in for Claude Code's UserPromptSubmit → Stop."""
-    monkeypatch.setattr("sessionorc.agent.SEND_STALL_SECONDS", 0.6)
+    monkeypatch.setattr("sessionorc.agent_common.SEND_STALL_SECONDS", 0.6)
     async with LocalClient() as c, LocalClient() as feeder:
         s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
         await feeder.call("hook", session=s["id"], state="idle")
@@ -507,7 +507,7 @@ async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypa
     """TD-027: every `send` waits for the paste to paint, presses Enter, and confirms the composer
     emptied — one `C-m` retry, then `prompt-stuck`. Faint text painted back into the composer (a
     tool's suggested next prompt) does not count as content."""
-    monkeypatch.setattr("sessionorc.agent.SUBMIT_SECONDS", 0.6)
+    monkeypatch.setattr("sessionorc.agent_common.SUBMIT_SECONDS", 0.6)
 
     async def submitted(sid: str) -> list[str]:
         return [t for t in await agent.rpc_tail(sid, 20) if t.startswith("SUBMITTED ")]
@@ -1722,7 +1722,7 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
     from sessionorc.agent import USAGE_BACKOFF_MAX, USAGE_EVERY
     from sessionorc.store import UsageStore
 
-    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
     K = "hookstub:p9"  # the account key (TD-122): the stub names no account, so the profile's
     async with LocalClient() as c:
         s = await c.call("create", name="u", dir=str(tmp_path), adapter="hookstub", profile="p9")
@@ -1777,7 +1777,7 @@ async def test_usage_is_polled_once_per_account_and_backed_off_as_one(agent, hoo
     profiles on one account are asked through one of them, both carry the same reading and
     `fetched`, and a 429 backs the account off rather than the profile it happened to ask
     through. A profile on another account is its own poll."""
-    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
     monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pb": "paul", "pc": "other"})
     monkeypatch.setattr(hookstub, "usage_asked", [])
     async with LocalClient() as c:

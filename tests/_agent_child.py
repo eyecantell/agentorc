@@ -18,7 +18,7 @@ from datetime import timedelta
 from _stubs import HookFedStub
 
 from sessionorc import adapters, hosts
-from sessionorc import agent as agent_mod
+from sessionorc import agent_common as agent_mod
 from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
 
