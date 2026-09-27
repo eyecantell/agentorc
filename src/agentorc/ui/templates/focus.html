@@ -84,8 +84,10 @@
         <div class="menu">
           {# design §4.5a **Pop out** (TD-046): this Focus in its own browser window, raised if it is open #}
           {% if not popped %}<button data-act="popout" data-id="{{ s.id }}" title="open this session in its own browser window, for alt-tab — a second press raises it">⇱ Pop out</button>{% endif %}
-          <button id="tcopy" title="copy the terminal selection — drag to select (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy <span class="key">Ctrl+Shift+C</span></button>
+          <button id="tcopy" title="copy the terminal selection — drag to select, Shift+click to grow or shrink it (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy <span class="key">Ctrl+Shift+C</span></button>
           <button id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click){% if s.unattended %} — not while you are watching: Take over first{% endif %}">⎘ Paste <span class="key">Ctrl+V</span></button>
+          {# design §4.5a *Focus: copy on select* (TD-164, built by TD-174): the person's, in settings.yml, on by default #}
+          <label id="tcopyselrow" class="menutoggle" title="copy on select: a selection is copied as soon as you release the mouse (or Shift+click), silently — Ctrl+C and Copy work either way. Yours everywhere: settings.yml person.terminal.copy_on_select"><input type="checkbox" id="tcopysel"{% if copy_on_select %} checked{% endif %}> Copy on select</label>
           <button id="fmodemenu" data-act="mode" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.unattended %} hidden{% endif %}
                   title="{{ s.mode_title }}">{{ s.mode_act }}</button>
           <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>

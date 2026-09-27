@@ -379,7 +379,7 @@ def test_status_and_reach_are_derived_from_the_entry(home):
     assert containers.observe_reach(n, Fake())["container"] == "abc123def456"
     argv = containers.attach_argv_in("abc123def456", "developer", "ao-cm-w")
     assert argv[:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"]
-    assert argv[6:] == ["tmux", "attach", "-t", "=ao-cm-w:", ";", "set-option", "-t", "=ao-cm-w:", "mouse", "on"]
+    assert argv[6:] == ["tmux", "attach", "-t", "=ao-cm-w:"]  # no mouse option: the browser's (TD-174)
 
 
 # -- forget ------------------------------------------------------------------------------------------------

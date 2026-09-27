@@ -66,6 +66,23 @@
     setTimeout(() => el.remove(), ok ? 3000 : 7000);
   };
 
+  // The Focus pane's **copy on select** (§4.5a, TD-174): written to the person's settings, which
+  // every browser reads; a refusal puts the box back and says why.
+  AO.setCopyOnSelect = async function (box) {
+    const want = !!box.checked;
+    try {
+      const r = await fetch("/api/settings/person", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ terminal: { copy_on_select: want } }),
+      });
+      if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      AO.toast(want ? "copy on select: on" : "copy on select: off", true);
+    } catch (e) {
+      box.checked = !want;
+      AO.toast(`copy on select not saved: ${e.message}`);
+    }
+  };
+
   // ---- actions: every data-act button posts to /api/sessions/<id>/<act> ----
   async function act(id, action, body) {
     // the top bar's person inbox is no session: its Reply and delete have their own routes (§4.5a)
@@ -1246,10 +1263,13 @@
   // socket never opened. Nothing can reach that difference today (a 1006 is client-synthesised and
   // carries no reason, and this server sends none), which is exactly why it had to be closed here
   // rather than left as a comment.
-  // A keystroke frame that is only mouse-wheel reports — the one thing a read-only attach passes
-  // (the server's `WHEEL_ONLY`, `pty_bridge.py`: buttons 64/65 with any of the modifier bits).
-  AO.isWheel = function (d) {
-    return /^(?:\x1b\[<(\d+);\d+;\d+[Mm])+$/.test(d) && [...d.matchAll(/\x1b\[<(\d+);/g)].every((m) => (Number(m[1]) & ~0x1d) === 64);
+  // The wheel over the terminal (design §4.6 *The mouse is the browser's*, TD-174): one animation
+  // frame's notches, in lines, become one scroll message — `{scroll: up|down, lines: n}` — and the
+  // fraction left over waits for the next frame, so a trackpad's small steps add up rather than
+  // each scrolling a line. Nothing whole yet is no message.
+  AO.wheelStep = function (acc) {
+    const n = Math.trunc(acc);
+    return { msg: n ? { scroll: n < 0 ? "up" : "down", lines: Math.abs(n) } : null, rest: acc - n };
   };
   AO.termClose = function (code, opened, delay, reason) {
     if (code === 4404) return { retry: false, final: true, delay, why: "no terminal for this session" };
@@ -1932,10 +1952,10 @@
       window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(keep, 500); });
       window.addEventListener("pagehide", () => { keep(); if (popChan()) popChan().postMessage({ closed: id }); });
     }
-    // scrollback: 0 — tmux owns the history (TD-022). The bridge sets `mouse on` on the session, so
-    // tmux asks for mouse tracking and xterm.js forwards the wheel to it (copy mode, its history);
-    // a local buffer would only ever hold stale repaints for the wheel to land on when tmux is not
-    // tracking. Shift+PageUp/PageDown below are the keyboard path; Shift+drag selects locally.
+    // scrollback: 0 — tmux owns the history (TD-022), and the mouse is the browser's (TD-174): the
+    // attach sets no mouse option, so tmux asks for no tracking, a plain drag selects here and
+    // Shift+click grows it. The wheel and Shift+PageUp/PageDown reach tmux's history by scroll
+    // messages (below); a local buffer would only ever hold stale repaints.
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();
@@ -1996,9 +2016,9 @@
     else openTerm();
     term.onData((d) => {
       if (!ws || ws.readyState !== 1) return;
-      // A read-only attach passes the wheel (tmux scrolls its history with it) and drops the rest,
-      // server-side; the page only spares the round trip and says why nothing happened.
-      if (readOnly && !AO.isWheel(d)) {
+      // A read-only attach drops every key, server-side (the wheel is a scroll message, below);
+      // the page only spares the round trip and says why nothing happened.
+      if (readOnly) {
         if (Date.now() - hinted > 5000) { hinted = Date.now(); AO.toast("watching: the terminal is read-only — Take over to type"); }
         return;
       }
@@ -2022,7 +2042,43 @@
       return true;
     });
     $("#term").addEventListener("contextmenu", (e) => { e.preventDefault(); pasteClip(); });
-    $("#tcopy").addEventListener("click", () => { if (!copySel()) AO.toast("select text in the terminal first (Shift+drag: plain drag goes to tmux)"); });
+    $("#tcopy").addEventListener("click", () => { if (!copySel()) AO.toast("select text in the terminal first (drag; Shift+click grows it)"); });
+    // The wheel scrolls tmux's history (§4.6, TD-174): caught before xterm.js sees it — with no
+    // mouse tracking it would turn a notch into arrow keys for the pane — and sent as lines, the
+    // notches of one animation frame in one message. A read-only attach passes it, as every scroll.
+    let wheelAcc = 0, wheelFrame = 0;
+    $("#term").addEventListener("wheel", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const cell = term.rows ? $("#term").clientHeight / term.rows : 16;
+      wheelAcc += e.deltaMode === 1 ? e.deltaY : e.deltaMode === 2 ? e.deltaY * (term.rows || 24) : e.deltaY / (cell || 16);
+      if (wheelFrame) return;
+      wheelFrame = requestAnimationFrame(() => {
+        wheelFrame = 0;
+        const { msg, rest } = AO.wheelStep(wheelAcc);
+        wheelAcc = rest;
+        if (msg && ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+      });
+    }, { capture: true, passive: false });
+    // Copy on select (§4.5a, TD-174): the person's, in settings.yml, on by default. A selection ended —
+    // the mouse released, which a Shift+click is too — is copied silently when it is on; Ctrl+C and
+    // Copy are unchanged either way. It needs the secure context the clipboard needs.
+    const cos = $("#tcopysel");
+    let selMoved = false;
+    term.onSelectionChange(() => { selMoved = true; });
+    document.addEventListener("mouseup", () => {  // the page's: a drag may end outside the pane
+      if (!selMoved) return;
+      selMoved = false;
+      const t = cos && cos.checked && !cos.disabled && term.getSelection();
+      if (t) navigator.clipboard.writeText(t).catch(() => { /* silent, as the copy is */ });
+    });
+    if (cos) {
+      if (!window.isSecureContext) {
+        cos.disabled = true;
+        cos.closest("label").classList.add("off");
+        cos.closest("label").title = "copy on select needs a secure context (https or localhost), as Copy does";
+      }
+      cos.addEventListener("change", () => AO.setCopyOnSelect(cos));
+    }
     $("#tpaste").addEventListener("click", pasteClip);
     new ResizeObserver(() => { fit.fit(); ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); }).observe($("#term"));
     term.focus();

@@ -91,6 +91,15 @@ def open_in() -> OpenIn:
     return OpenIn(error=f"{WHERE}: {got.error}") if got.error else got
 
 
+def copy_on_select() -> bool:
+    """The person's `terminal.copy_on_select` as last read (design §4.5a *Focus: copy on select*, §5
+    `person:`, TD-174): on unless they turned it off — a pane that is mostly read is where a line is
+    lifted out, and the selection is the lift."""
+    term = _read["person"].get("terminal")
+    got = term.get("copy_on_select") if isinstance(term, dict) else None
+    return got if isinstance(got, bool) else True
+
+
 def migrate_note() -> str:
     """The line naming a retired `ui.yml` still on disk, or ""."""
     return _read["migrate"][0] if _read["migrate"] else ""

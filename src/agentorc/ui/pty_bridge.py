@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import re
 from collections.abc import Awaitable, Callable
 
 import ptyprocess
@@ -73,42 +72,62 @@ def attach_argv(session_id: str, *, socket_name: str | None = None) -> list[str]
     return tmux_attach_argv(session_id, socket_name=socket_name)
 
 
-def scroll_argv(session_id: str, direction: str, *, socket_name: str | None = None) -> list[str]:
-    """Keyboard scrollback (Shift+PageUp/PageDown in the browser; TD-022). Up enters copy mode and
-    pages up (repeatable: each call pages further); down pages down and, thanks to `-e`, leaves
-    copy mode on reaching the live screen. Down outside copy mode is a harmless "not in a mode"."""
+def scroll_argv(
+    session_id: str, direction: str, lines: int | None = None, *, socket_name: str | None = None
+) -> list[str]:
+    """Scrollback, reached through tmux (TD-022): Shift+PageUp/PageDown in the browser, and the wheel
+    (design §4.6 *The mouse is the browser's*, TD-174). Without `lines` it is a page: up enters copy
+    mode and pages up (repeatable: each call pages further); down pages down and, thanks to `-e`,
+    leaves copy mode on reaching the live screen. With `lines` — the wheel's notches of one animation
+    frame — it enters copy mode (`-e`, a no-op when already in it) and scrolls that many lines up or
+    down, so a notch is lines, not a page, and reaching the bottom leaves copy mode as before. Down
+    outside copy mode is a harmless "not in a mode"."""
     argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
     target = f"={session_id}:"
+    if direction not in ("up", "down"):
+        raise ValueError(f"scroll direction {direction!r}: expected 'up' or 'down'")
+    if lines is not None:
+        if isinstance(lines, bool) or not isinstance(lines, int) or lines < 1:
+            raise ValueError(f"scroll lines {lines!r}: expected a whole number from 1")
+        n = str(min(lines, SCROLL_MAX))
+        return argv + [
+            "copy-mode",
+            "-e",
+            "-t",
+            target,
+            ";",
+            "send-keys",
+            "-X",
+            "-N",
+            n,
+            "-t",
+            target,
+            f"scroll-{direction}",
+        ]
     if direction == "up":
         return argv + ["copy-mode", "-e", "-u", "-t", target]
-    if direction == "down":
-        return argv + ["send-keys", "-X", "-t", target, "page-down"]
-    raise ValueError(f"scroll direction {direction!r}: expected 'up' or 'down'")
+    return argv + ["send-keys", "-X", "-t", target, "page-down"]
 
 
-# A frame made only of SGR mouse-wheel reports (button 64 up, 65 down, with any modifier bits xterm.js
-# adds — shift 4, meta 8, ctrl 16, in every combination): what the wheel sends once tmux's `mouse on` asks for tracking,
-# and all a read-only attach lets through. tmux scrolls its copy mode with them; a click or a drag
-# (any other button) is not one and is dropped with the keys.
-_WHEEL = b"|".join(str(64 + mods + down).encode() for mods in range(0, 32, 4) for down in (0, 1))
-WHEEL_ONLY = re.compile(rb"(?:\x1b\[<(?:" + _WHEEL + rb");\d+;\d+[Mm])+")
+SCROLL_MAX = 500  # lines in one wheel message: a frame's notches are a handful, so this only bounds a bad client
 
 
 async def pump(
     pty: PtySession,
     send: Callable[[bytes], object],
     recv: Callable[[], object],
-    scroll: Callable[[str], Awaitable[None]] | None = None,
+    scroll: Callable[[str, int | None], Awaitable[None]] | None = None,
     *,
     read_only: bool = False,
 ) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
-    with `resize: [cols, rows]` or `scroll: "up" | "down"`; `send` takes raw bytes for xterm.js;
-    `scroll` (optional) is awaited for scroll messages, which need a tmux command, not keys.
+    with `resize: [cols, rows]` or `scroll: "up" | "down"` and, for the wheel, `lines: n`; `send`
+    takes raw bytes for xterm.js; `scroll` (optional) is awaited for scroll messages, which need a
+    tmux command, not keys.
 
     `read_only` (design §4.6 *A read-only attach*, TD-096): key frames are dropped — str and bytes
-    alike — except a frame that is only mouse-wheel reports, which tmux turns into scrolling its
-    history and never passes to the pane as typing. Resize and scroll messages pass as ever."""
+    alike, every one: the wheel is a scroll message, never a mouse report (TD-174). Resize and
+    scroll messages pass as ever."""
 
     async def down() -> None:
         try:
@@ -127,10 +146,14 @@ async def pump(
                     cols, rows = msg["resize"]
                     pty.resize(int(cols), int(rows))
                 elif "scroll" in msg and scroll is not None:
-                    await scroll(str(msg["scroll"]))  # returns once the tmux command is spawned, not done
+                    lines = msg.get("lines")
+                    # returns once the tmux command is spawned, not done; a page when `lines` is absent
+                    await scroll(
+                        str(msg["scroll"]), lines if isinstance(lines, int) and not isinstance(lines, bool) else None
+                    )
                 continue
             data = msg.encode() if isinstance(msg, str) else msg
-            if read_only and not WHEEL_ONLY.fullmatch(data):
+            if read_only:
                 continue
             pty.write(data)
 

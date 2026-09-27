@@ -3007,6 +3007,7 @@ def create_app() -> FastAPI:
         person_inbox=person_inbox,
         board_items=board_items,
         inbox_html=inbox_html,
+        settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
     )
     for register in (
         _pages_routes,
@@ -3205,6 +3206,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # §4.5a *Focus composer* **prompt chips** (TD-170): the role's saved prompts, for a
                 # session whose composer is open — an interactive one — and none otherwise
                 "prompts": [] if s.get("unattended") else await asyncio.to_thread(role_prompts, s),
+                # §4.5a *Focus: copy on select* (TD-174): the person's, from `settings.yml`
+                "copy_on_select": uiconf.copy_on_select(),
             },
         )
 
@@ -3976,6 +3979,24 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     # as the toast every other RPC error on the page does.
     PERSON_ACTS = {"pause": "inbox_pause", "resume": "inbox_resume", "gowithit": "inbox_go_with_it"}
 
+    @app.post("/api/settings/person")
+    async def api_settings_person(request: Request):
+        """A person's own settings from a page (design §5 `person:`, §4.4a *Settings, replicated*):
+        today the Focus pane's **copy on select** toggle (§4.5a, TD-174), `{terminal: {copy_on_select}}`
+        through `set_settings`, which validates it and refuses a session. The page's next settings
+        read takes it up, so the choice survives a reload."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        term = body.get("terminal") if isinstance(body, dict) else None
+        if (
+            not isinstance(term, dict)
+            or set(term) != {"copy_on_select"}
+            or not isinstance(term["copy_on_select"], bool)
+        ):
+            raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
+        got = await call("set_settings", person={"terminal": term})
+        h.settings_at["at"] = 0.0  # read it again before the next page is drawn
+        return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+
     @app.post("/api/person/{action}")
     async def api_person_action(action: str, request: Request):
         """design §4.5a Org top bar **person inbox** → Reply and delete (§4.10): a person's reply
@@ -4345,11 +4366,12 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
         reapers: set[asyncio.Future[int]] = set()
 
-        async def scroll(direction: str) -> None:
+        async def scroll(direction: str, lines: int | None = None) -> None:
             # A tmux command against the session, not keys into the pane: there is no escape
-            # sequence that enters copy mode (TD-022). Bad directions are the client's bug; ignore.
+            # sequence that enters copy mode (TD-022). The wheel's `lines` scroll lines, their absence
+            # a page (TD-174). A bad direction or count is the client's bug; ignore.
             try:
-                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, socket_name=sock)]
+                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, lines, socket_name=sock)]
             except ValueError:
                 return
             devnull = asyncio.subprocess.DEVNULL
