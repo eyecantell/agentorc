@@ -255,3 +255,31 @@ def test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox()
     html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2, person_overdue=1)
     assert "data-inbox-needs>2<" in html and "data-inbox-overdue>1</span> overdue" in html
     assert 'class="meta overdue hidden"' in ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2)
+
+
+def test_an_ended_member_keeps_its_last_reference_with_the_prs_mark():
+    """§4.5 screen 1 *A PR that is no longer open says so*, §4.5a *card: compact* and card **report
+    line** (TD-182, built by TD-193): *Grinder · exited · code 0 · TD-066 → #158 merged* — read from
+    the readings of the record's repo, the card's report line and the Members list the same."""
+    readings = {
+        "/r/samscrape": {**reading("/r/samscrape"), "prs": {"open": [], "recent": [{"number": 158, "state": "merged"}]}}
+    }
+    m = member("g1", state="exited", progress=[claim("TD-066", 158, status="done")], role_label="Grinder")
+    m.update(rank=1, slot={"text": "exited · code 0", "caption": ""}, place="kmaster / samscrape")
+    v = ui.view(m, [m], repos=readings)
+    assert v["report"] == "TD-066 → #158 merged · 1/1 done" and v["pr_marks"] == {"158": "merged"}
+    v.update(role_label="Grinder", slot={"text": "exited · code 0", "caption": ""})  # what the view derives live
+    (g,) = ui.team_groups([v], (), readings, {})
+    assert g["members"][0]["compact_line"] == "Grinder · exited · code 0 · TD-066 → #158 merged"
+    # no readings: nothing is guessed
+    bare = ui.view(m, [m])
+    assert bare["report"] == "TD-066 → #158 · 1/1 done" and bare["pr_marks"] == {}
+    # a live claim in review carries the mark too, once its PR has merged under it
+    live = member("g2", progress=[claim("TD-067", 158)], role_label="Grinder")
+    live.update(rank=1, slot={}, place="x")
+    lv = {**ui.view(live, [live], repos=readings), "role_label": "Grinder"}
+    assert ui.compact_line(lv) == "Grinder · TD-067 → #158 merged"
+    # the lead's Members list says the same
+    lead = {**member("m", role_label="Manager"), "rank": 1}
+    kid = {**m, "controllers": ["m"]}
+    assert ui.view(lead, [lead, kid], repos=readings)["members"][0]["report"] == "TD-066 → #158 merged · 1/1 done"

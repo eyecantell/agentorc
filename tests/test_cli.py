@@ -1845,3 +1845,46 @@ def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, c
     assert cli.main(["settings", "--where"]) == 0
     where = capsys.readouterr().out
     assert "settings.yml" in where and "at the host agent's start" in where and "ao service install" in where
+
+
+@pytest.mark.unit
+def test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses(tmp_path, monkeypatch, capsys):
+    """Design §4.7 `ao status -v`, §4.5a card **report line** → **the PR's mark** (TD-182, built by
+    TD-193): the home's repo readings are read once per call, and a PR they hold as merged carries
+    the word; the read refused (a node offline), the line is printed unmarked. `--json` is the
+    records as they are."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
+    rec = {
+        "id": "ao-x-g",
+        "name": "g",
+        "state": "exited",
+        "confidence": "hook",
+        "since": "2026-09-27T10:00:00Z",
+        "adapter": "shell",
+        "repo": str(tmp_path / "r"),
+        "progress": [{"ref": "TD-066", "status": "done", "pr": 158, "source": "declared"}],
+    }
+    reading = {"prs": {"open": [], "recent": [{"number": 158, "state": "merged"}]}}
+    calls: list[str] = []
+
+    def fake(method, **params):
+        calls.append(method)
+        if method == "list":
+            return [rec]
+        if method == "repos":
+            if refused:
+                raise AgentError("repos: the home is not in reach")
+            return {str(tmp_path / "r"): reading}
+        raise AgentError(f"unknown method {method}")
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    refused = False
+    assert cli.main(["status", "-v"]) == 0
+    assert "report: TD-066 → #158 merged · 1/1 done" in capsys.readouterr().out
+    assert calls.count("repos") == 1  # once per call, not per record
+    refused = True
+    assert cli.main(["status", "-v"]) == 0
+    assert "report: TD-066 → #158 · 1/1 done" in capsys.readouterr().out  # unmarked, never guessed
+    assert cli.main(["--json", "status"]) == 0
+    assert json.loads(capsys.readouterr().out) == [rec]

@@ -79,7 +79,9 @@ def test_pages_and_shell_flow(client, tmp_path):
         raise AssertionError("composer text never reached the pane")
     # Wrap up is marked as one, which holds the doorbell off (design §4.10); a plain send clears it
     assert client.post(f"/api/sessions/{sid}/wrapup").json() == {"ok": True}
-    assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["wrapup_at"]
+    got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert got["wrapup_at"]
+    assert got["pr_marks"] == {}  # the list carries the PR's marks as the cards do (TD-193); no readings here
     assert client.post(f"/api/sessions/{sid}/kill").json() == {"ok": True}
     wait_state(client, sid, "exited")
     r = client.post(f"/api/sessions/{sid}/allow")
