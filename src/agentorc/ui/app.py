@@ -3626,7 +3626,9 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         sessions = await call("list")
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
-        return [view(s, sessions, icons=icons, seats=seats) for s in sessions]
+        # the readings too, so the PR's mark on a report survives Focus's Members refresh (TD-193)
+        repos = (await h.repo_facts())[0]
+        return [view(s, sessions, icons=icons, seats=seats, repos=repos) for s in sessions]
 
 
 def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
