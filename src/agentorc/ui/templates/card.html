@@ -69,10 +69,12 @@
       <span class="grow"></span>
       {% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}
     </div>
-    {# (4) what runs it, and what it reports: tool · account · model on every card; the report
+    {# (4) what runs it, and what it reports: tool · account · model on every card, then the context
+       reading where the adapter can tell (TD-190); the report
        line (§4.5a, TD-028 step 4) and the findings count at the right, only when non-empty #}
     <div class="row r4">
-      <span class="meta">{{ s.profile_line }}</span>
+      <span class="meta">{{ s.profile_line }}{% if s.context_short %} · <span class="context"
+            title="context {{ s.context_line }} — what this session's last turn sent (design §6 rule 5)">{{ s.context_short }}</span>{% endif %}</span>
       <span class="grow"></span>
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
             title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}

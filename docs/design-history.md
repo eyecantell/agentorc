@@ -99,6 +99,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-128 reconciled, with Paul): `spend(profile, cursors)` with four token kinds — cache reads folded into input would report a bill several times the real one — read from a byte cursor per transcript across the profile's config directory, sessions agentorc did not start included.
 - 2026-09-25 (TD-154, the designer): `read_transcript` joined the contract beside `transcript_path` — the adapter renders its file into neutral entries and the core draws them, so a second adapter's transcript draws on the same page.
 - 2026-09-26 (TD-188, the designer): `context` on the contract — the session's context size from the tool's records, Claude Code's from the last assistant entry's `usage`.
+- 2026-09-27 (TD-190 slice 1, grinder-ao-1): `context()` is built as `{tokens, at, window}` keyed by the profile *name*, the shape `model_in_use` already had, where the design of 2026-09-26 wrote a `Context` type and a `Profile` argument: the core cannot build a `Profile` (it lives in `agentorc`), and every optional method the core calls takes the name. The windows are a table of model-id prefixes in the adapter: 1M for the Fable, Mythos, Opus 5 and 4.6–4.8 and Sonnet 5 and 4.6 families, 200k for Haiku 4.5, none for anything else.
 
 ## 4.4 Host agent
 

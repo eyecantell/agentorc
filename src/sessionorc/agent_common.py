@@ -60,6 +60,7 @@ GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cach
 DERIVE_EVERY = timedelta(minutes=5)
 # The model in use per live agent session (TD-031): a local file's tail, so cheap, but not per tick.
 MODEL_EVERY = timedelta(seconds=30)
+CONTEXT_EVERY = timedelta(minutes=1)  # the context reading, unattended records only (§6 rule 5, TD-190)
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)

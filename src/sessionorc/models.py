@@ -69,6 +69,7 @@ NODE_OWNED = frozenset(
         "exit_code",
         "git",
         "model",
+        "context",
         "subagents",
         "wrapup_sent_at",
         "gated",
@@ -579,6 +580,32 @@ def report_ref(session: dict[str, Any], prs: Mapping[int, str] | None = None) ->
     return ref + (f" → #{pr}{mark}" if pr else "")
 
 
+def tokens_short(n: int) -> str:
+    """A token count as a reading says it: `231k`, `1M`, `1.2M`; under a thousand, as it is."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}".removesuffix(".0") + "M"
+    if n >= 1_000:
+        return f"{round(n / 1_000)}k"
+    return str(n)
+
+
+def context_reading(session: dict[str, Any], *, of_window: bool = True) -> str:
+    """The record's context reading (design §4.5 row 4, §4.7 `ao status -v`, TD-190): *231k of
+    1M*, or *231k* where the window is unknown or not asked for; "" where there is none, which is
+    an adapter that cannot tell and never an error. One text for the card, Focus and the CLI."""
+    ctx = session.get("context")
+    if not isinstance(ctx, dict):
+        return ""
+    try:
+        tokens = int(ctx.get("tokens") or 0)
+        window = int(ctx.get("window") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if tokens <= 0:
+        return ""
+    return tokens_short(tokens) + (f" of {tokens_short(window)}" if of_window and window > 0 else "")
+
+
 def report_line(session: dict[str, Any], prs: Mapping[int, str] | None = None) -> str:
     """The one-line report a card or `ao status -v` shows (design §4.8): the reference in hand, the
     PR it is on, and the lane count — `TD-027 → #60 · 1/2 done`. A reference whose entry the agent
@@ -662,6 +689,11 @@ class Session:
     # The model actually in use, when the adapter can tell (TD-031): observed, never the profile's
     # declared model — that is an intent (§4.2a), and a display says so when it falls back to it.
     model: str | None = None
+    # `{tokens, at, window}`: how much context the session's last turn sent, when the adapter can
+    # tell (design §4.3 `context`, §6 rule 5, TD-190) — `at` the turn's own time, `window` the
+    # model's, kept beside the tokens because the model may change mid-run. Observed like `model`:
+    # read on the tick for unattended records, and nothing but a display reads it yet.
+    context: dict[str, Any] | None = None
     # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
     # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
     # are what the session says it did.

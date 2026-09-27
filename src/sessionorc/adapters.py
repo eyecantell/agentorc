@@ -58,6 +58,12 @@ class Adapter(Protocol):
     #                                                      the model the session is running now, if the tool
     #                                                      says anywhere (TD-031); None = cannot tell. Keyed by
     #                                                      the profile *name*, like `usage_for`
+    #   context(session_id: str, cwd: Path, profile: str) -> dict | None
+    #                                                      the session's context size now, `{tokens, at,
+    #                                                      window}`: the prompt its last turn sent, that
+    #                                                      turn's time, the model's window or None; None =
+    #                                                      cannot tell (design §4.3, §6 rule 5, TD-190).
+    #                                                      Keyed by the profile *name*, like `model_in_use`
     #   short_model(model: str) -> str                     that name as a display shortens it
     #   account_for(profile: str) -> str | None           the account the profile runs under (§4.2a, TD-122):
     #                                                      usage is polled, cached and backed off once per

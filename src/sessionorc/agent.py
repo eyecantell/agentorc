@@ -49,6 +49,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     BOARD_REPLY_NOTE,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401
     COMPOSER_LINES,  # noqa: F401
+    CONTEXT_EVERY,  # noqa: F401
     CREATE_GRACE,  # noqa: F401
     DERIVE_EVERY,  # noqa: F401
     DOORBELL_TRIES,  # noqa: F401
@@ -325,6 +326,7 @@ class HostAgent(
         self._git_checked: dict[str, datetime] = {}
         self._derived_at: dict[str, datetime] = {}
         self._model_checked: dict[str, datetime] = {}
+        self._context_checked: dict[str, datetime] = {}  # the context reading's cadence (TD-190)
         # When a `kill` or a `close` destroyed a pane, so a tick holding a pane list taken before
         # it does not observe a session that is already gone (TD-063). Dropped as soon as a
         # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.

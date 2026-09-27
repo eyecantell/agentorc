@@ -86,6 +86,7 @@ class TickMixin:
         self._note_attention(snapshot_at)
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
+        await self._refresh_context(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
@@ -1020,6 +1021,40 @@ class TickMixin:
                 live.model = str(result)
                 self.store.save(live)
 
+    async def _refresh_context(self, now: datetime) -> None:
+        """Each unattended record's context reading (design §4.3 `context`, §6 rule 5, TD-190): the
+        adapter's read of the transcript's tail, in a thread, once per CONTEXT_EVERY. An attended
+        session is a person's, and they can see their own context; an adapter that cannot tell
+        leaves the field as it was."""
+        every = agent_common.CONTEXT_EVERY
+        due = []
+        for s in self.sessions.values():
+            if not (s.unattended and s.adapter_id and s.dir) or s.state == "closed":
+                continue
+            if now - self._context_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) <= every:
+                continue
+            try:
+                fn = getattr(adapters.get(s.adapter), "context", None)
+            except KeyError:
+                fn = None
+            if fn:
+                due.append((s, fn))
+        if not due:
+            return
+        results = await asyncio.gather(
+            *(asyncio.to_thread(fn, str(s.adapter_id), Path(s.dir), s.profile) for s, fn in due),
+            return_exceptions=True,
+        )
+        for (s, _), result in zip(due, results, strict=True):
+            self._context_checked[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None or not isinstance(result, dict) or not result.get("tokens"):
+                continue
+            reading = {"tokens": int(result["tokens"]), "at": result.get("at"), "window": result.get("window")}
+            if live.context != reading:
+                live.context = reading
+                self.store.save(live)
+
     async def _refresh_usage(self) -> None:
         """Ask each account a live agent session's profile names for its usage every
         `USAGE_EVERY`, once per account (§4.2a, TD-122), in a thread; a fetch failure keeps the
@@ -1316,6 +1351,7 @@ class TickMixin:
             self._git_checked,
             self._derived_at,
             self._model_checked,
+            self._context_checked,
             self._pre_limited,
             self._last_hook,
             self._live_hook_at,

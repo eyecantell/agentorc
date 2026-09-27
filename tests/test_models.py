@@ -12,6 +12,7 @@ from sessionorc.models import (
     ProgressEntry,
     Session,
     State,
+    context_reading,
     normalize_ref,
     report_line,
 )
@@ -294,3 +295,17 @@ def test_the_prs_mark_says_a_pr_is_no_longer_open_and_never_guesses():
     assert pr_marks(d, {"/r/x": reading}) == {159: "merged", 150: "closed"}
     assert pr_marks(d, {"/r/other": reading}) == {} and pr_marks(d, None) == {} and pr_marks(d, {}) == {}
     assert pr_marks({**d, "repo": None}, {"/r/x": reading}) == {}
+
+
+def test_the_context_reading_says_tokens_and_the_window_it_knows():
+    """TD-190, design §4.5 row 4 and §4.7: *231k of 1M* where the window is known, *231k* where it
+    is not or not asked for, nothing where there is no reading or a malformed one."""
+    ctx = {"tokens": 231_203, "at": "T", "window": 1_000_000}
+    assert context_reading({"context": ctx}) == "231k of 1M"
+    assert context_reading({"context": ctx}, of_window=False) == "231k"
+    assert context_reading({"context": {**ctx, "window": None}}) == "231k"
+    assert context_reading({"context": {"tokens": 1_234_567, "window": 200_000}}) == "1.2M of 200k"
+    assert context_reading({"context": {"tokens": 512}}) == "512"
+    for none in (None, {}, {"tokens": 0}, {"tokens": "x"}, "231k"):
+        assert context_reading({"context": none}) == ""
+    assert context_reading({}) == ""

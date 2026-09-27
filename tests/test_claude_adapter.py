@@ -310,6 +310,44 @@ def test_model_in_use_reads_the_last_top_level_assistant_turn(tmp_path, monkeypa
     assert short_model("claude-code", None) == ""
 
 
+def test_context_reads_the_last_top_level_turns_usage(tmp_path, monkeypatch):
+    """TD-190, design §4.3 `context`: the prompt the last top-level turn sent — input plus both
+    cache counts — stamped with that turn's time, and the model's window where the table knows it.
+    A sidechain turn is a subagent's, and a cut first line is skipped."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "profiles.yml").write_text(
+        f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
+    )
+    ad = ClaudeCodeAdapter()
+    repo = tmp_path / "repo"
+    assert ad.context("abc", repo, "t") is None  # no transcript: cannot tell, never an error
+    d = tmp_path / "cc" / "projects" / munge(repo)
+    d.mkdir(parents=True)
+    use = {"input_tokens": 3, "cache_read_input_tokens": 230_000, "cache_creation_input_tokens": 1_200}
+    entries = [
+        {"type": "assistant", "timestamp": "T1", "message": {"model": "claude-opus-5-5", "usage": {"input_tokens": 9}}},
+        {"type": "assistant", "timestamp": "T2", "message": {"model": "claude-opus-5-5", "usage": use}},
+        {
+            "type": "assistant",
+            "isSidechain": True,
+            "timestamp": "T3",
+            "message": {"model": "claude-sonnet-5", "usage": use},
+        },
+        {"type": "assistant", "timestamp": "T4", "message": {"model": "<synthetic>", "usage": {"input_tokens": 0}}},
+    ]
+    (d / "abc.jsonl").write_text("".join(json.dumps(e) + "\n" for e in entries))
+    assert ad.context("abc", repo, "t") == {"tokens": 231_203, "at": "T2", "window": 1_000_000}
+    assert ad.context("abc", repo, "nope") is None  # an unknown profile, not another account's files
+    # a model the table does not know: the tokens alone
+    other = {"type": "assistant", "timestamp": "T5", "message": {"model": "claude-x-1", "usage": use}}
+    (d / "abc.jsonl").write_text('del": "cut"}\n' + json.dumps(other) + "\n")
+    assert ad.context("abc", repo, "t") == {"tokens": 231_203, "at": "T5", "window": None}
+    haiku = {"type": "assistant", "message": {"model": "claude-haiku-4-5", "usage": use}}
+    (d / "abc.jsonl").write_text(json.dumps(haiku) + "\n")
+    assert ad.context("abc", repo, "t")["window"] == 200_000
+
+
 def test_parse_usage_and_credentials(tmp_path):
     u = parse_usage(
         {"five_hour": {"utilization": 42.7, "resets_at": "2026-09-07T02:00:00Z"}, "seven_day": {"utilization": 9}}
