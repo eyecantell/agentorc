@@ -724,6 +724,9 @@ class HostAgent:
         for s in [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]:
             if s.team != team or s.run_until != old or s.state in ("exited", "closed") or s.superseded_by:
                 continue
+            if new and not s.unattended:
+                # a person took it over: a move is a policy's, and policies leave it alone (§4.2); a Clear clears
+                continue
             if s.host == self.host:
                 self._take_stop(s, new)
                 changed = True

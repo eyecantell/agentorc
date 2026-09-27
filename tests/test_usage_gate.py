@@ -395,3 +395,24 @@ async def test_a_teams_stop_time_reaches_its_live_members_and_clear_takes_it_bac
         for s in (plain, member, early, later, again):
             await person.call("kill", id=s)
             await person.call("remove", id=s)
+
+
+@pytest.mark.integration
+async def test_a_moved_team_stop_time_leaves_a_member_a_person_took_over(agent, tmp_path):
+    """The techlead's read of #630: a member taken over with `ao mode` still carries the old
+    instant, but a move is a policy's and skips it (§4.2); a Clear still takes the instant back."""
+    await park_ticks(agent)
+    now = datetime.now(UTC).replace(microsecond=0)
+    first, moved = _iso(now + timedelta(hours=2)), _iso(now + timedelta(hours=3))
+    async with LocalClient() as person:
+        await person.call("set_settings", teams={"ao-grind": {"until": first}})
+        sid = await _worker(person, tmp_path, name="m", team="ao-grind")
+        assert agent.sessions[sid].run_until == first
+        await person.call("set_mode", id=sid, unattended=False)
+        await person.call("set_settings", teams={"ao-grind": {"until": moved}})
+        assert agent.sessions[sid].run_until == first, "a move leaves a person's session alone"
+        await person.call("set_settings", teams={"ao-grind": {"until": first}})  # back to what it carries
+        await person.call("set_settings", teams={"ao-grind": {"until": None}})
+        assert agent.sessions[sid].run_until is None, "a Clear takes the team's instant back all the same"
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)

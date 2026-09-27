@@ -1169,7 +1169,7 @@ WHERE = (
     ("profiles.yml", "profiles: tool, account, model, config directory, billing", "on every use"),
     ("org.yml", "projects, teams, the org-wide roles overlay", "by the clients on every use; never the host agent"),
     ("<repo>/.agentorc.yml", "a repo's roles, controllers, ledger, teams, promote",
-     "by the clients on every use; promote: by the home's tick"),
+     "by the clients on every use; promote: is checked there and read by nothing else yet (TD-132 builds its reader)"),
     ("systemd units", "the UI's bind and port, PATH, the home", "at `ao service install`"),
 )  # fmt: skip
 

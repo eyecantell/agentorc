@@ -1432,7 +1432,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Why:** the usage gate, a team's stop time and a schedule run on the node that holds the session, so a setting turned at the home must reach the node's tick, offline included; today each host read its own file and a reserve set on the home never reached a node's sessions.
 
-**Fix:** one slice in `src/sessionorc/**` (the techlead reads it). The frame and its two triggers; the node's write; the row change in `modes.py`; the node's reads from the replica; a test that a reserve set on the home while a node is linked pauses the node's session on its next tick, that one set while the node is offline reaches it on the next dial, and that `ao gate` at an offline node is refused in the same words `ao control` is.
+**Fix:** one slice in `src/sessionorc/**` (the techlead reads it). The frame and its two triggers; the node's write; the row change in `modes.py`; the node's reads from the replica; a test that a reserve set on the home while a node is linked pauses the node's session on its next tick, that one set while the node is offline reaches it on the next dial, and that `ao gate` at an offline node is refused in the same words `ao control` is. The replica also routes the two team stop time writes that run wherever `create` and `set_settings` are served — the create's stamp (`_team_stamp`) and the restamp on a moved or cleared instant (`_restamp_team`) — which read a node's own `settings.yml` until then (the techlead's read of #630).
 
 **Done when** the three tests pass, `ao gate` at a linked node writes the home's file and the node's replica agrees within one tick, and the Settings page on a node (TD-148) shows *set at <home>* beside each editable value.
 

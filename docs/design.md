@@ -5701,8 +5701,8 @@ teams:
   still ahead: a session created after it has passed is not given it, since starting the team again
   after its stop time is the person's word. It runs at the home, whose file it is; a node's member
   takes it through `set_stop` over the link, and waits for the link. **Clear** removes the key and
-  takes the team's instant back from the members that carry it, and a moved instant moves them with
-  it; a session's own `ao until` is kept as the earlier of the two, and a Clear leaves it alone. A stop time in the past is
+  takes the team's instant back from the members that carry it, and a moved instant moves the
+  unattended ones with it (a session a person took over keeps what it carries: a move is a policy's); a session's own `ao until` is kept as the earlier of the two, and a Clear leaves it alone. A stop time in the past is
   refused when set, as `ao until`'s is. **Run window** (Not built — phase 3, the tdgrind port):
   start missing workers inside the window; wrap-up-then-kill outside, by setting a stop time.
   **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on a
