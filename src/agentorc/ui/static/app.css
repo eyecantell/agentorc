@@ -110,6 +110,8 @@ input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border:
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */
 .meta.scraped { border-bottom: 1px dashed var(--scraped); }
+/* the context reading past its role's bound (design §4.5 row 4, §4.8, TD-190) */
+.context.over { color: var(--stalled); font-weight: 600; }
 .reports .rep { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
 .reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .reports .rep.derived .ref { border-bottom: 1px dashed var(--scraped); }

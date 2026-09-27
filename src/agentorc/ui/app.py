@@ -43,6 +43,7 @@ from sessionorc.containers import attach_argv_in
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
+    context_over,
     context_reading,
     has_control,
     normalize_ref,
@@ -51,6 +52,7 @@ from sessionorc.models import (
     report_line,
     report_ref,
     stop_note,
+    tokens_short,
 )
 
 from . import help as helpmod
@@ -872,6 +874,11 @@ def view(
     # 1M* in Focus; absent where the adapter cannot tell
     d["context_short"] = context_reading(s, of_window=False)
     d["context_line"] = context_reading(s)
+    # red past the role's bound (§4.8 *A role has a context bound*, §6 rule 5): the bound rides in
+    # the title, so the red says what it is measured against
+    d["context_over"] = context_over(s)
+    bound = s.get("context_bound")
+    d["context_bound"] = tokens_short(bound) if isinstance(bound, int) and bound > 0 else ""
     # A record whose `pending` is not a dict — another build, a hand repair — costs its card its
     # pending line and nothing more, the rule `doing` and `out_of_work` already follow: every
     # reader below (the card, the Focus header, `state_kind`) gets one shape (review of PR #251).
@@ -3414,6 +3421,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
             review=preset.review if preset else None,  # who reads its PRs (design §4.9b *The reader*)
+            context_bound=preset.context_bound if preset else None,  # §4.8 *A role has a context bound*
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
             project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)

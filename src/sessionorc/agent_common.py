@@ -31,6 +31,7 @@ from sessionorc.models import (
     SOURCES,
     MailEntry,
     Session,
+    normalize_context,
     normalize_ref,
     normalize_review,
     report_line,
@@ -384,7 +385,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
-    "seat", "review",
+    "seat", "review", "context_bound",
 )  # fmt: skip
 
 
@@ -504,6 +505,17 @@ def _review(review: Any) -> dict[str, Any] | None:
     """A role preset's `review:` as the record keeps it (design §4.9b *The reader*, TD-093)."""
     try:
         return normalize_review(review)
+    except ValueError as e:
+        raise RpcError(str(e)) from None
+
+
+def _context_bound(bound: Any) -> int | None:
+    """A role preset's context bound as the record keeps it (design §4.8, TD-190): tokens, or None.
+    The create is handed the number the client resolved, and checks it as the preset key is."""
+    if bound is None:
+        return None
+    try:
+        return normalize_context({"bound": bound})
     except ValueError as e:
         raise RpcError(str(e)) from None
 

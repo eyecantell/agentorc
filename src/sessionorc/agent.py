@@ -100,6 +100,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _cap,  # noqa: F401
     _clean,  # noqa: F401
     _clean_answer,  # noqa: F401
+    _context_bound,  # noqa: F401
     _controllers,  # noqa: F401
     _drop_unknown,  # noqa: F401
     _duration,  # noqa: F401
@@ -517,9 +518,12 @@ class HostAgent(
         supervised: bool = False,
         seat: dict[str, Any] | None = None,
         review: dict[str, Any] | None = None,
+        context_bound: int | None = None,
     ) -> dict[str, Any]:
         """`review` (design §4.9b *The reader*, TD-093): the role preset's `{reader, held, bound}`,
-        checked and kept on the record, read afterwards by the author's own `ao`.
+        checked and kept on the record, read afterwards by the author's own `ao`. `context_bound`
+        (design §4.8 *A role has a context bound*, TD-190): the preset's `context: {bound}` in tokens,
+        kept on the record the same way.
 
         `supervised` (design §6 *Keeping a team running*, TD-103 slice 1): kept on the record,
         and a resume of a supervised record stays supervised whether or not it says so — the field
@@ -539,7 +543,7 @@ class HostAgent(
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
-        reading = _review(review)
+        reading, bound = _review(review), _context_bound(context_bound)
         if seat is not None and not (
             isinstance(seat, dict) and isinstance(seat.get("trigger"), str) and seat["trigger"]
         ):
@@ -683,6 +687,7 @@ class HostAgent(
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
                 seat=dict(seat) if seat else None,
                 review=reading,
+                context_bound=bound,
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)

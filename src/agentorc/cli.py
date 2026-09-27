@@ -25,7 +25,16 @@ from sessionorc import mail as mailmod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, context_reading, pr_marks, report_line, stop_note
+from sessionorc.models import (
+    GRANTS,
+    STATE_RANK,
+    context_over,
+    context_reading,
+    pr_marks,
+    report_line,
+    stop_note,
+    tokens_short,
+)
 from sessionorc.tmux import attach_argv
 
 
@@ -264,7 +273,10 @@ def cmd_status(args: argparse.Namespace) -> int:
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
             if reading := context_reading(s):
-                print(f"{'':<{w}}      context: {reading}")
+                bound = s.get("context_bound")
+                over = " (over)" if context_over(s) else ""
+                bound_text = f", bound {tokens_short(bound)}{over}" if isinstance(bound, int) and bound > 0 else ""
+                print(f"{'':<{w}}      context: {reading}{bound_text}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
@@ -428,6 +440,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         "role": role.name,
         "ledger": cfg.ledger if cfg.root else None,  # None for a shell: there is no repo file behind it
         "review": role.review,  # who reads its PRs (design §4.9b *The reader*); None is none
+        "context_bound": role.context_bound,  # §4.8 *A role has a context bound* (TD-190); None is none
     }
 
 
@@ -555,6 +568,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
             ]
             if r.review:  # who reads its PRs (design §4.9b *The reader*)
                 bits.append(f"review: {r.review['reader']} on {', '.join(r.review['held'])}, {r.review['bound']}")
+            if r.context_bound:  # the reading past which §6 rule 5 tells it to end its run (§4.8)
+                bits.append(f"context bound: {tokens_short(r.context_bound)}")
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
             if r.message:  # when to message it (design §4.8, TD-171): its own line, since it is a sentence
                 print(f"{'':<{w}}  message: {r.message}")
