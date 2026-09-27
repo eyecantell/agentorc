@@ -113,7 +113,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Open — design-first |
 | TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | Open — pickable |
-| TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Open — pickable: capture the event first |
 
 
 ---
@@ -2106,27 +2105,3 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Fix:** (1) caption from `created` (the fill) for a seat, with a test; (2) a compact flag form, with a test that a two-digit count survives; (3) per the design check. Done when all three read true on the Org page.
 
 **Related:** TD-197 (found together), TD-175 (the unpushed round log), TD-176 slice 3 (the compact card), TD-097 (seats).
-
-## TD-201: An idle session flipped to `working` by a hook after its Stop reads `stalled?` forever, and its mail is never rung
-
-**Priority:** High
-**Added:** 2026-09-27 (Paul: *it looks like grinder-ao-1 is "stalled" — let's see if we need a TD for how it got there*; manager-ao-1 had boarded the symptom at 08:02Z, #636)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — the event that did it is not yet identified; step 1 below captures it.
-**Location:** `src/agentorc/adapters/claude_code/hook.py` (`STATE_EVENTS`: `PreToolUse` / `PostToolUse` / `UserPromptSubmit` / `SessionStart` → `working`), `src/sessionorc/agent.py` (`_observe`: `working` with no output past `STALL_AFTER` → `stalled?`; the doorbell's *hook-confirmed idle only*), the `--settings` layer (`hooks_settings`)
-
-**Why:** grinder-ao-1 ended a turn at 2026-09-27T05:56:04Z. Its transcript's last entries are the answer (*… Waiting for the reader on #635*), a `stop_hook_summary` (agentorc-hook, 188 ms, `level: suggestion`) and `turn_duration`, and nothing after. The store's nightly backup at 06:00Z holds its record as `state: working, since: 05:56:08Z, confidence: hook`, so a hook event four seconds after the Stop turned it `working` with no turn behind it. At 06:35:42Z the liveness check made it `stalled?`, and it stayed there for 13 hours. Meanwhile #635 merged at 05:56:39Z and a message landed (`unread: 1`), but the doorbell rings only a hook-confirmed idle session, so it never rang. The pane showed Claude Code's own dim suggestion `❯ open 1e once #635 merges` (`ESC[2m`, not typed; `composer()` rightly ignores it). The manager saw it at 08:02Z and could only board it: §6's stall handling is *not built — phase 3*. TD-108's split stopped at step 1d for the whole day. This is the third of a family: TD-090 (`/compact` fired `SessionStart`) and TD-155 (`--resume` fired `SessionStart`) were each an idle session turned `working` by an event that starts no turn.
-
-**Suspect, unconfirmed:** Claude Code 2.1.283's prompt suggestion. The Stop summary carries `level: suggestion`, the suggestion appeared on screen, and generating it (or pre-running it) may fire a tool or prompt hook outside the main turn. Other candidates: a queued event replayed by `agentorc-hook`'s `EventQueue`, or an auto-update redraw (the run log shows *Checking for updates* and keyboard-mode escapes after the turn).
-
-**Fix:**
-1. **Capture:** log each hook event's name, `source` / `tool_name` / `agent_id` and time per session for a day (a debug line in `agentorc-hook` or the agent's `rpc_hook`), and catch the post-Stop event. Name it in this entry.
-2. **Refuse it:** once named, map it in the adapter as TD-090 and TD-155 did, so it leaves the state as it was.
-3. **Belt and braces:** before `stalled?`, a hook-fed session whose screen shows the composer at rest (no spinner, empty or dim composer) is `idle` on the screen verdict, not stalled. And a `stalled?` session with unread mail and that same resting screen may be rung.
-4. **If the suspect holds:** turn prompt suggestions off for unattended launches in the `--settings` layer (Claude Code's setting for it, verified against the running version), since nobody reads a suggestion at an unattended pane.
-
-Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `UserPromptSubmit`, leaves the session `idle`; a stalled session with a resting composer reads `idle`. Done when the cause is named and an idle grinder with mail is rung.
-
-**Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
