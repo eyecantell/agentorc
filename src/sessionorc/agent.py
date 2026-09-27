@@ -49,6 +49,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     BOARD_REPLY_NOTE,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401
     COMPOSER_LINES,  # noqa: F401
+    CONTEXT_AGAIN,  # noqa: F401
     CONTEXT_EVERY,  # noqa: F401
     CREATE_GRACE,  # noqa: F401
     DERIVE_EVERY,  # noqa: F401

@@ -846,7 +846,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
   `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `restart_blocked`,
-  `lane_seen` (§6 rule 6, TD-187, TD-195),
+  `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
@@ -3160,7 +3160,7 @@ field for every role the team defines, in the definition's order: a role one ses
 sentences themselves, since no other field is designed (the shorter phrases this paragraph once
 gave as its example, *questions → manager-ao-1*, are not derivable from them). `ao roles` prints it.
 
-**A role has a context bound (TD-188; the key built, rule 5's line not yet — TD-190).** A preset or a
+**A role has a context bound (TD-188; built — TD-190).** A preset or a
 `roles:` entry may carry **`context: {bound: 200k}`** — a token count written as the reading is
 (`200k`, `1M`, `1.5M`), or a plain integer — the reading past which §6 rule 5 tells a
 supervised member to end its run: the built-in worker presets (`grinder`, `hunter`, `auditor`) carry
@@ -3946,7 +3946,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   other: a session is out of work or it wants another run at it, never both.
 - **When.** *Your context is long* is not a number a session can see; §6 rule 5 gives it one: the
   tick tells a supervised member, between entries, that its context reading is over its role's bound,
-  and a busy one reads it at the end of every `ao` reply (TD-188; not built — TD-190). The
+  and a busy one reads it at the end of every `ao` reply (TD-188, built — TD-190). The
   declaration stays the member's.
 - **What a controller does with it.** A member carrying `restart_wanted` that is `idle`, or
   `exited` by a natural exit — a kill or a Close is never undone (§6 rule 2) — **with nothing
@@ -4549,7 +4549,10 @@ sender's:
   `progress` and `finding` — ends its output with the same line while the caller has unread mail,
   with `(wake budget spent)` appended while it is, which is how a session learns that mail is
   landing without waking it. It types nothing, starts nothing, needs no counter, and reaches a
-  session at exactly the moment it is reading agentorc's output.
+  session at exactly the moment it is reading agentorc's output. While the caller's context reading
+  is past its role's bound (§6 rule 5), the line carries *(context 231k over the 200k bound)* too,
+  and stands alone as *[agentorc] (context 231k over the 200k bound) — finish the entry in hand,
+  then declare* when nothing is unread.
 - **Waiting on mail is ending the turn.** A session with nothing to do but wait for a reply ends
   its turn: the reply, a `steer`'s lapse at its bound (the `system` note, uncharged) and any other
   mail ring it once it is hook-confirmed `idle`. A loop on `ao wait` or `ao inbox --unread` keeps it
@@ -5629,7 +5632,7 @@ code and needs no grant; a session doing the same work does.
   performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
   does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
   background because a tool call is capped at ten minutes.
-  5. **Context bound** (TD-188; the bound on the record and the reading built, the line not yet — TD-190). A supervised member whose
+  5. **Context bound** (TD-188; built — TD-190). A supervised member whose
      **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
      kept beside the tokens, since the model may change mid-run) is over its role's
      **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,
@@ -5643,7 +5646,9 @@ code and needs no grant; a session doing the same work does.
      says what that means — finish the entry in hand, then declare. The declaration is the member's
      (§4.9a *A run that ends with work left*, §9 invariant 14) and rule 2 restarts it; the line is
      the trigger the brief's *your context is long* never had. Ordered as the doorbell is: a wrap-up
-     under way or a gate pause beats it. **Not compaction**: Claude Code documents no settable
+     under way or a gate pause beats it, and a member that has declared already (out of work, a restart
+     wanted) or is a seat is not sent it; a member on a node is not told yet, as rule 4's is not. The
+     reply clause is read at the home: a read a node serves alone carries none. **Not compaction**: Claude Code documents no settable
      auto-compact threshold, no way for another process to send `/compact`, and no hook before it,
      its summary is lossy and keeps merged work, and it is one tool's — so the bound restarts, which
      every adapter can do, and compaction stays what a person types into their own session. The
