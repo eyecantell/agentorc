@@ -1813,3 +1813,144 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-26 (PR #628) — an exit event carrying another run's tool id is ignored (`_apply_event`), rule 1 waits `RESTART_SETTLE` after a restart that succeeded (`_just_restarted`), and a clean `restart_wanted` runs past a ceiling whose window has emptied (`_window_full`); design §6 rules 1–2 and the §4.5a *Inbox row: restart* say so; tests in `tests/test_wanted_and_nudge.py` and `tests/test_crash_restart.py`.
 
 **Related:** TD-103 (the restart rules, slice 5 the Inbox row), TD-083 (`restart_wanted`), TD-115 (the exit-hook grace), TD-187, TD-188; design §6 *Keeping a team running*, §4.5a *Inbox row: restart*, §9 invariant 2 (the anchor rule).
+
+## TD-183: Clicking the team card collapses or expands it
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul: *have the team cards themselves be clickable to expand or collapse them*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-194
+**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Any team folds, and its header is the press*), §4.5a *team card: fold* (the new row), *team groups*, *Org: keys*, *team header ✉ n* (the fold's help text changes with the build); mockup `OrgTeamFirst.dc.html` (a live team folded, the fold button on the live headers), rendered `docs/mockups/reviews/2026-09-26-td183-folded-live-team.png`. Settled: the header row is the press, its controls, links and marks excepted; the *n sessions* button stays as the keyboard's control; any team folds; a folded live row keeps the counts and every mark; the choice is per team, per browser, and stands across state changes; `f` and a header stop in the ring. **One choice is Paul's to turn**: a needs-you member rings the folded row and does not open it (the alternative: the row opens itself) — sent as a steer (`m-db0c6cb316ac`), which lapsed at its bound on 2026-09-27 with no word against, so the default stands. The build is TD-194; this entry archives with it.
+**Location:** `src/agentorc/ui/static/app.js` (`syncTeams`, the fold keyed `fold:<team>`), `src/agentorc/ui/templates/group_head.html`
+
+**Why:** the only fold today is the *n sessions* button (§4.5a *the fold*), and `syncTeams` folds only a team with nothing live: *a live team never folds*. A page with several running teams can't be tidied, and the fold is a small button when the whole header is the natural target.
+
+**Resolved:** 2026-09-27 (PR #641, TD-194's build) — the design is design §4.5 screen 1 *Any team folds, and its header is the press* and §4.5a *team card: fold*.
+
+**Related:** TD-181 (what an unfolded team shows), design §4.5 screen 1, §4.5a **team groups**, *the fold*, *Org: keys*.
+
+## TD-194: Build the team card's fold: a click on the header folds any team, the folded live row with its counts and marks, the ring's header stop and `f`
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-183's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 1 (*Any team folds, and its header is the press*), §4.5a *team card: fold*, *Org: keys*, *team header ✉ n*; mockup `OrgTeamFirst.dc.html`.
+**Location:** `src/agentorc/ui/static/app.js` (`syncTeams`: `folded` loses its `!+sec.dataset.live` clause and takes the default from the team's state when nothing is stored; the header's click handler, which ignores a press that lands on a button, a link, an input or a mark, or that ends a text selection; the keys table), `src/agentorc/ui/templates/group_head.html` (the fold button on every team with sessions, `aria-expanded` / `aria-controls`; the counts and the ✉ mark on any folded team), `src/agentorc/ui/static/app.css` (the pointer, the hover tint, the amber ring on a folded row), `src/agentorc/ui/help.py` (the fold's text)
+
+**Why:** TD-183's *Why*: a page with several running teams cannot be tidied, and the fold is a small button where the whole header is the natural target.
+
+**Resolved:** 2026-09-27 (PR #641) — design §4.5a *team card: fold* now reads as built; `AO.teamFolded`, the header's press and the `f` key are in `src/agentorc/ui/static/app.js`, the header's markup in `group_head.html`, and `tests/test_ui_keys.py` holds the default and the stored choice. The live look is on `docs/user_attention.md`.
+
+**Done when** TD-183's *Done when*: a click on a team's header folds and unfolds it, live or not, and the choice survives a reload.
+
+**Related:** TD-183 (the design), TD-192 (what an unfolded wound-down team shows), TD-156 (f) (where the button sits), TD-124 (the keys).
+
+## TD-181: An unfolded team with nothing live shows its member cards but no summary
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul, at the dc-grind card after its wind-down: *the unfolded card should show the same info as the running team — some items will become stale and that's ok*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-192
+**Status:** Designed 2026-09-26 (the designer): design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups* (the fold's help text changes with the build, TD-192 step 4). Settled: the same three facets and compact members as a running team; the third facet opens on Doing; nothing is marked stale, the header's *stopped* / *wound down <t> ago* dates it; folded, the one row is unchanged; the rollup still sums live teams only. Obvious from Paul's words and the entry's *Fix*, so landed with a note to him. The build is TD-192; this entry archives with it. **What was:** Paul set the shape; the design rows and the build remained.
+**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`), `src/agentorc/ui/templates/team_summary.html`, `org.html`
+
+**Why:** the team summary (TD-176 slice 3) is built only for a team with a live member. When dc-grind wound down on 2026-09-26 all three sessions exited. The card folded to one row as §4.5 screen 1 says, and pressing *3 sessions* unfolded the member cards with no summary: no TD or PR bars, no TDs in motion, no Doing. samscrape-grind, concluded but with idle members, kept its summary right below. The repo facts don't depend on anyone being live, and a wound-down team is when the person most wants to see what it left behind. Because the summary wasn't there, a merged PR on the grinder's report line read as outstanding (TD-182).
+
+**Resolved:** 2026-09-27 (PR #644, TD-192's build) — the design is design §4.5 screen 1 *Unfolded, it is a running team's card* and §4.5a *team card: summary*, *card: compact*.
+
+**Related:** TD-176 (archived), TD-182, TD-183, design §4.5 screen 1, §4.5a **team card: summary**, **team groups**, *the fold*.
+
+## TD-192: Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-181's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 1 (*Unfolded, it is a running team's card*), §4.5a *team card: summary*, *card: compact*, *team groups*.
+**Location:** `src/agentorc/ui/app.py` (the groups builder: `summary = team_summary(…) if team != NO_TEAM and live else None`, and the `compact` flags set under it), `src/agentorc/ui/templates/org.html` and `team_summary.html` (the summary inside the fold), `src/agentorc/ui/static/app.js` (`syncTeams`: the fold hides the summary with the cards), `src/agentorc/ui/help.py` (the fold's text)
+
+**Why:** TD-181's *Why*: a wound-down team is when the person most wants to see what it left, and the summary is built only while a member is live.
+
+**Resolved:** 2026-09-27 (PR #644) — design §4.5a *team card: summary* and *card: compact* now read as built; `team_groups` and `compact_in` in `src/agentorc/ui/app.py`, the rollup's `live` filter, and `tests/test_ui_team_summary.py` (`test_a_wound_down_team_shows_what_it_left`). The live look is on `docs/user_attention.md`.
+
+**Done when** TD-181's *Done when*: an unfolded wound-down team shows the three facets, and a test covers a team whose members have all exited.
+
+**Related:** TD-181 (the design), TD-193 (the mark its cards carry), TD-183 (the fold's target), TD-176 (archived: the summary).
+
+## TD-164: Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *is shift-drag necessary for copy/paste in the tmux terminals or should we change it to auto-copy selected text? Ideally it would work smoothly like in vscode terminals where a selection can be made, then grown/shrunk with a shift-click*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-174
+
+**Status:** Designed 2026-09-25 (the designer): design §4.6 *Scrollback is tmux's* (**The mouse is the browser's**) and *A read-only attach* (the carve-out goes), §4.5a *Focus: Copy / Paste* and the **copy on select** toggle row, §5 `person.terminal.copy_on_select`, §4.5 screen 8 **You**; mockup `Focus.dc.html` (the toggle). Settled: (a) no `mouse on` on the attach, no tracking, a plain drag selects; the wheel is a scroll message with a line count the bridge turns into `copy-mode -e; send-keys -X -N n scroll-up`; (b) Shift+drag still selects and Shift+click grows — xterm.js's own selection service (`shiftKey → _handleIncrementalClick`), checked in the vendored source rather than a live pane; (c) copy on select is the one toggle, **on by default**, Ctrl+C-with-selection and Copy unchanged; (d) a person's setting, `person.terminal.copy_on_select` through `set_settings` — yours everywhere, as the terminal's face, not per browser; (e) a program asking for the mouse itself gets none, and there is no per-session escape; (f) the rows, the paragraphs, the texts named for the build. The design is PR #574, stacked on #572; the default-on choice is on the board for Paul (the designer's line of 2026-09-25, extended here — the person inbox is full), and #574 merges after 2026-09-26 08:45 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-174; this entry archives with it. **What was:** nothing designed. Today the Focus terminal is a terminal emulator's: the attach sets `mouse on` on the tmux session so the wheel reaches tmux's own history (§4.6 *Scrollback is tmux's*, TD-022), and because tmux then asks for mouse tracking, a plain drag goes to tmux — a copy-mode selection into tmux's buffer, not the clipboard — and only Shift+drag selects in the browser, then **Copy**, Ctrl+C with a selection or Ctrl+Shift+C (§4.5a *Focus: Copy / Paste*; `focus.html`'s Copy tooltip and the `select text in the terminal first (Shift+drag: plain drag goes to tmux)` toast in `app.js` say so). The rule is what a tmux user expects of a real terminal, and it is the wrong rule for a browser pane that is mostly read.
+
+**Why:** the pane is where a person reads a session's output and lifts a line out of it — an error, a path, a PR number — and today the first drag they try does the wrong thing silently: tmux takes it, the clipboard stays as it was, and the toast is the only teacher. A browser can offer both gestures at once, so this need not be a setting over which drag selects; the one real choice is whether a selection copies itself.
+
+**What the design round has to settle:** (a) **plain drag selects in the browser** — xterm.js stops forwarding the mouse to tmux; the wheel, the one thing tracking bought, goes down the bridge path Shift+PageUp already uses (`copy-mode -e -u` / `page-down` against the session, §4.6) as a scroll message per tick, with the latency and the batching that implies, and tmux's own mouse copy mode goes; whether `mouse on` is still set at all, since nothing then reads it; (b) **Shift+drag keeps working** — with tracking off, Shift is nothing to xterm.js, so the habit costs nothing and needs no setting; Shift+click to grow or shrink a selection is native to xterm.js's selection service and may already work while Shift is held — the round checks in a live pane before it designs around it; (c) **copy on select** — VS Code's `terminal.integrated.copyOnSelection`, off there by default, since a selection made to read clobbers the clipboard; on a pane that is mostly read the round decides the default and makes it the one toggle, with Ctrl+C-with-a-selection and **Copy** unchanged either way; it needs the secure context Copy needs; (d) **where the toggle lives** — a person's browser preference like the team fold (*remembered per team in the browser*, §4.5a *team groups*), not the org's, and the settings audit (ADR 2026-09-25) is where that is argued; (e) **what is lost** — a full-screen program that asks for mouse tracking itself (htop, a mouse-enabled `less`) no longer gets the mouse; Claude Code does not ask for it; the round says whether a per-session escape exists or it is simply so; (f) the §4.5a row, the §4.6 paragraph, the tooltip and toast texts, the read-only Focus (TD-096: Copy works, Paste is inert — unchanged).
+
+**Done when** Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
+
+**Resolved:** 2026-09-27 (PR #646, TD-174's build) — the design is design §4.6 *The mouse is the browser's* and §4.5a *Focus: copy on select*.
+
+**Related:** §4.5a *Focus: Copy / Paste*, §4.6 *Scrollback is tmux's* (TD-022), TD-096 (the read-only attach), TD-157 (an *i* mark for the control), ADR 2026-09-25 (where a person's preference lives).
+
+## TD-174: Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-164's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.6 *Scrollback is tmux's* (**The mouse is the browser's**), *A read-only attach*, §4.5a *Focus: Copy / Paste* and **copy on select**, §5 `person:`, §4.5 screen 8 **You**; mockup `Focus.dc.html`.
+
+**Location:** `src/sessionorc/tmux.py` (the attach argv ~line 46: the chained `set-option mouse on` goes), `src/agentorc/ui/pty_bridge.py` (the scroll argv ~line 77: takes `lines`, emits `copy-mode -e -t target ; send-keys -X -N n scroll-up|scroll-down`; `WHEEL_ONLY` and its `read_only` carve-out removed), `src/agentorc/ui/static/app.js` (a `wheel` listener on `#term` batching notches per animation frame into `{scroll, lines}`; the toggle's `change` → `set_settings`; `term.onSelectionChange` copying when on and the selection has ended; the toast *select text in the terminal first (Shift+drag: plain drag goes to tmux)* reworded), `src/agentorc/ui/templates/focus.html` (the toggle beside `#tcopy`, its `title`; `#tcopy`'s tooltip reworded), `src/agentorc/ui/app.py` and `src/sessionorc/agent.py` (`settings` / `set_settings`: the `person.terminal.copy_on_select` key, default true, replicated as `person.terminal` is), the Settings page's **You** section (TD-148 builds the page; this adds the row).
+
+**Why:** TD-164's *Why*: the first drag a person tries does the wrong thing silently.
+
+**Resolved:** 2026-09-27 (PR #646) — design §4.6 *The mouse is the browser's* and *A read-only attach*, and §4.5a *Focus: copy on select*, now read as built. The attach argv is in `src/sessionorc/tmux.py`, `scroll_argv` and the pump in `src/agentorc/ui/pty_bridge.py`, the wheel, `AO.wheelStep` and copy on select in `app.js`, and `POST /api/settings/person` in `app.py`. The tests are in `tests/test_ui.py` (`test_bridge_argv_shapes`, `test_terminal_scrollback_reaches_tmux`, `test_focus_watches_an_unattended_session`, `test_copy_on_select_is_the_persons_and_on_by_default`). Three things only a live pane can show, a plain drag selecting, Shift+click growing the selection and htop getting no mouse, are on `docs/user_attention.md`. The Settings page's You row is TD-148's.
+
+**Done when** TD-164's *Done when*: Paul drags in a Focus pane without Shift and the selection is the browser's, Shift+click grows it, the wheel still scrolls tmux's history, and the copy-on-select choice is on the page and survives a reload.
+
+**Related:** TD-164 (the design), TD-022 (scrollback is tmux's), TD-096 (the read-only attach), TD-146–148 (the settings file and page), TD-157 / TD-167 (the toggle's `title` as its mark), goal 12 (a pane you type into).
+
+## TD-182: A card's report line keeps a merged PR as `TD-066 → #158` with no mark
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the dc-grind wind-down: Paul read the grinder's card as *they have a PR outstanding*; #158 had merged at 17:00 UTC)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-193
+**Status:** Designed 2026-09-26 (the designer): design §4.5a *card: report line* (**the PR's mark**), *card: compact* (an ended member keeps its last reference after the ending), §4.5 screen 1, §4.7 (`ao status -v`); mockup `OrgTeamFirst.dc.html` (a compact line with the mark). Settled: the word after the number, *merged* or *closed*, from the repo readings; unmarked when the readings do not hold the PR; `ao status -v` shows it too, by one `repos` read per call; the record and `--json` are unchanged; the Focus Reports panel marks its PR links the same way. The build is TD-193; this entry archives with it.
+**Location:** `src/sessionorc/models.py` (`report_line`), the card's report line in `src/agentorc/ui/templates/card.html`; the PR states are in the repo facts (`repos.json`, TD-176 slice 1)
+
+**Why:** §4.5a's **card: report line** row draws `TD-027 → PR #59 · 1/2 done` from the record alone. TDs in motion marks a PR *merged* / *closed* once it is no longer open (§4.5a, TD-176). The member card doesn't, so an exited grinder's last report reads as work in flight. The same line is in `ao status -v` and the Members list.
+
+**Resolved:** 2026-09-27 (PR #648, TD-193's build). The design is design §4.5a card **report line** (**the PR's mark**) and §4.5 screen 1 *A PR that is no longer open says so*.
+
+**Related:** TD-181 (the summary would have shown it), TD-176, TD-095 (the card's anatomy), design §4.5a **card: report line**, **TDs in motion**.
+
+## TD-193: Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel
+
+**Priority:** Low
+**Added:** 2026-09-26 (the designer, from TD-182's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5a *card: report line* (**the PR's mark**), *card: compact*, §4.7 (`ao status -v`). Touches `src/sessionorc/**`, so the techlead reads its PR (§4.9b).
+**Location:** `src/sessionorc/models.py` (`report_line`: a second argument, the readings' PRs by number, default none), `src/agentorc/ui/app.py` (`_pr_states` is the lookup TDs in motion already uses; the card's `report`, `compact_line`, the Members rows), `src/agentorc/cli.py` (`ao status -v`: one `repos` read per call, its failure swallowed), `src/agentorc/ui/static/app.js` (`renderReports`: the word after the PR link, from a structured field the page passes, never from text)
+
+**Why:** TD-182's *Why*: an exited grinder's last report reads as work in flight.
+
+**Resolved:** 2026-09-27 (PR #648). Design §4.5a card **report line** (**the PR's mark**), *card: compact* and §4.7 `ao status -v` now read as built. `report_ref`, `report_line(session, prs)` and `pr_marks` are in `src/sessionorc/models.py`. `view(…, repos=)`, `pr_marks` on the view and `compact_line` are in `src/agentorc/ui/app.py`, `renderReports` is in `app.js`, and the `repos` read is in `cmd_status`. The tests are `tests/test_models.py`, `tests/test_ui_team_summary.py` and `tests/test_cli.py` (`test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses`).
+
+**Done when** TD-182's *Done when*: the dc-grind grinder's card would read `TD-066 → #158 merged`, and the tests above pass.
+
+**Related:** TD-182 (the design), TD-192, TD-176 (the readings), TD-095 (the card's anatomy).

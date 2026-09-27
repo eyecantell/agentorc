@@ -183,7 +183,7 @@ async def node(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(home))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", FAST_TICK)
+    monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", FAST_TICK)
     sock_name = private_socket_name()
     monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)
     tmux = Tmux(socket_name=sock_name)

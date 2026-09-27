@@ -40,7 +40,17 @@ from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
-from sessionorc.models import GRANTS, STATE_RANK, has_control, normalize_ref, report_head, report_line, stop_note
+from sessionorc.models import (
+    GRANTS,
+    STATE_RANK,
+    has_control,
+    normalize_ref,
+    pr_marks,
+    report_head,
+    report_line,
+    report_ref,
+    stop_note,
+)
 
 from . import help as helpmod
 from . import render as rendermod
@@ -740,6 +750,7 @@ def view(
     fleet_known: bool = True,
     icons: dict[tuple[str, str], tuple[str, str, str]] | None = None,
     seats: Mapping[str, str] | None = None,
+    repos: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
@@ -870,7 +881,12 @@ def view(
     # scraped state is; the `~` in the text says *which* entry, the dash says "not from the session".
     findings = s.get("findings") or []
     head = report_head(s)
-    d["report"] = report_line(s)
+    # **the PR's mark** (§4.5a card **report line**, TD-193): from the readings of the record's own
+    # repo, `repos` — none passed, none marked; `pr_marks` rides for the Reports panel's links
+    marks = pr_marks(s, repos)
+    d["pr_marks"] = {str(n): w for n, w in marks.items()}
+    d["report"] = report_line(s, marks)
+    d["report_ref"] = report_ref(s, marks)
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
     d["findings_line"] = f"{len(findings)} filed" if findings else ""
     # design §4.5a card / Focus header **out of work** chip (§4.9a, TD-053 step 6). Not a state —
@@ -990,7 +1006,7 @@ def view(
             "name": o.get("name") or o["id"],
             "state": o.get("state"),
             "lane": ", ".join(o.get("lane") or []),
-            "report": report_line(o),
+            "report": report_line(o, pr_marks(o, repos)),
         }
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
@@ -1490,8 +1506,10 @@ def team_summary(
     waiting: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """A live team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and
-    Answer needed / Doing — the facet opening on *answer* while any member waits on one."""
+    """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
+    needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
+    live has one too (TD-192): its claims as the members' last records hold them, and Doing, since
+    nobody can be waiting."""
     now = now or datetime.now(UTC)
     r = team_repo(members, repos or {})
     motion = motion_rows(members, r)
@@ -1529,8 +1547,9 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
     Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
     holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
     counted once), and Needs you's *answer needed*. None when no team is live: the page then has no
-    rollup, as it has no summaries. The Inbox's count is the top bar's, filled in by the client."""
-    live = [g for g in groups or [] if g.get("team") and g.get("summary")]
+    rollup — a wound-down team's summary (TD-192) is not summed. The Inbox's count is the top bar's,
+    filled in by the client."""
+    live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
     if not live:
         return None
     members = [m for g in live for m in g["members"]]
@@ -1591,13 +1610,16 @@ def compact_line(v: dict[str, Any]) -> str:
     if v.get("seat"):
         what = slot.get("caption") or slot.get("text") or "on call"
     elif v.get("state") in DEAD or v.get("out_of_work") or v.get("restart_wanted"):
-        what = str(slot.get("text") or v.get("state") or "")
+        # an ending, and the last reference after it with its PR's mark (TD-193): *Grinder · exited ·
+        # TD-066 → #158 merged*, so a wound-down team's cards say what each member left
+        what = " · ".join(x for x in (str(slot.get("text") or v.get("state") or ""), v.get("report_ref") or "") if x)
     else:
         claims = [p for p in v.get("progress") or [] if isinstance(p, dict) and p.get("status") == "claimed"]
         doing = (v.get("doing") or {}).get("text") if isinstance(v.get("doing"), dict) else ""
         if claims:
             pr = claims[0].get("pr") or claims[0].get("review_pr")
-            what = f"{claims[0]['ref']} → #{pr}" if pr else str(claims[0]["ref"])
+            mark = (v.get("pr_marks") or {}).get(str(pr), "") if pr else ""
+            what = f"{claims[0]['ref']} → #{pr}{' ' + mark if mark else ''}" if pr else str(claims[0]["ref"])
         elif doing:
             what = str(doing)
         else:
@@ -1682,16 +1704,11 @@ def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def team_live(team: str, fleet: Collection[dict[str, Any]]) -> bool:
-    """Whether any session of `team` in `fleet` is neither exited nor closed."""
-    return bool(team) and any(f.get("team") == team and f.get("state") not in DEAD for f in fleet)
-
-
 def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str, Any]:
-    """Mark `v` compact when it is a member of a live team (§4.5a *card: compact*): a `team` badge,
-    and some session of that team in `fleet` not exited or closed. The full card stays on *No team*
-    and on a team with nothing live."""
-    if team_live(str(v.get("team") or ""), fleet):
+    """Mark `v` compact when it is a member of a team (§4.5a *card: compact*): a `team` badge, live
+    or not — a team with nothing live draws its summary and compact cards too, once unfolded
+    (TD-192). The full card stays on *No team*. `fleet` is kept for the callers' shape."""
+    if v.get("team"):
         v["compact"], v["compact_line"] = True, compact_line(v)
     return v
 
@@ -1751,9 +1768,10 @@ def team_groups(
     only inside the group (review of PR #117). Its card stays where its own badge puts it; the
     header names it and says so, because moving the card would contradict the badge.
 
-    A team with something live carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*)
-    from `repos` (the home's repo facts) and `doing` (its doing log), and its members are marked
-    compact; its header then drops the state counts, which the member cards say."""
+    A team carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*) from `repos` (the
+    home's repo facts) and `doing` (its doing log), live or not — a team with nothing live shows what
+    it left once unfolded (TD-192) — and its members are marked compact; its header then drops the
+    state counts, which the member cards say, but for the fold."""
     defs = {str(r["name"]): r for r in rows}
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
@@ -1789,7 +1807,7 @@ def team_groups(
         dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
-        summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM and live else None
+        summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM else None
         if summary:
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m)
@@ -1827,8 +1845,8 @@ def team_groups(
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
                 # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
-                # stopped team — folded, sorted with them, Start alone — since a wind-down would
-                # only wake the manager to find nothing to wind down
+                # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
+                # since a wind-down would only wake the manager to find nothing to wind down
                 "concluded": concluded,
                 "concluded_age": row.get("concluded_age") if concluded else "",
                 "stopped": not live or concluded is not None,
@@ -2853,7 +2871,9 @@ def create_app() -> FastAPI:
         rollup's markup (§4.5a *Org: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
         fleet = list(known.values())
         seats = await seats_of(fleet)
-        groups = team_groups([view(s, fleet, seats=seats) for s in fleet], await team_rows(fleet), repos, doing)
+        groups = team_groups(
+            [view(s, fleet, seats=seats, repos=repos) for s in fleet], await team_rows(fleet), repos, doing
+        )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
 
@@ -2866,7 +2886,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "manager": (g["manager"] or {}).get("id", ""),
-                "live": g["live"],  # what the fold keys on: only a team with nothing live folds (TD-156)
+                "live": g["live"],  # what the fold's default keys on: nothing live opens folded (TD-194)
                 "ids": g["ids"],
                 "html": head.render(g=g),
                 # the summary's facets (TD-176 slice 3), swapped by the client as the header is
@@ -3008,6 +3028,7 @@ def create_app() -> FastAPI:
         person_inbox=person_inbox,
         board_items=board_items,
         inbox_html=inbox_html,
+        settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
     )
     for register in (
         _pages_routes,
@@ -3059,8 +3080,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             sessions, agent_down = [], True
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
-        vs = sorted((view(s, sessions, icons=icons, seats=seats) for s in sessions), key=card_order)
         repos, doing = ({}, {}) if agent_down else await repo_facts()
+        vs = sorted((view(s, sessions, icons=icons, seats=seats, repos=repos) for s in sessions), key=card_order)
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
@@ -3196,7 +3217,14 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             request,
             "focus.html",
             {
-                "s": view(s, fleet, fleet_known=known, icons=await role_icons([s]), seats=await seats_of([s])),
+                "s": view(
+                    s,
+                    fleet,
+                    fleet_known=known,
+                    icons=await role_icons([s]),
+                    seats=await seats_of([s]),
+                    repos=(await repo_facts())[0],  # the PR's mark on the report line (TD-193)
+                ),
                 "host": host_name(),
                 "active": "Org",
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
@@ -3206,6 +3234,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # §4.5a *Focus composer* **prompt chips** (TD-170): the role's saved prompts, for a
                 # session whose composer is open — an interactive one — and none otherwise
                 "prompts": [] if s.get("unattended") else await asyncio.to_thread(role_prompts, s),
+                # §4.5a *Focus: copy on select* (TD-174): the person's, from `settings.yml`
+                "copy_on_select": uiconf.copy_on_select(),
             },
         )
 
@@ -3596,7 +3626,9 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         sessions = await call("list")
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
-        return [view(s, sessions, icons=icons, seats=seats) for s in sessions]
+        # the readings too, so the PR's mark on a report survives Focus's Members refresh (TD-193)
+        repos = (await h.repo_facts())[0]
+        return [view(s, sessions, icons=icons, seats=seats, repos=repos) for s in sessions]
 
 
 def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
@@ -3977,6 +4009,24 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     # as the toast every other RPC error on the page does.
     PERSON_ACTS = {"pause": "inbox_pause", "resume": "inbox_resume", "gowithit": "inbox_go_with_it"}
 
+    @app.post("/api/settings/person")
+    async def api_settings_person(request: Request):
+        """A person's own settings from a page (design §5 `person:`, §4.4a *Settings, replicated*):
+        today the Focus pane's **copy on select** toggle (§4.5a, TD-174), `{terminal: {copy_on_select}}`
+        through `set_settings`, which validates it and refuses a session. The page's next settings
+        read takes it up, so the choice survives a reload."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        term = body.get("terminal") if isinstance(body, dict) else None
+        if (
+            not isinstance(term, dict)
+            or set(term) != {"copy_on_select"}
+            or not isinstance(term["copy_on_select"], bool)
+        ):
+            raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
+        got = await call("set_settings", person={"terminal": term})
+        h.settings_at["at"] = 0.0  # read it again before the next page is drawn
+        return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+
     @app.post("/api/person/{action}")
     async def api_person_action(action: str, request: Request):
         """design §4.5a Org top bar **person inbox** → Reply and delete (§4.10): a person's reply
@@ -4163,12 +4213,14 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
-                    # the record's team now and before this delta: a re-badge moves a card between
-                    # two teams, and either may come alive or wind down by it (review of TD-176 slice 3)
-                    teams = {str(s.get("team") or ""), str((known.get(s["id"]) or {}).get("team") or "")} - {""}
-                    was_live = {t: team_live(t, known.values()) for t in teams}
                     known[s["id"]] = s
-                    v = view(s, list(known.values()), icons=await role_icons([s]), seats=await seats_of([s]))
+                    v = view(
+                        s,
+                        list(known.values()),
+                        icons=await role_icons([s]),
+                        seats=await seats_of([s]),
+                        repos=repos,
+                    )
                     compact_in(v, known.values())
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
                     # `controllers` change on one record can move a card, change a lead, or turn
@@ -4186,30 +4238,6 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                             }
                         )
                     )
-                    flipped = {t for t in teams if was_live[t] != team_live(t, known.values())}
-                    if flipped:
-                        # a team came alive or wound down: its other members' cards change shape,
-                        # compact ↔ full (§4.5a *card: compact*, TD-176), so each is redrawn
-                        for other in [o for o in known.values() if o.get("team") in flipped and o["id"] != s["id"]]:
-                            ov = view(
-                                other,
-                                list(known.values()),
-                                icons=await role_icons([other]),
-                                seats=await seats_of([other]),
-                            )
-                            compact_in(ov, known.values())
-                            await ws.send_text(
-                                json.dumps(
-                                    {
-                                        "event": "session",
-                                        "id": other["id"],
-                                        "state": other["state"],
-                                        "rank": ov["rank"],
-                                        "html": render_card(ov),
-                                        "session": ov,
-                                    }
-                                )
-                            )
                 elif ev.get("event") in ("repos", "doing"):
                     # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
                     # member said what it is doing (§4.8 *the doing log*): kept here, passed through
@@ -4244,6 +4272,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     list(known.values()),
                                     icons=await role_icons([other]),
                                     seats=await seats_of([other]),
+                                    repos=repos,
                                 )
                                 compact_in(ov, known.values())
                                 await ws.send_text(
@@ -4374,11 +4403,12 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
         reapers: set[asyncio.Future[int]] = set()
 
-        async def scroll(direction: str) -> None:
+        async def scroll(direction: str, lines: int | None = None) -> None:
             # A tmux command against the session, not keys into the pane: there is no escape
-            # sequence that enters copy mode (TD-022). Bad directions are the client's bug; ignore.
+            # sequence that enters copy mode (TD-022). The wheel's `lines` scroll lines, their absence
+            # a page (TD-174). A bad direction or count is the client's bug; ignore.
             try:
-                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, socket_name=sock)]
+                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, lines, socket_name=sock)]
             except ValueError:
                 return
             devnull = asyncio.subprocess.DEVNULL

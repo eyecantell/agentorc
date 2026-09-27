@@ -187,8 +187,6 @@ async def test_a_state_rows_snooze_lives_in_the_homes_own_store(agent, tmp_path)
 async def test_the_trail_is_kept_for_the_retention_window_and_bounded(agent, tmp_path, monkeypatch):
     """Design §4.10 rule 2: the newest `TRAIL_KEEP`, each kept for `MAIL_RETENTION`. What retention
     prunes is a *trail*, never an item a person has not answered."""
-    import sessionorc.agent as agent_mod
-
     old = datetime.now(UTC) - timedelta(days=1)
     stamp = old.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     agent.trail = [
@@ -197,7 +195,7 @@ async def test_the_trail_is_kept_for_the_retention_window_and_bounded(agent, tmp
     ]
     await agent._sweep_mail(datetime.now(UTC))
     assert [e["id"] for e in agent.trail] == ["t-new"]  # a stamp that cannot be read is kept, not lost
-    monkeypatch.setattr(agent_mod, "TRAIL_KEEP", 3)
+    monkeypatch.setattr("sessionorc.agent_common.TRAIL_KEEP", 3)
     s = _rec()
     for i in range(5):
         agent._trail_append(s, "stalled", "", datetime.now(UTC), how=f"resolved {i}")

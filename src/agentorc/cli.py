@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import math
 import os
@@ -24,7 +25,7 @@ from sessionorc import mail as mailmod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, pr_marks, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -226,6 +227,13 @@ def cmd_status(args: argparse.Namespace) -> int:
     if not sessions:
         print("no sessions")
         return 0
+    # **the PR's mark** on the report line (design §4.7, §4.5a card **report line**, TD-193): the home's
+    # repo readings, read once per call; refused (a node offline) or failed, the lines are unmarked
+    readings: dict[str, Any] = {}
+    if args.verbose:
+        with contextlib.suppress(Exception):
+            got = call_sync("repos")
+            readings = got if isinstance(got, dict) else {}
     sessions.sort(key=lambda s: (STATE_RANK.get(s["state"], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
     for s in sessions:
@@ -255,7 +263,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      title:  {title}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
-            if line := report_line(s):
+            if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
@@ -1106,6 +1114,117 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return emit(args, got, said)
 
 
+def _defined_team(args: argparse.Namespace) -> str:
+    """The team `args.name` names, checked against the org's definitions here — the agent takes the
+    key as given (design §4.7): a team the org does not define is refused, naming the defined ones."""
+    org = _org_here(pathlib.Path(args.dir or os.getcwd()))
+    if args.name not in org.teams:
+        raise AgentError(
+            f"no team {args.name!r}: the org defines {', '.join(sorted(org.teams)) or 'none'} (design §4.9)"
+        )
+    return args.name
+
+
+def _team_setting_line(name: str, t: dict[str, Any]) -> str:
+    until = stop_note({"run_until": t.get("until")}).replace("stops", "members stop") if t.get("until") else ""
+    if t.get("passed"):
+        until += " (passed)"
+    parts = [
+        until or "no stop time",
+        f"reserve priority +{t['reserve']}" if t.get("reserve") else "no reserve priority",
+    ]
+    if t.get("schedule"):
+        parts.append(f"schedule {t['schedule']}")
+    return f"{name}: " + " · ".join(parts)
+
+
+def cmd_team_until(args: argparse.Namespace) -> int:
+    """`ao team until <team> <06:00|+8h|ISO> | --clear` (design §4.7, §6 *Team stop time*, TD-146):
+    the team's stop time, parsed in the caller's clock as `ao until` parses one, written to
+    `teams.<team>.until` through `set_settings` — a person's own. The tick gives it to every live
+    member and seat; `--clear` takes it back from the members that carry it."""
+    try:
+        name = _defined_team(args)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    if not args.clear and not args.when:
+        raise AgentError("ao team until <team> <06:00|+8h|ISO>, or --clear")
+    when = None if args.clear else stop_time(args.when)
+    got = call_sync("set_settings", teams={name: {"until": when}})
+    t = (got.get("teams") or {}).get(name) or {}
+    return emit(args, got, lambda: print(_team_setting_line(name, t)))
+
+
+def cmd_team_reserve(args: argparse.Namespace) -> int:
+    """`ao team reserve <team> <n>` (design §4.7, §6 *Usage gate*, TD-146): the team's reserve
+    priority, a flat percent added to its profile's reserve for the team's sessions; `0` clears it."""
+    try:
+        name = _defined_team(args)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    got = call_sync("set_settings", teams={name: {"reserve": args.n or None}})
+    t = (got.get("teams") or {}).get(name) or {}
+    return emit(args, got, lambda: print(_team_setting_line(name, t)))
+
+
+# Where every other configured value lives and when it is re-read (design §4.7 `ao settings --where`,
+# §5): the Settings page's *i* marks, in text. Paths under the agentorc home are the home's.
+WHERE = (
+    ("settings.yml", "the settings a person moves: reserves, teams, repos, person",
+     "every tick; written only by set_settings"),
+    ("hosts.yml", "this host: name, home, identity, nodes, link, VS Code alias, retention",
+     "local.name, home: and local.identity at the host agent's start; the rest on use"),
+    ("profiles.yml", "profiles: tool, account, model, config directory, billing", "on every use"),
+    ("org.yml", "projects, teams, the org-wide roles overlay", "by the clients on every use; never the host agent"),
+    ("<repo>/.agentorc.yml", "a repo's roles, controllers, ledger, teams, promote",
+     "by the clients on every use; promote: is checked there and read by nothing else yet (TD-132 builds its reader)"),
+    ("systemd units", "the UI's bind and port, PATH, the home", "at `ao service install`"),
+)  # fmt: skip
+
+
+def cmd_settings(args: argparse.Namespace) -> int:
+    """`ao settings [--where]` (design §4.7, §5, TD-146): the home's `settings.yml` as the Settings
+    page draws it — each key with the line or instant it makes today — through the `settings` read, a
+    person's own; `--where` names every other file a value lives in and when it is re-read."""
+    if args.where:
+        rows = [{"file": f, "holds": h, "read": r} for f, h, r in WHERE]
+
+        def where() -> None:
+            for f, h, r in WHERE:
+                print(f"{f}\n  {h}\n  read: {r}")
+
+        return emit(args, rows, where)
+    got = call_sync("settings")
+
+    def prose() -> None:
+        print(got["file"])
+        print("usage_gate:")
+        for prof, v in (got.get("usage_gate") or {}).items():
+            rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
+            print("  " + _gate_line(prof, rows))
+        if not got.get("usage_gate"):
+            print("  none — the gate pauses nothing")
+        print("teams:")
+        for name, t in (got.get("teams") or {}).items():
+            print("  " + _team_setting_line(name, t))
+        if not got.get("teams"):
+            print("  none")
+        print("repos:")
+        for repo, r in (got.get("repos") or {}).items():
+            print(f"  {repo}: promote {'auto' if (r.get('promote') or {}).get('auto') else 'by hand'}")
+        if not got.get("repos"):
+            print("  none — every repo promotes by hand")
+        person = got.get("person") or {}
+        print("person:")
+        print(f"  open_in: {person.get('open_in', 'vscode (default)')}")
+        term = person.get("terminal") or {}
+        print(f"  terminal: {', '.join(f'{k} {v}' for k, v in term.items()) or 'defaults'}")
+        for line in got.get("migrate") or []:
+            print(f"migrate: {line}")
+
+    return emit(args, got, prose)
+
+
 def cmd_control(args: argparse.Namespace) -> int:
     """`ao control <controller> add|remove <session>…` (design §4.8, TD-036): edit membership from
     the controller's side, which is how a person thinks about it — *this lead controls these
@@ -1897,6 +2016,17 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("-p", "--profile", help="a profile for every session in it, over the role's and the member's")
     q.set_defaults(fn=cmd_team_start)
 
+    q = add_team("until", help="set or clear the team's stop time: every live member and seat stops then (§6)")
+    q.add_argument("name")
+    q.add_argument("when", nargs="?", help="06:00 (the next one, local), +8h, or an ISO time")
+    q.add_argument("--clear", action="store_true", help="remove it, and take it back from the members that carry it")
+    q.set_defaults(fn=cmd_team_until)
+
+    q = add_team("reserve", help="set the team's reserve priority: added to its profile's reserve (§6 Usage gate)")
+    q.add_argument("name")
+    q.add_argument("n", type=int, help="a whole percent, 0–100; 0 clears it")
+    q.set_defaults(fn=cmd_team_reserve)
+
     q = add_team("stop", help="wrap the members up, then the lead (--now kills instead of asking)")
     q.add_argument("name")
     q.add_argument("--now", action="store_true", help="kill each session instead of sending the wrap-up prompt")
@@ -1991,6 +2121,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("name", nargs="?", help="the repo's name or its checkout's path. None: the repo of this directory")
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
     p.set_defaults(fn=cmd_repo)
+
+    p = add("settings", help="the home's settings.yml, each key with what it makes today (design §5)")
+    p.add_argument("--where", action="store_true", help="where every other configured value lives, and when it is read")
+    p.set_defaults(fn=cmd_settings)
 
     p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
     p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")

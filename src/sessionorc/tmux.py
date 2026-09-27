@@ -30,20 +30,14 @@ _PASTE_SEQ = itertools.count()  # with the pid, makes each paste buffer name uni
 
 def attach_argv(session: str, *, socket_name: str | None = None, binary: str = "tmux") -> list[str]:
     """The client command that attaches a terminal to a session: what the UI's pty bridge runs and
-    what `ao focus` execs. Attaching writes nothing to the session's pane (design §9 invariant 1);
-    it does chain `mouse on` onto the session (TD-022): tmux owns the history and only ever paints
-    the live screen, so the wheel has to reach tmux, which then scrolls its history in copy mode.
-    A session option, never `-g`: the person's server and their other sessions keep their own
-    setting. Set here rather than at creation so adopted and pre-existing sessions get it too.
-    The attach comes first because tmux stops a `;` chain at the first failure: a missing session
-    fails exactly as a bare attach did, and a set-option that fails (an old tmux) can never cost
-    the terminal. The chained command runs as soon as the client is attached, not on detach
-    (verified 2026-09-09, tmux 3.5a)."""
+    what `ao focus` execs. Attaching writes nothing to the session's pane (design §9 invariant 1),
+    and sets no option on the session: **the mouse is the browser's** (design §4.6, TD-164, built by
+    TD-174), so tmux asks for no mouse tracking and a plain drag selects in xterm.js. The wheel
+    reaches tmux's history as a scroll message instead (`scroll_argv` in the UI's pty bridge)."""
     argv = [binary]
     if socket_name:
         argv += ["-L", socket_name]
-    target = f"={session}:"
-    return argv + ["attach", "-t", target, ";", "set-option", "-t", target, "mouse", "on"]
+    return argv + ["attach", "-t", f"={session}:"]
 
 
 class TmuxError(RuntimeError):

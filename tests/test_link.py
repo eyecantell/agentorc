@@ -186,7 +186,7 @@ async def node_agent(tmp_path, monkeypatch, command=None, name="laptop", socket=
     monkeypatch.setenv("AGENTORC_HOME", str(d))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(d / "claude"))
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", FAST_TICK)
+    monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", FAST_TICK)
     monkeypatch.setattr(link, "BACKOFF_FIRST", 0.05)
     monkeypatch.setattr(link, "BACKOFF_MAX", 0.2)
     sock_name = private_socket_name()
@@ -481,7 +481,7 @@ async def test_a_record_created_while_the_snapshot_is_out_goes_in_the_first_repo
 async def test_a_report_that_cannot_be_written_gives_the_link_up_instead_of_stalling_the_node(agent, monkeypatch):
     from sessionorc.models import Session
 
-    monkeypatch.setattr("sessionorc.agent.REPORT_WRITE", 0.2)
+    monkeypatch.setattr("sessionorc.agent_common.REPORT_WRITE", 0.2)
     agent.mode, agent.home = "node", "kmaster"
     agent._home_mux, agent._snapshot_sent = FakeMux(stall=True), True
     agent.sessions["ao-x-a"] = Session(
@@ -1410,7 +1410,7 @@ async def test_stopping_policies_run_on_the_node_with_the_link_down_and_both_own
     beside the home's `run_until`."""
     from datetime import UTC, datetime, timedelta
 
-    monkeypatch.setattr("sessionorc.agent.WRAPUP_GRACE", timedelta(seconds=1))
+    monkeypatch.setattr("sessionorc.agent_common.WRAPUP_GRACE", timedelta(seconds=1))
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         at = (datetime.now(UTC) + timedelta(seconds=3)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         async with LocalClient() as c:

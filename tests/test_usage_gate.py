@@ -361,3 +361,58 @@ async def test_a_session_made_unattended_later_can_carry_the_two_texts(agent, tm
         assert got["pause_prompt"] == "p", "left alone when not given"
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_teams_stop_time_reaches_its_live_members_and_clear_takes_it_back(agent, tmp_path):
+    """§6 *Team stop time* (TD-146 slice 2): every live unattended session with the team's badge
+    whose stop time is unset or later takes the team's instant on the tick, as `set_stop` gives
+    one; a member's own earlier one is kept; a member started after it is stamped at create;
+    **Clear** takes the team's instant back from the members that carry it, and only from those."""
+    await park_ticks(agent)
+    now = datetime.now(UTC).replace(microsecond=0)
+    team_at, own_at = _iso(now + timedelta(hours=2)), _iso(now + timedelta(hours=1))
+    async with LocalClient() as person:
+        plain = await _worker(person, tmp_path, name="p")
+        member = await _worker(person, tmp_path, name="m", team="ao-grind", run_until=_iso(now + timedelta(hours=5)))
+        early = await _worker(person, tmp_path, name="e", team="ao-grind", run_until=own_at)
+        agent.sessions[member].wrapup_sent_at = _iso(now)  # a wrap-up asked under the old time is spent
+        await person.call("set_settings", teams={"ao-grind": {"until": team_at}})
+        await agent._team_stop_times(now)
+        assert agent.sessions[member].run_until == team_at and agent.sessions[member].wrapup_sent_at is None
+        assert agent.sessions[early].run_until == own_at, "its own earlier stop time is kept"
+        assert agent.sessions[plain].run_until is None
+        later = await _worker(person, tmp_path, name="l", team="ao-grind")
+        assert agent.sessions[later].run_until == team_at, "a start after the instant is set is stamped"
+        await person.call("set_settings", teams={"ao-grind": {"until": None}})
+        assert agent.sessions[member].run_until is None and agent.sessions[later].run_until is None
+        assert agent.sessions[early].run_until == own_at, "Clear leaves a member's own earlier time"
+        # a team started again after its stop time has passed is not stopped by it
+        settings.save({"teams": {"ao-grind": {"until": _iso(now - timedelta(minutes=5))}}})
+        again = await _worker(person, tmp_path, name="a", team="ao-grind")
+        await agent._team_stop_times(now)
+        assert agent.sessions[again].run_until is None
+        for s in (plain, member, early, later, again):
+            await person.call("kill", id=s)
+            await person.call("remove", id=s)
+
+
+@pytest.mark.integration
+async def test_a_moved_team_stop_time_leaves_a_member_a_person_took_over(agent, tmp_path):
+    """The techlead's read of #630: a member taken over with `ao mode` still carries the old
+    instant, but a move is a policy's and skips it (§4.2); a Clear still takes the instant back."""
+    await park_ticks(agent)
+    now = datetime.now(UTC).replace(microsecond=0)
+    first, moved = _iso(now + timedelta(hours=2)), _iso(now + timedelta(hours=3))
+    async with LocalClient() as person:
+        await person.call("set_settings", teams={"ao-grind": {"until": first}})
+        sid = await _worker(person, tmp_path, name="m", team="ao-grind")
+        assert agent.sessions[sid].run_until == first
+        await person.call("set_mode", id=sid, unattended=False)
+        await person.call("set_settings", teams={"ao-grind": {"until": moved}})
+        assert agent.sessions[sid].run_until == first, "a move leaves a person's session alone"
+        await person.call("set_settings", teams={"ao-grind": {"until": first}})  # back to what it carries
+        await person.call("set_settings", teams={"ao-grind": {"until": None}})
+        assert agent.sessions[sid].run_until is None, "a Clear takes the team's instant back all the same"
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)

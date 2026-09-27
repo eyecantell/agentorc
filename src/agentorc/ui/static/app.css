@@ -310,9 +310,17 @@ details.fold[open] > summary { margin-bottom: 3px; }
    team* and the flat grid (`data-team=""`) stay plain sections. */
 .tgroup:not([data-team=""]) { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 14px; background: var(--line2); }
 .ghead .btn[hidden] { display: none; }
-/* a team with nothing live: its cards folded behind the header's count, and the card itself quieter */
-.tgroup.folded:not(.filtering) .grid { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+/* a folded team (design §4.5a *team card: fold*, TD-194): the card is its header alone — the summary
+   and the cards hidden, nothing unloaded — and a team with nothing live is also quieter (below) */
+.tgroup.folded:not(.filtering) .grid, .tgroup.folded:not(.filtering) .tsum { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 .tgroup:not(.folded) .ghead .foldmail, .tgroup.filtering .ghead .foldmail { display: none; }  /* ✉ n: what the fold hides (TD-071) */
+/* a live team's header: the session count while its compact cards say the states, the counts by state while folded */
+.tgroup.folded:not(.filtering) .ghead .unfoldonly, .tgroup:not(.folded) .ghead .foldonly, .tgroup.filtering .ghead .foldonly { display: none; }
+/* the header is the fold's press, grown to the row: the pointer and a hover tint where it folds */
+.tgroup:has(> .ghead .fold) > .ghead { cursor: pointer; border-radius: 6px; } .tgroup:has(> .ghead .fold) > .ghead:hover { background: var(--hover); }
+.tgroup > .ghead:focus { outline: none; } .tgroup > .ghead:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }  /* the ring, as on a card */
+/* a member that needs the person rings the folded row amber, as it would its card; the row stays folded */
+.tgroup.folded:not(.filtering):has(> .ghead .pill.s-needs) > .ghead { box-shadow: 0 0 0 2px var(--needs); }
 .tgroup[data-live="0"]:not([data-team=""]) { background: transparent; border-style: dashed; }
 .tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
 /* one scale with the cards (TD-095 i): the header sits on the body's 13 px and its title is no
@@ -384,6 +392,7 @@ details.more { position: relative; } details.more summary { list-style: none; } 
    clipped by the card's `overflow: hidden`, which the card's one height needs */
 details.more .menu { position: fixed; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 4px; display: flex; flex-direction: column; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
 details.more .menu button { text-align: left; background: none; border: 0; padding: 6px 8px; color: var(--fg); font: inherit; cursor: pointer; border-radius: 3px; } details.more .menu button:hover { background: var(--hover); }
+details.more .menu .menutoggle { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: var(--fg); cursor: pointer; border-radius: 3px; } details.more .menu .menutoggle:hover { background: var(--hover); } details.more .menu .menutoggle.off { opacity: .45; cursor: default; }  /* copy on select (TD-174) */
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
 .toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: var(--t-small); max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); }
 /* Focus */

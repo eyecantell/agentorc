@@ -1976,10 +1976,9 @@ global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
 global.location = { pathname: "/focus/ao-x", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
-const gone = window.AO.paneIsGone, close = window.AO.termClose, wheel = window.AO.isWheel;
+const gone = window.AO.paneIsGone, close = window.AO.termClose, wheel = window.AO.wheelStep;
 console.log(JSON.stringify({
-  wheel: ["\x1b[<64;5;5M", "\x1b[<65;1;1M\x1b[<65;1;1M", "\x1b[<81;3;3M", "\x1b[<0;5;5M", "\x1b[<96;5;5M",
-          "a", "\x1b[<64;5;5Mx", ""].map(wheel),
+  wheel: [-3, 2.5, 0.4, -0.9, 0].map(wheel),
   gone_closed: gone({state: "closed", pane: true}),
   gone_pane_false: gone({state: "working", pane: false}),
   gone_working: gone({state: "working", pane: true}),
@@ -2062,9 +2061,15 @@ def test_the_terminals_two_client_rules_are_reachable_and_right():
     assert js.count("delay = 500; term.write(") == 1
     assert js.index('"read_only" in c') < js.index("delay = 500; term.write(")
 
-    # TD-096: the one frame a read-only attach passes is the wheel — buttons 64/65 with any modifier
-    # bits, as the server's `WHEEL_ONLY` has it; a click, wheel-with-motion, a key or a mix is not
-    assert got["wheel"] == [True, True, True, False, False, False, False, False]
+    # TD-174: the wheel is a scroll message with a line count, the frame's whole lines, the fraction
+    # kept for the next frame; nothing whole is no message
+    assert got["wheel"] == [
+        {"msg": {"scroll": "up", "lines": 3}, "rest": 0},
+        {"msg": {"scroll": "down", "lines": 2}, "rest": 0.5},
+        {"msg": None, "rest": 0.4},
+        {"msg": None, "rest": -0.9},
+        {"msg": None, "rest": 0},
+    ]
     assert "ws.onopen = () => { delay = 500; }" not in js.split("AO.focus")[-1]  # never on open
 
 

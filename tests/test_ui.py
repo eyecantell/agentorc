@@ -79,7 +79,9 @@ def test_pages_and_shell_flow(client, tmp_path):
         raise AssertionError("composer text never reached the pane")
     # Wrap up is marked as one, which holds the doorbell off (design §4.10); a plain send clears it
     assert client.post(f"/api/sessions/{sid}/wrapup").json() == {"ok": True}
-    assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["wrapup_at"]
+    got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert got["wrapup_at"]
+    assert got["pr_marks"] == {}  # the list carries the PR's marks as the cards do (TD-193); no readings here
     assert client.post(f"/api/sessions/{sid}/kill").json() == {"ok": True}
     wait_state(client, sid, "exited")
     r = client.post(f"/api/sessions/{sid}/allow")
@@ -174,18 +176,38 @@ def test_bridge_argv_shapes():
     from agentorc.ui.pty_bridge import attach_argv, scroll_argv
 
     a = attach_argv("ao-x", socket_name="s")
-    assert a[:6] == ["tmux", "-L", "s", "attach", "-t", "=ao-x:"]  # attach first: a chain stops at a failure
-    assert a[6:] == [";", "set-option", "-t", "=ao-x:", "mouse", "on"]  # a session option, never -g
+    # the mouse is the browser's (§4.6, TD-174): the attach sets no option on the session
+    assert a == ["tmux", "-L", "s", "attach", "-t", "=ao-x:"] and "set-option" not in a
     assert attach_argv("ao-x")[0:2] == ["tmux", "attach"]
+    # a page, the keyboard's: no `lines`
     assert scroll_argv("ao-x", "up", socket_name="s")[3:] == ["copy-mode", "-e", "-u", "-t", "=ao-x:"]
     assert scroll_argv("ao-x", "down")[1:] == ["send-keys", "-X", "-t", "=ao-x:", "page-down"]
-    with pytest.raises(ValueError):
-        scroll_argv("ao-x", "sideways")
+    # lines, the wheel's: copy mode (a no-op when in it), then that many lines
+    t = "=ao-x:"
+    assert scroll_argv("ao-x", "up", 3)[1:] == [
+        "copy-mode",
+        "-e",
+        "-t",
+        t,
+        ";",
+        "send-keys",
+        "-X",
+        "-N",
+        "3",
+        "-t",
+        t,
+        "scroll-up",
+    ]
+    assert scroll_argv("ao-x", "down", 1)[-1] == "scroll-down" and scroll_argv("ao-x", "up", 9999)[9] == "500"
+    for bad in (("sideways", None), ("up", 0), ("up", -2), ("up", True)):
+        with pytest.raises(ValueError):
+            scroll_argv("ao-x", *bad)
 
 
 def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
-    """TD-022: the attach sets `mouse on` on the session, and a `scroll` bridge message moves tmux
-    into copy mode over its history (up) and back out on reaching the live screen (down)."""
+    """TD-022: a `scroll` bridge message moves tmux into copy mode over its history (up) and back
+    out on reaching the live screen (down); the wheel's `lines` scroll lines (TD-174). The attach
+    sets no mouse option: the mouse is the browser's (§4.6)."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "scroll"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
@@ -201,17 +223,19 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
         while time.time() < deadline and b"SCROLL-DONE" not in buf:
             buf += ws.receive_bytes()
         assert b"SCROLL-DONE" in buf
-        # both of these were read once, which races the attach (TD-033): the option is set by the
-        # attach and the pane leaves whatever mode it started in, so wait for each
-        assert wait_for(
-            lambda: tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == "mouse on"
-        ), "the attach never set `mouse on`"
+        # read once, this raced the attach (TD-033): the pane leaves whatever mode it started in
         assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
+        assert tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == ""
         ws.send_text(json.dumps({"scroll": "up"}))
         assert wait_for(lambda: mode() == "1"), "scroll up did not enter copy mode"
         ws.send_text(json.dumps({"scroll": "sideways"}))  # ignored, the bridge stays up
         ws.send_text(json.dumps({"scroll": "down"}))
         assert wait_for(lambda: mode() == "0"), "scroll down to the live screen did not leave copy mode"
+        # the wheel (TD-174): lines up enter copy mode, as many lines down leave it at the bottom
+        ws.send_text(json.dumps({"scroll": "up", "lines": 3}))
+        assert wait_for(lambda: mode() == "1"), "the wheel's lines did not enter copy mode"
+        ws.send_text(json.dumps({"scroll": "down", "lines": 3}))
+        assert wait_for(lambda: mode() == "0"), "the wheel back to the bottom did not leave copy mode"
         ws.send_text("echo STILL-$((1+1))\r")
         buf = b""
         deadline = time.time() + 8
@@ -599,10 +623,10 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
         assert json.loads(ws.receive_text()) == {"read_only": True}
         ws.send_text("echo TYPED-$((40+2))\r")
         ws.send_bytes(b"echo BYTES-$((40+3))\r")
-        ws.send_text("\x1b[<0;5;5M\x1b[<0;5;5m")  # a click is not the wheel: dropped with the keys
-        assert wait_for(lambda: tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip())
+        ws.send_text("\x1b[<0;5;5M\x1b[<0;5;5m")  # a click: dropped with the keys
+        ws.send_text("\x1b[<64;5;5M")  # a wheel report too, since TD-174: the wheel is a scroll message
         assert wait_for(lambda: in_mode() == "0")
-        ws.send_text("\x1b[<64;5;5M")  # the wheel, up: tmux enters copy mode over its history
+        ws.send_text(json.dumps({"scroll": "up", "lines": 2}))  # the wheel, up: tmux enters copy mode
         assert wait_for(lambda: in_mode() == "1"), "the wheel did not reach tmux on a read-only attach"
     time.sleep(0.3)
     assert "TYPED-42" not in pane() and "BYTES-43" not in pane() and "echo TYPED" not in pane()
@@ -1312,8 +1336,10 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     (g,) = team_groups([view(r, records) for r in records])
     head = templates.get_template("group_head.html").render(g=g)
     assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
-    # the counts stay in the group (a stopped team's row draws them), not on a live team's header (TD-176)
-    assert g["counts"] == ["1 working", "1 unseen"] and "· 2 sessions" in head and "1 working" not in head
+    # the counts stay in the group (a stopped team's row draws them), and on a live team's header
+    # only for its fold (TD-176, TD-194): unfolded, CSS hides them, since the compact cards say it
+    assert g["counts"] == ["1 working", "1 unseen"] and "· 2 sessions" in head
+    assert 'class="meta counts foldonly">· 1 working · 1 unseen<' in head
     assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
     card = templates.get_template("card.html").render(s=g["members"][0])
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
@@ -1667,10 +1693,11 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js
 
 
-def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
-    """TD-176 slice 3 (§4.5a *card: compact*): a member of a live team is a compact card; when the
-    team's last live session goes, the stream redraws its other members' cards in the full shape —
-    and it keys on the record's team before the delta as well as after (review of slice 3)."""
+def test_a_team_winding_down_keeps_its_cards_compact_and_its_summary(client, tmp_path):
+    """§4.5a *card: compact*, *team card: summary* (TD-176 slice 3; TD-181, built by TD-192): a
+    member of a team is a compact card, live or not, so a team whose last live session goes changes
+    no card's shape — the exit's own delta is compact, and the groups it carries still hold the
+    team's summary, now drawn behind the fold."""
     from sessionorc.client import call_sync
 
     made = [
@@ -1682,19 +1709,16 @@ def test_a_team_winding_down_redraws_its_other_cards_full(client, tmp_path):
     assert " compact" in client.get("/").text.split(f'id="card-{made[1]}"')[0].rsplit("<div", 1)[-1]
     with client.websocket_connect("/events") as ws:
         call_sync("kill", id=made[0])
-        # the subscribe's snapshot comes first (w1 still live, w2 compact); the redraw follows w1's exit
-        gone, redrawn = False, None
         for _ in range(80):
             ev = json.loads(ws.receive_text())
-            if ev.get("event") != "session":
-                continue
-            if ev["id"] == made[0] and ev["state"] == "exited":
-                gone = True
-            elif gone and ev["id"] == made[1]:
-                redrawn = ev
+            if ev.get("event") == "session" and ev["id"] == made[0] and ev["state"] == "exited":
                 break
-        assert redrawn and " compact" not in redrawn["html"].split(">", 1)[0]
+        assert " compact" in ev["html"].split(">", 1)[0]
+        (g,) = [g for g in ev["groups"] if g["team"] == "wind"]
+        assert g["live"] == 0 and 'class="tsum' in g["summary"]
+    page = client.get("/").text
     for sid in made:
+        assert " compact" in page.split(f'id="card-{sid}"')[0].rsplit("<div", 1)[-1]
         client.post(f"/api/sessions/{sid}/remove")
 
 
@@ -1816,3 +1840,31 @@ def test_the_page_reads_person_through_the_agents_settings_read(client, tmp_path
         assert 'id="migratenote"' in r.text
     finally:
         uiconf.set_read({"person": {}, "migrate": []})
+
+
+def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
+    """design §4.5a *Focus: copy on select*, §5 `person.terminal.copy_on_select` (TD-164, built by
+    TD-174): the toggle in Focus's *more ▾* is drawn checked until the person turns it off; a press
+    writes `settings.yml` through `set_settings`, the next page draws it off, and only a boolean is
+    taken."""
+    from agentorc.ui import uiconf
+    from sessionorc.client import call_sync
+
+    uiconf.set_read({"person": {}, "migrate": []})
+    assert uiconf.copy_on_select() is True  # nothing written: on
+    uiconf.set_read({"person": {"terminal": {"copy_on_select": "yes"}}, "migrate": []})
+    assert uiconf.copy_on_select() is True  # not a boolean: the default
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "cos"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    page = client.get(f"/focus/{sid}").text
+    assert re.search(r'<input type="checkbox" id="tcopysel" checked>', page) and "Copy on select" in page
+    assert "Shift+click to grow or shrink it" in page  # Copy's tooltip (§4.5a *Focus: Copy / Paste*)
+    for bad in ({"terminal": {"copy_on_select": "no"}}, {"terminal": {"size": 14}}, {}):
+        assert client.post("/api/settings/person", json=bad).status_code == 400
+    assert client.post("/api/settings/person", json={"terminal": {"copy_on_select": False}}).json()["ok"]
+    assert call_sync("settings")["person"]["terminal"]["copy_on_select"] is False
+    assert re.search(r'<input type="checkbox" id="tcopysel">', client.get(f"/focus/{sid}").text)
+    assert client.post("/api/settings/person", json={"terminal": {"copy_on_select": True}}).json()["ok"]
+    assert 'id="tcopysel" checked' in client.get(f"/focus/{sid}").text
+    client.post(f"/api/sessions/{sid}/kill")

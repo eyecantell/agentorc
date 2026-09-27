@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from sessionorc import naming
@@ -537,24 +538,61 @@ def stop_note(session: dict[str, Any]) -> str:
     return f"stops {day}{at:%H:%M}" + (" · wrap-up sent" if session.get("wrapup_sent_at") else "")
 
 
-def report_line(session: dict[str, Any]) -> str:
+PR_MARKS = ("merged", "closed")  # the words a PR that is no longer open carries (§4.5a **the PR's mark**)
+
+
+def pr_marks(session: Mapping[str, Any], repos: Mapping[str, Any] | None) -> dict[int, str]:
+    """The PRs of the record's repo that are no longer open, by number, as *merged* or *closed* — what
+    **the PR's mark** reads (§4.5a card **report line**, TD-193). `repos` is the home's repo facts
+    (§4.4 *Repo facts*, the `repos` read: a registered root to its reading, whose `prs` hold the open
+    list and the month's `recent`); the record's `repo` — a worktree's main checkout — picks one. A
+    PR the readings do not hold is absent, so it is never guessed; no readings, no marks."""
+    if not repos or not session.get("repo"):
+        return {}
+    want = str(Path(str(session["repo"])).resolve())
+    r = next(
+        (r for root, r in repos.items() if isinstance(r, dict) and str(Path(str(root)).resolve()) == want),
+        None,
+    )
+    prs = (r or {}).get("prs") or {}
+    return {
+        p["number"]: str(p.get("state"))
+        for p in [*(prs.get("recent") or []), *(prs.get("open") or [])]
+        if isinstance(p, dict) and isinstance(p.get("number"), int) and p.get("state") in PR_MARKS
+    }
+
+
+def report_ref(session: dict[str, Any], prs: Mapping[int, str] | None = None) -> str:
+    """The reference half of the report line — `TD-066 → #158`, `#359`, `TD-027~` — with **the PR's
+    mark** (design §4.5a card **report line**, TD-182, built by TD-193): one word after the PR's
+    number, *merged* or *closed*, when `prs` (the readings' PRs of the record's repo, by number, as
+    their state) holds it so. An open PR, one the readings do not hold, and `prs` None leave it
+    unmarked — never guessed. Display only: the record is not touched. Empty with no entry."""
+    head = report_head(session)
+    if not head:
+        return ""
+    pr = head.get("pr")
+    mark = f" {prs[pr]}" if pr and prs and prs.get(pr) in PR_MARKS else ""
+    ref = head["ref"] + ("~" if head.get("source", "declared") != "declared" else "")
+    if pr and head["ref"] == f"#{pr}":
+        return ref + mark
+    return ref + (f" → #{pr}{mark}" if pr else "")
+
+
+def report_line(session: dict[str, Any], prs: Mapping[int, str] | None = None) -> str:
     """The one-line report a card or `ao status -v` shows (design §4.8): the reference in hand, the
     PR it is on, and the lane count — `TD-027 → #60 · 1/2 done`. A reference whose entry the agent
     derived rather than the session declared carries `~`, as a scraped state does (§9 invariant 10).
     A reference is shown once: where the entry's reference is the PR itself, `#359 · 1/2 done`,
-    never `#359 → #359` (§4.5a card **report line**, TD-095). Empty when the session has neither a
-    lane nor a single entry."""
+    never `#359 → #359` (§4.5a card **report line**, TD-095). A PR that is no longer open carries
+    its mark when `prs` says so, `TD-066 → #158 merged · 3/3 done` (`report_ref`, TD-193). Empty
+    when the session has neither a lane nor a single entry."""
     progress = session.get("progress") or []
     lane = [r for r in (session.get("lane") or []) if r != "free-pick"]
     done = [p for p in progress if p.get("status") == "done"]
-    head = report_head(session)
     bits = []
-    if head:
-        bits.append(
-            head["ref"]
-            + ("~" if head.get("source", "declared") != "declared" else "")
-            + (f" → #{head['pr']}" if head.get("pr") and head["ref"] != f"#{head['pr']}" else "")
-        )
+    if ref := report_ref(session, prs):
+        bits.append(ref)
     if total := (len(lane) or len(progress)):
         bits.append(f"{len(done)}/{total} done")
     return " · ".join(bits)

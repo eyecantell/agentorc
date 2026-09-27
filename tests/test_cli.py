@@ -262,7 +262,7 @@ def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp
     out = json.loads(capsys.readouterr().out)
     sid = out["id"]
     assert out["attach"][:6] == ["tmux", "-L", subprocess_agent.sock_name, "attach", "-t", f"={sid}:"]
-    assert out["attach"][6:] == [";", "set-option", "-t", f"={sid}:", "mouse", "on"]  # TD-022
+    assert "set-option" not in out["attach"]  # the mouse is the browser's (TD-174)
     wait_state(sid, "idle")
     assert cli.main(["--json", "focus", sid]) == 0
     out = json.loads(capsys.readouterr().out)
@@ -1812,3 +1812,79 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys,
     assert "a person's own" in capsys.readouterr().err
     monkeypatch.delenv("AGENTORC_SESSION")
     assert cli.main(["kill", rec["id"]]) == 0
+
+
+def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-146 slice 3 end to end (design §4.7): `ao team until` and `ao team reserve` write
+    `teams.<team>` through `set_settings`, a team the org does not define is refused naming the
+    defined ones, `ao settings` prints each key with what it makes, and `--where` names the files."""
+    from sessionorc import paths
+
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (paths.home() / "org.yml").write_text(
+        f"projects:\n  ao: {{repos: {{ao: {{kmaster: {tmp_path}}}}}}}\n"
+        "teams:\n  ao-grind:\n    projects: [ao]\n    manager: {role: manager, name: m}\n"
+        "    members: [{role: grinder, name: g}]\n"
+    )
+    assert cli.main(["team", "until", "nope", "+2h"]) != 0
+    assert "no team 'nope': the org defines ao-grind" in capsys.readouterr().err
+    assert cli.main(["team", "until", "ao-grind", "+2h"]) == 0
+    assert capsys.readouterr().out.startswith("ao-grind: members stop ")
+    assert cli.main(["team", "reserve", "ao-grind", "10"]) == 0
+    assert "reserve priority +10" in capsys.readouterr().out
+    assert cli.main(["settings"]) == 0
+    out = capsys.readouterr().out
+    assert "teams:\n  ao-grind: members stop " in out and "reserve priority +10" in out
+    assert "open_in: vscode (default)" in out and "every repo promotes by hand" in out
+    assert cli.main(["--json", "settings"]) == 0
+    assert json.loads(capsys.readouterr().out)["teams"]["ao-grind"]["reserve"] == 10
+    assert cli.main(["team", "until", "ao-grind", "--clear"]) == 0
+    assert cli.main(["team", "reserve", "ao-grind", "0"]) == 0
+    assert "no stop time · no reserve priority" in capsys.readouterr().out.splitlines()[-1]
+    assert cli.main(["settings", "--where"]) == 0
+    where = capsys.readouterr().out
+    assert "settings.yml" in where and "at the host agent's start" in where and "ao service install" in where
+
+
+@pytest.mark.unit
+def test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses(tmp_path, monkeypatch, capsys):
+    """Design §4.7 `ao status -v`, §4.5a card **report line** → **the PR's mark** (TD-182, built by
+    TD-193): the home's repo readings are read once per call, and a PR they hold as merged carries
+    the word; the read refused (a node offline), the line is printed unmarked. `--json` is the
+    records as they are."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
+    rec = {
+        "id": "ao-x-g",
+        "name": "g",
+        "state": "exited",
+        "confidence": "hook",
+        "since": "2026-09-27T10:00:00Z",
+        "adapter": "shell",
+        "repo": str(tmp_path / "r"),
+        "progress": [{"ref": "TD-066", "status": "done", "pr": 158, "source": "declared"}],
+    }
+    reading = {"prs": {"open": [], "recent": [{"number": 158, "state": "merged"}]}}
+    calls: list[str] = []
+
+    def fake(method, **params):
+        calls.append(method)
+        if method == "list":
+            return [rec]
+        if method == "repos":
+            if refused:
+                raise AgentError("repos: the home is not in reach")
+            return {str(tmp_path / "r"): reading}
+        raise AgentError(f"unknown method {method}")
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    refused = False
+    assert cli.main(["status", "-v"]) == 0
+    assert "report: TD-066 → #158 merged · 1/1 done" in capsys.readouterr().out
+    assert calls.count("repos") == 1  # once per call, not per record
+    refused = True
+    assert cli.main(["status", "-v"]) == 0
+    assert "report: TD-066 → #158 · 1/1 done" in capsys.readouterr().out  # unmarked, never guessed
+    assert cli.main(["--json", "status"]) == 0
+    assert json.loads(capsys.readouterr().out) == [rec]

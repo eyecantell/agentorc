@@ -316,7 +316,7 @@ async def agent(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))  # never this machine's live registry
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)  # tests run inside an ao session are not a caller
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", FAST_TICK)
+    monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", FAST_TICK)
     sock_name = private_socket_name()
     monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
     tmux = Tmux(socket_name=sock_name)

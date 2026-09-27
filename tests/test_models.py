@@ -266,3 +266,31 @@ def test_asks_waiting_compares_whole_addresses_host_included():
     there = Session(id="ao-tl", name="tl", kind="interactive", adapter="shell", dir="/", host="laptop")
     there.inbox = [ask("m-7", "ao-tl@laptop"), ask("m-8", "ao-tl")]  # as the home on kmaster stores them
     assert there.asks_waiting(home="kmaster") == 1
+
+
+def test_the_prs_mark_says_a_pr_is_no_longer_open_and_never_guesses():
+    """Design §4.5a card **report line** → **the PR's mark** (TD-182, built by TD-193): *merged* or
+    *closed* after the PR's number when the readings of the record's repo hold it so; an open PR, an
+    unknown one, another repo's and no readings at all leave the line as it was."""
+    from sessionorc.models import pr_marks
+
+    s = Session(id="g", name="g", kind="agent", adapter="shell", dir="/r/x/.wt/g", repo="/r/x")
+    s.report_progress(ProgressEntry(ref="TD-066", status="done", pr=158))
+    s.report_progress(ProgressEntry(ref="TD-067", status="done", pr=159))
+    d = s.to_dict()
+    assert report_line(d, {158: "merged"}) == "TD-067 → #159 · 2/2 done"  # only the head entry's PR is named
+    assert report_line(d, {159: "merged"}) == "TD-067 → #159 merged · 2/2 done"
+    assert report_line(d, {159: "closed"}) == "TD-067 → #159 closed · 2/2 done"
+    assert report_line(d, {159: "open"}) == report_line(d, {}) == report_line(d) == "TD-067 → #159 · 2/2 done"
+    own = Session(id="h", name="h", kind="agent", adapter="shell", dir="/")
+    own.report_progress(ProgressEntry(ref="#360", status="done", pr=360))
+    assert report_line(own.to_dict(), {360: "merged"}) == "#360 merged · 1/1 done"  # shown once, marked
+    reading = {
+        "prs": {
+            "open": [{"number": 160, "state": "open"}],
+            "recent": [{"number": 159, "state": "merged"}, {"number": 150, "state": "closed"}, {"number": "x"}],
+        }
+    }
+    assert pr_marks(d, {"/r/x": reading}) == {159: "merged", 150: "closed"}
+    assert pr_marks(d, {"/r/other": reading}) == {} and pr_marks(d, None) == {} and pr_marks(d, {}) == {}
+    assert pr_marks({**d, "repo": None}, {"/r/x": reading}) == {}
