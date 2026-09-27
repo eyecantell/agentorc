@@ -44,6 +44,10 @@ HOOK_EVENTS = (
 TRANSCRIPT_TAIL = 256 * 1024  # bytes of transcript read from the end to find the last assistant turn
 # Each model's context window in tokens (design §4.3 `context`, TD-190), by the id's prefix — the
 # transcript's `message.model`. An id not here has no window: the reading shows the tokens alone.
+# Source: the Claude API's model table (as the claude-api skill carried it, cached 2026-06-24), which
+# gives 1M for every row below but Haiku 4.5's 200k, and says of Fable 5.1 that the maximum is also the
+# default. Not verified: whether Claude Code runs any of these at a smaller window by default (its
+# `[1m]` model suffix), which `message.model` would not show — then *of 1M* overstates the window.
 CONTEXT_WINDOWS = (
     ("claude-fable-5", 1_000_000),
     ("claude-mythos-5", 1_000_000),

@@ -845,7 +845,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `restarts`, `restart_ceiling`, `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -1450,7 +1450,7 @@ Screens:
       sits at the right.
    4. **What runs it, and what it reports**: tool · account · model at the left, on every card
       (a team's members commonly differ), then the **context reading** — *· 231k*, red past the
-      role's bound, absent where the adapter cannot tell (§6 rule 5, TD-188; the reading built, the red waits on the bound — TD-190); the report line at the right — progress, and the
+      role's bound (the bound in its title), absent where the adapter cannot tell (§6 rule 5, TD-188, TD-190); the report line at the right — progress, and the
       findings count beside it — **a reference shown once** (`#359 · 1/2 done`, never
       `#359 → #359`).
    5. **The slot**, always two lines and a caption; a longer text is clamped, whole on hover and
@@ -2620,7 +2620,7 @@ for another's, since the channels are ungated:
   line**, TD-182; built — TD-193): the CLI reads `repos` once per call, and where that read is
   refused (a node offline) or holds no such PR the line is printed unmarked. The mark is in the
   text only; `--json` carries the entries as the record holds them.
-- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k* — and `--json` the `context` field (§6 rule 5, TD-188; the reading and the field built, *bound* waits on the preset key — TD-190).
+- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k*, and *(over)* past it — and `--json` the `context` and `context_bound` fields (§6 rule 5, TD-188, TD-190).
 
 **A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, not built — TD-173: today it sets the badge and nothing else) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
 
@@ -3160,13 +3160,16 @@ field for every role the team defines, in the definition's order: a role one ses
 sentences themselves, since no other field is designed (the shorter phrases this paragraph once
 gave as its example, *questions → manager-ao-1*, are not derivable from them). `ao roles` prints it.
 
-**A role has a context bound (TD-188; designed 2026-09-26, not built — TD-190).** A preset or a
-`roles:` entry may carry **`context: {bound: 200k}`** — the reading past which §6 rule 5 tells a
+**A role has a context bound (TD-188; the key built, rule 5's line not yet — TD-190).** A preset or a
+`roles:` entry may carry **`context: {bound: 200k}`** — a token count written as the reading is
+(`200k`, `1M`, `1.5M`), or a plain integer — the reading past which §6 rule 5 tells a
 supervised member to end its run: the built-in worker presets (`grinder`, `hunter`, `auditor`) carry
 200k, Paul's number from grinder-ao-1's 462k run, and `manager`, `techlead` and `plain` carry none
 (a manager restarts on its own rules, a seat is short, a plain session is often a person's).
 Layered as every preset key is; `none` removes it. A definition, not a setting: it is part of what
-the role is, as `review:` is, and changes by PR or by hand in `org.yml`.
+the role is, as `review:` is, and changes by PR or by hand in `org.yml`. It is checked when the file is
+read (a typo is a line naming the key), and the start writes it onto the record as **`context_bound`**,
+in tokens, as it writes `review`; `ao roles` prints *context bound: 200k*.
 
 **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** (one line,
 40 characters at most, checked when the file is read) — *Manager*, *Tech Lead*, *Grinder*,
@@ -5626,7 +5629,7 @@ code and needs no grant; a session doing the same work does.
   performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
   does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
   background because a tool call is capped at ten minutes.
-  5. **Context bound** (TD-188; designed 2026-09-26, not built — TD-190). A supervised member whose
+  5. **Context bound** (TD-188; the bound on the record and the reading built, the line not yet — TD-190). A supervised member whose
      **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
      kept beside the tokens, since the model may change mid-run) is over its role's
      **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,

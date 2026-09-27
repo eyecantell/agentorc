@@ -124,6 +124,7 @@ class Launch:
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
     review: dict[str, Any] | None = None  # who reads its PRs, from its role (design §4.9b *The reader*)
+    context_bound: int | None = None  # tokens past which rule 5 tells it to end its run (§4.8, TD-190)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -155,6 +156,7 @@ class Launch:
             # a seat's ending is its own: the record says it is one, so no crash restart acts on it
             **({"seat": dict(self.trigger)} if self.trigger else {}),
             **({"review": dict(self.review)} if self.review else {}),
+            **({"context_bound": self.context_bound} if self.context_bound else {}),
         }
 
 
@@ -435,6 +437,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         ledger=cfg.ledger,
         host=host if host != here else "",
         review=dict(role.review) if role.review else None,
+        context_bound=role.context_bound,
     )
 
 

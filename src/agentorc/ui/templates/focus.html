@@ -196,7 +196,7 @@
       <summary class="row gap"><span class="h2">Session</span><span class="meta mono small">{{ s.profile_line }}</span></summary>
       <dl class="kv">
         <dt>profile</dt><dd class="mono small">{{ s.profile_line }}</dd>
-        {% if s.context_line %}<dt>context</dt><dd title="what this session's last turn sent (design §6 rule 5)">{{ s.context_line }}</dd>{% endif %}
+        {% if s.context_line %}<dt>context</dt><dd title="what this session's last turn sent (design §6 rule 5)"{% if s.context_over %} class="context over"{% endif %}>{{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% endif %}</dd>{% endif %}
         <dt>adapter id</dt><dd class="mono small" id="adapter_id">{{ s.adapter_id or '—' }}</dd>
         <dt>tmux</dt><dd class="mono small">{{ s.id }}</dd>
         <dt>directory</dt><dd class="mono small">{{ s.dir }}</dd>

@@ -101,6 +101,7 @@ HOME_OWNED = frozenset(
         "seat_due",
         "seat_count",
         "review",
+        "context_bound",
         "wrapup_prompt",
         "pause_prompt",
         "resume_prompt",
@@ -456,6 +457,38 @@ def normalize_review(review: Any) -> dict[str, Any] | None:
     return {"reader": reader, "held": [g.strip() for g in held], "bound": bound}
 
 
+_TOKENS = re.compile(r"(\d+(?:\.\d+)?)\s*([kKmM]?)")
+
+
+def normalize_context(context: Any) -> int | None:
+    """A role preset's `context:` (design §4.8 *A role has a context bound*, TD-190) as the record
+    keeps it: the bound in tokens, `context_bound`. `{bound: 200k}` — a count written as the reading
+    is (`200k`, `1M`, `1.5M`) or a plain integer; `none` (or null) is no bound, which is how a layer
+    takes a built-in's away. A `ValueError` rather than a guess, as `normalize_review`'s is."""
+    if context is None or context == "none":
+        return None
+    if not isinstance(context, dict):
+        raise ValueError(f"context: a mapping {{bound: 200k}}, or none, not {context!r}")
+    unknown = sorted(str(k) for k in set(context) - {"bound"})
+    if unknown:
+        raise ValueError(f"context: unknown key(s) {', '.join(unknown)}; it takes bound")
+    bound = context.get("bound")
+    if bound is None or bound == "none":
+        return None
+    if isinstance(bound, bool):
+        bound = str(bound)
+    if isinstance(bound, int):
+        n = bound
+    else:
+        m = _TOKENS.fullmatch(str(bound).strip())
+        if not m:
+            raise ValueError(f"context: bound is a token count such as 200k or 1M, not {bound!r}")
+        n = int(float(m.group(1)) * {"": 1, "k": 1_000, "m": 1_000_000}[m.group(2).lower()])
+    if n <= 0:
+        raise ValueError(f"context: bound is a token count above zero, not {bound!r}")
+    return n
+
+
 def normalize_ref(ref: str) -> str:
     """A reference is a ledger id, a PR number, or an attention-board line (design §4.8). Only the
     two machine-readable shapes are canonicalised, so `td-27` and `TD-027` are one entry, not two."""
@@ -607,6 +640,18 @@ def context_reading(session: dict[str, Any], *, of_window: bool = True) -> str:
     return tokens_short(tokens) + (f" of {tokens_short(window)}" if of_window and window > 0 else "")
 
 
+def context_over(session: dict[str, Any]) -> bool:
+    """Whether the record's context reading is past its role's bound (design §4.8, §6 rule 5,
+    TD-190): what draws the card's reading red. False without a reading or without a bound."""
+    ctx, bound = session.get("context"), session.get("context_bound")
+    if not isinstance(ctx, dict) or not isinstance(bound, int) or isinstance(bound, bool) or bound <= 0:
+        return False
+    try:
+        return int(ctx.get("tokens") or 0) > bound
+    except (TypeError, ValueError):
+        return False
+
+
 def report_line(session: dict[str, Any], prs: Mapping[int, str] | None = None) -> str:
     """The one-line report a card or `ao status -v` shows (design §4.8): the reference in hand, the
     PR it is on, and the lane count — `TD-027 → #60 · 1/2 done`. A reference whose entry the agent
@@ -695,6 +740,10 @@ class Session:
     # model's, kept beside the tokens because the model may change mid-run. Observed like `model`:
     # read on the tick for unattended records, and nothing but a display reads it yet.
     context: dict[str, Any] | None = None
+    # The reading past which §6 rule 5 tells a supervised member to end its run, in tokens (design
+    # §4.8 *A role has a context bound*, TD-190): from its role preset's `context: {bound}`, written
+    # at start as `review` is; None is no bound. The home's, like the rest of the role's intent.
+    context_bound: int | None = None
     # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
     # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
     # are what the session says it did.
