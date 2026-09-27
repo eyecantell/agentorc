@@ -1,6 +1,9 @@
 """Waking and the doorbell (TD-108 step 1): design §4.8 *Waking a manager* and §4.10 *The host agent decides
-each wake* and *How a Claude Code session is told it has mail*, as a mixin `HostAgent` inherits. Moved as
-written; the state it reads is the agent's.
+each wake* and *How a Claude Code session is told it has mail*, as a mixin `HostAgent` inherits. The run
+of `agent.py` that followed them came too, in its order: the hook's entry and the permission it waits on
+(`rpc_hook`, `rpc_decide`), and the small reads and settings (`rpc_recent_dirs`, `rpc_repos`,
+`rpc_doing_log`, `rpc_usage`, `rpc_gate`, `rpc_settings`, `rpc_set_settings`, `rpc_adapters`, `rpc_ping`,
+`rpc_host`). Moved as written; the state it reads is the agent's.
 """
 
 from __future__ import annotations
