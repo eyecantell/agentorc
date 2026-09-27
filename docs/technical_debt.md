@@ -58,7 +58,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-103 | The manager is an LLM doing policy the tick should do: crash restart, the idle nudge and seat fills move to §6 *Keeping a team running* as policies keyed on `unattended` and `supervised` — a restart is not a start | High | Partly done — slices (1)–(4) and the Inbox row built; the briefs' cut remains (after TD-114) |
 | TD-105 | Mail carries more kinds and machinery than a night's traffic warrants: fold `conflict` into a multi-addressee `ask`, freeze the outcome debt at what is built, state the two tallies as one bound | Medium | Open |
 | TD-106 | Identity on one host (§4.8a) is finished as built: drop the unbuilt techlead alarm path and the `alarms` grant from the design, and decide the cgroup clause | Low | Open |
-| TD-108 | The host agent is one 5,800-line class holding link, mail, identity and policy; `create_app` is 1,090 lines; ten person-only inbox RPCs could be one | Medium | Partly done — `create_app` split by page |
+| TD-108 | The host agent is one 7,000-line class holding link, mail, identity and policy — every grinder build lands in it, so a second grinder has no lane; ten person-only inbox RPCs could be one | High | Open — pickable: the mechanical split next, after TD-146; the fold is a decision |
 | TD-109 | Docs housekeeping after the design pass: finished step briefs sit in `docs/briefs/`, the ledger is 1,000 lines with 50 open entries, and the history file needs a home in the map | Low | Partly done — (1) the step briefs archived |
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Medium | Open |
 | TD-111 | `ao doctor`: one command that checks what the ledger keeps finding live — hooks, tmux, identity, usage, links, build | Medium | Open |
@@ -109,6 +109,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-192 | Build the wound-down team's summary: an unfolded team with nothing live draws the three facets and compact member cards | Medium | Open — pickable |
 | TD-193 | Build the PR's mark on the report line: `TD-066 → #158 merged` on the card, the compact line, the Members list, `ao status -v` and the Reports panel | Low | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Open — pickable; touches `src/sessionorc/**`, so the techlead reads its PR |
+| TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 
 
 ---
@@ -1056,13 +1057,13 @@ Two things are missing, and the design round chooses between them or takes both:
 
 ## TD-108: The host agent is one class holding link, mail, identity and policy
 
-**Priority:** Medium
+**Priority:** High (raised 2026-09-26: the split now gates a second grinder, and the file's size is context every grinder pays for — TD-188)
 **Added:** 2026-09-22 (the anchor session; the design review)
-**Owner:** anchor
+**Owner:** grinder
 **Kind:** build
-**Pickable:** no — what is left is `src/sessionorc` refactoring that wants the anchor's plan (the fold is not mechanical)
+**Pickable:** yes
 **Status:** Partly done. **`create_app` split by page (2026-09-22, grinder-ao-1):** it now builds the shared helpers (`call`, `defs`, `seats_of`, the person-inbox reads …) into one namespace and hands it to six register functions — `_pages_routes`, `_new_routes`, `_sessions_routes`, `_teams_routes`, `_inbox_routes`, `_stream_routes` — none over 200 lines, `create_app` itself 159; same module, so the tests' `monkeypatch` of `LocalClient`, `rpc` and `PtySession` still reaches every route; route order within each group unchanged. **Left:** the agent split by concern and the ten-RPC fold (both `src/sessionorc`, the anchor's to merge). **The fold is not mechanical (2026-09-22, `grinder-ao-1`, looked at before building):** the ten fall into four routing classes that `src/sessionorc/modes.py` and design §4.4a key on the **method name** — `suspend` and `identity_log` are `HOME_EDITS` (forwarded to the home from a node), `inbox_delete` / `inbox_snooze` / `inbox_pause` / `inbox_resume` / `inbox_go_with_it` are `MAILBOX` (refused offline, forwarded when linked), `inbox_delete` and `identity_ack` are in `PERSON_NODE_BOUND`, `identity_ack` is also routed by the link (`agent.py`, `_route_act`), and `inbox_dismiss` / `attention_snooze` are in none. One `inbox_act {entry, action}` would need each of those tables — and §4.4a's offline table — to key on *(method, action)*, and design §4.8a already says `identity_ack`'s wire name *stays* because it is in `NODE_ACTS`. So the fold is a design decision first (the anchor's): either the tables take an action, or the fold is dropped and the ten stay as named RPCs sharing one person-only gate helper. Not built. Was: Open. `src/sessionorc/agent.py` is 5,833 lines; `_msg` is 435 lines and `rpc_create` 180; `src/agentorc/ui/app.py`'s `create_app` is 1,090 lines and `view` 250; there are 46 RPC methods, 115 fields on the record and 186 module-level constants. Not a design fault yet, but §4.4a's per-field ownership rules and §4.8a's classification live in one class with the tick and the mail. Fix, before phase 3's policies add to it: split the agent by concern (link, mail, identity, policies, reconcile) as modules or mixins over one state object; split `create_app` by page; fold the ten person-only inbox RPCs (`inbox_delete`, `inbox_snooze`, `inbox_dismiss`, `attention_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it`, `identity_ack`, `identity_log`, `suspend`) into one `inbox_act {entry, action}` with the same person-only gate. No behaviour change; the tests are the guard.
-**Location:** `src/sessionorc/agent.py`, `src/agentorc/ui/app.py`, `src/sessionorc/models.py`
+**2026-09-26 — the split, planned (the anchor, Paul's go):** `agent.py` is now **7,053 lines** (it was 5,833 at this entry's filing), 227 methods on `HostAgent`, 53 RPCs, and the most-changed file in the repo (127 commits in 30 days). All ten open grinder builds (TD-132, 146, 149, 151, 152, 165, 173, 174, 185, 186) touch it or `models.py`, so grinder-ao-2, whose lane excludes it, declared out of work with 18 entries pickable. Paul stopped grinder-ao-2 so that grinder-ao-1 does the split alone and undisturbed. **Who and when:** grinder-ao-1 alone, after its TD-146 has merged and while no other PR touching `agent.py` is open. **Step 1, mechanical:** move each of the file's own sections into a mixin module that `HostAgent` inherits, under one state object and with no behaviour change. The sections are: reconcile and the tick's policies (restart, usage, wake); the attention trail; mail; the person's inbox bookkeeping; waking and the doorbell; the container supervisor; the link; a node's calls at the home; acts across the link; who is calling; streaming. Keep `sessionorc.agent` as the assembly and the import path. **Hazard:** the tests patch module constants by path (`sessionorc.agent.TICK_SECONDS`, `USAGE_EVERY`, `SUBMIT_SECONDS`, `CREATE_GRACE`, `WRAPUP_GRACE`, `SEND_STALL_SECONDS`, `REPORT_WRITE`, `CLOSED_KEEP`) and methods on the module (`rpc_close`, `_push_changes`, `_save`, …). A mixin that reads a constant from its own module would no longer see the patch, so either the constants stay in `agent.py` and the mixins read them as `agent.X` at call time, or the tests are retargeted in the same PR. The full suite must pass unchanged in count. It is best done as several PRs, one or two sections each, merged quickly, so no PR stays open against a moving file. **Step 2:** the anchor redraws the grinder briefs' lanes by the new files (`docs/briefs/grinder-ao-*.md`; #620 was a first try, closed for this) and restarts grinder-ao-2. **Step 3, the fold:** unchanged, a design decision first (below). `app.py`'s module split is TD-196. **Location:** `src/sessionorc/agent.py`, `src/agentorc/ui/app.py`, `src/sessionorc/models.py`
 
 **Why:** the design's ownership rules are easier to check when the code is shaped like them, and a 1,000-line function is where the next TD-063 hides.
 
@@ -2032,3 +2033,19 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Done when** TD-187's *Done when*: an entry filed into a finished member's lane wakes it within a tick of the reading that holds it, and the tests above pass.
 
 **Related:** TD-187 (the design), TD-176 (the ledger reader), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-026 (a team that starts on work appearing: not this).
+
+## TD-196: `ui/app.py` is one 4,413-line module: split it into modules
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul, while TD-108's split was planned: *do we want one for app.py as well?*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — after TD-108 step 1, by the same single grinder (grinder-ao-1) while grinder-ao-2 is stopped
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (4,413 lines: about 2,760 of helpers and view builders — `view`, `team_summary`, `compact_line`, `prs_waiting`, the rollup and the Repo page's readers — then `create_app` and its seven route groups `_pages_routes` … `_stream_routes`), `tests/test_ui_*.py`
+
+**Why:** TD-108's first half (2026-09-22) split `create_app` by page, but within the one module, so that the tests' `monkeypatch` of `LocalClient`, `rpc` and `PtySession` on `agentorc.ui.app` kept reaching every route. The module is still the second most-changed file in the repo (127 commits in 30 days, level with `agent.py`), every page change passes through it, and grinder-ao-2's brief calls it *shared* with its sibling. The same reasons as TD-108 apply: parallel lanes, and less context for a grinder reading one page's code.
+
+**Fix:** move the view builders into modules by page (`ui/org.py`, `ui/repo.py`, `ui/inbox.py`, `ui/focus.py` or similar) and each route group beside its views, keeping `agentorc.ui.app` as the assembly (`create_app`). Keep the tests' patch points working: the patched names (`LocalClient`, `rpc`, `PtySession`, …) are looked up through `app` at call time, or the tests move to the new paths in the same PR. No behaviour change; the full suite passes unchanged in count. Done in small PRs as TD-108's step 1 is, and then the lanes are redrawn along with TD-108's step 2.
+
+**Related:** TD-108 (the host agent's split, and the page split within this module), TD-188 (context per run).
