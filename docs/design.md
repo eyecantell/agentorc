@@ -281,7 +281,7 @@ State transitions (Claude Code adapter):
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
 | `SessionStart` with `source: compact` (a compaction ends by firing it; a manual `/compact` fires nothing after) | no state change — the session is what it was, idle after a `/compact`, working mid-turn (TD-090) |
 | `SessionStart` with `source: resume` (`claude --resume` prints the conversation and waits at the composer; no `Stop` follows) | `idle` — a prompt given with the resume reports `working` through its own `UserPromptSubmit` (TD-155) |
-| `PreToolUse`, `PostToolUse` from inside a subagent (the tool sets `agent_id` only there) | no state change — a background agent runs on after its caller's `Stop`, and says nothing about the main composer (TD-201) |
+| `PreToolUse`, `PostToolUse` from inside a subagent (the tool sets `agent_id` only there) | no state change — a background agent runs on after its caller's `Stop`, and says nothing about the main composer (TD-201). So a permission a subagent's tool asks for, answered in the terminal rather than through **Allow** / **Deny** (which set `working` themselves), leaves the record `needs-you` with its old pending until the main thread's next event: the safer of the two errors, the other being a background agent wiping the main thread's question |
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
 | `Stop` | `idle` |
