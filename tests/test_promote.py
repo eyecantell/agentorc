@@ -361,3 +361,30 @@ def test_ao_promote_status_prints_the_readings(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert out.startswith("agentorc · live 4444444 · main 9999999, 3 ahead · checks green · auto off")
     assert "FAILED 9999999 at t: it broke" in out and "    boom" in out
+
+
+# ── slice 3: the row's snooze, and the press's notes (§4.5a *Inbox row: promote*) ──────────────
+
+
+async def test_the_promote_row_snoozes_by_repo_in_the_attention_store(agent):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        got = await person.call("attention_snooze", id="promote:agentorc", kind="promote", until="2030-01-01T00:00:00Z")
+    assert got["row"] == "promote:agentorc|promote" and agent.attention_snoozed[got["row"]] == "2030-01-01T00:00:00Z"
+
+
+async def test_a_press_that_finds_its_run_done_files_the_note(agent, checkout):
+    """The techlead's read of #666: a run that reached its commit as the person pressed is concluded
+    by the press's own reading — its *promoted …* note must still reach the person inbox."""
+    await park_ticks(agent)
+    _register(checkout)
+    main = _merge(checkout, "b")
+    promote.repo_dir("repo").mkdir(parents=True)
+    intent = {"sha": main, "at": datetime.now(UTC).isoformat(), "pid": 999999999, "log": "x", "by": "auto", "ahead": 1}
+    (promote.repo_dir("repo") / "inflight.json").write_text(json.dumps(intent))
+    (checkout.parent / "live").write_text(main)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="nothing to promote"):
+            await person.call("promote", repo="repo")
+    assert [e.text for e in agent.person_inbox if e.from_ == "system"] == [f"promoted `repo` `{main[:7]}` — 1 commit"]
+    assert agent._promotes["repo"]["inflight"] is None
