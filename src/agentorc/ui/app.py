@@ -3219,7 +3219,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         strip = teams_view(sessions)
         id_info = {} if agent_down else await identity_info()
         boards = [] if agent_down else (await board_items())[0]
-        if entries or vs or boards:
+        # §4.5a *Inbox row: promote* (TD-132 slice 3): the same rows the Inbox counts, from the
+        # `host` reading this page already took, so the top bar and the Inbox cannot disagree
+        promos = [] if agent_down else promote_rows((info or {}).get("promotes"))
+        if entries or vs or boards or promos:
             secs = inbox_sections(
                 entries,
                 states=state_rows(
@@ -3227,7 +3230,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     host_alarms=alarm_view(id_info.get("alarms")),
                     host=str(id_info.get("host") or host_name()),
                     identity_mode=str(id_info.get("mode") or ""),
-                ),
+                )
+                + promos,
                 boards=boards,
             )
             person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]

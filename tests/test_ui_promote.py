@@ -149,3 +149,11 @@ def test_promote_and_dismiss_go_to_the_rpcs_with_the_repo(page):
         ("promote", {"repo": "agentorc"}), ("clear_promote", {"repo": "agentorc"}),
     ]  # fmt: skip
     assert c.post("/api/person/promote", json={}).status_code == 400
+
+
+def test_the_org_top_bar_counts_the_row_as_the_inbox_does(page):
+    """The review of #668: the Org's first render builds its own count, and it must agree with the
+    Inbox's (the two numbers cannot drift apart, review of PR #251)."""
+    c, _calls, _ = page
+    got = c.get("/")
+    assert got.status_code == 200 and 'id="personneeds">1<' in got.text
