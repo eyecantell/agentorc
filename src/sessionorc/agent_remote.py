@@ -432,6 +432,8 @@ class RemoteMixin:
                 return None
             if method == "derived":
                 return await self._take_derived(host, params)
+            if method == "spend":
+                return await self._take_spend(host, params)
             if method == "forward":
                 return await self._forwarded(host, params)
             if method == "cancel":

@@ -693,7 +693,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   (`usage.json`) and so is the allowance: the first poll after a restart waits until the held
   reading's `fetched` plus the cadence, never sooner. The reason is not held.
   **A metered account's reading is a sum, not a poll** (§4.2a; TD-128, reconciled 2026-09-25;
-  built at the home 2026-09-27 — TD-151 slice 3; a node's turns not yet — slice 4). On every tick each host asks the adapter `spend(profile, cursors)` (§4.3) for
+  built at the home 2026-09-27 — TD-151 slice 3; a node's turns the same day — slice 4). On every tick each host asks the adapter `spend(profile, cursors)` (§4.3) for
   the metered profiles its live sessions run under and adds the turns to a **daily ledger per
   account**, `spend.json` beside `usage.json`: one row per account per day holding tokens by kind
   and cost, and the **cursors** — a byte offset per transcript, per host — kept thirteen months.
@@ -722,18 +722,34 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   is never `stale`: a sum has no failed poll; and the cap rule below is skipped for it by the
   profile's `billing`, read before the windows are, so `limited` is never marked from an amount. A
   **node's turns** (§4.4a): the node reads its own transcripts and sends them home as `spend
-  {account, turns}`, a link method with a reply. The ledger's cursors for that host's transcripts live at
+  {account, profile, prices, turns, cursors}`, a link method with a reply — the prices are the
+  node's profile's, since the home may not define it. The ledger's cursors for that host's transcripts live at
   the home: it drops each turn at or before the cursor it holds for the turn's `source`, writes the
-  rest, and answers with the cursors; the node advances its own on the reply. A lost request is
+  rest, and answers with the cursors, whether the profile is seeded on that host, and the
+  **account's sums**; the node advances its own on the reply. The node's first `spend` on each link
+  carries no turns and no cursors: it is a read of those three, so the node starts from the cursors
+  the home holds. The seeding never travels as turns — a first read returns every turn of every
+  transcript, past what one link frame carries — so while a profile is not seeded on that host the
+  node sends the cursors alone (the home takes them as the ends), with only the turns of transcripts
+  the home already holds a cursor for; and a long batch goes in pieces, each ending at a turn's
+  offset (its line's start), so a piece that never lands is read again from there. A lost request is
   resent, a lost reply is resent and dropped turn by turn, so a link down loses nothing and a turn
-  is never counted twice. The home learns a node's accounts from the node's own `spend` calls, and sends the
-  account's reading to every node that has named it — `usage {account, reading}`, a notification
-  on the road the settings take (§4.4a *Settings, replicated*) — on the node's `hello`, after its
-  first `spend` for an account, and whenever a window's `pct` moves a whole point or a window
-  rolls. A node's gate reads that reading as it reads its own poll's; offline, it adds its own
-  turns to the last reading it holds, so its own spend still counts toward the pause — a figure
-  for the gate and the chip alone, written nowhere: the ledger is written at the home, on a
-  `spend`, and the node's next reading replaces the figure on reconnect.
+  is never counted twice. The home learns a node's accounts from the node's own `spend` calls, and
+  sends the account's sums to every node that has named it — in the reply to each `spend`, and as
+  `usage {account, sums}`, a notification on the road the settings take (§4.4a *Settings,
+  replicated*), whenever a named profile's `pct` moves a whole point or a window rolls, whoever's
+  turns moved it. The sums and not a reading, because `pct` is the profile's, over its own amount:
+  the node makes each profile's reading from the sums with its replica of the amounts, as the home
+  does, and its gate reads that as it reads its own poll's; the eight-tenths note (§6) for a node's
+  profile is filed at the home, whose person inbox it is, once per window. Offline, it adds its own turns past its
+  last acknowledged cursors to the last sums it holds, a window whose reset has passed counted from
+  nothing, so its own spend still counts toward the pause — a figure for the gate and the chip
+  alone, written nowhere: the ledger is written at the home, on a `spend`, and the home's sums
+  replace the figure on reconnect. Each host's top bar shows the accounts its own live sessions
+  run under, as a polled reading is. A metered profile whose only live session is command-kind is
+  not read while that is so (the spend pass and the poll share one definition of live): its turns
+  are counted when an interactive session on the account is next live, on the day each turn
+  carries, so nothing is lost and the gate is late by that much.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
@@ -1392,9 +1408,11 @@ call by call.
   answer from the replica, and the page says *set at <home>* beside each value. A write may
   originate at the home with no node involved, so the send is a broadcast, never a reply to a
   caller. Refused, not queued, as the intent push is. The same road carries a metered account's
-  reading, `usage {account, reading}`, home → node — on `hello` as the settings go, after the node's first `spend` for an account, and on a move —
-  and the node's turns travel the other way as `spend {account, turns}`, a method with a reply that
-  carries the cursors (§4.4 *Usage*; TD-151). **Derived reports from a node.** The tick's
+  sums, `usage {account, sums}`, home → node — the account's window sums, not a reading, since
+  `pct` is the profile's — whenever a profile the node named moves a whole point or a window rolls,
+  and the node's turns travel the other way as `spend {account, profile, prices, turns, cursors}`,
+  a method whose reply carries the cursors and the sums, its first on each dial a read (§4.4
+  *Usage*; built — TD-151 slice 4). **Derived reports from a node.** The tick's
   derived `progress` and `findings` are home-owned, so a node's tick sends what it derives to the
   home as `derived {id, progress, findings, retire}` — applied there exactly as the home's own tick
   applies its own (upserts under invariant 10, a moved-off branch claim retired), for a record of

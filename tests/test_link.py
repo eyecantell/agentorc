@@ -1849,3 +1849,65 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
         assert held(replica, "usage_gate", "", "5h") == 40
         async with LocalClient() as c:
             await c.call("kill", id=w["id"])
+
+
+async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_reading_follows(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """§4.4 *Usage*, §4.4a (TD-151 slice 4): a node's metered turns go home as `spend`; the first call
+    on a link reads the home's cursors, the seeding carries no turns, a turn is ledgered at the home
+    once, and the node's reading is made from the sums the home answers with and its replica of the
+    amounts. Offline, the node's figure adds its own turns; on the next dial they are sent, once."""
+    import json
+    from datetime import UTC, datetime
+
+    from conftest import park_ticks
+
+    from sessionorc import settings
+
+    at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    def turn(uid, offset, inp):
+        return {"at": at, "id": uid, "source": "t1", "offset": offset, "response": f"r-{uid}", "model": "m",
+                "input": inp, "output": 0, "cache_read": 0, "cache_write": 0, "cost": None}  # fmt: skip
+
+    def ledgered():
+        try:
+            acct = json.loads((home.dir / "spend.json").read_text())["hookstub:key"]
+        except (OSError, ValueError, KeyError):
+            return None
+        return sum(int(r.get("input") or 0) for r in acct.get("days", {}).values())
+
+    hookstub.billing = {"api": {"billing": "metered", "prices": {"input": 1.0}}}
+    hookstub.accounts = {"api": "key"}
+    hookstub.spend_turns = [turn("u0", 0, 7_000_000)]  # history: never billed
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
+        await park_ticks(node)
+        assert await wait_for(lambda: node._snapshot_sent, timeout=10.0, step=0.05)
+        settings.save({"usage_gate": {"api": {"day": "$5"}}})  # the node's replica, as the home would send it
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, profile="api")
+        await node._refresh_spend_inner()  # the read, then the seeding: cursors only
+        assert ledgered() == 0 and node._spend_link["api"] == {"cursors": {"t1": 1}, "seeded": True}
+        hookstub.spend_turns.append(turn("u1", 1, 1_000_000))
+        await node._refresh_spend_inner()
+        await node._refresh_spend_inner()  # nothing new: nothing sent, nothing counted twice
+        assert ledgered() == 1_000_000
+        day = node._usage["api"]["windows"][0]
+        assert (day["label"], day["spent"]["cost"], day["pct"]) == ("day", 1.0, 20)
+        # offline: the figure adds the node's own turn, and the home has not seen it
+        home.write_hosts([])
+        node._home_mux.close("the lid closed")
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
+        hookstub.spend_turns.append(turn("u2", 2, 2_000_000))
+        await node._refresh_spend_inner()
+        assert node._usage["api"]["windows"][0]["pct"] == 60 and ledgered() == 1_000_000
+        # the next dial sends it, once
+        home.write_hosts(["laptop"])
+        assert await wait_for(lambda: node._snapshot_sent, timeout=20.0, step=0.1)
+        await node._refresh_spend_inner()
+        await node._refresh_spend_inner()
+        assert ledgered() == 3_000_000 and node._usage["api"]["windows"][0]["pct"] == 60
+        async with LocalClient() as c:
+            await c.call("kill", id=w["id"])

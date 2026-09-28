@@ -3,6 +3,7 @@ billed*, §6 *Usage gate*; TD-151 slice 3): turns counted once across reads, rew
 that straddles two reads; the three windows in the home's clock; `pct` from the profile's amount;
 the eight-tenths note; the gate's pause at the amount; `limited` never from it."""
 
+import json
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -236,3 +237,96 @@ def test_a_boundary_past_a_dst_change_carries_its_own_offset(monkeypatch):
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+# -- a node's road (§4.4 *Usage*, §4.4a; TD-151 slice 4) --------------------------------------------
+
+
+def test_a_long_batch_goes_in_pieces_cut_at_a_line_and_counts_as_one_read():
+    """A piece ends at a turn's offset, so a transcript cut across two pieces resumes at that line;
+    ingesting the pieces in order counts exactly what one read would, and a piece sent again after
+    its reply was lost counts nothing (the build fact (ii))."""
+    turns = [_t(f"a{i}", _at(1, i), 10 * i, source="a", inp=100) for i in range(5)]
+    turns += [_t(f"b{i}", _at(2, i), 10 * i, source="b", inp=10) for i in range(3)]
+    result = {"turns": turns, "cursors": {"a": 50, "b": 30, "quiet": 7}}
+    size = max(len(json.dumps(t)) for t in turns)
+    got = spend_mod.pieces(result, budget=2 * size)
+    assert [len(p["turns"]) for p in got] == [2, 2, 2, 2]
+    assert got[0]["cursors"] == {"quiet": 7, "a": 20}, "cut inside a: resume at the next line"
+    assert got[2]["cursors"] == {"a": 50, "b": 10}, "a's end rides with its last turn, b is cut after its first"
+    assert got[-1]["cursors"] == {"b": 30}
+    assert spend_mod.pieces(result) == [
+        {"turns": sorted(turns, key=lambda t: (t["source"], t["offset"])), "cursors": {"quiet": 7, "a": 50, "b": 30}}
+    ]
+
+    whole: dict = {}
+    _ingest(whole, [], {"a": 0, "b": 0, "quiet": 0})  # seeded, with every transcript at its start
+    _ingest(whole, turns, result["cursors"])
+    cut: dict = {}
+    _ingest(cut, [], {"a": 0, "b": 0, "quiet": 0})
+    for p in got:
+        _ingest(cut, p["turns"], p["cursors"])
+    assert _day(cut) == _day(whole) and _day(cut)["input"] == 530
+    assert _ingest(cut, got[1]["turns"], got[1]["cursors"]) == 0, "a resent piece is dropped turn by turn"
+    assert _day(cut)["input"] == 530
+
+
+def test_the_offline_figure_is_the_held_sums_plus_the_nodes_own_turns():
+    """Offline, a node's figure adds its unacknowledged turns to the sums the home last sent; a window
+    whose reset has passed since counts from nothing (§4.4 *Usage*)."""
+    now = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
+    held = spend_mod.sums({"days": {"2026-09-27": {"input": 1000, "cost": 2.0}}}, now)
+    t = _t("u1", now.isoformat(), 0, inp=500, cost=0.5)
+    fig = spend_mod.figure(held, [t], None, now)
+    assert (fig["day"]["tokens"]["input"], fig["day"]["cost"]) == (1500, 2.5)
+    tomorrow = now + timedelta(days=1)
+    fig = spend_mod.figure(held, [t | {"at": tomorrow.isoformat()}], None, tomorrow)
+    assert (fig["day"]["total"], fig["week"]["total"]) == (500, 500), "the day and the week (Sunday→Monday) rolled"
+    assert fig["month"]["total"] == 1500
+
+
+async def test_the_home_takes_a_nodes_spend_and_pushes_its_sums_when_its_readings_move(agent, monkeypatch):
+    """The home's side (§4.4a): a read answers the cursors and whether the profile is seeded; turns
+    are ledgered under the node's host; a node is pushed `usage {account, sums}` only when a named
+    profile's `pct` or a window's reset moved, never on every tick."""
+    await park_ticks(agent)
+    settings.save({"usage_gate": {"api": {"day": "$10"}}})
+    sent: list[dict] = []
+
+    class Mux:
+        async def notify(self, method, **params):
+            sent.append({"method": method, **params})
+
+    monkeypatch.setitem(agent._link_muxes, "laptop", Mux())
+    now = datetime.now().astimezone().replace(microsecond=0)  # the home's own clock, as the pass has it
+    at = now.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    head = {"account": "hookstub:key", "profile": "api", "prices": {"input": 1.0}}
+    got = await agent._take_spend("laptop", head | {"turns": [], "cursors": {}})
+    assert (got["cursors"], got["seeded"]) == ({}, False) and set(got["sums"]) == {"day", "week", "month"}
+    got = await agent._take_spend("laptop", head | {"turns": [_t("u0", at, 0, inp=9)], "cursors": {"t": 1}})
+    assert (got["cursors"], got["seeded"], got["sums"]["day"]["total"]) == ({"t": 1}, True, 0)
+    turn = _t("u1", at, 1, source="t", inp=1_000_000)
+    got = await agent._take_spend("laptop", head | {"turns": [turn], "cursors": {"t": 2}})
+    assert got["sums"]["day"]["cost"] == 1.0
+    assert agent._spend["hookstub:key"]["hosts"]["laptop"]["cursors"]["t"]["offset"] == 2
+    await agent._push_spend_usage(now)
+    assert sent == [], "the reply told it: nothing moved since"
+    acct = agent._spend["hookstub:key"]
+    acct["days"][now.astimezone().date().isoformat()]["input"] += 50  # a turn too small to move a point
+    await agent._push_spend_usage(now)
+    assert sent == []
+    acct["days"][now.astimezone().date().isoformat()]["cost"] += 1.0  # another host's turn: 20%
+    await agent._push_spend_usage(now)
+    await agent._push_spend_usage(now)
+    assert [(m["method"], m["account"], m["sums"]["day"]["cost"]) for m in sent] == [("usage", "hookstub:key", 2.0)]
+    # the eight-tenths note for a node's profile is the home's, filed once per window
+    notes: list[str] = []
+    monkeypatch.setattr(agent, "_system_note", lambda to, text, **kw: notes.append(text))
+    acct["days"][now.astimezone().date().isoformat()]["cost"] += 6.5
+    await agent._push_spend_usage(now)
+    await agent._push_spend_usage(now)
+    assert notes == ["api · day $8.50 of $10"]
+    # a node's figure is kept only when it is one: a negative cost is not a cost
+    bad = _t("u2", at, 2, source="t", inp=0, cost=-100.0)
+    await agent._take_spend("laptop", head | {"turns": [bad], "cursors": {"t": 3}})
+    assert agent._spend["hookstub:key"]["days"][now.astimezone().date().isoformat()]["cost"] == 8.5

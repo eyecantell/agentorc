@@ -399,6 +399,15 @@ class HostAgent(
         self._billing_seen: dict[str, tuple[float, bool]] = {}  # profile → (monotonic, metered), for the gate
         self._metered_shown: set[str] = set()
         self._spend_task: asyncio.Task[None] | None = None
+        # A node's side of the road (§4.4a, TD-151 slice 4): per profile, the cursors and seeding the
+        # home answered on this link (cleared on each dial) and the last cursors it acknowledged (kept
+        # for the offline figure); per account, the sums the home last sent. The home's side: the
+        # accounts each node named in a `spend`, and what each was last told.
+        self._spend_link: dict[str, dict[str, Any]] = {}
+        self._spend_acked: dict[str, dict[str, int]] = {}
+        self._spend_held: dict[str, dict[str, Any]] = {}
+        self._spend_named: dict[str, dict[str, set[str]]] = {}
+        self._spend_told: dict[tuple[str, str], str] = {}
         # The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), kept across a
         # restart in `repos.json`; the home's alone — a node reads none of this (§4.4a).
         self.repos_store = RepoStore()
