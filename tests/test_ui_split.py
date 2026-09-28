@@ -17,7 +17,7 @@ pytestmark = pytest.mark.unit
 # patched by the suite as `agentorc.ui.app.X`
 PATCHED = {"LocalClient", "read_boards", "rpc", "PtySession", "repo_teams"}
 # the modules moved out of app.py (TD-196), in the order they were split
-SPLIT = ("common",)
+SPLIT = ("common", "cards")
 
 
 def _defined(path: Path) -> set[str]:
@@ -32,6 +32,20 @@ def _defined(path: Path) -> set[str]:
     return out
 
 
+def _bare_reads(tree: ast.Module) -> list[str]:
+    """Loads of a patched name that are not a function's own local of that name (`rpc = str(...)` in
+    an alarm's words is a string, not the RPC)."""
+    out = []
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)]:
+        local = {a.arg for a in ast.walk(fn.args) if isinstance(a, ast.arg)}
+        local |= {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+        out += [n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and n.id in PATCHED - local]
+    for node in tree.body:  # module level, outside any function
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            out += [n.id for n in ast.walk(node) if isinstance(n, ast.Name) and n.id in PATCHED]
+    return out
+
+
 @pytest.mark.parametrize("name", SPLIT)
 def test_no_split_module_reads_a_patched_name_bare(name):
     mod = importlib.import_module(f"agentorc.ui.{name}")
@@ -40,8 +54,13 @@ def test_no_split_module_reads_a_patched_name_bare(name):
         if isinstance(node, ast.ImportFrom):
             bare = {a.asname or a.name for a in node.names} & PATCHED
             assert not bare, f"ui/{name}.py imports {sorted(bare)} by name: read them as app.X at call time"
-        if isinstance(node, ast.Name) and node.id in PATCHED:
-            raise AssertionError(f"ui/{name}.py reads {node.id} bare: read it as app.{node.id} at call time")
+    bare = _bare_reads(tree)
+    assert not bare, f"ui/{name}.py reads {sorted(set(bare))} bare: read them as app.X at call time"
+
+
+def test_the_guard_sees_a_bare_read_and_passes_a_local():
+    assert _bare_reads(ast.parse("def f():\n    return rpc('x')\n")) == ["rpc"]
+    assert _bare_reads(ast.parse("def f(a):\n    rpc = str(a)\n    return rpc\n")) == []
 
 
 @pytest.mark.parametrize("name", SPLIT)

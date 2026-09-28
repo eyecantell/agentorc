@@ -773,4 +773,10 @@ async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, st
     return {k: _icon_cache[k][1] for k in want if k in _icon_cache}
 
 
-# -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
+def _iso(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
