@@ -115,6 +115,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — proposal |
 | TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Open — design-first |
 | TD-213 | Closing a member closes the questions it put to the person (`asker_gone`), even when the ledger still waits on the answer: the wind-down of 2026-09-28 took a steer (TD-149) and an ask (TD-180) out of the Inbox | High | Open — design-first |
+| TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 
 
 ---
@@ -2188,3 +2189,24 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Fix:** design what a question outlives. Options: (a) a question tied to a ledger entry (its `about` or `cites` names a TD) survives its asker's close and moves to the board as a line (*Decide: …*, the steer's default beside it), written by the host agent or by the manager's wind-down step (the brief already boards a passed-up question nobody answered; extend it to the members' own open questions); (b) the wind-down refuses to close a member with open questions to the person and leaves it idle for the person; (c) the question stays open under the team rather than the record, answered to whoever next holds the entry. Also: `asker_gone` on a question the person had not yet seen should at least leave a trail row saying what was withdrawn. Done when a member closed with an open question to the person leaves that question somewhere the person will see it, and a test covers the wind-down case.
 
 **Related:** TD-180, TD-149 (the two questions that went), TD-187 / TD-195 (the same wind-down closed a designer whose lane had work), §4.10, §4.9a.
+
+## TD-214: A wound-down team never starts again when its lanes gain work
+
+**Priority:** Medium
+**Added:** 2026-09-28 (Paul: *it looks like the dc-grind and ao-grind teams both have work to do but are both idle — should they restart automatically?*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §6 (*Keeping a team running*, rule 6), §4.9a (wind-down), `src/sessionorc/agent_tick.py` (rule 6: `lane_seen`), the team's Start (`agentorc.teamrun`), TD-133 (schedules)
+
+**Why:** ao-grind wound down at 2026-09-28T06:56Z. Every member had declared out of work, so the manager closed them and exited. Over the next day the designer's lane gained entries (TD-198, 199, 203, 206, 207, 208, 210, 212, 213, and TD-180 once answered), and nothing started the team again; Paul noticed at the Org page and the anchor pressed Start. Three gaps:
+1. **Nothing restarts a wound-down team.** Start is a person's press or `ao team start`; the schedule that could press it (TD-133) is designed and not built, and it is a clock, not a response to work.
+2. **Rule 6 (TD-195) cannot reach a closed member.** It tells a *live* finished member its lane gained work. The wind-down closes the members, so the rule has nobody to tell.
+3. **Rule 6's first reading counts today's backlog as seen.** When TD-195 went live with the promote of `9a023752`, its first tick (15:00:19Z) wrote each finished member's `lane_seen` as every entry then matching its lane, as §6 says, *written on the first tick after the declaration*. The designer's ten entries were thus recorded as seen and would never have been told: nine filed after its declaration of 2026-09-27T14:27Z (TD-198 to TD-213), and TD-180, filed earlier but made pickable again by Paul's answer on 2026-09-28. The rule is right from here on; it was wrong for the backlog it went live on. Also: `free-pick` matches by `Pickable` and `Kind` but not `Owner`, so grinder-ao-1's `lane_seen` holds TD-159, an anchor evaluation.
+
+dc-grind is the other case: its grinder is live, idle and truly out of work (four entries wait on Paul's decisions), which is working as designed.
+
+**Fix:** design (1) a team-level rule: when a wound-down team's lanes (its members' lane words matched against the ledger reading, as rule 6 does) gain an entry filed or made pickable after the wind-down, the home starts the team again, the same sequence as Start. Bounded by the usage gate, the team's stop time, a per-day start budget, and a person's *hold* on the team, and saying so on the team card (*restarted: TD-213 filed*). Or it puts a *Start?* row in the Inbox instead, if an automatic start is too much; the round decides which, maybe per team. (2) `lane_seen`'s first write takes the declaration's time: entries filed, or made pickable, after `out_of_work.at` are new even if the first tick is later. (3) The lane match keys on `Owner` as well (the grinder's lane is `Owner: grinder`, the designer's `Owner: designer`). Then the build. Done when an entry filed into a wound-down team's lane starts the team (or asks the person to) within a tick or two, and a promote that turns rule 6 on does not swallow the backlog.
+
+**Related:** TD-187 / TD-195 (rule 6), TD-133 (schedules), TD-053 (the wind-down), TD-213 (the wind-down drops the person's questions), TD-199 (a running member keeps its start brief).
