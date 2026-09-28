@@ -32,6 +32,17 @@ class HookFedStub:
         self.usage_asked.append(profile)
         return self.usage_value
 
+    spend_turns: list = []  # set by a test: the turns `spend` reports past any cursor (TD-151)
+
+    def spend(self, profile, cursors=None):
+        """A test adapter that reports turns (§4.3 *Spend per turn*): every turn in `spend_turns`
+        whose `offset` is at or past its `source`'s cursor, and the cursors moved past them."""
+        cursors = dict(cursors or {})
+        turns = [t for t in self.spend_turns if t["offset"] >= cursors.get(t["source"], 0)]
+        for t in turns:
+            cursors[t["source"]] = max(cursors.get(t["source"], 0), t["offset"] + 1)
+        return {"turns": turns, "cursors": cursors, "reason": "ok"}
+
     def account_for(self, profile):
         return self.accounts.get(profile)
 

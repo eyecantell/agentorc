@@ -273,6 +273,40 @@ def _undecorated(pane_title: str) -> str:
     return text.strip()
 
 
+def _turn(line: bytes, source: str, offset: int) -> dict | None:
+    """One transcript line as a turn (`spend`), or None when it is not an `assistant` entry with a
+    `usage`: the four token kinds kept apart, because a coding agent's input is mostly cache reads
+    at a tenth of the input rate. `message` is the API response's id, for `spend`'s dedup alone."""
+    try:
+        d = json.loads(line)
+    except ValueError:
+        return None
+    if not isinstance(d, dict) or d.get("type") != "assistant":
+        return None
+    msg = d.get("message") if isinstance(d.get("message"), dict) else {}
+    usage = msg.get("usage")
+    if not isinstance(usage, dict):
+        return None
+
+    def n(key: str) -> int:
+        v = usage.get(key)
+        return int(v) if isinstance(v, int | float) and not isinstance(v, bool) and v > 0 else 0
+
+    return {
+        "at": d.get("timestamp"),
+        "id": str(d.get("uuid") or ""),
+        "source": source,
+        "offset": offset,
+        "model": str(msg.get("model") or ""),
+        "input": n("input_tokens"),
+        "output": n("output_tokens"),
+        "cache_read": n("cache_read_input_tokens"),
+        "cache_write": n("cache_creation_input_tokens"),
+        "cost": None,
+        "message": str(msg.get("id") or ""),
+    }
+
+
 class ClaudeCodeAdapter:
     name = "claude-code"
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
@@ -498,6 +532,64 @@ class ClaudeCodeAdapter:
         except (KeyError, ValueError):
             return None
         return prof.account or prof.name
+
+    def spend(self, profile: str, cursors: dict[str, int] | None = None) -> dict:
+        """Spend per turn for a metered profile (design §4.3 *Spend per turn*, TD-151 slice 2):
+        `{turns, cursors, reason}` — the design's `(turns, cursors)` with the reason beside them. Every
+        transcript under the profile's config directory is read from its cursor (a byte offset; 0
+        for one not in `cursors`) to its last whole line, sessions agentorc did not start and
+        subagents' transcripts included, since both are billed. A cursor past its file's end means
+        the tool rewrote the file (a compaction does), and it is read from 0 again — dropping what
+        was already counted is the home's (§4.4). Each `assistant` entry's `usage` is one turn:
+        `{at, id, source, offset, model, input, output, cache_read, cache_write, cost}`, `id` the
+        entry's `uuid`, `cost` None (the tool does not price its turns; the home does, from the
+        profile). One API response is written as one entry per content block, each carrying the
+        response's usage, so a read counts a response once — its last entry, keyed by
+        `message.id`. `reason` is `ok`, or why nothing could be read, with the cursors unchanged."""
+        before = {str(k): int(v) for k, v in (cursors or {}).items() if isinstance(v, int) and v >= 0}
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return {"turns": [], "cursors": before, "reason": "no_profile"}
+        root = config_dir(prof) / "projects"
+        if not root.is_dir():
+            return {"turns": [], "cursors": before, "reason": f"no transcripts under {root}"}
+        try:
+            files = sorted(root.rglob("*.jsonl"))
+        except OSError as e:
+            return {"turns": [], "cursors": before, "reason": f"unreadable: {root}: {type(e).__name__}"}
+        turns: list[dict] = []
+        after: dict[str, int] = {}
+        for p in files:
+            key = str(p)
+            start = before.get(key, 0)
+            try:
+                size = p.stat().st_size
+                if start > size:
+                    start = 0  # rewritten under us: read it again from the top
+                if start == size:
+                    after[key] = start
+                    continue
+                with p.open("rb") as f:
+                    f.seek(start)
+                    data = f.read(size - start)
+            except OSError:
+                if key in before:
+                    after[key] = before[key]
+                continue
+            whole = data.rfind(b"\n") + 1  # a line still being written is read next time
+            after[key] = start + whole
+            by_message: dict[str, dict] = {}
+            pos = start
+            for line in data[:whole].splitlines(keepends=True):
+                offset, pos = pos, pos + len(line)
+                if b'"assistant"' not in line:
+                    continue
+                turn = _turn(line, key, offset)
+                if turn is not None:
+                    by_message[turn.pop("message") or turn["id"] or f"@{offset}"] = turn
+            turns.extend(by_message.values())
+        return {"turns": turns, "cursors": after, "reason": "ok"}
 
     def usage_for(self, profile: str) -> dict | None:
         """The core-facing form of `usage()`: by profile name, as a plain dict —
