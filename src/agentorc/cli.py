@@ -945,6 +945,47 @@ def cmd_tail(args: argparse.Namespace) -> int:
     return emit(args, lines, lambda: print("\n".join(lines)) if lines else None)
 
 
+def transcript_text(t: dict[str, Any]) -> list[str]:
+    """`ao transcript`'s text (design §4.7 *Transcript*): the neutral entries as the pane draws them —
+    `>` the prompt, the assistant's text, `⏺ Tool(first line)` with its result folded to its first
+    line, *thought · n lines*, *n subagent turns*, a compaction's one line."""
+    out = [f"{t.get('path')} · {t.get('size')} bytes · {t.get('first_at') or '?'} → {t.get('last_at') or '?'}"]
+    if t.get("before") is not None:
+        out.append(f"… earlier turns: --before {t['before']}")
+    for e in t.get("entries") or []:
+        kind = e.get("kind")
+        if kind == "prompt":
+            out.append("")
+            out.extend(
+                f"> {ln}" if i == 0 else f"  {ln}" for i, ln in enumerate(str(e.get("text") or "").splitlines() or [""])
+            )
+        elif kind == "text":
+            out.extend(str(e.get("text") or "").splitlines())
+        elif kind == "thought":
+            out.append(f"✻ thought · {e.get('lines') or 0} lines")
+        elif kind == "tool":
+            out.append(f"⏺ {e.get('name')}({e.get('call') or ''})")
+            result = e.get("result")
+            first = str(result).strip().splitlines()[0] if result and str(result).strip() else ""
+            if first:
+                out.append(f"  ⎿ {first[:160]}")
+            if side := e.get("sidechain"):
+                out.append(f"  ⎿ {side.get('count') or 0} subagent turns")
+        elif kind == "sidechain":
+            out.append(f"⎿ {e.get('count') or 0} subagent turns")
+        elif kind == "compaction":
+            out.append(f"── compacted{' ' + e['at'] if e.get('at') else ''} ──")
+    return out
+
+
+def cmd_transcript(args: argparse.Namespace) -> int:
+    t = call_sync("transcript", id=args.id, turns=args.turns, before=args.before, raw=args.raw)
+    if args.raw and not args.json:
+        print(t.get("raw") or "")
+        return 0
+    return emit(args, t, lambda: print("\n".join(transcript_text(t))))
+
+
 def cmd_mode(args: argparse.Namespace) -> int:
     s = call_sync(
         "set_mode", id=args.id, unattended=args.mode == "unattended", **teams.gate_prompts(args.mode == "unattended")
@@ -2338,6 +2379,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("-n", "--lines", type=int, default=40)
     p.set_defaults(fn=cmd_tail)
+
+    p = add("transcript", help="what a session said and did, read from its tool's file without resuming it")
+    p.add_argument("id")
+    p.add_argument("-n", "--turns", type=int, default=20, help="prompts to read back (default 20)")
+    p.add_argument("--before", type=int, metavar="OFFSET", help="the turns before this byte offset (from --json)")
+    p.add_argument("--raw", action="store_true", help="the file's own last N lines instead")
+    p.set_defaults(fn=cmd_transcript)
 
     p = add("mode", help="flip a session between unattended and interactive")
     p.add_argument("id")

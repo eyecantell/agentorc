@@ -89,7 +89,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
-| TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Built on draft #627, parked until TD-108 step 1 and TD-196 land |
+| TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Built — live check pending |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Built — live look pending after the next promote |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
@@ -1675,10 +1675,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (the designer, from TD-154's design)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** no — parked on #627 until TD-108 step 1 and TD-196 have landed
-**Status:** Built on the draft PR #627 (grinder-ao-1, 2026-09-26) and parked there by the person's order of 2026-09-26 (via the anchor): TD-165 waits until TD-108 step 1 and TD-196 have split `agent.py` and `ui/app.py`, then #627 is rebased onto the split files, reviewed and asked. Its build notes are in #627's body. Design §4.5 screen 9 *Transcript* (*The adapter renders, the core draws*; *Where it is read*; *Which record*), §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*. Was: Open — nothing built.
-
-**Blocked by:** TD-196
+**Pickable:** no — built; what is left is the live look after a promote
+**Status:** Built 2026-09-26 (grinder-ao-1, PR #627; parked by the person until TD-108 step 1 and TD-196 split `agent.py` and `ui/app.py`, rebased onto them 2026-09-28, reviewed (Sonnet SHIP) and asked of the techlead, ask `m-8e6b6691e09a`): the neutral `Transcript` / `TranscriptEntry` in `sessionorc.adapters`, Claude Code's `read_transcript` (`adapters/claude_code/transcript.py`, subagents read from `<session>/subagents/`), the `transcript` RPC with `transcript` in `NODE_READS` and `identity.READS`, `ao transcript`, the skill's read-only line. What is left is the *Done when* on the live copy (board line). Was: nothing built. Design §4.5 screen 9 *Transcript* (*The adapter renders, the core draws*; *Where it is read*; *Which record*), §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*.
 
 **Location:** `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`, `model_in_use` — the tail read and the `isSidechain` rule to reuse), `src/agentorc/adapters/` (the contract and a neutral `Transcript` / entry model beside `Usage`), `src/sessionorc/agent.py` (`rpc_tail` is the shape; `NODE_READS`; `_route_read`), `src/agentorc/cli.py` (`cmd_tail`, the `tail` parser), `src/agentorc/skill.md` (the read-only line).
 

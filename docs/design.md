@@ -505,13 +505,15 @@ class Adapter(Protocol):
                                                           # makes, `window` the model's when known; None when it cannot tell (§6
                                                           # rule 5, TD-188). Read on the tick for unattended records once a minute,
                                                           # never a grep (built — TD-190 slice 1)
-    def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
-                        before: int | None = None, turns: int = 20) -> Transcript | None
+    def read_transcript(self, session_id: str, cwd: Path, profile: str, *,
+                        before: int | None = None, turns: int = 20, raw: bool = False) -> Transcript | None
                                                           # the tool's transcript as neutral entries — a prompt, text, a thought, a
                                                           # tool call with its result, a compaction, a sidechain group — the last
                                                           # `turns` before byte `before` (None: the file's end), with the offset that
-                                                          # asks for earlier ones; None when there is no file. No field name of the
-                                                          # tool's leaves this method, as none of `usage` does (§4.5 screen 9, TD-154)
+                                                          # asks for earlier ones; with `raw`, the file's last `turns` lines as text.
+                                                          # Keyed by the profile *name*, as `context` is; None when there is no file
+                                                          # or the profile is unknown. No field name of the tool's leaves this
+                                                          # method, as none of `usage` does (§4.5 screen 9, TD-154, TD-165)
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
     def usage(self, profile: Profile) -> Usage | None     # this account's quota windows: Usage(windows=[Window(label, pct,
                                                           # resets), ...], fetched). The labels are the adapter's; nothing
@@ -1421,9 +1423,10 @@ call by call.
   which the RPC does not. While the link is down the node derives nothing: a claim written to the
   replica is overwritten on reconnect and was never checked against the siblings' leases. **Reads of
   a pane, and of a transcript.** `tail` and `explain` on `id@host` read a screen only that node's tmux
-  holds, and `transcript` a file only that node's disk holds (§4.5 screen 9), so the home
+  holds, `transcript` a file only that node's disk holds (§4.5 screen 9), and `log_tail` a round log
+  kept beside that node's run logs (§4.8 *A session's round log*), so the home
   asks the node for them — `read {rpc, params}`, a link method of its own whose allowlist is exactly
-  those three (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
+  those four (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
   never grows by a read. A transcript is read where it lies and never copied to the home. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
   and a session with no grant reads a node's pane as it reads a local one. Refused as unreachable —
   never queued — while the link is down; the reply is the node's, untouched but for its addresses. A
@@ -2062,8 +2065,8 @@ Screens:
    design), the terminal's colours (goal 12), a density switch (§4.5 *Type scale*), live identity
    mode (§4.8a), and any definition. A **Settings** tab in the top bar, last, after Inbox (TD-123:
    a tab exists only for a built page, and this one is).
-9. **Transcript** (`/transcript/<id>`; TD-154, designed 2026-09-25 — the build is TD-165 and
-   TD-166; mockup `Transcript.dc.html`): **a read of what a session said and did, without resuming
+9. **Transcript** (`/transcript/<id>`; TD-154, designed 2026-09-25 — the read, the RPC and `ao transcript`
+   are built (TD-165); the page and its button are TD-166; mockup `Transcript.dc.html`): **a read of what a session said and did, without resuming
    it.** Resuming was the only way to read a finished session, and it is the wrong tool three times
    over: it creates a live session and a record, it is a lifecycle event a manager may act on, and
    it has to be closed again. The transcript is a file on the session's host that its adapter
@@ -2098,7 +2101,7 @@ Screens:
    transcript draws on the same page. **Where it is read**: the `transcript` RPC is served on the
    record's host, since the file is there; for a node's record the home asks the node through
    `read` as it asks for `tail` (§4.4a *Reads of a pane, and of a transcript*: `NODE_READS` is
-   `tail`, `explain`, `transcript`), refused as unreachable while the link is down, and the file
+   `tail`, `explain`, `log_tail`, `transcript`), refused as unreachable while the link is down, and the file
    is never copied to the home. **Which record**: the transcript is located from the record's own
    `adapter_id`, `dir`, `adapter` and `profile`, so an `exited` record reads the run it held and a
    `closed` one left behind by a resume (`superseded_by`, TD-081) still reads its own; the
@@ -2644,7 +2647,12 @@ offset `--before` takes for the turns before them; `--raw` prints the file's own
 the last N of them, for a reader that wants the tool's shape. A record with no tool session id is
 refused with what it is (*a shell has no transcript*). A read-only verb, listed beside `tail` and
 `explain` in `ao --skill`: what a manager reads before deciding a quiet member has stalled
-(TD-091's moment), and what a person reads instead of Resume.
+(TD-091's moment), and what a person reads instead of Resume. Built (TD-165). The offset `--before` takes is given only
+when an earlier prompt exists — the read goes back as far as the prompt before the ones it holds, so
+*earlier turns* never opens on nothing but the tool's bookkeeping — and Claude Code's subagents,
+which the tool now writes to their own files beside the session, are read from there and folded
+under the Agent call whose id their record names (an older file's inline sidechain entries fold
+under the Agent call before them).
 
 **Reporting (§4.8, §4.9a).** Each is a small RPC on the calling session's own record — `--id`
 for another's, since the channels are ungated:
