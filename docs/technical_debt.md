@@ -2035,21 +2035,21 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-197 (the same rows' phases), TD-202 (grinders picking by priority), TD-176 (archived: TDs in motion).
 
-## TD-206: The Doing list's times are clock times cut short, and its fields run together
+## TD-204: `send --wait` reads the tool's own start of *this* prompt as a previous turn, when its hook lands while the paste is being confirmed, and reports `prompt-stalled` for a prompt that ran
 
-**Priority:** Low
-**Added:** 2026-09-27 (Paul: *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** yes
-**Status:** Open
-**Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
+**Priority:** Medium
+**Added:** 2026-09-27 (grinder-ao-1, reading `rpc_send` while fixing TD-078's test race, PR #672)
+**Owner:** paul
+**Kind:** decision
+**Pickable:** no — the board item of 2026-09-12 asks Paul whether this is a TD and the shape of its fix; this is the mechanism and a recommendation
+**Status:** Open — found by reading, not reproduced live.
+**Location:** `src/sessionorc/agent.py` `rpc_send` (the busy branch and the `rev` baselines, read **after** `_submit` returns), `_type` (paste, Enter, then polling until the composer is empty)
 
-**Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
+**Why:** `rpc_send` reads the record's state and `rev` only after `_submit` — the paste, the Enter and `_type`'s check that the prompt left the composer — has returned. Claude Code fires `UserPromptSubmit` the moment Enter lands, so under load the hook can turn the record `working` while `_type` is still polling the composer. `rpc_send` then sees `working`, takes the **busy** branch (*the tool queues the text; wait for the current turn to end*), waits for that turn — which is this prompt's own — to settle, finds `rev` moved by less than three, and waits for a *further* turn to start within `SEND_STALL_SECONDS`: none comes, and it raises `prompt-stalled` for a prompt that ran. That is the board item's symptom exactly (2026-09-12: two in eight sends, a 27 s answer on screen, the record's `progress` proving the prompt ran), and it explains why a long context was not the cause. The test in `test_send_wait_three_outcomes` could not see it: its stand-in hooks were fired by the test after the paste (TD-078).
 
-**Fix:** design (1) the time as a fuzzy age (*just now*, *5m*, *1h*, *2d*), the page's existing `_age` shape, with the exact time on hover, and refreshed as it ages without a server round trip; (2) three columns with a fixed-width time, the doer at its full name or a width that fits the team's longest, and the words taking the rest and wrapping or ellipsed with hover. Do the same on the Repo page's Doing section. Then build it. Done when the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns.
+**Fix (recommended, the shape is Paul's):** take the baseline **before** typing — the state and `rev` read before `_submit` — so the busy branch is decided by what the session was doing when the prompt was sent, and *started* is any transition since then; a turn that began and even ended during the paste then reads as started and settled. A test: a hook stub fired from inside a slowed `_type`, after its Enter. The other shapes on the board (a longer or adapter-supplied window; re-checking the composer before raising) treat the symptom.
 
-**Related:** TD-205 (the same list's scrolling), TD-176 slice 2 (the doing log), §4.8 *the doing log*.
+**Related:** TD-078 (the test's race, fixed in #672), TD-016 / TD-027 (the wait and the composer check, archived), the board item of 2026-09-12 (*`ao send --wait` reported `prompt-stalled` for a prompt that in fact ran*).
 
 ## TD-205: Scrolling the Doing list jumps back to the top
 
@@ -2067,18 +2067,18 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-206 (the same list), TD-176 slice 3 (the summary and its swap).
 
-## TD-204: `send --wait` reads the tool's own start of *this* prompt as a previous turn, when its hook lands while the paste is being confirmed, and reports `prompt-stalled` for a prompt that ran
+## TD-206: The Doing list's times are clock times cut short, and its fields run together
 
-**Priority:** Medium
-**Added:** 2026-09-27 (grinder-ao-1, reading `rpc_send` while fixing TD-078's test race, PR #672)
-**Owner:** paul
-**Kind:** decision
-**Pickable:** no — the board item of 2026-09-12 asks Paul whether this is a TD and the shape of its fix; this is the mechanism and a recommendation
-**Status:** Open — found by reading, not reproduced live.
-**Location:** `src/sessionorc/agent.py` `rpc_send` (the busy branch and the `rev` baselines, read **after** `_submit` returns), `_type` (paste, Enter, then polling until the composer is empty)
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
 
-**Why:** `rpc_send` reads the record's state and `rev` only after `_submit` — the paste, the Enter and `_type`'s check that the prompt left the composer — has returned. Claude Code fires `UserPromptSubmit` the moment Enter lands, so under load the hook can turn the record `working` while `_type` is still polling the composer. `rpc_send` then sees `working`, takes the **busy** branch (*the tool queues the text; wait for the current turn to end*), waits for that turn — which is this prompt's own — to settle, finds `rev` moved by less than three, and waits for a *further* turn to start within `SEND_STALL_SECONDS`: none comes, and it raises `prompt-stalled` for a prompt that ran. That is the board item's symptom exactly (2026-09-12: two in eight sends, a 27 s answer on screen, the record's `progress` proving the prompt ran), and it explains why a long context was not the cause. The test in `test_send_wait_three_outcomes` could not see it: its stand-in hooks were fired by the test after the paste (TD-078).
+**Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
 
-**Fix (recommended, the shape is Paul's):** take the baseline **before** typing — the state and `rev` read before `_submit` — so the busy branch is decided by what the session was doing when the prompt was sent, and *started* is any transition since then; a turn that began and even ended during the paste then reads as started and settled. A test: a hook stub fired from inside a slowed `_type`, after its Enter. The other shapes on the board (a longer or adapter-supplied window; re-checking the composer before raising) treat the symptom.
+**Fix:** design (1) the time as a fuzzy age (*just now*, *5m*, *1h*, *2d*), the page's existing `_age` shape, with the exact time on hover, and refreshed as it ages without a server round trip; (2) three columns with a fixed-width time, the doer at its full name or a width that fits the team's longest, and the words taking the rest and wrapping or ellipsed with hover. Do the same on the Repo page's Doing section. Then build it. Done when the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns.
 
-**Related:** TD-078 (the test's race, fixed in #672), TD-016 / TD-027 (the wait and the composer check, archived), the board item of 2026-09-12 (*`ao send --wait` reported `prompt-stalled` for a prompt that in fact ran*).
+**Related:** TD-205 (the same list's scrolling), TD-176 slice 2 (the doing log), §4.8 *the doing log*.
