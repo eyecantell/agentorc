@@ -429,7 +429,9 @@ model to the `--model` flag; other adapters map their own equivalents. Profiles 
 per host in `~/.agentorc/profiles.yml`.
 
 **How a profile is billed** (TD-128; designed 2026-09-25 by the designer, #547, and reconciled the
-same day in a cloud session with Paul; not built — TD-151): a profile carries **`billing`** —
+same day in a cloud session with Paul; the profile's `billing` and `prices` and the skipped poll
+built 2026-09-27 — TD-151 slice 1; the spend, the summed reading, the amount and the chip not yet):
+a profile carries **`billing`** —
 `subscription`, the default and every profile today, whose bound is the account's quota windows
 above; or **`metered`**, an API key (`ANTHROPIC_API_KEY`), a hosted open-weights model behind an
 OpenAI-compatible endpoint, or a second adapter billed the same way, with optional **prices per

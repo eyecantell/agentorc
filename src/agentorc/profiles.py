@@ -6,7 +6,16 @@ profiles:
   paul:  {adapter: claude-code, account: paul,  model: opus,   config_dir: ~/.claude}
   grind: {adapter: claude-code, account: grind, model: sonnet, config_dir: ~/.claude-grind,
           permission_wait: 600, unattended_args: [--dangerously-skip-permissions]}
+  api:   {adapter: claude-code, account: api-key, config_dir: ~/.claude-api,
+          billing: metered,             # an API key: spend per turn, never a quota poll (design §4.2a)
+          # per million tokens, one per kind; a cache kind left out is charged at `input`, the safe
+          # side — most of a coding agent's input is cache reads at a tenth of the input rate
+          prices: {input: 3, output: 15, cache_read: 0.3, cache_write: 3.75}}
 ```
+
+`billing` (design §4.2a *How a profile is billed*, TD-151): `subscription` — the default, bound by the
+account's quota windows — or `metered`, bound by an amount on its spend; `prices` only on a metered
+profile, and none at all for a self-hosted model, whose reading is tokens.
 
 With no file, one implicit profile named `default` uses the tool's own default config directory.
 """
@@ -21,6 +30,8 @@ import yaml
 from sessionorc import paths
 
 DEFAULT_PERMISSION_WAIT = 600  # seconds; long enough to reach a phone (design §4.2)
+BILLINGS = ("subscription", "metered")
+PRICE_KINDS = ("input", "output", "cache_read", "cache_write")
 
 
 @dataclass
@@ -33,13 +44,45 @@ class Profile:
     permission_wait: int = DEFAULT_PERMISSION_WAIT
     extra_args: list[str] = field(default_factory=list)
     unattended_args: list[str] = field(default_factory=list)
+    billing: str = "subscription"  # §4.2a: or `metered` — never guessed from the directory or the environment
+    prices: dict[str, float] = field(default_factory=dict)  # per million tokens, by kind; a metered profile's
+
+    @property
+    def metered(self) -> bool:
+        return self.billing == "metered"
 
     @property
     def label(self) -> str:
         parts = [self.adapter, self.account or self.name]
         if self.model:
             parts.append(self.model)
+        if self.metered:
+            parts.append("metered")
         return " · ".join(parts)
+
+
+def _billing(name: str, raw: dict) -> tuple[str, dict[str, float]]:
+    """A profile's `billing` and `prices` (design §4.2a), checked: an unknown billing, prices on a
+    subscription, an unknown token kind or a price that is not a number at or above zero is the
+    file's error, named, never a guess — a wrong one pauses nothing or everything."""
+    billing = str(raw.pop("billing", "subscription") or "subscription")
+    if billing not in BILLINGS:
+        raise ValueError(f"profiles.yml: {name}.billing is {' or '.join(BILLINGS)}, not {billing!r}")
+    prices = raw.pop("prices", None)
+    if prices is None:
+        return billing, {}
+    if billing != "metered":
+        raise ValueError(f"profiles.yml: {name}.prices belongs to a metered profile (billing: metered)")
+    if not isinstance(prices, dict):
+        raise ValueError(f"profiles.yml: {name}.prices is a mapping of {', '.join(PRICE_KINDS)} to a price per million")
+    out: dict[str, float] = {}
+    for kind, v in prices.items():
+        if kind not in PRICE_KINDS:
+            raise ValueError(f"profiles.yml: {name}.prices.{kind} is not a token kind ({', '.join(PRICE_KINDS)})")
+        if isinstance(v, bool) or not isinstance(v, int | float) or v < 0:
+            raise ValueError(f"profiles.yml: {name}.prices.{kind} is a price per million tokens, not {v!r}")
+        out[str(kind)] = float(v)
+    return billing, out
 
 
 def profiles_file() -> Path:
@@ -56,6 +99,7 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
     for name, raw in (data.get("profiles") or {}).items():
         raw = dict(raw or {})
         cfg = raw.pop("config_dir", None)
+        billing, prices = _billing(name, raw)
         out[name] = Profile(
             name=name,
             adapter=raw.pop("adapter", "claude-code"),
@@ -65,6 +109,8 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
             permission_wait=int(raw.pop("permission_wait", DEFAULT_PERMISSION_WAIT)),
             extra_args=list(raw.pop("extra_args", []) or []),
             unattended_args=list(raw.pop("unattended_args", []) or []),
+            billing=billing,
+            prices=prices,
         )
     if not out:
         out["default"] = Profile(name="default")
