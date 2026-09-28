@@ -290,7 +290,7 @@ State transitions (Claude Code adapter):
 | `ao new --at`, the New session **At** field | `scheduled` — a record with a name, a directory and a launch record but no pane yet; the host agent creates the session at the instant (§6 *Start time*; TD-026, designed 2026-09-25, built 2026-09-27 — TD-152) |
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time (a metered profile's amount is not a cap and never makes it, §4.2a) |
 | `SessionEnd`, or tmux session gone | `exited` — the record's `pane` says whether a dead pane is still there to read (natural exit: yes; killed, or the tmux server restarted: no) |
-| person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
+| person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable; final: a hook that lands after it (the killed run's own `SessionEnd`) changes nothing |
 | host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
 
 A tool event names itself to the host agent (`event`: `PreToolUse:Bash`), and the host agent logs the

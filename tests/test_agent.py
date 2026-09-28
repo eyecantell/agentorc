@@ -496,6 +496,23 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         agent.tmux.kill_session(s["id"])
 
 
+async def test_a_closed_record_stays_closed_when_its_run_says_it_ended(agent, hookstub, tmp_path):
+    """Design §4.2 *Close*, TD-200 (3): `ao close` kills the pane, and the tool's SessionEnd for
+    the run it killed lands after the close. Applied, it turned the record `exited` — a card that
+    read EXITED and offered Forget, and a record the day-long keep (which reads only `closed`) never
+    forgot. A closed record takes no state from a hook."""
+    async with LocalClient() as c, LocalClient() as feeder:
+        s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        closed = await c.call("close", id=s["id"])
+        assert closed["state"] == "closed" and closed["closed_at"]
+        for state in ("exited", "working"):
+            await feeder.call("hook", session=s["id"], state=state)
+        got = await c.call("get", id=s["id"])
+        assert got["state"] == "closed" and got["closed_at"] == closed["closed_at"]
+
+
 async def test_send_to_an_exited_record_is_refused_in_words(agent, hookstub, tmp_path):
     """Design §4.5a *Focus composer*, TD-078: a record with no turn to type into is refused by the
     **host agent**, not only by the page that disables its composer. Until 2026-09-20 an `exited`
