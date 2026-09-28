@@ -124,7 +124,7 @@ on a host.
 
 `.agentorc.yml` takes these keys and refuses any other: `adapter`, `worktrees`, `anchor`,
 `ledger`, `unattended`, `roles`, `controllers`, `ready_when`, `commands`, `teams` and `promote`
-(read, not yet run — TD-132) — **never `projects`**, which is the org's (design §5).
+(read by the home's promote, design §6) — **never `projects`**, which is the org's (design §5).
 
 **Ignore `.claude/worktrees/`** in the repo's `.gitignore` before the first start: every team
 session works in `<repo>/.claude/worktrees/<name>`, and a repo that does not ignore it leaves

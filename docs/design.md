@@ -238,7 +238,9 @@ first entry of `git worktree list --porcelain`, computed live, so it holds in a 
 runner finds its children beside itself, and a consumer's copy is what its last sync carried — and falls back to the directory's own copy outside a git repo (dev-cadence
 TD-055 (b), 2026-09-25): a worktree on an older branch runs the current hook set against itself, where
 `$CLAUDE_PROJECT_DIR` alone ran that branch's copy. One known limit, recorded and not fixed since the bytes are the pair: a consumer that is itself a git submodule gets its parent's `.git/modules` gitdir as the first entry, so the set silently does not run there. An unattended launch's layer also refuses the tool's own peer
-messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064). It uses the cadence line when
+messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064) and turns off the tool's
+suggested next prompt (`promptSuggestionEnabled: false`, TD-201): nobody reads one at an unattended pane, generating
+it spends usage after every turn, and it is the suspect for the event that woke an idle session after its `Stop`. It uses the cadence line when
 the session directory's own `.claude/settings.json` — the worktree's copy, the file the tool loads
 — does not already run those hooks (either shape of the line counts as wired, so nothing runs twice); a directory
 that wires nothing gets the current set, and the line is a no-op outside a dev-cadence consumer. A directory that wires them
@@ -250,7 +252,9 @@ need them without agentorc; only the wiring for agentorc's own sessions lives he
 The hook script (`agentorc-hook`) knows its session from `AGENTORC_SESSION` and its agent from
 `AGENTORC_HOME`; the host agent sets both on the tmux session at creation, explicitly, because the
 tmux server may predate the host agent and carry another environment
-([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). An event it cannot deliver because nothing
+([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). Beside them it sets `AGENT_NAME`, the name the Org shows
+(the automatic one for a blank name, with any shown suffix), for every adapter's session: dev-cadence's
+`prepare-commit-msg` hook writes it into a commit as a co-author (TD-185). An event it cannot deliver because nothing
 answers on the socket is appended to `events/<session>.jsonl`, stamped with when it happened, and
 the tick applies the file on its next pass — **except a queued state older than one that reached
 the record live meanwhile**, which is skipped (its session id, model and subagent count still
@@ -279,14 +283,20 @@ State transitions (Claude Code adapter):
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
 | `SessionStart` with `source: compact` (a compaction ends by firing it; a manual `/compact` fires nothing after) | no state change — the session is what it was, idle after a `/compact`, working mid-turn (TD-090) |
 | `SessionStart` with `source: resume` (`claude --resume` prints the conversation and waits at the composer; no `Stop` follows) | `idle` — a prompt given with the resume reports `working` through its own `UserPromptSubmit` (TD-155) |
+| `PreToolUse`, `PostToolUse` from inside a subagent (the tool sets `agent_id` only there) | no state change — a background agent runs on after its caller's `Stop`, and says nothing about the main composer (TD-201). So a permission a subagent's tool asks for, answered in the terminal rather than through **Allow** / **Deny** (which set `working` themselves), leaves the record `needs-you` with its old pending until the main thread's next event: the safer of the two errors, the other being a background agent wiping the main thread's question |
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
 | `Stop` | `idle` |
-| `ao new --at`, the New session **At** field | `scheduled` — a record with a name, a directory and a launch record but no pane yet; the host agent creates the session at the instant (§6 *Start time*; TD-026, designed 2026-09-25, not built — TD-152) |
+| `ao new --at`, the New session **At** field | `scheduled` — a record with a name, a directory and a launch record but no pane yet; the host agent creates the session at the instant (§6 *Start time*; TD-026, designed 2026-09-25, built 2026-09-27 — TD-152) |
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time (a metered profile's amount is not a cap and never makes it, §4.2a) |
 | `SessionEnd`, or tmux session gone | `exited` — the record's `pane` says whether a dead pane is still there to read (natural exit: yes; killed, or the tmux server restarted: no) |
 | person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
 | host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
+
+A tool event names itself to the host agent (`event`: `PreToolUse:Bash`), and the host agent logs the
+one that turns a hook-confirmed `idle` session `working`: an event that is not a turn's start once
+did that four seconds after a `Stop`, and the session read `stalled?` unrung for 13 hours (TD-201).
+The line is how the next one is named; a turn's own `UserPromptSubmit` is never logged.
 
 `unreachable` shows at the host level first: the host chip in the top bar goes hollow and one
 banner row in the Org says "laptop unreachable since 14:02 · 2 sessions". A `volatile` host asleep
@@ -419,7 +429,9 @@ model to the `--model` flag; other adapters map their own equivalents. Profiles 
 per host in `~/.agentorc/profiles.yml`.
 
 **How a profile is billed** (TD-128; designed 2026-09-25 by the designer, #547, and reconciled the
-same day in a cloud session with Paul; not built — TD-151): a profile carries **`billing`** —
+same day in a cloud session with Paul; the profile's `billing` and `prices` and the skipped poll
+built 2026-09-27 — TD-151 slice 1; the spend, the summed reading, the amount and the chip not yet):
+a profile carries **`billing`** —
 `subscription`, the default and every profile today, whose bound is the account's quota windows
 above; or **`metered`**, an API key (`ANTHROPIC_API_KEY`), a hosted open-weights model behind an
 OpenAI-compatible endpoint, or a second adapter billed the same way, with optional **prices per
@@ -480,12 +492,14 @@ class Adapter(Protocol):
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
-    def context(self, session_id: str, cwd: Path, profile: Profile | None) -> Context | None
-                                                          # the session's context size now — Context(tokens, at, window) — from the
+    def context(self, session_id: str, cwd: Path, profile: str) -> dict | None
+                                                          # the session's context size now — {tokens, at, window}, keyed by the
+                                                          # profile *name* as `model_in_use` is — from the
                                                           # tool's own records: Claude Code, the last top-level `assistant` entry's
                                                           # `usage` (input + cache_read + cache_creation), the tail read `model_in_use`
                                                           # makes, `window` the model's when known; None when it cannot tell (§6
-                                                          # rule 5, TD-188). Read on the tick for unattended records, never a grep
+                                                          # rule 5, TD-188). Read on the tick for unattended records once a minute,
+                                                          # never a grep (built — TD-190 slice 1)
     def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
                         before: int | None = None, turns: int = 20) -> Transcript | None
                                                           # the tool's transcript as neutral entries — a prompt, text, a thought, a
@@ -833,8 +847,8 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `restarts`, `restart_ceiling`, `restart_blocked`,
-  `lane_seen` (§6 rule 6, TD-187; not built — TD-195),
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `restart_blocked`,
+  `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
@@ -1438,7 +1452,7 @@ Screens:
       sits at the right.
    4. **What runs it, and what it reports**: tool · account · model at the left, on every card
       (a team's members commonly differ), then the **context reading** — *· 231k*, red past the
-      role's bound, absent where the adapter cannot tell (§6 rule 5, TD-188; not built — TD-190); the report line at the right — progress, and the
+      role's bound (the bound in its title), absent where the adapter cannot tell (§6 rule 5, TD-188, TD-190); the report line at the right — progress, and the
       findings count beside it — **a reference shown once** (`#359 · 1/2 done`, never
       `#359 → #359`).
    5. **The slot**, always two lines and a caption; a longer text is clamped, whole on hover and
@@ -1759,7 +1773,7 @@ Screens:
    resume → optional brief file → **Unattended** switch (off by default; disabled with "no
    `unattended:` block in `.agentorc.yml`" for repos without one; hidden for directory sessions).
    The same mode can be flipped later from the card or Focus header (§4.5a). A **Team** pick
-   (TD-160; not built — TD-173) puts the session in a team: its badge and group, its manager as a
+   (TD-160; built — TD-173) puts the session in a team: its badge and group, its manager as a
    controller, the team's reader for its held PRs (§4.9 *A person in the team*).
 4. **Resumable**: inactive sessions from each adapter's transcript locator (Claude:
    `list_sessions.py`-style index over `~/.claude/projects`), grouped by host/repo, name first
@@ -2248,13 +2262,13 @@ noted). If a control is not in this table it does not exist.
 | New session | **prompt chips** | the picked role's `prompts:` beside the Opening prompt (TD-161; built — TD-170), rebuilt with the Role pick (`/api/roles` carries them): a press fills the Opening prompt with the text — nothing runs yet, so nothing is sent — and a second press of another replaces it; the brief a preset fills is left as it is (the chip is a first prompt, the brief is the job) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above. Every side card is a fold remembered per browser, in reading order — Working, Git, Reports, Inbox, Members, Ready to close (open on an own session, **folded on a team member**, whose note says its team closes it), then **Session**, which starts folded and holds the profile, ids, directory, times, mode, run log, the stops control, and the grants and controllers chips (TD-156) |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
-| New session | **Team** picker | (TD-160; designed 2026-09-25, not built — TD-173) *none*, or a team of `org.yml` and the repos' `.agentorc.yml` (`ao team list`'s set). Picking one narrows Host and the Directory list to the team's host and projects, filters Role to the team's roles plus `plain`, prefills Controllers with the team's live manager, leaves Unattended off, sets the `team` badge, and fills the record's `review` from the role's or else the team's (§4.9 *A person in the team*) — with one line under the picker saying what that is: *held PRs read by techlead-ao-1 on src/sessionorc/**, docs/briefs/**, or *no reader: this team has no techlead seat*. The terminal's form is `ao new --team` |
+| New session | **Team** picker | (TD-160; designed 2026-09-25, built 2026-09-27 — TD-173) *none*, or a team of `org.yml` and the repos' `.agentorc.yml` (`ao team list`'s set). Picking one narrows Host and the Directory list to the team's host and projects, filters Role to the team's roles plus `plain`, prefills Controllers with the team's live manager, leaves Unattended off, sets the `team` badge, and fills the record's `review` from the role's or else the team's (§4.9 *A person in the team*) — with one line under the picker saying what that is: *held PRs read by techlead-ao-1 on src/sessionorc/**, docs/briefs/**, or *no reader: this team has no techlead seat*. The terminal's form is `ao new --team` |
 | New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `manager`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule (TD-040): the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked (the row below), so nothing it grants applies unseen |
 | New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `control`). Unchecked by default for every preset but `manager`; shown with a one-line warning of what the grant allows (TD-028): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and what is ticked is what the session starts with — an untick on a `manager` preset means the session does not get the grant |
 | card | **doing** line (the card's slot) | display only. The slot's order is §4.5 *The card's anatomy*, row 5 (TD-095): (a) what needs a person or explains a stop, (b) an ending — *exited · code N*, *closed by you*, *out of work*, *restart wanted* — (c) this line, (d) the tail or *at prompt*. *ready to close ✓* is the slot's caption and its Close button the foot's first; neither is slot text. The team's header does not show its manager's line. Within (c)/(d), first that applies: what needs a person (pending permission or question, hook channel, §4.2); the session's `doing` line (§4.8) with its age, *says · 11m ago*; the pane's tail — three lines while working, one when idle. The line replaces the tail only; the record keeps it either way. A session whose adapter's tail *is* the work (`shell`, a command run) has no `doing` line and keeps the tail; a TUI session that has said nothing falls back to it. Nothing here is a control and nothing parses it (TD-071 item 8) |
 | card / Focus header | **title** — the session's name as its tool holds it | display only, beside the session name, whenever the adapter's `title()` gives one (§4.3) and it differs from the session's name (on Focus too since TD-156) (TD-095: a team's members are titled by their names, and the same word twice is noise). Claude Code sets its terminal title to the conversation's name — the one a person gave it with the tool's own rename (*Error Checker*), else the tool's summary — and tmux holds it as `#{pane_title}`, read with the pane list each tick. Set in the tool, not here: agentorc has no rename of its own, since a second name kept in the record would drift from the one the tool shows in its own picker and resume list. A name and not a status, so it is always shown and is not a fallback for the doing line. The filter box matches it (TD-074) |
 | card | **report line** | row 4, at the right (§4.5 *The card's anatomy*, TD-095); a reference is shown once — `#359 · 1/2 done` where the entry's reference is the PR itself, never `#359 → #359` (the card's and `ao status -v`'s line is `report_line`'s). Shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, a manager's `last round 20:10 · 2 wrapped up`; an entry the host agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed`. **The PR's mark** (TD-182; built — TD-193): a PR that is no longer open carries one word after its number, *merged* or *closed* — `TD-066 → #158 merged · 3/3 done` — read from the repo readings of the record's repo (§4.4 *Repo facts*: the open list and the month's `recent`), as *team card: TDs in motion* marks its rows; an open PR carries no word, and a PR the readings do not hold (older than the month, another repo's, a reading that never succeeded) is left unmarked, never guessed. The mark is display only and changes nothing on the record. One formatter: `report_line` takes the readings' PRs beside the record, so the card, the compact card's line, the Members list and `ao status -v` say the same; the Focus **Reports** panel marks each row's PR link with the same word |
-| Focus side panel, **Session** card | **rounds** line | display only (§4.8 *A session's round log*, TD-175; not built — TD-191): one line of the Session card, under *run log*, holding the session's last two round-log lines with their stamps, *from an earlier run* where a line is older than this record's start, and *no round log* when there is none; the whole log is `ao log --tail`. Text a session wrote is only text (TD-071); no fold of its own, so the side panel's fold order is unchanged |
+| Focus side panel, **Session** card | **rounds** line | display only (§4.8 *A session's round log*, TD-175; built — TD-191): one line of the Session card, under *run log*, holding the session's last two round-log lines with their stamps, *from an earlier run* where a line is older than this record's start, and *no round log* when there is none; the whole log is `ao log --tail`. Text a session wrote is only text (TD-071); no fold of its own, so the side panel's fold order is unchanged |
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived (dashed). **Grouped by state** (TD-143; designed 2026-09-25; built by TD-150 — the groups, the *i* mark, Drop behind **more ▾** with its confirm, the route's refusal of a drop on a claim with a PR, the branch's PR as `review_pr`, and the `system` note; a declared claim's own `pr` is refused merged or open alike, since only `review_pr` knows it merged): *in progress* (claimed, no PR), *in review* (claimed with a PR — the entry's own `pr`, else the PR `sessionorc.reports` finds for the record's `tdNNN-*` branch, carried beside the claim as `review_pr` (§4.8); a derived entry never shares a declared one's reference, §9 invariant 10, so there is no third — drawn as *claimed · in review #532*, the number a link from a structured field), *done*, *dropped*, so a claim in review never reads as a claim not started, which is how two design PRs' claims were let go on 2026-09-24. The panel's explanation is the **i** mark at its heading (§4.5 screen 6's pattern), read before a press, not a note under the list. **Drop** sits behind the panel's **more ▾** on an *in progress* row only — never a primary button, and not offered while a PR from that claim is open — and its confirm names the consequence: *let go of TD-127's claim: the lease ends and another session may take it; its branch and any work on it stay; only designer-ao-1 can claim it again* — no branch by name, since a declared entry carries none and the session's checked-out branch may be another claim's. It is a host-agent RPC recorded as dropped by the person — a *declaration*, so the tick cannot undo it — and **the session is told** by a `system` note (§4.10): *your claim on TD-127 was dropped by the person — the lease is gone; claim again if you still hold the work* (no *from Focus*: the RPC cannot tell Focus from a person's `ao progress drop`), waking it as a person's act does; the session's own drop files none. A drop never has an open PR now, so its `why` is *dropped from Focus* and names none |
 | Focus side panel, Session card | **grants** chip | (in the header until TD-156) lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes), each with what the grant allows on its confirm |
 | Focus side panel, Session card | **controllers** chip | (in the header until TD-156) the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the host agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning (TD-036) |
@@ -2278,7 +2292,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
 | Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three restarts (§6, TD-186) |
-| Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; not built — TD-132; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row only and clears the failure — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is not a failure leaves when live catches up |
+| Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; built 2026-09-27 — TD-132 slice 3; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row only and clears the failure — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is not a failure leaves when live catches up |
 | Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | §4.8a *An alarm's answers* is the full text (TD-077). One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and counted: an alarm is a bug of ours or a session misbehaving, and a person should know which. Not built: under *Steering*, uncounted, while a techlead holds it (§4.8a *Who answers first*). The row lists the alarms in words — channel, what was claimed, the rpc, the count, first–last in the person's clock, *(others)* as *and n more distinct claims* — and the host's identity mode, since *observe* records what *enforce* would refuse. Two of the four are answers and only an answer ends the row (§4.10 *The Inbox is a queue*): **Dismiss** (wire name `identity_ack`) clears that list, the record's or the host's; trail *dismissed by you*. **Log TD** (`identity_log`) hands the alarm, in words the home composes from its fields, to the record's first live controller — read from the control graph, never a badge (`alarm_to`, the home's answer, which the RPC reads too) — as mail from the person that owes an outcome (§4.8a, TD-079's debt), clears the list; trail *logged by you → `<controller>`*. Drawn only where such a session exists — not on the host's row, not on a record with no live controller (a manager's own is one); elsewhere the row reads *no session answers for this one* (or *for the host's own list*); its confirm names that session and the outcome owed; a controller gone between draw and press is the agent's refusal, in words, as the toast, and the refreshed row says nobody answers. The other two act on the session and leave the row standing: **Open** focuses it while its record is here; **Suspend** (`rpc_suspend`) stops it at once — no wrap-up — keeps worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); offered only on a record's row while that session is live — not the host's row, not a record already suspended, `exited` or `closed`; its confirm says what it does. A suspended record's row says so in a flat mark — its only record, since a suspension ends no row and writes no trail; the mark is drawn wherever the record is (card, Focus header, Inbox state row), never pressable, with the when, who and why on hover, tolerant of a record another build wrote (it costs that card its mark, never the grid). No Unsuspend control anywhere, by design: a person's **Resume** and **Forget** lift it. The New session form's `suspended` verdict keeps Start enabled, since a person's create *is* the lift; the form prints the agent's sentence and adds what pressing Start does. All four are a person's own acts, caller-less and refused to every session as `inbox_delete` is (one exception, not built and never on a host that carries a person: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is a never-gated read — a session that could clear the list could erase evidence of its own forgery, one that could suspend could stop its rival. The host agent's log keeps every alarm, a line each. On the card the alarm is a mark and nothing more, as is *suspended*. A node's record is answered at that node: alarms are node-owned, an `id` naming another host is routed there (§4.4a step 4a), the node clears its list and the home takes the cleared record from the reply. **Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed. The host's own list is whichever host was asked, and never travels |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the text in its shape — the first paragraph drawn, the rest under *details* (row below; §4.10 *How a message to a person is written*, TD-127) — sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below |
 | Inbox row: **details** | one disclosure per mail row | §4.10 *How a message to a person is written* (TD-127; designed 2026-09-24, built 2026-09-25 — TD-138). A mail row — `ask`, `steer`, `note`, a reply, *answered for you*, a passed-up question — on the Inbox and in the Focus Inbox panel alike, draws its text's **first paragraph**, up to the first blank line, and the rest under a native `<details>` whose summary reads *details*: closed by default, a tab stop, `Enter` or `Space` on the summary as on any disclosure, remembered open per row while the page lives and never across loads (a fold is not state). Both halves are rendered from the closed markdown subset by the UI's own renderer (§4.10); the row's controls and suggested answers sit at the foot outside the fold, so a row is answered folded. **Backstop for text nobody shaped** — no blank line and longer than `FOLD_CHARS` (300): the first paragraph is the text up to the last sentence end before 300 characters, else the first 300, and the rest goes under *details*; a shorter text draws whole with no disclosure. A `steer`'s default, a passed-up question's recommendation and the suggested answers are fields, drawn where they are today, never inside the fold; the *answered for you* row's quotation is the question's first paragraph. The message page (§4.5 screen 6, TD-136) draws the same row with *details* open. A rendered link is the one thing on a row built from the text that is pressable, drawn as §4.10 says |
@@ -2312,18 +2326,18 @@ noted). If a control is not in this table it does not exist.
 | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (the create RPC refuses the same way) |
 | Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; any team folds, live or not, and by its header too (TD-183, row *team card: fold*), a team with something live opening unfolded; between the header and the cards sits the **summary** (its own row, below: the Repo, TDs in motion and Answer needed / Doing facets; on a team with nothing live it is drawn with the cards, behind the fold — TD-181), the header carrying no state chips since the member cards say it (TD-176, 2026-09-26), and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. A **concluded** team is drawn like a stopped one **and is never folded by the page** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*; since TD-183 it opens unfolded, and a person who folds it has read it); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live session carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — the rest exited or closed, and its seats (§4.9b) either absent or `idle` (a seat never declares; a `working` seat is answering somebody). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is offered and the team opens unfolded (above, row *team card: fold*); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. A team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own. **Who for what** (TD-162; built — TD-171): a second line on the header, generated from the `message:` field of every role the definition names, each with the session's name that holds it — *<line> → manager-ao-1 · <line> → techlead-ao-1 (on call) · Grinder: <line>*, the sentences themselves (§4.8) — so the choice of whom to write to is made at the team, before a card's Message; display only, hidden on a team whose roles carry no line, and on the phone the line wraps |
 | team card | **fold**: the header | (TD-183; built — TD-194) a click anywhere on a team card's header row that is not one of its controls, links or marks folds the card to that row, and a click on a folded row opens it — **any team, live, concluded or stopped**; the header shows the pointer and a hover tint, and the press is on `click` with no text selected, so a name can still be copied. The **▸ n sessions** button stays where TD-156 (f) put it, beside Start or Wind down, on every team with sessions: it is the same press, the control a keyboard and a screen reader reach (`aria-expanded`, `aria-controls` the card's body), and the header's click is its mouse target grown to the row. Folded, the card is the header alone: the summary and the members are hidden, nothing is unloaded, and deltas keep arriving. **Default and memory**: a team with something live, and a concluded one, opens unfolded; a team with nothing live opens folded; a press writes the choice, `fold:<team>` in the browser's storage, and a stored choice wins over the default whatever the team's state becomes — cleared by Settings' *Reset this browser*. **A folded live team's row** reads the counts by state in place of the session count (the chips the summary replaced return while the cards that say it are hidden), its marks — the needs-you count, *n ready to close*, *answered for you*, *PRs waiting*, ✉ n (row *team header ✉ n*, now on any folded team) — and its controls, Wind down and Stop now included. A member in `needs-you` puts the amber ring on the row (§4.5 screen 1 *Colour*), and **the row is not unfolded for it**: the fold is the person's, and the need is counted on the row, in the rollup and in the Inbox. **Keys** (row *Org: keys*): a folded team's header takes the place of its cards in the ring; `f` folds the team of the ringed card and the ring moves to its header; `f` or `Enter` on a ringed header opens it, the ring staying on the header. The filter is unchanged: a team none of whose sessions match is hidden, folded or not. *No team* is a section, not a card, and does not fold. Client-side, nothing written on any record |
-| card, Inbox row | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Org rollup's, a team header's): there the summary above says what the glyphs were for, and the word and colour carry the state (TD-176; Paul, 2026-09-26: *are those icons serving a real purpose?*). The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; not built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
+| card, Inbox row | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Org rollup's, a team header's): there the summary above says what the glyphs were for, and the word and colour carry the state (TD-176; Paul, 2026-09-26: *are those icons serving a real purpose?*). The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
 | Org | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.agentorc.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above); the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, or an idle seat — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it |
 | Org | team card: **Members…** | (TD-163; designed 2026-09-25, built 2026-09-26 — TD-172) beside Start on a stopped team and beside Wind down on a live one: the dialog of §4.9 *Add or remove a member from the team card* — the definition's manager, techlead seat and member entries, each with the session holding it, **Add member** and **Remove**. Absent on a team defined in a repo's `.agentorc.yml` (a note says *defined in the repo — edit it by PR*) and on *No team* |
 | Members dialog | **Add member** / **Remove** | **Add member**: role, name (defaulted to the team's pattern) and lane, then one press: `org.yml` edited as text in place (a `count:` bumped, or one member line appended), re-parsed, and on a live team the member created under the manager as `ao team start` creates one — refused with the reason when the edit cannot be one line or the file fails to parse, the bytes restored. **Remove**: a confirm naming the file edit and, on a live member, the wind-down it sends (Wrap up's, never a kill); the record stays a card until Forget. The manager and the techlead seat carry no Remove. A person's act, through the UI process, never the host agent (§4.4a: the org file is the clients') |
-| Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1). Live, stopped, concluded and wound down are read over the team's **unattended** sessions, and Wind down's and Stop now's confirm name a person's session in the team apart — *your session main-ao stays: a team act never stops an interactive session* — and leave it alone (§4.9 *A person in the team*, TD-160; not built — TD-173) |
+| Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1). Live, stopped, concluded and wound down are read over the team's **unattended** sessions, and Wind down's and Stop now's confirm name a person's session in the team apart — *your session main-ao stays: a team act never stops an interactive session* — and leave it alone (§4.9 *A person in the team*, TD-160; built — TD-173) |
 | Org | team header **✉ n** | display only: on a folded team's header (any folded team, live or not — TD-183, built by TD-194), the sum of its folded sessions' unread counts — the count each card's **unread** chip shows, which the fold hides; nothing at zero, and gone while the team is unfolded or a filter shows its cards. The mail stays where it is: unread never ages out (§4.10 *The lifecycle of an entry*), and a start under the same name moves the old record's mail to the new session (§4.10, TD-081), so what a folded team holds unread is what its next run reads first. Unfold to read or dismiss it (TD-071 item 2) |
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is a plain session |
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026). On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *none — set* in the Session card's row rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs; the identity line's note appears only once a time is set (TD-156). Setting a different time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill |
-| card / Focus header | **starts** note | designed (TD-026, §6 *Start time*; not built — TD-152): on a `scheduled` record, *starts 20:00* (or *starts Mon 20:00*) in the host's local clock, by the *stops* formatter, in the card's slot as *what explains a stop* would be (§4.5 row 5 (a)); on **Focus** it is the control that moves it — click for a time, or *now* — as the stops note edits the stop time, and the host agent refuses exactly as `ao at` does. Focus on a `scheduled` record has no terminal (as **Details** on a closed record) and a banner: *starts 20:00 · **Start now** · **Cancel*** — Cancel confirms and forgets the record, which ran nothing; the card carries the same two under `more ▾` |
+| card / Focus header | **starts** note | designed (TD-026, §6 *Start time*; built 2026-09-27 — TD-152): on a `scheduled` record, *starts 20:00* (or *starts Mon 20:00*) in the host's local clock, by the *stops* formatter, in the card's slot as *what explains a stop* would be (§4.5 row 5 (a)); on **Focus** it is the control that moves it — click for a time, or *now* — as the stops note edits the stop time, and the host agent refuses exactly as `ao at` does. Focus on a `scheduled` record has no terminal (as **Details** on a closed record) and a banner: *starts 20:00 · **Start now** · **Cancel*** — Cancel confirms and forgets the record, which ran nothing; the card carries the same two under `more ▾` |
 | card / Focus header | **paused · usage** mark | built (TD-100 slice 3): when the record carries `gated` (§6 *Usage gate*), the slot's first line — *what explains a stop*, §4.5 row 5 (a) — reads ***paused · usage** — `<profile> <label> n% ≥ line%`, line moves `<when>`* (*resets `<when>`* when `next` is the window's `resets`, as a flat reserve's always is), with *· pause sent* once `gated.sent_at` is set — and, when the pause is under a team's reserve priority (`gated.team_extra`, §6, TD-146), ***paused · usage (ao-grind +10)** — …* with the team's line — composed by the page from the record's fields, never from anything the session said; row 5's *one text, the first that applies* holds — a pending permission or question, a `limited` reset or a `stalled?` note takes the slot and the mark waits for it to clear (§6: a person is needed for those, not for the pause), while the Focus header shows the mark regardless; the state pill stays `idle` (or `working`, until the pause prompt is taken). A mark, not pressable. The Focus header shows the same line and, on an unattended session, nothing to press: the way out is **Take over** (the person's send is not refused) or a lower reserve (`ao gate`), and under a team's priority a lower one of those too (`teams.<team>.reserve`, which the hover names). It goes when `gated` does — the resume send clears it |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Refused on a session that is not **Unattended**, since policies leave interactive sessions alone (§4.2); empty means nothing stops it (§6, TD-026) |
-| New session | **At** field | designed (TD-026, §6 *Start time*; not built — TD-152): the start time the session waits for: `20:00` (the next one, in your clock), `+2h`, or an ISO time; empty means start now. Refused on a session that is not **Unattended**, as **Until** is, and refused with an Until that is not after it; Start then creates a `scheduled` record and the Org shows its card with the *starts* note |
+| New session | **At** field | designed (TD-026, §6 *Start time*; built 2026-09-27 — TD-152): the start time the session waits for: `20:00` (the next one, in your clock), `+2h`, or an ISO time; empty means start now. Refused on a session that is not **Unattended**, as **Until** is, and refused with an Until that is not after it; Start then creates a `scheduled` record and the Org shows its card with the *starts* note |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line (TD-053). On a card it moves into the slot (TD-095): the fixed words, then the first line of the reason as text, clamped, the whole of it and the time of the declaration on hover — and no age of its own, since a card has one clock; the Focus header keeps the chip. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a). The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller does not act on one — so it is drawn as wanting a person instead |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a, TD-053); on the team's card, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
@@ -2530,9 +2544,10 @@ it is why the terminal rides the host agent's pipe and why the adapter contract 
   a real terminal. No per-session escape: a setting over which drag selects is the thing this
   removes. **Copy on select** is the one choice left, and it is the person's (§4.5a *Focus:
   copy on select*, §5 `person.terminal.copy_on_select`).
-- **The round log** (§4.8 *A session's round log*, TD-175; not built — TD-191) sits beside the run
-  log, `~/.agentorc/runs/<name>.rounds.log`, keyed by the record's name in its repo so a start under
-  the name continues it, and is pruned with the run logs of that name by the rule below.
+- **The round log** (§4.8 *A session's round log*, TD-175; built — TD-191) sits beside the run
+  log, `~/.agentorc/runs/<base id>.rounds.log` — the record's base id, `ao-<repo>-<name>` (§4.1),
+  which is its name in its repo — so a start under the name continues it. It is pruned by the rule
+  below, as a run log is, and kept while any record of that name is live.
 - **Run-log retention.** A session's log is bounded by its lifetime; retention is by age: logs
   of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the agent's
   tick. Live logs are never truncated, so invariant 3 holds while the session exists.
@@ -2602,15 +2617,15 @@ for another's, since the channels are ungated:
 - `ao progress none --why "..."` — the session found no work it may pick (§4.9a, TD-053);
 - `ao progress restart --why "..."` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*, TD-083);
 - `ao finding TD-029 --priority low`;
-- `ao log "<line>"` appends one stamped line to the session's round log, `ao log --tail n` reads it back (§4.8 *A session's round log*, TD-175; not built — TD-191): the manager's memory across runs, its own record only, never a report;
+- `ao log "<line>"` appends one stamped line to the session's round log, `ao log --tail n` reads it back (§4.8 *A session's round log*, TD-175; built — TD-191): the manager's memory across runs, its own record only, never a report;
 - `ao status -v` prints the same report line the card will, and `--json` the entries. A PR that
   is no longer open is marked as the card marks it, `TD-066 → #158 merged` (§4.5a card **report
   line**, TD-182; built — TD-193): the CLI reads `repos` once per call, and where that read is
   refused (a node offline) or holds no such PR the line is printed unmarked. The mark is in the
   text only; `--json` carries the entries as the record holds them.
-- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k* — and `--json` the `context` field (§6 rule 5, TD-188; not built — TD-190).
+- `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k*, and *(over)* past it — and `--json` the `context` and `context_bound` fields (§6 rule 5, TD-188, TD-190).
 
-**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, not built — TD-173: today it sets the badge and nothing else) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
+**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, built 2026-09-27 — TD-173 slice 1) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
 
 **Presets and grants.** `ao new --role grinder --lane TD-027,TD-019` (TD-028, TD-040,
 `agentorc.repoconfig`): the preset fills the brief from its template with `{lane}` filled and `--brief <path>` in its `{repo}` slot (§4.8; `--prompt` is raw text and fills nothing, and is refused beside `--brief`), the
@@ -2664,7 +2679,7 @@ own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it
 **`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, built by TD-176 slices 1, 2 and 6; the reader standing is read from the techlead seat's inbox, which a session may not read, so a session's `ao repo` shows none and a person's does):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
-entries, the board items due, and what the servicing team's members hold; `--all` prints every
+entries (High first, each with its priority: §4.8 *Choosing in a free-pick lane*), the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
 balance rule exists (§10, TD-177), and what a person reads instead of the page.
 
@@ -2697,18 +2712,23 @@ other configured value lives and when it is re-read, which is the page's *i* mar
 reserve <team> 0` clears the priority; `ao schedule`'s key path (`teams.<team>.schedule`) is TD-133's,
 with the schedule itself.
 
-**`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; designed, not built — TD-132): the
+**`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; built 2026-09-27 — TD-132 slice 2, all
+but `--sha`, below): the
 press from a terminal. `ao promote [<repo>] [--sha <commit>]` promotes the registered checkout —
 the current directory's repo when none is named — to main's head, or to `--sha` for a rollback or
 a hotfix, through the `promote` RPC at the home, **refused to a session** (a person's own, as
 `set_settings` is; a worker never promotes, CLAUDE.md) and refused, naming which, on §6's
 preconditions (1) and (3); on (2) it says what the checks read and goes on, since the press is the
-person's word. It returns once the run is started, with the log's path: the outcome is `check`'s
+person's word; a repo whose live is main's head already is refused as having nothing to promote,
+and one with no block says so. It returns once the run is started, with the log's path: the outcome is `check`'s
 on a later tick, as §6 says, and for this repo the command's own host agent goes away under it.
 `ao promote status` prints every promotable repo's readings — *agentorc · live 485d28b · main
 9c1e0f2, 3 ahead · checks green · auto off*, in flight or failed with the log — and `--json` the
 `promotes` field of `host`. `ao status -v`'s build line stays: it is this repo's `check` read from
-the client's side, and the one line a session may read.
+the client's side, and the one line a session may read. **`--sha` is refused for now**: `run`
+installs the checkout's tree, which precondition (1) holds at main's head, so how a rollback's
+commit would reach `run` is not designed (TD-132). Dismiss's half is the `clear_promote` RPC, a
+person's own as `promote` is; both are home edits a node forwards or refuses (§4.4a).
 
 **`ao schedule`** (TD-026; §6 *Schedule*, §5 `settings.yml`; designed, not built — TD-133): with no
 arguments prints every team's rule and when it next fires — *ao-grind · starts at the reset of
@@ -2718,7 +2738,7 @@ grind's week — Thu 07:00*, or *no schedule*; `ao schedule <team> reset --profi
 which the host agent does not read) and that an adapter of the profile reports the label, and
 refuses naming which; the rule takes effect on the next tick.
 
-**`ao new --at`, `ao at`** (TD-026; §6 *Start time*; designed, not built — TD-152): `ao new
+**`ao new --at`, `ao at`** (TD-026; §6 *Start time*; built 2026-09-27 — TD-152): `ao new
 --unattended --at 20:00 | +2h | <ISO> …` creates a `scheduled` record and prints *starts 20:00*;
 `ao at <session> <when>` moves a scheduled start, `ao at <session> now` starts it at once, and
 `ao close` on a scheduled record cancels it. Parsed as `--until` is — *the next 20:00* is a
@@ -2884,8 +2904,7 @@ manager controls.** Prior art: [ADR 2026-09-12](decisions/2026-09-12-orchestrato
   `set_grants`: a person at a terminal or the UI always may; a session only if it already
   controls that target. Control is handed on, never seized.
 
-**A session's round log: `ao log`, never a commit (TD-175; designed 2026-09-26, not built —
-TD-191).** Paul, at a manager's card reading *18 unpushed*: *is making round-by-round commits on the
+**A session's round log: `ao log`, never a commit (TD-175; built — TD-191).** Paul, at a manager's card reading *18 unpushed*: *is making round-by-round commits on the
 manager's branch the right design?* It was not: the manager template's round step appended one line
 per round to a file on its launch branch and committed it — a save-point branch by another name, a
 git write into the checkout's shared object store every round, a file nobody reads from git, and a
@@ -2893,13 +2912,14 @@ count under Ready to close's unpushed signal, which exists for work at risk. **T
 stays; git goes.** The narrative it gives — one line per round that outlives a run, which the run
 log (§4.6) does not, since a restart starts a fresh one — has a git-free home: **`ao log "<line>"`**
 appends the line, stamped, to the session's **round log**, a file the host agent that runs the
-session keeps beside its run log (`~/.agentorc/runs/<name>.rounds.log`, keyed by the record's
-**name in its repo** rather than by the run, so a start under the same name — a restart, a resume,
+session keeps beside its run log (`~/.agentorc/runs/<base id>.rounds.log`, keyed by the record's
+**name in its repo** — its base id, §4.1 — rather than by the run, so a start under the same name — a restart, a resume,
 the next night's `ao team start` — continues the file, as the name carries its mail, §4.10), and
 pruned with the run logs (`runs_keep_days`). A restarted manager's first read is **`ao log --tail
 n`** — its own words from the previous run, in the place `ao inbox` and `ao status` already are,
 so nothing is replayed from a run log or a branch. Its own record only, as `doing` is (§9 invariant
-14); a line is text, never a control (TD-071); `--json` prints the entries. **It is not a report**:
+14) — a person reads it, by `--id`, and never writes it; a line is text, never a control (TD-071),
+stamped to the minute and cut at 500 characters; `--json` prints the entries. **It is not a report**:
 `progress` and `findings` stay the declared record (§4.8), `out_of_work` the ending, the board what
 waits on the person, and the night report (TD-110) the person's morning read — the round log is
 the manager's memory across runs and nothing else's, and a person who wants it has the **rounds** line
@@ -3148,13 +3168,26 @@ field for every role the team defines, in the definition's order: a role one ses
 sentences themselves, since no other field is designed (the shorter phrases this paragraph once
 gave as its example, *questions → manager-ao-1*, are not derivable from them). `ao roles` prints it.
 
-**A role has a context bound (TD-188; designed 2026-09-26, not built — TD-190).** A preset or a
-`roles:` entry may carry **`context: {bound: 200k}`** — the reading past which §6 rule 5 tells a
+**Choosing in a free-pick lane (TD-202).** A `free-pick` worker chooses by priority: High, then
+Medium, then Low (the ledger has no Critical), ties in the ledger's order. It chooses among the
+entries whose header says `Pickable: yes` (TD-118), less what its brief excludes and what a live
+sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities, beside what
+each live member holds, read from the main checkout, which the worker confirms on `origin` before
+it claims. Passing over a higher entry needs a reason: a lease, an exclusion, a `Blocked by:`, or
+the entry's own status. The claim's first `ao doing` line names the entry's priority and, where a
+higher one was passed over, why. The page can then show whether a High was passed over (TD-203).
+Nothing checks the pick: it is the worker's judgement, said where it can be read.
+
+**A role has a context bound (TD-188; built — TD-190).** A preset or a
+`roles:` entry may carry **`context: {bound: 200k}`** — a token count written as the reading is
+(`200k`, `1M`, `1.5M`), or a plain integer — the reading past which §6 rule 5 tells a
 supervised member to end its run: the built-in worker presets (`grinder`, `hunter`, `auditor`) carry
 200k, Paul's number from grinder-ao-1's 462k run, and `manager`, `techlead` and `plain` carry none
 (a manager restarts on its own rules, a seat is short, a plain session is often a person's).
 Layered as every preset key is; `none` removes it. A definition, not a setting: it is part of what
-the role is, as `review:` is, and changes by PR or by hand in `org.yml`.
+the role is, as `review:` is, and changes by PR or by hand in `org.yml`. It is checked when the file is
+read (a typo is a line naming the key), and the start writes it onto the record as **`context_bound`**,
+in tokens, as it writes `review`; `ao roles` prints *context bound: 200k*.
 
 **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** (one line,
 40 characters at most, checked when the file is read) — *Manager*, *Tech Lead*, *Grinder*,
@@ -3647,10 +3680,10 @@ member's name. `ao team status <name>` is the manager's Members view for a termi
 with state, lane and report line. `ao team list` shows every definition, its source file, and
 whether it is live. A team is **live** when any **unattended** session carrying its badge is live
 (a person's own session in the team keeps nothing live, *A person in the team* below; TD-160, designed
-2026-09-25, not built — TD-173: today every session with the badge counts); there
+2026-09-25, built 2026-09-27 — TD-173); there
 is no team record — a stopped team is only its definition.
 
-**A person in the team (TD-160; designed 2026-09-25, not built — TD-173).** Paul: *I should
+**A person in the team (TD-160; designed 2026-09-25, built 2026-09-27 — TD-173).** Paul: *I should
 start having interactive sessions on the team itself to prove the project and get the benefits —
 tmux stays alive, and PRs get routed through the techlead.* The mechanism was already here — a
 `--team` session with a role whose preset carries `review:` gets the reader a grinder does
@@ -3687,6 +3720,9 @@ session form had no Team field, and nothing said what a team act does to a perso
 - **The CLI**: `ao new <name> --team <team>` is the terminal's form of the same start — the badge,
   the group, the manager as a controller, the team's reader — and its help line says so, in place
   of *a badge, nothing keys on it*, which stays true of the badge and was read as *this does nothing*.
+  It prints the reader the session got, or *no reader*, and a team the org does not define stays a
+  badge, said once. `ao team stop` leaves a person's session in the team alone and prints its
+  *stays* line; with only a person's session live it stops nothing and says so.
 
 **Add or remove a member from the team card (TD-163; designed 2026-09-25, built 2026-09-26 — TD-172).**
 Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the
@@ -3848,7 +3884,7 @@ pace by design — a wake is bounded (§4.10), and the doorbell rings once.
 plenty. The manager winds the team down when **every** member is finished; until then an
 out-of-work member is simply not sent to and not restarted — by its manager; the one thing
 that reaches it is the host agent's note that its lane gained entries (§6 *Keeping a team
-running* rule 6, TD-187; not built — TD-195). The wind-down itself is `ao team
+running* rule 6, TD-187, TD-195). The wind-down itself is `ao team
 stop`'s sequence and nothing new — wrap up the members, wait for them to settle, then the
 manager — so there is one code path and the order is the order (§4.9).
 
@@ -3931,7 +3967,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   other: a session is out of work or it wants another run at it, never both.
 - **When.** *Your context is long* is not a number a session can see; §6 rule 5 gives it one: the
   tick tells a supervised member, between entries, that its context reading is over its role's bound,
-  and a busy one reads it at the end of every `ao` reply (TD-188; not built — TD-190). The
+  and a busy one reads it at the end of every `ao` reply (TD-188, built — TD-190). The
   declaration stays the member's.
 - **What a controller does with it.** A member carrying `restart_wanted` that is `idle`, or
   `exited` by a natural exit — a kill or a Close is never undone (§6 rule 2) — **with nothing
@@ -3984,8 +4020,7 @@ more likely failed to look.
 **Out of work does not mean out of reach.** An out-of-work session that is still alive keeps its
 inbox, and mail may wake it within the wake budget (§4.10, §9 invariant 13): a message is exactly
 how *there is work now* would arrive, and the host agent sends it when the member's lane gains an
-entry (§6 rule 6, TD-187; not built — TD-195: until then nobody sends it, and a person's
-message is the only way in). A session that has exited has no inbox, and the way to
+entry (§6 rule 6, TD-187, TD-195). A session that has exited has no inbox, and the way to
 bring it back is the way it started — `ao team start`, which is already the restart (§4.9). A
 wound-down team is only its definition again, as a stopped team is.
 
@@ -4501,7 +4536,7 @@ to a person reads *budget spent*; from a session the same function sees the budg
 without waking it: its wake budget is spent, read on its next look* — the `wake_budget_spent` the
 `msg` reply already carries, as one sentence. **The kind**: the seat's sentence is the only one the
 kind changes, and it changes as the person switches `ask` ↔ `note` in the composer, before typing;
-an `ask` adds its bound (*an ask takes the default bound of n h*, after every sentence but the seat's note, its own bound where the sender gave one). A `reply` reads as a `note` does. A record on another host whose link is down reads the `unreachable` row whatever its last state, since the home overlays that on the view rather than the record. The `scheduled` row arrives with its state (TD-152); until then no record reads it.
+an `ask` adds its bound (*an ask takes the default bound of n h*, after every sentence but the seat's note, its own bound where the sender gave one). A `reply` reads as a `note` does. A record on another host whose link is down reads the `unreachable` row whatever its last state, since the home overlays that on the view rather than the record.
 The sentence names states in the page's words (*on call*, *wrapping up*) and never a field's; it is
 advice, never a refusal — a note to a seat lands and waits, as `ao msg` delivers to an exited record,
 because refusing it would turn information into a question just to get it delivered, which this
@@ -4535,7 +4570,10 @@ sender's:
   `progress` and `finding` — ends its output with the same line while the caller has unread mail,
   with `(wake budget spent)` appended while it is, which is how a session learns that mail is
   landing without waking it. It types nothing, starts nothing, needs no counter, and reaches a
-  session at exactly the moment it is reading agentorc's output.
+  session at exactly the moment it is reading agentorc's output. While the caller's context reading
+  is past its role's bound (§6 rule 5), the line carries *(context 231k over the 200k bound)* too,
+  and stands alone as *[agentorc] (context 231k over the 200k bound) — finish the entry in hand,
+  then declare* when nothing is unread.
 - **Waiting on mail is ending the turn.** A session with nothing to do but wait for a reply ends
   its turn: the reply, a `steer`'s lapse at its bound (the `system` note, uncharged) and any other
   mail ring it once it is hook-confirmed `idle`. A loop on `ao wait` or `ao inbox --unread` keeps it
@@ -5378,7 +5416,8 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
 ```
 
-  **`promote:`** (TD-120 step 2, designed 2026-09-24; not built — TD-132; the block is accepted and
+  **`promote:`** (TD-120 step 2, designed 2026-09-24; read by the home since TD-132 slice 1, run
+  under `auto` alone until the press is built; the block is accepted and
   checked already — `run` and `check`, both required, `auto` refused as `settings.yml`'s — so
   writing it does not break `ao new`, TD-149) is the repo's own
   answer to *how does `main` become what is running*, and nothing in agentorc names pip, a venv,
@@ -5461,7 +5500,8 @@ code and needs no grant; a session doing the same work does.
   an expiry, and calendar-shaped schedules (TD-026; the one start rule designed is *Schedule*,
   below).
 - **Start time** (`start_at`; TD-026, decided by Paul 2026-09-25 — *keep start_at and a
-  scheduled state for one session as well*; designed the same day, not built — TD-152): the stop
+  scheduled state for one session as well*; designed the same day, built 2026-09-27 — TD-152):
+  the stop
   time's twin. `ao new --unattended --at 20:00 | +2h | <ISO>` (and the New session form's **At**
   field, §4.5a) creates the **record now** — the name taken under §4.1's rule, the worktree made,
   the launch record written (`launch/<id>.json`, the same one a restart replays, *Keeping a team
@@ -5482,6 +5522,16 @@ code and needs no grant; a session doing the same work does.
   person's press with a clock on it, replayed from a launch record, never a definition re-read.
   The card and the Focus header show it as the **starts** note (§4.5a), `ao status -v` prints
   *starts 20:00* by the same formatter as *stops*, and the New session form takes it.
+  In the agent: the record carries `start_at` (home-owned, as `run_until` is) and ranks between
+  idle and exited; `create` with `start_at` writes it, and the tick's replay passes `start_of`,
+  naming the record it starts, so the create supersedes it in place — its mail moved to the
+  session — rather than refusing it as the live holder of its name and slot. The usage gate and the
+  stop time pass a scheduled record by: it has nothing running to pause or stop.
+  Starting a scheduled record supersedes it and takes its mailbox, so `start_of` is an act on that
+  record: a person's, or one of its controllers' — as `keep_mail` is (§4.9b, §9 invariant 11); the
+  tick's own start carries no caller. At the restart ceiling the record is a person's: a person's
+  new time (`ao at`) spends the ceiling and the failed starts' count, while a controller's is
+  refused, naming the ceiling, and below it moves the time and leaves the count.
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
   built, and the manager preset is silent on the four rules). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
@@ -5615,7 +5665,7 @@ code and needs no grant; a session doing the same work does.
   performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
   does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
   background because a tool call is capped at ten minutes.
-  5. **Context bound** (TD-188; designed 2026-09-26, not built — TD-190). A supervised member whose
+  5. **Context bound** (TD-188; built — TD-190). A supervised member whose
      **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
      kept beside the tokens, since the model may change mid-run) is over its role's
      **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,
@@ -5629,13 +5679,15 @@ code and needs no grant; a session doing the same work does.
      says what that means — finish the entry in hand, then declare. The declaration is the member's
      (§4.9a *A run that ends with work left*, §9 invariant 14) and rule 2 restarts it; the line is
      the trigger the brief's *your context is long* never had. Ordered as the doorbell is: a wrap-up
-     under way or a gate pause beats it. **Not compaction**: Claude Code documents no settable
+     under way or a gate pause beats it, and a member that has declared already (out of work, a restart
+     wanted) or is a seat is not sent it; a member on a node is not told yet, as rule 4's is not. The
+     reply clause is read at the home: a read a node serves alone carries none. **Not compaction**: Claude Code documents no settable
      auto-compact threshold, no way for another process to send `/compact`, and no hook before it,
      its summary is lossy and keeps merged work, and it is one tool's — so the bound restarts, which
      every adapter can do, and compaction stays what a person types into their own session. The
      reading is drawn whether or not a bound is set (§4.5 *The card's anatomy* row 4, `ao status -v`):
      *460k is a lot* was seen on a card that said nothing.
-  6. **New work in a lane** (TD-187; designed 2026-09-26, not built — TD-195). A member that
+  6. **New work in a lane** (TD-187; designed 2026-09-26, built — TD-195). A member that
      declared `out_of_work` is never sent to (§4.9a), and filing a ledger entry sends no mail, so
      nothing told a finished member that its lane had gained work: the designer slept through
      four entries filed within two hours of its declaration. The tick tells it. For a supervised
@@ -5665,7 +5717,9 @@ code and needs no grant; a session doing the same work does.
      appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
 
-- **Promote** (TD-120 step 2; designed 2026-09-24, not built — TD-132): a repo's live copy — the
+- **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
+  `sessionorc.promote`; the press — `promote`, `clear_promote`, `ao promote` — slice 2; the Inbox
+  row slice 3; this repo's block not yet): a repo's live copy — the
   host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`
   by **a person's press or this policy, never by a session** (CLAUDE.md: a worker never promotes;
   the `promote` RPC is refused to a session as `set_settings` is, §4.7). It runs **at the home**
@@ -5678,7 +5732,11 @@ code and needs no grant; a session doing the same work does.
   `origin/main` of the checkout after the home's own `git fetch origin main` (a policy that acts
   is not hostage to whoever last fetched); **checks**, the CI verdict on main's head read with
   `gh` — `green` when every check run has concluded and none failed, `pending`, `failed`, or
-  `unknown` with why (no `gh`, no remote, a rate limit). **Three preconditions** stand between
+  `unknown` with why (no `gh`, no remote, a rate limit, no check runs at all — a commit CI has not
+  looked at is not a green one). *When main moved* is its head's committer time (a squash merge
+  stamps it), so the settle and the row's age survive a restart of the home; the readings
+  themselves are held in memory and re-read at start, and what must survive one — a run in
+  flight, a failure — is in the intent files below. **Three preconditions** stand between
   the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
   `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree,
   and a branch checked out there or a change left in it would go live (the tree is a person's, so
@@ -5695,18 +5753,21 @@ code and needs no grant; a session doing the same work does.
   intent file `~/.agentorc/promotes/<repo>/inflight.json` — `{sha, at, pid, log, by}`, `by` being
   `auto` or the person — is written **before** the start, because for this repo the run restarts
   the host agent that started it: **the outcome is read from `check` on later ticks, never from
-  the run's exit code**, and the agent that judges it need not be the one that started it (a
+  the run's exit code** (`check` read every fifteen seconds, `PROMOTE_WATCH`, while it is in
+  flight), and the agent that judges it need not be the one that started it (a
   restart mid-run finds the file and carries on — which is exactly how this repo's own promote
   concludes). Live reads the wanted commit → done: the file cleared and a `system` note to the
   person inbox, *promoted `<repo>` `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the
   nodes follow §4.4a as today. The process gone with live still elsewhere, or `PROMOTE_BOUND`
-  (twenty minutes) passed — the process killed at the bound as the stop time kills — → **failed**:
+  (twenty minutes) passed — the process killed at the bound as the stop time kills, and only
+  while it is still the run: the intent keeps the process's start time beside its pid, so after a
+  restart of the home a pid taken again by another process reads gone and is never killed — → **failed**:
   `failed.json` `{sha, at, log, exit, why}` beside it, the Inbox row under *Needs you*, and
   **nothing further is promoted for that repo, auto or press, until the person clears it** — the
   row's Dismiss, or a press that succeeds. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
-  contract, and a blocked `wait` ends with the socket as §4.7 says. Until built, the anchor
-  promotes by hand as CLAUDE.md says.
+  contract, and a blocked `wait` ends with the socket as §4.7 says. Until this repo's block (TD-132
+  slice 4) lands, the anchor promotes by hand as CLAUDE.md says.
 - **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general

@@ -335,6 +335,17 @@
       // design §4.5a Focus header **stops** badge (§6, TD-026): the same shape — the person types
       // a time, the agent parses it and says no if it cannot. Empty clears it, deliberately: a
       // session that should run on is a decision, not a restart.
+      // design §4.5a **starts** note / **Start now** (§6 *Start time*, TD-152): `now`, or the time
+      // asked for when the note itself is pressed on Focus
+      if (action === "start") {
+        let at = b.dataset.at || "now";
+        if (b.dataset.ask) {
+          const when = prompt("Start this session at… (20:00, +2h, an ISO time, or now)", "now");
+          if (!when) return;
+          at = when.trim();
+        }
+        body = { at };
+      }
       if (action === "stop") {
         // Filled from the record, not from the badge: the badge reads "stops Mon 06:00" once the
         // stop is not today and gains "· wrap-up sent" after the agent has asked, and both of
@@ -380,6 +391,9 @@
       // §4.8a *An alarm's answers* (TD-077 b): **Log TD** — an answer, so the row goes. The agent
       // picks the controller and writes the words; the page sends only whose alarms they are.
       if (action === "identity_log") body = { id: b.dataset.who || "" };
+      // design §4.5a **Inbox row: promote** (TD-132 slice 3): **Promote** and a failure row's
+      // **Dismiss**, the person's own, to `/api/person/<action>` with the repo alone
+      if (action === "promote" || action === "clear_promote") body = { repo: b.dataset.repo };
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
@@ -480,6 +494,8 @@
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
+      if (action === "promote") AO.toast(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
+      if (action === "clear_promote") AO.toast(res.cleared ? "the failure is cleared: promoting goes on" : "no failure stood", true);
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
@@ -498,6 +514,7 @@
       }
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
+      if (action === "start") AO.toast(res.start_note ? `${res.start_note} — the agent starts it then` : "starts on the next tick", true);
       if (action2 === "controllers") {
         AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
         if (typeof AO.refreshMembership === "function") AO.refreshMembership();
@@ -1109,6 +1126,8 @@
     const d = new Date();
     if (when === "1h") { d.setHours(d.getHours() + 1); return iso(d); }
     if (when === "tomorrow") { d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return iso(d); }
+    if (when === "1d") { d.setDate(d.getDate() + 1); return iso(d); }  // the promote row's (§4.5a)
+    if (when === "1w") { d.setDate(d.getDate() + 7); return iso(d); }
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     const s = prompt("Snooze until… (YYYY-MM-DDTHH:MM, your own clock)", local);
     if (!s) return null;
@@ -1861,6 +1880,7 @@
         role.value = [...role.options].some((x) => x.value === keep) ? keep : "plain";
         picker.dataset.default = (o.controllers || []).join(",");
         rnote.textContent = o.error ? `⚠ ${o.error}` : (o.file ? `presets from ${o.file}` : "a preset fills the brief, lane, grants and profile it names; each can be edited before Start");
+        teamRoles();
         applyRole();
       } catch (e) { /* the built-ins rendered with the page still stand */ }
     }
@@ -1925,10 +1945,49 @@
     if (proj) proj.addEventListener("change", applyProject);
     dir.addEventListener("change", applyProject);
 
+    // The Team picker (design §4.5a New session **Team**, §4.9 *A person in the team*, TD-173):
+    // the team's checkouts in the Directory list, Role narrowed to its roles plus `plain`, its live
+    // manager ticked under Controllers, Unattended left off, and the reader its held PRs get — the
+    // one line /api/team_review answers for the team and the directory. "none" undoes all but the
+    // ticks, which are the person's by then.
+    const teamSel = $("#team"), tnote = $("#teamnote");
+    const TNOTE = tnote ? tnote.textContent : "";
+    let tseq = 0;
+    function teamRoles() {
+      const o = teamSel && teamSel.selectedOptions[0];
+      const keep = o && o.value ? ["plain", ...(o.dataset.roles || "").split(",").filter(Boolean)] : null;
+      for (const r of role.options) r.hidden = !!keep && !keep.includes(r.value);
+      if (keep && !keep.includes(role.value)) { role.value = "plain"; applyRole(); }
+    }
+    async function teamLine() {
+      const o = teamSel.selectedOptions[0]; const my = ++tseq;
+      if (!o || !o.value) { tnote.textContent = TNOTE; return; }
+      try {
+        const got = await (await fetch(`/api/team_review?team=${encodeURIComponent(o.value)}&dir=${encodeURIComponent(dir.value.trim())}`)).json();
+        if (my === tseq) tnote.textContent = got.line || TNOTE;
+      } catch (e) { /* the default note stands */ }
+    }
+    function applyTeam() {
+      if (!teamSel) return;
+      const o = teamSel.selectedOptions[0];
+      if (o && o.value) {
+        let dirs = [];
+        try { dirs = JSON.parse(o.dataset.dirs || "[]"); } catch (e) { dirs = []; }
+        options(dirs);
+        if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; check(); loadRoles(); nameCheck(); }
+        if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
+        const un = $("[name=unattended]"); if (un) un.checked = false;
+      } else applyProject();
+      teamRoles();
+      teamLine();
+    }
+    if (teamSel) { teamSel.addEventListener("change", applyTeam); dir.addEventListener("change", teamLine); }
+
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
     applyProject();
     applyRole();  // the ticks the page rendered are the repo's; a role picked later may narrow them
+    if (teamSel && teamSel.value) applyTeam();  // a prefilled team (a Resume of a team's session)
   };
 
   // ---- Focus ----
@@ -1956,6 +2015,15 @@
     // attach sets no mouse option, so tmux asks for no tracking, a plain drag selects here and
     // Shift+click grows it. The wheel and Shift+PageUp/PageDown reach tmux's history by scroll
     // messages (below); a local buffer would only ever hold stale repaints.
+    if (s.state === "scheduled") {
+      // §6 *Start time*: no pane yet, so no terminal — the banner stands, and the page looks again
+      // while it waits, so the session's terminal appears once the agent has started it
+      // — but never under a person's hands: an open dialog (a Message… being written) or a field
+      // with the focus puts the look off until they are done
+      const busy = () => !!document.querySelector("dialog[open]") || ["INPUT", "TEXTAREA"].includes((document.activeElement || {}).tagName);
+      setInterval(() => { if (!busy()) location.reload(); }, 20000);
+      return;
+    }
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();

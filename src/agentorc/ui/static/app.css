@@ -102,7 +102,7 @@ input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border:
 .pill::before { font-size: .9em; line-height: 1; }
 .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 1.1em; } .pill.s-stalled::before { content: "?"; font-size: 1.1em; }
 /* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
-.pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
+.pill.s-scheduled::before { content: "◷"; font-size: 1.1em; } .pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
 .pill.s-closed::before { content: "✓"; font-size: 1.1em; } .pill.s-unreachable::before { content: "⌀"; font-size: 1.1em; }
 .pill.s-oncall::before { content: "◇"; font-size: 1.1em; }  /* a seat with nobody in it (TD-097) */
 .sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: .9em; letter-spacing: 0; }  /* not the idle glyph's tuning */
@@ -110,6 +110,8 @@ input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border:
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */
 .meta.scraped { border-bottom: 1px dashed var(--scraped); }
+/* the context reading past its role's bound (design §4.5 row 4, §4.8, TD-190) */
+.context.over { color: var(--stalled); font-weight: 600; }
 .reports .rep { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
 .reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .reports .rep.derived .ref { border-bottom: 1px dashed var(--scraped); }
@@ -247,6 +249,7 @@ details.fold > summary:hover { color: var(--fg); }
 details.fold[open] > summary { margin-bottom: 3px; }
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
 .inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
+.inboxpage .promotelog { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14em; overflow: auto; margin: 0; }
 /* §4.5 screen 6 *Layout* (Paul's rule, 2026-09-19): what says **what a row is** — the kind mark,
    the role badge, the state pill (which never had a border) — is flat and unbordered; everything
    bordered on a row is a control. The team badge keeps its border, because it is a button. */

@@ -25,7 +25,21 @@ from sessionorc.mail import self_decide_refusal
 # **`identity_log`** likewise (review of PR #318): the message it sends is mail *from the person*,
 # its `handed` debt and its trail entry are the home's, and the graph it reads a controller from
 # is the home's — served at a node, all four would be written to the node's own store.
-HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode", "suspend", "identity_log"})
+# **`promote`** and **`clear_promote`** (§6 *Promote*, TD-132): the run starts in the home's checkout
+# and its intent file is the home's, so a press at a node goes to the home or nowhere.
+HOME_EDITS = frozenset(
+    {
+        "set_controllers",
+        "set_grants",
+        "set_stop",
+        "set_start",
+        "set_mode",
+        "suspend",
+        "identity_log",
+        "promote",
+        "clear_promote",
+    }
+)
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
 # writes: an empty inbox would say *no mail*, and the truth is *not known from here*.
 # The person's own bookkeeping on that mailbox travels with it (§4.10, TD-069): the org's person

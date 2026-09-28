@@ -31,6 +31,7 @@ from sessionorc.models import (
     SOURCES,
     MailEntry,
     Session,
+    normalize_context,
     normalize_ref,
     normalize_review,
     report_line,
@@ -60,6 +61,8 @@ GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cach
 DERIVE_EVERY = timedelta(minutes=5)
 # The model in use per live agent session (TD-031): a local file's tail, so cheap, but not per tick.
 MODEL_EVERY = timedelta(seconds=30)
+CONTEXT_EVERY = timedelta(minutes=1)  # the context reading, unattended records only (§6 rule 5, TD-190)
+LANE_NEWS_NAMED = 5  # rule 6's note names this many new entries, then *and n more* (§6, TD-195)
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
@@ -103,6 +106,12 @@ SEAT_IDLE_GRACE = timedelta(minutes=2)
 # §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
 # the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
 IDLE_NUDGE = timedelta(minutes=20)
+# §6 rule 5 (TD-190): the context-bound line is typed again after this, while the member is still
+# idle and over its bound.
+CONTEXT_AGAIN = timedelta(minutes=20)
+# A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
+# who did what, so it is allowed more than `doing`'s 200 characters.
+ROUND_LINE_CAP = 500
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
@@ -123,12 +132,12 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "cre
 # The home does it the other way round — it marks its own record, which owns the field, and routes
 # only the `kill`. `modes.HOME_EDITS` is the other table, and `suspend` **is** in that one: a node
 # asked to suspend forwards the whole act here, or its mark would be wiped by the home's next copy.
-HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"})
+HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_controllers"})
 # What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
-NODE_READS = frozenset({"tail", "explain"})
+NODE_READS = frozenset({"tail", "explain", "log_tail"})
 
 
 def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[MailEntry]:
@@ -382,7 +391,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
-    "seat", "review",
+    "seat", "review", "context_bound",
 )  # fmt: skip
 
 
@@ -506,6 +515,17 @@ def _review(review: Any) -> dict[str, Any] | None:
         raise RpcError(str(e)) from None
 
 
+def _context_bound(bound: Any) -> int | None:
+    """A role preset's context bound as the record keeps it (design §4.8, TD-190): tokens, or None.
+    The create is handed the number the client resolved, and checks it as the preset key is."""
+    if bound is None:
+        return None
+    try:
+        return normalize_context({"bound": bound})
+    except ValueError as e:
+        raise RpcError(str(e)) from None
+
+
 def _ref(ref: str) -> str:
     try:
         return normalize_ref(ref)
@@ -558,13 +578,13 @@ def _pane_title(adapter: Any, pane_title: str) -> str | None:
     return (_clean(str(name)).strip()[:TITLE_CAP] or None) if name else None
 
 
-def _clean(text: str) -> str:
+def _clean(text: str, cap: int = 200) -> str:
     """Strip ANSI/control bytes and cap width: pane output is untrusted everywhere but xterm.js."""
     text = _OSC.sub("", text)
     text = _CSI.sub("", text)
     text = _ESC_OTHER.sub("", text)
     text = "".join(ch for ch in text if ch == "\t" or ch >= " ")
-    return text[:200]
+    return text[:cap]
 
 
 _LINE_BREAKS = re.compile("[\n\r\x0b\x0c\x85\u2028\u2029]")
@@ -637,6 +657,33 @@ def _stop_time(value: str | None) -> str | None:
         raise RpcError(f"run_until: not a time: {value}") from exc
     if when.tzinfo is None:
         raise RpcError(f"run_until: needs a timezone (got {value})")
+    return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _start_time(value: str | None, unattended: bool, run_until: str | None) -> str | None:
+    """A scheduled start's instant (design §6 *Start time*, TD-152), normalised to UTC, or None when
+    none was asked. Refused: without `unattended` — a start nobody is at the keyboard for is a
+    policy's act, and §9 invariant 5 keeps those off an interactive session — an instant not ahead
+    (*start it now*), and a `run_until` that is not after it. The friendly `20:00` / `+2h` are the
+    clients', as `run_until`'s are."""
+    if not value:
+        return None
+    try:
+        when = _parse(str(value).strip())
+    except ValueError as exc:
+        raise RpcError(f"start_at: not a time: {value}") from exc
+    if when.tzinfo is None:
+        raise RpcError(f"start_at: needs a timezone (got {value})")
+    if not unattended:
+        raise RpcError(
+            "start_at applies to unattended sessions: a scheduled start is a policy's act, and policies leave an "
+            "interactive session alone (design §6 Start time, §9 invariant 5)"
+        )
+    if when <= datetime.now(UTC):
+        raise RpcError(f"start_at {value} is not ahead: start it now instead (design §6 Start time)")
+    stop = _stop_time(run_until)
+    if stop and _parse(stop) <= when:
+        raise RpcError(f"run_until {stop} is not after start_at {value}: a stop comes after the start (design §6)")
     return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 

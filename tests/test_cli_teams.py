@@ -84,6 +84,8 @@ def world(tmp_path, monkeypatch):
                 "dir": params["dir"],
                 "adapter": params["adapter"],
                 "controllers": list(params.get("controllers") or []),
+                "unattended": bool(params.get("unattended")),
+                "review": params.get("review"),
                 "team": params.get("team", ""),
                 "project": params.get("project", ""),
                 "lane": list(params.get("lane") or []),
@@ -715,6 +717,13 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     concluded_team()
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
     assert {c["name"] for c in json.loads(capsys.readouterr().out)["closed"]} == set(names)
+    # a person's idle session beside it (§4.9 *A person in the team*, TD-173): it neither stops the
+    # team being concluded nor is closed by the start
+    concluded_team()
+    me = {"id": "ao-agentorc-me", "name": "me", "team": "ao-grind", "state": "idle", "unattended": False}
+    state["sessions"].append(me)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert "ao-agentorc-me" not in closes() and sorted(closes()) == sorted(f"ao-agentorc-{n}" for n in names)
 
 
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────
@@ -1410,3 +1419,102 @@ def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
     )
     v = teamrun.members_view(org, "repo-team", [])
     assert not v["editable"] and "edit it by PR" in v["note"]
+
+
+# ── a person in the team (design §4.9 *A person in the team*, TD-160 / TD-173) ─────────────────
+
+
+def _reader_org(tmp_path, *, seat: bool = True) -> None:
+    doc = org_doc(tmp_path)
+    if seat:
+        doc["teams"]["ao-grind"]["techlead"] = {"name": "tl-ao"}
+    doc["roles"] = {
+        "grinder": {"review": {"reader": "techlead", "held": ["src/sessionorc/**", "docs/briefs/**"]}},
+        "hunter": {"review": {"reader": "techlead", "held": ["src/sessionorc/**", "tests/**"]}},
+    }
+    write_org(tmp_path, doc)
+
+
+def test_team_review_is_the_union_of_the_member_roles_held_when_the_team_has_a_seat(world):
+    tmp_path, _ = world
+    _reader_org(tmp_path)
+    org = orgmod.load()
+    team = org.teams["ao-grind"]
+    cfg = cli.repoconfig.discover(tmp_path / "agentorc")
+    got = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
+    assert got == {"reader": "techlead", "held": ["docs/briefs/**", "src/sessionorc/**", "tests/**"], "bound": "2h"}
+    assert teams.team_review(team, {}) is None  # no member role holds a path: nothing is held
+    _reader_org(tmp_path, seat=False)
+    org = orgmod.load()
+    assert teams.team_review(org.teams["ao-grind"], teams.team_roles(team, cfg, org.roles)) is None
+
+
+def test_new_with_a_team_takes_its_reader_and_its_live_manager(world, capsys):
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    assert cli.main(["new", "me", "--team", "ao-grind"]) == 0
+    (made,) = creates(state)
+    assert made["team"] == "ao-grind" and made["controllers"] == ["ao-agentorc-orc-ao"]
+    assert made["review"]["held"] == ["docs/briefs/**", "src/sessionorc/**", "tests/**"]
+    assert "held PRs read by team ao-grind's techlead on docs/briefs/**" in capsys.readouterr().out
+
+
+def test_new_with_a_team_keeps_a_roles_own_review_and_a_typed_controller(world):
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    state["sessions"].append(
+        {"id": "ao-agentorc-boss", "name": "boss", "state": "idle", "dir": str(tmp_path / "agentorc")}
+    )
+    assert cli.main(["new", "me", "--team", "ao-grind", "--role", "grinder", "--controller", "boss"]) == 0
+    (made,) = creates(state)
+    assert made["review"]["held"] == ["src/sessionorc/**", "docs/briefs/**"]  # the role's, not the team's
+    assert made["controllers"] == ["ao-agentorc-boss"]
+
+
+def test_new_with_a_team_and_no_seat_or_no_live_manager_says_no_reader(world, capsys):
+    tmp_path, state = world
+    _reader_org(tmp_path, seat=False)
+    assert cli.main(["new", "me", "--team", "ao-grind"]) == 0
+    (made,) = creates(state)
+    assert made["review"] is None and made["controllers"] == []
+    assert "no reader: team ao-grind has no techlead seat" in capsys.readouterr().out
+
+
+def test_new_with_an_undefined_team_is_the_badge_alone(world, capsys):
+    tmp_path, state = world
+    assert cli.main(["new", "me", "--team", "nope"]) == 0
+    (made,) = creates(state)
+    assert made["team"] == "nope" and made["review"] is None
+    assert "--team nope: no such team in the org" in capsys.readouterr().err
+
+
+def test_stop_leaves_a_persons_session_alone_and_names_it(world, capsys):
+    tmp_path, state = world
+    started(state)
+    state["sessions"].append(
+        {"id": "ao-agentorc-me", "name": "me", "state": "working", "team": "ao-grind", "unattended": False}
+    )
+    capsys.readouterr()
+    assert cli.main(["team", "stop", "ao-grind", "--now"]) == 0
+    killed = [p["id"] for m, p in state["calls"] if m == "kill"]
+    assert "ao-agentorc-me" not in killed and len(killed) == 4
+    assert "your session me stays: a team act never stops an interactive session" in capsys.readouterr().out
+    for s in state["sessions"]:
+        s["state"] = "closed" if s["name"] != "me" else "working"
+    assert cli.main(["team", "stop", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "no live unattended session carries the team ao-grind badge" in err and "your session me stays" in err
+
+
+def test_new_with_a_team_keeps_a_roles_deliberately_empty_controllers(world):
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["roles"]["solo"] = {"controllers": []}
+    write_org(tmp_path, doc)
+    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    assert cli.main(["new", "me", "--team", "ao-grind", "--role", "solo"]) == 0
+    (made,) = creates(state)
+    assert made["controllers"] == []  # nobody may act on it, as the role says

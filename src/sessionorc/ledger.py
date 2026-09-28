@@ -63,6 +63,20 @@ def kind_of(entry: dict[str, Any]) -> str:
     return "other"
 
 
+def lane_matches(word: str, entry: dict[str, Any]) -> bool:
+    """Whether an entry belongs to a lane word (design §6 rule 6, TD-195), by its header and never
+    its prose: `design-first` is an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
+    one with `Pickable: yes` that is not design-first. A reference, or any other word, matches
+    nothing until a role gives it a meaning here."""
+    if entry.get("pickable") != "yes":
+        return False
+    if word == "design-first":
+        return entry.get("kind") == "design-first"
+    if word == "free-pick":
+        return entry.get("kind") != "design-first"
+    return False
+
+
 def entries(text: str) -> list[dict[str, Any]]:
     """Every entry of one version of the file, in file order: `id`, `title`, and the header fields
     `priority`, `owner`, `kind`, `pickable` as their first word ('' when absent), with `for_page`

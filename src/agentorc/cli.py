@@ -25,7 +25,17 @@ from sessionorc import mail as mailmod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, pr_marks, report_line, stop_note
+from sessionorc.models import (
+    GRANTS,
+    STATE_RANK,
+    context_over,
+    context_reading,
+    pr_marks,
+    report_line,
+    start_note,
+    stop_note,
+    tokens_short,
+)
 from sessionorc.tmux import attach_argv
 
 
@@ -255,6 +265,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      under:  {', '.join(s['controllers'])}")
             if members := [o["id"] for o in sessions if s["id"] in (o.get("controllers") or [])]:
                 print(f"{'':<{w}}      members: {', '.join(members)}")
+            if note := start_note(s):
+                print(f"{'':<{w}}      {note}")
             if note := stop_note(s):
                 print(f"{'':<{w}}      {note}")
             # design §4.5a **title** (§4.3 `title()`, TD-074): the session's name as its tool holds
@@ -263,6 +275,11 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      title:  {title}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
+            if reading := context_reading(s):
+                bound = s.get("context_bound")
+                over = " (over)" if context_over(s) else ""
+                bound_text = f", bound {tokens_short(bound)}{over}" if isinstance(bound, int) and bound > 0 else ""
+                print(f"{'':<{w}}      context: {reading}{bound_text}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
@@ -426,10 +443,11 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         "role": role.name,
         "ledger": cfg.ledger if cfg.root else None,  # None for a shell: there is no repo file behind it
         "review": role.review,  # who reads its PRs (design §4.9b *The reader*); None is none
+        "context_bound": role.context_bound,  # §4.8 *A role has a context bound* (TD-190); None is none
     }
 
 
-def stop_time(when: str) -> str:
+def stop_time(when: str, flag: str = "--until") -> str:
     """`--until` in the shapes a person types, as an absolute UTC instant (design §6, TD-026).
 
     `06:00` is the next 06:00 *here* — the host's local time, because that is the clock the person
@@ -439,7 +457,7 @@ def stop_time(when: str) -> str:
     """
     text = (when or "").strip()
     if not text:
-        raise AgentError("--until: no time given")
+        raise AgentError(f"{flag}: no time given")
     now = datetime.now().astimezone()
     if m := re.fullmatch(r"\+(\d+)\s*([smhd])", text, re.IGNORECASE):
         unit = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days"}[m[2].lower()]
@@ -447,13 +465,13 @@ def stop_time(when: str) -> str:
     if m := re.fullmatch(r"(\d{1,2}):(\d{2})", text):
         hour, minute = int(m[1]), int(m[2])
         if hour > 23 or minute > 59:
-            raise AgentError(f"--until: not a time of day: {text}")
+            raise AgentError(f"{flag}: not a time of day: {text}")
         at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         return _utc(at if at > now else at + timedelta(days=1))  # today if it is still ahead
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise AgentError(f"--until: not a time: {text} (try 06:00, +8h, or an ISO time)") from exc
+        raise AgentError(f"{flag}: not a time: {text} (try 06:00, +8h, or an ISO time)") from exc
     return _utc(parsed if parsed.tzinfo else parsed.astimezone())
 
 
@@ -469,17 +487,63 @@ def _stop(args: argparse.Namespace) -> dict[str, str]:
     runs out of time and a worker its lead wraps up are asked the same thing in the same words.
     """
     until = getattr(args, "until", None)
+    at = getattr(args, "at", None)
+    out: dict[str, str] = {}
+    if at:
+        # design §6 *Start time* (TD-152): a start nobody is at the keyboard for is a policy's act,
+        # refused on an interactive session for the reason `--until` is — the agent refuses it too
+        if not getattr(args, "unattended", False):
+            raise AgentError("--at applies to unattended sessions: add --unattended, or leave it off")
+        out["start_at"] = stop_time(at, "--at")
     if not until:
-        return {}
+        return out
     if not getattr(args, "unattended", False):
         # A stop time is a policy, and §4.2 says policies never touch an interactive session. Silently
         # storing one that nothing will ever act on is the failure this entry is about, inverted.
         raise AgentError("--until applies to unattended sessions: add --unattended, or leave it off")
-    return {"run_until": stop_time(until), "wrapup_prompt": teams.WRAPUP_PROMPT}
+    return {**out, "run_until": stop_time(until), "wrapup_prompt": teams.WRAPUP_PROMPT}
+
+
+def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
+    """`ao new --team` (design §4.9 *A person in the team*, TD-160): beyond the badge, the team's
+    live manager as a controller when the record is given none, and the record's `review` from the
+    role's or else the team's (`teams.team_review`). Fills `defaults` in place and returns the
+    line saying which reader the session got, "" when none. A team the org does not define stays
+    a badge, said once on stderr; a shell asks for nothing, as `_launch_defaults` says."""
+    name = getattr(args, "team", None) or ""
+    if not name or args.adapter == "shell":
+        return ""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    try:
+        org = _org_here(directory)
+    except ValueError as e:
+        print(f"--team {name}: {e} — the badge alone", file=sys.stderr)
+        return ""
+    team = org.teams.get(name)
+    if team is None:
+        print(f"--team {name}: no such team in the org (ao team list) — the badge alone", file=sys.stderr)
+        return ""
+    cfg = repoconfig.discover(pathlib.Path(args.repo) if args.repo else directory)
+    role = getattr(args, "role", None)
+    # a role that says `controllers: []` means nobody may act on it, deliberately (`_launch_defaults`)
+    isolated = bool(role) and repoconfig.resolve_role(cfg, role, org.roles).controllers_set
+    if not defaults.get("controllers") and not args.controller and not isolated:
+        here = hosts.local_host().name
+        mid = teams.manager_id(org, team, team.host or here, here)
+        if mid and any(s["id"] == mid for s in teamrun.live(call_sync("list"))):
+            defaults["controllers"] = [mid]
+    if defaults.get("review") is None:
+        defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
+        if defaults["review"] is None:
+            return f"no reader: team {name} has no techlead seat, or its members hold no path"
+        held = ", ".join(defaults["review"]["held"])
+        return f"held PRs read by team {name}'s techlead on {held} (ao pr held <n>)"
+    return ""
 
 
 def cmd_new(args: argparse.Namespace) -> int:
     defaults = _launch_defaults(args)
+    reader = _team_defaults(args, defaults)
     s = call_sync(
         "create",
         name=args.name,
@@ -503,6 +567,8 @@ def cmd_new(args: argparse.Namespace) -> int:
         # worker nobody may act on is rarely what was meant, so `ao new` says so once, here,
         # rather than leaving it to be discovered when a send is refused.
         print(f"{s['id']} starts with no controller: nobody may act on it (ao control <controller> add {s['name']})")
+    if reader and not args.json:
+        print(reader)
     if s.get("previous_run") and not args.json:
         # the same note the New session form shows before Start (design §4.1, TD-030)
         print(f"replaces the earlier {s['name']} — run log kept: {s['previous_run']}")
@@ -510,6 +576,9 @@ def cmd_new(args: argparse.Namespace) -> int:
         if not args.json:
             print(f"{s['id']}  ({s['adapter']}, {s['dir']})")
         return _attach(args, s["id"], s)
+    if note := start_note(s):
+        # §6 *Start time*: a record with no pane yet — nothing to attach to until it starts
+        return emit(args, s, lambda: print(f"{s['id']}  ({s['adapter']}, {s['dir']})  {note}"))
     return emit(args, s, lambda: print(f"{s['id']}  ({s['adapter']}, {s['dir']})\nattach: tmux attach -t {s['id']}"))
 
 
@@ -553,6 +622,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
             ]
             if r.review:  # who reads its PRs (design §4.9b *The reader*)
                 bits.append(f"review: {r.review['reader']} on {', '.join(r.review['held'])}, {r.review['bound']}")
+            if r.context_bound:  # the reading past which §6 rule 5 tells it to end its run (§4.8)
+                bits.append(f"context bound: {tokens_short(r.context_bound)}")
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
             if r.message:  # when to message it (design §4.8, TD-171): its own line, since it is a sentence
                 print(f"{'':<{w}}  message: {r.message}")
@@ -859,6 +930,15 @@ def cmd_grants(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
 
 
+def cmd_at(args: argparse.Namespace) -> int:
+    """`ao at <session> <when> | now` (design §4.7, §6 *Start time*, TD-152): move a scheduled start,
+    or start it on the next tick. Acting, and gated as `ao until` is; the agent refuses it on a
+    session that already started. Cancel is `ao close`."""
+    when = "now" if (args.when or "").strip().lower() == "now" else stop_time(args.when or "", "ao at")
+    s = call_sync("set_start", id=resolve(args.id), start_at=when)
+    return emit(args, s, lambda: print(f"{s['id']}: {start_note(s) or 'starts on the next tick'}"))
+
+
 def cmd_until(args: argparse.Namespace) -> int:
     """`ao until <session> <when>` / `ao until <session> --clear` (design §6, TD-026): set or clear
     when an unattended session stops. Acting, so it is gated like `kill` — a stop time is a kill
@@ -1004,6 +1084,65 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def _promote_line(name: str, r: dict[str, Any]) -> str:
+    """One repo's promote readings (design §4.7 `ao promote status`): *agentorc · live 485d28b · main
+    9c1e0f2, 3 ahead · checks green · auto off*, then a run in flight, a failure, or the first
+    precondition that stands."""
+    live = str(r.get("live") or "")[:7] or f"unknown ({r.get('live_why') or 'not read'})"
+    main = str(r.get("main") or "")[:7] or f"unknown ({r.get('main_why') or 'not read'})"
+    ahead = r.get("ahead")
+    main += (
+        f", {ahead} ahead" if isinstance(ahead, int) and ahead else (", live" if r.get("live") == r.get("main") else "")
+    )
+    checks = str(r.get("checks") or "unknown") + (f" ({r['checks_why']})" if r.get("checks_why") else "")
+    line = f"{name} · live {live} · main {main} · checks {checks} · auto {'on' if r.get('auto') else 'off'}"
+    if f := r.get("inflight"):
+        line += f"\n  promoting {str(f.get('sha'))[:7]} · started {f.get('at')} by {f.get('by')} · log {f.get('log')}"
+    elif f := r.get("failed"):
+        line += f"\n  FAILED {str(f.get('sha'))[:7]} at {f.get('at')}: {f.get('why')} · log {f.get('log')}"
+        line += "".join(f"\n    {t}" for t in f.get("tail") or [])
+        line += "\n  nothing is promoted until it is cleared (the Inbox row's Dismiss)"
+    elif u := r.get("unmet"):
+        line += f"\n  not now: {u.get('text')}"
+    return line
+
+
+def cmd_promote(args: argparse.Namespace) -> int:
+    """`ao promote [<repo>]` and `ao promote status` (design §4.7, §6 *Promote*, TD-132 slice 2): the
+    press from a terminal, through the home's `promote` RPC — a person's own, refused to a session —
+    or the readings it keeps (`promotes` on `host`). The press returns once the run is started: the
+    outcome is `check`'s on a later tick, and for this repo the host agent goes away under it."""
+    if args.repo == "status":
+        got = call_sync("host")
+        if "promotes" not in got:
+            raise AgentError(f"the promote runs at the home ({got.get('home')}): run ao promote status there")
+        promotes = got["promotes"]
+
+        def status() -> None:
+            for name, r in promotes.items():
+                print(_promote_line(name, r))
+            if not promotes:
+                print("no registered repo carries a promote: block (design §5) — nothing promotes")
+
+        return emit(args, promotes, status)
+    repo = args.repo or _main_checkout(os.getcwd())
+    if not repo:
+        raise AgentError("this directory is not in a git checkout; name the repo: ao promote <repo>")
+    got = call_sync("promote", repo=repo, **({"sha": args.sha} if args.sha else {}))
+
+    def prose() -> None:
+        print(f"promoting {got['repo']} to {got['sha'][:7]} — log: {got['log']}")
+        if got.get("checks") != "green":
+            why = f" ({got['checks_why']})" if got.get("checks_why") else ""
+            print(f"checks on {got['sha'][:7]} read {got.get('checks') or 'unknown'}{why}: pressed through, your word")
+        print("the outcome is check's on a later tick: ao promote status")
+
+    return emit(args, got, prose)
+
+
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs with their
@@ -1059,8 +1198,12 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     print(f"         {st}")
             for kind in ("pickable", "design-first"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
+                # the pick order (design §4.8 *Choosing in a free-pick lane*, TD-202): High, then
+                # Medium, then Low, then an entry with none; ties in file order (a stable sort)
+                ids.sort(key=lambda e: PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)))
                 for e in ids:
-                    print(f"  {kind:<12} {e['id']}  {e['title']}")
+                    prio = str(e.get("priority") or "").capitalize() or "-"
+                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")
@@ -1177,7 +1320,7 @@ WHERE = (
     ("profiles.yml", "profiles: tool, account, model, config directory, billing", "on every use"),
     ("org.yml", "projects, teams, the org-wide roles overlay", "by the clients on every use; never the host agent"),
     ("<repo>/.agentorc.yml", "a repo's roles, controllers, ledger, teams, promote",
-     "by the clients on every use; promote: is checked there and read by nothing else yet (TD-132 builds its reader)"),
+     "by the clients on every use; promote: alone also by the host agent at the home, every five minutes"),
     ("systemd units", "the UI's bind and port, PATH, the home", "at `ao service install`"),
 )  # fmt: skip
 
@@ -1356,6 +1499,38 @@ def cmd_doing(args: argparse.Namespace) -> int:
         return fail(args, 'ao doing needs a line: ao doing "<what you are doing now>", or --clear', 2)
     s = call_sync("doing", id=sid, text=" ".join(args.words))
     return emit(args, s, lambda: print(f"{s['id']}: doing — {s['doing']['text']}"))
+
+
+def cmd_log(args: argparse.Namespace) -> int:
+    """`ao log "<line>"` and `ao log --tail n` (design §4.8 *A session's round log*, TD-191): one
+    stamped line appended to this session's round log, or its last lines read back — the manager's
+    memory across runs, kept beside the run logs and keyed by the name, so a restart reads what the
+    run before it wrote. Never a report and never a commit. Only the session writes its own; a
+    read may name another with `--id`."""
+    if args.tail is not None:
+        if args.words:
+            return fail(args, "ao log --tail takes no line", 2)
+        sid = args.id or _own_session(args)
+        if sid is None:
+            return 2
+        entries = call_sync("log_tail", id=sid, n=args.tail)
+
+        def human() -> None:
+            if not entries:
+                print(f"{sid}: no round log")
+            for e in entries:
+                print(f"{e['at']}  {e['text']}")
+
+        return emit(args, entries, human)
+    if args.id:
+        return fail(args, "ao log writes to your own round log only: --id goes with --tail", 2)
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    if not args.words:
+        return fail(args, 'ao log needs a line: ao log "<what this round did>", or --tail n', 2)
+    e = call_sync("log", id=sid, text=" ".join(args.words))
+    return emit(args, e, lambda: print(f"{sid}: logged {e['at']}  {e['text']}"))
 
 
 def cmd_whoami(args: argparse.Namespace) -> int:
@@ -1972,13 +2147,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="a repo's brief, a path: filled into the --role template's *This repo's rules* in place of the "
         "role's own (design §4.8 — a supplement, never a replacement); with no template it is the whole brief",
     )
-    p.add_argument("--team", help="the team this session is started under (design §4.9): a badge, nothing keys on it")
+    p.add_argument(
+        "--team",
+        help=(
+            "the team this session joins (design §4.9): its badge and group, its manager as a controller, "
+            "the team's reader for its held PRs"
+        ),
+    )
     p.add_argument(
         "--until",
         metavar="WHEN",
         help="when this unattended session stops (design §6, TD-026): 06:00 (the next one, local), "
         "+8h, or an ISO time. At it the session is asked to wrap up and is killed once it settles "
         "or ten minutes later — so a worker started by hand has a stopper without anyone remembering",
+    )
+    p.add_argument(
+        "--at",
+        metavar="WHEN",
+        help="when this unattended session starts (design §6 Start time): 20:00 (the next one, local), +2h, or an "
+        "ISO time. The record, its name and its directory are taken now; the host agent starts it at the time",
     )
     p.add_argument(
         "--project",
@@ -2111,6 +2298,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("mode", choices=["unattended", "interactive"])
     p.set_defaults(fn=cmd_mode)
 
+    p = add("at", help="move a scheduled start, or `now` to start it at once; ao close cancels it (design §6)")
+    p.add_argument("id")
+    p.add_argument("when", help="20:00 (the next one, local), +2h, an ISO time, or now")
+    p.set_defaults(fn=cmd_at)
+
     p = add("until", help="set or clear when an unattended session stops (design §6, TD-026)")
     p.add_argument("id")
     p.add_argument("when", nargs="?", help="06:00 (the next one, local), +8h, or an ISO time")
@@ -2121,6 +2313,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("name", nargs="?", help="the repo's name or its checkout's path. None: the repo of this directory")
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
     p.set_defaults(fn=cmd_repo)
+
+    p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")
+    p.add_argument(
+        "repo", nargs="?", help="the repo's name or its checkout's path, or `status`. None: this directory's"
+    )
+    p.add_argument("--sha", help="a commit other than main's head, for a rollback (not built yet)")
+    p.set_defaults(fn=cmd_promote)
 
     p = add("settings", help="the home's settings.yml, each key with what it makes today (design §5)")
     p.add_argument("--where", action="store_true", help="where every other configured value lives, and when it is read")
@@ -2170,6 +2369,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
     p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")
     p.set_defaults(fn=cmd_doing)
+    p = add("log", help="append a line to this session's round log, or read it back with --tail (design §4.8)")
+    p.add_argument("words", nargs="*", metavar="line", help="one line, stamped to the minute")
+    p.add_argument("--tail", type=int, metavar="N", nargs="?", const=20, help="print the last N lines (default 20)")
+    p.add_argument("--id", help="with --tail: the session whose round log to read (default: your own)")
+    p.set_defaults(fn=cmd_log)
 
     p = add("finding", help="declare a reference this session filed on the side (design §4.8)")
     p.add_argument("ref")
@@ -2425,13 +2629,18 @@ def unread_line(args: argparse.Namespace) -> None:
     goes to stderr, so a caller parsing stdout never meets it. A command that never reached the
     agent (`ao --skill`, `ao roles`) has no response to read and prints nothing."""
     m = clientmod.last_mail
-    if not m or not (m.get("unread") or m.get("owed")):
+    if not m or not (m.get("unread") or m.get("owed") or m.get("context")):
         return
     lines = []
+    over = str(m.get("context") or "")  # §6 rule 5 (TD-190): past the role's context bound
     if n := int(m.get("unread") or 0):
         lines.append(mailmod.unread_line(n))
         if m.get("wake_budget_spent"):
             lines[-1] += " (wake budget spent)"
+        if over:
+            lines[-1] += f" ({over})"
+    elif over:
+        lines.append(f"[agentorc] ({over}) — finish the entry in hand, then declare")
     # Design §4.10 *Outcomes*: the person answered and is waiting to hear what came of it. One line
     # each settles them — `ao msg person --outcome done|blocked|dropped "<line>" --for <id>`.
     if owed := [str(x) for x in (m.get("owed") or [])]:

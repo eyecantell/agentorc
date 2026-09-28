@@ -34,7 +34,7 @@ advisory. `ao explain <id> --json` shows the screen, the rule that fired, and th
 
 ## Commands
 
-Read-only: `ao status [-v]`, `ao tail <id> -n N`, `ao explain <id>`, `ao wait [--timeout S]`
+Read-only: `ao status [-v]`, `ao tail <id> -n N`, `ao explain <id>`, `ao log --tail N` (your round log), `ao wait [--timeout S]`
 (leading a team: end a round with it instead of sleeping — one call, never a loop; your brief says how; silence is not an event).
 
 ## Mail (design §4.10)

@@ -68,6 +68,23 @@ def test_a_resume_lands_at_the_composer():
     assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
 
 
+def test_a_subagents_tool_events_leave_the_state_alone():
+    """TD-201: the tool sets `agent_id` only on an event from inside a subagent. A background agent
+    runs on after its caller's Stop, so its tool events read as `working` held an idle session unrung;
+    they carry the session id and no state. The main thread's own tool events name themselves in
+    `event`, which the host agent logs when one wakes a hook-confirmed idle session."""
+    ev = {"hook_event_name": "PreToolUse", "session_id": "u1", "tool_name": "Bash", "tool_input": {}}
+    assert translate(ev) == {"adapter_id": "u1", "state": "working", "pending": None, "event": "PreToolUse:Bash"}
+    assert translate({**ev, "hook_event_name": "PostToolUse"})["event"] == "PostToolUse:Bash"
+    assert translate({"hook_event_name": "PostToolUse"})["event"] == "PostToolUse"  # no tool name: the event's own
+    assert translate({**ev, "agent_id": "a97a5f"}) == {"adapter_id": "u1"}
+    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) is None
+    assert "event" not in translate({"hook_event_name": "UserPromptSubmit"})  # a turn's start is not named
+    # a question asked from inside a subagent still stops the session for the person
+    ask = {**ev, "agent_id": "a1", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "q?"}]}}
+    assert translate(ask)["state"] == "needs-you"
+
+
 def test_translate_permission_and_questions():
     p = translate(
         {
@@ -165,6 +182,9 @@ def test_an_unattended_layer_refuses_the_tools_peer_messages(tmp_path, monkeypat
     prof = profiles.Profile(name="p")
     assert "crossSessionInbound" not in hooks_settings(prof)
     assert hooks_settings(prof, unattended=True)["crossSessionInbound"] == "refuse"
+    # nobody reads a suggested next prompt at an unattended pane (TD-201); a person's session keeps them
+    assert hooks_settings(prof, unattended=True)["promptSuggestionEnabled"] is False
+    assert "promptSuggestionEnabled" not in hooks_settings(prof)
     bare = tmp_path / "bare"
     bare.mkdir()
     att, un = write_hooks_file(prof, bare), write_hooks_file(prof, bare, unattended=True)
@@ -288,6 +308,44 @@ def test_model_in_use_reads_the_last_top_level_assistant_turn(tmp_path, monkeypa
     assert short_model("claude-code", "claude-fable-5-1") == "fable-5-1"
     assert short_model("shell", "claude-fable-5-1") == "claude-fable-5-1"  # an adapter with no opinion
     assert short_model("claude-code", None) == ""
+
+
+def test_context_reads_the_last_top_level_turns_usage(tmp_path, monkeypatch):
+    """TD-190, design §4.3 `context`: the prompt the last top-level turn sent — input plus both
+    cache counts — stamped with that turn's time, and the model's window where the table knows it.
+    A sidechain turn is a subagent's, and a cut first line is skipped."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "profiles.yml").write_text(
+        f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
+    )
+    ad = ClaudeCodeAdapter()
+    repo = tmp_path / "repo"
+    assert ad.context("abc", repo, "t") is None  # no transcript: cannot tell, never an error
+    d = tmp_path / "cc" / "projects" / munge(repo)
+    d.mkdir(parents=True)
+    use = {"input_tokens": 3, "cache_read_input_tokens": 230_000, "cache_creation_input_tokens": 1_200}
+    entries = [
+        {"type": "assistant", "timestamp": "T1", "message": {"model": "claude-opus-5-5", "usage": {"input_tokens": 9}}},
+        {"type": "assistant", "timestamp": "T2", "message": {"model": "claude-opus-5-5", "usage": use}},
+        {
+            "type": "assistant",
+            "isSidechain": True,
+            "timestamp": "T3",
+            "message": {"model": "claude-sonnet-5", "usage": use},
+        },
+        {"type": "assistant", "timestamp": "T4", "message": {"model": "<synthetic>", "usage": {"input_tokens": 0}}},
+    ]
+    (d / "abc.jsonl").write_text("".join(json.dumps(e) + "\n" for e in entries))
+    assert ad.context("abc", repo, "t") == {"tokens": 231_203, "at": "T2", "window": 1_000_000}
+    assert ad.context("abc", repo, "nope") is None  # an unknown profile, not another account's files
+    # a model the table does not know: the tokens alone
+    other = {"type": "assistant", "timestamp": "T5", "message": {"model": "claude-x-1", "usage": use}}
+    (d / "abc.jsonl").write_text('del": "cut"}\n' + json.dumps(other) + "\n")
+    assert ad.context("abc", repo, "t") == {"tokens": 231_203, "at": "T5", "window": None}
+    haiku = {"type": "assistant", "message": {"model": "claude-haiku-4-5", "usage": use}}
+    (d / "abc.jsonl").write_text(json.dumps(haiku) + "\n")
+    assert ad.context("abc", repo, "t")["window"] == 200_000
 
 
 def test_parse_usage_and_credentials(tmp_path):

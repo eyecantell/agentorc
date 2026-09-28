@@ -20,7 +20,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, has_control
+from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, has_control, start_note
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
@@ -80,6 +80,7 @@ ACTING_RPCS = frozenset(
         "set_grants",
         "set_controllers",
         "set_stop",
+        "set_start",
     }
 )
 
@@ -331,6 +332,10 @@ def read_when(
         )
     if s is None or state in ("exited", "closed"):
         return "read when this session is resumed, or started again under this name" + tail
+    if state == "scheduled":
+        # §6 *Start time* (TD-152): its mail moves to the session it becomes, which reads it first
+        at = start_note({"state": state, "start_at": s.start_at}).removeprefix("starts ") or "its start time"
+        return f"read when it starts, at {at}" + tail
     stop = s.wrapup_sent_at or s.wrapup_at
     if not stop and s.run_until:
         try:

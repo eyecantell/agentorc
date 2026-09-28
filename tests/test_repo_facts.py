@@ -343,7 +343,13 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
                 "failed_at": now.isoformat(),
             },
             "ledger": {
-                "entries": [{"id": "TD-010", "title": "a build", "for_page": "pickable"}],
+                "entries": [
+                    {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "low"},
+                    {"id": "TD-011", "title": "no priority", "for_page": "pickable", "priority": ""},
+                    {"id": "TD-012", "title": "a first high", "for_page": "pickable", "priority": "high"},
+                    {"id": "TD-013", "title": "a medium", "for_page": "pickable", "priority": "medium"},
+                    {"id": "TD-014", "title": "a second high", "for_page": "pickable", "priority": "high"},
+                ],
                 "by_kind": {"pickable": 1, "design-first": 0, "for-you": 0, "other": 0},
             },
             "at": now.isoformat(),
@@ -383,8 +389,12 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("r  1 open PRs, oldest 3d · this week 4 opened, 5 closed (could not look")
-    assert "1 open entries: 1 pickable, 0 design-first" in out
-    assert "#9" in out and "pickable     TD-010  a build" in out
+    assert "5 open entries: 1 pickable, 0 design-first" in out  # the counts are the reading's `by_kind`
+    assert "#9" in out and "pickable     TD-010  Low     a build" in out
+    # the pick order (§4.8 *Choosing in a free-pick lane*, TD-202): High, Medium, Low, none; ties in file order
+    order = [i for i in ("TD-012", "TD-014", "TD-013", "TD-010", "TD-011") if f"pickable     {i}" in out]
+    assert sorted(order, key=out.index) == ["TD-012", "TD-014", "TD-013", "TD-010", "TD-011"]
+    assert "pickable     TD-011  -       no priority" in out
     # slice 6: the reader's standing on each open PR, what members hold, the board items due
     assert "waiting on review by tl · 40m" in out and "holds        TD-010 → #9  g1" in out
     assert "due          3d overdue  decide TD-283" in out
@@ -505,3 +515,13 @@ def test_a_doing_log_cut_short_mid_character_loads_without_it(tmp_path):
     f = tmp_path / "doing.jsonl"
     f.write_bytes(b'{"team": "a", "id": "g", "text": "ok", "at": "1"}\n{"team": "a", "text": "caf\xc3')
     assert [e["text"] for e in DoingLogStore(f).rings["a"]] == ["ok"]
+
+
+def test_the_grinder_template_says_the_pick_order_and_names_the_tool():
+    """TD-202, design §4.8 *Choosing in a free-pick lane*: the order spelled out, `ao repo` named,
+    and the priority in the claim's first `ao doing` line."""
+    from importlib import resources
+
+    text = resources.files("agentorc").joinpath("briefs", "grinder.md").read_text(encoding="utf-8")
+    assert "High, then Medium, then Low" in text and "`ao repo` lists" in text
+    assert "put the priority there" in text and "Choosing in a free-pick lane" in text

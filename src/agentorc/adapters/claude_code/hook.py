@@ -42,6 +42,12 @@ SESSION_START_NOT_A_START = {"compact"}
 # UserPromptSubmit, which fires after this.
 SESSION_START_AT_THE_COMPOSER = {"resume"}
 
+# Tool events that report `working` without being a turn's start. Each carries its name in `event`
+# (`PreToolUse:Bash`), which the host agent logs when one wakes a hook-confirmed `idle` session: an
+# idle grinder was turned `working` four seconds after its Stop, with no turn behind it, and read
+# `stalled?` for 13 hours unrung (TD-201). The line names the event the next time it happens.
+TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
+
 # idle_prompt (Claude idle for a minute) is deliberately absent: an idle session waiting for you is
 # `idle`, the normal state, not an alert (design §4.2, first-use finding 2026-09-06).
 NOTIFICATION_KINDS = {
@@ -76,6 +82,12 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
         qs = (payload.get("tool_input") or {}).get("questions") or []
         text = qs[0].get("question", "") if qs and isinstance(qs[0], dict) else "question"
         return {**out, "state": "needs-you", "pending": {"kind": "question", "text": text}}
+    if ev in TOOL_EVENTS and payload.get("agent_id"):
+        # A subagent's tool (the tool sets `agent_id` only inside one) says nothing about the main
+        # composer: a background agent runs on after its caller's Stop, and read as `working` it held
+        # an idle session unrung; mid-turn the session is `working` anyway, and a `PostToolUse` of
+        # its own no longer clears the main thread's `needs-you` (TD-201).
+        return out or None
     if ev == "Notification":
         kind = NOTIFICATION_KINDS.get(payload.get("notification_type", ""))
         if kind is None:
@@ -98,6 +110,9 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
         return {**out, "subagent_delta": 1}
     if ev == "SubagentStop":
         return {**out, "subagent_delta": -1}
+    if ev in TOOL_EVENTS:
+        tool = payload.get("tool_name")
+        return {**out, "state": STATE_EVENTS[ev], "pending": None, "event": f"{ev}:{tool}" if tool else ev}
     if ev in STATE_EVENTS:
         return {**out, "state": STATE_EVENTS[ev], "pending": None}
     return None

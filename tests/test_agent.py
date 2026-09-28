@@ -25,10 +25,11 @@ async def test_shell_lifecycle(agent, tmp_path):
         # the session's environment names this agent's home, so hooks inside it reach this socket
         env = await c.call("tail", id=sid, lines=1)  # warm-up; the real check is below
         assert env is not None
-        await c.call("send", id=sid, text="echo HOME=$AGENTORC_HOME SESSION=$AGENTORC_SESSION")
+        # and the name the Org shows, for dev-cadence's co-author hook (TD-185)
+        await c.call("send", id=sid, text='echo HOME=$AGENTORC_HOME SESSION=$AGENTORC_SESSION NAME="$AGENT_NAME".')
         for _ in range(30):
             tail = await c.call("tail", id=sid, lines=6)
-            if any(f"HOME={paths.home()} SESSION={sid}" in line for line in tail):
+            if any(f"HOME={paths.home()} SESSION={sid} NAME=my shell." in line for line in tail):
                 break
             await asyncio.sleep(0.1)
         else:
@@ -369,6 +370,24 @@ async def test_limited_from_one_daily_window(agent, hookstub, tmp_path, monkeypa
         assert "pd" not in await c.call("usage")
 
 
+def _last_send(agent, sid: str) -> str | None:
+    s = agent.sessions.get(sid)
+    return s.sends[-1].id if s and s.sends else None
+
+
+async def _typed(agent, sid: str, mark: str | None) -> None:
+    """Until the send just started has typed its text into the pane: its `sends` entry written and
+    the pane's typing lock free again (TD-078). A fixed sleep here raced the paste under a loaded
+    run — the hooks standing in for the tool then landed while the prompt was still being typed,
+    before `rpc_send` took its baseline, and the wait read the idle they left as a stall."""
+    for _ in range(250):
+        lock = agent._typing.get(sid)
+        if _last_send(agent, sid) != mark and not (lock and lock.locked()):
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"the send to {sid} never finished typing")
+
+
 async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
     """TD-016: `send(wait=True)` returns the settled record, or errors prompt-stalled / timeout.
     Hook events stand in for Claude Code's UserPromptSubmit → Stop."""
@@ -379,8 +398,9 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         await wait_state(c, s["id"], "idle")
 
         # settled: the prompt is taken (working) and the turn ends (idle)
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="do it", wait=True, timeout=5))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="working")
         await asyncio.sleep(0.2)
         assert not task.done()  # started, not settled
@@ -389,8 +409,9 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         assert got["id"] == s["id"] and got["state"] == "idle"
 
         # a permission counts as settled too: the caller can see what it is waiting on
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="again", wait=True, timeout=5))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="working")
         await feeder.call(
             "hook", session=s["id"], state="needs-you", pending={"kind": "question", "text": "which one?"}
@@ -405,8 +426,9 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
             await c.call("send", id=s["id"], text="hello?", wait=True, timeout=5)
 
         # timeout: taken, never settles
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="long", wait=True, timeout=0.8))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="working")
         with pytest.raises(AgentError, match="timeout: .* still working"):
             await task
@@ -414,8 +436,9 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
 
         # busy at send: the prompt is queued behind the current turn. That turn ending is not the
         # confirmation; the *next* turn starting and settling is.
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="queued", wait=True, timeout=5))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="idle")  # the current turn ends
         await asyncio.sleep(0.3)
         assert not task.done()
@@ -427,28 +450,32 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         # busy, and the whole queued turn runs between two polls (idle, working, idle back to back):
         # settled, never a false prompt-stalled
         await feeder.call("hook", session=s["id"], state="working")
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="fast", wait=True, timeout=5))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         for st in ("idle", "working", "idle"):
             await feeder.call("hook", session=s["id"], state=st)
         assert (await asyncio.wait_for(task, 5))["state"] == "idle"
         # busy, and the current turn stops on a question: returned as is, the prompt still queued
         await feeder.call("hook", session=s["id"], state="working")
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="queued2", wait=True, timeout=5))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="needs-you", pending={"kind": "question", "text": "hm?"})
         assert (await asyncio.wait_for(task, 5))["state"] == "needs-you"
         # busy, the current turn ends, and nothing takes the queued prompt: prompt-stalled
         await feeder.call("hook", session=s["id"], state="working")
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="queued3", wait=True, timeout=5))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="idle")
         with pytest.raises(AgentError, match="prompt-stalled"):
             await task
         # removed while waiting, with no timeout: a clear error, not a format crash
         await feeder.call("hook", session=s["id"], state="idle")
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="bye", wait=True))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("kill", id=s["id"])  # `c` is busy with the send: one request per connection
         await wait_state(feeder, s["id"], "exited")
         got = await asyncio.wait_for(task, 5)  # an exit is a transition and a settled state
@@ -458,8 +485,9 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         s = await feeder.call("create", name="w2", dir=str(tmp_path), adapter="hookstub")
         await feeder.call("hook", session=s["id"], state="idle")
         await wait_state(feeder, s["id"], "idle")
+        mark = _last_send(agent, s["id"])
         task = asyncio.create_task(c.call("send", id=s["id"], text="gone", wait=True))
-        await asyncio.sleep(0.2)
+        await _typed(agent, s["id"], mark)
         await feeder.call("hook", session=s["id"], state="working")
         await asyncio.sleep(0.2)
         agent._forget(s["id"])  # what a remove does to the record, without the exited precondition
@@ -1292,6 +1320,43 @@ async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp
         assert sid not in agent._model_checked  # no key outlives the record
 
 
+async def test_the_context_reading_is_read_on_the_tick_for_unattended_records(agent, tmp_path, monkeypatch):
+    """TD-190, design §6 rule 5: the tick asks the adapter for each unattended record's context
+    reading and keeps it on the record; an attended session is a person's and is not read, and a
+    reading the adapter cannot make leaves the last one alone."""
+    reading = {"tokens": 231_000, "at": "2026-09-27T20:00:00Z", "window": 1_000_000}
+    asked: list[str] = []
+
+    def context(session_id, cwd, profile=""):
+        asked.append(session_id)
+        return reading
+
+    monkeypatch.setattr(adapters.get("shell"), "context", context, raising=False)
+    async with LocalClient() as person:
+        att = await person.call("create", name="att", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        un = await person.call(
+            "create", name="un", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+        )
+        for s in (att, un):
+            await person.call("hook", session=s["id"], adapter_id=f"conv-{s['name']}")
+        agent._context_checked.clear()
+        await agent.tick()
+        assert asked == ["conv-un"]
+        assert (await person.call("get", id=un["id"]))["context"] == reading
+        assert (await person.call("get", id=att["id"]))["context"] is None
+        # read once per CONTEXT_EVERY, not on every tick
+        await agent.tick()
+        assert asked == ["conv-un"]
+        monkeypatch.setattr(adapters.get("shell"), "context", lambda *a, **kw: None, raising=False)
+        agent._context_checked.clear()
+        await agent.tick()
+        assert (await person.call("get", id=un["id"]))["context"] == reading
+        for s in (att, un):
+            await person.call("kill", id=s["id"])
+            await person.call("remove", id=s["id"])
+        assert un["id"] not in agent._context_checked  # no key outlives the record
+
+
 async def test_one_name_one_session(agent, tmp_path, monkeypatch):
     """Design §4.1, §9 invariant 12, TD-030: within a scope a name identifies one session — a live
     holder refuses (and says which id to switch to), an exited or closed one is superseded and its
@@ -1838,3 +1903,39 @@ async def test_a_mode_change_is_pushed_at_the_press(agent, tmp_path, monkeypatch
     assert view["unattended"] is True and pushed
     monkeypatch.setattr(agent, "_push_changes", push)
     await agent.rpc_kill(sid)
+
+
+async def test_a_tool_event_that_wakes_an_idle_session_is_logged(agent, tmp_path, caplog):
+    """TD-201's capture: a hook turned an idle grinder `working` four seconds after its Stop, with no
+    turn behind it, and nothing recorded which event it was. The adapter names a tool event in
+    `event`; the agent logs the one that wakes a hook-confirmed idle session, and only that one."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="woken", dir=str(tmp_path), adapter="shell")
+        with caplog.at_level("INFO", logger="agentorc.agent"):
+            await c.call("hook", session=s["id"], state="idle")
+            await c.call("hook", session=s["id"], state="working")  # a prompt's own start: unnamed
+            await c.call("hook", session=s["id"], state="working", event="PreToolUse:Bash")  # already working
+            assert "turned a hook-confirmed idle session working" not in caplog.text
+            await c.call("hook", session=s["id"], state="idle")
+            await c.call("hook", session=s["id"], state="working", event="PreToolUse:Read")
+        assert f"{s['id']}: PreToolUse:Read turned a hook-confirmed idle session working" in caplog.text
+
+
+async def test_a_session_started_without_a_name_exports_the_one_it_was_given(agent, tmp_path):
+    """TD-185: `AGENT_NAME` is the name the Org shows — for a blank name, the automatic one — so
+    dev-cadence's commit hook signs with what a person sees on the card, whatever the adapter."""
+    out = tmp_path / "name.txt"
+    async with LocalClient() as c:
+        s = await c.call(
+            "create",
+            name="",
+            dir=str(tmp_path),
+            adapter="command",
+            argv=["bash", "-c", f'echo "$AGENT_NAME" > {out}; sleep 30'],
+        )
+        for _ in range(50):
+            if out.exists() and out.read_text().strip():
+                break
+            await asyncio.sleep(0.1)
+        assert s["name"] and out.read_text().strip() == s["name"]
+        await c.call("kill", id=s["id"])

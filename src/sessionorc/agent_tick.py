@@ -26,11 +26,13 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     COMPOSER_LINES,
+    CONTEXT_AGAIN,
     DERIVE_EVERY,
     FILL_CEILING,
     FILL_WINDOW,
     GIT_EVERY,
     IDLE_NUDGE,
+    LANE_NEWS_NAMED,
     LAUNCH_KEYS,
     MODEL_EVERY,
     PRUNE_EVERY,
@@ -62,6 +64,7 @@ from sessionorc.models import (
     SYSTEM,
     Pending,
     Session,
+    context_over_text,
     now_iso,
 )
 from sessionorc.tmux import PaneInfo
@@ -86,6 +89,7 @@ class TickMixin:
         self._note_attention(snapshot_at)
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
+        await self._refresh_context(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
@@ -94,7 +98,10 @@ class TickMixin:
             self._pruned_at = snapshot_at
             # the live set is read here, on the loop (the class's one-writer rule); only the file
             # work goes to the thread
-            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
+            ended = ("exited", "closed")
+            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
+            # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
+            live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
             await asyncio.to_thread(self._prune_runs, snapshot_at, live)
         if self.mode == "home":
             self._supervise_containers()
@@ -105,6 +112,9 @@ class TickMixin:
         if self.mode == "home" and (self._repos_task is None or self._repos_task.done()):
             # detached as the usage refresh is: `gh` talks to the network (§4.4 *Repo facts*)
             self._repos_task = asyncio.create_task(self._refresh_repos())
+        if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
+            # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
+            self._promote_task = asyncio.create_task(self._refresh_promotes())
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
@@ -209,8 +219,8 @@ class TickMixin:
         sessions alone (§4.2).
         """
         for s in list(self.sessions.values()):
-            if not (s.unattended and s.run_until) or s.state in ("exited", "closed"):
-                continue
+            if not (s.unattended and s.run_until) or s.state in ("exited", "closed", "scheduled"):
+                continue  # a scheduled record has nothing running to stop yet (§6 *Start time*)
             if now < _parse(s.run_until):
                 continue
             if not s.wrapup_sent_at:
@@ -264,7 +274,7 @@ class TickMixin:
         doc = settings_mod.reserves(whole)
         changed = False
         for s in list(self.sessions.values()):
-            if not s.unattended or s.state in ("exited", "closed"):
+            if not s.unattended or s.state in ("exited", "closed", "scheduled"):
                 if s.gated:
                     s.gated = None  # the gate's reach is unattended, live sessions alone (§9 invariant 5)
                     self.store.save(s)
@@ -328,19 +338,24 @@ class TickMixin:
 
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
-        restart; rule 3, the seats; rule 4, the idle nudge. **The restarts run at the home** (§4.4a: policies that start
-        run at the home), over this host's records and every node's — a member on a host whose link
-        is down is left as it is and looked at again on the next tick, refused rather than queued.
-        **Each record's pass is isolated**: one's exception is logged and the tick goes on to the next."""
+        restart; rule 3, the seats; rule 4, the idle nudge; rule 5, the context bound (TD-190);
+        rule 6, new work in a lane (TD-195).
+        **The restarts run at the home** (§4.4a: policies that start run at the home), over this
+        host's records and every node's — a member on a host whose link is down is left as it is and
+        looked at again on the next tick, refused rather than queued. **Each record's pass is
+        isolated**: one's exception is logged and the tick goes on to the next."""
         if self.mode != "home":
             return
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         for s in records:
             try:
+                await self._scheduled_start(s, now)
                 await self._crash_restart(s, now)
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
                 await self._idle_nudge(s, now)
+                await self._context_line(s, now)
+                self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
         if (
@@ -417,6 +432,36 @@ class TickMixin:
             return
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
         await self._replay(s, "crash")
+
+    async def _scheduled_start(self, s: Session, now: datetime) -> None:
+        """Design §6 *Start time* (TD-152): a `scheduled` record whose instant has passed is created
+        from its launch record — `restarts: [{why: start}]`, the record superseded in place with its
+        mail — here or at its node; a node whose link is down waits and is looked at next tick. A
+        failed start counts, as a failed replay does, and at `RESTART_CEILING` inside the window the
+        tick stops trying and says so: the record is a person's."""
+        if s.state != "scheduled" or not s.start_at or s.restart_ceiling:
+            return
+        try:
+            due = _parse(s.start_at) <= now
+        except ValueError:
+            due = False
+        if not due:
+            return
+        if s.host != self.host and s.host not in self._link_muxes:
+            return  # its link is down: left as it is, looked at again next tick (§4.4a)
+        tries = [
+            r
+            for r in s.restarts
+            if isinstance(r, dict) and r.get("why") == "start" and _recent(r.get("at"), now, RESTART_WINDOW)
+        ]
+        if len(tries) >= RESTART_CEILING:
+            s.restart_ceiling = {"at": now_iso(), "count": len(tries)}
+            log.warning("%s: its scheduled start failed %d times — the ceiling; it is a person's now", s.id, len(tries))
+            self._save(s)
+            await self._push_changes()
+            return
+        log.info("%s: its start time %s has come — starting it", s.id, s.start_at)
+        await self._replay(s, "start", start_of=s.id)
 
     async def _wanted_restart(self, s: Session, now: datetime) -> None:
         """Rule 2 (design §6, §4.9a): a supervised member that declared `restart_wanted` and is `idle`,
@@ -522,6 +567,81 @@ class TickMixin:
             log.info("%s: idle %s with work open — nudged", s.id, IDLE_NUDGE)
             self._save(s)
             await self._push_changes()
+
+    async def _context_line(self, s: Session, now: datetime) -> None:
+        """Rule 5 (design §6, TD-190): a supervised member whose context reading is past its role's
+        bound is told so by one fixed line once it is hook-confirmed `idle` and holds no claim in
+        progress — between entries, never mid-turn — and again after `CONTEXT_AGAIN` while it is
+        still idle and over (`context_sent_at`). A wrap-up under way or a gate pause beats it, as it
+        beats the doorbell; a member that declared already (out of work, a restart wanted) is not
+        told. The send needs the pane here: a node's member is not told yet, as rule 4's is not."""
+        if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.host != self.host:
+            return
+        if s.seat is not None or s.out_of_work or s.restart_wanted:
+            return
+        over = context_over_text({"context": s.context, "context_bound": s.context_bound})
+        if not over:
+            return
+        if s.state != "idle" or s.confidence != "hook" or s.pending:
+            return
+        if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
+            return  # a claim in progress: the clause on its `ao` replies says it, and it declares after
+        if s.context_sent_at and now - _parse(s.context_sent_at) < CONTEXT_AGAIN:
+            return
+        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+            return
+        if s.gated or self._profile_gated(s.profile, now, s.team):
+            return
+        line = f"[agentorc] {over.replace(' over the ', ', over your ', 1)} — take nothing new: push, ledger, then "
+        line += '`ao progress restart --why "context bound"`'
+        if await self._policy_send(s, line):
+            s.context_sent_at = now_iso()
+            log.info("%s: %s — told", s.id, over)
+            self._save(s)
+            await self._push_changes()
+
+    def _lane_news(self, s: Session, now: datetime) -> None:
+        """Rule 6 (design §6, TD-195): a supervised member, not a seat, that declared out of work is
+        told when its lane gains entries. The first tick that sees the declaration writes
+        `lane_seen` — the ids in its repo's ledger reading that match its lane; a later reading
+        holding a matching id not in it, while the member is live, not winding down, not gated and
+        not suspended, becomes one `note` from `system` naming the new ids, which are then added,
+        so each is told once. The doorbell does the waking; nothing is typed here. No reading —
+        the repo not in this home's registry, or its file unreadable — writes nothing."""
+        if not (s.supervised and s.out_of_work) or s.seat is not None or s.superseded_by:
+            return
+        led = (self._repos.get(s.repo or "") or {}).get("ledger") or {}
+        if "error" in led or not isinstance(led.get("entries"), list):
+            return
+        ids = [
+            str(e["id"])
+            for e in led["entries"]
+            if isinstance(e, dict) and e.get("id") and any(ledger_mod.lane_matches(w, e) for w in s.lane)
+        ]
+        if s.lane_seen is None:
+            s.lane_seen = {"at": now_iso(), "ids": ids}
+            self._save(s)
+            return
+        seen = set(s.lane_seen.get("ids") or [])
+        new = [i for i in ids if i not in seen]
+        if not new or s.state in ("exited", "closed") or s.suspended:
+            return
+        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+            return
+        if s.gated or self._profile_gated(s.profile, now, s.team):
+            return
+        s.lane_seen = {"at": now_iso(), "ids": [*s.lane_seen.get("ids", []), *new]}
+        named = ", ".join(new[:LANE_NEWS_NAMED]) + (
+            f" and {len(new) - LANE_NEWS_NAMED} more" if len(new) > LANE_NEWS_NAMED else ""
+        )
+        count = f"{len(new)} entr{'y' if len(new) == 1 else 'ies'}"
+        self._system_note(
+            self._address(s),
+            f"your lane gained {count} since you declared out of work: {named} — read the ledger on "
+            "`origin/main`, then claim one or declare again",
+        )
+        self._save(s)
+        log.info("%s: told of %s new in its lane", self._address(s), count)
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
@@ -869,6 +989,15 @@ class TickMixin:
                     log.info("pruned run log %s (older than %d days)", f.name, keep)
             except OSError:
                 continue
+        # a promote's log goes with the run logs (§6 *Promote*), unless its run is still in flight
+        inflight = {str(r["inflight"].get("log")) for r in self._promotes.values() if r.get("inflight")}
+        for f in (paths.home() / "promotes").glob("*/*.log"):
+            try:
+                if str(f) not in inflight and f.stat().st_mtime < cutoff:
+                    f.unlink()
+                    log.info("pruned promote log %s (older than %d days)", f, keep)
+            except OSError:
+                continue
 
     async def _refresh_git(self, now: datetime) -> None:
         due = [
@@ -1018,6 +1147,40 @@ class TickMixin:
                 continue
             if live.model != result:
                 live.model = str(result)
+                self.store.save(live)
+
+    async def _refresh_context(self, now: datetime) -> None:
+        """Each unattended record's context reading (design §4.3 `context`, §6 rule 5, TD-190): the
+        adapter's read of the transcript's tail, in a thread, once per CONTEXT_EVERY. An attended
+        session is a person's, and they can see their own context; an adapter that cannot tell
+        leaves the field as it was."""
+        every = agent_common.CONTEXT_EVERY
+        due = []
+        for s in self.sessions.values():
+            if not (s.unattended and s.adapter_id and s.dir) or s.state == "closed":
+                continue
+            if now - self._context_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) <= every:
+                continue
+            try:
+                fn = getattr(adapters.get(s.adapter), "context", None)
+            except KeyError:
+                fn = None
+            if fn:
+                due.append((s, fn))
+        if not due:
+            return
+        results = await asyncio.gather(
+            *(asyncio.to_thread(fn, str(s.adapter_id), Path(s.dir), s.profile) for s, fn in due),
+            return_exceptions=True,
+        )
+        for (s, _), result in zip(due, results, strict=True):
+            self._context_checked[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None or not isinstance(result, dict) or not result.get("tokens"):
+                continue
+            reading = {"tokens": int(result["tokens"]), "at": result.get("at"), "window": result.get("window")}
+            if live.context != reading:
+                live.context = reading
                 self.store.save(live)
 
     async def _refresh_usage(self) -> None:
@@ -1172,6 +1335,8 @@ class TickMixin:
                 if s.closed_at and _parse(s.closed_at) + agent_common.CLOSED_KEEP < now:
                     self._forget(sid)
                 continue
+            if s.state == "scheduled":
+                continue  # no pane yet, by design (§6 *Start time*): the tick's start pass is its judge
             killed = self._killed_at.get(sid)
             if killed is not None and killed < snapshot_at:
                 del self._killed_at[sid]  # this snapshot is newer than the kill: the guard is spent
@@ -1299,6 +1464,10 @@ class TickMixin:
                 # and its answer still wins (verified 2026-09-06). Keep Allow / Deny up.
                 pass
             else:
+                if state == "working" and s.state == "idle" and s.confidence == "hook" and event.get("event"):
+                    # An event that is not a turn's start woke a session its Stop left idle: the
+                    # capture TD-201 asks for, since the one that did it once is not yet named.
+                    log.info("%s: %s turned a hook-confirmed idle session working", sid, event["event"])
                 s.set_state(state, confidence="hook", pending=pending)
         self.store.save(s)
 
@@ -1312,6 +1481,7 @@ class TickMixin:
             self._git_checked,
             self._derived_at,
             self._model_checked,
+            self._context_checked,
             self._pre_limited,
             self._last_hook,
             self._live_hook_at,

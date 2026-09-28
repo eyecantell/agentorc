@@ -33,8 +33,8 @@
 {% else %}<span class="meta">stopped</span>{% endif %}{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
    control sits on the thing it acts on, and only a team with a definition has either. #}
-{% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}">Wind down</button>
-<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}">Stop now</button>
+{% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}"{% if g.stays %} data-confirm="Wind down {{ g.team }}? {{ g.stays | join('; ') }}."{% endif %}>Wind down</button>
+<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}"{% if g.stays %} data-confirm="Stop {{ g.team }} now? {{ g.stays | join('; ') }}."{% endif %}>Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
 {# design §4.5a *team card: **Members…*** (§4.9, TD-163, built by TD-172): beside Start on a stopped
    team and beside Wind down on a live one; on a team a repo defines, a note instead — its file is

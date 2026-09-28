@@ -34,7 +34,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc.models import GRANTS, normalize_review
+from sessionorc.models import GRANTS, normalize_context, normalize_review
 
 FILE = ".agentorc.yml"
 DEFAULT_ADAPTER = "claude-code"
@@ -42,7 +42,12 @@ DEFAULT_WORKTREES = ".claude/worktrees"
 DEFAULT_ANCHOR = "main-checkout-single"
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
-ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "message", "prompts")
+ROLE_KEYS = (
+    "brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "context", "message", "prompts",
+)  # fmt: skip
+# The built-in worker presets' context bound (design §4.8 *A role has a context bound*, TD-190): Paul's
+# number from grinder-ao-1's 462k run. `manager`, `techlead` and `plain` carry none.
+WORKER_CONTEXT = {"bound": "200k"}
 # A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
 # ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
 # label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
@@ -88,6 +93,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "grants": [],
         "icon": "wrench",
         "label": "Grinder",
+        "context": WORKER_CONTEXT,
         "message": "its own card only: the entry it holds, a finding on its PR",
     },
     "hunter": {
@@ -96,6 +102,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "grants": [],
         "icon": "search",
         "label": "Hunter",
+        "context": WORKER_CONTEXT,
         "message": "an area to look at; it files, never fixes",
     },
     "manager": {
@@ -125,6 +132,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "grants": [],
         "icon": "eye",
         "label": "Auditor",
+        "context": WORKER_CONTEXT,
         "message": "what its trigger counts: the last n PRs, the period",
     },
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
@@ -175,6 +183,7 @@ class Role:
     prompts: list[dict[str, str]] = field(default_factory=list)  # saved prompts (§4.8, TD-170), in file order
     controllers: list[str] = field(default_factory=list)
     review: dict[str, Any] | None = None  # who reads its PRs (design §4.9b *The reader*, TD-093)
+    context_bound: int | None = None  # tokens past which §6 rule 5 tells it to end its run (§4.8, TD-190)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
     # deliberately, and the repo's default is not fallen back to (review of PR #116)
     sources: list[str] = field(default_factory=list)  # `built-in`, `org`, `repo`: which layers spoke
@@ -258,6 +267,7 @@ class Role:
             "label": self.display,
             "message": self.message,
             "prompts": [dict(p) for p in self.prompts],
+            "context_bound": self.context_bound,
             "controllers": list(self.controllers),
             "source": self.source,
         }
@@ -278,7 +288,7 @@ class RepoConfig:
     commands: list[dict[str, Any]] = field(default_factory=list)
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
     # §5 `promote:` (§6 *Promote*, TD-120): `{run, check}`, accepted and checked now so writing the
-    # designed block does not break `ao new` in that repo; TD-132 is what runs it (TD-149 (2))
+    # designed block does not break `ao new` in that repo; `sessionorc.promote` runs it at the home (TD-132)
     promote: dict[str, str] | None = None
 
 
@@ -465,6 +475,13 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
                 out[k] = normalize_review(v)
             except ValueError as e:
                 raise ValueError(f"{here}.{e}") from None
+        elif k == "context":
+            # §4.8 *A role has a context bound* (TD-190): `{bound: 200k}`, or `none` to take a
+            # built-in's away — checked by the one function the host agent's create applies too
+            try:
+                out[k] = {"bound": normalize_context(v)}
+            except ValueError as e:
+                raise ValueError(f"{here}.{e}") from None
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
             grants = list(dict.fromkeys(grants))
@@ -546,6 +563,11 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             # `normalize_review` is idempotent, so a second pass over its output changes nothing
             try:
                 role.review = normalize_review(block["review"])
+            except ValueError as e:
+                raise ValueError(f"{src} roles.{name}.{e}") from None
+        if "context" in block:
+            try:
+                role.context_bound = normalize_context(block["context"])
             except ValueError as e:
                 raise ValueError(f"{src} roles.{name}.{e}") from None
         if "controllers" in block:

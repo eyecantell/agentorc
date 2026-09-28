@@ -52,6 +52,8 @@
       {# design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat, never pressable #}
       {% if s.suspended_note %}<span class="badge suspendedmark" title="{{ s.suspended_note }}">suspended</span>{% endif %}
       {# design §6 / §4.5a **stops** note (TD-026): plain text after the mode, only when something will stop it #}
+      {#- design §4.5a **starts** note (§6 *Start time*, TD-152): a scheduled record's start, in the stops note's place -#}
+      {% if s.start_note %}<span class="meta startnote" title="the agent starts it at this time: Start now or Cancel under more ⋯">{{ s.start_note }}</span>{% endif %}
       {% if s.stop_note %}<span class="meta" title="the agent asks it to wrap up at this time, then stops it">{{ s.stop_note }}</span>{% endif %}
       <span class="grow"></span>
       <span class="meta age" data-since="{{ s.since }}" title="how long it has been {{ s.state_label }}">{{ s.age }}</span>
@@ -69,10 +71,12 @@
       <span class="grow"></span>
       {% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}
     </div>
-    {# (4) what runs it, and what it reports: tool · account · model on every card; the report
+    {# (4) what runs it, and what it reports: tool · account · model on every card, then the context
+       reading where the adapter can tell (TD-190); the report
        line (§4.5a, TD-028 step 4) and the findings count at the right, only when non-empty #}
     <div class="row r4">
-      <span class="meta">{{ s.profile_line }}</span>
+      <span class="meta">{{ s.profile_line }}{% if s.context_short %} · <span class="context{% if s.context_over %} over{% endif %}"
+            title="context {{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% if s.context_over %} — over it{% endif %}{% endif %} — what this session's last turn sent (design §6 rule 5)">{{ s.context_short }}</span>{% endif %}</span>
       <span class="grow"></span>
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
             title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}
@@ -119,6 +123,11 @@
     <details class="more">
       <summary class="btn sm link" title="more">⋯</summary>
       <div class="menu">
+        {%- if s.state == 'scheduled' %}
+        {#- §4.5a **starts** note: `more ⋯`'s two on a scheduled card (§6 *Start time*, TD-152) -#}
+        <button data-act="start" data-id="{{ s.id }}" data-at="now" title="start it on the next tick instead of at its time">Start now</button>
+        <button data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free." title="forget the scheduled record: nothing ran">Cancel</button>
+        {%- endif %}
         <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }} — {% endif %}{{ help_title('message') }}">Message…</button>
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
