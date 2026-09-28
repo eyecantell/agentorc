@@ -964,7 +964,7 @@ the home instead (*Mail across hosts*).
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
 | node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served, except `decide` (a session does not answer its own permission prompt, TD-119). On another session, and any `create`: **refused** — except `seen` and `hook`, which the gate does not cover (§4.8) and which are the node's own socket |
 | home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
-| `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below; not built — TD-147: today the row reads *served, link or no link*) | refused — a person's own, link or no link |
+| `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below; built — TD-147) | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
 | reports — `progress`, `finding`, `doing` | — | **refused** |
 | the readings — `repos`, the doing log's read `doing_log` (`ao repo`, TD-176) | **forwarded** while the link is up, refused offline: the readings are taken at the home (§4.4 *Repo facts*) and a node holds none | the same |
@@ -1378,15 +1378,16 @@ call by call.
   **hint**, not an inbox: a read the node serves alone carries the mail line from it.
   Refused, not queued: nothing is pushed to a link that is down, and the next snapshot pushes
   everything.
-- **Settings, replicated** (TD-100 (4), 2026-09-25; not built — TD-147). `settings.yml` is home-
+- **Settings, replicated** (TD-100 (4), 2026-09-25; built 2026-09-27 — TD-147; the page's *set at <home>* is TD-148's). `settings.yml` is home-
   owned (§5), and the policies that read it — the usage gate, a team's stop time, a schedule — run
   on the node that holds the session, so the file travels: the `settings` link method, home → node,
   a notification carrying the whole file as the home holds it, sent to **every node whose link is up
-  after each `set_settings` write**, and to a node once **on its `hello`** at every dial. The node
+  after each `set_settings` write**, and to a node once **on its `hello`** at every dial (sent once its snapshot is taken: nothing is pushed to a link before it). The node
   writes its own `settings.yml` from it and reads that on every tick as the home reads its own,
   offline included — *policies that stop run on the node, from its replica*, the rule the stop time
   already has — so the last settings a node was sent stay in force until its next dial, and a hand
-  edit at a node is overwritten by the next frame. `set_settings` at a node is forwarded while the
+  edit at a node is overwritten by the next frame. A home file that is absent or cannot be read is
+  not settings: nothing is sent, and each node keeps what it has (TD-147, the techlead's read of #682). `set_settings` at a node is forwarded while the
   link is up and refused offline (the table above); the reads a node serves — `gate`, `settings` —
   answer from the replica, and the page says *set at <home>* beside each value. A write may
   originate at the home with no node involved, so the send is a broadcast, never a reply to a
@@ -5328,7 +5329,7 @@ session is never woken by mail at all.
 - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
   audit](decisions/2026-09-25-settings-audit.md); the file's four keys, their readers and `set_settings` / `settings` are built — TD-146 slice 1;
   and the UI reads `person:` through that read with `ui.yml` retired — TD-146 slice 1;
-  the team stop time — slice 2; the CLI is TD-146's rest, TD-147 the replica, TD-148
+  the team stop time — slice 2; the CLI is TD-146's rest; the replica built — TD-147; TD-148
   the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
   owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
   written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`

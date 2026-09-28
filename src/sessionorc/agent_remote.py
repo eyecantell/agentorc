@@ -21,6 +21,7 @@ from sessionorc import (
     modes,
     naming,
 )
+from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
     HOME_EDITS,
@@ -417,6 +418,11 @@ class RemoteMixin:
                 taken = self._take_records(host, params.get("records") or [], whole=method == "snapshot")
                 if method == "snapshot":
                     self._intent_sent[host] = {}  # the intent goes out whole once, then as it changes
+                    # and the settings once per dial (§4.4a *Settings, replicated*, TD-147), after the
+                    # reply: nothing is pushed to a link before its snapshot is taken
+                    task = asyncio.ensure_future(self._push_settings(host))
+                    self._bg.add(task)
+                    task.add_done_callback(self._bg.discard)
                 await self._push_changes()
                 return {"taken": taken}
             if method == "gone":
@@ -469,6 +475,30 @@ class RemoteMixin:
             self._save(s)
             await self._push_changes()
         return {"changed": changed}
+
+    async def _push_settings(self, host: str | None = None) -> None:
+        """The home's `settings.yml`, whole, to `host`'s link or — after a `set_settings` write — to
+        every node whose link is up (§4.4a *Settings, replicated*, TD-147). A notification: a write may
+        start at the home with no node involved, so it is a broadcast and never a reply. Refused, not
+        queued, as the intent push is: a node whose link is down is sent the file on its next dial."""
+        if self.mode != "home":
+            return
+        doc = await asyncio.to_thread(settings_mod.read)
+        if doc is None:
+            # absent or broken: not settings. `load` reads it as `{}`, which gates nothing here while
+            # it is mended — sent, it would replace every node's good replica with nothing
+            log.warning("settings.yml is absent or cannot be read: not sent, and each node keeps its replica")
+            return
+        for h, mux in list(self._link_muxes.items()):
+            if host is not None and h != host:
+                continue
+            try:
+                async with asyncio.timeout(agent_common.REPORT_WRITE):
+                    await mux.notify("settings", doc=doc)
+            except link.LinkClosed:
+                continue
+            except (link.LinkError, TimeoutError) as e:
+                log.warning("the settings did not reach %s: %s — it is sent again on its next dial", h, e)
 
     async def _push_intent(self) -> None:
         """What changed in the home-owned fields, or the unread count, of a linked node's records

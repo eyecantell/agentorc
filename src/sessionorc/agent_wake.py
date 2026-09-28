@@ -428,8 +428,9 @@ class WakeMixin:
         """Write the home's `settings.yml` (design §5, §4.7 `ao gate` / `ao team until` / `ao team
         reserve`, the Settings page; TD-100, TD-146): any subset of its keys, each validated before
         anything is written, then the whole file rewritten. **A person's own**, refused to a session
-        as `inbox_pause` is. Takes effect on the next tick. Served on a node, link or no link: the
-        file is this host's own (TD-147 replicates it).
+        as `inbox_pause` is. Takes effect on the next tick. At the home alone: a node forwards it while
+        its link is up and refuses it offline (`modes.HOME_EDITS`), and every linked node is sent
+        the file after the write (§4.4a *Settings, replicated*, TD-147).
 
         - `profile` + `reserves`: a window label to a flat percent, to `{per_day: N}`, or to None,
           which clears that window's reserve. A label the profile's adapter does not report is
@@ -498,6 +499,7 @@ class WakeMixin:
                 )
         held = [k for k in ("usage_gate", "teams", "repos", "person") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
+        await self._push_settings()
         return out
 
     def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any) -> dict[str, Any]:

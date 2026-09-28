@@ -21,6 +21,7 @@ from sessionorc import (
     mail,
     naming,
 )
+from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
     HOME_EDITS,
@@ -264,6 +265,9 @@ class LinkMixin:
         if method == "intent":
             await self._take_intent(params.get("records") or [])
             return None
+        if method == "settings":
+            await self._take_settings(params.get("doc"))
+            return None
         if method == "files":
             try:
                 return await asyncio.wait_for(
@@ -275,6 +279,15 @@ class LinkMixin:
             d = Path(str(params.get("dir") or "")).expanduser()
             return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
         raise link.LinkError(f"unknown link method {method!r}")
+
+    async def _take_settings(self, doc: Any) -> None:
+        """The home's `settings.yml`, whole (§4.4a *Settings, replicated*, TD-147): written as this
+        node's own file, which its tick, `gate` and `settings` read as the home reads its own —
+        offline included, until the next dial sends it again. A hand edit here is overwritten."""
+        if self.mode == "home" or not isinstance(doc, dict):
+            return
+        await asyncio.to_thread(settings_mod.save, doc)
+        log.info("settings.yml replicated from the home")
 
     async def _act(self, params: dict[str, Any]) -> dict[str, Any]:
         """An act the home routed here (design §4.4a "A node reports and executes; the home
