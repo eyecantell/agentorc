@@ -934,7 +934,7 @@ def cmd_at(args: argparse.Namespace) -> int:
     """`ao at <session> <when> | now` (design §4.7, §6 *Start time*, TD-152): move a scheduled start,
     or start it on the next tick. Acting, and gated as `ao until` is; the agent refuses it on a
     session that already started. Cancel is `ao close`."""
-    when = "now" if (args.when or "").strip().lower() == "now" else stop_time(args.when or "", "at")
+    when = "now" if (args.when or "").strip().lower() == "now" else stop_time(args.when or "", "ao at")
     s = call_sync("set_start", id=resolve(args.id), start_at=when)
     return emit(args, s, lambda: print(f"{s['id']}: {start_note(s) or 'starts on the next tick'}"))
 

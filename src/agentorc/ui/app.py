@@ -3739,7 +3739,7 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # record that already started, in its own words
             when = str(body.get("at") or "now").strip()
             try:
-                at = "now" if when.lower() == "now" else clistop(when, "at")
+                at = "now" if when.lower() == "now" else clistop(when, "start time")
             except AgentError as e:
                 raise HTTPException(400, str(e)) from None
             s = await call("set_start", id=sid, start_at=at)

@@ -2018,7 +2018,10 @@
     if (s.state === "scheduled") {
       // §6 *Start time*: no pane yet, so no terminal — the banner stands, and the page looks again
       // while it waits, so the session's terminal appears once the agent has started it
-      setTimeout(() => location.reload(), 20000);
+      // — but never under a person's hands: an open dialog (a Message… being written) or a field
+      // with the focus puts the look off until they are done
+      const busy = () => !!document.querySelector("dialog[open]") || ["INPUT", "TEXTAREA"].includes((document.activeElement || {}).tagName);
+      setInterval(() => { if (!busy()) location.reload(); }, 20000);
       return;
     }
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
