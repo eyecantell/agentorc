@@ -533,3 +533,24 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .dchips .chip { border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
 .repopage .dchips .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 @media (max-width: 720px) { .repopage .rrow { flex-wrap: wrap; } }
+/* the Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148): the Inbox's one centred
+   column (TD-082) at a reading width — a section is a heading with its i mark, a row is a card; a
+   field is a label, its input and what it makes today, on one line that wraps on a phone */
+.inboxpage.setpage { max-width: 880px; display: flex; flex-direction: column; gap: 18px; }
+.setpage .setgroup { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+.setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
+.setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
+.setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
+.setpage .setin { width: 100%; }
+.setpage .settemplate { display: flex; flex-direction: column; gap: 10px; }
+.setpage .setline.warn, .setpage .setsaid.warn { color: var(--needs-fg); }
+.setpage .setvals { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 10px; margin: 0; }
+.setpage .setvals dt { font-size: var(--t-small); color: var(--muted); }
+.setpage .setvals dd { margin: 0; font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+.setpage .badge.defmark { cursor: default; color: var(--muted); border-color: transparent; font-family: inherit; }
+.setpage .setfoot { border-top: 1px solid var(--line); padding-top: 8px; align-items: center; }
+.setpage .setfoot .note { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .setpage .setrow, .setpage .setvals { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .setpage .setvals dd { margin-bottom: 6px; }
+}
