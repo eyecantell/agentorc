@@ -111,6 +111,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-207 | The Inbox shows board items only once they are due, and says so nowhere: a grinder's two *act* items due in a week read to Paul as messages that never arrived; a setting for the horizon, drawn on the page | Medium | Open — design-first |
 | TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
+| TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first |
 
 
 ---
@@ -2060,3 +2061,19 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Fix:** decide where a repo's held paths live: in the repo's own `.agentorc.yml` (per repo, reviewed with the code), on the team in `org.yml`, or both with the repo's winning. Then move agentorc's two paths there and leave the org-wide role with a reader and no paths. Check §4.9b and the settings audit's definition-versus-setting rule (ADR 2026-09-25) for which it is. Done when grinder-dc-1's record holds dev-cadence's own held paths or none, and ao-grind's grinders keep theirs.
 
 **Related:** TD-093 (the reader and `held`), TD-120 (org roles), `docs/decisions/2026-09-25-settings-audit.md`.
+
+## TD-210: The home's definition files have no history and no copy off the machine
+
+**Priority:** Medium
+**Added:** 2026-09-28 (Paul: *does it seem odd that our org.yml is not source controlled? If I set up an org then want to work it from another machine, I have to remember to grab it?*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** `~/.agentorc/` (`org.yml`, `profiles.yml`, `settings.yml`, `hosts.yml`), design §4.4a (*`org.yml` lives on the home*), §5 (the settings files), §4.9 (Members… edits `org.yml` in place), `docs/decisions/2026-09-25-settings-audit.md` (the file table)
+
+**Why:** the home's definition files live only in `~/.agentorc/` on the home. A node reads the home's org and keeps none of its own (§4.4a), so two machines never disagree. But nothing gives the home's copy history or a second place to live. The nightly backup tars the files into `~/.agentorc/backups/`, on the same disk. Moving the home, rebuilding kmaster, or running the org from a fresh machine means remembering to copy the files by hand. There is no history: `~/.agentorc/` holds ten hand-made `org.yml.bak-*` files (2026-09-17 to 2026-09-24), which is version control by hand. The pressure grows now that Members… (TD-172) edits `org.yml` from the page. A repo's `.agentorc.yml` can hold `teams:` and is versioned with its code, but the org's projects, its `roles:` overlay and cross-repo teams have no such home.
+
+**Fix:** design a versioned home for the definition files. The anchor's proposal: a private git repo (e.g. `agentorc-org`) whose checkout the home reads from, via `AGENTORC_ORG_DIR` or `~/.agentorc` pointing into it. Then settle: (1) **which files**: `org.yml` and `profiles.yml` surely, `settings.yml` probably (the person's; no secrets in any, since secrets stay in Doppler), while `hosts.yml` (this machine's identity) and the runtime store (sessions, runs, inbox) stay local; (2) **page edits commit**: Members… and the Settings page's writes commit with a message naming the act, as the board write-back does (§4.4); pushed, or committed and left for the anchor to push; (3) **a hand edit and a page edit meeting**: the page refuses on a dirty checkout, or commits the hand edit first; (4) **moving the home**: clone the repo on the new machine and name it as the home; `ao host up` / `ao service install` could take the repo's URL; (5) where each file stands under the settings audit's definition-versus-setting rule, and whether per-repo keys (TD-209's held paths) move to the repos instead. Done when the org can be stood up on a fresh machine from a clone and one command, and `org.yml`'s history is `git log`.
+
+**Related:** TD-209 (the org-wide role's review paths), TD-172 (Members… edits `org.yml`), TD-146 (`settings.yml`), TD-057 (home and node), the settings audit ADR, CLAUDE.md's cross-repo convention (secrets in Doppler).
