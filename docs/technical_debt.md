@@ -104,6 +104,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
+| TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — mechanism and a recommended fix; the shape is Paul's (board, 2026-09-12) |
 
 
 ---
@@ -1941,3 +1942,18 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
 
+## TD-204: `send --wait` reads the tool's own start of *this* prompt as a previous turn, when its hook lands while the paste is being confirmed, and reports `prompt-stalled` for a prompt that ran
+
+**Priority:** Medium
+**Added:** 2026-09-27 (grinder-ao-1, reading `rpc_send` while fixing TD-078's test race, PR #672)
+**Owner:** paul
+**Kind:** decision
+**Pickable:** no — the board item of 2026-09-12 asks Paul whether this is a TD and the shape of its fix; this is the mechanism and a recommendation
+**Status:** Open — found by reading, not reproduced live.
+**Location:** `src/sessionorc/agent.py` `rpc_send` (the busy branch and the `rev` baselines, read **after** `_submit` returns), `_type` (paste, Enter, then polling until the composer is empty)
+
+**Why:** `rpc_send` reads the record's state and `rev` only after `_submit` — the paste, the Enter and `_type`'s check that the prompt left the composer — has returned. Claude Code fires `UserPromptSubmit` the moment Enter lands, so under load the hook can turn the record `working` while `_type` is still polling the composer. `rpc_send` then sees `working`, takes the **busy** branch (*the tool queues the text; wait for the current turn to end*), waits for that turn — which is this prompt's own — to settle, finds `rev` moved by less than three, and waits for a *further* turn to start within `SEND_STALL_SECONDS`: none comes, and it raises `prompt-stalled` for a prompt that ran. That is the board item's symptom exactly (2026-09-12: two in eight sends, a 27 s answer on screen, the record's `progress` proving the prompt ran), and it explains why a long context was not the cause. The test in `test_send_wait_three_outcomes` could not see it: its stand-in hooks were fired by the test after the paste (TD-078).
+
+**Fix (recommended, the shape is Paul's):** take the baseline **before** typing — the state and `rev` read before `_submit` — so the busy branch is decided by what the session was doing when the prompt was sent, and *started* is any transition since then; a turn that began and even ended during the paste then reads as started and settled. A test: a hook stub fired from inside a slowed `_type`, after its Enter. The other shapes on the board (a longer or adapter-supplied window; re-checking the composer before raising) treat the symptom.
+
+**Related:** TD-078 (the test's race, fixed in #672), TD-016 / TD-027 (the wait and the composer check, archived), the board item of 2026-09-12 (*`ao send --wait` reported `prompt-stalled` for a prompt that in fact ran*).
