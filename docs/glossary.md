@@ -188,6 +188,12 @@ not mix:
   into a pane (design §4.10). Kinds: `note`, `ask`, `reply`, `conflict`. The sender keeps its own
   copy in its **outbox**, which is where the marks it must see live. — *proposed*; built 2026-09-17
   (TD-052 step 1).
+- **orphaned question** — an open `ask` or `steer` to the person that names a reference (`about`)
+  and whose asker's record was closed, forgotten or cancelled: it stays in the Inbox, a `steer`
+  among them waits on the person from its bound instead of lapsing, and the person's answer is
+  written on the repo's board and mailed to whoever holds the reference. The asker's name coming
+  back adopts it. A question with no reference closes `asker_gone`. — *designed* 2026-09-28
+  (design §4.10 *A question about a reference outlives its asker*, TD-213; the build is TD-215, TD-216).
 - **person inbox** — the host's inbox for the person; sessions reach it with `ao msg person`, a
   person reads it with `ao inbox` outside any session. — *built* 2026-09-16 (design §4.10, TD-052 step 2).
 - **thread** — a root message and every `reply` chained to it. — *proposed*.

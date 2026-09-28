@@ -1360,6 +1360,13 @@ def inbox_rows():
               '<div class="txt">tdgrind-ao-1 has ended its run with the ledger still holding work. Restart it with fresh context, or stop the team for the night?</div><div class="meta">will go with: <b style="color: #374151;">Restart it once</b> — doing nothing is a valid answer</div>'
               '<div class="sugg"><span class="lbl">suggested by orchestrator-ao-1</span>' + b("“Restart it once” · default") + b("“Stop the team”") + '</div>',
               b("Reply") + b("Go with it", "primary") + b("Pause") + gap + b(ICON["focus"] + "Open", "ghost")),
+        # TD-213: an orphaned steer — its asker was closed by the wind-down, the question stands
+        mcard(BAR["exited"], "steer", "grinder-ao-1", "ao-grind", "7h ago · about TD-149 · <b>5h left, then it waits on you</b>",
+              '<div class="txt"><span class="muted">its session was closed · <b style="color: #374151;">nobody holds TD-149 — your answer is written on agentorc’s board</b></span></div>'
+              '<div class="txt">Six keys of <span class="mono">.agentorc.yml</span> are read by nothing. <b>Remove them and refuse them at load, or keep reading them with a warning?</b></div>'
+              '<div class="meta">its asker would have gone with: <b style="color: #374151;">Remove and refuse</b></div>'
+              '<div class="sugg"><span class="lbl">suggested by grinder-ao-1</span>' + b("“Remove and refuse” · default") + b("“Keep, with a warning”") + '</div>',
+              b("Reply") + b("Go with it", "primary") + gap + b("Delete", "ghost danger")),
     ]
     waiting = [
         mcard("#cbd0d6", "answered · waiting for the outcome", "tdgrind-ao-1", "ao-grind", "answered 52m ago",
@@ -1390,19 +1397,19 @@ def inbox(picks=False):
     needs, steering, waiting, answered, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
-        secs = [("Needs you", 6, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
+        secs = [("Needs you", 6, False), ("Steering", 2, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
         teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
-        kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", 1, False), ("notes", 3, False), ("trail", 6, False)]
-        body = (isec("Needs you", 6, opened=True) + "".join(needs) + isec("Steering", 1) + "".join(steering)
+        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 1, False), ("notes", 3, False), ("trail", 6, False)]
+        body = (isec("Needs you", 6, opened=True) + "".join(needs) + isec("Steering", 2) + "".join(steering)
                 + isec("Waiting on them", 1) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
                 "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks. <b>A board row</b> (TD-126) says its sender's standing before the press — <i>still on TD-122 — grinder-ao-2 holds it</i>, <i>moved on</i> or <i>gone</i> — and carries <b>Reply</b>: the words go on the board line under Paul's name always, and to the lease holder as well while one exists; a reply is not Done. <b>A message has one shape</b> (TD-127): its first paragraph is the whole of what you need, the rest folds under <i>details</i> — closed on the ask row, open on the <i>answered for you</i> row, where the reading is a rendered list from the closed markdown subset and the one link carries its host after its text.")
     else:
-        secs = [("Needs you", "2 of 6", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
+        secs = [("Needs you", "2 of 6", True), ("Steering", "0 of 2", False), ("Waiting on them", "0 of 1", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
         teams = [("ao-grind", "2 of 3", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
-        kinds = [("questions", "1 of 1", False), ("steering", "0 of 1", False), ("session states", "1 of 3", False), ("board items", "0 of 0", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
+        kinds = [("questions", "1 of 1", False), ("steering", "0 of 2", False), ("session states", "1 of 3", False), ("board items", "0 of 0", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
         body = (isec("Needs you", "2 of 6") + "".join(needs[:2])
                 + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them, Answered for you and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
         summary, title = "", "Inbox"
