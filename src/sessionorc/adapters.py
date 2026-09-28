@@ -87,11 +87,18 @@ class Adapter(Protocol):
     #                                                      a metered profile's turns since `cursors` (§4.3 *Spend
     #                                                      per turn*, TD-151): {"turns": [Turn], "cursors":
     #                                                      {transcript: byte offset}, "reason": "ok" | why};
-    #                                                      a Turn is {at, id, source, offset, model, input,
-    #                                                      output, cache_read, cache_write, cost} — four token
+    #                                                      a Turn is {at, id, source, offset, response, model,
+    #                                                      input, output, cache_read, cache_write, cost} —
+    #                                                      `response` the API response's id, so the home
+    #                                                      counts a response once across reads; four token
     #                                                      kinds, never folded; `cost` None where the tool does
     #                                                      not price its own turns. A cursor past its
     #                                                      transcript's end is a rewrite, read from 0 again
+    #   billing_for(profile: str) -> dict | None           {"billing": "subscription" | "metered", "prices":
+    #                                                      {kind: per million}} as the profile declares it
+    #                                                      (§4.2a, TD-151): the home reads it before the cap
+    #                                                      rule, and prices the turns with it. No method, or
+    #                                                      None: a subscription — never guessed
 
 
 def short_model(adapter: str, model: str | None) -> str:

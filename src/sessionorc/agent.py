@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import secrets
@@ -37,6 +38,7 @@ from sessionorc import (
     naming,
     paths,
 )
+from sessionorc import spend as spend_mod
 from sessionorc.agent_attention import AttentionMixin
 from sessionorc.agent_common import (  # re-exported: callers and tests read these from the agent
     _CSI,  # noqa: F401
@@ -142,6 +144,7 @@ from sessionorc.agent_mail import MailMixin
 from sessionorc.agent_promote import PromoteMixin
 from sessionorc.agent_remote import RemoteMixin
 from sessionorc.agent_serve import ServeMixin
+from sessionorc.agent_spend import SpendMixin
 from sessionorc.agent_tick import TickMixin
 from sessionorc.agent_wake import WakeMixin
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
@@ -175,6 +178,7 @@ class HostAgent(
     ServeMixin,
     TickMixin,
     PromoteMixin,
+    SpendMixin,
     AttentionMixin,
     WakeMixin,
     InboxMixin,
@@ -382,6 +386,19 @@ class HostAgent(
         self._usage_checked: dict[str, float] = {}
         self._usage_wait: dict[str, float] = {}
         self._usage_task: asyncio.Task[None] | None = None
+        # A metered account's ledger (§4.4 *Usage*, TD-151): `spend.json`, the rows and the cursors
+        # that make its reading a sum, written only when it changed. `_metered` is the profiles the
+        # last pass found billed `metered` — what the gate reads amounts for — and `_metered_shown`
+        # those whose reading is in `_usage`, so one no live session runs under leaves the top bar.
+        self.spend_store = spend_mod.SpendStore()
+        self._spend: dict[str, dict[str, Any]] = self.spend_store.load()
+        self._spend_saved = json.dumps(self._spend, sort_keys=True)
+        self._spend_pruned = ""
+        self._spend_reason: dict[str, str] = {}
+        self._metered: set[str] = set()
+        self._billing_seen: dict[str, tuple[float, bool]] = {}  # profile → (monotonic, metered), for the gate
+        self._metered_shown: set[str] = set()
+        self._spend_task: asyncio.Task[None] | None = None
         # The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), kept across a
         # restart in `repos.json`; the home's alone — a node reads none of this (§4.4a).
         self.repos_store = RepoStore()
