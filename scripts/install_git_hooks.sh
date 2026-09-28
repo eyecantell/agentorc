@@ -110,7 +110,7 @@ if [ -n "$local_hp" ]; then
             fi ;;
         *)
             echo "  WARN  core.hooksPath is '$local_hp' — this clone's own hooks setup, left alone, so the shims in $common/hooks do not run."
-            echo "        Do NOT just unset it: git honors ONE hooks directory. Fix: copy $root/$rel/pre-push (and post-merge) into it" ;;
+            echo "        Do NOT just unset it: git honors ONE hooks directory. Fix: copy $root/$rel/pre-push (and the other hooks there) into it" ;;
     esac
 fi
 eff="$(git -C "$root" config core.hooksPath 2>/dev/null || true)"

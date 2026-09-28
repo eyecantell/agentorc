@@ -15,9 +15,13 @@ after it runs to the end of the line and may hold anything. **Pickable is derive
 it has no Blocked by field, or every entry it names is archived and it names no decision.
 So archiving a blocker makes its dependents pickable with no further edit.
 
-Prints the pick order — Priority (High, Medium, Low, then anything else), then summary-table
-order — then the blocked entries with their blockers, then flags: a blocker that names no
-entry in the ledger or the archive, an item the field cannot read, and a block whose
+An entry may also carry ``**Type:** debt | feature`` (cadence.md §2.11); no field reads as debt.
+Within one Priority, debt is picked before features.
+
+Prints the pick order — Priority (High, Medium, Low, then anything else), then Type (debt
+before feature), then summary-table order — then the blocked entries with their blockers, then flags: a blocker that names no
+entry in the ledger or the archive, an item the field cannot read, a Type it does not know
+(read as debt), and a block whose
 blockers are all archived (pickable now; the field can go). Which entries a given picker
 also excludes (a sibling's lease, a brief's own rules) is the picker's business, not this.
 
@@ -41,6 +45,9 @@ ROW_RE = re.compile(r"^\|\s*(TD-(\d+))\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|", re.MULTI
 PRIORITY_RE = re.compile(r"^\*\*Priority:\*\*\s*(\w+)", re.MULTILINE)
 # Parity (cadence.md §7): the §2 entry shape and the seed template's field write this.
 BLOCKED_RE = re.compile(r"^\*\*Blocked by:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # one line only
+# Parity (cadence.md §7): §2.11 and the seed template's field write this; TYPES is its vocabulary.
+TYPE_RE = re.compile(r"^\*\*Type:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+TYPES = ("debt", "feature")  # pick order within a Priority; the first is the default
 ID_ITEM_RE = re.compile(r"^TD-(\d+)$")
 DECISION_RE = re.compile(r"\bdecision\s*\(([^)]+)\)", re.IGNORECASE)
 PRIORITIES = ("high", "medium", "low")
@@ -58,10 +65,12 @@ def entries(text: str) -> list[dict]:
         body = text[m.end(): nxt.start() if nxt else len(text)]
         pm = PRIORITY_RE.search(body)
         bm = BLOCKED_RE.search(body)
+        tm = TYPE_RE.search(body)
         if bm and not bm.group(1):
             bm = None  # an empty field (the template's line left blank) blocks nothing
         out.append({"id": m.group(1), "title": m.group(3).strip(),
                     "priority": pm.group(1) if pm else None,
+                    "type_raw": tm.group(1) if tm and tm.group(1) else None,
                     "blocked_raw": bm.group(1) if bm else None})
     return out
 
@@ -97,7 +106,13 @@ def pickable(ledger: str, archive: str) -> dict:
         order, table_prio = rows.get(n, (len(rows) + pos, None))
         prio = e["priority"] or table_prio or "?"
         rank = PRIORITIES.index(prio.lower()) if prio.lower() in PRIORITIES else len(PRIORITIES)
-        rec = {"id": e["id"], "title": e["title"], "priority": prio, "_key": (rank, order)}
+        etype = (e["type_raw"] or TYPES[0]).lower()
+        if etype not in TYPES:
+            flags.append(f"⚠ {e['id']}: unknown Type {e['type_raw']!r} — write one of "
+                         f"{' | '.join(TYPES)}; read as {TYPES[0]}")
+            etype = TYPES[0]
+        rec = {"id": e["id"], "title": e["title"], "priority": prio, "type": etype,
+               "_key": (rank, TYPES.index(etype), order)}
         if e["blocked_raw"] is None:
             pick.append(rec)
             continue
@@ -158,13 +173,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     print(f"Pickable ({len(res['pickable'])}), in pick order:")
     for r in res["pickable"]:
-        print(f"  {r['id']:<7} {r['priority']:<7} {r['title']}")
+        print(f"  {r['id']:<7} {r['priority']:<7} {r['type']:<8} {r['title']}")
     if not res["pickable"]:
         print("  (none)")
     if res["blocked"]:
         print(f"Blocked ({len(res['blocked'])}):")
         for r in res["blocked"]:
-            print(f"  {r['id']:<7} {r['priority']:<7} {r['title']} — by {', '.join(r['blocked_by'])}")
+            print(f"  {r['id']:<7} {r['priority']:<7} {r['type']:<8} {r['title']} — by {', '.join(r['blocked_by'])}")
     for f in res["flags"]:
         print(f)
     return 0

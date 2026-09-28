@@ -12,6 +12,26 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-09-28 — a ledger entry may say `**Type:** feature`; debt is picked first within a Priority
+Do: add `**Type:** feature` after Priority on an entry that asks for something new rather than fixing something wrong; leave debt unmarked (or `**Type:** debt`). `ledger.py --pickable` shows the type and orders debt before features within a Priority.
+See: cadence.md §2.11; ledger.py `TYPE_RE`.
+
+## 2026-09-27 — cadence.md holds the rules only, numbered §N.M; the why moves to `cadence-rationale.md`
+Do: cite a rule as §N.M; read its reasoning in `docs/cadence-rationale.md` and its incident in `docs/cadence-incidents.md` under the same number. No rule changed. Split so far: §1; other sections follow one PR at a time.
+See: cadence.md (header, Three files); TD-049.
+
+## 2026-09-27 — a new ADR follows `docs/adr-template.md`; a decided ADR is never edited
+Do: write a new architecture decision from the synced template (Status proposed / decided <date> by <who> / superseded by <link>, then Context, Options, Decision, Consequences, Revisit triggers); change a decision with a new ADR that supersedes the old. Existing ADRs stay as they are.
+See: cadence.md §7 (Architecture decisions get ADRs); TD-069.
+
+## 2026-09-27 — a board item may say what it is: `decide`, `act`, `watch` or `fyi` before its date
+Do: write `- [ ] fyi YYYY-MM-DD …` (no `Due:`) for a heads-up and `watch` for a check-by, so neither fires as a to-do; ledger and close any item overdue 14d+ or snoozed twice; triage a board past 15 open items. Unmarked items still read as before.
+See: cadence.md §3 (Kind, Size, Escalation); TD-039.
+
+## 2026-09-27 — an orchestrator exports `AGENT_NAME`; the agent becomes a co-author of its commits
+Do: launch each agent with `AGENT_NAME=<short name>` in its environment (optionally set `cadence.agentDomain` in git config); the synced `prepare-commit-msg` hook adds `Co-Authored-By: <name> <<name>@<domain>>`. Merge with `--squash` and no `--body` so the trailers survive.
+See: cadence.md §9 (Agent co-author), §4 (The squash keeps who worked it); TD-067.
+
 ## 2026-09-26 — a board question marks the answer you recommend with ` (default)`
 Do: end at most one answer in `Answers:` with ` (default)` — `Answers: merge (default) | hold.` — instead of saying "my default first" in prose; `/attention` shows it and `--json` carries it as `default`. The board never falls to it: a fall-through is a `steer`.
 See: cadence.md §3 (A question lists its answers); TD-066.

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/git-hooks/prepare-commit-msg
+# Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
+# Adds the working agent as a co-author of the commit (cadence.md §9 "Agent co-author",
+# TD-067): `Co-Authored-By: $AGENT_NAME <$AGENT_NAME@<domain>>`. Tool-neutral — every
+# tool ends at `git commit`, so Codex or an on-prem model gets the same trailer Claude
+# Code adds for itself. The orchestrator exports AGENT_NAME (the short name, e.g.
+# grinder-ao-1) when it launches the agent; a person's shell has none, and then this
+# hook does nothing.
+#
+# The domain: $AGENT_DOMAIN, else git config cadence.agentDomain (repo or global), else
+# shiftlead.placeholder.
+#
+# Never blocks and never alters a commit otherwise: every unexpected case (no
+# AGENT_NAME, a name or domain with characters an email address cannot carry, an
+# unreadable message file, no `git interpret-trailers`, a message that is still empty
+# so git would abort) adds nothing and exits 0. Idempotent — amend and cherry-pick
+# re-run it, and `interpret-trailers --if-exists addIfDifferent` skips an identical
+# trailer. Normal commits only: `merge` (a real merge) and `squash` messages are git's, and a
+# `commit` source other than HEAD (-c/-C <other commit>) is someone else's message.
+
+name="${AGENT_NAME:-}"
+msg="${1:-}"
+case "${2:-}" in
+    # git also says `merge` for any commit while .git/MERGE_MSG exists — a cherry-pick or
+    # revert resumed after a conflict (`--continue`) — and that commit is the agent's.
+    merge) git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null 2>&1 \
+               || git rev-parse -q --verify REVERT_HEAD >/dev/null 2>&1 || exit 0 ;;
+    squash) exit 0 ;;
+    commit) [ "${3:-}" = "HEAD" ] || exit 0 ;;
+esac
+[ -n "$name" ] && [ -n "$msg" ] && [ -f "$msg" ] && [ -r "$msg" ] && [ -w "$msg" ] || exit 0
+domain="${AGENT_DOMAIN:-$(git config cadence.agentDomain 2>/dev/null)}"
+domain="${domain:-shiftlead.placeholder}"
+[[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] && [[ "$domain" =~ ^[A-Za-z0-9.-]+$ ]] || exit 0
+
+# A message with nothing but comments and blank lines is one git is about to abort as
+# empty — a trailer would turn that abort into a commit.
+cc="$(git config core.commentChar 2>/dev/null)"
+[ "${#cc}" -eq 1 ] || cc="#"
+# Everything below the scissors line (commit -v) is discarded by git, so it is not content.
+awk -v c="$cc" '
+    $0 == c " ------------------------ >8 ------------------------" { exit }
+    NF && substr($0, 1, 1) != c { found = 1; exit }
+    END { exit !found }' "$msg" 2>/dev/null || exit 0
+
+git interpret-trailers --in-place --if-exists addIfDifferent \
+    --trailer "Co-Authored-By: $name <$name@$domain>" "$msg" >/dev/null 2>&1
+exit 0
