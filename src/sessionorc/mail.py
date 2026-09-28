@@ -33,7 +33,9 @@ MAILBOX_DEPTH: int | None = 100  # unread entries an inbox holds before a send t
 # open `ask` or `steer` — one set, each entry once — so reading the page frees no slot an
 # unanswered question still holds, and one worker cannot fill it with questions that never lapse.
 PERSON_INBOX_DEPTH: int | None = 200  # entries the org's person inbox holds before a send is refused
-PERSON_SENDER_DEPTH: int | None = 20  # …and of those, how many one sender may hold there
+# …and of those, how many one sender may hold there: 100 since 2026-09-28 (Paul), 20 before, when a
+# techlead seat's replies to the person were refused for a day with every one of its 20 slots held
+PERSON_SENDER_DEPTH: int | None = 100
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down
