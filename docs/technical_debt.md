@@ -110,6 +110,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
 | TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — mechanism and a recommended fix; the shape is Paul's (board, 2026-09-12) |
+| TD-207 | The Inbox shows board items only once they are due, and says so nowhere: a grinder's two *act* items due in a week read to Paul as messages that never arrived; a setting for the horizon, drawn on the page | Medium | Open — design-first |
+| TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
+| TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
 
 
 ---
@@ -2045,3 +2048,51 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Fix:** design (1) the time as a fuzzy age (*just now*, *5m*, *1h*, *2d*), the page's existing `_age` shape, with the exact time on hover, and refreshed as it ages without a server round trip; (2) three columns with a fixed-width time, the doer at its full name or a width that fits the team's longest, and the words taking the rest and wrapping or ellipsed with hover. Do the same on the Repo page's Doing section. Then build it. Done when the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns.
 
 **Related:** TD-205 (the same list's scrolling), TD-176 slice 2 (the doing log), §4.8 *the doing log*.
+
+## TD-207: The Inbox shows board items only once they are due, and says so nowhere
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *"the Inbox only lists board items once they're due" — we need to add a setting for this so it is obvious to the user*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5 screen 6 (*Board items*: `--due-only`), §5 `person:` in `settings.yml` (TD-146), §4.5a (the Inbox's board rows and the Settings page's **You**), `src/agentorc/ui/app.py` (`board_argv`: `--report --due-only --json`)
+
+**Why:** grinder-dc-1 finished its run on 2026-09-27 telling Paul it had left him two items. They were two `act` lines on dev-cadence's board, each `Due: 2026-10-04`. Paul looked in the Inbox, found nothing, and asked where the two messages were. The Inbox reads boards with `--due-only`, so an item a week out doesn't exist there until its day, and nothing on the page says the Inbox has a horizon or that items wait beyond it. (TD-208 hid these two a second way.) A session that writes a board line reasonably calls it *left for you*; the person reasonably looks in the one place the system sends them.
+
+**Fix:** design (1) a setting for the horizon, per person: `person.inbox.board_ahead` (`due` today, `7d`, `all`; default to be decided), on the Settings page's **You** with its *i* text; (2) the Inbox says it: a line under the board rows, *n more board items due later: next <date> — show*, whatever the setting; (3) whether a not-yet-due row is drawn plainer than a due one and counted apart from *Needs you*, so the counts keep meaning *due now*; (4) whether a session's summary that names board items should say *on the board, due <date>*, a word for the grinder template. Then the build. Done when a board item due next week can be seen from the Inbox in one press, and the page says the horizon it uses.
+
+**Related:** TD-208 (the same rows, read from a stale checkout), TD-069 step 3 (board rows in the Inbox), TD-126 (Reply on a board row), TD-146 (`settings.yml`'s `person:`), dev-cadence's TD-039 (`act` and the other item kinds).
+
+## TD-208: The Inbox reads each board from the local working tree, so a checkout behind origin hides items
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *yes look into the second part*, after TD-207's two items could not be found)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`board_argv`: the boards are `<root>/docs/user_attention.md` of each registry root, read with `--report --due-only --json` and no `--fetch`), design §4.5 screen 6 (*Board items*), §4.4 (the board write-back), dev-cadence's `nudge_user_attention.py` (`--fetch`, TD-030 there)
+
+**Why:** every board line a session writes lands on origin by a merged PR. The registry's roots are the main checkouts, which move only when someone pulls. The Inbox reads the file in each checkout's working tree, so an item merged on origin is invisible until that checkout is pulled. Measured 2026-09-27 after a `git fetch` of each: dev-cadence 10 commits behind (its board lacked grinder-dc-1's two `act` items), agentorc 4 behind, samscrape 1. Three of the six boards differed from origin. The SessionStart hook already solves this for itself: dev-cadence's reader takes `--fetch` and reads a merely-behind clone's board from `origin/<default>`, bounded by `ATTENTION_DUE_FETCH_BUDGET` (8 s) with `--due-only`. The Inbox doesn't pass it.
+
+**Fix:** design where the fetch happens and what the write-back does then: (a) pass `--fetch` on the Inbox's read (at most once a minute already; the 8 s budget bounds it), or (b) the host agent's repo tick (TD-176, which already reads the remote every five minutes) fetches, and the Inbox reads with `--fetch`'s origin fallback; (c) what Snooze / Done / Reply do on an item that exists only on origin, since the write-back commits to the local default branch (§4.4), so it must pull first or refuse and say so; (d) a checkout that is ahead or diverged is read from the working tree, as the reader already does, with a note. Then the build, with a test on a clone that is one commit behind. Done when a board line merged on origin shows in the Inbox within the read interval without a pull.
+
+**Related:** TD-207 (the horizon), TD-069 (board rows, the write-back), TD-176 (the repo tick), dev-cadence's TD-030 (`--fetch`).
+
+## TD-209: The org-wide `grinder` role carries agentorc's review paths into every repo
+
+**Priority:** Low
+**Added:** 2026-09-27 (found when grinder-dc-1 was recreated: its launch record holds `review: {reader: techlead, held: [src/sessionorc/**, docs/briefs/**], bound: 2h}`)
+**Owner:** anchor
+**Kind:** decision
+**Pickable:** no — `org.yml` is the anchor's, outside the repo
+**Status:** Open
+**Location:** `~/.agentorc/org.yml` (`roles: grinder: {profile: grind, review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}}`), design §4.9b *The reader*, §4.8 (role presets and their layers)
+
+**Why:** the `review:` line was set on 2026-09-23 for agentorc (TD-093): a grinder PR touching `src/sessionorc/**` or `docs/briefs/**` waits for the techlead. It sits on the org-wide role overlay, so every team's grinder carries it. In dev-cadence `src/sessionorc/**` doesn't exist and `docs/briefs/**` is a real path with a different meaning; samscrape's and contractmatch's grinders carry it too. It is harmless where a path is absent and wrong where it matches by accident.
+
+**Fix:** decide where a repo's held paths live: in the repo's own `.agentorc.yml` (per repo, reviewed with the code), on the team in `org.yml`, or both with the repo's winning. Then move agentorc's two paths there and leave the org-wide role with a reader and no paths. Check §4.9b and the settings audit's definition-versus-setting rule (ADR 2026-09-25) for which it is. Done when grinder-dc-1's record holds dev-cadence's own held paths or none, and ao-grind's grinders keep theirs.
+
+**Related:** TD-093 (the reader and `held`), TD-120 (org roles), `docs/decisions/2026-09-25-settings-audit.md`.
