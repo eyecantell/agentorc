@@ -515,6 +515,10 @@ class ClaudeCodeAdapter:
             prof = profiles_mod.get(profile or None)
         except (KeyError, ValueError):
             return {"reason": "no_profile"}
+        if prof.metered:
+            # §4.2a: a metered profile is never polled for a quota — the endpoint answers
+            # `no_credentials` to a key, five minutes apart, forever; its bound is its spend (TD-151)
+            return {"reason": "metered"}
         try:
             u = self.usage(prof)
         except UsageRefused as e:
