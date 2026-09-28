@@ -42,7 +42,8 @@ unauthenticated, per-repo 403/5xx, truncated listing, budget exhaustion) degrade
 Lead with the report's own header line (N boards, M open items, K due/overdue) as the
 TL;DR, then the per-repo sections. The report is already ordered (decided items first —
 they wait on a session, not the user — then overdue-most-first, dated soonest-first,
-undated) — do not re-sort or re-derive tags.
+undated; then `watch` items, then `fyi` last — TD-039) — do not re-sort or re-derive tags.
+An item tagged *ledger it* is overdue 14 days or more: offer to ledger it and close it here.
 
 When the user answers, snoozes or closes an item here, make the edit with
 `scripts/board_edit.py decide|snooze|done --board <board> --line <N> --expect "<item text>"`

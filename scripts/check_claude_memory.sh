@@ -144,7 +144,18 @@ MEM_DIR="${mem_setting:-$DEFAULT_MEM_DIR}"
 # just '/'), same rule as list_sessions.py's munge() — keep them in step. A
 # narrower substitution makes check #2 probe a nonexistent fallback dir for
 # any repo path containing '.', '_', etc., silently disabling stray detection.
+# The sed is exact only for printable ASCII up to 200 characters: Claude Code
+# counts UTF-16 code units (one '-' per accented letter, two per emoji — sed's
+# count depends on the locale) and cuts a longer name with a hash suffix (TD-11).
+# Any other path goes to munge() itself, the one full implementation.
 ENCODED=$(printf '%s' "$REPO_ROOT" | sed 's/[^a-zA-Z0-9]/-/g')
+if [ "${#ENCODED}" -gt 200 ] || ! printf '%s' "$REPO_ROOT" | LC_ALL=C grep -q '^[ -~]*$'; then
+  _ls_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  if command -v python3 >/dev/null 2>&1 && [ -f "$_ls_dir/list_sessions.py" ]; then
+    ENCODED=$(PYTHONPATH="$_ls_dir" python3 -c 'import sys, list_sessions; print(list_sessions.munge(sys.argv[1]))' "$REPO_ROOT" 2>/dev/null) \
+      || ENCODED=$(printf '%s' "$REPO_ROOT" | sed 's/[^a-zA-Z0-9]/-/g')
+  fi
+fi
 FALLBACK="$HOME/.claude/projects/${ENCODED}/memory"
 
 warns=()

@@ -135,6 +135,22 @@ ANSWER_SPLIT_RE = re.compile(r"\s*(?<!\\)\|\s*")
 # malformed Due: is silent") is never mistaken for one.
 DUE_ATTEMPT_RE = re.compile(r"\bDue:?\s*(?P<raw>\d{1,4}[-/.]\d{1,2}(?:[-/.]\d{1,4})?)\b", re.IGNORECASE)
 MAX_ITEM_CHARS = 200
+# TD-039: an item's KIND — one optional word before its date, `- [ ] decide 2026-09-27 (…)`.
+# decide/act (and an unmarked item) are the person's to-do; `watch` carries a check-by
+# date in its Due: (§6) and is reported apart; `fyi` never has a Due: (one is ignored and
+# flagged) and never reaches the SessionStart line. Only a word followed by a date is a
+# kind, so prose that happens to start with "act" is not. Parity (cadence.md §7): the
+# board's Format: line and cadence.md §3 write it.
+KINDS = ("decide", "act", "watch", "fyi")
+KIND_RE = re.compile(r"^(?P<kind>decide|act|watch|fyi)\s+(?=\d{4}-\d{2}-\d{2}\b)", re.IGNORECASE)
+# TD-039: a board past this many open items is warned about (report and SessionStart line).
+BOARD_SIZE_WARN = 15
+# TD-039: an item overdue this long is ledger material, not board material — the report
+# says "ledger it" and /stranded-work proposes the move. The other trigger, an item
+# snoozed twice, needs the board's git history, so the sweep checks that one (its skill).
+ESCALATE_OVERDUE_DAYS = 14
+# TD-039: the SessionStart line lists at most this many items, then says how many more.
+DUE_ONLY_LIST_CAP = 12
 
 
 def _trailer(text: str) -> str:
@@ -190,6 +206,23 @@ class BoardItem:
     # session acts on it and closes it — but it is no longer the person's to-do.
     decided: tuple[str, date] | None = None
     bad_due: str | None = None  # the text after "Due:" when it is not a date (TD-053)
+    kind: str | None = None  # decide | act | watch | fyi, or None when unmarked (TD-039)
+    fyi_due: bool = False  # an fyi item that carries a Due: anyway — ignored, and flagged
+
+    @property
+    def todo(self) -> bool:
+        """The person's to-do: decide, act, or unmarked (TD-039)."""
+        return self.kind not in ("watch", "fyi")
+
+    def escalation(self, today: date) -> str | None:
+        """Why this item belongs in the ledger rather than on the board (TD-039), or None.
+        Not for fyi (it has no date to miss) or a decided item (a session's work order)."""
+        if self.kind == "fyi" or self.decided is not None:
+            return None
+        days = self.overdue_days(today)
+        if days is not None and days >= ESCALATE_OVERDUE_DAYS:
+            return f"overdue {days}d"
+        return None
 
     def overdue_days(self, today: date) -> int | None:
         """Days at-or-past due (0 = due today); None if no due date or not yet due."""
@@ -265,10 +298,30 @@ def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
         bad = None
         if due is None and (am := DUE_ATTEMPT_RE.search(text)):
             bad = am.group("raw")
+        km = KIND_RE.match(text)
+        kind = km.group("kind").lower() if km else None
+        fyi_due = kind == "fyi" and (due is not None or bad is not None)
+        if kind == "fyi":
+            due, bad = None, None  # an fyi is never due (TD-039)
         items.append(BoardItem(text=text, due=due, line=lineno, answers=parse_answers(text),
                                default=parse_default(text),
-                               decided=parse_decided(text), bad_due=bad))
+                               decided=parse_decided(text), bad_due=bad,
+                               kind=kind, fyi_due=fyi_due))
     return items
+
+
+def size_note(items: list[BoardItem]) -> str | None:
+    """TD-039: the warning for a board past BOARD_SIZE_WARN open items."""
+    if len(items) <= BOARD_SIZE_WARN:
+        return None
+    return (f"⚠ {len(items)} open items on this board (over {BOARD_SIZE_WARN}) — triage or ledger "
+            "them: the board is only \"a human must act\" (cadence.md §3)")
+
+
+def kind_counts(items: list[BoardItem]) -> str:
+    """'decide 2, act 1, unmarked 3' — the kinds present, in KINDS order (TD-039)."""
+    n = {k: sum(1 for i in items if i.kind == k) for k in (*KINDS, None)}
+    return ", ".join(f"{k or 'unmarked'} {c}" for k, c in n.items() if c)
 
 
 def _clip(text: str) -> str:
@@ -297,7 +350,18 @@ def item_tag(item: BoardItem, today: date) -> str:
         if item.bad_due is not None:
             return f"⚠ unparseable due date {_clip(item.bad_due)} — write Due: YYYY-MM-DD"
         rec = f" · default: {_clip(item.default)}" if item.default else ""
-        return due_tag(item, today) + rec
+        if item.kind == "fyi":
+            base = "fyi" + (" · ⚠ an fyi carries no Due: — drop it" if item.fyi_due else "")
+        elif item.kind == "watch":
+            days = item.overdue_days(today)
+            base = "watch · " + ("no check-by date" if item.due is None
+                                 else f"check by {item.due.isoformat()}" if days is None
+                                 else "check today" if days == 0 else f"check {days}d overdue")
+        else:
+            base = due_tag(item, today)
+        esc = item.escalation(today)
+        esc_tag = f" · ⚠ {esc} — ledger it and close it here" if esc else ""
+        return base + rec + esc_tag
     text, on = item.decided
     age = (today - on).days
     since = f", {age}d ago" if age > 0 else ""
@@ -306,9 +370,15 @@ def item_tag(item: BoardItem, today: date) -> str:
 
 def _report_sort_key(item: BoardItem, today: date) -> tuple[int, int]:
     """Decided first (oldest decision leading — a session's work order, TD-036), then
-    overdue (most overdue leading), then dated soonest-first, then undated."""
+    overdue (most overdue leading), then dated soonest-first, then undated; then the
+    watch items the same way, then fyi (TD-039: reported apart from the to-dos)."""
     if item.decided is not None:
         return (-1, item.decided[1].toordinal())
+    if item.kind == "fyi":
+        return (7, 0)
+    if item.kind == "watch":
+        days = item.overdue_days(today)
+        return (4, -days) if days is not None else (5, item.due.toordinal()) if item.due else (6, 0)
     days = item.overdue_days(today)
     if days is not None:
         return (0, -days)
@@ -320,7 +390,9 @@ def _report_sort_key(item: BoardItem, today: date) -> tuple[int, int]:
 def surfaces_at_start(item: BoardItem, today: date) -> bool:
     """What the SessionStart line (--due-only) shows: every decided item, due or not,
     because it is a session's work order; an item whose Due: cannot be read (it might be
-    due — TD-053); otherwise only due and overdue items."""
+    due — TD-053); otherwise only due and overdue items — never an fyi (TD-039)."""
+    if item.kind == "fyi" and item.decided is None:
+        return False
     return item.decided is not None or item.bad_due is not None or item.overdue_days(today) is not None
 
 
@@ -1169,6 +1241,9 @@ def _item_json(item: BoardItem, today: date) -> dict:
         # TD-036: a decided item has stopped being the person's to-do
         "waiting_on": "session" if item.decided else "person",
         "due_error": item.bad_due,
+        # TD-039
+        "kind": item.kind,
+        "escalate": item.escalation(today),
     }
 
 
@@ -1286,7 +1361,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                          # report only, never --due-only (a session start pays no gh call)
                          "settings": (settings_line(root, json_gh_spent)
                                       if fr is not None and root is not None and not due_only else None),
-                         "sweep": None, "archive": None, "items": []}
+                         "sweep": None, "archive": None, "size": None, "items": []}
             if board is not None:
                 try:
                     content = read_board(i, board)
@@ -1296,7 +1371,9 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 if content is not None:
                     row["sweep"] = sweep_note_for(content, today, root)
                     row["archive"] = " ".join(n for n in (archive_note(content), twin_note(content)) if n) or None
-                    row["items"] = [_item_json(it, today) for it in parse_board(content, warn=False)
+                    all_items = parse_board(content, warn=False)
+                    row["size"] = size_note(all_items)  # TD-039
+                    row["items"] = [_item_json(it, today) for it in all_items
                                     if not due_only or surfaces_at_start(it, today)]
             out_rows.append(row)
         print(json.dumps({"today": today.isoformat(), "due_only": due_only, "boards": out_rows}, indent=2))
@@ -1304,8 +1381,12 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
 
     if due_only:
         due_lines: list[str] = []
+        due_items: list[BoardItem] = []
         decided_lines: list[str] = []
         bad_lines: list[str] = []
+        watch_lines: list[str] = []
+        oversized: list[str] = []
+        n_escalate = 0
         for i, (label, board, _root, _note) in enumerate(rows):
             if board is None:
                 continue
@@ -1315,24 +1396,48 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 continue
             fr = fetched.get(i)
             tag = f" [{fr.source} — local clone behind, pull]" if fr is not None and fr.source else ""
-            for item in sorted(parse_board(content, warn=False), key=lambda it: _report_sort_key(it, today)):
+            items = parse_board(content, warn=False)
+            if len(items) > BOARD_SIZE_WARN:
+                oversized.append(f"{label} {len(items)}")
+            for item in sorted(items, key=lambda it: _report_sort_key(it, today)):
                 if not surfaces_at_start(item, today):
                     continue
+                n_escalate += item.escalation(today) is not None
                 ln = f"  • {label}{tag}: ({item_tag(item, today)}) {_clip(item.text)}"
-                (decided_lines if item.decided is not None
-                 else bad_lines if item.bad_due is not None else due_lines).append(ln)
-        if due_lines or decided_lines or bad_lines:
+                if item.decided is not None:
+                    decided_lines.append(ln)
+                elif item.bad_due is not None:
+                    bad_lines.append(ln)
+                elif item.kind == "watch":
+                    watch_lines.append(ln)
+                else:
+                    due_lines.append(ln)
+                    due_items.append(item)
+        if due_lines or decided_lines or bad_lines or watch_lines:
             parts = []
             if due_lines:
-                parts.append(f"{len(due_lines)} attention item(s) due")
+                kinds = kind_counts(due_items)
+                parts.append(f"{len(due_lines)} attention item(s) due"
+                             + (f" ({kinds})" if any(it.kind for it in due_items) else ""))
             if decided_lines:
                 parts.append(f"{len(decided_lines)} decided item(s) waiting on a session")
             if bad_lines:
                 parts.append(f"{len(bad_lines)} with a due date that cannot be read")
+            if watch_lines:
+                parts.append(f"{len(watch_lines)} watch item(s) to check")
             print(f"⚠ {' and '.join(parts)} across this machine's repos — "
                   "run /attention for the full report (cadence.md §3):")
-            for ln in decided_lines + due_lines + bad_lines:
+            listed = decided_lines + due_lines + bad_lines + watch_lines
+            for ln in listed[:DUE_ONLY_LIST_CAP]:
                 print(ln)
+            if len(listed) > DUE_ONLY_LIST_CAP:
+                print(f"  … and {len(listed) - DUE_ONLY_LIST_CAP} more — run /attention")
+            if n_escalate:
+                # Counts every surfacing item, listed or past the cap — so never "of them".
+                print(f"⚠ {n_escalate} item(s) overdue {ESCALATE_OVERDUE_DAYS}d or more across these boards — "
+                      "ledger each as a TD and close it on the board (cadence.md §3)")
+        if oversized:
+            print(f"⚠ board(s) over {BOARD_SIZE_WARN} open items — triage or ledger them: {', '.join(oversized)}")
         if fetch and here is not None:
             for ln in open_pr_lines(here, deadline):
                 print(ln)
@@ -1343,6 +1448,8 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
     total_items = 0
     total_due = 0
     total_decided = 0
+    total_watch = 0
+    all_items: list[BoardItem] = []
     n_boards = 0
     for i, (label, board, root, note) in enumerate(rows):
         fr = fetched.get(i)
@@ -1362,7 +1469,10 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 n_boards += 1
                 items = parse_board(content, warn=False)
                 total_items += len(items)
-                total_due += sum(1 for i in items if i.decided is None and i.overdue_days(today) is not None)
+                all_items += items
+                total_due += sum(1 for i in items if i.decided is None and i.todo and i.overdue_days(today) is not None)
+                total_watch += sum(1 for i in items if i.decided is None and i.kind == "watch"
+                                   and i.overdue_days(today) is not None)
                 total_decided += sum(1 for i in items if i.decided is not None)
                 if items:
                     for item in sorted(items, key=lambda i: _report_sort_key(i, today)):
@@ -1376,7 +1486,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 sweep = sweep_note_for(content, today, root)
                 if sweep:
                     body.append(f"  {sweep}")
-                for extra in (archive_note(content), twin_note(content)):
+                for extra in (size_note(items), archive_note(content), twin_note(content)):
                     if extra:
                         body.append(f"  {extra}")
         if note:
@@ -1393,7 +1503,10 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
         sections.append("\n".join([head, *body]))
 
     decided_note = f", {total_decided} decided (waiting on a session)" if total_decided else ""
-    print(f"Attention report — {n_boards} board(s), {total_items} open item(s), {total_due} due/overdue{decided_note}")
+    decided_note += f", {total_watch} watch item(s) to check" if total_watch else ""
+    kinds_note = f" ({kind_counts(all_items)})" if any(i.kind for i in all_items) else ""
+    print(f"Attention report — {n_boards} board(s), {total_items} open item(s){kinds_note}, "
+          f"{total_due} due/overdue{decided_note}")
     for s in sections:
         print()
         print(s)
