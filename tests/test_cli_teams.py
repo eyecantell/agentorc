@@ -1499,3 +1499,15 @@ def test_stop_leaves_a_persons_session_alone_and_names_it(world, capsys):
     assert cli.main(["team", "stop", "ao-grind"]) == 1
     err = capsys.readouterr().err
     assert "no live unattended session carries the team ao-grind badge" in err and "your session me stays" in err
+
+
+def test_new_with_a_team_keeps_a_roles_deliberately_empty_controllers(world):
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["roles"]["solo"] = {"controllers": []}
+    write_org(tmp_path, doc)
+    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    assert cli.main(["new", "me", "--team", "ao-grind", "--role", "solo"]) == 0
+    (made,) = creates(state)
+    assert made["controllers"] == []  # nobody may act on it, as the role says

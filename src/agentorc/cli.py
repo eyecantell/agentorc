@@ -512,13 +512,16 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
     if team is None:
         print(f"--team {name}: no such team in the org (ao team list) — the badge alone", file=sys.stderr)
         return ""
-    if not defaults.get("controllers"):
+    cfg = repoconfig.discover(pathlib.Path(args.repo) if args.repo else directory)
+    role = getattr(args, "role", None)
+    # a role that says `controllers: []` means nobody may act on it, deliberately (`_launch_defaults`)
+    isolated = bool(role) and repoconfig.resolve_role(cfg, role, org.roles).controllers_set
+    if not defaults.get("controllers") and not args.controller and not isolated:
         here = hosts.local_host().name
         mid = teams.manager_id(org, team, team.host or here, here)
         if mid and any(s["id"] == mid for s in teamrun.live(call_sync("list"))):
             defaults["controllers"] = [mid]
     if defaults.get("review") is None:
-        cfg = repoconfig.discover(pathlib.Path(args.repo) if args.repo else directory)
         defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
         if defaults["review"] is None:
             return f"no reader: team {name} has no techlead seat, or its members hold no path"

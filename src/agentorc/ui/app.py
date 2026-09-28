@@ -3828,10 +3828,13 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             task = asyncio.create_task(asyncio.to_thread(teamrun.stop_lead, rpc, st))
             background.add(task)
             task.add_done_callback(_lead_stopped(name, pending))
-        sent = len(st.acted)
+        sent = sum(1 for e in st.acted if e["role"] != "person")  # a person's session is left alone (§4.9)
         msg = f"{name}: {'killed' if now else 'wrap-up sent to'} {sent} session{'' if sent == 1 else 's'}"
         if pending:
             msg += f" — {pending} follows when they settle"
+        for e in st.acted:
+            if e["role"] == "person":
+                msg += f"; {e['action']}"
         return JSONResponse(
             {"ok": True, "team": name, "now": now, "sessions": st.acted, "manager": pending, "text": msg}
         )
