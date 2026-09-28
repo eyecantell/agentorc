@@ -103,7 +103,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Built — the live look waits on the promote |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
-| TD-197 | TDs in motion misreads phases: a design-first entry marked `Pickable: yes` reads *grind*, and a grinder's PR waiting for its reader reads *grind* once the grinder has left the branch | Medium | Open — pickable |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Open — design-first |
 | TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | Open — pickable |
@@ -1921,24 +1920,6 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Fix:** move the view builders into modules by page (`ui/org.py`, `ui/repo.py`, `ui/inbox.py`, `ui/focus.py` or similar) and each route group beside its views, keeping `agentorc.ui.app` as the assembly (`create_app`). Keep the tests' patch points working: the patched names (`LocalClient`, `rpc`, `PtySession`, …) are looked up through `app` at call time, or the tests move to the new paths in the same PR. No behaviour change; the full suite passes unchanged in count. Done in small PRs as TD-108's step 1 is, and then the lanes are redrawn along with TD-108's step 2.
 
 **Related:** TD-108 (the host agent's split, and the page split within this module), TD-188 (context per run).
-
-## TD-197: TDs in motion misreads phases — design-first reads *grind*, and a PR waiting for its reader reads *grind*
-
-**Priority:** Medium
-**Added:** 2026-09-26 (Paul, at the Org page: *it shows 3 TDs in motion, when only one grinder is running … designer items are being listed as GRIND instead of DESIGN*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/agentorc/ui/app.py` (`motion_rows`: `row["phase"] = "design" if e.get("for_page") == "design-first" else …`), `src/sessionorc/ledger.py` (`kind_of`), `src/sessionorc/reports.py` and `src/sessionorc/agent.py` (the derive tick: `review_pr` from the checked-out branch)
-
-**Why:** the count was right. At the screenshot, three claims were open: grinder-ao-1's TD-146 (in hand) and TD-186 (PR #628, waiting for the techlead's read), and designer-ao-1's TD-175 (#603, waiting for its 03:00 MDT merge bound). There is no clean-up delay; a claim leaves the section when its member marks it done or dropped. The phases were wrong, for two reasons:
-1. **Design-first reads *grind*.** `motion_rows` keys the phase on the ledger reading's `for_page`, the page's four-way bucket. `kind_of` puts every `Pickable: yes` entry in *pickable* before it looks at `Kind`. So a design-first entry the designer may pick is never *design*. On 2026-09-26, TD-175, TD-180 and TD-183 each read `kind: design-first`, `for_page: pickable` in `repos.json`; all three have since been designed or parked, so none does today, but the next pickable design-first entry will. It is *grind* without a PR and *review* with one (TD-183 with #623 read *review*). Design §4.5 screen 1: *a claim on a design-first entry is design*.
-2. **A parked PR reads *grind*.** A declared claim gets its PR as `review_pr` only from the derive tick's reading of the branch the session has checked out (`reports.derive`, TD-150). A grinder that opens its PR, asks its reader and moves to the next entry before the next derive pass (`DERIVE_EVERY`) leaves a claim whose PR the tick never saw. grinder-ao-1's TD-186 claim read *grind* on the page while #628 waited for the techlead. The same holds for any held PR, which is the common case for `src/sessionorc/**`.
-
-**Fix:** (1) key the phase on `e.get("kind") == "design-first"`, not `for_page`, with a test on a pickable design-first entry. (2) Match open PRs to declared claims by head branch (`branch_ref(headRefName)`) across the repo's PR reading, not only the checked-out branch, so a claim's PR is found wherever its branch sits. TD-176's repo facts already hold the open PRs with `headRefName`. Or have `ao progress claim --pr N` recorded when the grinder asks its reader, and say so in the grinder brief. Tests: a claim whose PR was opened on a branch the session has since left reads *review*. Done when the screenshot's three rows would read *design* (TD-175), *review* (TD-186) and *grind* (TD-146).
-
-**Related:** TD-176 (TDs in motion, the repo facts), TD-150 (`review_pr`), TD-198 (the same `kind_of` precedence on the kind bar); design §4.5 screen 1, §4.5a *team card: TDs in motion*.
 
 ## TD-198: The kind bar's *pickable* bucket swallows design-first entries
 
