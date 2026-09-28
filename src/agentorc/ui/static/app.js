@@ -924,7 +924,13 @@
       if (g.summary) {
         const tpl = document.createElement("template"); tpl.innerHTML = g.summary.trim();
         const fresh = tpl.content.firstElementChild;
-        if (sum) { const kept = AO.denyWhys(sum); sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept); }
+        if (sum) {
+          const kept = AO.denyWhys(sum);
+          // a scrolled list keeps where the person left it (TD-205): put back in syncSummaries,
+          // once the face it sits in is shown again — a hidden box takes no scrollTop
+          scrollKept[g.team] = AO.scrolls(sum);
+          sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
+        }
         else { const h = $(".ghead", sec); if (h) h.after(fresh); else sec.prepend(fresh); }
       } else if (sum) sum.remove();
       const grid = $(".grid", sec);
@@ -985,6 +991,7 @@
   // is remembered per team; the answer / doing toggle is the person's until the set of pending
   // answers changes, and a new one flips it back to *answer*.
   const faceFlip = {};  // team → {key, face}: a flip, held while the pending answers are the same
+  const scrollKept = {};  // team → the summary's scrolled boxes, from the swap to the next sync
   function summaryState(sum) {
     const team = sum.dataset.team, key = sum.dataset.answerKey || "";
     const flip = faceFlip[team];
@@ -1011,6 +1018,7 @@
       $$(".wv", sum).forEach((el) => (el.hidden = el.dataset.wv !== st.win));
       $$(".fv", sum).forEach((el) => (el.hidden = el.dataset.fv !== st.face));
       $(".fface", sum)?.classList.toggle("answering", st.face === "answer" && !!sum.dataset.answerKey);
+      AO.restoreScrolls(sum, scrollKept[sum.dataset.team]); delete scrollKept[sum.dataset.team];
       $$(".seg[data-pick]", sum).forEach((seg) => {
         const v = st[seg.dataset.pick];
         $$("button", seg).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === v ? "true" : "false"));
@@ -1317,6 +1325,23 @@
       if (i.value || i === document.activeElement) kept[i.dataset.id] = { value: i.value, focused: i === document.activeElement };
     });
     return kept;
+  };
+  // The team summary is swapped whole on every delta (TD-176 slice 3), and a scrolled list in it —
+  // the Doing feed — would snap back to the top each time (TD-205). Read each `data-keep-scroll`
+  // box's position before the swap, by its name; one at the top is not kept, so it stays at the
+  // top where the newest rows land.
+  AO.scrolls = function (root) {
+    const kept = {};
+    if (!root) return kept;
+    root.querySelectorAll("[data-keep-scroll]").forEach((el) => { if (el.scrollTop > 0) kept[el.dataset.keepScroll] = el.scrollTop; });
+    return kept;
+  };
+  AO.restoreScrolls = function (root, kept) {
+    if (!root || !kept) return;
+    root.querySelectorAll("[data-keep-scroll]").forEach((el) => {
+      const top = kept[el.dataset.keepScroll];
+      if (top) el.scrollTop = top;
+    });
   };
   AO.restoreDenyWhys = function (root, kept) {
     if (!root) return;

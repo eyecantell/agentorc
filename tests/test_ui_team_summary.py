@@ -132,6 +132,19 @@ def test_answer_needed_opens_the_facet_and_doing_is_newest_first():
     assert quiet["face"] == "doing" and quiet["answer_key"] == ""
 
 
+def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
+    # TD-205: the summary is swapped whole on every delta; the feed names itself for the swap to
+    # read its scrollTop, and the position goes back once syncSummaries has shown the face again
+    s = ui.team_summary("grind", [member("g2")], {}, {}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert '<div class="dfeed" data-keep-scroll="doing">' in html
+    js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
+    assert "scrollKept[g.team] = AO.scrolls(sum);" in js
+    swap, sync = js.index("scrollKept[g.team] = AO.scrolls(sum)"), js.index("function syncSummaries()")
+    restore = js.index("AO.restoreScrolls(sum, scrollKept[sum.dataset.team])")
+    assert restore > sync and restore > js.index('el.hidden = el.dataset.fv !== st.face', sync) and swap
+
+
 def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
     ms = [member("g1", progress=[claim("TD-301", 811)], role_label="Grinder"), member("g2", state="exited")]
     for m in ms:
