@@ -206,14 +206,15 @@ def bounds(now: datetime) -> dict[str, tuple[date, datetime]]:
     """Each window's first day and its reset, in `now`'s own zone (the home's): `day` rolls at
     midnight, `week` on Monday, `month` on the first (§4.2a)."""
     today = now.date()
-    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     monday = today - timedelta(days=today.weekday())
     first = today.replace(day=1)
     nxt_month = (first + timedelta(days=32)).replace(day=1)
 
     def at(d: date) -> datetime:
-        # a local midnight, built from the date so a DST change in between lands on 00:00
-        return midnight.replace(year=d.year, month=d.month, day=d.day).astimezone(now.tzinfo)
+        # a local midnight with **that** day's offset: `now` from `datetime.now().astimezone()` carries a
+        # fixed offset, so a boundary past a DST change is converted through the system's zone
+        naive = datetime(d.year, d.month, d.day)
+        return naive.replace(tzinfo=UTC) if now.tzinfo is UTC else naive.astimezone()
 
     return {
         "day": (today, at(today + timedelta(days=1))),

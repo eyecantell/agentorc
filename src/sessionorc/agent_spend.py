@@ -64,11 +64,11 @@ class SpendMixin:
             )
             g["profiles"][prof] = prices
         now = datetime.now().astimezone()  # the home's own clock: its midnight, Monday and first (§4.2a)
-        reasons: dict[str, str] = {}
         for key, g in groups.items():
             acct = self._spend.setdefault(key, {})
-            for prof, prices in g["profiles"].items():
-                # read one profile after another: two profiles sharing a directory read it once
+            for prof, prices in sorted(g["profiles"].items()):
+                # read one profile after another, in a fixed order: two profiles sharing a directory
+                # read it once, and the first by name prices its turns
                 host = (acct.get("hosts") or {}).get(self.host) or {}
                 cursors = {
                     src: int(c.get("offset") or 0)
@@ -84,7 +84,6 @@ class SpendMixin:
                     if self._spend_reason.get(prof) != why:
                         log.info("spend for %s (account %s): %s", prof, key, why)  # once per change
                     self._spend_reason[prof] = why
-                    reasons[key] = why
                     continue
                 self._spend_reason.pop(prof, None)
                 spend_mod.ingest(acct, self.host, prof, r, prices, now.date(), now.tzinfo)
@@ -101,7 +100,7 @@ class SpendMixin:
             for prof in g["profiles"]:
                 reading = spend_mod.reading(window_sums, amounts.get(prof) or {}, now_iso())
                 reading |= {"account": g["account"], "tool": g["tool"]}
-                if why := reasons.get(key):
+                if why := self._spend_reason.get(prof):
                     reading["reason"] = why  # the chip's *spend unknown* (§4.3); the sum so far still stands
                 self._spend_notes(acct, prof, reading)
                 was = self._usage.get(prof) or {}

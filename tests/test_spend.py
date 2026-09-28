@@ -203,3 +203,20 @@ def test_status_v_prints_a_metered_profiles_spend():
     unread = spend_line(priceless | {"reason": "no transcripts"})
     assert unread.endswith("month 1.2M tok · spend unknown (no transcripts)")
     assert spend_line({"windows": [{"label": "5h", "pct": 3}], "reason": "ok"}) == ""  # a polled reading
+
+
+def test_a_boundary_past_a_dst_change_carries_its_own_offset(monkeypatch):
+    """The review of #681: the home's `now` carries a fixed offset, and a reset on the far side of a
+    DST change must still be that day's local midnight."""
+    import time
+
+    monkeypatch.setenv("TZ", "America/Denver")
+    time.tzset()
+    try:
+        now = datetime(2026, 10, 31, 12, 0).astimezone()  # MDT, -06:00; DST ends Sunday Nov 1
+        b = spend_mod.bounds(now)
+        assert b["day"][1].isoformat() == "2026-11-01T00:00:00-06:00"
+        assert b["week"][1].isoformat() == "2026-11-02T00:00:00-07:00"
+    finally:
+        monkeypatch.undo()
+        time.tzset()
