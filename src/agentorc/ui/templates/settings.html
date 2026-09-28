@@ -42,7 +42,13 @@
       <form class="card pad setcard" data-section="usage" data-profile="{{ c.profile }}">
         <div class="row gap wrap"><span class="h2 mono">{{ c.profile or "(default)" }}</span><span class="note">{{ c.badge }}</span></div>
         {% if c.metered %}
-          <div class="note">A metered profile's reserve is an amount per window — <span class="mono">$5</span>, <span class="mono">20M tok</span> — against the account's spend (§4.2a). This card's fields are not built — TD-151 slice 5; until then an amount is written in settings.yml by hand.</div>
+          {% for w in c.rows %}
+          <label class="setrow"><span class="setlabel">{{ w.label }} amount</span>
+            <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no amount" data-metered="1" autocomplete="off" spellcheck="false">
+            <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span></label>
+          {% endfor %}
+          <div class="row gap wrap"><span class="note setsaid">an amount is the window's 100 — $5, 20M tok — against the account's spend · applies on the next tick</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+          {{ filefoot(profiles_file, "at each start", "the billing and prices, by hand") }}
         {% else %}
           {% for w in c.rows %}
           <label class="setrow"><span class="setlabel">{{ w.label }} reserve</span>

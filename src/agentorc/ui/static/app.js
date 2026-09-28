@@ -803,8 +803,50 @@
     }
     return parts.length ? `profiles on this account: ${parts.join("; ")}` : "";
   }
+  // A token count as the server says it (`tokens_short`): `231k`, `1.2M`; under a thousand, as it is.
+  // Half to even, as Python's `round` and format are, so a tie reads the same in both homes.
+  const halfEven = (x) => { const f = Math.floor(x), d = x - f; return d > 0.5 || (d === 0.5 && f % 2 !== 0) ? f + 1 : f; };
+  const tokShort = (n) => n >= 1e6 ? String(halfEven(n / 1e5) / 10) + "M" : n >= 1e3 ? `${halfEven(n / 1e3)}k` : String(n);
+  const money = (v) => "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\.00$/, "");
+  const METERED_KINDS = [["input", "in"], ["output", "out"], ["cache_read", "cache read"], ["cache_write", "cache write"]];
+  // A **metered** account's chip (§4.5a **usage**, TD-151 slice 5) — `_metered_chip` in app.py is
+  // the same rule: the account's spend over the window's amount, worst the one nearest its amount,
+  // amber from eight tenths, red at it; *spend unknown* when the adapter could not read; never stale.
+  function meteredChip(profile, u, windows) {
+    const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+    const spend = (w) => {
+      const s = w.spent, a = w.amount && typeof w.amount === "object" ? w.amount : {};
+      return a.unit === "tok" || !isNum(s.cost) ? `${tokShort(Math.trunc(s.total || 0))} tok` : money(s.cost);
+    };
+    const amount = (w) => {
+      const a = w.amount && typeof w.amount === "object" ? w.amount : null;
+      if (!a || !isNum(a.value)) return "";
+      return a.unit === "$" ? money(a.value) : `${tokShort(Math.trunc(a.value))} tok`;
+    };
+    const pct = (w) => Number.isInteger(w.pct) ? w.pct : null;
+    let worst = windows[0];
+    for (const w of windows) if (pct(w) !== null && (pct(worst) === null || pct(w) > pct(worst))) worst = w;
+    const n = pct(worst) || 0;
+    let text = `${profile} · ${worst.label} ${spend(worst)}`;
+    if (amount(worst)) text += ` / ${amount(worst)}`;
+    let title = windows.map((w) => {
+      const t = w.spent.tokens && typeof w.spent.tokens === "object" ? w.spent.tokens : {};
+      const kinds = METERED_KINDS.map(([k, word]) => `${tokShort(Math.trunc(t[k] || 0))} ${word}`).join(", ");
+      let part = `${w.label} ${spend(w)}`;
+      if (amount(w)) part += ` / ${amount(w)} (${pct(w) !== null ? pct(w) : "?"}%)`;
+      return `${part} — ${kinds} (resets ${w.resets || "?"})`;
+    }).join(" · ");
+    const reason = String(u.reason || "ok");
+    if (reason !== "ok") { text += " · spend unknown"; title = `spend unknown: ${USAGE_WHY[reason] || reason}. ${title}`; }
+    const sharing = usageProfiles(u);
+    if (sharing) title += `. ${sharing}`;
+    const near = n >= NEAR_CAP;
+    return { text, title, pct: n, cls: n >= 100 ? "cap" : near ? "near" : "", near };
+  }
   AO.usageChip = function (profile, u) {
     if (!u || typeof u !== "object") return null;
+    const spent = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w === "object" && w.spent && typeof w.spent === "object" && !Array.isArray(w.spent));
+    if (spent.length) return meteredChip(profile, u, spent);
     const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
     const reason = String(u.reason || "ok"), stale = reason !== "ok";
     if (!windows.length && !stale) return null;
@@ -2793,6 +2835,15 @@
     const line = Math.max(0, Math.min(100, 100 - n * left));
     return { line, says: `→ line ${line}% · ${left} day${left === 1 ? "" : "s"} left` };
   };
+  // A metered card's field (§4.5a *Settings page: Usage*): an amount, `$5` or `20M tok`, or empty to
+  // clear it; a percent is refused by naming the billing, as `set_settings` refuses it. The spend
+  // beside the field stays until the press lands.
+  AO.amountSays = function (text) {
+    const t = String(text || "").trim();
+    if (!t) return { says: "no amount" };
+    if (/^\$\s*[\d,]*\.?\d+$/.test(t) || /^\d*\.?\d+\s*[Mm]?\s*tok$/.test(t)) return { says: `→ amount ${t}` };
+    return { error: "a metered profile's reserve is an amount ($5, 20M tok), not a percent" };
+  };
   AO.settings = function () {
     const page = $("#setpage"); if (!page) return;
     const post = async (section, body) => {
@@ -2808,7 +2859,7 @@
     $$(".setcard[data-section='usage'] .setin", page).forEach((inp) => {
       const out = inp.parentElement.querySelector(".setline");
       inp.addEventListener("input", () => {
-        const got = AO.reserveLine(inp.value, inp.dataset.resets);
+        const got = inp.dataset.metered ? AO.amountSays(inp.value) : AO.reserveLine(inp.value, inp.dataset.resets);
         out.textContent = got.error || (inp.value.trim() === (inp.defaultValue || "").trim() ? out.dataset.was : got.says);
         out.classList.toggle("warn", !!got.error);
       });

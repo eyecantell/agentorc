@@ -415,6 +415,21 @@ USAGE_CASES = {
                              "sessions": ["grinder-ao-1", "grinder-ao-2"]},
                             {"name": "default", "lines": [], "sessions": []}, "junk"]},
     "shared_unread": {"reason": "rate_limited", "profiles": [{"name": "grind", "sessions": ["g1"]}]},
+    # a metered account (§4.5a **usage**, TD-151 slice 5): spend over amount, tokens where unpriced
+    "metered": {"reason": "ok", "windows": [
+        {"label": "day", "pct": 82, "resets": "d1", "amount": {"value": 5.0, "unit": "$"},
+         "spent": {"tokens": {"input": 4_100_000, "output": 2_000, "cache_read": 0, "cache_write": 0},
+                   "total": 4_102_000, "cost": 4.1}},
+        {"label": "week", "pct": None, "resets": "w1",
+         "spent": {"tokens": {"input": 12_300_000}, "total": 12_300_000, "cost": 1234.5}},
+        {"label": "month", "pct": 100, "resets": "m1", "amount": {"value": 10_000_000, "unit": "tok"},
+         "spent": {"tokens": {}, "total": 12_300_000, "cost": 1234.5}}]},
+    "metered_ties": {"reason": "ok", "windows": [  # half to even in both homes: 2k and 1.2M
+        {"label": "day", "pct": 3, "resets": "d", "amount": {"value": 1_250_000, "unit": "tok"},
+         "spent": {"tokens": {"input": 2_500, "output": 3_500}, "total": 1_250_000, "cost": None}}]},
+    "metered_unpriced": {"reason": "error: OSError", "windows": [
+        {"label": "day", "pct": None, "resets": None,
+         "spent": {"tokens": {"input": 900}, "total": 900, "cost": None}}]},
 }  # fmt: skip
 
 
@@ -1005,3 +1020,28 @@ def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     assert "To bring it back into ${esc(v.team)} unattended: <b>Resume with changes…</b>" in js
     skill = (ui_dir.parent / "team_skill.md").read_text()
     assert "**One member back**" in skill and "**Members…** on the team card" in skill
+
+
+def test_a_metered_accounts_chip_reads_spend_over_its_amount():
+    """design §4.5a **usage** (TD-151 slice 5): *day $4.10 / $5*, the worst window the one nearest its
+    amount, amber from eight tenths and red at it, tokens by kind on hover, *spend unknown* when the
+    adapter could not read, and a window with no amount printing its spend alone."""
+    from agentorc.ui.app import usage_accounts, usage_chip
+
+    got = usage_chip("Claude · key", USAGE_CASES["metered"])
+    assert got["text"] == "Claude · key · month 12.3M tok / 10M tok" and got["cls"] == "cap" and got["pct"] == 100
+    assert got["title"].startswith("day $4.10 / $5 (82%) — 4.1M in, 2k out, 0 cache read, 0 cache write (resets d1)")
+    assert " · week $1,234.50 — 12.3M in" in got["title"]
+    u = usage_chip("Claude · key", USAGE_CASES["metered_unpriced"])
+    assert u["text"] == "Claude · key · day 900 tok · spend unknown" and u["cls"] == "" and u["pct"] == 0
+    # two profiles on one key: one sum, the chip over the smaller amount (the higher pct)
+    day = USAGE_CASES["metered"]["windows"][0]
+    a = {
+        "tool": "Claude",
+        "account": "key",
+        "reason": "ok",
+        "windows": [day | {"pct": 41, "amount": {"value": 10.0, "unit": "$"}}],
+    }
+    b = {"tool": "Claude", "account": "key", "reason": "ok", "windows": [day]}
+    acc = usage_accounts({"api2": a, "api": b})["Claude · key"]
+    assert usage_chip("Claude · key", acc)["text"] == "Claude · key · day $4.10 / $5"

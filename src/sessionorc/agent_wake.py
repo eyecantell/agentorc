@@ -21,6 +21,7 @@ from sessionorc import (
     waits,
 )
 from sessionorc import settings as settings_mod
+from sessionorc import spend as spend_mod
 from sessionorc.agent_common import (
     COMPOSER_LINES,
     DOORBELL_TRIES,
@@ -385,6 +386,17 @@ class WakeMixin:
                 "windows": settings_mod.lines(by_label, windows, now),
                 "labels": [str(w.get("label")) for w in windows or []],
             }
+        # a metered profile's amounts (§6 *Usage gate*, TD-151 slice 5), as written, with the spend
+        whole = settings_mod.load()
+        for prof, by_label in sorted(settings_mod.amounts(whole).items()):
+            written = ((whole.get("usage_gate") or {}).get(prof)) or {}
+            mine = {label: written[label] for label in by_label if label in written}
+            out[prof] = {
+                "reserves": mine,
+                "windows": self._amount_rows(prof, mine),
+                "labels": list(spend_mod.LABELS),
+                "metered": True,
+            }
         return {"profiles": out, "file": str(settings_mod.settings_file())}
 
     async def rpc_settings(self, caller: Any = None) -> dict[str, Any]:
@@ -506,6 +518,9 @@ class WakeMixin:
         """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file)."""
         if not isinstance(reserves, dict) or not reserves:
             raise RpcError("set_settings needs reserves: {label: percent | {per_day: N} | null}")
+        billing = self._billing_of(prof)
+        if billing is not None:
+            return self._amounts_change(doc, prof, reserves, billing.get("prices") or {})
         windows = (self._usage.get(prof) or {}).get("windows")
         reported = [str(w.get("label")) for w in windows or []]
         if windows is not None and (unknown := sorted(set(map(str, reserves)) - set(reported))):
@@ -515,10 +530,84 @@ class WakeMixin:
             )
         parsed: dict[str, Any] = {}
         for label, value in reserves.items():
+            if isinstance(value, str):
+                raise RpcError(
+                    f"{label}: profile {prof or '(default)'} is billed by subscription, so its reserve is a percent "
+                    f"(30, 10/day), not an amount like {value!r} (design §6 Usage gate)"
+                )
             try:
                 parsed[str(label)] = None if value is None else settings_mod.parse_reserve(value)
             except ValueError as e:
                 raise RpcError(f"{label}: {e}") from None
+        self._lay_gate(doc, prof, parsed)
+        mine = (doc["usage_gate"] or {}).get(prof) or {}
+        log.info("usage gate for profile %s set to %s", prof or "(default)", mine or "no reserves")
+        return {
+            "profile": prof,
+            "reserves": mine,
+            "windows": settings_mod.lines(mine, windows, datetime.now(UTC)),
+            "unchecked": windows is None,
+        }
+
+    def _amounts_change(
+        self, doc: dict[str, Any], prof: str, reserves: dict[str, Any], prices: dict[str, Any]
+    ) -> dict[str, Any]:
+        """A metered profile's half (§6 *Usage gate*, TD-151 slice 5): an amount per window of the
+        home's three — `$5` where the profile has prices, `2M tok` either way — or None to clear it;
+        a percent refused by naming the billing, as is money on a profile with no prices, which would
+        make no line."""
+        who = prof or "(default)"
+        if unknown := sorted(set(map(str, reserves)) - set(spend_mod.LABELS)):
+            raise RpcError(
+                f"profile {who} is metered: its windows are {', '.join(spend_mod.LABELS)}, "
+                f"not {', '.join(unknown)} (design §4.2a)"
+            )
+        parsed: dict[str, Any] = {}
+        for label, value in reserves.items():
+            if value is None:
+                parsed[str(label)] = None
+                continue
+            if not isinstance(value, str):
+                raise RpcError(
+                    f"{label}: profile {who} is metered, so its reserve is an amount ($5, 20M tok), "
+                    f"not a percent like {value!r} (design §6 Usage gate)"
+                )
+            try:
+                amount = settings_mod.parse_amount(value)
+            except ValueError as e:
+                raise RpcError(f"{label}: {e}") from None
+            if amount["unit"] == "$" and not prices:
+                raise RpcError(
+                    f"{label}: profile {who} declares no prices, so its spend is tokens: an amount like 20M tok, "
+                    f"not {value!r} (design §4.2a)"
+                )
+            parsed[str(label)] = value.strip()
+        self._lay_gate(doc, prof, parsed)
+        mine = (doc["usage_gate"] or {}).get(prof) or {}
+        log.info("usage gate for metered profile %s set to %s", who, mine or "no amounts")
+        return {"profile": prof, "reserves": mine, "windows": self._amount_rows(prof, mine), "metered": True}
+
+    def _amount_rows(self, prof: str, mine: dict[str, Any]) -> list[dict[str, Any]]:
+        """A metered profile's rows for `gate` and `set_settings`' reply: each window with an amount,
+        its amount as written, and the account's spend and `pct` from the last reading — `unread`
+        before there is one. The `pct` is the reading's, made at the amount it last read."""
+        windows = {str(w.get("label")): w for w in (self._usage.get(prof) or {}).get("windows") or ()}
+        rows = []
+        for label in spend_mod.LABELS:
+            if label not in mine:
+                continue
+            w = windows.get(label)
+            row: dict[str, Any] = {"label": label, "reserve": mine[label], "metered": True}
+            if w is None:
+                row["unread"] = True
+            else:
+                row |= {"spent": w.get("spent"), "pct": w.get("pct"), "resets": w.get("resets")}
+            rows.append(row)
+        return rows
+
+    def _lay_gate(self, doc: dict[str, Any], prof: str, parsed: dict[str, Any]) -> None:
+        """`parsed` laid onto `doc`'s `usage_gate.<prof>` in place: None clears a window, a profile
+        with none left leaves the key."""
         gate = doc.get("usage_gate") if isinstance(doc.get("usage_gate"), dict) else {}
         mine = dict(gate.get(prof) or {}) if isinstance(gate.get(prof), dict) else {}
         for label, value in parsed.items():
@@ -531,13 +620,6 @@ class WakeMixin:
         else:
             gate.pop(prof, None)
         doc["usage_gate"] = gate
-        log.info("usage gate for profile %s set to %s", prof or "(default)", mine or "no reserves")
-        return {
-            "profile": prof,
-            "reserves": mine,
-            "windows": settings_mod.lines(mine, windows, datetime.now(UTC)),
-            "unchecked": windows is None,
-        }
 
     @staticmethod
     def _person_change(current: Any, change: Any) -> dict[str, Any]:

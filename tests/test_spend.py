@@ -330,3 +330,41 @@ async def test_the_home_takes_a_nodes_spend_and_pushes_its_sums_when_its_reading
     bad = _t("u2", at, 2, source="t", inp=0, cost=-100.0)
     await agent._take_spend("laptop", head | {"turns": [bad], "cursors": {"t": 3}})
     assert agent._spend["hookstub:key"]["days"][now.astimezone().date().isoformat()]["cost"] == 8.5
+
+
+async def test_set_settings_and_gate_take_a_metered_profiles_amounts(agent, hookstub):
+    """§6 *Usage gate*, §4.7 `ao gate` (TD-151 slice 5): a metered profile's reserve is an amount per
+    window of the home's three, set before its first session; a percent is refused by naming the
+    billing, as are money on a profile with no prices and an amount on a subscription profile; `gate`
+    answers the amounts as written with the spend beside them."""
+    from agentorc.cli import _gate_line, _reserve
+    from sessionorc.client import AgentError
+
+    await park_ticks(agent)
+    hookstub.billing = {
+        "api": {"billing": "metered", "prices": {"input": 1.0}},
+        "toks": {"billing": "metered", "prices": {}},
+    }
+    async with LocalClient() as person:
+        got = await person.call("set_settings", profile="api", reserves={"day": "$5", "week": "20M tok"})
+        assert got["metered"] and got["reserves"] == {"day": "$5", "week": "20M tok"}
+        assert [r.get("unread") for r in got["windows"]] == [True, True]
+        with pytest.raises(AgentError, match="is metered, so its reserve is an amount"):
+            await person.call("set_settings", profile="api", reserves={"day": 30})
+        with pytest.raises(AgentError, match="its windows are day, week, month, not 5h"):
+            await person.call("set_settings", profile="api", reserves={"5h": "$5"})
+        with pytest.raises(AgentError, match="declares no prices"):
+            await person.call("set_settings", profile="toks", reserves={"day": "$5"})
+        with pytest.raises(AgentError, match="billed by subscription, so its reserve is a percent"):
+            await person.call("set_settings", profile="grind", reserves={"5h": "$5"})
+        await person.call("set_settings", profile="api", reserves={"week": None})
+        assert settings.load()["usage_gate"]["api"] == {"day": "$5"}
+        agent._usage["api"] = spend_mod.reading(
+            spend_mod.sums({"days": {datetime.now().astimezone().date().isoformat(): {"cost": 3.2}}},
+                           datetime.now().astimezone()),
+            settings.amounts(settings.load())["api"], "now",
+        )  # fmt: skip
+        gate = (await person.call("gate"))["profiles"]["api"]
+    assert gate["metered"] and gate["reserves"] == {"day": "$5"}
+    assert _gate_line("api", gate["windows"]) == "api · day $5 → spent $3.20 (64%)"
+    assert _reserve(" $5 ") == "$5" and _reserve("2M tok") == "2M tok" and _reserve("30") == 30

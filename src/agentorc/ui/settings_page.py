@@ -29,6 +29,8 @@ from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
 from sessionorc import hosts
 from sessionorc import settings as settings_mod
+from sessionorc import spend as spend_mod
+from sessionorc.models import tokens_short
 
 # The *i* mark of each file card (§4.5a *Settings page: read-only values and the i mark*): when the
 # file is re-read and who edits it. A host's name, its `home:` and its identity mode are read once,
@@ -68,12 +70,15 @@ def reserve_text(r: Any) -> str:
     return "" if r is None else str(r)
 
 
-def parse_reserve_text(text: Any) -> int | dict[str, int] | None:
+def parse_reserve_text(text: Any) -> int | dict[str, int] | str | None:
     """What a reserve field sends: `30`, `10/day`, empty to clear — `ao gate`'s forms, the same
-    refusal. Raises ValueError with the words the field shows in place."""
+    refusal — or a metered card's amount, `$5` or `20M tok`, which goes as written for the agent to
+    check against the profile's billing. Raises ValueError with the words the field shows in place."""
     t = str(text if text is not None else "").strip()
     if not t:
         return None
+    if t.startswith("$") or t.endswith("tok"):
+        return t
     per_day = t.endswith("/day")
     n = t.removesuffix("/day").strip()
     if not n.isdigit():
@@ -89,6 +94,22 @@ def _when(iso: Any) -> datetime | None:
     except ValueError:
         return None
     return t if t.tzinfo else t.replace(tzinfo=UTC)
+
+
+def spend_text(w: Mapping[str, Any] | None, unit: str = "") -> str:
+    """A metered window's spend as the chip draws it (§4.5a): *spent $3.20 · 64% · resets 00:00*, in
+    tokens where the amount is tokens or nothing was priced; *no reading yet* before one."""
+    spent = (w or {}).get("spent")
+    if not isinstance(spent, dict):
+        return "no reading yet"
+    cost = spent.get("cost")
+    got = f"{tokens_short(int(spent.get('total') or 0))} tok" if unit == "tok" or cost is None else f"${cost:,.2f}"
+    out = f"spent {got}"
+    if isinstance(w.get("pct"), int):
+        out += f" · {w['pct']}%"
+    if resets := _when(w.get("resets")):
+        out += f" · resets {resets.astimezone():%H:%M}"
+    return out
 
 
 def line_text(row: Mapping[str, Any] | None, now: datetime | None = None) -> str:
@@ -129,8 +150,8 @@ def usage_cards(
     row per window label the adapter reports — each with its reserve as the field takes it, the line
     it makes today, and what the page's preview needs to draw a new line before the press lands
     (`resets`). A profile with no reading yet draws the labels it has reserves for, and says the
-    labels are not checked. A **metered** profile's card (§4.2a) takes amounts, which `set_settings`
-    does not take before TD-151 slice 5: it is drawn with its billing and no fields."""
+    labels are not checked. A **metered** profile's card (§4.2a) carries the home's three windows,
+    each taking an amount (`$5`, `20M tok`), with the account's spend beside it."""
     now = now or datetime.now(UTC)
     gate, usage = gate or {}, usage or {}
     groups: dict[str, dict[str, Any]] = {}
@@ -163,12 +184,27 @@ def usage_cards(
         if metered:
             prices = " / ".join(f"${v:g} {PRICE_WORDS.get(k, k)}" for k, v in p.prices.items())
             badge += f" · metered · {prices + ' per M' if prices else 'tokens'}"
+            # the home's three windows, each an amount (§4.5a *Settings page: Usage*): the account's
+            # spend beside it, as the chip draws it
+            by_label = {str(w["label"]): w for w in windows}
+            rows = []
+            for label in spend_mod.LABELS:
+                value = str(reserves.get(label) or "")
+                rows.append(
+                    {
+                        "label": label,
+                        "value": value,
+                        "line": spend_text(by_label.get(label), "tok" if value.endswith("tok") else ""),
+                        "resets": str((by_label.get(label) or {}).get("resets") or ""),
+                        "pct": None,
+                    }
+                )
         groups.setdefault(key, {"account": key, "cards": []})["cards"].append(
             {
                 "profile": name,
                 "badge": badge,
                 "metered": metered,
-                "rows": [] if metered else rows,
+                "rows": rows,
                 "unchecked": not windows and not metered,
             }
         )

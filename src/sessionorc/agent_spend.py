@@ -348,3 +348,20 @@ class SpendMixin:
             by_label = settings_mod.amounts(whole).get(profile)
             return {label: 0 for label in by_label} if by_label else None
         return settings_mod.reserves(whole).get(profile)
+
+    def _billing_of(self, profile: str) -> dict[str, Any] | None:
+        """`{billing, prices}` when `profile` is billed `metered`, else None — asked of the adapter of
+        any record running under it, and with none of every adapter this host knows, so a person can
+        set an amount before the profile's first session (`set_settings`, §6 *Usage gate*)."""
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        names = sorted({r.adapter for r in records if r.profile == profile and r.adapter != "shell"})
+        for name in names or adapters.names():
+            try:
+                fn = getattr(adapters.get(name), "billing_for", None)
+                b = fn(profile) if fn else None
+            except Exception as e:  # noqa: BLE001 — an adapter's lookup never stops the write
+                log.warning("billing_for %s on %s failed: %s — read as a subscription", profile, name, e)
+                b = None
+            if isinstance(b, dict) and b.get("billing") == "metered":
+                return {"billing": "metered", "prices": dict(b.get("prices") or {})}
+        return None

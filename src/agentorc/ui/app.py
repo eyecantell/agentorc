@@ -227,6 +227,18 @@ def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
         acc = out.get(name)
         if acc is None:
             acc = out[name] = {**{k: v for k, v in u.items() if k != "lines"}, "lines": [], "profiles": []}
+        else:
+            # a metered account's spend is one sum and each profile's amount its own: the chip reads
+            # each window over the smallest amount, which is the highest `pct` (§4.5a **usage**)
+            theirs = {w.get("label"): w for w in u.get("windows") or [] if isinstance(w, dict) and w.get("spent")}
+            acc["windows"] = [
+                theirs[w.get("label")]
+                if isinstance(w, dict)
+                and isinstance((theirs.get(w.get("label")) or {}).get("pct"), int)
+                and (not isinstance(w.get("pct"), int) or theirs[w.get("label")]["pct"] > w["pct"])
+                else w
+                for w in acc.get("windows") or []
+            ]
         lines = [r for r in u.get("lines") or [] if isinstance(r, dict)]
         acc["profiles"].append({"name": prof, "lines": lines, "sessions": live.get(prof, [])})
         for row in lines:
@@ -239,6 +251,63 @@ def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
             elif ln < acc["lines"][have]["line"]:
                 acc["lines"][have] = row
     return out
+
+
+def _money(v: Any) -> str:
+    return f"${float(v):,.2f}".removesuffix(".00")
+
+
+def _metered_chip(prof: str, u: dict[str, Any], windows: list[dict[str, Any]]) -> dict[str, Any]:
+    """A **metered** account's chip (§4.5a **usage**, §4.2a; TD-151 slice 5): *Claude · key · day
+    $3.20 / $5* — the account's spend over the window's amount — or *day 1.2M tok* with no amount;
+    its worst window the one nearest its amount, red at it, amber from eight tenths; tokens by kind
+    on hover; *spend unknown* beside it when the adapter could not read. Never *stale*: the reading
+    is a sum. `AO.usageChip` is the same rule."""
+
+    def spend(w: dict[str, Any]) -> str:
+        s, a = w["spent"], w.get("amount") if isinstance(w.get("amount"), dict) else {}
+        if a.get("unit") == "tok" or not isinstance(s.get("cost"), int | float):
+            return f"{tokens_short(int(s.get('total') or 0))} tok"
+        return _money(s["cost"])
+
+    def amount(w: dict[str, Any]) -> str:
+        a = w.get("amount") if isinstance(w.get("amount"), dict) else None
+        if not a or not isinstance(a.get("value"), int | float):
+            return ""
+        return _money(a["value"]) if a.get("unit") == "$" else f"{tokens_short(int(a['value']))} tok"
+
+    def pct(w: dict[str, Any]) -> int | None:
+        p = w.get("pct")
+        return p if isinstance(p, int) and not isinstance(p, bool) else None
+
+    worst = windows[0]
+    for w in windows:
+        if pct(w) is not None and (pct(worst) is None or pct(w) > pct(worst)):
+            worst = w
+    n = pct(worst) or 0
+    text = f"{prof} · {worst.get('label')} {spend(worst)}"
+    if amount(worst):
+        text += f" / {amount(worst)}"
+    parts = []
+    for w in windows:
+        t = w["spent"].get("tokens") if isinstance(w["spent"].get("tokens"), dict) else {}
+        kinds = ", ".join(f"{tokens_short(int(t.get(k) or 0))} {word}" for k, word in METERED_KINDS)
+        part = f"{w.get('label')} {spend(w)}"
+        if amount(w):
+            part += f" / {amount(w)} ({pct(w) if pct(w) is not None else '?'}%)"
+        parts.append(f"{part} — {kinds} (resets {w.get('resets') or '?'})")
+    title = " · ".join(parts)
+    reason = str(u.get("reason") or "ok")
+    if reason != "ok":
+        text += " · spend unknown"
+        title = f"spend unknown: {USAGE_WHY.get(reason, reason)}. {title}"
+    if sharing := _usage_profiles(u):
+        title += f". {sharing}"
+    near = n >= NEAR_CAP
+    return {"text": text, "title": title, "pct": n, "cls": "cap" if n >= 100 else "near" if near else "", "near": near}
+
+
+METERED_KINDS = (("input", "in"), ("output", "out"), ("cache_read", "cache read"), ("cache_write", "cache write"))
 
 
 def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
@@ -262,6 +331,9 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
     to the same cases."""
     if not isinstance(u, dict):
         return None
+    spent = [w for w in (u.get("windows") or []) if isinstance(w, dict) and isinstance(w.get("spent"), dict)]
+    if spent:
+        return _metered_chip(prof, u, spent)
     windows = [
         w
         for w in (u.get("windows") or [])
@@ -4091,6 +4163,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "settings.html",
             {
                 "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
+                "profiles_file": str(profiles_mod.profiles_file()),
                 "teams": setmod.team_cards(org.teams, got.get("teams")),
                 "repos": setmod.repo_cards(local.repos(), got.get("repos")),
                 "you": term,
@@ -4132,8 +4205,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/settings/usage")
     async def settings_usage(request: Request):
         """§4.5a *Settings page: Usage* → **Save** on a profile card: `{profile, reserves: {label:
-        text}}`, each text in `ao gate`'s forms (`30`, `10/day`, empty to clear) — refused in place
-        with the same words when it is not one — then `set_settings {profile, reserves}`."""
+        text}}`, each text in `ao gate`'s forms (`30`, `10/day`, empty to clear; on a metered card an
+        amount, `$5` or `20M tok`) — refused in place with the same words when it is not one — then
+        `set_settings {profile, reserves}`, whose refusal names the billing when the kind is wrong."""
         body = await body_of(request)
         raw = body.get("reserves")
         if not isinstance(raw, dict) or not raw:
