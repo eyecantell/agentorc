@@ -81,7 +81,7 @@
     <div class="fv" data-fv="doing"{% if m.face != 'doing' %} hidden{% endif %}>
       <div class="fhead"><span class="kind">Doing</span> <span class="meta">the team's ao doing calls</span><span class="grow"></span>
         <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
-      <div class="dfeed">
+      <div class="dfeed" data-keep-scroll="doing">
       {% for d in m.doing %}
       <div class="drow" title="{{ d.at }}"><span class="meta mono">{{ d.hm }}</span> <a class="name" href="/focus/{{ d.id }}">{{ d.name }}</a> <span class="dtext" title="{{ d.text }}">{{ d.text }}</span></div>
       {% else %}

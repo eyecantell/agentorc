@@ -1971,3 +1971,21 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Fix:** (1) spell out the clause in the template: High, then Medium, then Low, ties in Summary-table order, and say why when passing over a higher one. (2) Name the tool: either `ledger.py --pickable` gains `--owner` / `--kind` filters on the header lines (a dev-cadence TD, through its anchor), or the template gives the one-line filter to run. (3) Put the entry's priority in the claim note, which TD-203 would then show. Add the sentence to design §4.8's `free-pick` in the same PR. A running grinder keeps the brief it started with, so the change reaches each grinder at its next start. Done when a grinder's claim note names the entry's priority and a test on the template (or the tool) shows High sorted first.
 
 **Related:** TD-118 (the header lines), TD-203 (priority on TDs in motion, on the parked branch at filing), dev-cadence's TD-064 (`ledger.py --pickable`; not this ledger's TD-064), design §4.8.
+
+## TD-205: Scrolling the Doing list jumps back to the top
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *there is an issue with scrolling in the doing list (on the teams card) — it seems to redraw while scrolling, popping back up to the top*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (the group delta: `tpl.innerHTML = g.summary.trim(); … sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept)`, around line 908 at filing), `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** the team summary is re-sent with the groups on every delta and on the `repos` and `doing` events, and the client swaps it whole (`team_summary.html`'s header says so). The swap carries over the Deny *why?* boxes a person was typing (`denyWhys`), but nothing else. The Doing list is a scrolled box, so every delta (any member's state change, any `ao doing`) snaps it back to the top. On a busy team that is every few seconds.
+
+**Resolved:** 2026-09-27 (PR #676). The feed carries `data-keep-scroll="doing"` in `team_summary.html`; `AO.scrolls` / `AO.restoreScrolls` in `app.js` read it at `syncGroups`' swap and put it back in `syncSummaries` once the face is shown. Design §4.5a *Answer needed / Doing*; `tests/test_ui_team_summary.py` (`test_the_doing_feed_keeps_its_scroll_across_the_summary_swap`). Merged, live check pending.
+
+**Fix (as filed):** carry each scrolled facet's `scrollTop` across the swap as `denyWhys` does, keyed by the facet (`.facet.fface` for Doing, `.facet.fmotion` for TDs in motion), and keep the person's position unless it was at the top, where new rows should show. Better still, re-render only the facet whose data changed. Test in the page's JS tests if they cover the swap, or a note in the PR on how it was checked by hand. Done when a person can scroll the Doing list while the team works and stay where they scrolled.
+
+**Related:** TD-206 (the same list), TD-176 slice 3 (the summary and its swap).

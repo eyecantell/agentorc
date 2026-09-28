@@ -109,7 +109,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | Open — pickable |
 | TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
 | TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
-| TD-205 | Scrolling the Doing list jumps back to the top: every group delta replaces the team summary whole, and the list's scroll position is not carried over | Medium | Open — pickable |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
 | TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — mechanism and a recommended fix; the shape is Paul's (board, 2026-09-12) |
 
@@ -2049,22 +2048,6 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Fix (recommended, the shape is Paul's):** take the baseline **before** typing — the state and `rev` read before `_submit` — so the busy branch is decided by what the session was doing when the prompt was sent, and *started* is any transition since then; a turn that began and even ended during the paste then reads as started and settled. A test: a hook stub fired from inside a slowed `_type`, after its Enter. The other shapes on the board (a longer or adapter-supplied window; re-checking the composer before raising) treat the symptom.
 
 **Related:** TD-078 (the test's race, fixed in #672), TD-016 / TD-027 (the wait and the composer check, archived), the board item of 2026-09-12 (*`ao send --wait` reported `prompt-stalled` for a prompt that in fact ran*).
-
-## TD-205: Scrolling the Doing list jumps back to the top
-
-**Priority:** Medium
-**Added:** 2026-09-27 (Paul: *there is an issue with scrolling in the doing list (on the teams card) — it seems to redraw while scrolling, popping back up to the top*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (the group delta: `tpl.innerHTML = g.summary.trim(); … sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept)`, around line 908 at filing), `src/agentorc/ui/templates/team_summary.html`
-
-**Why:** the team summary is re-sent with the groups on every delta and on the `repos` and `doing` events, and the client swaps it whole (`team_summary.html`'s header says so). The swap carries over the Deny *why?* boxes a person was typing (`denyWhys`), but nothing else. The Doing list is a scrolled box, so every delta (any member's state change, any `ao doing`) snaps it back to the top. On a busy team that is every few seconds.
-
-**Fix:** carry each scrolled facet's `scrollTop` across the swap as `denyWhys` does, keyed by the facet (`.facet.fface` for Doing, `.facet.fmotion` for TDs in motion), and keep the person's position unless it was at the top, where new rows should show. Better still, re-render only the facet whose data changed. Test in the page's JS tests if they cover the swap, or a note in the PR on how it was checked by hand. Done when a person can scroll the Doing list while the team works and stay where they scrolled.
-
-**Related:** TD-206 (the same list), TD-176 slice 3 (the summary and its swap).
 
 ## TD-206: The Doing list's times are clock times cut short, and its fields run together
 
