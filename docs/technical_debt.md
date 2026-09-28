@@ -112,6 +112,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first |
+| TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Open — design-first |
+| TD-213 | Closing a member closes the questions it put to the person (`asker_gone`), even when the ledger still waits on the answer: the wind-down of 2026-09-28 took a steer (TD-149) and an ask (TD-180) out of the Inbox | High | Open — design-first |
 
 
 ---
@@ -1731,8 +1733,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-26 (Paul: *it will look like the user giving short info, then an agent fleshing it out — asking questions as needed, then generating the TD*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no — waits on Paul's answer to the designer's ask
-**Status:** Open — nothing designed. **Asked 2026-09-26** (the designer, ask `m-d20bbf79bdbe` in the person inbox): who drafts the entry — an on-call seat on the repo's team filled by the form's message (recommended: it reuses the seat fill, the Inbox's `ask` and the outcome debt, and costs one line in `org.yml` per team), the team's designer by mail, a one-shot session per press, or no agent and a stub. The round runs on his answer; the door proposed is **Add entry…** beside **Open ledger** on the Repo page, with `ao td add` beside it.
+**Pickable:** yes
+**Status:** Open — nothing designed. **Answered 2026-09-28 (Paul, to the anchor; the ask itself had been closed `asker_gone` at the designer's wind-down before he saw it, TD-213):** (1) the form is not limited to one line; the person may write as much as they have. (2) A second way through: the form offers **Open an interactive session** beside submitting, which starts a new *interactive* session with everything typed so far as a prompt in its composer, filled but **not submitted**. The person talks the entry through with it. It is an interactive designer (the designer role, interactive) when the entry is a new feature, and a techlead session for everything else. dev-cadence is adding an optional **type** field to the ledger entry, which is what tells the two apart. (3) The same button belongs on the team card, where it may overlap the on-demand drafter (the seat the designer recommended), so the round decides whether they are one mechanism or two. Filling a composer without submitting exists already: Shift+press on a prompt chip (TD-170). **Asked 2026-09-26** (the designer, ask `m-d20bbf79bdbe` in the person inbox): who drafts the entry — an on-call seat on the repo's team filled by the form's message (recommended: it reuses the seat fill, the Inbox's `ask` and the outcome debt, and costs one line in `org.yml` per team), the team's designer by mail, a one-shot session per press, or no agent and a stub. The round runs on his answer; the door proposed is **Add entry…** beside **Open ledger** on the Repo page, with `ao td add` beside it.
 
 **Why:** a TD reaches the ledger today only through a session. The person tells a session in its terminal, which writes the entry on a branch and opens a PR. The UI has no way in: §4.5a's **Open ledger** row says *an entry is edited in its file, never on the page*, and the Repo page's Technical debt lists are read-only. A thought the person has while looking at the Org or the Repo page has to wait until they open a session and explain it there. Most of what makes an entry good is work the person should not have to do: the next number, the Owner/Kind/Pickable lines, the evidence, the file locations, and the link to the design section and its neighbours. An agent can do all of that, and it only needs the person for the *why* and the choice between options.
 
@@ -2077,3 +2079,35 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Fix:** design a versioned home for the definition files. The anchor's proposal: a private git repo (e.g. `agentorc-org`) whose checkout the home reads from, via `AGENTORC_ORG_DIR` or `~/.agentorc` pointing into it. Then settle: (1) **which files**: `org.yml` and `profiles.yml` surely, `settings.yml` probably (the person's; no secrets in any, since secrets stay in Doppler), while `hosts.yml` (this machine's identity) and the runtime store (sessions, runs, inbox) stay local; (2) **page edits commit**: Members… and the Settings page's writes commit with a message naming the act, as the board write-back does (§4.4); pushed, or committed and left for the anchor to push; (3) **a hand edit and a page edit meeting**: the page refuses on a dirty checkout, or commits the hand edit first; (4) **moving the home**: clone the repo on the new machine and name it as the home; `ao host up` / `ao service install` could take the repo's URL; (5) where each file stands under the settings audit's definition-versus-setting rule, and whether per-repo keys (TD-209's held paths) move to the repos instead. Done when the org can be stood up on a fresh machine from a clone and one command, and `org.yml`'s history is `git log`.
 
 **Related:** TD-209 (the org-wide role's review paths), TD-172 (Members… edits `org.yml`), TD-146 (`settings.yml`), TD-057 (home and node), the settings audit ADR, CLAUDE.md's cross-repo convention (secrets in Doppler).
+
+## TD-212: `ao promote --sha` is refused — design the rollback
+
+**Priority:** Medium
+**Added:** 2026-09-28 (Paul, answering grinder-ao-1's board line of 2026-09-27: *add a design TD for ao promote --sha*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.7 (`ao promote`), §6 *Promote*, `src/sessionorc/promote.py` and the promote's `run` (TD-132, the build #666 refuses `--sha`)
+
+**Why:** design §4.7 promised `ao promote --sha <commit>`, a promote of an older commit, which is the rollback. TD-132's build (#666, grinder-ao-1) refuses it: the promote's `run` installs the checkout's tree, and precondition (1) holds that tree at main's head, so an older commit has no way to reach `run`. The techlead, reading #666, asked for it on the board since it narrows what the design promised. Today a rollback is a revert merged to main and then a press, which is slow when the live copy is broken (TD-062's 31 minutes).
+
+**Fix:** design how an older commit reaches the install: (a) `run` installs from a scratch worktree at the commit (`git worktree add --detach`) instead of the main checkout; (b) install the wheel the last promote wrote to `~/.agentorc/wheels/` (kept per commit, so a rollback needs no build); (c) keep the refusal and make the revert PR a one-press path. Also: what the live reading says after a rollback (*live is older than main*, not *behind*), whether the automatic promote then leaves it alone until a newer main, and what `ao promote --sha` refuses (a commit not on main, one older than the last schema change). Then the build TD. Done when a person can put the live copy back on the previous commit in one command and the page says it is a rollback.
+
+**Related:** TD-132 (the promote), TD-062 (why the live copy is promoted, not edited), #666.
+
+## TD-213: Closing a member closes the questions it put to the person, even when the ledger still waits on the answer
+
+**Priority:** High
+**Added:** 2026-09-28 (Paul: *I do not see a steering item from ao-grind in the inbox*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent_attention.py` (`_asker_gone`: closing or forgetting a record closes the open `ask`s and `steer`s it put to the person, `closed_reason: asker_gone`), design §4.10 *What a person is asked*, §4.9a (the wind-down), `src/agentorc/briefs/manager.md` (*Out of work*)
+
+**Why:** an `ask` to the person never expires, so the design ends it with its asker: closing or forgetting the record closes its open questions, or a forgotten worker's questions would stand forever. The team wind-down closes every finished member. On 2026-09-28 at 06:56Z, ao-grind's wind-down closed grinder-ao-1 and designer-ao-1, and with them grinder-ao-1's steer `m-43f5e3922686` (TD-149 (1): six `.agentorc.yml` keys) and the designer's ask `m-d20bbf79bdbe` (TD-180: who drafts the entry). Both left the person's Inbox before Paul had seen them. The work still waits on them. grinder-ao-1's out-of-work note, written three minutes before its close, says *TD-149 (1) waits on a steer to Paul*, and TD-180's header said *waits on Paul's answer*. The question is gone and the dependency stays, so an entry can wait forever on an answer nobody can give.
+
+**Fix:** design what a question outlives. Options: (a) a question tied to a ledger entry (its `about` or `cites` names a TD) survives its asker's close and moves to the board as a line (*Decide: …*, the steer's default beside it), written by the host agent or by the manager's wind-down step (the brief already boards a passed-up question nobody answered; extend it to the members' own open questions); (b) the wind-down refuses to close a member with open questions to the person and leaves it idle for the person; (c) the question stays open under the team rather than the record, answered to whoever next holds the entry. Also: `asker_gone` on a question the person had not yet seen should at least leave a trail row saying what was withdrawn. Done when a member closed with an open question to the person leaves that question somewhere the person will see it, and a test covers the wind-down case.
+
+**Related:** TD-180, TD-149 (the two questions that went), TD-187 / TD-195 (the same wind-down closed a designer whose lane had work), §4.10, §4.9a.
