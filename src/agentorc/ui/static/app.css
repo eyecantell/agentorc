@@ -249,6 +249,7 @@ details.fold > summary:hover { color: var(--fg); }
 details.fold[open] > summary { margin-bottom: 3px; }
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
 .inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
+.inboxpage .promotelog { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14em; overflow: auto; margin: 0; }
 /* §4.5 screen 6 *Layout* (Paul's rule, 2026-09-19): what says **what a row is** — the kind mark,
    the role badge, the state pill (which never had a border) — is flat and unbordered; everything
    bordered on a row is a control. The team badge keeps its border, because it is a button. */

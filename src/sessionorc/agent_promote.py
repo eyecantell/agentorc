@@ -93,12 +93,21 @@ class PromoteMixin:
         root = self._promote_root(repo)
         name = Path(root).name
         async with self._promote_lock:
-            readings, _notes, bad = await asyncio.to_thread(promote_mod.survey, [root], {}, True, {}, datetime.now(UTC))
+            readings, notes, bad = await asyncio.to_thread(promote_mod.survey, [root], {}, True, {}, datetime.now(UTC))
+            # a run that reached its commit just now is concluded by this reading: its note is filed
+            # here, or the person inbox would never hear of that promote (techlead's read of #666)
+            for text in notes:
+                log.info("promote: %s", text)
+                self._system_note(PERSON, text)
             if root in bad:
                 raise RpcError(bad[root])
             r = readings.get(name)
             if r is None:
                 raise RpcError(f"{root} has no promote: block in its .agentorc.yml (design §5): nothing to press")
+            # the fresh reading replaces the held one whatever the press does next, so the Inbox row
+            # a refusal leaves standing reads what was just read
+            r["auto"] = self._promotes.get(name, {}).get("auto", False)
+            self._promotes[name] = r
             if (u := promote_mod.unmet(r, press=True)) is not None:
                 raise RpcError(f"promote {name} refused — {u[1]} (design §6 Promote, precondition: {u[0]})")
             if r.get("live") == r["main"]:
@@ -110,8 +119,6 @@ class PromoteMixin:
             )
             u = promote_mod.unmet(r)
             r["unmet"] = {"name": u[0], "text": u[1]} if u else None
-            r["auto"] = self._promotes.get(name, {}).get("auto", False)
-            self._promotes[name] = r
             self._promote_watch_at = float("-inf")  # the watch starts on the next tick
         log.info("promote: %s pressed by the person at %s", name, r["main"][:12])
         return {

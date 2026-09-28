@@ -2259,6 +2259,57 @@ def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
     return out
 
 
+def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: promote** (§6 *Promote*, TD-132 slice 3): one row per repo in the
+    home's `promotes` reading, drawn only while live is not main's head or a promote failed — and
+    every part from that structured reading, never text a session wrote. Under `auto: false` a repo
+    main is ahead of is *Needs you*, counted (the press is what stands between merged and live); a
+    run **in flight** is FYI (`fyi`), uncounted, its Promote disabled; a **failure** is *Needs you*
+    whatever `auto` says. Under `auto: true` nothing but a failure: the normal flow is the note.
+    Aged from when main moved (`moved`, its head's committer time). Keyed `promote:<repo>` in the
+    attention store, so Snooze is by time alone and more merges do not wake a snoozed row."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    for repo, r in sorted((promotes or {}).items()):
+        if not isinstance(r, dict):
+            continue
+        failed = r.get("failed") if isinstance(r.get("failed"), dict) else None
+        flight = r.get("inflight") if isinstance(r.get("inflight"), dict) else None
+        behind = bool(r.get("main")) and r.get("live") != r.get("main")
+        if not failed and (r.get("auto") or not (flight or behind)):
+            continue
+        live = str(r.get("live") or "")[:7]
+        main = str(r.get("main") or "")[:7]
+        ahead = r.get("ahead")
+        checks = str(r.get("checks") or "unknown")
+        text = f"{repo} · live {live or 'unknown'} · main {main or 'unknown'}"
+        if isinstance(ahead, int) and ahead:
+            text += f", {ahead} commit{'' if ahead == 1 else 's'} ahead"
+        text += f" · checks {checks}"
+        when = str((failed or {}).get("at") or (flight or {}).get("at") or r.get("moved") or "")
+        out.append(
+            {
+                "row": "promote",
+                "sid": f"promote:{repo}",
+                "id": f"promote:{repo}",
+                "name": repo,
+                "repo": repo,
+                "team": "",
+                "at": when,
+                "age": _age(when, at),
+                "text": text,
+                "live_why": r.get("live_why") if not live else None,
+                "checks_why": r.get("checks_why"),
+                "unmet": r.get("unmet"),
+                "failed": failed,
+                "inflight": flight,
+                "fyi": bool(flight) and not failed,
+                "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),
+            }
+        )
+    return out
+
+
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per item the report says is due today or overdue — its repo, its due words, the whole text, and
@@ -2476,6 +2527,9 @@ def inbox_sections(
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
     for r in states:
+        if r.get("fyi"):
+            out["fyi"].append(r)  # a promote in flight (§4.5a *Inbox row: promote*): FYI, uncounted
+            continue
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
         if isinstance(raw, str) and raw.startswith("dismissed:"):
             # the restart row's **Dismiss** (§4.5a, TD-103): that one mark's row is gone from every
@@ -3009,12 +3063,14 @@ def create_app() -> FastAPI:
         seats = await seats_of(fleet)
         views = [view(s, fleet, icons=icons, seats=seats) for s in fleet]
         info = await identity_info()
-        return state_rows(
+        rows = state_rows(
             views,
             host_alarms=alarm_view(info.get("alarms")),
             host=str(info.get("host") or host_name()),
             identity_mode=str(info.get("mode") or ""),
         )
+        # §4.5a *Inbox row: promote* (TD-132 slice 3): the home's readings; a node has none
+        return rows + promote_rows((await call("host")).get("promotes"))
 
     async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
@@ -4243,6 +4299,16 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not sid or not kind:
                 raise HTTPException(400, "a state row's snooze names the session and the row kind")
             got = await call("attention_snooze", id=sid, kind=kind, until=str(body.get("until") or "").strip() or None)
+            return JSONResponse({"ok": True, **got})
+        if action in ("promote", "clear_promote"):
+            # design §4.5a **Inbox row: promote** (§6 *Promote*, TD-132 slice 3): **Promote** presses
+            # the `promote` RPC with main's head, **Dismiss** on a failure row `clear_promote`. Both
+            # are the person's own and the agent refuses them to a session; a refusal — the tree, a
+            # run in flight, a failure standing — comes back in its words and is drawn in place.
+            repo = str(body.get("repo") or "").strip()
+            if not repo:
+                raise HTTPException(400, f"{action} names the repo")
+            got = await call(action, repo=repo)
             return JSONResponse({"ok": True, **got})
         if action == "suspend":
             # design §4.8a *An alarm's answers* (TD-077 a2): **Suspend** — a person's own act, and
