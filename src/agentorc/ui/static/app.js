@@ -1793,12 +1793,13 @@
         const res = await fetch(`/repo/${encodeURIComponent(repo)}?part=1`);
         if (res.ok) {
           const kept = AO.denyWhys(box), open = $$(".secinfo:not([hidden])", box).map((el) => el.id);
-          const unfolded = $$("[data-unfolded]", box).map((el) => el.dataset.unfolded);
+          const unfolded = $$("[data-unfolded]", box).map((el) => el.dataset.unfolded), scrolled = AO.scrolls(box);
           box.innerHTML = await res.text();
           AO.restoreDenyWhys(box, kept);
           open.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = false; });
           unfolded.forEach((k) => unfold(k));
           apply();
+          AO.restoreScrolls(box, scrolled);  // the summary's Doing feed, as on the Org (TD-205)
         }
       } finally { busy = false; }
     }

@@ -143,6 +143,8 @@ def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
     swap, sync = js.index("scrollKept[g.team] = AO.scrolls(sum)"), js.index("function syncSummaries()")
     restore = js.index("AO.restoreScrolls(sum, scrollKept[sum.dataset.team])")
     assert restore > sync and restore > js.index('el.hidden = el.dataset.fv !== st.face', sync) and swap
+    # …and the Repo page, which includes the same summary and re-reads its part whole
+    assert "scrolled = AO.scrolls(box);" in js and "AO.restoreScrolls(box, scrolled);" in js
 
 
 def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
