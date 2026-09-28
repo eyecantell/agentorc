@@ -1785,6 +1785,7 @@ Two things are missing, and the design round chooses between them or takes both:
 ## TD-180: Add a TD from the UI — the person types a line, an agent asks what it needs and writes the entry
 
 **Priority:** Medium
+**Type:** feature
 **Added:** 2026-09-26 (Paul: *it will look like the user giving short info, then an agent fleshing it out — asking questions as needed, then generating the TD*)
 **Owner:** designer
 **Kind:** design-first
