@@ -5406,7 +5406,8 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
 ```
 
-  **`promote:`** (TD-120 step 2, designed 2026-09-24; not built — TD-132; the block is accepted and
+  **`promote:`** (TD-120 step 2, designed 2026-09-24; read by the home since TD-132 slice 1, run
+  under `auto` alone until the press is built; the block is accepted and
   checked already — `run` and `check`, both required, `auto` refused as `settings.yml`'s — so
   writing it does not break `ao new`, TD-149) is the repo's own
   answer to *how does `main` become what is running*, and nothing in agentorc names pip, a venv,
@@ -5695,7 +5696,8 @@ code and needs no grant; a session doing the same work does.
      appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
 
-- **Promote** (TD-120 step 2; designed 2026-09-24, not built — TD-132): a repo's live copy — the
+- **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
+  `sessionorc.promote`; the press, the row and this repo's block not yet): a repo's live copy — the
   host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`
   by **a person's press or this policy, never by a session** (CLAUDE.md: a worker never promotes;
   the `promote` RPC is refused to a session as `set_settings` is, §4.7). It runs **at the home**
@@ -5708,7 +5710,11 @@ code and needs no grant; a session doing the same work does.
   `origin/main` of the checkout after the home's own `git fetch origin main` (a policy that acts
   is not hostage to whoever last fetched); **checks**, the CI verdict on main's head read with
   `gh` — `green` when every check run has concluded and none failed, `pending`, `failed`, or
-  `unknown` with why (no `gh`, no remote, a rate limit). **Three preconditions** stand between
+  `unknown` with why (no `gh`, no remote, a rate limit, no check runs at all — a commit CI has not
+  looked at is not a green one). *When main moved* is its head's committer time (a squash merge
+  stamps it), so the settle and the row's age survive a restart of the home; the readings
+  themselves are held in memory and re-read at start, and what must survive one — a run in
+  flight, a failure — is in the intent files below. **Three preconditions** stand between
   the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
   `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree,
   and a branch checked out there or a change left in it would go live (the tree is a person's, so
@@ -5725,7 +5731,8 @@ code and needs no grant; a session doing the same work does.
   intent file `~/.agentorc/promotes/<repo>/inflight.json` — `{sha, at, pid, log, by}`, `by` being
   `auto` or the person — is written **before** the start, because for this repo the run restarts
   the host agent that started it: **the outcome is read from `check` on later ticks, never from
-  the run's exit code**, and the agent that judges it need not be the one that started it (a
+  the run's exit code** (`check` read every fifteen seconds, `PROMOTE_WATCH`, while it is in
+  flight), and the agent that judges it need not be the one that started it (a
   restart mid-run finds the file and carries on — which is exactly how this repo's own promote
   concludes). Live reads the wanted commit → done: the file cleared and a `system` note to the
   person inbox, *promoted `<repo>` `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the
@@ -5735,8 +5742,8 @@ code and needs no grant; a session doing the same work does.
   **nothing further is promoted for that repo, auto or press, until the person clears it** — the
   row's Dismiss, or a press that succeeds. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
-  contract, and a blocked `wait` ends with the socket as §4.7 says. Until built, the anchor
-  promotes by hand as CLAUDE.md says.
+  contract, and a blocked `wait` ends with the socket as §4.7 says. Until the press (TD-132 slices
+  2 and 3) and this repo's block (slice 4) are built, the anchor promotes by hand as CLAUDE.md says.
 - **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general
