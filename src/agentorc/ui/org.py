@@ -1,0 +1,323 @@
+"""The team-first Org (design §4.5 screen 1 *The Org, team-first*): a team's summary, its repo facet,
+the TDs in motion, the answer blocks, the doing rows, the rollup and the compact line. Moved out of
+`agentorc.ui.app` unchanged (TD-196) and re-exported from it, so a route, a template or a test reads
+each name from the app as before.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Collection, Mapping
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from sessionorc.reports import branch_ref
+
+from .cards import DEAD
+from .common import _age, _instant
+from .inbox import NEEDS_YOU_ROWS, state_kind
+
+# -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
+
+PHASES = ("add", "design", "grind", "review")
+DOING_KEPT = 50  # the doing log's ring per team (§4.8), as the host agent keeps it
+WINDOWS = ("day", "week", "month")
+LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
+PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))
+KIND_BARS = (("pickable", "pickable"), ("design-first", "design-first"), ("for-you", "for you"), ("other", "other"))
+
+
+def _https(remote: str) -> str:
+    """A git remote as the web page it names — `git@github.com:o/r.git` and
+    `https://github.com/o/r.git` both `https://github.com/o/r` — or "" for anything else."""
+    m = re.match(r"^(?:git@([^:]+):|https?://(?:[^@/]+@)?([^/]+)/)(.+?)(?:\.git)?/?$", remote.strip())
+    return f"https://{m.group(1) or m.group(2)}/{m.group(3)}" if m else ""
+
+
+def team_repo(members: Collection[dict[str, Any]], repos: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The repo a team services, as the home read it (§4.4 *Repo facts*): the registered checkout
+    most of its members work in (`repo` on the record, a worktree's main checkout), or None when no
+    member's repo is registered here — the facet then reads *no repo here*."""
+    by_root = {str(Path(root).resolve()): r for root, r in (repos or {}).items() if isinstance(r, dict)}
+    tally: dict[str, int] = {}
+    for m in members:
+        if m.get("repo"):
+            key = str(Path(str(m["repo"])).resolve())
+            if key in by_root:
+                tally[key] = tally.get(key, 0) + 1
+    if not tally:
+        return None
+    return by_root[max(sorted(tally), key=lambda k: tally[k])]
+
+
+def _bars(counts: Mapping[str, Any], labels: tuple[tuple[str, str], ...]) -> list[dict[str, Any]]:
+    """A stacked bar's segments, zeros left out: `{key, label, n, pct}` with the widths summing to 100."""
+    total = sum(int(counts.get(k) or 0) for k, _ in labels)
+    return [
+        {"key": k, "label": label, "n": int(counts.get(k) or 0), "pct": round(100 * int(counts.get(k) or 0) / total, 1)}
+        for k, label in labels
+        if total and int(counts.get(k) or 0)
+    ]
+
+
+def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Two sized blocks, *opened* and *closed* in a window: the counts and each one's share."""
+    o, c = int((win or {}).get("opened") or 0), int((win or {}).get("closed") or 0)
+    return {"opened": o, "closed": c, "opct": round(100 * o / (o + c), 1) if o + c else 50.0}
+
+
+def repo_facet(r: Mapping[str, Any], now: datetime, waiting: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The team card's **Repo** facet (§4.5a *team card: Repo facet*): the repo's name and page, the
+    ledger's open entries as two bars and its windows as blocks, the PRs' windows as blocks, the
+    oldest open PR's age, how many wait on review, and the readings' age. A reading that failed is
+    `error`, drawn *could not look*; its last numbers, when there are any, stay beside it."""
+    led, prs = r.get("ledger") or {}, r.get("prs") or {}
+    entries = led.get("entries")
+    open_ = prs.get("open")
+    oldest = _age(open_[0].get("created"), now) if open_ else ""
+    return {
+        "name": str(r.get("name") or ""),
+        "url": f"/repo/{r.get('name') or ''}",
+        "web": _https(str(r.get("remote") or "")),
+        "ledger": {
+            "n": len(entries) if isinstance(entries, list) else None,
+            "error": led.get("error") or "",
+            "history_error": led.get("history_error") or "",
+            "priority": _bars(led.get("by_priority") or {}, PRIORITY_BARS),
+            "kind": _bars(led.get("by_kind") or {}, KIND_BARS),
+            "windows": {w: _blocks((led.get("windows") or {}).get(w)) for w in WINDOWS} if led.get("windows") else None,
+        },
+        "prs": {
+            "n": len(open_) if isinstance(open_, list) else None,
+            "error": prs.get("error") or "",
+            "windows": {w: _blocks((prs.get("windows") or {}).get(w)) for w in WINDOWS} if prs.get("windows") else None,
+            "oldest": oldest,
+            "waiting": waiting,
+            "truncated": bool(prs.get("truncated")),
+        },
+        "read": _age(r.get("at"), now),
+    }
+
+
+def _pr_states(r: Mapping[str, Any] | None) -> dict[int, dict[str, Any]]:
+    """Every PR the reading knows, by number: its state and page."""
+    prs = (r or {}).get("prs") or {}
+    out: dict[int, dict[str, Any]] = {}
+    for p in [*(prs.get("recent") or []), *(prs.get("open") or [])]:
+        if isinstance(p, dict) and isinstance(p.get("number"), int):
+            out[p["number"]] = p
+    return out
+
+
+def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
+    a `claimed` progress entry, with its **phase** derived here, never declared — *design* on an
+    entry whose `Kind:` is design-first (its kind, not the page's bucket, which puts a pickable
+    design-first entry under *pickable*, TD-197), *review* with a PR (its own `pr`, the tick's
+    `review_pr`, or else an open PR whose head branch names the reference — the tick reads only the
+    branch checked out, and a grinder that asked its reader has moved on), *grind* without one; a PR
+    that is no longer open keeps *review*, marked *merged* / *closed*, until the member marks the
+    claim done or dropped. A reference two members hold is one row naming both. Rows in phase
+    order, then by reference."""
+    entries = {e["id"]: e for e in ((r or {}).get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
+    prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
+    # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
+    by_branch: dict[str, int] = {}
+    for p in ((r or {}).get("prs") or {}).get("open") or []:
+        if isinstance(p, dict) and isinstance(p.get("number"), int) and (ref := branch_ref(p.get("branch"))):
+            by_branch.setdefault(ref, p["number"])  # oldest first, as the reading keeps them
+    rows: dict[str, dict[str, Any]] = {}
+    for m in members:
+        for p in m.get("progress") or []:
+            if not isinstance(p, dict) or p.get("status") != "claimed" or not p.get("ref"):
+                continue
+            ref = str(p["ref"])
+            row = rows.setdefault(ref, {"ref": ref, "members": [], "pr": None})
+            row["members"].append({"id": m["id"], "name": m.get("name") or m["id"], "mine": not m.get("unattended")})
+            pr = p.get("pr") or p.get("review_pr")
+            if isinstance(pr, int) and not row["pr"]:
+                row["pr"] = pr
+    out = []
+    for ref, row in rows.items():
+        e = entries.get(ref) or {}
+        pr = row["pr"] = row["pr"] or by_branch.get(ref)
+        known = prs.get(pr) if pr else None
+        state = str((known or {}).get("state") or "")
+        row["phase"] = "design" if e.get("kind") == "design-first" else "review" if pr else "grind"
+        row["title"] = str(e.get("title") or "")
+        row["pr_state"] = state if state in ("merged", "closed") else ""
+        row["pr_url"] = str((known or {}).get("url") or (f"{web}/pull/{pr}" if pr and web else ""))
+        out.append(row)
+    out.sort(key=lambda x: (PHASES.index(x["phase"]), x["ref"]))
+    return out
+
+
+def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+    """**Answer needed** (§4.5a *team card: Answer needed / Doing*): each member waiting on a
+    permission or a question — the permission with Allow / Deny when the hook gave something to
+    answer (`tool_use_id`), a question as its text with Focus."""
+    out = []
+    for m in members:
+        kind = state_kind(m)
+        if kind not in NEEDS_YOU_ROWS:
+            continue
+        pend = m.get("pending") if isinstance(m.get("pending"), dict) else {}
+        out.append(
+            {
+                "id": m["id"],
+                "name": m.get("name") or m["id"],
+                "kind": kind,
+                "text": str(pend.get("text") or ""),
+                "deadline": m.get("deadline") or "",
+            }
+        )
+    return out
+
+
+def doing_rows(team: str, doing: Mapping[str, Any] | None, names: Mapping[str, str]) -> list[dict[str, Any]]:
+    """**Doing** (§4.8 *the doing log*): the team's `ao doing` calls newest first — time, doer, words."""
+    rows = []
+    for e in reversed(list((doing or {}).get(team) or [])):
+        if not isinstance(e, dict):
+            continue
+        at = _instant(e.get("at"))
+        rows.append(
+            {
+                "at": e.get("at") or "",
+                "hm": at.astimezone().strftime("%H:%M") if at else "",
+                "id": str(e.get("id") or ""),
+                "name": names.get(str(e.get("id") or ""), str(e.get("id") or "")),
+                "text": str(e.get("text") or ""),
+            }
+        )
+    return rows
+
+
+def team_summary(
+    team: str,
+    members: list[dict[str, Any]],
+    repos: Mapping[str, Any] | None,
+    doing: Mapping[str, Any] | None,
+    waiting: dict[str, Any] | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
+    needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
+    live has one too (TD-192): its claims as the members' last records hold them, and Doing, since
+    nobody can be waiting."""
+    now = now or datetime.now(UTC)
+    r = team_repo(members, repos or {})
+    motion = motion_rows(members, r)
+    answers = answer_blocks(members)
+    return {
+        "team": team,
+        "repo": repo_facet(r, now, waiting) if r else None,
+        "motion": motion,
+        "phases": {ph: sum(1 for x in motion if x["phase"] == ph) for ph in PHASES},
+        "answers": answers,
+        "doing": doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}),
+        "face": "answer" if answers else "doing",
+        # what the toggle's memory keys on: a person's flip holds until the pending set changes (§4.5a)
+        "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}" for a in answers)),
+    }
+
+
+# the rollup's Agents pills, in the grid's urgency order: (the filter word, the pill's class, its label)
+ROLLUP_STATES = (
+    ("needs-you", "needs", "needs you"),
+    ("limited", "limited", "limited"),
+    ("stalled", "stalled", "stalled?"),
+    ("unreachable", "unreachable", "unreachable"),
+    ("working", "working", "working"),
+    ("unseen", "idle", "unseen"),
+    ("idle", "idle", "idle"),
+    ("on-call", "oncall", "on call"),
+    ("exited", "exited", "exited"),
+    ("closed", "closed", "closed"),
+)
+
+
+def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    """The Org **rollup** (§4.5a *Org: rollup*, TD-176 slice 4): sums over every live team — the
+    Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
+    holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
+    counted once), and Needs you's *answer needed*. None when no team is live: the page then has no
+    rollup — a wound-down team's summary (TD-192) is not summed. The Inbox's count is the top bar's,
+    filled in by the client."""
+    live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
+    if not live:
+        return None
+    members = [m for g in live for m in g["members"]]
+    tally: dict[str, int] = {}
+    for m in members:
+        tally[str(m.get("pill_word") or m.get("state"))] = tally.get(str(m.get("pill_word") or m.get("state")), 0) + 1
+    agents = [{"word": w, "cls": c, "label": label, "n": tally[w]} for w, c, label in ROLLUP_STATES if tally.get(w)]
+    phases: dict[str, int] = {ph: 0 for ph in PHASES}
+    lead: dict[str, str] = {}
+    for ph in PHASES:
+        best = max(live, key=lambda g: g["summary"]["phases"].get(ph, 0))
+        phases[ph] = sum(g["summary"]["phases"].get(ph, 0) for g in live)
+        if phases[ph] and best["summary"].get("repo"):
+            lead[ph] = f"{best['summary']['repo']['url']}?phase={ph}"
+    motion = sum(phases.values())
+    repos: dict[str, dict[str, Any]] = {}
+    for g in live:
+        r = g["summary"].get("repo")
+        if r and r["name"] not in repos:
+            repos[r["name"]] = r
+    wins = {w: {"opened": 0, "closed": 0} for w in WINDOWS}
+    n_open, errors = 0, []
+    for r in repos.values():
+        p = r["prs"]
+        if p["error"]:
+            errors.append(f"{r['name']}: {p['error']}")
+        n_open += p["n"] or 0
+        for w in WINDOWS:
+            for k in ("opened", "closed"):
+                wins[w][k] += int(((p["windows"] or {}).get(w) or {}).get(k) or 0)
+    busiest = max(repos.values(), key=lambda r: r["prs"]["n"] or 0, default=None)
+    answers = [(g["team"], a) for g in live for a in g["summary"]["answers"]]
+    return {
+        "agents": agents,
+        "n_agents": len(members),
+        "phases": [
+            {"key": ph, "n": phases[ph], "pct": round(100 * phases[ph] / motion, 1), "url": lead.get(ph, "")}
+            for ph in PHASES
+            if phases[ph]
+        ],
+        "motion": motion,
+        "prs": {w: _blocks(wins[w]) for w in WINDOWS},
+        "prs_open": n_open,
+        "prs_url": f"{busiest['url']}#prs" if busiest else "",
+        "prs_errors": errors,
+        "has_repo": bool(repos),
+        "waiting": sum(int((g.get("prs_waiting") or {}).get("n") or 0) for g in live),
+        "answer_needed": len(answers),
+        "answer_team": answers[0][0] if answers else "",
+    }
+
+
+def compact_line(v: dict[str, Any]) -> str:
+    """A compact card's one line of its own (§4.5a *card: compact*): the seat's *last came*, an
+    ending, the role and its claim with the PR, what it says it is doing, or the role alone."""
+    role = str(v.get("role_label") or v.get("role") or ("interactive" if not v.get("unattended") else ""))
+    slot = v.get("slot") or {}
+    if v.get("seat"):
+        what = slot.get("caption") or slot.get("text") or "on call"
+    elif v.get("state") in DEAD or v.get("out_of_work") or v.get("restart_wanted"):
+        # an ending, and the last reference after it with its PR's mark (TD-193): *Grinder · exited ·
+        # TD-066 → #158 merged*, so a wound-down team's cards say what each member left
+        what = " · ".join(x for x in (str(slot.get("text") or v.get("state") or ""), v.get("report_ref") or "") if x)
+    else:
+        claims = [p for p in v.get("progress") or [] if isinstance(p, dict) and p.get("status") == "claimed"]
+        doing = (v.get("doing") or {}).get("text") if isinstance(v.get("doing"), dict) else ""
+        if claims:
+            pr = claims[0].get("pr") or claims[0].get("review_pr")
+            mark = (v.get("pr_marks") or {}).get(str(pr), "") if pr else ""
+            what = f"{claims[0]['ref']} → #{pr}{' ' + mark if mark else ''}" if pr else str(claims[0]["ref"])
+        elif doing:
+            what = str(doing)
+        else:
+            what = ""
+    return " · ".join(x for x in (role, what) if x)
