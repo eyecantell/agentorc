@@ -79,7 +79,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Partly done — slice 1 (the file half) built; the mail half waits on the reader |
 | TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
 | TD-146 | Build the one settings file — `settings.yml` home-owned with `teams`, `repos` and `person`, `ui.yml` retired, the `settings` read, the team stop time and reserve priority in the tick, `ao team until` | Medium | Built (three slices); live look after a promote |
-| TD-147 | Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline | Medium | Open — designed, pickable after TD-146 |
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2)–(8) done; (1) on a steer |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Partly done — slices 1–2 (billing on the profile, the adapter's spend) built; slice 3, the home's ledger, next |
@@ -1423,25 +1422,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** (1) `ao gate grind 5h=30` and `ao team reserve ao-grind 10` leave `settings.yml` with both keys and the gate pauses an ao-grind session at 60% and a plain grind session at 70%, each card saying which line; (2) `ao team until ao-grind +2h` gives every live ao-grind member and seat that `run_until` within a tick, a member started after it carries it, and `--clear` removes it without touching a member's own earlier `ao until`; (3) `person.open_in: none` removes the editor button and a `ui.yml` left on disk is named as *migrate* and ignored; (4) `ao settings` prints the four keys with their lines and instants and `--where` names every other file and its re-read rule; (5) a session's `set_settings` and `settings` are refused; (6) the nightly backup carries `settings.yml`; (7) `pdm run test` covers each key's validation, the team line, the team stop and the migrate path.
 
 **Related:** TD-100 (the design), TD-147 (the replica), TD-148 (the page), TD-133 (the schedule reads its new key), TD-132 (`auto` read from here), TD-026 (the team stop time answers one of its shapes), TD-095 (`open_in`).
-
-## TD-147: Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline
-
-**Priority:** Medium
-**Added:** 2026-09-25 (TD-100 (4)'s design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** no — after TD-146 lands (it replicates the file TD-146 shapes); then yes
-**Status:** Open — designed, nothing built. Design: §4.4a *Settings, replicated* and the offline table's `set_settings` row, §5 *Nodes*.
-
-**Location:** `src/sessionorc/agent.py` (the `settings` notification to every linked node after each `set_settings` write and to a node on `hello`, beside the `intent` push; the node's handler writing its own `settings.yml`; `set_settings` forwarded from a node — `modes.HOME_EDITS` gains it, so `modes.offline_refusal` refuses it offline in the home-owned edits' words; the node's `gate` and `settings` reads answering from the replica), `src/sessionorc/link.py` (nothing new: a method with no `id` is a notification already), `src/sessionorc/modes.py`, `tests/test_link.py`, `tests/test_modes.py`.
-
-**Why:** the usage gate, a team's stop time and a schedule run on the node that holds the session, so a setting turned at the home must reach the node's tick, offline included; today each host read its own file and a reserve set on the home never reached a node's sessions.
-
-**Fix:** one slice in `src/sessionorc/**` (the techlead reads it). The frame and its two triggers; the node's write; the row change in `modes.py`; the node's reads from the replica; a test that a reserve set on the home while a node is linked pauses the node's session on its next tick, that one set while the node is offline reaches it on the next dial, and that `ao gate` at an offline node is refused in the same words `ao control` is. The replica also routes the two team stop time writes that run wherever `create` and `set_settings` are served — the create's stamp (`_team_stamp`) and the restamp on a moved or cleared instant (`_restamp_team`) — which read a node's own `settings.yml` until then (the techlead's read of #630).
-
-**Done when** the three tests pass, `ao gate` at a linked node writes the home's file and the node's replica agrees within one tick, and the Settings page on a node (TD-148) shows *set at <home>* beside each editable value.
-
-**Related:** TD-100, TD-146, TD-057 (the link), TD-148.
 
 ## TD-148: Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab
 

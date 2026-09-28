@@ -2030,3 +2030,23 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Fix (as filed):** (1) caption from `created` (the fill) for a seat, with a test; (2) a compact flag form, with a test that a two-digit count survives; (3) per the design check. Done when all three read true on the Org page.
 
 **Related:** TD-197 (found together), TD-175 (the unpushed round log), TD-176 slice 3 (the compact card), TD-097 (seats).
+
+## TD-147: Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline
+
+**Priority:** Medium
+**Added:** 2026-09-25 (TD-100 (4)'s design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+
+**Resolved:** 2026-09-27 (PR #682). The `settings` link notification, home → node, after each `set_settings` write and once per dial after the snapshot (`agent_remote._push_settings`); the node's replica (`agent_link._take_settings`); `set_settings` in `modes.HOME_EDITS`, so it is forwarded while linked and refused offline; design §4.4a *Settings, replicated*, the offline table's row, §5 *Nodes*; `tests/test_link.py` (`test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dial`). The page's *set at <home>* is TD-148's, as the page is.
+
+**Location:** `src/sessionorc/agent.py` (the `settings` notification to every linked node after each `set_settings` write and to a node on `hello`, beside the `intent` push; the node's handler writing its own `settings.yml`; `set_settings` forwarded from a node — `modes.HOME_EDITS` gains it, so `modes.offline_refusal` refuses it offline in the home-owned edits' words; the node's `gate` and `settings` reads answering from the replica), `src/sessionorc/link.py` (nothing new: a method with no `id` is a notification already), `src/sessionorc/modes.py`, `tests/test_link.py`, `tests/test_modes.py`.
+
+**Why:** the usage gate, a team's stop time and a schedule run on the node that holds the session, so a setting turned at the home must reach the node's tick, offline included; today each host read its own file and a reserve set on the home never reached a node's sessions.
+
+**Fix (as filed):** one slice in `src/sessionorc/**` (the techlead reads it). The frame and its two triggers; the node's write; the row change in `modes.py`; the node's reads from the replica; a test that a reserve set on the home while a node is linked pauses the node's session on its next tick, that one set while the node is offline reaches it on the next dial, and that `ao gate` at an offline node is refused in the same words `ao control` is. The replica also routes the two team stop time writes that run wherever `create` and `set_settings` are served — the create's stamp (`_team_stamp`) and the restamp on a moved or cleared instant (`_restamp_team`) — which read a node's own `settings.yml` until then (the techlead's read of #630).
+
+**Done when** the three tests pass, `ao gate` at a linked node writes the home's file and the node's replica agrees within one tick, and the Settings page on a node (TD-148) shows *set at <home>* beside each editable value.
+
+**Related:** TD-100, TD-146, TD-057 (the link), TD-148.
