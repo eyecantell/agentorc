@@ -368,3 +368,22 @@ async def test_set_settings_and_gate_take_a_metered_profiles_amounts(agent, hook
     assert gate["metered"] and gate["reserves"] == {"day": "$5"}
     assert _gate_line("api", gate["windows"]) == "api · day $5 → spent $3.20 (64%)"
     assert _reserve(" $5 ") == "$5" and _reserve("2M tok") == "2M tok" and _reserve("30") == 30
+
+
+async def test_a_metered_profile_only_a_node_defines_takes_an_amount_at_the_home(agent, hookstub):
+    """The techlead's read of #689: the home's adapters do not know a profile only a node defines, so
+    its billing is read from the node's `spend` calls — and its prices, for the money check."""
+    from sessionorc.client import AgentError
+
+    await park_ticks(agent)
+    hookstub.billing = {}
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="billed by subscription"):
+            await person.call("set_settings", profile="lap", reserves={"day": "$5"})
+        head = {"account": "hookstub:k", "profile": "lap", "turns": [], "cursors": {}}
+        await agent._take_spend("laptop", head | {"prices": {}})
+        with pytest.raises(AgentError, match="declares no prices"):
+            await person.call("set_settings", profile="lap", reserves={"day": "$5"})
+        await agent._take_spend("laptop", head | {"prices": {"input": 1.0}})
+        got = await person.call("set_settings", profile="lap", reserves={"day": "$5"})
+    assert got["metered"] and got["reserves"] == {"day": "$5"}

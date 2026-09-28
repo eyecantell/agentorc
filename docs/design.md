@@ -2738,7 +2738,10 @@ ones are named, so a typo is not a silent no-op. A **metered** profile's reserve
 (§6): `ao gate grind-api 'day=$5' 'week=20M tok'` over the home's three windows, printed *grind-api ·
 day $5 → spent $3.20 (64%)*; a percent there is refused by naming the billing, as are money on a
 profile that declares no prices and an amount on a subscription profile, and the billing is asked
-of the profile's adapter even before its first session. A change takes effect on the next tick,
+of the profile's adapter even before its first session — or, for a profile only a node defines,
+read from that node's `spend` calls with the prices it declared (§4.4 *Usage*), since the home's
+`profiles.yml` need not name it; the Settings page draws cards from the home's own `profiles.yml`,
+so such a profile has no card there and its amount is set with `ao gate`. A change takes effect on the next tick,
 with no restart; under `--json` the reply is the file's key as written and the computed lines.
 
 **`ao team until <team> <06:00|+8h|ISO> | --clear`** and **`ao team reserve <team> <n>`** (TD-100 (4);
