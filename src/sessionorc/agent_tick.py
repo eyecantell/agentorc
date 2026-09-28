@@ -1200,12 +1200,17 @@ class TickMixin:
         finally:
             await self._push_changes()
 
-    async def _refresh_usage_inner(self) -> None:
-        live = [
+    def _usage_live(self) -> list[Session]:
+        """The records whose profile has a reading: this host's live tool sessions. The quota poll and
+        the spend pass read the same list, or one would drop what the other writes."""
+        return [
             s
             for s in self.sessions.values()
             if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
         ]
+
+    async def _refresh_usage_inner(self) -> None:
+        live = self._usage_live()
         # A metered profile is never polled (§4.2a): its reading is the spend pass's sum, and the cap
         # rule below skips it by its billing, read before the windows (TD-151)
         metered = {p for _, p in await asyncio.to_thread(_metered_of, {(s.adapter, s.profile) for s in live})}

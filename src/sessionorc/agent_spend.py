@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from datetime import datetime
 from typing import Any
 
@@ -20,6 +21,8 @@ from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.agent_common import _usage_key, log
 from sessionorc.models import PERSON, now_iso
+
+BILLING_KEEP = 60.0  # seconds a profile's billing, read for the gate, is kept before it is read again
 
 
 def _metered_of(pairs: set[tuple[str, str]]) -> dict[tuple[str, str], dict[str, float]]:
@@ -48,13 +51,12 @@ class SpendMixin:
             log.exception("the spend pass failed")
 
     async def _refresh_spend_inner(self) -> None:
-        live = {
-            (s.adapter, s.profile)
-            for s in self.sessions.values()
-            if s.adapter != "shell" and s.state not in ("exited", "closed", "scheduled")
-        }
+        # one definition of live with the quota poll (`_usage_live`), or one pass would write a reading
+        # the other drops, tick after tick (the techlead's read of #681)
+        live = {(s.adapter, s.profile) for s in self._usage_live()}
         metered = await asyncio.to_thread(_metered_of, live)
         self._metered = {prof for _, prof in metered}
+        self._billing_seen = {p: (time.monotonic(), p in self._metered) for _, p in live}
         groups: dict[str, dict[str, Any]] = {}  # account key → {account, tool, adapter, profiles: {prof: prices}}
         for (name, prof), prices in metered.items():
             ad = adapters.get(name)
@@ -142,12 +144,27 @@ class SpendMixin:
             log.info("spend: %s", text)
             self._system_note(PERSON, text)
 
+    def _is_metered(self, profile: str) -> bool:
+        """Whether `profile` is billed `metered`, known **before** the gate judges (§4.4: keyed on the
+        billing, read before the windows): from the spend pass when it has run, else asked of the
+        adapter of any record running under it and kept for `BILLING_KEEP`. After a restart the gate
+        runs before the detached pass has, and a profile read as a subscription would lose its
+        amounts and lift every pause made at them (the techlead's read of #681)."""
+        seen = self._billing_seen.get(profile)
+        if seen is not None and time.monotonic() - seen[0] < BILLING_KEEP:
+            return seen[1]
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        pairs = {(r.adapter, r.profile) for r in records if r.profile == profile and r.adapter != "shell"}
+        metered = bool(_metered_of(pairs))
+        self._billing_seen[profile] = (time.monotonic(), metered)
+        return metered
+
     def _gate_reserves(self, whole: dict[str, Any], profile: str) -> dict[str, Any] | None:
         """The reserves the gate reads for `profile`: a subscription profile's percents, or — for a
         metered one — a line at the amount itself on each window that has one (§6 *Usage gate*:
         the amount is the window's 100, and a team's priority lowers it), since its `pct` is
         already the spend over the amount. Keyed on the profile's billing, never on the reading."""
-        if profile in self._metered:
+        if self._is_metered(profile):
             by_label = settings_mod.amounts(whole).get(profile)
             return {label: 0 for label in by_label} if by_label else None
         return settings_mod.reserves(whole).get(profile)

@@ -396,6 +396,7 @@ class HostAgent(
         self._spend_pruned = ""
         self._spend_reason: dict[str, str] = {}
         self._metered: set[str] = set()
+        self._billing_seen: dict[str, tuple[float, bool]] = {}  # profile → (monotonic, metered), for the gate
         self._metered_shown: set[str] = set()
         self._spend_task: asyncio.Task[None] | None = None
         # The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), kept across a
