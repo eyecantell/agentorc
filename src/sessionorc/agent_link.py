@@ -178,6 +178,7 @@ class LinkMixin:
             self.home_link = {"up": up, "since": now_iso(), "why": why}
             self._home_mux = mux
             self._snapshot_sent = False
+            self._spend_link.clear()  # the first `spend` on a new link reads the home's cursors again
             if up:
                 task = asyncio.ensure_future(self._send_snapshot(mux))
                 self._bg.add(task)
@@ -267,6 +268,9 @@ class LinkMixin:
             return None
         if method == "settings":
             await self._take_settings(params.get("doc"))
+            return None
+        if method == "usage":
+            self._take_usage(params)
             return None
         if method == "files":
             try:

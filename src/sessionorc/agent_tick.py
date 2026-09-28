@@ -119,9 +119,9 @@ class TickMixin:
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
-        if self.mode == "home" and (self._spend_task is None or self._spend_task.done()):
+        if self._spend_task is None or self._spend_task.done():
             # detached as the usage poll is: it reads transcripts (§4.4 *Usage*, TD-151); a node's
-            # turns reach the home over the link, not from here (slice 4)
+            # pass sends its turns home over the link (slice 4)
             self._spend_task = asyncio.create_task(self._refresh_spend())
         await self._team_stop_times(snapshot_at)
         await self._enforce_stop_times(snapshot_at)

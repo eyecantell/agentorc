@@ -136,15 +136,7 @@ def ingest(
         turns = sorted(by_source.pop(source, []), key=lambda t: t["offset"])
         keep = [] if seeding and not cur else _fresh(cur, turns)  # a shared directory's known transcript keeps counting
         for t, tokens in keep:
-            when = _when(t.get("at"))
-            day = (when.astimezone(tz) if when else datetime.now(tz)).date().isoformat()
-            row = acct.setdefault("days", {}).setdefault(day, {k: 0 for k in KINDS} | {"turns": 0, "cost": None})
-            for k in KINDS:
-                row[k] = int(row.get(k) or 0) + tokens[k]
-            row["turns"] = int(row.get("turns") or 0) + 1
-            c = cost_of(tokens, t.get("cost"), prices)
-            if c is not None:
-                row["cost"] = round(float(row.get("cost") or 0.0) + c, 6)  # at this tick's prices, never rewritten
+            _add(acct, t, tokens, prices, tz)
             counted += 1
         new = {"offset": offset, "seen": stamp}
         last = turns[-1] if turns else None
@@ -161,6 +153,21 @@ def ingest(
     if seeding:
         seeded.append(profile)
     return counted
+
+
+def _add(
+    acct: dict[str, Any], t: dict[str, Any], tokens: dict[str, int], prices: dict[str, float] | None, tz: Any
+) -> None:
+    """One turn into its day's row, on the day its `at` carries in `tz`."""
+    when = _when(t.get("at"))
+    day = (when.astimezone(tz) if when else datetime.now(tz)).date().isoformat()
+    row = acct.setdefault("days", {}).setdefault(day, {k: 0 for k in KINDS} | {"turns": 0, "cost": None})
+    for k in KINDS:
+        row[k] = int(row.get(k) or 0) + tokens[k]
+    row["turns"] = int(row.get("turns") or 0) + 1
+    c = cost_of(tokens, t.get("cost"), prices)
+    if c is not None:
+        row["cost"] = round(float(row.get("cost") or 0.0) + c, 6)  # at this tick's prices, never rewritten
 
 
 def _fresh(cur: dict[str, Any], turns: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, int]]]:
@@ -285,3 +292,66 @@ def say(amount: dict[str, Any], value: float) -> str:
     if amount.get("unit") == "tok":
         return f"{tokens_short(int(value))} tok"
     return f"${value:,.2f}".removesuffix(".00")
+
+
+# -- a node's road (§4.4 *Usage*, §4.4a; TD-151 slice 4) ------------------------------------------
+
+PIECE_BYTES = 1_000_000  # a `spend` frame's turns, well inside `link.FRAME_LIMIT`: a long batch goes in pieces
+
+
+def pieces(result: dict[str, Any], budget: int | None = None) -> list[dict[str, Any]]:
+    """One `spend` call's `{turns, cursors}` cut into pieces a link frame carries, in order. A piece
+    ends at a turn's `offset` — its line's start — so the cursor it carries for a transcript cut
+    across two pieces is where the next piece's first turn begins: the home resumes there, and a
+    piece that never lands is read again from it. A transcript with no turns rides in the first
+    piece; every other transcript's end is in the piece that holds its last turn."""
+    budget = PIECE_BYTES if budget is None else budget
+    ends = {s: o for s, o in (result.get("cursors") or {}).items() if isinstance(o, int)}
+    by_source: dict[str, list[dict[str, Any]]] = {}
+    for t in result.get("turns") or ():
+        if isinstance(t, dict) and t.get("source") in ends and isinstance(t.get("offset"), int):
+            by_source.setdefault(t["source"], []).append(t)
+    out: list[dict[str, Any]] = [{"turns": [], "cursors": {s: o for s, o in ends.items() if s not in by_source}}]
+    size = 0
+    for source in sorted(by_source):
+        for t in sorted(by_source[source], key=lambda t: t["offset"]):
+            n = len(json.dumps(t))
+            if out[-1]["turns"] and size + n > budget:
+                if out[-1]["turns"][-1]["source"] == source:
+                    out[-1]["cursors"][source] = t["offset"]  # cut inside this transcript: resume at this line
+                out.append({"turns": [], "cursors": {}})
+                size = 0
+            out[-1]["turns"].append(t)
+            size += n
+        out[-1]["cursors"][source] = ends[source]
+    return out
+
+
+def figure(
+    held: dict[str, dict[str, Any]] | None, turns: list[dict[str, Any]], prices: dict[str, float] | None, now: datetime
+) -> dict[str, dict[str, Any]]:
+    """A node's offline figure (§4.4 *Usage*): the account's sums the home last sent, a window whose
+    reset has passed counted from nothing, plus this node's own turns read since its last
+    acknowledged cursor — for the gate and the chip alone, written nowhere. The home's next sums
+    replace it on reconnect."""
+    extra: dict[str, Any] = {"days": {}}
+    for t in turns:
+        if isinstance(t, dict):
+            _add(extra, t, _tokens(t), prices, now.tzinfo)
+    mine = sums(extra, now)
+    out = {}
+    for label in LABELS:
+        m = mine[label]
+        h = (held or {}).get(label)
+        if not isinstance(h, dict) or not (w := _when(h.get("resets"))) or w <= now:
+            out[label] = m  # never held, or rolled since: this window starts from nothing
+            continue
+        tokens = {k: int((h.get("tokens") or {}).get(k) or 0) + m["tokens"][k] for k in KINDS}
+        costs = [c for c in (h.get("cost"), m["cost"]) if isinstance(c, int | float)]
+        out[label] = {
+            "tokens": tokens,
+            "total": sum(tokens.values()),
+            "cost": round(sum(costs), 6) if costs else None,
+            "resets": h["resets"],
+        }
+    return out
