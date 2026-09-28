@@ -427,10 +427,19 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     team's own lead this is the wind-down (design §4.9a): the same sequence under a different
     trigger, except that the lead is never typed at or killed by its own command."""
     up = live(badged(name, call("list")))
+    # A person's session in the team is left alone and named (design §4.9 *A person in the team*):
+    # §9 invariant 5 would refuse it anyway, and a stop must not end on that refusal.
+    people = [s for s in up if not s.get("unattended")]
+    up = [s for s in up if s.get("unattended")]
+    if not up and people:
+        stays = "; ".join(stays_line(s) for s in people)
+        raise teams.TeamError(f"no live unattended session carries the team {name} badge — nothing to stop ({stays})")
     if not up:
         raise teams.TeamError(f"no live session carries the team {name} badge — nothing to stop")
     lead, members = split(name, up, org)
     st = Stopping(team=name, now=now, lead=lead, lead_is_caller=bool(caller and lead and lead["id"] == caller))
+    for s in people:
+        st.acted.append({**_entry(s, "person"), "action": stays_line(s), "state": s["state"]})
     for s in members:
         if not now and s.get("out_of_work") and s["state"] in SETTLED:
             # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
@@ -527,6 +536,12 @@ def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[st
     except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
         return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
     return {**_entry(s, role), "action": "killed" if now else "wrap-up sent", "state": "killed" if now else "?"}
+
+
+def stays_line(s: dict[str, Any]) -> str:
+    """The words Wind down's and Stop now's confirm and `ao team stop` use for a person's session in
+    the team (design §4.9 *A person in the team*)."""
+    return f"your session {s.get('name') or s['id']} stays: a team act never stops an interactive session"
 
 
 def _entry(s: dict[str, Any], role: str) -> dict[str, Any]:

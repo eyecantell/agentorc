@@ -55,6 +55,7 @@ class Fleet:
                 "kind": "agent",
                 "adapter": params.get("adapter") or "claude-code",
                 "controllers": list(params.get("controllers") or []),
+                "unattended": bool(params.get("unattended")),
                 "team": params.get("team", ""),
                 "project": params.get("project", ""),
                 "previous_run": None,
@@ -145,8 +146,11 @@ def write_org(tmp_path, doc):
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
 
 
-def badged(name, team, project="ao", state="working"):
-    return {"id": name, "name": name, "state": state, "dir": "/tmp", "kind": "agent", "team": team, "project": project}
+def badged(name, team, project="ao", state="working", unattended=True):
+    return {
+        "id": name, "name": name, "state": state, "dir": "/tmp", "kind": "agent", "team": team, "project": project,
+        "unattended": unattended,
+    }  # fmt: skip
 
 
 # ── the strip's contents (design §4.5a Org **Teams** strip) ───────────────────────────────────
@@ -565,3 +569,18 @@ def test_a_container_nodes_session_is_reached_by_docker_exec_and_vs_code_attache
     assert seen["argv"][6:10] == ["tmux", "attach", "-t", "=ao-repo-w:"]  # the bare id inside the container
     page = client.get("/").text
     assert 'href="vscode://vscode-remote/attached-container+7b7d/home/x/repo?windowId=_blank"' in page
+
+
+def test_stop_now_leaves_a_persons_session_and_counts_only_what_it_killed(world, client):
+    """Design §4.9 *A person in the team* (TD-173): Stop now kills the workers and names the
+    person's session as staying — it is neither killed nor counted."""
+    tmp_path, fleet = world
+    fleet.sessions += [
+        badged("orc-ao", "ao-grind"),
+        badged("grind-1", "ao-grind"),
+        badged("me", "ao-grind", unattended=False),
+    ]
+    body = client.post("/api/teams/ao-grind/stop", json={"now": True}).json()
+    assert sorted(fleet.sent("kill")) == ["grind-1", "orc-ao"]
+    assert "killed 2 sessions" in body["text"]
+    assert "your session me stays: a team act never stops an interactive session" in body["text"]

@@ -493,8 +493,46 @@ def _stop(args: argparse.Namespace) -> dict[str, str]:
     return {"run_until": stop_time(until), "wrapup_prompt": teams.WRAPUP_PROMPT}
 
 
+def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
+    """`ao new --team` (design §4.9 *A person in the team*, TD-160): beyond the badge, the team's
+    live manager as a controller when the record is given none, and the record's `review` from the
+    role's or else the team's (`teams.team_review`). Fills `defaults` in place and returns the
+    line saying which reader the session got, "" when none. A team the org does not define stays
+    a badge, said once on stderr; a shell asks for nothing, as `_launch_defaults` says."""
+    name = getattr(args, "team", None) or ""
+    if not name or args.adapter == "shell":
+        return ""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    try:
+        org = _org_here(directory)
+    except ValueError as e:
+        print(f"--team {name}: {e} — the badge alone", file=sys.stderr)
+        return ""
+    team = org.teams.get(name)
+    if team is None:
+        print(f"--team {name}: no such team in the org (ao team list) — the badge alone", file=sys.stderr)
+        return ""
+    cfg = repoconfig.discover(pathlib.Path(args.repo) if args.repo else directory)
+    role = getattr(args, "role", None)
+    # a role that says `controllers: []` means nobody may act on it, deliberately (`_launch_defaults`)
+    isolated = bool(role) and repoconfig.resolve_role(cfg, role, org.roles).controllers_set
+    if not defaults.get("controllers") and not args.controller and not isolated:
+        here = hosts.local_host().name
+        mid = teams.manager_id(org, team, team.host or here, here)
+        if mid and any(s["id"] == mid for s in teamrun.live(call_sync("list"))):
+            defaults["controllers"] = [mid]
+    if defaults.get("review") is None:
+        defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
+        if defaults["review"] is None:
+            return f"no reader: team {name} has no techlead seat, or its members hold no path"
+        held = ", ".join(defaults["review"]["held"])
+        return f"held PRs read by team {name}'s techlead on {held} (ao pr held <n>)"
+    return ""
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     defaults = _launch_defaults(args)
+    reader = _team_defaults(args, defaults)
     s = call_sync(
         "create",
         name=args.name,
@@ -518,6 +556,8 @@ def cmd_new(args: argparse.Namespace) -> int:
         # worker nobody may act on is rarely what was meant, so `ao new` says so once, here,
         # rather than leaving it to be discovered when a send is refused.
         print(f"{s['id']} starts with no controller: nobody may act on it (ao control <controller> add {s['name']})")
+    if reader and not args.json:
+        print(reader)
     if s.get("previous_run") and not args.json:
         # the same note the New session form shows before Start (design §4.1, TD-030)
         print(f"replaces the earlier {s['name']} — run log kept: {s['previous_run']}")
@@ -2028,7 +2068,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="a repo's brief, a path: filled into the --role template's *This repo's rules* in place of the "
         "role's own (design §4.8 — a supplement, never a replacement); with no template it is the whole brief",
     )
-    p.add_argument("--team", help="the team this session is started under (design §4.9): a badge, nothing keys on it")
+    p.add_argument(
+        "--team",
+        help=(
+            "the team this session joins (design §4.9): its badge and group, its manager as a controller, "
+            "the team's reader for its held PRs"
+        ),
+    )
     p.add_argument(
         "--until",
         metavar="WHEN",
