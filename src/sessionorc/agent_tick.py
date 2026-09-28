@@ -1446,6 +1446,14 @@ class TickMixin:
             # `exited` and made its own tool session read as *outside agentorc* to the anchor rule.
             log.info("%s: ignored the end of a previous run (%s; this run is %s)", sid, aid, s.adapter_id)
             return
+        if s.state == "closed":
+            # Closed is final (§4.2 *Close*: the card kept a day, then forgotten). `ao close` kills
+            # the pane, and the tool's own SessionEnd for the run it killed lands after it: applied,
+            # it read `exited`, offered Forget, and the reconcile's day-long keep — which reads only
+            # `closed` — never forgot the record (TD-200 (3)). Whatever a closed run still says is
+            # the dying run's.
+            log.info("%s: ignored %s on a closed record", sid, event.get("event") or event.get("state") or "a hook")
+            return
         if not queued:
             self._live_hook_at[sid] = time.time()
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
