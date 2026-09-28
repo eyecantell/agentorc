@@ -78,6 +78,11 @@
               title="{{ help_title('wrap-up') }}">Wrap up</button>
       <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" title="a shell session in this session's directory">⌘ Open shell here</button>
       {% if s.editor %}<a class="btn sm link editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
+      {# design §4.5a Focus header **Transcript** (TD-166): the Transcript page in a new tab, on any
+         state; only for a record holding a tool session id — a shell has nothing to read. Always in
+         the page and hidden until then, since a hook reports the id after the first paint. #}
+      <a class="btn sm link{% if not s.adapter_id %} hidden{% endif %}" id="ftranscript" href="/transcript/{{ s.id }}" target="_blank" rel="noopener"
+         title="what this session said and did, read from its tool's file without resuming it (design §4.5 screen 9)">☰ Transcript</a>
       <span class="grow"></span>
       <details class="more">
         <summary class="btn sm link" title="more">more ▾</summary>

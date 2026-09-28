@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import json
 import os
 import subprocess
@@ -195,6 +196,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     team_groups,  # noqa: F401
     who_for_what,  # noqa: F401
 )
+from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_view
 
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
 
@@ -853,6 +855,45 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "copy_on_select": uiconf.copy_on_select(),
                 # §4.5a *Focus side panel, Session card* **rounds** line (TD-191): display only
                 "rounds": rounds_lines(s, await _rounds_tail(call, s)),
+            },
+        )
+
+    @app.get("/transcript/{sid}", response_class=HTMLResponse)
+    async def transcript(request: Request, sid: str, before: int | None = None, part: str = ""):
+        """Screen 9, **Transcript** (design §4.5, §4.5a *Transcript*, TD-166): the record's tool
+        transcript through the `transcript` RPC on the record's host — a read, gated by nobody (§9
+        invariant 11), which never marks the session seen. `part=1` with `before` is *earlier
+        turns*: the twenty before the first shown, as the fragment the page puts above them."""
+        if part:
+            try:
+                t = await call("transcript", id=sid, before=before, turns=TRANSCRIPT_TURNS)
+            except HTTPException as e:
+                return HTMLResponse(f'<p class="note">{html.escape(str(e.detail))}</p>', status_code=e.status_code)
+            return templates.TemplateResponse(request, "transcript_turns.html", {"t": transcript_view(t)})
+        try:
+            s = await call("get", id=sid)
+        except HTTPException as e:
+            if e.status_code == 503:
+                return RedirectResponse("/", status_code=303)  # the Org shows the down banner
+            raise
+        t, error = None, ""
+        try:
+            t = transcript_view(await call("transcript", id=sid, before=before, turns=TRANSCRIPT_TURNS))
+        except HTTPException as e:  # no tool session id, no file on its host: the page says which
+            error = str(e.detail)
+        v = view(s)
+        here = v["host"] == host_name()
+        return templates.TemplateResponse(
+            request,
+            "transcript.html",
+            {
+                "s": v,
+                "t": t,
+                "error": error,
+                "editor": transcript_editor(t["path"], here) if t else None,
+                "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "host": host_name(),
+                "active": "Org",
             },
         )
 

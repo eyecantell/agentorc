@@ -90,7 +90,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Built — live check pending |
-| TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
+| TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Built — live look pending |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Built — live look pending after the next promote |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-180 | Add a TD from the UI: the person writes what they have and an agent asks what it needs and writes the entry, or the form opens an interactive designer or techlead session prefilled | Medium | Open — design-first; answered 2026-09-28 |
@@ -1700,8 +1700,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (the designer, from TD-154's design)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** no — after TD-165 (the RPC it reads)
-**Status:** Open — nothing built. Design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript** and the *Transcript* row; mockup `Transcript.dc.html` and the Focus artboards' header.
+**Pickable:** no — built; what is left is the live look after a promote
+**Status:** Built 2026-09-28 (grinder-ao-1, PR #707): all four parts of the Fix — the page (`ui/transcript.py`, `transcript.html`, `transcript_turns.html`, the route in `ui/app.py`), VS Code on the file, the Focus header's **Transcript** and the exited banner's words, `tests/test_ui_transcript.py`. Taken while TD-165 awaits only its live check: the RPC the page reads was merged (#627). Two readings written into §4.5 screen 9 and design-history: the head counts the turns shown, not the file's; VS Code only on this host's records. What is left: the live look (on the board), then archive with TD-165. Was: Open — nothing built. Design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript** and the *Transcript* row; mockup `Transcript.dc.html` and the Focus artboards' header.
 
 **Blocked by:** TD-165
 

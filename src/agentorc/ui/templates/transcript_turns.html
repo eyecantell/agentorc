@@ -1,0 +1,27 @@
+{#- design §4.5 screen 9 **Transcript** (TD-166): the turns, and *earlier turns* above them when the
+    file holds more. The page draws this once; *earlier turns* fetches it again with `before` and
+    puts it in the button's place, so the older turns land above the ones already shown. Everything
+    here is text (TD-071): a session's words never become a link or a button. -#}
+{%- macro entry(e) -%}
+{%- if e.kind == 'prompt' -%}
+<div class="tprompt"><span class="tmark mono">&gt;</span><div class="ttext">{{ e.text }}</div>{% if e.at %}<span class="meta mono localtime" data-at="{{ e.at }}" title="{{ e.at }}">{{ e.at }}</span>{% endif %}</div>
+{%- elif e.kind == 'text' -%}
+<div class="tsaid ttext">{{ e.text }}</div>
+{%- elif e.kind == 'thought' -%}
+<div class="tthought"><details class="fold"><summary>thought · {{ e.lines }} line{{ '' if e.lines == 1 else 's' }}</summary><div class="ttext tbody">{{ e.text }}</div></details></div>
+{%- elif e.kind == 'tool' -%}
+<div class="ttool"><div class="mono tcall"><span class="tmark">⏺</span> {{ e.name }}(<span class="targ">{{ e.call }}</span>)</div>
+{%- if e.result is not none -%}
+<div class="tfold"><details class="fold"><summary>result · {{ e.result_lines }} line{{ '' if e.result_lines == 1 else 's' }}</summary><pre class="tbody mono">{{ e.result }}</pre></details></div>
+{%- endif -%}
+{%- if e.sidechain -%}{{ entry(e.sidechain) }}{%- endif -%}
+</div>
+{%- elif e.kind == 'sidechain' -%}
+<div class="tfold"><details class="fold"><summary>{{ e.count }} subagent turn{{ '' if e.count == 1 else 's' }}</summary><div class="tsidebody">{% for x in e.entries %}{{ entry(x) }}{% endfor %}</div></details></div>
+{%- elif e.kind == 'compaction' -%}
+<div class="tcompact"><span class="meta">— compacted{% if e.at %} <span class="localtime" data-at="{{ e.at }}" title="{{ e.at }}">{{ e.at }}</span>{% endif %} —</span></div>
+{%- endif -%}
+{%- endmacro -%}
+{% if t.before is not none %}<div class="tearlier"><button class="btn sm" data-act="transcript-earlier" data-before="{{ t.before }}"
+  title="the twenty turns before the first shown, read backwards from the file">earlier turns</button></div>{% endif %}
+<div class="tturns" data-turns="{{ t.turns }}">{% for e in t.entries %}{{ entry(e) }}{% endfor %}</div>
