@@ -407,6 +407,7 @@ class HostAgent(
         self._spend_acked: dict[str, dict[str, int]] = {}
         self._spend_held: dict[str, dict[str, Any]] = {}
         self._spend_named: dict[str, dict[str, set[str]]] = {}
+        self._spend_node_prices: dict[str, dict[str, float]] = {}  # profile → prices, as a node's `spend` declared
         self._spend_told: dict[tuple[str, str], str] = {}
         # The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), kept across a
         # restart in `repos.json`; the home's alone — a node reads none of this (§4.4a).
