@@ -395,6 +395,7 @@ class HostAgent(
         self._promote_watch_at = float("-inf")
         self._promote_bad: dict[str, str] = {}
         self._promote_task: asyncio.Task[None] | None = None
+        self._promote_lock = asyncio.Lock()
         # the last fifty `ao doing` calls per team (design §4.8 *the doing log*, TD-176 slice 2)
         self.doing_log = DoingLogStore()
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap

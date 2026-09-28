@@ -2710,18 +2710,23 @@ other configured value lives and when it is re-read, which is the page's *i* mar
 reserve <team> 0` clears the priority; `ao schedule`'s key path (`teams.<team>.schedule`) is TD-133's,
 with the schedule itself.
 
-**`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; designed, not built — TD-132): the
+**`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; built 2026-09-27 — TD-132 slice 2, all
+but `--sha`, below): the
 press from a terminal. `ao promote [<repo>] [--sha <commit>]` promotes the registered checkout —
 the current directory's repo when none is named — to main's head, or to `--sha` for a rollback or
 a hotfix, through the `promote` RPC at the home, **refused to a session** (a person's own, as
 `set_settings` is; a worker never promotes, CLAUDE.md) and refused, naming which, on §6's
 preconditions (1) and (3); on (2) it says what the checks read and goes on, since the press is the
-person's word. It returns once the run is started, with the log's path: the outcome is `check`'s
+person's word; a repo whose live is main's head already is refused as having nothing to promote,
+and one with no block says so. It returns once the run is started, with the log's path: the outcome is `check`'s
 on a later tick, as §6 says, and for this repo the command's own host agent goes away under it.
 `ao promote status` prints every promotable repo's readings — *agentorc · live 485d28b · main
 9c1e0f2, 3 ahead · checks green · auto off*, in flight or failed with the log — and `--json` the
 `promotes` field of `host`. `ao status -v`'s build line stays: it is this repo's `check` read from
-the client's side, and the one line a session may read.
+the client's side, and the one line a session may read. **`--sha` is refused for now**: `run`
+installs the checkout's tree, which precondition (1) holds at main's head, so how a rollback's
+commit would reach `run` is not designed (TD-132). Dismiss's half is the `clear_promote` RPC, a
+person's own as `promote` is; both are home edits a node forwards or refuses (§4.4a).
 
 **`ao schedule`** (TD-026; §6 *Schedule*, §5 `settings.yml`; designed, not built — TD-133): with no
 arguments prints every team's rule and when it next fires — *ao-grind · starts at the reset of
@@ -5702,7 +5707,8 @@ code and needs no grant; a session doing the same work does.
      at the home, so an entry counts from the moment that checkout holds it.
 
 - **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
-  `sessionorc.promote`; the press, the row and this repo's block not yet): a repo's live copy — the
+  `sessionorc.promote`; the press — `promote`, `clear_promote`, `ao promote` — slice 2; the row and
+  this repo's block not yet): a repo's live copy — the
   host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`
   by **a person's press or this policy, never by a session** (CLAUDE.md: a worker never promotes;
   the `promote` RPC is refused to a session as `set_settings` is, §4.7). It runs **at the home**
@@ -5742,13 +5748,15 @@ code and needs no grant; a session doing the same work does.
   concludes). Live reads the wanted commit → done: the file cleared and a `system` note to the
   person inbox, *promoted `<repo>` `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the
   nodes follow §4.4a as today. The process gone with live still elsewhere, or `PROMOTE_BOUND`
-  (twenty minutes) passed — the process killed at the bound as the stop time kills — → **failed**:
+  (twenty minutes) passed — the process killed at the bound as the stop time kills, and only
+  while it is still the run: the intent keeps the process's start time beside its pid, so after a
+  restart of the home a pid taken again by another process reads gone and is never killed — → **failed**:
   `failed.json` `{sha, at, log, exit, why}` beside it, the Inbox row under *Needs you*, and
   **nothing further is promoted for that repo, auto or press, until the person clears it** — the
   row's Dismiss, or a press that succeeds. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
-  contract, and a blocked `wait` ends with the socket as §4.7 says. Until the press (TD-132 slices
-  2 and 3) and this repo's block (slice 4) are built, the anchor promotes by hand as CLAUDE.md says.
+  contract, and a blocked `wait` ends with the socket as §4.7 says. Until the Inbox row (TD-132 slice
+  3) and this repo's block (slice 4) are built, the anchor promotes by hand as CLAUDE.md says.
 - **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general

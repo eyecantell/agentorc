@@ -233,17 +233,31 @@ def start(root: str | Path, repo: str, sha: str, run: str, by: str, n: int | Non
             run, shell=True, cwd=str(root), stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True,
         )  # fmt: skip
-    intent["pid"] = p.pid
+    intent["pid"], intent["started"] = p.pid, proc_start(p.pid)
     _procs[p.pid] = p
     _write(d / "inflight.json", intent)
     return intent
 
 
-def alive(pid: Any) -> bool:
+def proc_start(pid: int) -> int | None:
+    """The process's start time in clock ticks since boot (`/proc/<pid>/stat` field 22), which with
+    the pid names one process: a pid read back from a file after a restart of the home may since
+    have been taken by another. None where it cannot be read."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        return int(stat.rsplit(")", 1)[1].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def alive(pid: Any, started: Any = None) -> bool:
     """Whether the run's process is still there. This agent's own child is polled, which reaps it,
-    so an exited child reads gone and leaves its exit status; another agent's is signalled."""
+    so an exited child reads gone and leaves its exit status; another agent's is signalled, and is
+    the run's only while its start time is still `started` (when the intent recorded one)."""
     if not isinstance(pid, int) or pid <= 0:
         return False
+    if pid not in _procs and isinstance(started, int) and proc_start(pid) not in (started, None):
+        return False  # the number was taken again by another process
     if pid in _procs:
         code = _procs[pid].poll()
         if code is None:
@@ -260,9 +274,10 @@ def alive(pid: Any) -> bool:
     return True
 
 
-def kill(pid: Any) -> None:
-    """The run's whole process group, as the stop time kills: it was started in a session of its own."""
-    if isinstance(pid, int) and pid > 0:
+def kill(pid: Any, started: Any = None) -> None:
+    """The run's whole process group, as the stop time kills: it was started in a session of its own.
+    Only while `alive` still reads it as the run, so a reused pid's group is never killed."""
+    if alive(pid, started):
         with suppress(OSError):
             os.killpg(pid, signal.SIGKILL)
         p = _procs.pop(pid, None)
@@ -320,16 +335,16 @@ def _conclude(repo: str, r: dict[str, Any], now: datetime) -> tuple[dict[str, An
         _exits.pop(intent.get("pid"), None)
         clear(repo, "inflight")
         return None, note_text(repo, intent)
-    try:
-        started = datetime.fromisoformat(str(intent.get("at")))
-    except ValueError:
-        started = now
-    if (now - started).total_seconds() > PROMOTE_BOUND:
-        kill(intent.get("pid"))
-        return fail(repo, intent, f"still running after {PROMOTE_BOUND / 60:g} minutes: killed"), None
-    if not alive(intent.get("pid")):
+    if not alive(intent.get("pid"), intent.get("started")):
         live = r.get("live_why") and f"live unknown — {r['live_why']}" or f"live is {str(r.get('live'))[:7]}"
         return fail(repo, intent, f"the run ended and {live}, not {str(intent.get('sha'))[:7]}"), None
+    try:
+        at = datetime.fromisoformat(str(intent.get("at")))
+    except ValueError:
+        at = now
+    if (now - at).total_seconds() > PROMOTE_BOUND:
+        kill(intent.get("pid"), intent.get("started"))
+        return fail(repo, intent, f"still running after {PROMOTE_BOUND / 60:g} minutes: killed"), None
     return None, None
 
 
