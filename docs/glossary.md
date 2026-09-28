@@ -188,7 +188,7 @@ not mix:
   into a pane (design §4.10). Kinds: `note`, `ask`, `reply`, `conflict`. The sender keeps its own
   copy in its **outbox**, which is where the marks it must see live. — *proposed*; built 2026-09-17
   (TD-052 step 1).
-- **orphaned question** — an open `ask` or `steer` to the person that names a reference (`about`)
+- **orphaned question** — an open `ask` or `steer` to the person whose `about` names a reference
   and whose asker's record was closed, forgotten or cancelled: it stays in the Inbox, a `steer`
   among them waits on the person from its bound instead of lapsing, and the person's answer is
   written on the repo's board and mailed to whoever holds the reference. The asker's name coming

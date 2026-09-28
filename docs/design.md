@@ -3466,7 +3466,7 @@ not an answer to the alarm.
   by you*, at the home and on a node's routed act alike.
 - **Log TD** files the alarm where work is picked up (TD-077 b). The host agent does not write a
   repo's ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
-  write-back (§4.4) only edits an item already on a board, or adds one from an FYI row, at a person's press — so *filing* is handing it to the session that answers for this
+  write-back (§4.4) only edits an item already on a board, or adds one from an FYI row or from the answer to an orphaned question, at a person's press — so *filing* is handing it to the session that answers for this
   one: **the record's first live controller**, in the order `controllers` holds them — the
   session that created it (§4.8 *Create adds the creator*), a team member's manager (§4.9) — read
   from the control graph, never from a badge (§9 invariant 9; the host agent does not read
@@ -4813,13 +4813,17 @@ TD-215, TD-216).** A question is about the work, not about the run that asked it
 wind-down closes every finished member (§4.9a): on 2026-09-28 one closed two members and with
 them a `steer` and an `ask` the ledger still waited on, before the person had seen either. So the
 asker's going ends a question **only when the question names no reference**. An open `ask` or
-`steer` in the person inbox whose envelope carries **`about`** (the field `--about` writes: a
-ledger id, a PR number or a board line, §4.8 — never anything read from the text) is **orphaned**
+`steer` in the person inbox whose **`about` names a reference** is **orphaned**
 when its asker's record is closed, forgotten, or cancelled before its start: it stays open, and
-the home writes **`orphaned: {at, how, name, repo, host, team}`** on the entry — `how` one of
+the home writes **`orphaned: {at, how, ref, name, repo, host, team}`** on the entry — `how` one of
 `closed`, `forgotten`, `cancelled`, the rest copied from the record at that moment, since a
-forgotten record can be asked nothing afterwards. A question with no `about` closes `asker_gone`
-as before, and its FYI row says so. A record a resume superseded is no more a gone asker here
+forgotten record can be asked nothing afterwards. **`about` is free text nobody checks at the
+send** (*Outcomes*, below), so the home checks it here: it names a reference when the check a
+claim's reference passes (§4.8, `normalize_ref`) accepts it, and the entry is held under the
+reference as that check writes it, which is the form a lease's `ref` has and so what the holder
+is matched on. It is the envelope's field that is read, never the message's text. A question
+with no `about`, or one whose `about` is a session's id or prose, closes `asker_gone` as before,
+and its FYI row says so. A record a resume superseded is no more a gone asker here
 than above: its questions moved with the conversation and are not orphaned.
 
 - **An orphaned `steer` does not lapse.** Its clock runs on, and the row says what the bound now
@@ -4847,7 +4851,7 @@ than above: its questions moved with the conversation and are not orphaned.
   question's first paragraph> — <name>, <date>: <the answer>. Context: <about>. Due: <today>.` —
   the answer being the reply's text, the suggested answer's text, or for *Go with it* *go with the
   default: <default>*. **And it is mailed as well to whoever holds the reference**: every live
-  record with an unexpired declared lease on `about` (§4.8, `LEASE_TTL`) gets a `note` from the
+  record with an unexpired declared lease on `orphaned.ref` (§4.8, `LEASE_TTL`) gets a `note` from the
   person, `about` that reference, marked `handed` (§4.8a), its text the question's first
   paragraph and the answer, and owes an outcome as a handed board reply does (*Outcomes*, below).
   With no holder nothing is mailed and nothing is owed: the line on the board is what the next
