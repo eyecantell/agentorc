@@ -14,7 +14,9 @@ from typing import Any, Literal
 
 from sessionorc import naming
 
-State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited", "closed", "unreachable"]
+# `scheduled` (design §6 *Start time*, TD-152): a record with a name, a directory, a launch record and
+# the directory's slot, but no pane yet — the home's tick creates the session at its `start_at`
+State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited", "closed", "unreachable", "scheduled"]
 Kind = Literal["interactive", "command"]
 Confidence = Literal["hook", "scraped"]
 
@@ -91,6 +93,7 @@ HOME_OWNED = frozenset(
         "lane",
         "unattended",
         "run_until",
+        "start_at",
         "supervised",
         "restarts",
         "restart_ceiling",
@@ -138,6 +141,7 @@ STATE_RANK: dict[str, int] = {
     "unreachable": 3,
     "working": 4,
     "idle": 5,
+    "scheduled": 6,  # not started yet (§6 *Start time*): after what runs, before what has ended
     "exited": 7,
     "closed": 8,
 }
@@ -811,6 +815,10 @@ class Session:
     run_until: str | None = None
     wrapup_prompt: str | None = None
     wrapup_sent_at: str | None = None
+    # When a `scheduled` record starts (design §6 *Start time*, TD-152): an absolute UTC instant, the
+    # stop time's twin. Set at create with `start_at`, moved by `set_start`; the tick replays the
+    # launch record at it (`restarts: [{why: start}]`). None on every record that is not scheduled.
+    start_at: str | None = None
     # The usage gate (design §6, TD-100): how to ask this session to pause when its profile crosses
     # a line, and to carry on when every window is back under — wording from the client, as the
     # wrap-up's is. `gated` is the mark, `{profile, label, pct, line, since, next, resets, sent_at}`: written
