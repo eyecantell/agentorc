@@ -103,6 +103,13 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Built — the live look waits on the promote |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
+| TD-197 | TDs in motion misreads phases: a design-first entry marked `Pickable: yes` reads *grind*, and a grinder's PR waiting for its reader reads *grind* once the grinder has left the branch | Medium | Open — pickable |
+| TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
+| TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Open — design-first |
+| TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | Open — pickable |
+| TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
+| TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
+| TD-205 | Scrolling the Doing list jumps back to the top: every group delta replaces the team summary whole, and the list's scroll position is not carried over | Medium | Open — pickable |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
 | TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — mechanism and a recommended fix; the shape is Paul's (board, 2026-09-12) |
 
@@ -1916,6 +1923,75 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 
 **Related:** TD-108 (the host agent's split, and the page split within this module), TD-188 (context per run).
 
+## TD-197: TDs in motion misreads phases — design-first reads *grind*, and a PR waiting for its reader reads *grind*
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul, at the Org page: *it shows 3 TDs in motion, when only one grinder is running … designer items are being listed as GRIND instead of DESIGN*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`motion_rows`: `row["phase"] = "design" if e.get("for_page") == "design-first" else …`), `src/sessionorc/ledger.py` (`kind_of`), `src/sessionorc/reports.py` and `src/sessionorc/agent.py` (the derive tick: `review_pr` from the checked-out branch)
+
+**Why:** the count was right. At the screenshot, three claims were open: grinder-ao-1's TD-146 (in hand) and TD-186 (PR #628, waiting for the techlead's read), and designer-ao-1's TD-175 (#603, waiting for its 03:00 MDT merge bound). There is no clean-up delay; a claim leaves the section when its member marks it done or dropped. The phases were wrong, for two reasons:
+1. **Design-first reads *grind*.** `motion_rows` keys the phase on the ledger reading's `for_page`, the page's four-way bucket. `kind_of` puts every `Pickable: yes` entry in *pickable* before it looks at `Kind`. So a design-first entry the designer may pick is never *design*. On 2026-09-26, TD-175, TD-180 and TD-183 each read `kind: design-first`, `for_page: pickable` in `repos.json`; all three have since been designed or parked, so none does today, but the next pickable design-first entry will. It is *grind* without a PR and *review* with one (TD-183 with #623 read *review*). Design §4.5 screen 1: *a claim on a design-first entry is design*.
+2. **A parked PR reads *grind*.** A declared claim gets its PR as `review_pr` only from the derive tick's reading of the branch the session has checked out (`reports.derive`, TD-150). A grinder that opens its PR, asks its reader and moves to the next entry before the next derive pass (`DERIVE_EVERY`) leaves a claim whose PR the tick never saw. grinder-ao-1's TD-186 claim read *grind* on the page while #628 waited for the techlead. The same holds for any held PR, which is the common case for `src/sessionorc/**`.
+
+**Fix:** (1) key the phase on `e.get("kind") == "design-first"`, not `for_page`, with a test on a pickable design-first entry. (2) Match open PRs to declared claims by head branch (`branch_ref(headRefName)`) across the repo's PR reading, not only the checked-out branch, so a claim's PR is found wherever its branch sits. TD-176's repo facts already hold the open PRs with `headRefName`. Or have `ao progress claim --pr N` recorded when the grinder asks its reader, and say so in the grinder brief. Tests: a claim whose PR was opened on a branch the session has since left reads *review*. Done when the screenshot's three rows would read *design* (TD-175), *review* (TD-186) and *grind* (TD-146).
+
+**Related:** TD-176 (TDs in motion, the repo facts), TD-150 (`review_pr`), TD-198 (the same `kind_of` precedence on the kind bar); design §4.5 screen 1, §4.5a *team card: TDs in motion*.
+
+## TD-198: The kind bar's *pickable* bucket swallows design-first entries
+
+**Priority:** Low
+**Added:** 2026-09-26 (found with TD-197)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/ledger.py` (`kind_of`: *pickable* is decided before *design-first*), the team card's Repo facet and the Repo page's *Technical debt* lists (`src/agentorc/ui/app.py`), design §4.5a *team card: Repo facet*
+
+**Why:** the page sorts each open entry into exactly one of *pickable, design-first, for you, other*, and *pickable* wins. Since TD-118 put `Pickable: yes` on design-first entries the designer may take, those entries count as *pickable* and never as *design-first*. On 2026-09-26 the bar read *19 pickable · 13 design-first*, and 7 of the 19 were designer-owned design-first entries. A reader takes *pickable* to mean *work a grinder can start*, and the Repo page's pickable list mixes the two.
+
+**Fix:** decide what the buckets mean now that the designer has its own lane: (a) *design-first* wins over *pickable* (Kind before Pickable), so *pickable* means builds; (b) the buckets follow the lanes (*grinder pickable*, *designer pickable*, *for you*, *other*); or (c) pickable becomes a mark within each kind. Then update §4.5a and `kind_of`. TD-197's phase fix does not depend on this.
+
+**Related:** TD-197, TD-118 (the header lines), TD-176 (the facet and the Repo page).
+
+## TD-199: A running member keeps the brief it started with
+
+**Priority:** Medium
+**Added:** 2026-09-26 (found at the Org page: manager-ao-1's card line)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.8 (the template and its supplements), §4.9 (team start reads `brief:` from the checkout), `src/agentorc/briefs/manager.md` (*A round*), `docs/cadence-changes.md` (the one relay that exists)
+
+**Why:** a member reads its brief once, at start. manager-ao-1 started 2026-09-25 18:27Z and has run since. #600 (TD-176 slice 6, 2026-09-26) changed the manager template so the manager says each round step with `ao doing`, but this manager never read it. Its card has read *round 1: designer/grinder-1/grinder-2 all working (TD-154, TD-155, TD-138)* from 2026-09-25 18:29Z ever since, though it has run many rounds. The only relay for a changed rule is the manager's own step for `docs/cadence-changes.md`, and it covers the cadence, not the agentorc templates or `docs/briefs/`. A promote changes the template on disk and nothing that is running. The same applies to every long-lived member: a manager restarts only on a crash, and its run is not bounded by TD-189's context limit unless the design says so.
+
+**Fix:** decide how a changed brief reaches a running member: (a) the record keeps the brief's version (a hash of the template and supplement at start), and the card and `ao status -v` mark *brief changed since start*; (b) a promote, or a merge touching `src/agentorc/briefs/` or `docs/briefs/`, sends each affected live member a `system` note naming what changed; (c) the tick restarts an idle, supervised member with pushed work when its brief changed (rule 2's path); or a mix. Also decide whether the manager falls under TD-189's bound. Done when a template change reaches a running manager within a round, or the card says it hasn't.
+
+**Related:** TD-114 (supplements), TD-189 (context bound), TD-186 (restarts), TD-175 (the manager's round log: its unpushed commits, 47 on 2026-09-26 and 91 a day later, are this member's), §4.8, §4.9.
+
+## TD-200: Small Org card misreadings — *last came*, a clipped flag, a closed record reading EXITED
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the Org page with TD-197)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — (3) needs checking against the design before a fix
+**Location:** `src/agentorc/ui/app.py` (the slot's caption: `came = "last came" …; caption = came + f" · {d['age']} ago"` with `d["age"] = _age(s.get("since"))`; `d["flag"]`), `src/agentorc/ui/templates/card.html` (the compact card's row 2), `src/agentorc/ui/static/app.css` (`.flag`, `white-space: nowrap`)
+
+**Why:** three small things the Org page said wrongly on 2026-09-26:
+1. **A seat's *last came* measures when it left.** The caption uses the record's `since`, the time of its last state change, which for an exited seat is `closed_at`. techlead-ao-1, filled at 03:32Z and gone at 03:36Z, read *last came · 0s ago* on the page just after it left. It should use when the seat came (`created`), or say *left*.
+2. **The compact card clips its flag into a different number.** manager-ao-1 has 47 unpushed commits (its round log, TD-175). Its compact card showed *⚠ 4*, because the flag text *47 unpushed* was cut to fit and still reads as a count. The compact card needs a short form that stays true (*⚠ 47*, with the full text on hover), or no flag.
+3. **A record closed by `ao close` reads EXITED.** grinder-ao-2, closed by the anchor at 02:19:54Z, has `closed_at` set and `state: exited`. Its card reads EXITED and offers Forget. Check what the design wants a closed unattended member to read (§4.5a *Ready to close*, the Close row) before changing anything; this may be right.
+
+**Fix:** (1) caption from `created` (the fill) for a seat, with a test; (2) a compact flag form, with a test that a two-digit count survives; (3) per the design check. Done when all three read true on the Org page.
+
+**Related:** TD-197 (found together), TD-175 (the unpushed round log), TD-176 slice 3 (the compact card), TD-097 (seats).
+
 ## TD-201: An idle session flipped to `working` by a hook after its Stop reads `stalled?` forever, and its mail is never rung
 
 **Priority:** High
@@ -1942,6 +2018,22 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
 
+## TD-203: TDs in motion shows no priority
+
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *add priority to "TDs in Motion" list on the teams card*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/app.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** a row reads *phase · reference · title · holder · PR*. Whether the team has its High entries in hand or is grinding Lows is not visible without opening the ledger. The ledger reading already carries each entry's `priority` (`sessionorc/ledger.py`), so the data is there.
+
+**Fix:** design where the priority sits (a short mark before the reference: *H / M / L*, or the priority bar's hue on the phase pill) and whether rows sort by priority within a phase (§4.5a says phase order, then reference). Then build it in `motion_rows` and the template, and extend the rollup's TDs in motion if the design says so. Done when a row shows its entry's priority and a test covers an entry with none (a foreign or archived reference: no mark).
+
+**Related:** TD-197 (the same rows' phases), TD-202 (grinders picking by priority), TD-176 (archived: TDs in motion).
+
 ## TD-204: `send --wait` reads the tool's own start of *this* prompt as a previous turn, when its hook lands while the paste is being confirmed, and reports `prompt-stalled` for a prompt that ran
 
 **Priority:** Medium
@@ -1957,3 +2049,35 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Fix (recommended, the shape is Paul's):** take the baseline **before** typing — the state and `rev` read before `_submit` — so the busy branch is decided by what the session was doing when the prompt was sent, and *started* is any transition since then; a turn that began and even ended during the paste then reads as started and settled. A test: a hook stub fired from inside a slowed `_type`, after its Enter. The other shapes on the board (a longer or adapter-supplied window; re-checking the composer before raising) treat the symptom.
 
 **Related:** TD-078 (the test's race, fixed in #672), TD-016 / TD-027 (the wait and the composer check, archived), the board item of 2026-09-12 (*`ao send --wait` reported `prompt-stalled` for a prompt that in fact ran*).
+
+## TD-205: Scrolling the Doing list jumps back to the top
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *there is an issue with scrolling in the doing list (on the teams card) — it seems to redraw while scrolling, popping back up to the top*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the group delta: `tpl.innerHTML = g.summary.trim(); … sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept)`, around line 908 at filing), `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** the team summary is re-sent with the groups on every delta and on the `repos` and `doing` events, and the client swaps it whole (`team_summary.html`'s header says so). The swap carries over the Deny *why?* boxes a person was typing (`denyWhys`), but nothing else. The Doing list is a scrolled box, so every delta (any member's state change, any `ao doing`) snaps it back to the top. On a busy team that is every few seconds.
+
+**Fix:** carry each scrolled facet's `scrollTop` across the swap as `denyWhys` does, keyed by the facet (`.facet.fface` for Doing, `.facet.fmotion` for TDs in motion), and keep the person's position unless it was at the top, where new rows should show. Better still, re-render only the facet whose data changed. Test in the page's JS tests if they cover the swap, or a note in the PR on how it was checked by hand. Done when a person can scroll the Doing list while the team works and stay where they scrolled.
+
+**Related:** TD-206 (the same list), TD-176 slice 3 (the summary and its swap).
+
+## TD-206: The Doing list's times are clock times cut short, and its fields run together
+
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
+
+**Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
+
+**Fix:** design (1) the time as a fuzzy age (*just now*, *5m*, *1h*, *2d*), the page's existing `_age` shape, with the exact time on hover, and refreshed as it ages without a server round trip; (2) three columns with a fixed-width time, the doer at its full name or a width that fits the team's longest, and the words taking the rest and wrapping or ellipsed with hover. Do the same on the Repo page's Doing section. Then build it. Done when the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns.
+
+**Related:** TD-205 (the same list's scrolling), TD-176 slice 2 (the doing log), §4.8 *the doing log*.
