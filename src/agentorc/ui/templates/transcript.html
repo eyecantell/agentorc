@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ s.name }} · transcript{% endblock %}
+{% block body %}
+{# design §4.5 screen 9 **Transcript** (TD-154, built by TD-166): what a session said and did, read
+   from the file its tool wrote, without resuming it. A snapshot at the moment it was opened —
+   reload reads what came after; the terminal is the live view. The only controls are the folds,
+   *earlier turns* and the editor button (§4.5a *Transcript*). #}
+<div class="page transcript" id="transcript" data-id="{{ s.id }}">
+  <div class="row gap thead">
+    <a class="muted" href="/focus/{{ s.id }}">← Focus</a>
+    <span class="mono title">{{ s.place }} / {{ s.name }}</span>
+    <span class="pill s-{{ s.state_class }}">{{ s.state_label }}</span>
+    {% if s.team %}<span class="badge">{{ s.team }}</span>{% endif %}
+    {% if s.role %}<span class="badge">{{ s.role }}</span>{% endif %}
+    <span class="meta">{{ s.profile_line }}</span>
+    <span class="grow"></span>
+    {% if editor %}<a class="btn sm link editor" href="{{ editor.url }}" data-label="{{ editor.label }}" title="the raw file: one JSON object per line">‹› {{ editor.label }}</a>{% endif %}
+  </div>
+  {% if error %}
+  <div class="card tcard"><p class="note" id="terror">{{ error }}</p></div>
+  {% else %}
+  <div class="card tcard">
+    <dl class="kv">
+      <dt>directory</dt><dd class="mono small">{{ s.dir }}</dd>
+      <dt>file</dt><dd class="mono small">{{ t.path }}{% if t.size %} · {{ t.size }}{% endif %} · on {{ s.host }}</dd>
+      <dt>when</dt><dd>{% if t.first_at %}<span class="localtime" data-at="{{ t.first_at }}" title="{{ t.first_at }}">{{ t.first_at }}</span>{% else %}?{% endif %} → {% if t.last_at %}<span class="localtime" data-at="{{ t.last_at }}" title="{{ t.last_at }}">{{ t.last_at }}</span>{% else %}?{% endif %}</dd>
+      <dt>showing</dt><dd>the last <span id="tshown">{{ t.turns }}</span> turn{{ '' if t.turns == 1 else 's' }} · <span class="muted">a snapshot at <span class="localtime" data-at="{{ at }}" title="{{ at }}">{{ at }}</span>; reload to read what came after</span></dd>
+    </dl>
+  </div>
+  <div class="card tcard tlog" id="tlog">{% include "transcript_turns.html" %}</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.transcript();</script>{% endblock %}

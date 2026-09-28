@@ -554,3 +554,29 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .setpage .setrow, .setpage .setvals { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .setpage .setvals dd { margin-bottom: 6px; }
 }
+
+/* design §4.5 screen 9 **Transcript** (TD-166): the pane's reading of the conversation, folded — the
+   prompt on a tinted band with `>`, the assistant's text in full, each tool call one mono line with
+   its result folded under it. Everything is text; the folds are plain <details>. */
+.page.transcript { max-width: 1100px; width: 100%; margin: 0 auto; }
+.transcript .thead { align-items: center; flex-wrap: wrap; }
+.transcript .thead .title { font-size: var(--t-title); font-weight: 500; }
+.transcript .tcard { padding: 10px 12px; }
+.transcript .tcard .kv { margin: 0; }
+.transcript .tlog { padding: 6px 0; display: flex; flex-direction: column; gap: 2px; line-height: var(--lh); }
+.transcript .tturns { display: flex; flex-direction: column; gap: 2px; }
+.transcript .ttext { white-space: pre-wrap; overflow-wrap: anywhere; }
+.transcript .tprompt { display: flex; gap: 10px; padding: 10px 12px; margin-top: 8px; background: var(--hover); border-radius: 4px; }
+.transcript .tprompt .ttext { flex-grow: 1; min-width: 0; }
+.transcript .tprompt .meta { flex-shrink: 0; }
+.transcript .tmark { color: var(--muted); }
+.transcript .tsaid { padding: 4px 12px 4px 30px; }
+.transcript .ttool { padding: 3px 12px; display: flex; flex-direction: column; gap: 2px; }
+.transcript .tcall { font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+.transcript .targ { color: var(--strong); }
+.transcript .tfold { padding-left: 22px; }
+.transcript .tthought { padding: 3px 12px 3px 30px; }
+.transcript details.fold > summary { user-select: none; } /* a fold with no `data-fold`: remembered nowhere */
+.transcript .tbody { margin: 4px 0; padding: 6px 8px; font-size: var(--t-mono-s); background: var(--input); border: 1px solid var(--line2); border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30em; overflow: auto; }
+.transcript .tsidebody { border-left: 2px solid var(--line); margin: 4px 0 4px 4px; }
+.transcript .tcompact, .transcript .tearlier { text-align: center; padding: 8px; }

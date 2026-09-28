@@ -1841,6 +1841,31 @@
   // The page is `repo_part.html`, re-read on a poll and on every `repos` or `doing` event; the
   // facets' selectors are the team card's (`syncSummaries`), the doing chips are remembered per
   // browser, and a typed Deny reason survives a re-read.
+  // design §4.5 screen 9 **Transcript** (TD-166): the page is a snapshot drawn by the server; the one
+  // script is *earlier turns*, which fetches the twenty before the first shown and puts them in the
+  // button's place — above the turns already there. Folds are plain <details>, remembered nowhere.
+  AO.transcript = function () {
+    const box = $("#transcript"); if (!box) return;
+    const id = box.dataset.id;
+    showLocalTimes();
+    box.addEventListener("click", async (ev) => {
+      const b = ev.target.closest('[data-act="transcript-earlier"]'); if (!b || b.disabled) return;
+      b.disabled = true;
+      try {
+        const res = await fetch(`/transcript/${encodeURIComponent(id)}?part=1&before=${encodeURIComponent(b.dataset.before)}`);
+        const html = await res.text();
+        if (!res.ok) { b.insertAdjacentHTML("afterend", html); return; }
+        const wrap = b.closest(".tearlier");
+        const tmp = document.createElement("div"); tmp.innerHTML = html;
+        const got = tmp.querySelector(".tturns");
+        const shown = $("#tshown");
+        if (shown && got) shown.textContent = String((+shown.textContent || 0) + (+got.dataset.turns || 0));
+        wrap.replaceWith(...tmp.childNodes);
+        showLocalTimes();
+      } finally { b.disabled = false; }
+    });
+  };
+
   AO.repo = function () {
     const box = $("#repopage"); if (!box) return;
     const repo = box.dataset.repo, whoKey = "doingwho:" + repo;
@@ -2391,7 +2416,9 @@
         const code = v.exit_code == null ? "" : ` (exit code ${v.exit_code})`;
         const q = `dir=${encodeURIComponent(v.dir || "")}&adapter=${encodeURIComponent(v.adapter || "claude-code")}`;
         const kept = v.state === "exited" && v.pane !== false;  // a kill/close destroys the pane (TD-023)
-        ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. ${kept ? "The pane is kept so its last screen and run log stay readable." : "Its pane is gone (killed, or the tmux server restarted); the run log stays readable."} `
+        // …and, where the header draws **Transcript** (§4.5a, TD-166), *or read its transcript*
+        const read = v.adapter_id ? ` — or <a href="/transcript/${id}" target="_blank" rel="noopener">read its transcript</a>` : "";
+        ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. ${kept ? `The pane is kept so its last screen and run log stay readable${read}.` : `Its pane is gone (killed, or the tmux server restarted); the run log stays readable${read}.`} `
           // design §4.5a **Focus (exited / closed)** (TD-081 step 2, Paul: *a resume option that
           // requires no input from me*): **Resume** is one press and no form — the same name, so
           // the record is replaced in place and keeps its mail — and **Resume with changes…** is
@@ -2418,6 +2445,8 @@
         ex.classList.remove("hidden");
       } else ex.classList.add("hidden");
       $("#adapter_id").textContent = v.adapter_id || "—";
+      const tr = $("#ftranscript");
+      if (tr) tr.classList.toggle("hidden", !v.adapter_id);
       $("#last_output").textContent = v.last_output ? fmtAge(v.last_output) + " ago" : "—";
       if (v.git) {
         // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which
