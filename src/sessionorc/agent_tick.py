@@ -219,8 +219,8 @@ class TickMixin:
         sessions alone (§4.2).
         """
         for s in list(self.sessions.values()):
-            if not (s.unattended and s.run_until) or s.state in ("exited", "closed"):
-                continue
+            if not (s.unattended and s.run_until) or s.state in ("exited", "closed", "scheduled"):
+                continue  # a scheduled record has nothing running to stop yet (§6 *Start time*)
             if now < _parse(s.run_until):
                 continue
             if not s.wrapup_sent_at:
@@ -274,7 +274,7 @@ class TickMixin:
         doc = settings_mod.reserves(whole)
         changed = False
         for s in list(self.sessions.values()):
-            if not s.unattended or s.state in ("exited", "closed"):
+            if not s.unattended or s.state in ("exited", "closed", "scheduled"):
                 if s.gated:
                     s.gated = None  # the gate's reach is unattended, live sessions alone (§9 invariant 5)
                     self.store.save(s)
@@ -349,6 +349,7 @@ class TickMixin:
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         for s in records:
             try:
+                await self._scheduled_start(s, now)
                 await self._crash_restart(s, now)
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
@@ -431,6 +432,36 @@ class TickMixin:
             return
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
         await self._replay(s, "crash")
+
+    async def _scheduled_start(self, s: Session, now: datetime) -> None:
+        """Design §6 *Start time* (TD-152): a `scheduled` record whose instant has passed is created
+        from its launch record — `restarts: [{why: start}]`, the record superseded in place with its
+        mail — here or at its node; a node whose link is down waits and is looked at next tick. A
+        failed start counts, as a failed replay does, and at `RESTART_CEILING` inside the window the
+        tick stops trying and says so: the record is a person's."""
+        if s.state != "scheduled" or not s.start_at or s.restart_ceiling:
+            return
+        try:
+            due = _parse(s.start_at) <= now
+        except ValueError:
+            due = False
+        if not due:
+            return
+        if s.host != self.host and s.host not in self._link_muxes:
+            return  # its link is down: left as it is, looked at again next tick (§4.4a)
+        tries = [
+            r
+            for r in s.restarts
+            if isinstance(r, dict) and r.get("why") == "start" and _recent(r.get("at"), now, RESTART_WINDOW)
+        ]
+        if len(tries) >= RESTART_CEILING:
+            s.restart_ceiling = {"at": now_iso(), "count": len(tries)}
+            log.warning("%s: its scheduled start failed %d times — the ceiling; it is a person's now", s.id, len(tries))
+            self._save(s)
+            await self._push_changes()
+            return
+        log.info("%s: its start time %s has come — starting it", s.id, s.start_at)
+        await self._replay(s, "start", start_of=s.id)
 
     async def _wanted_restart(self, s: Session, now: datetime) -> None:
         """Rule 2 (design §6, §4.9a): a supervised member that declared `restart_wanted` and is `idle`,
@@ -1304,6 +1335,8 @@ class TickMixin:
                 if s.closed_at and _parse(s.closed_at) + agent_common.CLOSED_KEEP < now:
                     self._forget(sid)
                 continue
+            if s.state == "scheduled":
+                continue  # no pane yet, by design (§6 *Start time*): the tick's start pass is its judge
             killed = self._killed_at.get(sid)
             if killed is not None and killed < snapshot_at:
                 del self._killed_at[sid]  # this snapshot is newer than the kill: the guard is spent

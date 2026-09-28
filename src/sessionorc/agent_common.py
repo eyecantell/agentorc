@@ -132,7 +132,7 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "cre
 # The home does it the other way round — it marks its own record, which owns the field, and routes
 # only the `kill`. `modes.HOME_EDITS` is the other table, and `suspend` **is** in that one: a node
 # asked to suspend forwards the whole act here, or its mark would be wiped by the home's next copy.
-HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"})
+HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_controllers"})
 # What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
@@ -657,6 +657,33 @@ def _stop_time(value: str | None) -> str | None:
         raise RpcError(f"run_until: not a time: {value}") from exc
     if when.tzinfo is None:
         raise RpcError(f"run_until: needs a timezone (got {value})")
+    return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _start_time(value: str | None, unattended: bool, run_until: str | None) -> str | None:
+    """A scheduled start's instant (design §6 *Start time*, TD-152), normalised to UTC, or None when
+    none was asked. Refused: without `unattended` — a start nobody is at the keyboard for is a
+    policy's act, and §9 invariant 5 keeps those off an interactive session — an instant not ahead
+    (*start it now*), and a `run_until` that is not after it. The friendly `20:00` / `+2h` are the
+    clients', as `run_until`'s are."""
+    if not value:
+        return None
+    try:
+        when = _parse(str(value).strip())
+    except ValueError as exc:
+        raise RpcError(f"start_at: not a time: {value}") from exc
+    if when.tzinfo is None:
+        raise RpcError(f"start_at: needs a timezone (got {value})")
+    if not unattended:
+        raise RpcError(
+            "start_at applies to unattended sessions: a scheduled start is a policy's act, and policies leave an "
+            "interactive session alone (design §6 Start time, §9 invariant 5)"
+        )
+    if when <= datetime.now(UTC):
+        raise RpcError(f"start_at {value} is not ahead: start it now instead (design §6 Start time)")
+    stop = _stop_time(run_until)
+    if stop and _parse(stop) <= when:
+        raise RpcError(f"run_until {stop} is not after start_at {value}: a stop comes after the start (design §6)")
     return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 

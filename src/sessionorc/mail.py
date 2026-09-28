@@ -80,6 +80,7 @@ ACTING_RPCS = frozenset(
         "set_grants",
         "set_controllers",
         "set_stop",
+        "set_start",
     }
 )
 

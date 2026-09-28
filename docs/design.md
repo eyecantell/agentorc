@@ -287,7 +287,7 @@ State transitions (Claude Code adapter):
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
 | `Stop` | `idle` |
-| `ao new --at`, the New session **At** field | `scheduled` — a record with a name, a directory and a launch record but no pane yet; the host agent creates the session at the instant (§6 *Start time*; TD-026, designed 2026-09-25, not built — TD-152) |
+| `ao new --at`, the New session **At** field | `scheduled` — a record with a name, a directory and a launch record but no pane yet; the host agent creates the session at the instant (§6 *Start time*; TD-026, designed 2026-09-25; the record, `create`'s `start_at` and the tick's start built 2026-09-27 — TD-152 slices 1–2; `ao new --at`, `ao at` and the pages not yet) |
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time (a metered profile's amount is not a cap and never makes it, §4.2a) |
 | `SessionEnd`, or tmux session gone | `exited` — the record's `pane` says whether a dead pane is still there to read (natural exit: yes; killed, or the tmux server restarted: no) |
 | person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
@@ -5498,7 +5498,9 @@ code and needs no grant; a session doing the same work does.
   an expiry, and calendar-shaped schedules (TD-026; the one start rule designed is *Schedule*,
   below).
 - **Start time** (`start_at`; TD-026, decided by Paul 2026-09-25 — *keep start_at and a
-  scheduled state for one session as well*; designed the same day, not built — TD-152): the stop
+  scheduled state for one session as well*; designed the same day; the record, `create`'s
+  `start_at`, `set_start`, Cancel and the tick's start built 2026-09-27 — TD-152 slices 1–2;
+  `ao new --at`, `ao at` and the pages not yet): the stop
   time's twin. `ao new --unattended --at 20:00 | +2h | <ISO>` (and the New session form's **At**
   field, §4.5a) creates the **record now** — the name taken under §4.1's rule, the worktree made,
   the launch record written (`launch/<id>.json`, the same one a restart replays, *Keeping a team
@@ -5519,6 +5521,11 @@ code and needs no grant; a session doing the same work does.
   person's press with a clock on it, replayed from a launch record, never a definition re-read.
   The card and the Focus header show it as the **starts** note (§4.5a), `ao status -v` prints
   *starts 20:00* by the same formatter as *stops*, and the New session form takes it.
+  In the agent: the record carries `start_at` (home-owned, as `run_until` is) and ranks between
+  idle and exited; `create` with `start_at` writes it, and the tick's replay passes `start_of`,
+  naming the record it starts, so the create supersedes it in place — its mail moved to the
+  session — rather than refusing it as the live holder of its name and slot. The usage gate and the
+  stop time pass a scheduled record by: it has nothing running to pause or stop.
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
   built, and the manager preset is silent on the four rules). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record

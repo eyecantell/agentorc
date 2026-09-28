@@ -124,6 +124,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _reply_line,  # noqa: F401
     _review,  # noqa: F401
     _source,  # noqa: F401
+    _start_time,  # noqa: F401
     _stop_time,  # noqa: F401
     _urgent,  # noqa: F401
     _usage_checked_at,  # noqa: F401
@@ -539,8 +540,17 @@ class HostAgent(
         seat: dict[str, Any] | None = None,
         review: dict[str, Any] | None = None,
         context_bound: int | None = None,
+        start_at: str | None = None,
+        start_of: str | None = None,
     ) -> dict[str, Any]:
-        """`review` (design §4.9b *The reader*, TD-093): the role preset's `{reader, held, bound}`,
+        """`start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
+        **record** now — the name taken, the worktree made, the launch record written, the slot held
+        — in the state `scheduled`, with no pane, and the home's tick creates the session at the
+        instant. Refused without `unattended`, in the past, and with a `run_until` not after it.
+        `start_of` is that start: the tick's replay names the scheduled record it starts, which is
+        then superseded in place, its mail kept, rather than refused as the live holder it is.
+
+        `review` (design §4.9b *The reader*, TD-093): the role preset's `{reader, held, bound}`,
         checked and kept on the record, read afterwards by the author's own `ao`. `context_bound`
         (design §4.8 *A role has a context bound*, TD-190): the preset's `context: {bound}` in tokens,
         kept on the record the same way.
@@ -564,6 +574,11 @@ class HostAgent(
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
         reading, bound = _review(review), _context_bound(context_bound)
+        starts = _start_time(start_at, unattended, run_until)
+        # the scheduled record this create starts (the tick's replay, §6 *Start time*), if it is one
+        starting = self.sessions.get(str(start_of)) if start_of else None
+        if start_of and (starting is None or starting.state != "scheduled"):
+            raise RpcError(f"{start_of} is not a scheduled record: nothing to start (design §6 Start time)")
         if seat is not None and not (
             isinstance(seat, dict) and isinstance(seat.get("trigger"), str) and seat["trigger"]
         ):
@@ -614,6 +629,8 @@ class HostAgent(
                 await locks.enter_async_context(self._dir_locks[f"conversation:{resume}"])
             if kind == "interactive" and adapter != "shell":
                 for who in await asyncio.to_thread(self.occupants, directory):
+                    if starting is not None and who.split(" ", 1)[0] == starting.id:
+                        continue  # the scheduled record holds the slot for exactly this start
                     raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
             # Design §4.1 / §9 invariant 12: a name identifies one session per scope. An unnamed
             # session is named here, not by its caller, so two of them never collide (TD-030).
@@ -621,7 +638,7 @@ class HostAgent(
                 name = await asyncio.to_thread(self._auto_name, directory, repo, adapter)
             # Refuse here; *take* the name below, once the launch has succeeded. Taking it kills a
             # pane, and a launch that then failed would have killed it for nothing (review).
-            holder = await self._name_holder(directory, repo, name)
+            holder = starting if starting is not None else await self._name_holder(directory, repo, name)
             if isinstance(holder, Session):
                 self._refuse_suspended(holder, caller, "a create under that name")
             if keep_mail:
@@ -637,6 +654,8 @@ class HostAgent(
                     self._save(held)
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
+            if starts:
+                return await self._schedule(locals(), holder, directory, repo, name, starts)
             try:
                 spec = ad.launch(
                     profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory, name=name
@@ -711,21 +730,85 @@ class HostAgent(
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
-                kept = bool(keep_mail or (resume and holder.adapter_id == resume))
+                kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
                 s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
             self.sessions[sid] = s
             self.store.save(s)
             self._remember_dir(directory)
             if resume:
                 await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
-            elif keep_mail and isinstance(holder, Session):
-                self._move_mail(holder, s)  # the seat's mail, to the seat's next holder (§4.9b)
+            elif (keep_mail or starting is not None) and isinstance(holder, Session):
+                # the seat's mail, to the seat's next holder (§4.9b); a scheduled record's, to the
+                # session it becomes (§6 *Start time*): mail sent to it before the instant is its own
+                self._move_mail(holder, s)
                 self.store.save(s)
             if self.mode != "node":
                 if s.supervised:
                     self._write_launch(s.id, s, launch_params(locals()))
                 else:
                     self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
+        return s.view()
+
+    async def _schedule(
+        self,
+        given: dict[str, Any],
+        holder: Session | str | None,
+        directory: Path,
+        repo: str | None,
+        name: str,
+        starts: str,
+    ) -> dict[str, Any]:
+        """A create with `start_at` (design §6 *Start time*, TD-152): the record now, in the state
+        `scheduled` — the name taken under §4.1's rule, the worktree already made, the launch record
+        written (the one the tick replays at the instant), the directory's slot held by being a
+        record that is neither exited nor closed — and no pane, no run log, no conversation yet.
+        Called from `create` under its locks, with `given` its own arguments as they stand."""
+        if given.get("resume"):
+            raise RpcError("start_at is a fresh start: a resume runs now or not at all (design §6 Start time)")
+        previous_run, freed = await self._take_name(holder)
+        live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
+        taken = (set(self.sessions) | set(live)) - ({freed} if freed else set())
+        base = naming.base_id(directory, repo, name)
+        sid = naming.session_id(directory, repo, name, taken)
+        team = str(given.get("team") or "")
+        s = Session(
+            id=sid,
+            name=name if sid == base else name + sid[len(base) :],
+            kind=given["kind"],
+            adapter=given["adapter"],
+            dir=str(directory),
+            profile=given["profile"],
+            repo=repo,
+            worktree=given["worktree"],
+            unattended=True,
+            capabilities=given["grants"],
+            controllers=given["members"],
+            lane=given["references"],
+            role=str(given.get("role") or ""),
+            ledger=(str(given["ledger"]).strip() or None) if given.get("ledger") else None,
+            team=team,
+            project=str(given.get("project") or ""),
+            run_until=self._team_stamp(team, True, _stop_time(given.get("run_until"))),
+            wrapup_prompt=(str(given["wrapup_prompt"]).strip() or None) if given.get("wrapup_prompt") else None,
+            pause_prompt=(str(given["pause_prompt"]).strip() or None) if given.get("pause_prompt") else None,
+            resume_prompt=(str(given["resume_prompt"]).strip() or None) if given.get("resume_prompt") else None,
+            previous_run=previous_run,
+            host=self.host,
+            supervised=True,  # it is started by the tick's replay, as any supervised record is restarted
+            seat=dict(given["seat"]) if given.get("seat") else None,
+            review=given["reading"],
+            context_bound=given["bound"],
+            start_at=starts,
+        )
+        s.set_state("scheduled", confidence="hook")
+        if isinstance(holder, Session):
+            s.supersedes = [{"id": holder.id, "mail": False, "at": s.created}]
+        self.sessions[sid] = s
+        self.store.save(s)
+        self._remember_dir(directory)
+        if self.mode != "node":
+            self._write_launch(s.id, s, launch_params(given))
+        log.info("%s scheduled to start at %s", sid, starts)
         return s.view()
 
     def _check_keep_mail(self, holder: Session | str | None, caller: Any, resume: str | None) -> None:
@@ -1062,6 +1145,10 @@ class HostAgent(
 
     async def rpc_close(self, id: str) -> dict[str, Any]:
         s = self._get(id)
+        if s.state == "scheduled":
+            # **Cancel** (design §6 *Start time*, §4.5a): nothing ran, so there is nothing to keep —
+            # the record and its launch record are forgotten and the directory's slot is free
+            return await self._cancel_start(s)
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("closed", confidence="scraped")
         s.pane = False
@@ -1078,6 +1165,9 @@ class HostAgent(
 
     async def rpc_remove(self, id: str, caller: Any = None) -> None:
         s = self._get(id)
+        if s.state == "scheduled":
+            await self._cancel_start(s)  # §6 *Start time*: Forget of a scheduled record is its Cancel
+            return
         if s.state not in ("exited", "closed"):
             raise RpcError(f"{id} is {s.state}; kill it first")
         # **Forget is the other road out of a suspension** (design §4.8a, TD-077 a2), so it is a
@@ -1360,6 +1450,34 @@ class HostAgent(
         s.run_until = when
         if wrapup_prompt is not None:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
+        self._save(s)
+        await self._push_changes()
+        return self._view(s)
+
+    async def _cancel_start(self, s: Session) -> dict[str, Any]:
+        """A scheduled record cancelled (design §6 *Start time*): forgotten with its launch record, and
+        its open questions closed with it, as a close does."""
+        view = {**s.view(), "state": "closed", "cancelled": True}
+        self._asker_gone(s, self._address(s))
+        self._forget(s.id)
+        log.info("%s: its scheduled start cancelled", s.id)
+        await self._push_changes()
+        return view
+
+    async def rpc_set_start(self, id: str, start_at: str = "") -> dict[str, Any]:
+        """`ao at <session> <when> | now` (design §6 *Start time*, §4.7, TD-152): move a scheduled
+        start, or — with `now` — hand it to the tick's next pass. Acting, and gated as `set_stop` is:
+        it starts another session's run. Refused on a record that is not `scheduled`: a live session
+        already started."""
+        s = self._find(id)
+        if s.state != "scheduled":
+            raise RpcError(f"{id} is {s.state}, not scheduled: a start time is for a record that has not started")
+        if str(start_at).strip().lower() == "now":
+            s.start_at = now_iso()
+        else:
+            s.start_at = _start_time(start_at, True, s.run_until)
+            if not s.start_at:
+                raise RpcError("set_start needs a time, or now (design §6 Start time)")
         self._save(s)
         await self._push_changes()
         return self._view(s)
