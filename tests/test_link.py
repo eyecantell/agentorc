@@ -1840,5 +1840,12 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
         assert held(replica, "usage_gate", "", "5h") == 30  # the last frame stays in force offline
         home.write_hosts(["laptop"])
         assert await wait_for(lambda: held(replica, "usage_gate", "", "5h") == 40, timeout=20.0, step=0.1)
+        # a home file that cannot be read is not settings: nothing is sent, and the node keeps its replica
+        (home.dir / "settings.yml").write_text("usage_gate: {broken\n")
+        node._home_mux.close("a blip")
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
+        assert await wait_for(node.home_reachable, timeout=20.0, step=0.1)
+        await asyncio.sleep(1.0)  # the frame, had one been sent, lands just after the snapshot
+        assert held(replica, "usage_gate", "", "5h") == 40
         async with LocalClient() as c:
             await c.call("kill", id=w["id"])

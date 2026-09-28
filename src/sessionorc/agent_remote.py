@@ -483,7 +483,12 @@ class RemoteMixin:
         queued, as the intent push is: a node whose link is down is sent the file on its next dial."""
         if self.mode != "home":
             return
-        doc = await asyncio.to_thread(settings_mod.load)
+        doc = await asyncio.to_thread(settings_mod.read)
+        if doc is None:
+            # absent or broken: not settings. `load` reads it as `{}`, which gates nothing here while
+            # it is mended — sent, it would replace every node's good replica with nothing
+            log.warning("settings.yml is absent or cannot be read: not sent, and each node keeps its replica")
+            return
         for h, mux in list(self._link_muxes.items()):
             if host is not None and h != host:
                 continue

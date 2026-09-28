@@ -51,6 +51,20 @@ def load(path: Path | None = None) -> dict[str, Any]:
     return doc if isinstance(doc, dict) else {}
 
 
+def read(path: Path | None = None) -> dict[str, Any] | None:
+    """The whole file as it was read, or None when it is **absent or broken** — missing, unreadable,
+    not YAML, not a mapping — where `load` answers `{}` for all of them. An empty file is `{}`.
+    What the home sends its nodes (§4.4a *Settings, replicated*, TD-147): a broken file is not
+    settings, and a node keeps the replica it has rather than take nothing over it."""
+    try:
+        doc = yaml.safe_load((path or settings_file()).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    if doc is None:
+        return {}
+    return doc if isinstance(doc, dict) else None
+
+
 def save(doc: dict[str, Any], path: Path | None = None) -> None:
     p = path or settings_file()
     p.parent.mkdir(parents=True, exist_ok=True)

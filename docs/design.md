@@ -1386,7 +1386,8 @@ call by call.
   writes its own `settings.yml` from it and reads that on every tick as the home reads its own,
   offline included — *policies that stop run on the node, from its replica*, the rule the stop time
   already has — so the last settings a node was sent stay in force until its next dial, and a hand
-  edit at a node is overwritten by the next frame. `set_settings` at a node is forwarded while the
+  edit at a node is overwritten by the next frame. A home file that is absent or cannot be read is
+  not settings: nothing is sent, and each node keeps what it has (TD-147, the techlead's read of #682). `set_settings` at a node is forwarded while the
   link is up and refused offline (the table above); the reads a node serves — `gate`, `settings` —
   answer from the replica, and the page says *set at <home>* beside each value. A write may
   originate at the home with no node involved, so the send is a broadcast, never a reply to a
