@@ -17,7 +17,7 @@ pytestmark = pytest.mark.unit
 # patched by the suite as `agentorc.ui.app.X`
 PATCHED = {"LocalClient", "read_boards", "rpc", "PtySession", "repo_teams"}
 # the modules moved out of app.py (TD-196), in the order they were split
-SPLIT = ("common", "cards", "inbox")
+SPLIT = ("common", "cards", "inbox", "org", "repo")
 
 
 def _defined(path: Path) -> set[str]:

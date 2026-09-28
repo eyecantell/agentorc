@@ -1,0 +1,273 @@
+"""The Repo page (design §4.5 screen 11): the PR rows and their standing, the ledger's lists, the doing
+chips, who serves the repo for what, and the grouping of a team's cards. Moved out of
+`agentorc.ui.app` unchanged (TD-196) and re-exported from it, so a route, a template or a test reads
+each name from the app as before.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Collection, Mapping
+from datetime import datetime
+from typing import Any
+
+from agentorc import repoconfig, teamrun
+from sessionorc.models import (
+    has_control,
+)
+
+from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
+from .common import _age
+from .org import compact_line, team_summary
+
+# -- the Repo page (design §4.5 screen 11, TD-176 slice 5) -------------------------------------------
+
+LEDGER_LISTS = (("pickable", "pickable"), ("design-first", "design-first"), ("for-you", "for you"), ("other", "other"))
+LEDGER_FOLD = 4  # a list folds past this many rows, with *+n more*
+PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
+
+
+def pr_rows(
+    r: Mapping[str, Any], members: Collection[dict[str, Any]], standing: Mapping[int, dict[str, Any]], now: datetime
+) -> list[dict[str, Any]]:
+    """**Open PRs** (§4.5 screen 11): every open PR, newest last, with its author — the member whose
+    branch it is, else the GitHub login — its age, *draft*, and its standing with the techlead
+    (`standing`, by number; nothing when no entry names it)."""
+    by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
+    rows = []
+    for p in (r.get("prs") or {}).get("open") or []:
+        if not isinstance(p, dict) or not isinstance(p.get("number"), int):
+            continue
+        who = by_branch.get(str(p.get("branch") or ""))
+        rows.append(
+            {
+                "number": p["number"],
+                "title": str(p.get("title") or ""),
+                "url": str(p.get("url") or ""),
+                "author": {"id": who["id"], "name": who.get("name") or who["id"]} if who else None,
+                "login": str(p.get("author") or ""),
+                "age": _age(p.get("created"), now),
+                "draft": bool(p.get("draft")),
+                "standing": standing.get(p["number"]),
+            }
+        )
+    return rows
+
+
+def pr_standing(entries: Collection[dict[str, Any]], now: datetime) -> dict[int, dict[str, Any]]:
+    """Each PR's standing with the techlead (§4.9b *The reader*), from the seat's inbox entries that
+    carry a `pr`: *waiting on review · <age>* while the `ask` is open, *reviewed* once it carries a
+    reply. The latest entry for a number wins."""
+    out: dict[int, dict[str, Any]] = {}
+    for e in sorted((e for e in entries if isinstance(e, dict)), key=lambda e: str(e.get("at") or "")):
+        pr = e.get("pr")
+        if not isinstance(pr, int) or e.get("kind") != "ask":
+            continue
+        if e.get("closed_by"):
+            out[pr] = {"word": "reviewed", "cls": "done"}
+        elif not e.get("closed_reason"):
+            out[pr] = {"word": f"waiting on review · {_age(e.get('at'), now)}", "cls": "wait"}
+    return out
+
+
+def ledger_lists(r: Mapping[str, Any], motion: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+    """**Technical debt** (§4.5 screen 11): the open entries in four lists by the page's kind, each
+    row id, title, priority and owner, *held by <name>* when a member claims it, sorted by priority
+    then id; `shown` the rows before the fold."""
+    held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
+    entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+    out = []
+    for key, label in LEDGER_LISTS:
+        rows = sorted(
+            ({**e, "held": held.get(e["id"], "")} for e in entries if e.get("for_page") == key),
+            key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"]),
+        )
+        out.append({"key": key, "label": label, "rows": rows, "fold": max(0, len(rows) - LEDGER_FOLD)})
+    return out
+
+
+def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The Doing section's filter chips (§4.5a *Repo page: doing filters*): *all (n)* and one per
+    doer in the feed, the busiest first."""
+    tally: dict[str, int] = {}
+    for d in rows:
+        tally[d["name"]] = tally.get(d["name"], 0) + 1
+    return [{"who": "", "label": "all", "n": len(rows)}] + [
+        {"who": w, "label": w, "n": n} for w, n in sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+
+
+def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str, Any]:
+    """Mark `v` compact when it is a member of a team (§4.5a *card: compact*): a `team` badge, live
+    or not — a team with nothing live draws its summary and compact cards too, once unfolded
+    (TD-192). The full card stays on *No team*. `fleet` is kept for the callers' shape."""
+    if v.get("team"):
+        v["compact"], v["compact_line"] = True, compact_line(v)
+    return v
+
+
+def who_for_what(roles: Collection[Mapping[str, Any]], views: Collection[Mapping[str, Any]]) -> list[str]:
+    """The team header's **who for what** line (design §4.5a *team groups*, §4.8 *A role says when to
+    message it*; TD-162, built by TD-171): one phrase per role the definition names, in its order,
+    from the role's `message:` line — the definition's words, never a session's. A role one session
+    holds reads *<line> → <name>*, and an empty seat *(on call)* after the name; a role several
+    hold reads *<Label>: <line>*, since no one name answers for them. A role with no line is left
+    out, and a team whose roles carry none has no line at all (an empty list). The line comes from
+    a view of a session holding the role, which resolved it with the repo's and the org's layers;
+    where no session holds it yet, from the built-in preset."""
+    by_name = {str(v.get("name") or ""): v for v in views}
+    out: list[str] = []
+    for r in roles:
+        role, names = str(r.get("role") or ""), [str(n) for n in r.get("names") or ()]
+        held = [by_name[n] for n in names if n in by_name]
+        line = next((str(v.get("message_line") or "") for v in held if v.get("message_line")), "")
+        line = line or str((repoconfig.PRESETS.get(role) or {}).get("message") or "")
+        if not line:
+            continue
+        if len(names) == 1:
+            v = by_name.get(names[0])
+            empty = bool(r.get("seat")) and (v is None or v.get("seat") or v.get("state") in ("exited", "closed"))
+            out.append(f"{line} → {names[0]}{' (on call)' if empty else ''}")
+        else:
+            label = next(
+                (str(v.get("role_label")) for v in held if v.get("role_label")), repoconfig.default_label(role)
+            )
+            out.append(f"{label}: {line}")
+    return out
+
+
+def team_groups(
+    views: list[dict[str, Any]],
+    rows: Collection[dict[str, Any]] = (),
+    repos: Mapping[str, Any] | None = None,
+    doing: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]] | None:
+    """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
+    derived from the views on every render and every delta, never stored. `rows` is the definitions
+    (`teamrun.rows`). `None` when no session carries a badge and nothing is defined — the page then
+    renders the flat grid, with no header anywhere. A team with nothing live keeps its group
+    (2026-09-18): dead cards under a team's name are still that team's, and a definition no session
+    carries is a group with no members, because its card is where Start lives.
+
+    The badge decides the group; `controllers` decides the manager: the one member holding
+    `control` that other members of the same group list as a controller. A group without one
+    has no manager card and its header says so. Within a group the manager comes first, then the rest in
+    urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
+    per group in Pinned mode. Down the page: the teams with something live, the sessions with no
+    badge as *No team*, then the teams with nothing live.
+
+    A manager carrying a different badge from its members — which `ao team start` never produces, but a
+    hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
+    only inside the group (review of PR #117). Its card stays where its own badge puts it; the
+    header names it and says so, because moving the card would contradict the badge.
+
+    A team carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*) from `repos` (the
+    home's repo facts) and `doing` (its doing log), live or not — a team with nothing live shows what
+    it left once unfolded (TD-192) — and its members are marked compact; its header then drops the
+    state counts, which the member cards say, but for the fold."""
+    defs = {str(r["name"]): r for r in rows}
+    by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
+    for v in views:
+        by_team.setdefault(str(v.get("team") or NO_TEAM), []).append(v)
+    if not any(t != NO_TEAM for t in by_team):
+        return None
+    groups: list[dict[str, Any]] = []
+    for team in sorted(by_team):
+        members = sorted(by_team[team], key=card_order)
+        manager, manager_elsewhere = None, False
+        if team != NO_TEAM:
+            named = {c for m in members for c in (m.get("controllers") or [])}
+            # The fleet, not just this group: a manager whose own badge differs is still this group's
+            # manager, and saying "managed by you" over a group that plainly has one would be a lie.
+            managers = sorted(
+                (v for v in views if has_control(v.get("capabilities")) and v["id"] in named),
+                key=lambda v: (str(v.get("team") or "") != team, v["rank"], v["name"]),  # our own badge first
+            )
+            if managers:
+                manager = managers[0]
+                if manager in members:
+                    members.remove(manager)
+                    members.insert(0, manager)
+                else:
+                    manager_elsewhere = True
+        projects = sorted({str(m.get("project")) for m in members if m.get("project")})
+        row = defs.get(team) or {}
+        # live, concluded, wound down and Forget all read the team's unattended sessions: a person's
+        # session in it keeps nothing live (design §4.9 *A person in the team*, TD-173)
+        crew = [m for m in members if not teamrun.persons(m)] if team != NO_TEAM else members
+        live = sum(1 for m in crew if m.get("state") not in DEAD)
+        people = [m for m in members if teamrun.persons(m) and m.get("state") not in DEAD] if team != NO_TEAM else []
+        c = row.get("concluded")
+        # the definition's rows read the raw records; a view that disagrees about what is live (a
+        # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
+        concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
+        # never a person's card, live or closed: Forget all is a team act (§4.9 *A person in the team*)
+        dead = [m for m in crew if not m.get("seat") and m.get("state") in DEAD] if team != NO_TEAM and not live else []
+        ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
+        waiting = prs_waiting(members) if team != NO_TEAM else None
+        summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM else None
+        if summary:
+            for m in members:
+                m["compact"], m["compact_line"] = True, compact_line(m)
+        groups.append(
+            {
+                "team": team,
+                "label": team or "No team",
+                # the header names its manager only when that card is in another group (TD-095: its
+                # name, state and line are on its own card, the first here); `role_label` is what it
+                # is called there (§4.8 *The names*, TD-076): *Manager*, or its role's own label.
+                "manager": {k: manager.get(k) for k in ("id", "name", "state", "role_label")} if manager else None,
+                "manager_elsewhere": manager_elsewhere,  # its card sits under its own badge, not here
+                "members": members,
+                "ids": [m["id"] for m in members],
+                "projects": projects or list(row.get("projects") or []),
+                "needs": sum(1 for m in members if m.get("state") == "needs-you"),
+                "prs_waiting": waiting,
+                "summary": summary,
+                "live": live,
+                # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the
+                # team's sessions are, once, and how many are in each state — never its manager's
+                # name, state or line, which are on the manager's card, the first in the group
+                "place": group_place(members),
+                # …and, on any team, how many wait for a person's Close (TD-156 (b): a concluded
+                # team's idle cards were folded away and read as already closed)
+                "counts": state_counts(members) + ([f"{ready} ready to close"] if ready else []),
+                # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
+                "defined": team in defs,
+                "source": row.get("source"),
+                "in_org": bool(row.get("in_org")),  # Members… edits org.yml's teams only (TD-172)
+                "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
+                "def_members": row.get("members"),
+                "def_techlead": row.get("techlead"),  # the seat's name (§4.9b), when the definition has one
+                # *nothing running* and *nothing left to run* are different facts (§4.9a)
+                "wound_down": row.get("wound_down"),
+                "wound_down_age": row.get("wound_down_age"),
+                # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
+                # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
+                # since a wind-down would only wake the manager to find nothing to wind down
+                "concluded": concluded,
+                "concluded_age": row.get("concluded_age") if concluded else "",
+                "stopped": not live or concluded is not None,
+                # a person's live sessions in the team, named apart in Wind down's and Stop now's
+                # confirm: a team act never stops an interactive session (§4.9, §9 invariant 5)
+                "stays": [teamrun.stays_line(m) for m in people],
+                # design §4.5a team card **Forget all** (TD-071 item 1): on a team with nothing live,
+                # the Forget each card carries, on every card but those with the dirty / unpushed
+                # flag — Forget drops the record that points at the worktree, and unpushed work would
+                # lose its only pointer, so those are named apart and forgotten one at a time. A seat
+                # with nobody in it is neither: its card never offers Forget while the definition
+                # names it (`next_act`), and Forget all does not go round that
+                "forget": [m for m in dead if not m.get("flag")],
+                "forget_kept": [m for m in dead if m.get("flag")],
+                # design §4.5a team header **✉ n** (TD-071 item 2): what the fold hides of the cards'
+                # unread chips — display only, the mail stays where it is (§4.10)
+                "unread": sum(int(m.get("unread") or 0) for m in members),
+                # design §4.5a *team groups* **who for what** (§4.8, TD-171): whom to write to, by role
+                "who": who_for_what((defs.get(team) or {}).get("roles") or (), views) if team != NO_TEAM else [],
+            }
+        )
+    # what is running is read first; *No team* is never "stopped" — nothing there starts as one
+    # …and among the live teams, one with a session that needs a person comes first (2026-09-18)
+    groups.sort(
+        key=lambda g: (2 if g["team"] and g["stopped"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
+    )
+    return groups
