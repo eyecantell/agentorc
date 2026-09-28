@@ -335,6 +335,17 @@
       // design §4.5a Focus header **stops** badge (§6, TD-026): the same shape — the person types
       // a time, the agent parses it and says no if it cannot. Empty clears it, deliberately: a
       // session that should run on is a decision, not a restart.
+      // design §4.5a **starts** note / **Start now** (§6 *Start time*, TD-152): `now`, or the time
+      // asked for when the note itself is pressed on Focus
+      if (action === "start") {
+        let at = b.dataset.at || "now";
+        if (b.dataset.ask) {
+          const when = prompt("Start this session at… (20:00, +2h, an ISO time, or now)", "now");
+          if (!when) return;
+          at = when.trim();
+        }
+        body = { at };
+      }
       if (action === "stop") {
         // Filled from the record, not from the badge: the badge reads "stops Mon 06:00" once the
         // stop is not today and gains "· wrap-up sent" after the agent has asked, and both of
@@ -503,6 +514,7 @@
       }
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
+      if (action === "start") AO.toast(res.start_note ? `${res.start_note} — the agent starts it then` : "starts on the next tick", true);
       if (action2 === "controllers") {
         AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
         if (typeof AO.refreshMembership === "function") AO.refreshMembership();
@@ -2003,6 +2015,15 @@
     // attach sets no mouse option, so tmux asks for no tracking, a plain drag selects here and
     // Shift+click grows it. The wheel and Shift+PageUp/PageDown reach tmux's history by scroll
     // messages (below); a local buffer would only ever hold stale repaints.
+    if (s.state === "scheduled") {
+      // §6 *Start time*: no pane yet, so no terminal — the banner stands, and the page looks again
+      // while it waits, so the session's terminal appears once the agent has started it
+      // — but never under a person's hands: an open dialog (a Message… being written) or a field
+      // with the focus puts the look off until they are done
+      const busy = () => !!document.querySelector("dialog[open]") || ["INPUT", "TEXTAREA"].includes((document.activeElement || {}).tagName);
+      setInterval(() => { if (!busy()) location.reload(); }, 20000);
+      return;
+    }
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();

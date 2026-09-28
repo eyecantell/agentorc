@@ -51,6 +51,7 @@ from sessionorc.models import (
     report_head,
     report_line,
     report_ref,
+    start_note,
     stop_note,
     tokens_short,
 )
@@ -631,6 +632,21 @@ def _countdown(iso: str | None, now: datetime) -> str:
     return f"via hook · {left} left" if left else "via hook · falling through to the terminal"
 
 
+def start_fields(at: str, unattended: bool) -> dict[str, str]:
+    """The New session **At** field (design §6 *Start time*, §4.5a, TD-152): parsed as Until is, in the
+    caller's clock, and refused on a session that is not Unattended, as Until is — the agent refuses
+    it too, and a past time or an Until not after it, in its own words."""
+    text = (at or "").strip()
+    if not text:
+        return {}
+    if not unattended:
+        raise HTTPException(400, "a start time applies to unattended sessions: tick Unattended, or clear At")
+    try:
+        return {"start_at": clistop(text, "At")}
+    except AgentError as e:
+        raise HTTPException(400, str(e)) from None
+
+
 def stop_fields(until: str, unattended: bool) -> dict[str, str]:
     """The New session **Until** field (design §6, §4.5a, TD-026). Same rule as `ao new --until`:
     the friendly shapes are parsed here, in the caller's clock, and the agent is handed an instant;
@@ -1036,6 +1052,7 @@ def view(
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
+    d["start_note"] = start_note(s)  # §6 *Start time*, §4.5a **starts** note (TD-152): a scheduled record's
     d["gated"] = gated_view(s.get("gated"))  # the usage gate's pause (§6, TD-100): a mark, never a state
     d["grants_all"] = list(GRANTS)
     # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
@@ -3536,6 +3553,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         project: str = Form(""),
         team: str = Form(""),
         until: str = Form(""),
+        at: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
         grant: Annotated[list[str], Form()] = NO_GRANTS,
     ):
@@ -3597,8 +3615,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)
             team=team.strip(),  # the badge and the group, as `ao new --team` sets it (§4.9)
             **stop_fields(until, unattended == "on"),
+            **start_fields(at, unattended == "on"),
         )
-        return RedirectResponse(f"/focus/{s['id']}", status_code=303)
+        # a scheduled record has no terminal yet: the Org shows its card with the *starts* note (§4.5a At)
+        return RedirectResponse("/" if s.get("state") == "scheduled" else f"/focus/{s['id']}", status_code=303)
 
     @app.post("/shell")
     async def shell(dir: str = Form(...), name: str = Form("")):  # unnamed: the agent names it (TD-030)
@@ -3713,6 +3733,17 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "session reports it done or dropped, once the PR is merged or closed",
                 )
             await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
+        elif action == "start":
+            # design §4.5a **starts** note on Focus and the banner's / `more ▾`'s **Start now** (§6
+            # *Start time*, TD-152): `now`, or a time as `ao at` takes it; the agent refuses a
+            # record that already started, in its own words
+            when = str(body.get("at") or "now").strip()
+            try:
+                at = "now" if when.lower() == "now" else clistop(when, "start time")
+            except AgentError as e:
+                raise HTTPException(400, str(e)) from None
+            s = await call("set_start", id=sid, start_at=at)
+            return JSONResponse({"ok": True, "start_note": start_note(s), "start_at": s.get("start_at")})
         elif action == "stop":
             # design §4.5a Focus header **stops** badge → click to edit (§6, TD-026). The stop time
             # was settable at New session and from `ao until` and nowhere else, so a person who set

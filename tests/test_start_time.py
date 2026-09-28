@@ -6,6 +6,7 @@ record superseded in place with its mail, a failed start counted up to the ceili
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -201,3 +202,51 @@ async def test_a_sessions_set_start_moves_the_time_but_never_spends_the_ceiling(
                 await session.call("set_start", id=sid, start_at="now")
         await person.call("set_start", id=sid, start_at="now")  # a person's spends it
         assert agent.sessions[sid].restart_ceiling is None and agent.sessions[sid].restarts == []
+
+
+# ── slice 3: `ao new --at`, `ao at`, the *starts* note, the page (§4.7, §4.5a) ──────────────────
+
+
+def test_the_starts_note_is_the_stops_formatter_on_a_scheduled_record_only():
+    from sessionorc.models import start_note
+
+    soon = datetime.now().astimezone().replace(second=0, microsecond=0) + timedelta(minutes=5)
+    if soon.date() != datetime.now().astimezone().date():
+        soon -= timedelta(minutes=10)
+    at = soon.astimezone(UTC).isoformat()
+    assert start_note({"state": "scheduled", "start_at": at}) == f"starts {soon:%H:%M}"
+    assert start_note({"state": "working", "start_at": at}) == ""
+    assert start_note({"state": "scheduled", "start_at": "garbage"}) == ""
+    far = soon + timedelta(days=3)
+    assert start_note({"state": "scheduled", "start_at": far.astimezone(UTC).isoformat()}) == f"starts {far:%a %H:%M}"
+
+
+async def test_ao_new_at_and_ao_at_drive_the_start(agent, tmp_path, capsys, monkeypatch):
+    from agentorc import cli
+
+    await park_ticks(agent)
+    monkeypatch.chdir(tmp_path)
+    assert await asyncio.to_thread(cli.main, ["new", "w", "--adapter", "shell", "--unattended", "--at", "+2h"]) == 0
+    out = capsys.readouterr().out
+    (sid,) = [k for k, v in agent.sessions.items() if v.name == "w"]
+    assert agent.sessions[sid].state == "scheduled" and "starts " in out and "attach" not in out
+    assert await asyncio.to_thread(cli.main, ["new", "x", "--adapter", "shell", "--at", "+2h"]) == 1
+    assert "--at applies to unattended sessions" in capsys.readouterr().err
+    assert await asyncio.to_thread(cli.main, ["at", sid, "+3h"]) == 0
+    assert "starts " in capsys.readouterr().out
+    assert await asyncio.to_thread(cli.main, ["at", sid, "now"]) == 0
+    assert agent.sessions[sid].start_at <= _iso(datetime.now(UTC) + timedelta(seconds=1))
+    assert await asyncio.to_thread(cli.main, ["close", sid]) == 0
+    assert sid not in agent.sessions
+
+
+def test_mail_to_a_scheduled_record_reads_when_it_starts():
+    from sessionorc import mail
+    from sessionorc.models import Session
+
+    s = Session(id="ao-r-w", name="w", kind="interactive", adapter="hookstub", dir="/tmp", unattended=True)
+    s.set_state("scheduled", confidence="hook")
+    soon = datetime.now().astimezone().replace(second=0, microsecond=0) + timedelta(minutes=5)
+    s.start_at = soon.astimezone(UTC).isoformat()
+    got = mail.read_when(s, "note", datetime.now(UTC))
+    assert got == f"read when it starts, at {soon:%H:%M}" or got.startswith("read when it starts, at ")

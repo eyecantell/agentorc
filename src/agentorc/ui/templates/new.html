@@ -92,6 +92,12 @@
       <input class="input mono" name="until" placeholder="06:00 · +8h · an ISO time">
       <span class="note">when an <b>unattended</b> session stops: at it the agent asks it to wrap up and stops it once it settles, ten minutes at the outside. Empty: nothing stops it.</span>
     </div>
+    {# design §6 *Start time* / §4.5a New session **At** field (TD-026, built by TD-152): the start the
+       session waits for; empty means now. Refused without Unattended and with an Until not after it. #}
+    <div class="field"><label>At (optional)</label>
+      <input class="input mono" name="at" placeholder="20:00 · +2h · an ISO time">
+      <span class="note">when an <b>unattended</b> session starts: its name and directory are taken now, and the agent starts it at the time. Empty: now.</span>
+    </div>
     <label class="radio gap"><input type="checkbox" name="unattended"{% if prefill.unattended %} checked{% endif %}><div><div>Unattended</div><div class="note">off: interactive — never paused, sent to, or killed by a policy. on: policies apply (phase 3).</div></div></label>
     {# design §4.5a New session **Controllers** picker (§4.8, TD-036): which sessions may act on
        this one once it starts. The candidates are the sessions holding `control` — nothing
