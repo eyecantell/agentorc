@@ -112,6 +112,9 @@ class TickMixin:
         if self.mode == "home" and (self._repos_task is None or self._repos_task.done()):
             # detached as the usage refresh is: `gh` talks to the network (§4.4 *Repo facts*)
             self._repos_task = asyncio.create_task(self._refresh_repos())
+        if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
+            # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
+            self._promote_task = asyncio.create_task(self._refresh_promotes())
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
@@ -953,6 +956,15 @@ class TickMixin:
                 if str(f) not in live and f.stat().st_mtime < cutoff:
                     f.unlink()
                     log.info("pruned run log %s (older than %d days)", f.name, keep)
+            except OSError:
+                continue
+        # a promote's log goes with the run logs (§6 *Promote*), unless its run is still in flight
+        inflight = {str(r["inflight"].get("log")) for r in self._promotes.values() if r.get("inflight")}
+        for f in (paths.home() / "promotes").glob("*/*.log"):
+            try:
+                if str(f) not in inflight and f.stat().st_mtime < cutoff:
+                    f.unlink()
+                    log.info("pruned promote log %s (older than %d days)", f, keep)
             except OSError:
                 continue
 

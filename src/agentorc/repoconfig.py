@@ -288,7 +288,7 @@ class RepoConfig:
     commands: list[dict[str, Any]] = field(default_factory=list)
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
     # §5 `promote:` (§6 *Promote*, TD-120): `{run, check}`, accepted and checked now so writing the
-    # designed block does not break `ao new` in that repo; TD-132 is what runs it (TD-149 (2))
+    # designed block does not break `ao new` in that repo; `sessionorc.promote` runs it at the home (TD-132)
     promote: dict[str, str] | None = None
 
 

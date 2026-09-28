@@ -583,11 +583,13 @@ class WakeMixin:
     async def rpc_host(self) -> dict[str, Any]:
         """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
         whether the home can be reached — which a client on a node needs before it labels what it
-        shows *offline*; and which build it runs and since when (§4.4, TD-062)."""
+        shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
+        promote's readings per repo (`promotes`, §6 *Promote*)."""
         out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
         out["built_from"], out["started_at"] = dict(self.build), self.started_at
         if self.mode == "home":
             out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
+            out["promotes"] = self._promotes_view()
         else:
             out["link"] = dict(self.home_link)
         return out

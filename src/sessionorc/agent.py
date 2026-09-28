@@ -138,6 +138,7 @@ from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_inbox import InboxMixin
 from sessionorc.agent_link import LinkMixin
 from sessionorc.agent_mail import MailMixin
+from sessionorc.agent_promote import PromoteMixin
 from sessionorc.agent_remote import RemoteMixin
 from sessionorc.agent_serve import ServeMixin
 from sessionorc.agent_tick import TickMixin
@@ -170,7 +171,16 @@ from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
 
 
 class HostAgent(
-    ServeMixin, TickMixin, AttentionMixin, WakeMixin, InboxMixin, MailMixin, IdentityMixin, RemoteMixin, LinkMixin
+    ServeMixin,
+    TickMixin,
+    PromoteMixin,
+    AttentionMixin,
+    WakeMixin,
+    InboxMixin,
+    MailMixin,
+    IdentityMixin,
+    RemoteMixin,
+    LinkMixin,
 ):
     def __init__(
         self,
@@ -378,6 +388,13 @@ class HostAgent(
         self._repos_read_at = float("-inf")  # monotonic: the first tick reads
         self._ledger_mtime: dict[str, float | None] = {}
         self._repos_task: asyncio.Task[None] | None = None
+        # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
+        # what must survive a restart (a run in flight, a failure) is in its intent files.
+        self._promotes: dict[str, dict[str, Any]] = {}
+        self._promote_read_at = float("-inf")  # monotonic: the first tick reads
+        self._promote_watch_at = float("-inf")
+        self._promote_bad: dict[str, str] = {}
+        self._promote_task: asyncio.Task[None] | None = None
         # the last fifty `ao doing` calls per team (design §4.8 *the doing log*, TD-176 slice 2)
         self.doing_log = DoingLogStore()
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
