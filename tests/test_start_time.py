@@ -122,3 +122,18 @@ async def test_a_start_that_fails_counts_up_to_the_ceiling(agent, tmp_path):
         assert all(r["why"] == "start" and "no launch record" in r["error"] for r in rec.restarts)
         await agent._keep_running(now)
         assert agent.sessions[sid].restart_ceiling and len(agent.sessions[sid].restarts) == RESTART_CEILING
+
+
+async def test_start_of_names_only_the_record_it_starts(agent, tmp_path):
+    """`start_of` lets a create through the scheduled record's own name and slot, and no other: it is
+    never a way to supersede a scheduled record from another name or directory."""
+    await park_ticks(agent)
+    other = tmp_path / "other"
+    other.mkdir()
+    async with LocalClient() as person:
+        sid = (await _scheduled(person, tmp_path))["id"]
+        with pytest.raises(AgentError, match="start_of must name it"):
+            await person.call("create", name="x", dir=str(other), adapter="shell", unattended=True, start_of=sid)
+        with pytest.raises(AgentError, match="not a scheduled record"):
+            await person.call("create", name="x", dir=str(other), adapter="shell", start_of="ao-nope")
+        assert agent.sessions[sid].state == "scheduled"

@@ -638,6 +638,11 @@ class HostAgent(
                 name = await asyncio.to_thread(self._auto_name, directory, repo, adapter)
             # Refuse here; *take* the name below, once the launch has succeeded. Taking it kills a
             # pane, and a launch that then failed would have killed it for nothing (review).
+            base_of = naming.base_id(directory, repo, name)
+            if starting is not None and (starting.dir != str(directory) or not starting.id.startswith(base_of)):
+                # the start is of that record, under its name and in its directory — never a way to
+                # supersede some other scheduled record from elsewhere (§6 *Start time*)
+                raise RpcError(f"{start_of} is scheduled as {starting.name} in {starting.dir}: start_of must name it")
             holder = starting if starting is not None else await self._name_holder(directory, repo, name)
             if isinstance(holder, Session):
                 self._refuse_suspended(holder, caller, "a create under that name")
