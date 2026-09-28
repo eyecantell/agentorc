@@ -20,7 +20,7 @@
       <span class="pill nog s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.host_note or ('guessed from the screen' if s.scraped else 'reported by the tool') }}">{{ s.state_label }}</span>
     </div>
-    <div class="row r2"><span class="meta cline" title="{{ s.slot.full or s.slot.text }}">{{ s.compact_line }}</span><span class="grow"></span>{% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
+    <div class="row r2"><span class="meta cline" title="{{ s.slot.full or s.slot.text }}">{{ s.compact_line }}</span><span class="grow"></span>{% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}{% if s.flag %}<span class="flag" title="{{ s.flag }}">⚠ {{ s.flag_short or s.flag }}</span>{% endif %}</div>
   </div>
   {% else %}
   <div class="sc-body">

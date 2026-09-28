@@ -348,7 +348,7 @@ details.fold[open] > summary { margin-bottom: 3px; }
 .sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { display: flex; flex-direction: column; gap: 4px; } .sc-foot { display: flex; gap: 6px; align-items: center; height: var(--foot); }
 .sc-body > .row { height: var(--row); flex-wrap: nowrap; overflow: hidden; } .sc-body > .row.r1 { height: var(--row1); }
 .sc-body > .row > * { flex: 0 1 auto; min-width: 0; } .sc-body > .row > .grow { flex: 1 1 0; }
-.sc .r1 .name, .sc .r1 .pill, .sc .r2 .age, .sc .r3 .flag { flex-shrink: 0; }
+.sc .r1 .name, .sc .r1 .pill, .sc .r2 .age, .sc .r3 .flag, .sc .r2 .flag { flex-shrink: 0; }
 .sc .badge { white-space: nowrap; }
 .sc .r2 .mode { font-size: var(--t-small); } .sc .r2 .mode.mine { color: var(--fg); font-weight: 600; } .sc .r2 .mode .ricon { vertical-align: -2px; margin-right: 3px; }
 .sc .r3 .under { flex-shrink: 0; }
