@@ -55,6 +55,7 @@ class Fleet:
                 "kind": "agent",
                 "adapter": params.get("adapter") or "claude-code",
                 "controllers": list(params.get("controllers") or []),
+                "unattended": bool(params.get("unattended")),
                 "team": params.get("team", ""),
                 "project": params.get("project", ""),
                 "previous_run": None,
@@ -145,8 +146,11 @@ def write_org(tmp_path, doc):
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
 
 
-def badged(name, team, project="ao", state="working"):
-    return {"id": name, "name": name, "state": state, "dir": "/tmp", "kind": "agent", "team": team, "project": project}
+def badged(name, team, project="ao", state="working", unattended=True):
+    return {
+        "id": name, "name": name, "state": state, "dir": "/tmp", "kind": "agent", "team": team, "project": project,
+        "unattended": unattended,
+    }  # fmt: skip
 
 
 # ── the strip's contents (design §4.5a Org **Teams** strip) ───────────────────────────────────

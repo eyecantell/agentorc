@@ -29,6 +29,7 @@ from typing import Any
 from agentorc import org as orgmod
 from agentorc import profiles, repoconfig
 from sessionorc import naming
+from sessionorc.models import REVIEW_BOUND
 
 WRAPUP_PROMPT = (
     "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
@@ -439,6 +440,41 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         review=dict(role.review) if role.review else None,
         context_bound=role.context_bound,
     )
+
+
+def team_review(team: orgmod.TeamDef, roles: dict[str, Any]) -> dict[str, Any] | None:
+    """The reader a person's session in the team takes when its role carries no `review:` of its own
+    (design §4.9 *A person in the team*, TD-160): `{reader: techlead, held, bound}` when the
+    definition holds a techlead seat — `held` the union of the `held:` lists of the team's member
+    roles, so a person is held to the paths its workers are held to, no more — else None. `roles`
+    maps a member role's name to its resolved role (anything with `.review`); a role it lacks, or
+    one with no `review:`, adds nothing, and a team whose members hold no path gives None."""
+    if team.techlead is None:
+        return None
+    held: set[str] = set()
+    for m in team.members:
+        if m.team is not None:
+            continue  # a nested team is its own definition, with its own reader
+        review = getattr(roles.get(m.role), "review", None)
+        if review:
+            held.update(review.get("held") or [])
+    if not held:
+        return None
+    return {"reader": "techlead", "held": sorted(held), "bound": REVIEW_BOUND}
+
+
+def team_roles(team: orgmod.TeamDef, cfg: repoconfig.RepoConfig, overlay: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """The team's member roles resolved against one repo's file and the org's overlay, for
+    `team_review`: a role that does not resolve there is left out, never an error — the reader is a
+    safety net, and a start must not fail on a role it would only have read."""
+    out: dict[str, Any] = {}
+    for m in team.members:
+        if m.team is None and m.role and m.role not in out:
+            try:
+                out[m.role] = repoconfig.resolve_role(cfg, m.role, overlay)
+            except (KeyError, ValueError):
+                continue
+    return out
 
 
 def _trigger(member: Spec) -> dict[str, str]:

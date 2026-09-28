@@ -2623,7 +2623,7 @@ for another's, since the channels are ungated:
   text only; `--json` carries the entries as the record holds them.
 - `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k*, and *(over)* past it — and `--json` the `context` and `context_bound` fields (§6 rule 5, TD-188, TD-190).
 
-**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, not built — TD-173: today it sets the badge and nothing else) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
+**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, built 2026-09-27 — TD-173 slice 1) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
 
 **Presets and grants.** `ao new --role grinder --lane TD-027,TD-019` (TD-028, TD-040,
 `agentorc.repoconfig`): the preset fills the brief from its template with `{lane}` filled and `--brief <path>` in its `{repo}` slot (§4.8; `--prompt` is raw text and fills nothing, and is refused beside `--brief`), the
@@ -3673,10 +3673,12 @@ member's name. `ao team status <name>` is the manager's Members view for a termi
 with state, lane and report line. `ao team list` shows every definition, its source file, and
 whether it is live. A team is **live** when any **unattended** session carrying its badge is live
 (a person's own session in the team keeps nothing live, *A person in the team* below; TD-160, designed
-2026-09-25, not built — TD-173: today every session with the badge counts); there
+2026-09-25; `ao team stop` reads it so since TD-173 slice 1, the page not yet — there every session
+with the badge counts); there
 is no team record — a stopped team is only its definition.
 
-**A person in the team (TD-160; designed 2026-09-25, not built — TD-173).** Paul: *I should
+**A person in the team (TD-160; designed 2026-09-25; the CLI half built 2026-09-27 — TD-173 slice 1,
+`ao new --team` and `ao team stop`; the form, the page's derivations and its confirm not yet).** Paul: *I should
 start having interactive sessions on the team itself to prove the project and get the benefits —
 tmux stays alive, and PRs get routed through the techlead.* The mechanism was already here — a
 `--team` session with a role whose preset carries `review:` gets the reader a grinder does
@@ -3713,6 +3715,9 @@ session form had no Team field, and nothing said what a team act does to a perso
 - **The CLI**: `ao new <name> --team <team>` is the terminal's form of the same start — the badge,
   the group, the manager as a controller, the team's reader — and its help line says so, in place
   of *a badge, nothing keys on it*, which stays true of the badge and was read as *this does nothing*.
+  It prints the reader the session got, or *no reader*, and a team the org does not define stays a
+  badge, said once. `ao team stop` leaves a person's session in the team alone and prints its
+  *stays* line; with only a person's session live it stops nothing and says so.
 
 **Add or remove a member from the team card (TD-163; designed 2026-09-25, built 2026-09-26 — TD-172).**
 Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the
