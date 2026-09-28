@@ -4818,10 +4818,11 @@ when its asker's record is closed, forgotten, or cancelled before its start: it 
 the home writes **`orphaned: {at, how, ref, name, repo, host, team}`** on the entry — `how` one of
 `closed`, `forgotten`, `cancelled`, the rest copied from the record at that moment, since a
 forgotten record can be asked nothing afterwards. **`about` is free text nobody checks at the
-send** (*Outcomes*, below), so the home checks it here: it names a reference when the check a
-claim's reference passes (§4.8, `normalize_ref`) accepts it, and the entry is held under the
-reference as that check writes it, which is the form a lease's `ref` has and so what the holder
-is matched on. It is the envelope's field that is read, never the message's text. A question
+send** (*Outcomes*, below), so the home checks it here: it names a reference when it has one of
+the two machine-readable shapes a claim's reference is canonicalised to (§4.8, `normalize_ref`):
+a ledger id (`TD-027`) or a PR number (`#59`). A board line is prose to the home and is not one
+here. The entry is held under the canonical form, which is the form a lease's `ref` has and so
+what the holder is matched on. It is the envelope's field that is read, never the message's text. A question
 with no `about`, or one whose `about` is a session's id or prose, closes `asker_gone` as before,
 and its FYI row says so. A record a resume superseded is no more a gone asker here
 than above: its questions moved with the conversation and are not orphaned.
