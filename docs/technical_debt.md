@@ -83,15 +83,15 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2)–(8) done; (1) on a steer |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Partly done — slices 1–2 (billing on the profile, the adapter's spend) built; slice 3, the home's ledger, next |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Built — live walk pending after the next promote |
-| TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Designed 2026-09-25 (the designer) — the build is TD-165, TD-166; archives with them |
+| TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
-| TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Built — live check pending |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Built — live look pending |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Built — live look pending after the next promote |
+| TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-180 | Add a TD from the UI: the person writes what they have and an agent asks what it needs and writes the entry, or the form opens an interactive designer or techlead session prefilled | Medium | Open — design-first; answered 2026-09-28 |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Built — the live commit check waits on the promote |
@@ -102,11 +102,11 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Built — the live look waits on the promote |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
-| TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Open — design-first |
-| TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
-| TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
+| TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Designed 2026-09-28 — the build is TD-217 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
+| TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
 | TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — mechanism and a recommended fix; the shape is Paul's (board, 2026-09-12) |
+| TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
 | TD-207 | The Inbox shows board items only once they are due, and says so nowhere: a grinder's two *act* items due in a week read to Paul as messages that never arrived; a setting for the horizon, drawn on the page | Medium | Open — design-first |
 | TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
@@ -117,6 +117,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 | TD-215 | Build the orphaned question, the home's half: `_asker_gone` orphans a question that names a reference, `orphaned` on the entry, a `steer` that waits from its bound, adoption at a create under the asker's id, the lapse note that names the default | High | Open — pickable |
 | TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — after TD-215 |
+| TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Open — pickable |
 
 
 ---
@@ -1976,8 +1977,9 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Added:** 2026-09-26 (found at the Org page: manager-ao-1's card line)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-217
+**Status:** Designed 2026-09-28 (the designer, PR #702; the steer to Paul is `m-91f953c76cbc`, bound 2026-09-28 21:21 MDT): design §6 *Keeping a team running* rule 7 (**Brief changed**) and its launch-record paragraph, §4.8 *A repo's brief is a supplement* (when a promote's change arrives), §4.4a (`brief`, `brief_changed` among the home's fields), §4.5a the **brief changed** chip. Found while reading: a restart replays the prompt stored at the first start, so even a restarted member kept the old brief; only a team's Start read a new one. Settled: the launch record keeps what the prompt was made from and a replay reads those files again, as merged (`origin/<default>`), the host agent filling slots and knowing no role; the record marks a changed brief after a ten-minute settle; a working member is told on its `ao` replies and declares the restart, an idle one holding nothing is restarted by the tick (the manager's case); the manager stays outside TD-189's context bound. Option (b), a note naming what changed, is not taken. One choice steered to Paul: that the tick restarts an idle member by itself, against marking it and leaving the restart to a person. This entry archives with TD-217.
+**Blocked by:** TD-217
 **Location:** design §4.8 (the template and its supplements), §4.9 (team start reads `brief:` from the checkout), `src/agentorc/briefs/manager.md` (*A round*), `docs/cadence-changes.md` (the one relay that exists)
 
 **Why:** a member reads its brief once, at start. manager-ao-1 started 2026-09-25 18:27Z and has run since. #600 (TD-176 slice 6, 2026-09-26) changed the manager template so the manager says each round step with `ao doing`, but this manager never read it. Its card has read *round 1: designer/grinder-1/grinder-2 all working (TD-154, TD-155, TD-138)* from 2026-09-25 18:29Z ever since, though it has run many rounds. The only relay for a changed rule is the manager's own step for `docs/cadence-changes.md`, and it covers the cadence, not the agentorc templates or `docs/briefs/`. A promote changes the template on disk and nothing that is running. The same applies to every long-lived member: a manager restarts only on a crash, and its run is not bounded by TD-189's context limit unless the design says so.
@@ -2242,3 +2244,26 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when** Paul answers an orphaned question from the Inbox and the answer is on the repo's board and in the inbox of the session that holds the entry, the tests above pass, and design §4.4, §4.5a and §4.10 lose their *not built — TD-216*. TD-213 archives with this entry.
 
 **Related:** TD-213 (the design), TD-215 (the home's half), TD-126 / TD-142 (the board reply this follows; its mail half computes the same lease holders), TD-140 (*Put on the board*, the first add).
+
+## TD-217: Build rule 7, brief changed
+
+**Priority:** Medium
+**Added:** 2026-09-28 (the designer, from TD-199's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/repoconfig.py` (`Role.brief_text`: the slots and their sources), `src/agentorc/teams.py` (`_brief`), `src/agentorc/cli.py` (`ao new --brief`, `ao status -v`), `src/sessionorc/agent.py` (`rpc_create`), `src/sessionorc/agent_tick.py` (`_write_launch`, the replay, the keep-running passes), `src/sessionorc/models.py` (`brief`, `brief_changed`, `HOME_OWNED`), `src/sessionorc/gitinfo.py` (a file read at `origin/<default>`), `src/agentorc/ui/` (the chip), `src/agentorc/briefs/*.md` (what the reply clause means); design §6 *Keeping a team running* rule 7. Held path: the techlead reads the PR.
+
+**Why:** TD-199's *Why*, and what its design found: a restart replays the stored prompt, so a changed template reached nobody short of a team's Start.
+
+**Fix, in slices a PR each:**
+1. **`prompt_from`**: `brief_text` returns, beside the text, `{base, slots}` — the template's installed path, and per slot `{file}` or `{text}` (an empty slot is the text the template's `none` word is); `ao team start`, `ao new --role/--brief` and the New session form hand it to `create`; `_write_launch` keeps it. A role with no template and a supplement has the supplement as `base`. No behaviour changes yet.
+2. **The replay**: a replay with `prompt_from` fills `base` from the slots — a file inside a git checkout read at `origin/<default>:<path>` as last fetched, any other file from disk — and hands that prompt to `create`; unreadable, or no `prompt_from`: the stored prompt, `prompt: stored` on the `restarts` entry. `brief: {at, sources: [{path, sha}]}` written on the record at every create, from the texts as read.
+3. **The mark**: on the reports' cadence the home re-reads each source; a difference that has stood `BRIEF_SETTLE` (ten minutes) writes `brief_changed: {at, paths}`; a create clears it. `ao status -v` and `--json`; the chip on the card and the Focus header (§4.5a).
+4. **The two tellings**: the reply clause through `mail` as `mail.context` rides (`mail.brief`), printed by `ao` beside the unread line; the tick's restart of a member that is hook-idle, not a seat, unattended, with no claim in progress, no declaration, git known clean and pushed, no wrap-up, stop time, gate or suspension, on the home — closed, replayed, `why: brief`, under the ceiling. The worker and manager templates gain the sentence that says what the clause means.
+5. **Tests**: a replay after the supplement changed on `origin/main` hands the new text, and the working tree's unmerged edit is not read; an unreadable file replays the stored prompt; a change shorter than the settle marks nothing; the mark clears at the restart; a working member gets the clause and no restart; an idle manager with a clean tree is restarted once; a seat, a finished member, an interactive session, a gated one and a node's member are left alone; `sessionorc` imports nothing of `agentorc` (`tests/test_agent_split.py` stands).
+
+**Done when** a template change that is promoted, or a supplement change that is merged, reaches a running manager within a round — the tick restarts it on the new brief — and until it does the card says *brief changed*; design §6 rule 7, §4.8, §4.4a and §4.5a lose their *not built*.
+
+**Related:** TD-199 (the design), TD-114 (supplements), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-190 (rule 5, whose two tellings this follows), TD-191 (the round log that makes a manager's restart cheap).
