@@ -1861,6 +1861,7 @@
         role.value = [...role.options].some((x) => x.value === keep) ? keep : "plain";
         picker.dataset.default = (o.controllers || []).join(",");
         rnote.textContent = o.error ? `⚠ ${o.error}` : (o.file ? `presets from ${o.file}` : "a preset fills the brief, lane, grants and profile it names; each can be edited before Start");
+        teamRoles();
         applyRole();
       } catch (e) { /* the built-ins rendered with the page still stand */ }
     }
@@ -1925,10 +1926,49 @@
     if (proj) proj.addEventListener("change", applyProject);
     dir.addEventListener("change", applyProject);
 
+    // The Team picker (design §4.5a New session **Team**, §4.9 *A person in the team*, TD-173):
+    // the team's checkouts in the Directory list, Role narrowed to its roles plus `plain`, its live
+    // manager ticked under Controllers, Unattended left off, and the reader its held PRs get — the
+    // one line /api/team_review answers for the team and the directory. "none" undoes all but the
+    // ticks, which are the person's by then.
+    const teamSel = $("#team"), tnote = $("#teamnote");
+    const TNOTE = tnote ? tnote.textContent : "";
+    let tseq = 0;
+    function teamRoles() {
+      const o = teamSel && teamSel.selectedOptions[0];
+      const keep = o && o.value ? ["plain", ...(o.dataset.roles || "").split(",").filter(Boolean)] : null;
+      for (const r of role.options) r.hidden = !!keep && !keep.includes(r.value);
+      if (keep && !keep.includes(role.value)) { role.value = "plain"; applyRole(); }
+    }
+    async function teamLine() {
+      const o = teamSel.selectedOptions[0]; const my = ++tseq;
+      if (!o || !o.value) { tnote.textContent = TNOTE; return; }
+      try {
+        const got = await (await fetch(`/api/team_review?team=${encodeURIComponent(o.value)}&dir=${encodeURIComponent(dir.value.trim())}`)).json();
+        if (my === tseq) tnote.textContent = got.line || TNOTE;
+      } catch (e) { /* the default note stands */ }
+    }
+    function applyTeam() {
+      if (!teamSel) return;
+      const o = teamSel.selectedOptions[0];
+      if (o && o.value) {
+        let dirs = [];
+        try { dirs = JSON.parse(o.dataset.dirs || "[]"); } catch (e) { dirs = []; }
+        options(dirs);
+        if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; check(); loadRoles(); nameCheck(); }
+        if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
+        const un = $("[name=unattended]"); if (un) un.checked = false;
+      } else applyProject();
+      teamRoles();
+      teamLine();
+    }
+    if (teamSel) { teamSel.addEventListener("change", applyTeam); dir.addEventListener("change", teamLine); }
+
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
     applyProject();
     applyRole();  // the ticks the page rendered are the repo's; a role picked later may narrow them
+    if (teamSel && teamSel.value) applyTeam();  // a prefilled team (a Resume of a team's session)
   };
 
   // ---- Focus ----

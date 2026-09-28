@@ -75,6 +75,14 @@ class Stopping:
         return [e["id"] for e in self.acted if e["role"] == "member" and not e.get("refused")]
 
 
+def persons(s: dict[str, Any]) -> bool:
+    """A person's own session (design §4.9 *A person in the team*): one whose record says
+    `unattended: false`. A team's own facts — live, concluded, wound down, what a stop reaches —
+    read the others. Every record carries the field; one that lacks it is read as a worker's, which
+    is what every badged session was before TD-173."""
+    return s.get("unattended") is False
+
+
 def badged(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [s for s in sessions if s.get("team") == name]
 
@@ -253,10 +261,13 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
     when some are and every one is idle and declared, when it concluded (TD-099).
     There is no team record — a team that is stopped is only its definition, so both are counted
     across the fleet on every call."""
-    up = live(sessions)
+    # a team's own facts read its **unattended** sessions: a person's session in the team keeps
+    # nothing live and never winds it down (design §4.9 *A person in the team*, TD-173)
+    crew = [s for s in sessions if not persons(s)]
+    up = live(crew)
     rows_out = []
     for t in org.teams.values():
-        mine = badged(t.name, sessions)
+        mine = badged(t.name, crew)
         n_live = len(badged(t.name, up))
         rows_out.append(
             {
@@ -429,8 +440,8 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     up = live(badged(name, call("list")))
     # A person's session in the team is left alone and named (design §4.9 *A person in the team*):
     # §9 invariant 5 would refuse it anyway, and a stop must not end on that refusal.
-    people = [s for s in up if not s.get("unattended")]
-    up = [s for s in up if s.get("unattended")]
+    people = [s for s in up if persons(s)]
+    up = [s for s in up if not persons(s)]
     if not up and people:
         stays = "; ".join(stays_line(s) for s in people)
         raise teams.TeamError(f"no live unattended session carries the team {name} badge — nothing to stop ({stays})")
