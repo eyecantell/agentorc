@@ -1064,6 +1064,62 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
+def _promote_line(name: str, r: dict[str, Any]) -> str:
+    """One repo's promote readings (design §4.7 `ao promote status`): *agentorc · live 485d28b · main
+    9c1e0f2, 3 ahead · checks green · auto off*, then a run in flight, a failure, or the first
+    precondition that stands."""
+    live = str(r.get("live") or "")[:7] or f"unknown ({r.get('live_why') or 'not read'})"
+    main = str(r.get("main") or "")[:7] or f"unknown ({r.get('main_why') or 'not read'})"
+    ahead = r.get("ahead")
+    main += (
+        f", {ahead} ahead" if isinstance(ahead, int) and ahead else (", live" if r.get("live") == r.get("main") else "")
+    )
+    checks = str(r.get("checks") or "unknown") + (f" ({r['checks_why']})" if r.get("checks_why") else "")
+    line = f"{name} · live {live} · main {main} · checks {checks} · auto {'on' if r.get('auto') else 'off'}"
+    if f := r.get("inflight"):
+        line += f"\n  promoting {str(f.get('sha'))[:7]} · started {f.get('at')} by {f.get('by')} · log {f.get('log')}"
+    elif f := r.get("failed"):
+        line += f"\n  FAILED {str(f.get('sha'))[:7]} at {f.get('at')}: {f.get('why')} · log {f.get('log')}"
+        line += "".join(f"\n    {t}" for t in f.get("tail") or [])
+        line += "\n  nothing is promoted until it is cleared (the Inbox row's Dismiss)"
+    elif u := r.get("unmet"):
+        line += f"\n  not now: {u.get('text')}"
+    return line
+
+
+def cmd_promote(args: argparse.Namespace) -> int:
+    """`ao promote [<repo>]` and `ao promote status` (design §4.7, §6 *Promote*, TD-132 slice 2): the
+    press from a terminal, through the home's `promote` RPC — a person's own, refused to a session —
+    or the readings it keeps (`promotes` on `host`). The press returns once the run is started: the
+    outcome is `check`'s on a later tick, and for this repo the host agent goes away under it."""
+    if args.repo == "status":
+        got = call_sync("host")
+        if "promotes" not in got:
+            raise AgentError(f"the promote runs at the home ({got.get('home')}): run ao promote status there")
+        promotes = got["promotes"]
+
+        def status() -> None:
+            for name, r in promotes.items():
+                print(_promote_line(name, r))
+            if not promotes:
+                print("no registered repo carries a promote: block (design §5) — nothing promotes")
+
+        return emit(args, promotes, status)
+    repo = args.repo or _main_checkout(os.getcwd())
+    if not repo:
+        raise AgentError("this directory is not in a git checkout; name the repo: ao promote <repo>")
+    got = call_sync("promote", repo=repo, **({"sha": args.sha} if args.sha else {}))
+
+    def prose() -> None:
+        print(f"promoting {got['repo']} to {got['sha'][:7]} — log: {got['log']}")
+        if got.get("checks") != "green":
+            why = f" ({got['checks_why']})" if got.get("checks_why") else ""
+            print(f"checks on {got['sha'][:7]} read {got.get('checks') or 'unknown'}{why}: pressed through, your word")
+        print("the outcome is check's on a later tick: ao promote status")
+
+    return emit(args, got, prose)
+
+
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs with their
@@ -2223,6 +2279,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("name", nargs="?", help="the repo's name or its checkout's path. None: the repo of this directory")
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
     p.set_defaults(fn=cmd_repo)
+
+    p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")
+    p.add_argument(
+        "repo", nargs="?", help="the repo's name or its checkout's path, or `status`. None: this directory's"
+    )
+    p.add_argument("--sha", help="a commit other than main's head, for a rollback (not built yet)")
+    p.set_defaults(fn=cmd_promote)
 
     p = add("settings", help="the home's settings.yml, each key with what it makes today (design §5)")
     p.add_argument("--where", action="store_true", help="where every other configured value lives, and when it is read")

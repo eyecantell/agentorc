@@ -16,7 +16,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import hosts, promote
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
 
@@ -259,3 +259,105 @@ async def test_a_fresh_agent_concludes_a_run_it_did_not_start(agent, checkout, m
     async with LocalClient() as person:
         got = (await person.call("host"))["promotes"]["repo"]
     assert (got["live"], got["main"], got["ahead"], got["inflight"], got["unmet"]) == (main, main, 0, None, None)
+
+
+# ── slice 2: the press, Dismiss's half, and `ao promote` (§4.7, §6) ────────────────────────────
+
+
+async def test_the_press_is_a_persons_and_refused_to_a_session(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    async with LocalClient(caller="ao-some-worker") as worker:
+        with pytest.raises(AgentError, match="a person's own: refused to a session"):
+            await worker.call("promote", repo="repo")
+        with pytest.raises(AgentError, match="a person's own"):
+            await worker.call("clear_promote", repo="repo")
+
+
+async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(agent, checkout, monkeypatch):
+    await park_ticks(agent)
+    _register(checkout)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="nothing to promote"):
+            await person.call("promote", repo="repo")  # live is main already
+        live = checkout.parent / "live"
+        (checkout / ".agentorc.yml").write_text(
+            f"promote:\n  run: sleep 1; git rev-parse HEAD > {live}\n  check: cat {live}\n"
+        )
+        main = _merge(checkout, "b")
+        (checkout / "b").write_text("dirty")
+        with pytest.raises(AgentError, match="uncommitted change.*precondition: tree"):
+            await person.call("promote", repo=str(checkout))
+        _git(checkout, "checkout", "-q", "--", "b")
+        monkeypatch.setattr(promote, "read_checks", lambda root, sha: ("pending", ""))
+        got = await person.call("promote", repo="repo")
+        assert got["sha"] == main and got["checks"] == "pending" and got["log"].endswith(f"{main}.log")
+        assert agent._promotes["repo"]["inflight"]["by"] == "person"
+        with pytest.raises(AgentError, match="in flight.*precondition: inflight"):
+            await person.call("promote", repo="repo")
+        _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
+        await agent._refresh_promotes()
+        assert agent._promotes["repo"]["inflight"] is None and agent._promotes["repo"]["live"] == main
+        with pytest.raises(AgentError, match="no registered repo"):
+            await person.call("promote", repo="elsewhere")
+        with pytest.raises(AgentError, match="--sha is not built"):
+            await person.call("promote", repo="repo", sha=main)
+
+
+async def test_a_failure_standing_refuses_the_press_until_dismissed(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    _merge(checkout, "b")
+    promote.repo_dir("repo").mkdir(parents=True)
+    (promote.repo_dir("repo") / "failed.json").write_text(json.dumps({"sha": "f" * 40, "why": "it broke"}))
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="failed and is not cleared.*precondition: failed"):
+            await person.call("promote", repo="repo")
+        assert (await person.call("clear_promote", repo="repo")) == {"repo": "repo", "cleared": True}
+        assert (await person.call("clear_promote", repo="repo"))["cleared"] is False
+        assert (await person.call("promote", repo="repo"))["repo"] == "repo"
+
+
+async def test_a_repo_without_the_block_has_no_press(agent, tmp_path):
+    await park_ticks(agent)
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    _register(plain)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="no promote: block"):
+            await person.call("promote", repo="plain")
+
+
+def test_a_pid_taken_again_is_not_the_run_and_is_never_killed():
+    p = subprocess.Popen(["sleep", "30"], start_new_session=True)
+    try:
+        started = promote.proc_start(p.pid)
+        assert isinstance(started, int) and promote.alive(p.pid, started)
+        assert not promote.alive(p.pid, started + 1)  # another process under the same number
+        promote.kill(p.pid, started + 1)
+        assert p.poll() is None  # not killed
+    finally:
+        p.kill()
+        p.wait()
+
+
+def test_the_press_is_a_home_edit_refused_offline_at_a_node():
+    from sessionorc import modes
+
+    for method in ("promote", "clear_promote"):
+        why = modes.offline_refusal(method, None, {}, host="laptop", home="kmaster")
+        assert why and "kmaster (home) is unreachable" in why
+
+
+def test_ao_promote_status_prints_the_readings(monkeypatch, capsys):
+    from agentorc import cli
+
+    reading = {
+        "live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": False,
+        "failed": {"sha": "9" * 40, "at": "t", "why": "it broke", "log": "/l", "tail": ["boom"]},
+    }  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"agentorc": reading}})
+    assert cli.main(["promote", "status"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("agentorc · live 4444444 · main 9999999, 3 ahead · checks green · auto off")
+    assert "FAILED 9999999 at t: it broke" in out and "    boom" in out
