@@ -35,6 +35,10 @@ GH_TIMEOUT = 30.0
 KEYS = ("run", "check")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 # a check run's conclusions that are not a pass; `neutral` and `skipped` are
+# this agent's own runs by pid: held so `subprocess` never reaps one behind `alive`'s back (a
+# dropped Popen is reaped by the next `subprocess.run` and its status lost), polled for `exit`
+_procs: dict[int, subprocess.Popen[bytes]] = {}
+_exits: dict[int, int] = {}
 FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
 
 
@@ -230,19 +234,23 @@ def start(root: str | Path, repo: str, sha: str, run: str, by: str, n: int | Non
             start_new_session=True,
         )  # fmt: skip
     intent["pid"] = p.pid
+    _procs[p.pid] = p
     _write(d / "inflight.json", intent)
     return intent
 
 
 def alive(pid: Any) -> bool:
-    """Whether the run's process is still there. A zombie of this agent's own child is reaped here,
-    so an exited child reads gone."""
+    """Whether the run's process is still there. This agent's own child is polled, which reaps it,
+    so an exited child reads gone and leaves its exit status; another agent's is signalled."""
     if not isinstance(pid, int) or pid <= 0:
         return False
-    with suppress(ChildProcessError, OSError):
-        done, _ = os.waitpid(pid, os.WNOHANG)
-        if done:
-            return False
+    if pid in _procs:
+        code = _procs[pid].poll()
+        if code is None:
+            return True
+        _exits[pid] = code
+        del _procs[pid]
+        return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -257,13 +265,17 @@ def kill(pid: Any) -> None:
     if isinstance(pid, int) and pid > 0:
         with suppress(OSError):
             os.killpg(pid, signal.SIGKILL)
+        p = _procs.pop(pid, None)
+        if p is not None:  # this agent's own: reaped, so a killed run leaves no zombie
+            with suppress(subprocess.TimeoutExpired):
+                _exits[pid] = p.wait(timeout=5)
 
 
 def fail(repo: str, intent: dict[str, Any], why: str) -> dict[str, Any]:
     """Move the intent to `failed.json` `{sha, at, log, exit, why}`: nothing further is promoted for
     the repo until the person clears it."""
     out = {"sha": intent.get("sha"), "at": datetime.now(UTC).isoformat(), "log": intent.get("log")}
-    out |= {"exit": intent.get("exit"), "why": why, "by": intent.get("by")}
+    out |= {"exit": _exits.pop(intent.get("pid"), None), "why": why, "by": intent.get("by")}  # None: not ours
     _write(repo_dir(repo) / "failed.json", out)
     clear(repo, "inflight")
     return out
@@ -304,6 +316,8 @@ def _conclude(repo: str, r: dict[str, Any], now: datetime) -> tuple[dict[str, An
     the intent file whichever way it ended. Still running and inside the bound: `(None, None)`."""
     intent = r["inflight"]
     if r.get("live") == intent.get("sha") and not r.get("live_why"):
+        alive(intent.get("pid"))  # reaped if it was this agent's child: a done run leaves no zombie
+        _exits.pop(intent.get("pid"), None)
         clear(repo, "inflight")
         return None, note_text(repo, intent)
     try:

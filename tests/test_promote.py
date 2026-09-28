@@ -64,9 +64,17 @@ def _merge(root: Path, name: str) -> str:
     return sha
 
 
+def _finished(pid: int) -> bool:
+    """Exited — a zombie or gone — without reaping it: the pass under test is what must reap."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] == "Z"
+    except OSError:
+        return True
+
+
 def _wait_gone(pid: int) -> None:
     deadline = time.monotonic() + 10
-    while promote.alive(pid) and time.monotonic() < deadline:
+    while not _finished(pid) and time.monotonic() < deadline:
         time.sleep(0.05)
 
 
@@ -139,7 +147,15 @@ def test_by_hand_the_pass_reads_and_starts_nothing(checkout):
     _merge(checkout, "b")
     readings, notes, bad = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
     r = readings["repo"]
-    assert (r["ahead"], r["checks"], r["auto"], r["inflight"], r["unmet"], notes, bad) == (1, "green", False, None, None, [], {})
+    assert (r["ahead"], r["checks"], r["auto"], r["inflight"], r["unmet"], notes, bad) == (
+        1,
+        "green",
+        False,
+        None,
+        None,
+        [],
+        {},
+    )
     assert r["live"] != r["main"]
 
 
@@ -166,13 +182,17 @@ def test_auto_promotes_once_and_the_outcome_is_read_from_check(checkout, monkeyp
     assert readings["repo"]["inflight"] is None and readings["repo"]["live"] == main
     assert not (promote.repo_dir("repo") / "inflight.json").exists()
     assert (promote.repo_dir("repo") / f"{main}.log").exists()
+    with pytest.raises(ChildProcessError):  # reaped: no zombie left behind
+        os.waitpid(intent["pid"], os.WNOHANG)
     readings, notes, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"] is None and notes == []  # live is main: nothing to do
 
 
 def test_a_run_that_leaves_live_elsewhere_fails_and_stops_the_repo(checkout, monkeypatch, tmp_path):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
-    (checkout / ".agentorc.yml").write_text(f"promote:\n  run: echo it broke; exit 3\n  check: cat {tmp_path / 'live'}\n")
+    (checkout / ".agentorc.yml").write_text(
+        f"promote:\n  run: echo it broke; exit 3\n  check: cat {tmp_path / 'live'}\n"
+    )
     _git(checkout, "add", "-A")
     _git(checkout, "commit", "-q", "-m", "block")
     _git(checkout, "push", "-q", "origin", "main")
@@ -181,6 +201,7 @@ def test_a_run_that_leaves_live_elsewhere_fails_and_stops_the_repo(checkout, mon
     readings, notes, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, datetime.now(UTC))
     f = readings["repo"]["failed"]
     assert notes == [] and f["why"].startswith("the run ended and live is ") and f["tail"] == ["it broke"]
+    assert f["exit"] == 3
     assert readings["repo"]["unmet"]["name"] == "failed"
     readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"] is None  # nothing further until the person clears it
@@ -209,7 +230,9 @@ def test_a_malformed_block_is_skipped_never_fatal(checkout, tmp_path):
     other = tmp_path / "other"
     other.mkdir()
     (other / ".agentorc.yml").write_text("promote: {run: x}\n")
-    readings, _, bad = promote.survey([str(other), str(checkout), str(tmp_path / "gone")], {}, True, {}, datetime.now(UTC))
+    readings, _, bad = promote.survey(
+        [str(other), str(checkout), str(tmp_path / "gone")], {}, True, {}, datetime.now(UTC)
+    )
     assert list(readings) == ["repo"] and list(bad) == [str(other)]
 
 
