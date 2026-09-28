@@ -122,9 +122,9 @@ its `projects:` defaults to the repo, and the project is made from the checkout 
 its repo's checkout is not where you start it, because only `org.yml` says where a checkout is
 on a host.
 
-`.agentorc.yml` takes these keys and refuses any other: `adapter`, `worktrees`, `anchor`,
-`ledger`, `unattended`, `roles`, `controllers`, `ready_when`, `commands`, `teams` and `promote`
-(read by the home's promote, design §6) — **never `projects`**, which is the org's (design §5).
+`.agentorc.yml` takes these keys and refuses any other: `ledger`, `roles`, `controllers`,
+`teams` and `promote` (read by the home's promote, design §6), and `unattended`, `ready_when` and
+`commands`, which nothing reads yet — **never `projects`**, which is the org's (design §5).
 
 **Ignore `.claude/worktrees/`** in the repo's `.gitignore` before the first start: every team
 session works in `<repo>/.claude/worktrees/<name>`, and a repo that does not ignore it leaves

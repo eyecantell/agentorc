@@ -11,19 +11,24 @@ pytestmark = pytest.mark.unit
 def test_missing_file_gives_the_defaults(tmp_path):
     cfg = repoconfig.load(tmp_path)
     assert cfg.path is None and cfg.root == tmp_path
-    assert cfg.adapter == "claude-code" and cfg.worktrees == ".claude/worktrees"
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
     assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
     assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "auditor", "plain"]
 
 
+@pytest.mark.parametrize("key", ["adapter", "worktrees", "anchor"])
+def test_a_retired_key_is_refused_naming_where_it_lives(tmp_path, key):
+    # TD-149 (1): read by nothing, so a repo writing one is told where it is decided instead
+    (tmp_path / ".agentorc.yml").write_text(f"{key}: x\n")
+    with pytest.raises(ValueError, match=f"`{key}` is not a `.agentorc.yml` key any more") as e:
+        repoconfig.load(tmp_path)
+    assert repoconfig.RETIRED[key] in str(e.value)
+
+
 def test_the_section_5_example_loads(tmp_path):
     (tmp_path / ".agentorc.yml").write_text(
         """
-adapter: claude-code
-worktrees: .claude/worktrees
-anchor: main-checkout-single
 unattended:
   workers: 3
   window: {weekday: "20:00-06:00", weekend: all}
@@ -283,7 +288,7 @@ def test_promote_is_accepted_and_checked_ahead_of_its_build(tmp_path):
     read, both commands required, and `auto` refused as `settings.yml`'s (TD-132 runs it)."""
     ok = repoconfig.load_text("promote:\n  run: scripts/promote.sh\n  check: scripts/live_sha.sh\n", tmp_path)
     assert ok.promote == {"run": "scripts/promote.sh", "check": "scripts/live_sha.sh"}
-    assert repoconfig.load_text("adapter: claude-code\n", tmp_path).promote is None
+    assert repoconfig.load_text("ledger: docs/debt.md\n", tmp_path).promote is None
     for text, names in (
         ("promote:\n  run: x\n", "needs check"),
         ("promote:\n  run: x\n  check: y\n  auto: true\n", "is not this file's"),

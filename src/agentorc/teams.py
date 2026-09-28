@@ -138,7 +138,7 @@ class Launch:
             **({"host": self.host} if self.host else {}),
             "name": self.name,
             "dir": str(self.dir),
-            "adapter": repoconfig.DEFAULT_ADAPTER,
+            "adapter": profiles.DEFAULT_ADAPTER,
             "repo": str(self.dir),
             "worktree": self.name,
             "unattended": self.unattended,

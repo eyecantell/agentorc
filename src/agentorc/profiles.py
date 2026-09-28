@@ -29,6 +29,7 @@ import yaml
 
 from sessionorc import paths
 
+DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member (teams.create_params)
 DEFAULT_PERMISSION_WAIT = 600  # seconds; long enough to reach a phone (design §4.2)
 BILLINGS = ("subscription", "metered")
 PRICE_KINDS = ("input", "output", "cache_read", "cache_write")
@@ -37,7 +38,7 @@ PRICE_KINDS = ("input", "output", "cache_read", "cache_write")
 @dataclass
 class Profile:
     name: str
-    adapter: str = "claude-code"
+    adapter: str = DEFAULT_ADAPTER
     account: str = ""
     model: str | None = None
     config_dir: Path | None = None  # the tool's per-account config directory
@@ -123,7 +124,7 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
         billing, prices = _billing(name, raw)
         out[name] = Profile(
             name=name,
-            adapter=raw.pop("adapter", "claude-code"),
+            adapter=raw.pop("adapter", DEFAULT_ADAPTER),
             account=str(raw.pop("account", "") or ""),
             model=raw.pop("model", None),
             config_dir=Path(cfg).expanduser() if cfg else None,

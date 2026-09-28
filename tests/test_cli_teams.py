@@ -1117,9 +1117,6 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
     para = text[text.index("`.agentorc.yml` takes these keys") :].split("\n\n")[0]
     named = set(re.findall(r"`(\w+)`", para)) - {"projects"}
     accepted = {
-        "adapter": "claude-code",
-        "worktrees": ".claude/worktrees",
-        "anchor": "main",
         "ledger": "docs/technical_debt.md",
         "unattended": {},
         "roles": {},
@@ -1132,8 +1129,9 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
     assert named == set(accepted)
     for key, value in accepted.items():
         repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, value, tmp_path / ".agentorc.yml")
-    with pytest.raises(ValueError, match="is not a `.agentorc.yml` key"):
-        repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), "projects", {}, tmp_path / ".agentorc.yml")
+    for key in ("projects", *repoconfig.RETIRED):  # TD-149 (1): the retired keys are refused too
+        with pytest.raises(ValueError, match="is not a `.agentorc.yml` key"):
+            repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, {}, tmp_path / ".agentorc.yml")
     src = Path(repoconfig.__file__).read_text(encoding="utf-8")
     body = src[src.index("def _apply(") : src.index("def _mapping(")]
     assert set(re.findall(r'"(\w+)"', body)) == set(accepted)  # nothing the loader takes is left out
