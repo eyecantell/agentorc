@@ -85,6 +85,27 @@ def _billing(name: str, raw: dict) -> tuple[str, dict[str, float]]:
     return billing, out
 
 
+def _metered_dirs(profiles: dict[str, Profile]) -> None:
+    """A metered profile's spend is read from every transcript under its config directory (§4.3), so
+    the directory must be its account's alone: one with no `config_dir` would read the tool's
+    default, and one sharing a directory with another account's profile would bill that account's
+    turns to this one. Both are the file's error, named (TD-151)."""
+    for p in profiles.values():
+        if not p.metered:
+            continue
+        if p.config_dir is None:
+            raise ValueError(
+                f"profiles.yml: {p.name} is metered and names no config_dir — its spend is read from its own "
+                "transcripts, so it needs a directory of its own (design §4.2a)"
+            )
+        for q in profiles.values():
+            if q is not p and q.config_dir == p.config_dir and (q.account or q.name) != (p.account or p.name):
+                raise ValueError(
+                    f"profiles.yml: {p.name} is metered and shares config_dir {p.config_dir} with {q.name}, another "
+                    "account — its spend would count that account's turns (design §4.2a)"
+                )
+
+
 def profiles_file() -> Path:
     return paths.home() / "profiles.yml"
 
@@ -112,6 +133,7 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
             billing=billing,
             prices=prices,
         )
+    _metered_dirs(out)
     if not out:
         out["default"] = Profile(name="default")
     default = data.get("default") or next(iter(out))

@@ -441,7 +441,11 @@ report cost itself, and none for a self-hosted model, whose cost is throughput a
 tokens. A cache kind without a price is charged at `input`, the safe side, and `profiles.yml` says
 so beside the key: on a coding agent most input is cache reads at a tenth of the input rate, so a
 profile that leaves them out sees its bill several times over and its amount trips early. Never
-guessed from the config directory or the environment: a wrong guess pauses nothing or everything.
+guessed from the config directory or the environment: a wrong guess pauses nothing or everything. A
+metered profile names a **`config_dir` of its own** — shared, if at all, only with profiles of the
+same account — since its spend is read from every transcript there (§4.3): the tool's default
+directory, or another account's, would bill that account's turns to its amount; `profiles.yml`
+refuses either, naming it (TD-151).
 A metered profile is **never polled** for a quota — the usage endpoint would answer
 `no_credentials` to a key, five minutes apart, forever — and reports no window; the adapter reports
 **spend per turn** instead (§4.3), and the home sums it **per account**, as every reading is the

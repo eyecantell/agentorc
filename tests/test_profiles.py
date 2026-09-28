@@ -24,8 +24,8 @@ def test_billing_defaults_to_subscription_and_a_metered_profile_carries_its_pric
     got = _load(
         tmp_path,
         "profiles:\n  paul: {account: paul}\n"
-        "  api: {account: key, billing: metered, prices: {input: 3, output: 15, cache_read: 0.3}}\n"
-        "  local: {billing: metered}\n",
+        "  api: {account: key, billing: metered, config_dir: /c/api, prices: {input: 3, output: 15, cache_read: 0.3}}\n"
+        "  local: {billing: metered, config_dir: /c/local}\n",
     )
     assert got["paul"].billing == "subscription" and not got["paul"].metered and got["paul"].prices == {}
     assert got["api"].metered and got["api"].prices == {"input": 3.0, "output": 15.0, "cache_read": 0.3}
@@ -49,10 +49,29 @@ def test_a_wrong_billing_is_the_files_error_never_a_guess(tmp_path, block, why):
         _load(tmp_path, f"profiles:\n  p: {block}\n")
 
 
+def test_a_metered_profile_needs_a_config_dir_of_its_own(tmp_path):
+    """The review of #674: its spend is read from every transcript in its directory, so the tool's
+    default, or another account's directory, would bill someone else's turns to it."""
+    with pytest.raises(ValueError, match="names no config_dir"):
+        _load(tmp_path, "profiles:\n  api: {billing: metered}\n")
+    with pytest.raises(ValueError, match="shares config_dir /c/x with paul, another account"):
+        _load(
+            tmp_path,
+            "profiles:\n  paul: {account: paul, config_dir: /c/x}\n"
+            "  api: {account: key, billing: metered, config_dir: /c/x}\n",
+        )
+    got = _load(
+        tmp_path,
+        "profiles:\n  a: {account: key, billing: metered, config_dir: /c/x}\n"
+        "  b: {account: key, config_dir: /c/x, model: haiku}\n",
+    )
+    assert got["a"].metered  # two profiles of one account may share it
+
+
 def test_a_metered_profile_is_never_polled_for_a_quota(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     (tmp_path / "profiles.yml").write_text(
-        "profiles:\n  api: {account: key, billing: metered}\n  paul: {account: paul}\n"
+        "profiles:\n  api: {account: key, billing: metered, config_dir: /c/api}\n  paul: {account: paul}\n"
     )
     ad = ClaudeCodeAdapter()
     with um.patch.object(ClaudeCodeAdapter, "usage", side_effect=AssertionError("polled")) as polled:

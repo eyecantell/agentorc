@@ -587,7 +587,7 @@ class ClaudeCodeAdapter:
                     continue
                 turn = _turn(line, key, offset)
                 if turn is not None:
-                    by_message[turn.pop("message") or turn["id"]] = turn
+                    by_message[turn.pop("message") or turn["id"] or f"@{offset}"] = turn
             turns.extend(by_message.values())
         return {"turns": turns, "cursors": after, "reason": "ok"}
 
