@@ -8,7 +8,7 @@
      when a decision earns an ADR, what each field means, why a decided ADR is never edited —
      are cadence.md §7 (Architecture decisions). -->
 
-**Status:** proposed | decided YYYY-MM-DD by <who> | superseded by [ADR <id>](<link>)
+**Status:** proposed | decided YYYY-MM-DD by <who> | superseded by ADR <id> (its path)
 **Date:** YYYY-MM-DD
 **Related:** TD-NNN, PR #N, ADR <id>
 

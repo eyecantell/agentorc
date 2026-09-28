@@ -48,6 +48,7 @@ BLOCKED_RE = re.compile(r"^\*\*Blocked by:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 # Parity (cadence.md §7): §2.11 and the seed template's field write this; TYPES is its vocabulary.
 TYPE_RE = re.compile(r"^\*\*Type:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 TYPES = ("debt", "feature")  # pick order within a Priority; the first is the default
+COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)  # the seed template's example entry lives in one
 ID_ITEM_RE = re.compile(r"^TD-(\d+)$")
 DECISION_RE = re.compile(r"\bdecision\s*\(([^)]+)\)", re.IGNORECASE)
 PRIORITIES = ("high", "medium", "low")
@@ -58,7 +59,11 @@ def _num(tid: str) -> int:
 
 
 def entries(text: str) -> list[dict]:
-    """The ledger's entry bodies, in file order: id, title, priority, blocked (raw or None)."""
+    """The ledger's entry bodies, in file order: id, title, priority, blocked (raw or None).
+
+    HTML comments are dropped first: the seed ledger's entry template is a commented-out
+    `## TD-001: …` that is not an entry."""
+    text = COMMENT_RE.sub("", text)
     out = []
     for m in HEADING_RE.finditer(text):
         nxt = SECTION_RE.search(text, m.end())  # a body ends at the next `## ` heading of any kind
@@ -98,8 +103,9 @@ def parse_blocked(raw: str) -> tuple[list[str], list[str], list[str]]:
 def pickable(ledger: str, archive: str) -> dict:
     live = entries(ledger)
     live_nums = {_num(e["id"]) for e in live}
-    archived = {int(m.group(2)) for m in HEADING_RE.finditer(archive)}
-    rows = {int(m.group(2)): (i, m.group(4)) for i, m in enumerate(ROW_RE.finditer(ledger))}
+    archived = {int(m.group(2)) for m in HEADING_RE.finditer(COMMENT_RE.sub("", archive))}
+    rows = {int(m.group(2)): (i, m.group(4))
+            for i, m in enumerate(ROW_RE.finditer(COMMENT_RE.sub("", ledger)))}
     pick, blocked, flags = [], [], []
     for pos, e in enumerate(live):
         n = _num(e["id"])
