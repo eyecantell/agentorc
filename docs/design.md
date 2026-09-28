@@ -1421,9 +1421,10 @@ call by call.
   which the RPC does not. While the link is down the node derives nothing: a claim written to the
   replica is overwritten on reconnect and was never checked against the siblings' leases. **Reads of
   a pane, and of a transcript.** `tail` and `explain` on `id@host` read a screen only that node's tmux
-  holds, and `transcript` a file only that node's disk holds (§4.5 screen 9), so the home
+  holds, `transcript` a file only that node's disk holds (§4.5 screen 9), and `log_tail` a round log
+  kept beside that node's run logs (§4.8 *A session's round log*), so the home
   asks the node for them — `read {rpc, params}`, a link method of its own whose allowlist is exactly
-  those three (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
+  those four (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
   never grows by a read. A transcript is read where it lies and never copied to the home. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
   and a session with no grant reads a node's pane as it reads a local one. Refused as unreachable —
   never queued — while the link is down; the reply is the node's, untouched but for its addresses. A
@@ -2098,7 +2099,7 @@ Screens:
    transcript draws on the same page. **Where it is read**: the `transcript` RPC is served on the
    record's host, since the file is there; for a node's record the home asks the node through
    `read` as it asks for `tail` (§4.4a *Reads of a pane, and of a transcript*: `NODE_READS` is
-   `tail`, `explain`, `transcript`), refused as unreachable while the link is down, and the file
+   `tail`, `explain`, `log_tail`, `transcript`), refused as unreachable while the link is down, and the file
    is never copied to the home. **Which record**: the transcript is located from the record's own
    `adapter_id`, `dir`, `adapter` and `profile`, so an `exited` record reads the run it held and a
    `closed` one left behind by a resume (`superseded_by`, TD-081) still reads its own; the
