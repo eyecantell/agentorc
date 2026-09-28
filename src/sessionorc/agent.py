@@ -579,6 +579,14 @@ class HostAgent(
         starting = self.sessions.get(str(start_of)) if start_of else None
         if start_of and (starting is None or starting.state != "scheduled"):
             raise RpcError(f"{start_of} is not a scheduled record: nothing to start (design §6 Start time)")
+        if starting is not None and not mail.is_person(caller) and self._addr(str(caller)) not in self._ctl(starting):
+            # starting a scheduled record supersedes it and takes its mailbox: an act on that record,
+            # open to a person and to its own controllers, as keep_mail's is (§4.9b, §9 invariant 11);
+            # the tick's own start calls with no caller (techlead's read of #669)
+            raise RpcError(
+                f"{caller} is not a controller of {starting.id}: starting a scheduled record early is an act on it, "
+                "open to a person and to its own controllers (design §6 Start time, §9 invariant 11)"
+            )
         if seat is not None and not (
             isinstance(seat, dict) and isinstance(seat.get("trigger"), str) and seat["trigger"]
         ):
@@ -1469,7 +1477,7 @@ class HostAgent(
         await self._push_changes()
         return view
 
-    async def rpc_set_start(self, id: str, start_at: str = "") -> dict[str, Any]:
+    async def rpc_set_start(self, id: str, start_at: str = "", caller: Any = None) -> dict[str, Any]:
         """`ao at <session> <when> | now` (design §6 *Start time*, §4.7, TD-152): move a scheduled
         start, or — with `now` — hand it to the tick's next pass. Acting, and gated as `set_stop` is:
         it starts another session's run. Refused on a record that is not `scheduled`: a live session
@@ -1477,10 +1485,18 @@ class HostAgent(
         s = self._find(id)
         if s.state != "scheduled":
             raise RpcError(f"{id} is {s.state}, not scheduled: a start time is for a record that has not started")
-        # a person's new time is a new start: a ceiling the failed starts reached, and the count
-        # that reached it, are spent — as a person's own Resume starts rule 1's count again (§6)
-        s.restart_ceiling = None
-        s.restarts = [r for r in s.restarts if not (isinstance(r, dict) and r.get("why") == "start")]
+        if mail.is_person(caller):
+            # a person's new time is a new start: a ceiling the failed starts reached, and the count
+            # that reached it, are spent — as a person's own Resume starts rule 1's count again (§6)
+            s.restart_ceiling = None
+            s.restarts = [r for r in s.restarts if not (isinstance(r, dict) and r.get("why") == "start")]
+        elif s.restart_ceiling:
+            # at the ceiling the record is a person's (§6): a controller moving the time would retry
+            # without bound, so a session is refused here and the count is left as it is
+            raise RpcError(
+                f"{id} reached the restart ceiling ({s.restart_ceiling.get('count')} failed starts): it is a "
+                "person's now — a person's ao at spends the ceiling (design §6 Start time)"
+            )
         if str(start_at).strip().lower() == "now":
             s.start_at = now_iso()
         else:

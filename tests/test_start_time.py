@@ -140,3 +140,64 @@ async def test_start_of_names_only_the_record_it_starts(agent, tmp_path):
         with pytest.raises(AgentError, match="not a scheduled record"):
             await person.call("create", name="x", dir=str(other), adapter="shell", start_of="ao-nope")
         assert agent.sessions[sid].state == "scheduled"
+
+
+async def _manager(person, tmp_path):
+    """A session holding `control`, as a team's manager does."""
+    d = tmp_path / "mgr"
+    d.mkdir(exist_ok=True)
+    got = await person.call(
+        "create",
+        name="mgr",
+        dir=str(d),
+        adapter="shell",
+        argv=["bash", "--norc", "--noprofile"],
+        capabilities=["control"],
+    )
+    return got["id"]
+
+
+async def test_start_of_is_an_act_on_the_record_open_to_its_controllers_alone(agent, tmp_path):
+    """The techlead's read of #669: starting a scheduled record supersedes it and takes its mailbox, so a
+    session that is not one of its controllers is refused, as keep_mail's rule refuses (§9 invariant 11)."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        mgr = await _manager(person, tmp_path)
+        (tmp_path / "a").mkdir()
+        theirs = await _scheduled(person, tmp_path / "a")
+        launch = {"name": "w", "dir": theirs["dir"], "adapter": "shell", "argv": ["bash", "--norc"], "unattended": True}
+        async with LocalClient(caller=mgr) as session:
+            with pytest.raises(AgentError, match="is not a controller of"):
+                await session.call("create", start_of=theirs["id"], **launch)
+        assert agent.sessions[theirs["id"]].state == "scheduled"
+        (tmp_path / "b").mkdir()
+        async with LocalClient(caller=mgr) as session:
+            mine = await _scheduled(session, tmp_path / "b")  # the creator is its controller
+            started = await session.call("create", start_of=mine["id"], **{**launch, "dir": mine["dir"]})
+        assert started["id"] == mine["id"] and agent.sessions[mine["id"]].state != "scheduled"
+        await person.call("kill", id=mine["id"])
+
+
+async def test_a_sessions_set_start_moves_the_time_but_never_spends_the_ceiling(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        mgr = await _manager(person, tmp_path)
+        (tmp_path / "c").mkdir()
+        async with LocalClient(caller=mgr) as session:
+            sid = (await _scheduled(session, tmp_path / "c"))["id"]
+            (paths.launch_dir() / f"{sid}.json").unlink()  # every start fails
+            await session.call("set_start", id=sid, start_at="now")
+            now = datetime.now(UTC) + timedelta(seconds=1)
+            await agent._keep_running(now)
+            assert len(agent.sessions[sid].restarts) == 1
+            later = _later(60)
+            await session.call("set_start", id=sid, start_at=later)  # moves it, and the count stands
+            assert agent.sessions[sid].start_at == later and len(agent.sessions[sid].restarts) == 1
+            await session.call("set_start", id=sid, start_at="now")
+            for _ in range(RESTART_CEILING):
+                await agent._keep_running(now)
+            assert agent.sessions[sid].restart_ceiling
+            with pytest.raises(AgentError, match="reached the restart ceiling"):
+                await session.call("set_start", id=sid, start_at="now")
+        await person.call("set_start", id=sid, start_at="now")  # a person's spends it
+        assert agent.sessions[sid].restart_ceiling is None and agent.sessions[sid].restarts == []

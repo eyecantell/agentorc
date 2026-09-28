@@ -5526,6 +5526,11 @@ code and needs no grant; a session doing the same work does.
   naming the record it starts, so the create supersedes it in place — its mail moved to the
   session — rather than refusing it as the live holder of its name and slot. The usage gate and the
   stop time pass a scheduled record by: it has nothing running to pause or stop.
+  Starting a scheduled record supersedes it and takes its mailbox, so `start_of` is an act on that
+  record: a person's, or one of its controllers' — as `keep_mail` is (§4.9b, §9 invariant 11); the
+  tick's own start carries no caller. At the restart ceiling the record is a person's: a person's
+  new time (`ao at`) spends the ceiling and the failed starts' count, while a controller's is
+  refused, naming the ceiling, and below it moves the time and leaves the count.
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
   built, and the manager preset is silent on the four rules). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
