@@ -354,10 +354,13 @@ class SpendMixin:
         """`{billing, prices}` when `profile` is billed `metered`, else None — asked of the adapter of
         any record running under it, and with none of every adapter this host knows, so a person can
         set an amount before the profile's first session (`set_settings`, §6 *Usage gate*). A profile
-        this host's adapters do not bill as metered but a node's `spend` has named is metered, at the
-        prices the node declared: the home's `profiles.yml` need not define a node's profile."""
+        no adapter here resolves but a node's `spend` has named is metered, at the prices the node
+        declared: the home's `profiles.yml` need not define a node's profile, and one it does define
+        keeps the billing it gives it. The gate is unchanged: a node's sessions are judged at the node,
+        whose own adapters know the profile."""
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         names = sorted({r.adapter for r in records if r.profile == profile and r.adapter != "shell"})
+        known = False  # an adapter here resolved the profile: its word stands over any node's
         for name in names or adapters.names():
             try:
                 fn = getattr(adapters.get(name), "billing_for", None)
@@ -367,6 +370,7 @@ class SpendMixin:
                 b = None
             if isinstance(b, dict) and b.get("billing") == "metered":
                 return {"billing": "metered", "prices": dict(b.get("prices") or {})}
-        if profile in self._spend_node_prices:
+            known = known or isinstance(b, dict)
+        if not known and profile in self._spend_node_prices:
             return {"billing": "metered", "prices": dict(self._spend_node_prices[profile])}
         return None

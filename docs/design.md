@@ -2740,7 +2740,7 @@ day $5 → spent $3.20 (64%)*; a percent there is refused by naming the billing,
 profile that declares no prices and an amount on a subscription profile, and the billing is asked
 of the profile's adapter even before its first session — or, for a profile only a node defines,
 read from that node's `spend` calls with the prices it declared (§4.4 *Usage*), since the home's
-`profiles.yml` need not name it; the Settings page draws cards from the home's own `profiles.yml`,
+`profiles.yml` need not name it (one the home's own file defines keeps the billing it gives it); the Settings page draws cards from the home's own `profiles.yml`,
 so such a profile has no card there and its amount is set with `ao gate`. A change takes effect on the next tick,
 with no restart; under `--json` the reply is the file's key as written and the computed lines.
 

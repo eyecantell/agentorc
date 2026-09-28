@@ -387,3 +387,8 @@ async def test_a_metered_profile_only_a_node_defines_takes_an_amount_at_the_home
         await agent._take_spend("laptop", head | {"prices": {"input": 1.0}})
         got = await person.call("set_settings", profile="lap", reserves={"day": "$5"})
     assert got["metered"] and got["reserves"] == {"day": "$5"}
+    # a profile the home itself defines keeps the billing it gives it, whatever a node named
+    hookstub.billing = {"lap": {"billing": "subscription"}}
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="billed by subscription"):
+            await person.call("set_settings", profile="lap", reserves={"day": "$6"})
