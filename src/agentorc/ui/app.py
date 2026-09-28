@@ -468,6 +468,60 @@ def projects_view() -> list[dict[str, Any]]:
     ]
 
 
+def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The teams for New session's **Team** picker (design §4.5a, §4.9 *A person in the team*,
+    TD-173): every definition `org_here` reads — `ao team list`'s set — with the host it runs on,
+    its projects' checkouts there (the Directory list it narrows to), its member roles (Role is
+    filtered to them plus `plain`) and its manager's id when that session is live (the Controllers
+    tick). A definition that cannot be read leaves the picker at *none*, as the strip notes it."""
+    org, _notes = org_here()
+    here = host_name()
+    up = {s["id"] for s in teamrun.live(sessions)}
+    out = []
+    for t in org.teams.values():
+        host = t.host or here
+        dirs = [
+            str(by[host])
+            for p in t.projects
+            if p in org.projects
+            for by in org.projects[p].repos.values()
+            if by.get(host)
+        ]
+        mid = teams.manager_id(org, t, host, here)
+        out.append(
+            {
+                "name": t.name,
+                "host": host,
+                "dirs": dirs,
+                "roles": sorted({m.role for m in t.members if m.team is None and m.role}),
+                "manager": mid if mid in up else "",
+            }
+        )
+    return out
+
+
+def team_reader(team: str, directory: str) -> dict[str, Any]:
+    """The reader a person's session in `team` gets when its role has none (design §4.9 *A person in
+    the team*): `{review, line}` — `teams.team_review` over the member roles resolved in
+    `directory`'s repo, and the one line under the picker saying what that is."""
+    org, _notes = org_here()
+    t = org.teams.get(team)
+    if t is None:
+        return {"review": None, "line": f"no team {team} is defined"}
+    try:
+        cfg = repoconfig.discover(directory or os.getcwd())
+    except ValueError as e:
+        return {"review": None, "line": f"⚠ {e}"}
+    review = teams.team_review(t, teams.team_roles(t, cfg, org.roles))
+    if review is None:
+        seatless = t.techlead is None
+        why = "this team has no techlead seat" if seatless else "its members' roles hold no path"
+        return {"review": None, "line": f"no reader: {why}"}
+    here = host_name()
+    seat = teams.seat_id(org, t, t.host or here, here) or t.techlead.name
+    return {"review": review, "line": f"held PRs read by {seat} on {', '.join(review['held'])}"}
+
+
 def _aged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """design §4.5a **wound down** note (§4.9a, TD-053 step 6): a team's card says *wound down <t>*
     rather than a bare *stopped* when every session that carried the badge declared it was out of
@@ -1811,12 +1865,17 @@ def team_groups(
                     manager_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
         row = defs.get(team) or {}
-        live = sum(1 for m in members if m.get("state") not in DEAD)
+        # live, concluded, wound down and Forget all read the team's unattended sessions: a person's
+        # session in it keeps nothing live (design §4.9 *A person in the team*, TD-173)
+        crew = [m for m in members if not teamrun.persons(m)] if team != NO_TEAM else members
+        live = sum(1 for m in crew if m.get("state") not in DEAD)
+        people = [m for m in members if teamrun.persons(m) and m.get("state") not in DEAD] if team != NO_TEAM else []
         c = row.get("concluded")
         # the definition's rows read the raw records; a view that disagrees about what is live (a
         # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
         concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
-        dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
+        # never a person's card, live or closed: Forget all is a team act (§4.9 *A person in the team*)
+        dead = [m for m in crew if not m.get("seat") and m.get("state") in DEAD] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
         summary = team_summary(team, members, repos, doing, waiting) if team != NO_TEAM else None
@@ -1862,6 +1921,9 @@ def team_groups(
                 "concluded": concluded,
                 "concluded_age": row.get("concluded_age") if concluded else "",
                 "stopped": not live or concluded is not None,
+                # a person's live sessions in the team, named apart in Wind down's and Stop now's
+                # confirm: a team act never stops an interactive session (§4.9, §9 invariant 5)
+                "stays": [teamrun.stays_line(m) for m in people],
                 # design §4.5a team card **Forget all** (TD-071 item 1): on a team with nothing live,
                 # the Forget each card carries, on every card but those with the dirty / unpushed
                 # flag — Forget drops the record that points at the worktree, and unpushed work would
@@ -3319,9 +3381,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         adapters = await call("adapters")
         # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
         # holding `control` — nothing else could act on the new session anyway.
+        sessions_now = await call("list")
         control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"]}
-            for o in await call("list")
+            for o in sessions_now
             if has_control(o.get("capabilities")) and o.get("state") not in ("closed", "exited")
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
@@ -3353,6 +3416,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # list without another round trip. "No project" is the default and is what every
                 # session was before.
                 "projects": projects_view(),
+                # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173)
+                "form_teams": teams_for_form(sessions_now),
                 "prefill": {
                     "dir": dir,
                     "adapter": adapter,
@@ -3385,6 +3450,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"roles": [r.to_dict() for r in repoconfig.roles(repoconfig.RepoConfig())], "error": str(e)}
         return {"roles": found, "controllers": cfg.controllers, "file": str(cfg.path) if cfg.path else None}
 
+    @app.get("/api/team_review")
+    async def api_team_review(team: str = "", dir: str = ""):
+        """The line under New session's **Team** picker (design §4.5a): the reader a session started
+        in `team` from `dir` gets when its role has none."""
+        return await asyncio.to_thread(team_reader, team, dir) if team else {"review": None, "line": ""}
+
     @app.get("/api/roles")
     async def api_roles(dir: str = ""):
         return _roles_for(dir)
@@ -3403,6 +3474,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         role: str = Form(""),
         lane: str = Form(""),
         project: str = Form(""),
+        team: str = Form(""),
         until: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
         grant: Annotated[list[str], Form()] = NO_GRANTS,
@@ -3429,6 +3501,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # `ao new --project` puts in front of the brief, from the same function — each of the
         # project's repos on this host and which one is home. A one-repo project adds nothing, and
         # a name with no definition still badges the session: nothing keys on the badge.
+        # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own
+        # `review:` wins, else the team's reader, as `ao new --team` fills it. The Controllers
+        # picker was ticked with the team's live manager when the team was picked.
+        review = preset.review if preset else None
+        if team.strip() and adapter != "shell" and review is None:
+            review = (await asyncio.to_thread(team_reader, team.strip(), dir.strip()))["review"]
         text = prompt.strip() or brief
         if project.strip():
             block, _note = teams.reach_block(orgmod.load(), project.strip(), dir.strip() or os.getcwd(), host_name())
@@ -3452,11 +3530,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             capabilities=[g for g in dict.fromkeys(grant) if g in GRANTS],
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
-            review=preset.review if preset else None,  # who reads its PRs (design §4.9b *The reader*)
+            review=review,  # who reads its PRs (design §4.9b *The reader*): the role's, else the team's
             context_bound=preset.context_bound if preset else None,  # §4.8 *A role has a context bound*
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
             project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)
+            team=team.strip(),  # the badge and the group, as `ao new --team` sets it (§4.9)
             **stop_fields(until, unattended == "on"),
         )
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)

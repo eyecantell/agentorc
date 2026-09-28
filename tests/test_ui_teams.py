@@ -584,3 +584,73 @@ def test_stop_now_leaves_a_persons_session_and_counts_only_what_it_killed(world,
     assert sorted(fleet.sent("kill")) == ["grind-1", "orc-ao"]
     assert "killed 2 sessions" in body["text"]
     assert "your session me stays: a team act never stops an interactive session" in body["text"]
+
+
+# ── a person in the team (design §4.9 *A person in the team*, TD-173 slice 2) ─────────────────
+
+
+def _reader_org(tmp_path) -> None:
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "tl-ao"}
+    doc["roles"] = {"grinder": {"review": {"reader": "techlead", "held": ["src/sessionorc/**"]}}}
+    write_org(tmp_path, doc)
+
+
+def test_a_team_whose_only_live_session_is_a_persons_reads_stopped_and_offers_start(world):
+    tmp_path, fleet = world
+    rows = uiapp.teams_view([badged("me", "ao-grind", unattended=False)])["teams"]
+    assert rows[0]["live"] == 0
+    views = [
+        {**badged("me", "ao-grind", unattended=False), "rank": 5},
+        {**badged("grind-1", "ao-grind", state="exited"), "rank": 5},
+    ]
+    (g,) = [g for g in uiapp.team_groups(views, rows) if g["team"] == "ao-grind"]
+    assert g["stopped"] and g["live"] == 0
+    assert [m["name"] for m in g["forget"]] == ["grind-1"]  # never the person's live session
+    closed_me = {**badged("me", "ao-grind", state="closed", unattended=False), "rank": 5}
+    (g2,) = [x for x in uiapp.team_groups([closed_me, views[1]], rows) if x["team"] == "ao-grind"]
+    assert [m["name"] for m in g2["forget"]] == ["grind-1"]  # nor a person's closed one
+    org, _ = uiapp.org_here()
+    assert teamrun.members_view(org, "ao-grind", [badged("me", "ao-grind", unattended=False)])["live"] is False
+    assert g["stays"] == ["your session me stays: a team act never stops an interactive session"]
+
+
+def test_wind_down_and_stop_now_name_a_persons_session_in_their_confirm(world, client):
+    tmp_path, fleet = world
+    fleet.sessions += [
+        badged("orc-ao", "ao-grind"),
+        badged("grind-1", "ao-grind"),
+        badged("me", "ao-grind", unattended=False),
+    ]
+    html = client.get("/").text
+    assert (
+        'data-confirm="Wind down ao-grind? your session me stays: a team act never stops an interactive session."'
+        in html
+    )
+    assert 'data-confirm="Stop ao-grind now? your session me stays' in html
+
+
+def test_the_new_session_form_offers_the_teams_and_says_their_reader(world, client):
+    tmp_path, fleet = world
+    _reader_org(tmp_path)
+    fleet.sessions.append({**badged("orc-ao", "ao-grind"), "id": "ao-agentorc-orc-ao"})
+    html = client.get("/new").text
+    assert '<select class="input" name="team" id="team">' in html
+    assert 'value="ao-grind"' in html and 'data-manager="ao-agentorc-orc-ao"' in html
+    assert f"data-dirs='[\"{tmp_path / 'agentorc'}\"]'" in html and 'data-roles="grinder"' in html
+    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "agentorc")}).json()
+    assert got["line"] == "held PRs read by ao-agentorc-tl-ao on src/sessionorc/**"
+    write_org(tmp_path, org_doc(tmp_path))  # no seat
+    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "agentorc")}).json()
+    assert got == {"review": None, "line": "no reader: this team has no techlead seat"}
+
+
+def test_start_with_a_team_badges_the_session_and_fills_the_teams_reader(world, client):
+    tmp_path, fleet = world
+    _reader_org(tmp_path)
+    data = {"name": "me", "dir": str(tmp_path / "agentorc"), "team": "ao-grind"}
+    r = client.post("/new", data=data, follow_redirects=False)
+    assert r.status_code == 303
+    (made,) = fleet.creates()
+    assert made["team"] == "ao-grind"
+    assert made["review"] == {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}

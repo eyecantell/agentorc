@@ -38,6 +38,17 @@
         <select class="input" name="profile"><option value=""{% if not prefill.profile %} selected{% endif %}>the role's, else {{ default_profile }} (default)</option>{% for k, p in profiles.items() %}<option value="{{ k }}"{% if k == prefill.profile %} selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
         <span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span>
       </div>
+      {# design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-160, built by TD-173):
+         picking one narrows the Directory list to the team's checkouts, filters Role to its roles
+         plus `plain`, ticks its live manager under Controllers, leaves Unattended off, and says
+         which reader the session's held PRs get. The terminal's form is `ao new --team`. #}
+      <div class="field"><label>Team</label>
+        <select class="input" name="team" id="team">
+          <option value="">none</option>
+          {% for t in form_teams %}<option value="{{ t.name }}"{% if t.name == prefill.team %} selected{% endif %} data-dirs='{{ t.dirs | tojson }}' data-roles="{{ t.roles | join(',') }}" data-manager="{{ t.manager }}" data-host="{{ t.host }}">{{ t.name }}{% if t.host != host %} · on {{ t.host }}{% endif %}</option>{% endfor %}
+        </select>
+        <span class="note" id="teamnote">optional: its badge and group, its manager as a controller, the team's reader for its held PRs</span>
+      </div>
       {# design §4.5a New session **Role** preset + **Lane** field (§4.8): a preset fills the brief
          from its template, the lane's default, its grants and its profile; the list is the built-ins
          plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}

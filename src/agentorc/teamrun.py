@@ -75,8 +75,23 @@ class Stopping:
         return [e["id"] for e in self.acted if e["role"] == "member" and not e.get("refused")]
 
 
+def persons(s: dict[str, Any]) -> bool:
+    """A person's own session (design §4.9 *A person in the team*): one whose record says
+    `unattended: false`. A team's own facts — live, concluded, wound down, what a stop reaches —
+    read the others. Every record carries the field; one that lacks it is read as a worker's, which
+    is what every badged session was before TD-173."""
+    return s.get("unattended") is False
+
+
 def badged(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [s for s in sessions if s.get("team") == name]
+
+
+def crew(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The sessions carrying a team's badge that are not a person's (`persons`): what a team's own
+    facts and acts read — whether it is live or concluded, whom a stop or a concluded Start closes,
+    whether Add member starts the new one now (design §4.9 *A person in the team*)."""
+    return [s for s in badged(name, sessions) if not persons(s)]
 
 
 def live(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -253,10 +268,13 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
     when some are and every one is idle and declared, when it concluded (TD-099).
     There is no team record — a team that is stopped is only its definition, so both are counted
     across the fleet on every call."""
-    up = live(sessions)
+    # a team's own facts read its **unattended** sessions: a person's session in the team keeps
+    # nothing live and never winds it down (design §4.9 *A person in the team*, TD-173)
+    crew = [s for s in sessions if not persons(s)]
+    up = live(crew)
     rows_out = []
     for t in org.teams.values():
-        mine = badged(t.name, sessions)
+        mine = badged(t.name, crew)
         n_live = len(badged(t.name, up))
         rows_out.append(
             {
@@ -393,7 +411,7 @@ def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str
     refuses the whole start by name, and nothing is closed until every one has passed it. Returns
     what was closed; raises `NamesHeld` or `TeamError` before anything is closed or created."""
     team = org.teams.get(name)
-    mine = badged(name, call("list"))
+    mine = crew(name, call("list"))  # a person's session beside a concluded team neither blocks nor is closed
     done = concluded(mine, seat_names(team, mine)) if team is not None else None
     up = {str(s["id"]): s for s in live(mine)} if done else {}
     still = [v for v in held if v.get("verdict") != "live" or str(v.get("holder")) not in up]
@@ -429,8 +447,8 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     up = live(badged(name, call("list")))
     # A person's session in the team is left alone and named (design §4.9 *A person in the team*):
     # §9 invariant 5 would refuse it anyway, and a stop must not end on that refusal.
-    people = [s for s in up if not s.get("unattended")]
-    up = [s for s in up if s.get("unattended")]
+    people = [s for s in up if persons(s)]
+    up = [s for s in up if not persons(s)]
     if not up and people:
         stays = "; ".join(stays_line(s) for s in people)
         raise teams.TeamError(f"no live unattended session carries the team {name} badge — nothing to stop ({stays})")
@@ -570,7 +588,7 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
     states. `editable` is whether the page may edit it: a team `org.yml` defines, never one a
     repo's `.agentorc.yml` does (*edit it in the repo; this card only reads it*)."""
     team = teams.find(org, name)
-    by_name = {str(s.get("name") or ""): s for s in badged(name, sessions)}
+    by_name = {str(s.get("name") or ""): s for s in crew(name, sessions)}
 
     def held(n: str) -> dict[str, Any]:
         s = by_name.get(n)
@@ -597,7 +615,7 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
         "source": str(team.source) if team.source else None,
         "editable": editable,
         "note": "" if editable else "defined in the repo — edit it by PR; this card only reads it",
-        "live": bool(live(badged(name, sessions))),
+        "live": bool(live(crew(name, sessions))),
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,
         "members": entries,
@@ -621,7 +639,7 @@ def add_member(
     did = orgmod.edit_members(path, name, add={"role": role, "name": member, "lane": lane or []})
     org = orgmod.load(path)
     new = [n for n in _names(org, name) if n not in before]
-    up = live(badged(name, call("list")))
+    up = live(crew(name, call("list")))
     out: dict[str, Any] = {"team": name, "did": did, "created": [], "text": f"org.yml: {did}"}
     if not up or not new:
         out["text"] += " — the team is stopped: its next Start brings the member" if not up else ""
@@ -653,7 +671,7 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str) -
     gone = team.members[index].names()[-1] if team.members[index].team is None else ""
     did = orgmod.edit_members(path, name, remove=index, role=role)
     out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}
-    s = next((s for s in live(badged(name, call("list"))) if s.get("name") == gone), None)
+    s = next((s for s in live(crew(name, call("list"))) if s.get("name") == gone), None)
     if s is not None:
         out["wound_down"] = _stop_one(call, s, "member", now=False)
         out["text"] += f" — {gone} is sent the wrap-up; its card stays until Forget"
