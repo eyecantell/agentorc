@@ -17,7 +17,7 @@ pytestmark = pytest.mark.unit
 # patched by the suite as `agentorc.ui.app.X`
 PATCHED = {"LocalClient", "read_boards", "rpc", "PtySession", "repo_teams"}
 # the modules moved out of app.py (TD-196), in the order they were split
-SPLIT = ("common",)
+SPLIT = ("common", "cards")
 
 
 def _defined(path: Path) -> set[str]:
@@ -32,6 +32,30 @@ def _defined(path: Path) -> set[str]:
     return out
 
 
+def _bare_reads(tree: ast.Module) -> list[str]:
+    """Reads of a patched name that would dodge the patch. A **call** of one (`rpc(...)`) is always
+    one, whatever else the function assigns; a plain read is exempt only where the name is a local of
+    that function or of one enclosing it (`rpc = str(...)` in an alarm's words is a string, not the
+    RPC). Order in the body is not tracked, which is why the exemption stops short of calls."""
+    out: list[str] = []
+
+    def visit(node: ast.AST, local: frozenset[str]) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda):
+                own = {a.arg for a in ast.walk(child.args) if isinstance(a, ast.arg)}
+                own |= {n.id for n in ast.walk(child) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+                visit(child, local | own)
+                continue
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id in PATCHED:
+                out.append(child.func.id)
+            elif isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load) and child.id in PATCHED - local:
+                out.append(child.id)
+            visit(child, local)
+
+    visit(tree, frozenset())
+    return out
+
+
 @pytest.mark.parametrize("name", SPLIT)
 def test_no_split_module_reads_a_patched_name_bare(name):
     mod = importlib.import_module(f"agentorc.ui.{name}")
@@ -40,8 +64,17 @@ def test_no_split_module_reads_a_patched_name_bare(name):
         if isinstance(node, ast.ImportFrom):
             bare = {a.asname or a.name for a in node.names} & PATCHED
             assert not bare, f"ui/{name}.py imports {sorted(bare)} by name: read them as app.X at call time"
-        if isinstance(node, ast.Name) and node.id in PATCHED:
-            raise AssertionError(f"ui/{name}.py reads {node.id} bare: read it as app.{node.id} at call time")
+    bare = _bare_reads(tree)
+    assert not bare, f"ui/{name}.py reads {sorted(set(bare))} bare: read them as app.X at call time"
+
+
+def test_the_guard_sees_a_bare_read_and_passes_a_local():
+    assert set(_bare_reads(ast.parse("def f():\n    return rpc('x')\n"))) == {"rpc"}
+    assert _bare_reads(ast.parse("def f(a):\n    rpc = str(a)\n    return rpc\n")) == []
+    # a local in one branch does not hide a call in another, and a closure sees its outer local
+    assert set(_bare_reads(ast.parse("def f(a):\n    if a:\n        return rpc('x')\n    rpc = 1\n"))) == {"rpc"}
+    assert _bare_reads(ast.parse("def f(a):\n    rpc = str(a)\n    return lambda: rpc\n")) == []
+    assert set(_bare_reads(ast.parse("x = [rpc]\n"))) == {"rpc"}
 
 
 @pytest.mark.parametrize("name", SPLIT)
