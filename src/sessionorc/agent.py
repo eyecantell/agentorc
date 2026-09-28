@@ -1477,6 +1477,10 @@ class HostAgent(
         s = self._find(id)
         if s.state != "scheduled":
             raise RpcError(f"{id} is {s.state}, not scheduled: a start time is for a record that has not started")
+        # a person's new time is a new start: a ceiling the failed starts reached, and the count
+        # that reached it, are spent — as a person's own Resume starts rule 1's count again (§6)
+        s.restart_ceiling = None
+        s.restarts = [r for r in s.restarts if not (isinstance(r, dict) and r.get("why") == "start")]
         if str(start_at).strip().lower() == "now":
             s.start_at = now_iso()
         else:

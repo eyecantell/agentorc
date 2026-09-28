@@ -122,6 +122,9 @@ async def test_a_start_that_fails_counts_up_to_the_ceiling(agent, tmp_path):
         assert all(r["why"] == "start" and "no launch record" in r["error"] for r in rec.restarts)
         await agent._keep_running(now)
         assert agent.sessions[sid].restart_ceiling and len(agent.sessions[sid].restarts) == RESTART_CEILING
+        # a person's new time is a new start: the ceiling and its count are spent
+        await person.call("set_start", id=sid, start_at="now")
+        assert agent.sessions[sid].restart_ceiling is None and agent.sessions[sid].restarts == []
 
 
 async def test_start_of_names_only_the_record_it_starts(agent, tmp_path):
