@@ -32,6 +32,7 @@ from sessionorc.models import (
     context_reading,
     pr_marks,
     report_line,
+    start_note,
     stop_note,
     tokens_short,
 )
@@ -264,6 +265,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      under:  {', '.join(s['controllers'])}")
             if members := [o["id"] for o in sessions if s["id"] in (o.get("controllers") or [])]:
                 print(f"{'':<{w}}      members: {', '.join(members)}")
+            if note := start_note(s):
+                print(f"{'':<{w}}      {note}")
             if note := stop_note(s):
                 print(f"{'':<{w}}      {note}")
             # design §4.5a **title** (§4.3 `title()`, TD-074): the session's name as its tool holds
@@ -444,7 +447,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def stop_time(when: str) -> str:
+def stop_time(when: str, flag: str = "--until") -> str:
     """`--until` in the shapes a person types, as an absolute UTC instant (design §6, TD-026).
 
     `06:00` is the next 06:00 *here* — the host's local time, because that is the clock the person
@@ -454,7 +457,7 @@ def stop_time(when: str) -> str:
     """
     text = (when or "").strip()
     if not text:
-        raise AgentError("--until: no time given")
+        raise AgentError(f"{flag}: no time given")
     now = datetime.now().astimezone()
     if m := re.fullmatch(r"\+(\d+)\s*([smhd])", text, re.IGNORECASE):
         unit = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days"}[m[2].lower()]
@@ -462,13 +465,13 @@ def stop_time(when: str) -> str:
     if m := re.fullmatch(r"(\d{1,2}):(\d{2})", text):
         hour, minute = int(m[1]), int(m[2])
         if hour > 23 or minute > 59:
-            raise AgentError(f"--until: not a time of day: {text}")
+            raise AgentError(f"{flag}: not a time of day: {text}")
         at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         return _utc(at if at > now else at + timedelta(days=1))  # today if it is still ahead
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise AgentError(f"--until: not a time: {text} (try 06:00, +8h, or an ISO time)") from exc
+        raise AgentError(f"{flag}: not a time: {text} (try 06:00, +8h, or an ISO time)") from exc
     return _utc(parsed if parsed.tzinfo else parsed.astimezone())
 
 
@@ -484,13 +487,21 @@ def _stop(args: argparse.Namespace) -> dict[str, str]:
     runs out of time and a worker its lead wraps up are asked the same thing in the same words.
     """
     until = getattr(args, "until", None)
+    at = getattr(args, "at", None)
+    out: dict[str, str] = {}
+    if at:
+        # design §6 *Start time* (TD-152): a start nobody is at the keyboard for is a policy's act,
+        # refused on an interactive session for the reason `--until` is — the agent refuses it too
+        if not getattr(args, "unattended", False):
+            raise AgentError("--at applies to unattended sessions: add --unattended, or leave it off")
+        out["start_at"] = stop_time(at, "--at")
     if not until:
-        return {}
+        return out
     if not getattr(args, "unattended", False):
         # A stop time is a policy, and §4.2 says policies never touch an interactive session. Silently
         # storing one that nothing will ever act on is the failure this entry is about, inverted.
         raise AgentError("--until applies to unattended sessions: add --unattended, or leave it off")
-    return {"run_until": stop_time(until), "wrapup_prompt": teams.WRAPUP_PROMPT}
+    return {**out, "run_until": stop_time(until), "wrapup_prompt": teams.WRAPUP_PROMPT}
 
 
 def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
@@ -565,6 +576,9 @@ def cmd_new(args: argparse.Namespace) -> int:
         if not args.json:
             print(f"{s['id']}  ({s['adapter']}, {s['dir']})")
         return _attach(args, s["id"], s)
+    if note := start_note(s):
+        # §6 *Start time*: a record with no pane yet — nothing to attach to until it starts
+        return emit(args, s, lambda: print(f"{s['id']}  ({s['adapter']}, {s['dir']})  {note}"))
     return emit(args, s, lambda: print(f"{s['id']}  ({s['adapter']}, {s['dir']})\nattach: tmux attach -t {s['id']}"))
 
 
@@ -914,6 +928,15 @@ def cmd_grants(args: argparse.Namespace) -> int:
     edit = {"add": grants} if args.cmd == "grant" else {"remove": grants}
     s = call_sync("set_grants", id=args.id, **edit)
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
+
+
+def cmd_at(args: argparse.Namespace) -> int:
+    """`ao at <session> <when> | now` (design §4.7, §6 *Start time*, TD-152): move a scheduled start,
+    or start it on the next tick. Acting, and gated as `ao until` is; the agent refuses it on a
+    session that already started. Cancel is `ao close`."""
+    when = "now" if (args.when or "").strip().lower() == "now" else stop_time(args.when or "", "at")
+    s = call_sync("set_start", id=resolve(args.id), start_at=when)
+    return emit(args, s, lambda: print(f"{s['id']}: {start_note(s) or 'starts on the next tick'}"))
 
 
 def cmd_until(args: argparse.Namespace) -> int:
@@ -2139,6 +2162,12 @@ def build_parser() -> argparse.ArgumentParser:
         "or ten minutes later — so a worker started by hand has a stopper without anyone remembering",
     )
     p.add_argument(
+        "--at",
+        metavar="WHEN",
+        help="when this unattended session starts (design §6 Start time): 20:00 (the next one, local), +2h, or an "
+        "ISO time. The record, its name and its directory are taken now; the host agent starts it at the time",
+    )
+    p.add_argument(
         "--project",
         help="the project it is started under (design §4.9): the badge, and the Project block in front of the brief "
         "naming each of the project's repos on this host when there is more than one",
@@ -2268,6 +2297,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("mode", choices=["unattended", "interactive"])
     p.set_defaults(fn=cmd_mode)
+
+    p = add("at", help="move a scheduled start, or `now` to start it at once; ao close cancels it (design §6)")
+    p.add_argument("id")
+    p.add_argument("when", help="20:00 (the next one, local), +2h, an ISO time, or now")
+    p.set_defaults(fn=cmd_at)
 
     p = add("until", help="set or clear when an unattended session stops (design §6, TD-026)")
     p.add_argument("id")

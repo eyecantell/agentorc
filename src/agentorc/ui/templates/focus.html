@@ -108,6 +108,13 @@
     {{ hm.panel('exited', 'exited') }}
     <template id="exitedmark">{{ hm.mark('exited', 'exited') }}</template>
     <div class="inline-banner hidden" id="fbanner"></div>
+    {#- design §4.5a **starts** note on Focus (§6 *Start time*, TD-152): a scheduled record has no terminal
+        yet, as Details on a closed one; the banner's note moves it, and Start now / Cancel end the wait -#}
+    {% if s.state == 'scheduled' %}<div class="inline-banner" id="fscheduled">
+      <button class="badge" data-act="start" data-id="{{ s.id }}" data-ask="1" title="move it: a time, or now">{{ s.start_note or 'scheduled' }}</button>
+      <button class="btn sm" data-act="start" data-id="{{ s.id }}" data-at="now">Start now</button>
+      <button class="btn sm ghost" data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free.">Cancel</button>
+    </div>{% endif %}
     <div class="inline-banner hidden" id="fexited"></div>
     <div id="term" class="termbox"></div>
     <div class="card composer{% if s.unattended %} hidden{% endif %}" id="composer">

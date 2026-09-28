@@ -578,6 +578,21 @@ def stop_note(session: dict[str, Any]) -> str:
     return f"stops {day}{at:%H:%M}" + (" · wrap-up sent" if session.get("wrapup_sent_at") else "")
 
 
+def start_note(session: Mapping[str, Any]) -> str:
+    """ "starts 20:00" (or *starts Mon 20:00*) for a `scheduled` record's card, Focus header and
+    `ao status -v` (design §6 *Start time*, §4.5a **starts** note, TD-152) — the *stops* formatter's
+    clock, so the two notes read alike; empty on any record that is not scheduled."""
+    when = session.get("start_at")
+    if session.get("state") != "scheduled" or not when:
+        return ""
+    try:
+        at = datetime.fromisoformat(str(when).replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return ""  # one card's note, never the grid (see `stop_note`)
+    day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
+    return f"starts {day}{at:%H:%M}"
+
+
 PR_MARKS = ("merged", "closed")  # the words a PR that is no longer open carries (§4.5a **the PR's mark**)
 
 

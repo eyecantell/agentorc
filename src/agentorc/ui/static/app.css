@@ -102,7 +102,7 @@ input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border:
 .pill::before { font-size: .9em; line-height: 1; }
 .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 1.1em; } .pill.s-stalled::before { content: "?"; font-size: 1.1em; }
 /* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
-.pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
+.pill.s-scheduled::before { content: "◷"; font-size: 1.1em; } .pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
 .pill.s-closed::before { content: "✓"; font-size: 1.1em; } .pill.s-unreachable::before { content: "⌀"; font-size: 1.1em; }
 .pill.s-oncall::before { content: "◇"; font-size: 1.1em; }  /* a seat with nobody in it (TD-097) */
 .sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: .9em; letter-spacing: 0; }  /* not the idle glyph's tuning */
