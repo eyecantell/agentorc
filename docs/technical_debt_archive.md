@@ -2009,3 +2009,24 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Fix (as filed):** (1) key the phase on `e.get("kind") == "design-first"`, not `for_page`, with a test on a pickable design-first entry. (2) Match open PRs to declared claims by head branch (`branch_ref(headRefName)`) across the repo's PR reading, not only the checked-out branch, so a claim's PR is found wherever its branch sits. TD-176's repo facts already hold the open PRs with `headRefName`. Or have `ao progress claim --pr N` recorded when the grinder asks its reader, and say so in the grinder brief. Tests: a claim whose PR was opened on a branch the session has since left reads *review*. Done when the screenshot's three rows would read *design* (TD-175), *review* (TD-186) and *grind* (TD-146).
 
 **Related:** TD-176 (TDs in motion, the repo facts), TD-150 (`review_pr`), TD-198 (the same `kind_of` precedence on the kind bar); design §4.5 screen 1, §4.5a *team card: TDs in motion*.
+
+## TD-200: Small Org card misreadings — *last came*, a clipped flag, a closed record reading EXITED
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the Org page with TD-197)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (the slot's caption: `came = "last came" …; caption = came + f" · {d['age']} ago"` with `d["age"] = _age(s.get("since"))`; `d["flag"]`), `src/agentorc/ui/templates/card.html` (the compact card's row 2), `src/agentorc/ui/static/app.css` (`.flag`, `white-space: nowrap`)
+
+**Why:** three small things the Org page said wrongly on 2026-09-26:
+1. **A seat's *last came* measures when it left.** The caption uses the record's `since`, the time of its last state change, which for an exited seat is `closed_at`. techlead-ao-1, filled at 03:32Z and gone at 03:36Z, read *last came · 0s ago* on the page just after it left. It should use when the seat came (`created`), or say *left*.
+2. **The compact card clips its flag into a different number.** manager-ao-1 has 47 unpushed commits (its round log, TD-175). Its compact card showed *⚠ 4*, because the flag text *47 unpushed* was cut to fit and still reads as a count. The compact card needs a short form that stays true (*⚠ 47*, with the full text on hover), or no flag.
+3. **A record closed by `ao close` reads EXITED.** grinder-ao-2, closed by the anchor at 02:19:54Z, has `closed_at` set and `state: exited`. Its card reads EXITED and offers Forget. Check what the design wants a closed unattended member to read (§4.5a *Ready to close*, the Close row) before changing anything; this may be right.
+
+**Resolved:** 2026-09-27 (PR #678 for (1)–(2), PR #680 for (3)). (1) `view()`'s `came_age` from the record's `created`; (2) `flag_short` on the compact card, the full words as `title`, `.sc .r2 .flag` unshrinking — design §4.5a *card: compact*, `tests/test_ui_org.py` (`test_a_seats_last_came_is_its_fill_and_a_compact_flag_keeps_its_count`). (3) the design wanted `closed`; the killed run's `SessionEnd` landed after `ao close` and `_apply_event` set `exited`. It now ignores every hook on a closed record — design §4.2's **Close** row, `tests/test_agent.py` (`test_a_closed_record_stays_closed_when_its_run_says_it_ended`).
+
+**Fix (as filed):** (1) caption from `created` (the fill) for a seat, with a test; (2) a compact flag form, with a test that a two-digit count survives; (3) per the design check. Done when all three read true on the Org page.
+
+**Related:** TD-197 (found together), TD-175 (the unpushed round log), TD-176 slice 3 (the compact card), TD-097 (seats).
