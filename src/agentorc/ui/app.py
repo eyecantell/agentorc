@@ -55,6 +55,7 @@ from sessionorc.models import (
     stop_note,
     tokens_short,
 )
+from sessionorc.reports import branch_ref
 
 from . import help as helpmod
 from . import render as rendermod
@@ -1507,13 +1508,21 @@ def _pr_states(r: Mapping[str, Any] | None) -> dict[int, dict[str, Any]]:
 
 def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
-    a `claimed` progress entry, with its **phase** derived here, never declared — *design* on a
-    design-first entry, *review* with a PR (its own `pr`, or the tick's `review_pr`), *grind*
-    without one; a PR that is no longer open keeps *review*, marked *merged* / *closed*, until the
-    member marks the claim done or dropped. A reference two members hold is one row naming both.
-    Rows in phase order, then by reference."""
+    a `claimed` progress entry, with its **phase** derived here, never declared — *design* on an
+    entry whose `Kind:` is design-first (its kind, not the page's bucket, which puts a pickable
+    design-first entry under *pickable*, TD-197), *review* with a PR (its own `pr`, the tick's
+    `review_pr`, or else an open PR whose head branch names the reference — the tick reads only the
+    branch checked out, and a grinder that asked its reader has moved on), *grind* without one; a PR
+    that is no longer open keeps *review*, marked *merged* / *closed*, until the member marks the
+    claim done or dropped. A reference two members hold is one row naming both. Rows in phase
+    order, then by reference."""
     entries = {e["id"]: e for e in ((r or {}).get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
+    # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
+    by_branch: dict[str, int] = {}
+    for p in ((r or {}).get("prs") or {}).get("open") or []:
+        if isinstance(p, dict) and isinstance(p.get("number"), int) and (ref := branch_ref(p.get("branch"))):
+            by_branch.setdefault(ref, p["number"])  # oldest first, as the reading keeps them
     rows: dict[str, dict[str, Any]] = {}
     for m in members:
         for p in m.get("progress") or []:
@@ -1528,10 +1537,10 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     out = []
     for ref, row in rows.items():
         e = entries.get(ref) or {}
-        pr = row["pr"]
+        pr = row["pr"] = row["pr"] or by_branch.get(ref)
         known = prs.get(pr) if pr else None
         state = str((known or {}).get("state") or "")
-        row["phase"] = "design" if e.get("for_page") == "design-first" else "review" if pr else "grind"
+        row["phase"] = "design" if e.get("kind") == "design-first" else "review" if pr else "grind"
         row["title"] = str(e.get("title") or "")
         row["pr_state"] = state if state in ("merged", "closed") else ""
         row["pr_url"] = str((known or {}).get("url") or (f"{web}/pull/{pr}" if pr and web else ""))

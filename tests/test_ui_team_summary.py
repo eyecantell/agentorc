@@ -23,7 +23,8 @@ def reading(root: str, **kw) -> dict:
         "ledger": {
             "entries": [
                 {"id": "TD-301", "title": "recover stuck notices", "for_page": "pickable", "priority": "high"},
-                {"id": "TD-310", "title": "what the composer says", "for_page": "design-first", "priority": "medium"},
+                {"id": "TD-310", "title": "what the composer says", "for_page": "design-first", "kind": "design-first",
+                 "priority": "medium"},
             ],
             "by_priority": {"high": 1, "medium": 1, "low": 0},
             "by_kind": {"pickable": 1, "design-first": 1, "for-you": 0, "other": 0},
@@ -109,6 +110,29 @@ def test_tds_in_motion_derive_the_phase_and_merge_a_shared_reference():
     assert [w["name"] for w in rows["TD-290"]["members"]] == ["g3", "me"] and rows["TD-290"]["members"][1]["mine"]
     assert [x["phase"] for x in ui.motion_rows(ms, r)] == ["design", "grind", "review", "review"]
     assert rows["TD-301"]["title"] == "recover stuck notices" and rows["TD-296"]["title"] == ""  # not in the ledger
+
+
+def test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch():
+    # TD-197, the screenshot's three rows: a pickable design-first entry (the page's bucket says
+    # *pickable*) reads *design*; a claim whose PR waits for its reader while the grinder has moved
+    # to another branch reads *review*, found by the PR's head branch; a claim with nothing reads *grind*
+    r = reading("/r/s")
+    r["ledger"]["entries"] += [
+        {"id": "TD-175", "title": "round log", "for_page": "pickable", "kind": "design-first", "priority": "medium"},
+        {"id": "TD-186", "title": "held", "for_page": "pickable", "kind": "build", "priority": "medium"},
+    ]
+    r["prs"]["open"] += [
+        {"number": 628, "branch": "td186-held-thing", "url": "https://github.com/eye/samscrape/pull/628"},
+        {"number": 629, "branch": "fix-something"},
+    ]
+    r["prs"]["recent"] += [{"number": 600, "state": "merged", "branch": "td146-slice-1"}]
+    ms = [member("g1", progress=[claim("TD-146"), claim("TD-186")]), member("d1", progress=[claim("TD-175")])]
+    rows = {x["ref"]: x for x in ui.motion_rows(ms, r)}
+    assert rows["TD-175"]["phase"] == "design"
+    assert rows["TD-186"]["phase"] == "review" and rows["TD-186"]["pr"] == 628
+    assert rows["TD-186"]["pr_url"].endswith("/pull/628")
+    # a merged slice's branch does not make the entry's next slice *review*
+    assert rows["TD-146"]["phase"] == "grind" and rows["TD-146"]["pr"] is None
 
 
 def test_answer_needed_opens_the_facet_and_doing_is_newest_first():
