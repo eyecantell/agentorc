@@ -717,6 +717,13 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     concluded_team()
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
     assert {c["name"] for c in json.loads(capsys.readouterr().out)["closed"]} == set(names)
+    # a person's idle session beside it (§4.9 *A person in the team*, TD-173): it neither stops the
+    # team being concluded nor is closed by the start
+    concluded_team()
+    me = {"id": "ao-agentorc-me", "name": "me", "team": "ao-grind", "state": "idle", "unattended": False}
+    state["sessions"].append(me)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert "ao-agentorc-me" not in closes() and sorted(closes()) == sorted(f"ao-agentorc-{n}" for n in names)
 
 
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────

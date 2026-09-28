@@ -607,6 +607,11 @@ def test_a_team_whose_only_live_session_is_a_persons_reads_stopped_and_offers_st
     (g,) = [g for g in uiapp.team_groups(views, rows) if g["team"] == "ao-grind"]
     assert g["stopped"] and g["live"] == 0
     assert [m["name"] for m in g["forget"]] == ["grind-1"]  # never the person's live session
+    closed_me = {**badged("me", "ao-grind", state="closed", unattended=False), "rank": 5}
+    (g2,) = [x for x in uiapp.team_groups([closed_me, views[1]], rows) if x["team"] == "ao-grind"]
+    assert [m["name"] for m in g2["forget"]] == ["grind-1"]  # nor a person's closed one
+    org, _ = uiapp.org_here()
+    assert teamrun.members_view(org, "ao-grind", [badged("me", "ao-grind", unattended=False)])["live"] is False
     assert g["stays"] == ["your session me stays: a team act never stops an interactive session"]
 
 
