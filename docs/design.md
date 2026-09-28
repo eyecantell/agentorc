@@ -581,7 +581,8 @@ directory (an argument form would be dev-cadence's, if a tool ever needs one). T
 launched the session, and the tool's equivalent where one exists — decided when that adapter
 lands (TD-112). `shell` runs no hooks: it is not an agent.
 
-**Spend per turn** (TD-128; designed 2026-09-25, reconciled the same day; not built — TD-151). For
+**Spend per turn** (TD-128; designed 2026-09-25, reconciled the same day; Claude Code's `spend` built
+2026-09-27 — TD-151 slice 2; the home's ledger and sum not yet). For
 a `metered` profile (§4.2a) an adapter reports `spend(profile, cursors) -> (turns, cursors)` — `cursors` a byte offset
 per transcript path, `turns` a list of `Turn(at, id, source, offset, model, input, output,
 cache_read, cache_write, cost)`, `id` the entry's own (Claude Code's `uuid`), `source` and `offset`

@@ -81,6 +81,17 @@ class Adapter(Protocol):
     #                                                      legal and means the same as "error". Never gates
     #                                                      anything (design §4.3 `usage()`, keyed by the profile
     #                                                      *name* because this package cannot build a Profile)
+    #                                                      {"reason": "metered"}: the profile is billed by spend,
+    #                                                      and its quota is never polled (§4.2a, TD-151)
+    #   spend(profile: str, cursors: dict[str, int]) -> dict
+    #                                                      a metered profile's turns since `cursors` (§4.3 *Spend
+    #                                                      per turn*, TD-151): {"turns": [Turn], "cursors":
+    #                                                      {transcript: byte offset}, "reason": "ok" | why};
+    #                                                      a Turn is {at, id, source, offset, model, input,
+    #                                                      output, cache_read, cache_write, cost} — four token
+    #                                                      kinds, never folded; `cost` None where the tool does
+    #                                                      not price its own turns. A cursor past its
+    #                                                      transcript's end is a rewrite, read from 0 again
 
 
 def short_model(adapter: str, model: str | None) -> str:
