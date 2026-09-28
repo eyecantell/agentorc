@@ -46,6 +46,11 @@ class HookFedStub:
     def account_for(self, profile):
         return self.accounts.get(profile)
 
+    billing: dict = {}  # set by a test: profile → {billing, prices}; one it does not name is a subscription
+
+    def billing_for(self, profile):
+        return self.billing.get(profile)
+
     external = []  # set by a test: `ExternalSession`s the stub sees outside agentorc (TD-010 a)
 
     def external_sessions(self):

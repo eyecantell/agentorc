@@ -84,6 +84,50 @@ def reserves(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def amounts(doc: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+    """A metered profile's reserves under `usage_gate` (§6 *Usage gate*, TD-151): `{profile: {label:
+    {value, unit}}}` from every entry written as an amount — `"$5"`, `"2M tok"` — and nothing else;
+    `reserves` reads the percents and drops these, so each reader sees only its own billing's kind."""
+    gate = doc.get("usage_gate")
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    if not isinstance(gate, dict):
+        return out
+    for prof, by_label in gate.items():
+        if not isinstance(by_label, dict):
+            continue
+        good = {}
+        for label, r in by_label.items():
+            try:
+                good[str(label)] = parse_amount(r)
+            except ValueError:
+                continue
+        if good:
+            out[str(prof)] = good
+    return out
+
+
+def parse_amount(value: Any) -> dict[str, Any]:
+    """An amount per window (§6 *Usage gate*): `$n` in the account's currency, or `n tok` / `nM tok`
+    in tokens. `{value, unit}` with `unit` `$` or `tok`; anything else raises."""
+    text = str(value).strip() if isinstance(value, str) else ""
+    try:
+        if text.startswith("$"):
+            n = float(text[1:].replace(",", ""))
+            unit = "$"
+        elif text.endswith("tok"):
+            num = text[:-3].strip()
+            scale = 1_000_000 if num[-1:] in ("M", "m") else 1
+            n = float(num[:-1] if scale > 1 else num) * scale
+            unit = "tok"
+        else:
+            raise ValueError
+    except (ValueError, IndexError):
+        raise ValueError(f"an amount is $n or n tok (nM tok), not {value!r}") from None
+    if not math.isfinite(n) or n <= 0:
+        raise ValueError(f"an amount is more than nothing, not {value!r}")
+    return {"value": n, "unit": unit}
+
+
 def parse_reserve(value: Any) -> int | dict[str, int]:
     """A reserve as stored: an int 0–100 (flat) or `{per_day: int 0–100}`. Anything else raises."""
     if isinstance(value, dict):

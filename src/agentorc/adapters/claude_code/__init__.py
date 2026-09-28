@@ -276,7 +276,8 @@ def _undecorated(pane_title: str) -> str:
 def _turn(line: bytes, source: str, offset: int) -> dict | None:
     """One transcript line as a turn (`spend`), or None when it is not an `assistant` entry with a
     `usage`: the four token kinds kept apart, because a coding agent's input is mostly cache reads
-    at a tenth of the input rate. `message` is the API response's id, for `spend`'s dedup alone."""
+    at a tenth of the input rate. `response` is the API response's id: `spend` counts a response once
+    within a read, and the home's ledger once across two reads it straddles (TD-151)."""
     try:
         d = json.loads(line)
     except ValueError:
@@ -303,7 +304,7 @@ def _turn(line: bytes, source: str, offset: int) -> dict | None:
         "cache_read": n("cache_read_input_tokens"),
         "cache_write": n("cache_creation_input_tokens"),
         "cost": None,
-        "message": str(msg.get("id") or ""),
+        "response": str(msg.get("id") or ""),
     }
 
 
@@ -545,7 +546,8 @@ class ClaudeCodeAdapter:
         entry's `uuid`, `cost` None (the tool does not price its turns; the home does, from the
         profile). One API response is written as one entry per content block, each carrying the
         response's usage, so a read counts a response once — its last entry, keyed by
-        `message.id`. `reason` is `ok`, or why nothing could be read, with the cursors unchanged."""
+        `message.id`, which the turn carries as `response`. `reason` is `ok`, or why nothing could be
+        read, with the cursors unchanged."""
         before = {str(k): int(v) for k, v in (cursors or {}).items() if isinstance(v, int) and v >= 0}
         try:
             prof = profiles_mod.get(profile or None)
@@ -587,9 +589,19 @@ class ClaudeCodeAdapter:
                     continue
                 turn = _turn(line, key, offset)
                 if turn is not None:
-                    by_message[turn.pop("message") or turn["id"] or f"@{offset}"] = turn
+                    by_message[turn["response"] or turn["id"] or f"@{offset}"] = turn
             turns.extend(by_message.values())
         return {"turns": turns, "cursors": after, "reason": "ok"}
+
+    def billing_for(self, profile: str) -> dict | None:
+        """How the profile is billed (design §4.2a, TD-151): `{billing, prices}` as `profiles.yml`
+        declares it, which the home reads before the cap rule and to price the turns — it cannot
+        read a profile itself. None for a profile that does not resolve."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        return {"billing": prof.billing, "prices": dict(prof.prices)}
 
     def usage_for(self, profile: str) -> dict | None:
         """The core-facing form of `usage()`: by profile name, as a plain dict —

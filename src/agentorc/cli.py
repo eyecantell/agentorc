@@ -240,10 +240,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     # **the PR's mark** on the report line (design §4.7, §4.5a card **report line**, TD-193): the home's
     # repo readings, read once per call; refused (a node offline) or failed, the lines are unmarked
     readings: dict[str, Any] = {}
+    usage: dict[str, Any] = {}
     if args.verbose:
         with contextlib.suppress(Exception):
             got = call_sync("repos")
             readings = got if isinstance(got, dict) else {}
+        with contextlib.suppress(Exception):
+            got = call_sync("usage")
+            usage = got if isinstance(got, dict) else {}
     sessions.sort(key=lambda s: (STATE_RANK.get(s["state"], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
     for s in sessions:
@@ -280,6 +284,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 over = " (over)" if context_over(s) else ""
                 bound_text = f", bound {tokens_short(bound)}{over}" if isinstance(bound, int) and bound > 0 else ""
                 print(f"{'':<{w}}      context: {reading}{bound_text}")
+            if line := spend_line(usage.get(s.get("profile") or "")):
+                print(f"{'':<{w}}      spend:  {line}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
@@ -316,6 +322,31 @@ def cmd_status(args: argparse.Namespace) -> int:
             for line in (s.get("tail") or [])[-3:]:
                 print(f"{'':<{w}}      │ {line}")
     return 0
+
+
+def spend_line(reading: Any) -> str:
+    """A metered profile's spend for `ao status -v` (design §4.2a, §4.4 *Usage*; TD-151): each window's
+    spend, over this profile's amount where it has one — *day $3.20 / $5 (64%) · week $9.80 · month
+    $31.05* — in tokens where nothing was priced; *spend unknown (why)* beside it when the adapter
+    could not read. Empty for a polled reading, whose windows carry no spend."""
+    if not isinstance(reading, dict):
+        return ""
+    parts = []
+    for w in reading.get("windows") or ():
+        spent = w.get("spent") if isinstance(w, dict) else None
+        if not isinstance(spent, dict):
+            continue
+        amount = w.get("amount") if isinstance(w.get("amount"), dict) else None
+        money = spent.get("cost") is not None and not (amount and amount.get("unit") == "tok")
+        text = f"${spent['cost']:,.2f}" if money else f"{tokens_short(int(spent.get('total') or 0))} tok"
+        if amount:
+            value = amount.get("value") or 0
+            text += f" / ${value:,.2f}" if amount.get("unit") == "$" else f" / {tokens_short(int(value))} tok"
+            text += f" ({w['pct']}%)" if isinstance(w.get("pct"), int) else ""
+        parts.append(f"{w.get('label')} {text}")
+    if parts and reading.get("reason") not in (None, "ok"):
+        parts.append(f"spend unknown ({reading['reason']})")
+    return " · ".join(parts)
 
 
 def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> int:

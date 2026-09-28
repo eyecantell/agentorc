@@ -59,6 +59,7 @@ from sessionorc.agent_common import (
     backup_store,
     log,
 )
+from sessionorc.agent_spend import _metered_of
 from sessionorc.gitinfo import git_info
 from sessionorc.models import (
     SYSTEM,
@@ -118,6 +119,10 @@ class TickMixin:
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
+        if self.mode == "home" and (self._spend_task is None or self._spend_task.done()):
+            # detached as the usage poll is: it reads transcripts (§4.4 *Usage*, TD-151); a node's
+            # turns reach the home over the link, not from here (slice 4)
+            self._spend_task = asyncio.create_task(self._refresh_spend())
         await self._team_stop_times(snapshot_at)
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
@@ -271,7 +276,6 @@ class TickMixin:
         reserve`, TD-146) pauses at its profile's line lowered by that much, on every window with a
         reserve, and its mark carries `team_extra: {team, n}` so the card can say which line it was."""
         whole = settings_mod.load()
-        doc = settings_mod.reserves(whole)
         changed = False
         for s in list(self.sessions.values()):
             if not s.unattended or s.state in ("exited", "closed", "scheduled"):
@@ -280,7 +284,7 @@ class TickMixin:
                     self.store.save(s)
                     changed = True
                 continue
-            by_label = doc.get(s.profile)
+            by_label = self._gate_reserves(whole, s.profile)
             reading = self._usage.get(s.profile) or {}
             windows = reading.get("windows")
             if windows is None and by_label:
@@ -406,7 +410,7 @@ class TickMixin:
         if windows is None:
             return False
         whole = settings_mod.load()
-        by_label = settings_mod.reserves(whole).get(profile) or {}
+        by_label = self._gate_reserves(whole, profile) or {}
         extra = settings_mod.team_extra(whole, team)
         return settings_mod.crossed(settings_mod.lines(by_label, windows, now, extra)) is not None
 
@@ -1202,6 +1206,9 @@ class TickMixin:
             for s in self.sessions.values()
             if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
         ]
+        # A metered profile is never polled (§4.2a): its reading is the spend pass's sum, and the cap
+        # rule below skips it by its billing, read before the windows (TD-151)
+        metered = {p for _, p in await asyncio.to_thread(_metered_of, {(s.adapter, s.profile) for s in live})}
         mono = time.monotonic()
         # One poll per account, never per profile (§4.2a, TD-122): four profiles split by role on
         # one login asked four times, and the endpoint answered `rate_limited` to all of them.
@@ -1211,7 +1218,7 @@ class TickMixin:
         for s in live:
             ad = adapters.get(s.adapter)
             fn = getattr(ad, "usage_for", None)
-            if not fn:
+            if not fn or s.profile in metered:
                 continue
             key, account = _usage_key(ad, s.adapter, s.profile)
             profs = groups.setdefault(key, [])
@@ -1253,14 +1260,14 @@ class TickMixin:
             self._usage_acct.pop(key, None)
             self._usage_checked.pop(key, None)
             self._usage_wait.pop(key, None)
-        shown = {p for profs in groups.values() for p in profs}
+        shown = {p for profs in groups.values() for p in profs} | metered
         if dropped := [p for p in self._usage if p not in shown]:
             for prof in dropped:
                 self._usage.pop(prof, None)
                 await self._broadcast({"event": "usage", "profile": prof, "usage": None})
             self.usage_store.save(self._usage)
         for s in live:
-            cap = _cap(self._usage.get(s.profile))
+            cap = None if s.profile in metered else _cap(self._usage.get(s.profile))
             if cap and s.state not in ("limited", "needs-you"):
                 # the tool's own endpoint, not the screen: reported, so `hook` (design §9 invariant 4)
                 self._pre_limited[s.id] = s.state

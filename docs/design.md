@@ -430,7 +430,8 @@ per host in `~/.agentorc/profiles.yml`.
 
 **How a profile is billed** (TD-128; designed 2026-09-25 by the designer, #547, and reconciled the
 same day in a cloud session with Paul; the profile's `billing` and `prices` and the skipped poll
-built 2026-09-27 — TD-151 slice 1; the spend, the summed reading, the amount and the chip not yet):
+built 2026-09-27 — TD-151 slice 1; the home's ledger, the summed reading and the amount's pause slice 3;
+a node's turns, `ao gate`'s amounts and the chip not yet):
 a profile carries **`billing`** —
 `subscription`, the default and every profile today, whose bound is the account's quota windows
 above; or **`metered`**, an API key (`ANTHROPIC_API_KEY`), a hosted open-weights model behind an
@@ -586,11 +587,13 @@ launched the session, and the tool's equivalent where one exists — decided whe
 lands (TD-112). `shell` runs no hooks: it is not an agent.
 
 **Spend per turn** (TD-128; designed 2026-09-25, reconciled the same day; Claude Code's `spend` built
-2026-09-27 — TD-151 slice 2; the home's ledger and sum not yet). For
+2026-09-27 — TD-151 slice 2, the home's ledger and sum slice 3). For
 a `metered` profile (§4.2a) an adapter reports `spend(profile, cursors) -> (turns, cursors)` — `cursors` a byte offset
-per transcript path, `turns` a list of `Turn(at, id, source, offset, model, input, output,
+per transcript path, `turns` a list of `Turn(at, id, source, offset, response, model, input, output,
 cache_read, cache_write, cost)`, `id` the entry's own (Claude Code's `uuid`), `source` and `offset`
-naming the transcript and the entry's position in it — from the tool's own records: Claude Code: the `usage` on each `assistant` entry of
+naming the transcript and the entry's position in it, `response` the API response's id (one response
+is written as an entry per content block, each carrying the response's usage: the adapter counts it
+once within a read, the home once across two reads it straddles, §4.4) — from the tool's own records: Claude Code: the `usage` on each `assistant` entry of
 every transcript under the profile's config directory past its cursor, sessions agentorc did not
 start included (a plain `claude` in a shell on the same key spends the same money) and subagent
 turns included (they are billed), never the whole file each tick and never a grep — a cursor past
@@ -604,6 +607,9 @@ adapter reports, and neither knows a price list by heart: the prices are the pro
 declaration, and the chip's hover shows tokens by kind, so a wrong price is visible. An adapter that
 cannot report spend for a metered profile says so once (`reason`), and the chip draws *spend
 unknown*, never nothing — a metered profile with no reading is the runaway this exists to bound.
+The core cannot read a profile, so the adapter says how one is billed: `billing_for(profile) ->
+{billing, prices}` as `profiles.yml` declares it, an adapter without it billing every profile as a
+subscription.
 
 ### 4.4 Host agent
 
@@ -687,7 +693,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   (`usage.json`) and so is the allowance: the first poll after a restart waits until the held
   reading's `fetched` plus the cadence, never sooner. The reason is not held.
   **A metered account's reading is a sum, not a poll** (§4.2a; TD-128, reconciled 2026-09-25;
-  not built — TD-151). On every tick each host asks the adapter `spend(profile, cursors)` (§4.3) for
+  built at the home 2026-09-27 — TD-151 slice 3; a node's turns not yet — slice 4). On every tick each host asks the adapter `spend(profile, cursors)` (§4.3) for
   the metered profiles its live sessions run under and adds the turns to a **daily ledger per
   account**, `spend.json` beside `usage.json`: one row per account per day holding tokens by kind
   and cost, and the **cursors** — a byte offset per transcript, per host — kept thirteen months.
@@ -701,7 +707,13 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   and at that `at` the entries in file order up to and including the one with that `id` — every
   entry at that `at` when none carries it, since a survivor at the old boundary is old and a new
   turn at that millisecond is a coincidence worth cents, where a re-bill is the whole turn — so a
-  rewrite never re-bills, and loses at most that one coincidence. On the
+  rewrite never re-bills, and loses at most that one coincidence. A batch read **from** the cursor
+  drops every entry before that `at` too, since `at` never decreases in one file: that is what
+  catches a rewrite that left the file at or past its cursor, which the adapter cannot see as one.
+  Beside them the cursor keeps the last entry's `response` and tokens, and a response whose entries
+  straddle two reads is counted, the second time, for what it adds over them. The test stays per
+  transcript because `claude --resume` appends to the transcript it resumes: across 328 of kmaster's
+  transcripts, 20 of them resumed, no response appears in two files (checked 2026-09-27). On the
   first tick that finds a profile metered the cursors start at each transcript's end, so a key that
   ran unmetered for months does not bill its history to the first day; a transcript that first
   appears on a later tick starts at offset 0; a row's `cost` is written once, at that tick's prices, and a later
@@ -5344,7 +5356,7 @@ person:                                       # the person's own — nothing her
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a, TD-164; default on)
 ```
 
-  A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
+  A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it (the gate reads amounts since TD-151 slice 3; `set_settings` and `ao gate` take them with slice 5, and until then an amount is written by hand). A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
   no schedule, no stop time and no priority; a repo absent under `repos:` promotes by hand.
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
@@ -5880,8 +5892,8 @@ teams:
   host's `settings.yml` (§5), read on every tick and changed by `ao gate` (§4.7) or, once §4.5 lists
   one, a settings page; the top bar's chip shows the line beside the number (§4.5a). A one-day
   change to a reserve is by hand — the reserve down, and back after the reset. Rejected for now:
-  TD-101, an override that expires on its own. **A metered profile** (§4.2a; TD-128, designed 2026-09-25 and reconciled the same day with Paul,
-  not built — TD-151) has no quota to keep back, so its reserve is an **amount per window**, in
+  TD-101, an override that expires on its own. **A metered profile** (§4.2a; TD-128, designed 2026-09-25 and reconciled the same day with Paul;
+  the pause, the resume at the roll and the note built 2026-09-27 — TD-151 slice 3, `ao gate`'s amounts not yet) has no quota to keep back, so its reserve is an **amount per window**, in
   money where the profile has prices (`{day: "$5", week: "$20"}`) or in tokens where it has none
   (`{day: "2M tok"}`), read against the **account's** spend (§4.2a): the amount is the window's
   **100**, `pct` is spend over amount, and the line is `100 − <team priority>` — the amount itself
