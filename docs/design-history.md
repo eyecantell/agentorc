@@ -218,6 +218,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-164, the designer): screen 8's **You** lists copy on select with the terminal's face and size.
 - 2026-09-26 (after the TD-176 promote): the Org drew the new team summaries as plain text — the browser held the old `app.css` (served with no `Cache-Control`, so kept on a guessed freshness) and a hard refresh fixed it. The page's two links now carry a hash of the file.
 - 2026-09-26 (TD-188, the designer): the card's row 4 gains the context reading.
+- 2026-09-27 (screen 8 **Settings**, TD-148): the page built — `/settings` (`ui/settings_page.py`, `settings.html`), its writes through `/api/settings/usage|teams|repos|you` to `set_settings`, the person's terminal face and size handed to every page's terminals (`data-term-*` on `<body>`, a `BroadcastChannel` to the open ones). The Settings tab is drawn. The metered card is drawn without fields until TD-151 slice 5. The terminal size's bound in §4.5a read 10–20 while `set_settings` took 8–32 since TD-146; the design now says 8–32, the one bound the page and the agent share.
 
 ## 4.5a Controls
 
@@ -323,6 +324,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-27 (TD-205, grinder-ao-1; Paul: *it seems to redraw while scrolling, popping back up to the top*): *Answer needed / Doing* keeps the Doing list's scroll across the summary's whole swap — `AO.scrolls` reads each `data-keep-scroll` box before it and `syncSummaries` puts the position back once the face is shown (the Repo page, which re-reads its part whole, does the same around its swap); a list at its top is not kept.
 - 2026-09-27 (TD-197, grinder-ao-1; Paul: *designer items are being listed as GRIND instead of DESIGN*): TDs in motion keys *design* on the entry's `kind`, not the page's `for_page` bucket, and a claim with no PR of its own or from the tick takes an open PR whose head branch names its reference (`reports.branch_ref`). Call made: open PRs only — a merged slice's branch would otherwise mark the same entry's next slice *review*.
 - 2026-09-27 (TD-200 (1)–(2), grinder-ao-1): *card: compact* — a seat's *last came* is measured from its record's `created` (it read *last came · 0s ago* the moment a seat left, from `since`), and the compact card's flag is its count, `flex-shrink: 0`, with the full words as its `title` (*47 unpushed*, clipped, had read *⚠ 4*).
+- 2026-09-27 (*Settings page* rows, *Org top bar: Settings* tab, TD-148): built. The You section carries **copy on select** beside size and face, the same `person.terminal` key as Focus's toggle.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.

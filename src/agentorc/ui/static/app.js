@@ -48,7 +48,7 @@
   // face was not ready at open, measure again when it is. Two sets, because xterm.js ignores an
   // option set to the value it already has.
   AO.termFont = function (term, fit) {
-    const spec = `${AO.TERM_OPTS.fontSize}px "JetBrains Mono"`;
+    const spec = `${AO.TERM_OPTS.fontSize}px ${AO.termFace || '"JetBrains Mono"'}`;
     if (!document.fonts || document.fonts.check(spec)) return;
     document.fonts.load(spec).then(() => {
       term.options.fontFamily = "monospace";
@@ -56,6 +56,28 @@
       fit.fit();
     }).catch(() => { /* the fallback stack stays: still a monospace pane */ });
   };
+  // The person's face and size (goal 12, §5 `person.terminal`, the Settings page; TD-148): the page
+  // is drawn with them on `<body>`, and a Save on the Settings page tells this browser's other tabs
+  // at once, so every open terminal takes them without a reload. `monospace` always ends the stack;
+  // ligatures stay off (xterm.js draws none without its addon, which is never loaded).
+  AO.terms = [];
+  AO.termFamily = (face) => (face ? `"${String(face).replace(/["\\]/g, "")}", monospace` : '"JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace');
+  AO.setTermLook = function (look) {
+    const size = Number(look && look.size), face = look && look.face ? String(look.face) : "";
+    AO.TERM_OPTS.fontSize = size >= 8 && size <= 32 ? size : 13;
+    AO.TERM_OPTS.fontFamily = AO.termFamily(face);
+    AO.termFace = face ? `"${face.replace(/["\\]/g, "")}"` : "";
+    AO.terms.forEach(({ term, fit }) => {
+      term.options.fontSize = AO.TERM_OPTS.fontSize;
+      term.options.fontFamily = AO.TERM_OPTS.fontFamily;
+      try { fit.fit(); } catch (e) { /* a pane not laid out yet fits on its next resize */ }
+      AO.termFont(term, fit);
+    });
+  };
+  if (document.body && document.body.dataset) AO.setTermLook({ size: document.body.dataset.termSize, face: document.body.dataset.termFace });
+  AO.termChan = (() => { try { return new BroadcastChannel("ao-term"); } catch (e) { return null; } })();
+  if (AO.termChan) AO.termChan.onmessage = (e) => AO.setTermLook(e.data || {});
+  if (AO.termChan && AO.termChan.unref) AO.termChan.unref();  // node's probes (tests) only: a browser has no unref
 
   // ---- toasts: the one error surface (design §4.5) ----
   AO.toast = function (text, ok) {
@@ -2055,6 +2077,7 @@
     term.open($("#term")); fit.fit();
     AO.termRenderer(term);
     AO.termFont(term, fit);
+    AO.terms.push({ term, fit });
     let ws, delay = 500, paneGone = false;
     // design §4.5 *Focus watches* (TD-096): an unattended session's attach is read-only. The server
     // decides and drops the keys (§4.6); the page learns it from the attach's first frame and only
@@ -2752,5 +2775,94 @@
     store.set(HELP_OPEN(b.dataset.info), on);
   });
   AO.applyHelpMarks();
+  // ---- the Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148) ----
+  // A reserve's line before the press lands, by the gate's own arithmetic (§6 *Usage gate*,
+  // `sessionorc.settings.line`): `100 − n`, or `100 − n × days left` for `n/day`, days left counted
+  // up to the window's reset. Pure, so the tests hold it to the server's cases.
+  AO.reserveLine = function (text, resets, now) {
+    const t = String(text || "").trim();
+    if (!t) return { line: null, says: "no line" };
+    const m = /^(\d+)\s*(\/day)?$/.exec(t);
+    if (!m) return { error: "a reserve is a whole percent (30) or a percent per day (10/day)" };
+    const n = Number(m[1]);
+    if (n > 100) return { error: "a reserve is a whole percent from 0 to 100" };
+    if (!m[2]) return { line: Math.max(0, 100 - n), says: `→ line ${Math.max(0, 100 - n)}%` };
+    const at = resets ? Date.parse(resets) : NaN;
+    if (!Number.isFinite(at)) return { line: null, says: "no line — the window reports no reset" };
+    const left = Math.max(1, Math.ceil((at - (now || Date.now())) / 86400000));
+    const line = Math.max(0, Math.min(100, 100 - n * left));
+    return { line, says: `→ line ${line}% · ${left} day${left === 1 ? "" : "s"} left` };
+  };
+  AO.settings = function () {
+    const page = $("#setpage"); if (!page) return;
+    const post = async (section, body) => {
+      const r = await fetch(`/api/settings/${section}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      return r.json();
+    };
+    // the refusal, or the *applies on the next tick*, in place on the card (§4.5a: refusals are the RPC's words in place)
+    const say = (form, text, bad) => {
+      const el = $(".setsaid", form); if (!el) return AO.toast(text, !bad);
+      el.textContent = text; el.classList.toggle("warn", !!bad);
+    };
+    $$(".setcard[data-section='usage'] .setin", page).forEach((inp) => {
+      const out = inp.parentElement.querySelector(".setline");
+      inp.addEventListener("input", () => {
+        const got = AO.reserveLine(inp.value, inp.dataset.resets);
+        out.textContent = got.error || (inp.value.trim() === (inp.defaultValue || "").trim() ? out.dataset.was : got.says);
+        out.classList.toggle("warn", !!got.error);
+      });
+    });
+    const forms = {
+      usage: (f) => ["usage", { profile: f.dataset.profile, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
+      teams: (f) => {
+        const body = { team: f.dataset.team, reserve: f.elements.reserve.value.trim() };
+        if (f.elements.until.value.trim()) body.until = f.elements.until.value.trim();
+        return ["teams", body];
+      },
+      you: (f) => {
+        const mode = f.elements.open_in.value;
+        const open_in = mode === "template" ? { label: f.elements.label.value.trim(), url: f.elements.url.value.trim() } : mode;
+        const terminal = { size: f.elements.size.value ? Number(f.elements.size.value) : null, face: f.elements.face.value.trim() || null, copy_on_select: f.elements.copy_on_select.checked };
+        return ["you", { open_in, terminal }];
+      },
+    };
+    page.addEventListener("submit", async (e) => {
+      const f = e.target.closest("form.setcard"); if (!f || !forms[f.dataset.section]) return;
+      e.preventDefault();
+      const [section, body] = forms[f.dataset.section](f);
+      try {
+        await post(section, body);
+        say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
+        if (section === "you" && AO.termChan) { AO.termChan.postMessage(body.terminal); AO.setTermLook(body.terminal); }
+        if (section === "teams") setTimeout(() => location.reload(), 600);  // the stop time is drawn in this host's clock by the server
+      } catch (err) { say(f, err.message, true); }
+    });
+    page.addEventListener("click", async (e) => {
+      const clear = e.target.closest("[data-clear='until']"); if (!clear) return;
+      const f = clear.closest("form.setcard");
+      try { await post("teams", { team: f.dataset.team, until: null }); location.reload(); } catch (err) { say(f, err.message, true); }
+    });
+    $$(".setauto", page).forEach((box) => box.addEventListener("change", async () => {
+      const card = box.closest(".setcard");
+      try {
+        await post("repos", { repo: card.dataset.repo, auto: box.checked });
+        box.parentElement.querySelector(".note").textContent = box.checked ? "on: the home promotes 10 min after main moves" : "off: the Inbox row offers the press";
+        AO.toast(`${card.dataset.repo}: promote ${box.checked ? "auto" : "by hand"} · applies on the next tick`, true);
+      } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
+    }));
+    const openin = $("#setopenin");
+    if (openin) openin.addEventListener("change", () => $("#settemplate").classList.toggle("hidden", openin.value !== "template"));
+    // *this browser* (§4.5a): what it holds, each set by its own control; Reset clears every `ao.*` key
+    $$("#setbrowser [data-key]", page).forEach((dd) => {
+      const v = store.get(dd.dataset.key, null);
+      dd.textContent = v === null ? "not set" : typeof v === "boolean" ? (v ? "on" : "off") : String(v);
+    });
+    $("#setreset").addEventListener("click", () => {
+      if (!confirm("Reset this browser? Every ao.* key this browser keeps — the theme, mine, the folds, the filters, the pop-out windows — is cleared, and the page reloads. Nothing anywhere else changes.")) return;
+      try { Object.keys(localStorage).filter((k) => k.startsWith("ao.")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+      location.reload();
+    });
+  };
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 })();

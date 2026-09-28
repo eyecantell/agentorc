@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Settings · ShiftLead{% endblock %}
+{# design §4.5 screen 8 **Settings** (TD-100 (4), designed 2026-09-25; built by TD-148), §4.5a
+   *Settings page* rows; mockups `Settings.dc.html`, `SettingsDark.dc.html`. The one page that
+   **writes a setting** — a value a person moves without redefining anything, in the home's
+   `settings.yml`, written only through `set_settings` — and shows every other configured value with
+   where it lives. One centred column, the Inbox's (TD-082): a section is a heading with its *i*
+   mark, a row is a card. Everything here is drawn from `settings_page.py`; every write posts to
+   `/api/settings/<section>` and says *applies on the next tick*, or the refusal in place. #}
+{% block body %}
+{% macro imark(id, name, text) -%}
+<button class="imark helpmark" type="button" data-info="set-{{ id }}" id="i-set-{{ id }}" aria-controls="set-{{ id }}" aria-expanded="false" aria-describedby="set-{{ id }}" aria-label="About {{ name }}" title="{{ text }}">i</button>
+{%- endmacro %}
+{% macro panel(id, text) -%}
+<div class="note helppanel" id="set-{{ id }}" hidden>{{ text }}</div>
+{%- endmacro %}
+{% macro filefoot(path, read, who) -%}
+{#- a file card's foot (§4.5a *Open file*, *read-only values and the i mark*): the file, when it is
+    re-read and who edits it, and the editor button with the file's path; none under `open_in: none` -#}
+<div class="row gap wrap setfoot"><span class="note"><span class="mono">{{ path }}</span> · read {{ read }} · {{ who }}</span><span class="grow"></span>
+{%- set ed = editor_link(path) %}{% if ed and path %}<a class="btn sm ghost" href="{{ ed.url }}" title="open {{ path }} in {{ ed.label }}">Open file</a>{% endif %}</div>
+{%- endmacro %}
+{% macro rows(list) -%}
+<dl class="setvals">{% for r in list %}<dt>{{ r.key }}</dt><dd class="mono">{{ r.value }}{% if r.default %} <span class="badge defmark" title="the file does not set this: its default">default</span>{% endif %}</dd>{% endfor %}</dl>
+{%- endmacro %}
+{% set seth = "set at " ~ set_at ~ " — a write forwards to the home, and is refused while the link is down (§4.4a)" %}
+<div class="page inboxpage setpage" id="setpage" data-set-at="{{ set_at }}">
+  <div class="row gap wrap"><span class="h1">Settings</span>{% if set_at %}<span class="badge setat" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}</div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — the settings cannot be read or written until it is back <span class="grow"></span><a class="btn sm ghost" href="/settings">Retry</a></div>
+  {% for n in notes %}<div class="note warn">{{ n }}</div>{% endfor %}
+  {% for m in migrate %}<div class="note warn" id="migratenote">migrate: {{ m }}</div>{% endfor %}
+  {% if editor_note %}<div class="note warn">{{ editor_note }}</div>{% endif %}
+
+  {# **Usage** (§4.5a *Settings page: Usage*) #}
+  {% set info_usage = "The reserves the usage gate pauses a profile's unattended sessions at: what you keep back of each window for your own work, per profile, per window as the tool names it. Grouped by account, since the reading is the account's. Each field takes what ao gate takes — 30, 10/day, empty to clear — and the line beside it is what the chip will show. A change applies on the next tick. Written to settings.yml through set_settings; never by hand while the agent runs." %}
+  <section class="isec" id="sec-usage">
+    <div class="row gap sechead"><span class="h2">Usage</span>{{ imark("usage", "Usage", info_usage) }}</div>
+    {{ panel("usage", info_usage) }}
+    {% for g in usage_groups %}
+      <div class="note setgroup">{{ g.account }}</div>
+      {% for c in g.cards %}
+      <form class="card pad setcard" data-section="usage" data-profile="{{ c.profile }}">
+        <div class="row gap wrap"><span class="h2 mono">{{ c.profile or "(default)" }}</span><span class="note">{{ c.badge }}</span></div>
+        {% if c.metered %}
+          <div class="note">A metered profile's reserve is an amount per window — <span class="mono">$5</span>, <span class="mono">20M tok</span> — against the account's spend (§4.2a). This card's fields are not built — TD-151 slice 5; until then an amount is written in settings.yml by hand.</div>
+        {% else %}
+          {% for w in c.rows %}
+          <label class="setrow"><span class="setlabel">{{ w.label }} reserve</span>
+            <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no line" data-resets="{{ w.resets }}" data-pct="{{ w.pct if w.pct is not none else '' }}" autocomplete="off" spellcheck="false">
+            <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span></label>
+          {% else %}
+          <div class="note">No window reported yet: the adapter has not read this profile's usage. A reserve can be set with <span class="mono">ao gate</span>, which says the labels were not checked.</div>
+          {% endfor %}
+          {% if c.rows %}
+          <div class="row gap wrap"><span class="note setsaid">applies on the next tick · the chip shows the line{% if c.unchecked %} · no reading yet, so the labels are not checked{% endif %}</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+          {% endif %}
+        {% endif %}
+      </form>
+      {% endfor %}
+    {% else %}
+      <div class="note">No profiles.</div>
+    {% endfor %}
+  </section>
+
+  {# **Teams** (§4.5a *Settings page: Teams*) #}
+  {% set info_teams = "The three things you move for a team without redefining it: its schedule, its stop time — every live member and seat stops there, and the ones a start creates — and its reserve priority, an extra reserve on top of the profile's for this team's sessions, so two teams on one profile pause at different lines. The stop time takes 06:00, +8h or an ISO time, in this host's clock. Written to settings.yml's teams: through set_settings; the team itself is org.yml's, by hand." %}
+  <section class="isec" id="sec-teams">
+    <div class="row gap sechead"><span class="h2">Teams</span>{{ imark("teams", "Teams", info_teams) }}</div>
+    {{ panel("teams", info_teams) }}
+    {% for t in teams %}
+    <form class="card pad setcard" data-section="teams" data-team="{{ t.name }}">
+      <div class="row gap wrap"><span class="h2 mono">{{ t.name }}</span><span class="note">team</span></div>
+      <label class="setrow"><span class="setlabel">stop time</span>
+        <input class="input setin" name="until" value="" placeholder="06:00, +8h or ISO" autocomplete="off" spellcheck="false">
+        <span class="note">{% if t.until %}{{ t.until }}{% if t.passed %} (passed){% endif %} · every member and seat{% else %}none{% endif %}</span></label>
+      <label class="setrow"><span class="setlabel">reserve priority</span>
+        <input class="input setin" name="reserve" value="{{ t.reserve or '' }}" placeholder="0" inputmode="numeric" autocomplete="off">
+        <span class="note">{% if t.reserve %}+{{ t.reserve }} on the profile's reserve for this team's sessions{% else %}none — the profile's line{% endif %}</span></label>
+      <label class="setrow"><span class="setlabel">schedule</span>
+        <input class="input setin" value="{{ t.schedule | tojson if t.schedule else '' }}" placeholder="at a reset" disabled>
+        <span class="note">not built — TD-133</span></label>
+      <div class="row gap wrap"><span class="note setsaid">applies on the next tick</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}
+        {% if t.until %}<button class="btn sm ghost" type="button" data-clear="until">Clear stop time</button>{% endif %}
+        <button class="btn sm primary" type="submit">Save</button></div>
+      {% if t.source %}{{ filefoot(t.source, reads.org[0], "defined " ~ reads.org[1]) }}{% endif %}
+    </form>
+    {% else %}
+      <div class="note">The org defines no teams.</div>
+    {% endfor %}
+  </section>
+
+  {# **Repos** (§4.5a *Settings page: Repos*) #}
+  {% set info_repos = "A card per registered checkout: its .agentorc.yml values, read-only, and for a repo whose file carries promote:, the one setting you flip — auto. Off: the Inbox row offers the press when main is ahead of live. On: the home promotes ten minutes after main stops moving. The switch writes settings.yml's repos: through set_settings; the file itself changes by PR." %}
+  <section class="isec" id="sec-repos">
+    <div class="row gap sechead"><span class="h2">Repos</span>{{ imark("repos", "Repos", info_repos) }}</div>
+    {{ panel("repos", info_repos) }}
+    {% for r in repos %}
+    <div class="card pad setcard" data-section="repos" data-repo="{{ r.name }}">
+      <div class="row gap wrap"><span class="h2 mono">{{ r.name }}</span><span class="note mono">repo · {{ r.path }}</span></div>
+      {% if r.error %}<div class="note warn">{{ r.error }}</div>{% else %}
+      <label class="setrow"><span class="setlabel">promote auto</span>
+        {% if r.promote %}<input type="checkbox" class="setauto"{% if r.auto %} checked{% endif %}>
+        <span class="note">{{ "on: the home promotes 10 min after main moves" if r.auto else "off: the Inbox row offers the press" }}</span>
+        {% else %}<span class="note">no switch — {{ ".agentorc.yml carries no promote: block, so this repo promotes by hand" if r.exists else "no .agentorc.yml, so no promote: block" }}</span>{% endif %}</label>
+      {{ rows(r.rows) }}
+      {% endif %}
+      {{ filefoot(r.file, reads.repo[0], reads.repo[1]) }}
+    </div>
+    {% else %}
+      <div class="note">No checkouts in this host's registry.</div>
+    {% endfor %}
+  </section>
+
+  {# **You** (§4.5a *Settings page: You*): two halves by write path #}
+  {% set info_you = "Yours everywhere: the editor button (open_in) and the terminal's size and face, in settings.yml's person: through set_settings — every browser reads them. This browser: what this browser remembers — the theme, mine, the folds — each set by its own control, and Reset this browser, which clears them all here and nothing anywhere else." %}
+  <section class="isec" id="sec-you">
+    <div class="row gap sechead"><span class="h2">You</span>{{ imark("you", "You", info_you) }}</div>
+    {{ panel("you", info_you) }}
+    <form class="card pad setcard" data-section="you" id="setyou">
+      <div class="row gap wrap"><span class="h2">yours everywhere</span></div>
+      <label class="setrow"><span class="setlabel">editor</span>
+        <select class="input setin" name="open_in" id="setopenin">
+          <option value="vscode"{% if you.open_in == "vscode" %} selected{% endif %}>VS Code</option>
+          <option value="template"{% if you.open_in == "template" %} selected{% endif %}>a template of mine</option>
+          <option value="none"{% if you.open_in == "none" %} selected{% endif %}>none</option>
+        </select>
+        <span class="note">the card's and Focus's button; none removes it</span></label>
+      <div class="settemplate{% if you.open_in != 'template' %} hidden{% endif %}" id="settemplate">
+        <label class="setrow"><span class="setlabel">label</span><input class="input setin" name="label" value="{{ you.label }}" placeholder="Cursor" autocomplete="off"></label>
+        <label class="setrow"><span class="setlabel">url</span><input class="input setin mono" name="url" value="{{ you.url }}" placeholder="cursor://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank" autocomplete="off" spellcheck="false"><span class="note"><span class="mono">{path}</span> the directory or file, <span class="mono">{remote}</span> the host</span></label>
+      </div>
+      <label class="setrow"><span class="setlabel">terminal size</span>
+        <input class="input setin" name="size" type="number" min="{{ you.size_bounds[0] }}" max="{{ you.size_bounds[1] }}" value="{{ you.size or '' }}" placeholder="13">
+        <span class="note">px</span></label>
+      <label class="setrow"><span class="setlabel">terminal face</span>
+        <input class="input setin" name="face" value="{{ you.face }}" placeholder="JetBrains Mono" list="setfaces" autocomplete="off" spellcheck="false">
+        <span class="note">monospace always the fallback · ligatures off</span></label>
+      <label class="setrow"><span class="setlabel">copy on select</span>
+        <input type="checkbox" name="copy_on_select"{% if you.copy_on_select %} checked{% endif %}>
+        <span class="note">a selection in Focus copies itself — the same switch as Focus's <i>more ▾</i></span></label>
+      <datalist id="setfaces"><option value="JetBrains Mono"><option value="Cascadia Code"><option value="Fira Code"><option value="Menlo"><option value="Consolas"><option value="DejaVu Sans Mono"></datalist>
+      <div class="row gap wrap"><span class="note setsaid">every open terminal takes the size and face at once</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+    </form>
+    <div class="card pad setcard" id="setbrowser">
+      <div class="row gap wrap"><span class="h2">this browser</span></div>
+      <dl class="setvals">{% for key, name, how in browser_keys %}<dt>{{ name }}</dt><dd class="mono" data-key="{{ key }}" title="{{ how }}">—</dd>{% endfor %}</dl>
+      <div class="row gap wrap"><span class="note">remembered in this browser only</span><span class="grow"></span><button class="btn sm" type="button" id="setreset">Reset this browser</button></div>
+    </div>
+  </section>
+
+  {# **Hosts**, **Profiles**, **Org** — read-only (§4.5a *read-only values and the i mark*) #}
+  {% set info_hosts = "This host as hosts.yml sets it. name, home: and identity are read once, when the host agent starts — restart the host agent to apply a change to them; the rest are read on use. A value the file leaves out shows its default. Edited by hand." %}
+  <section class="isec" id="sec-hosts">
+    <div class="row gap sechead"><span class="h2">Hosts</span>{{ imark("hosts", "Hosts", info_hosts) }}</div>
+    {{ panel("hosts", info_hosts) }}
+    <div class="card pad setcard">
+      <div class="row gap wrap"><span class="h2 mono">{{ host_card.name }}</span><span class="note">{{ "home" if not set_at else "node of " ~ set_at }}</span></div>
+      {{ rows(host_card.rows) }}
+      {{ filefoot(files.hosts, reads.hosts[0], reads.hosts[1]) }}
+    </div>
+  </section>
+
+  {% set info_profiles = "Each profile as profiles.yml declares it: the tool, the account whose quota it draws on, the model, its config directory and how it is billed. Read on every use; edited by hand." %}
+  <section class="isec" id="sec-profiles">
+    <div class="row gap sechead"><span class="h2">Profiles</span>{{ imark("profiles", "Profiles", info_profiles) }}</div>
+    {{ panel("profiles", info_profiles) }}
+    {% for p in profile_cards %}
+    <div class="card pad setcard">
+      <div class="row gap wrap"><span class="h2 mono">{{ p.name }}</span>{% if p.default %}<span class="note">the default profile</span>{% endif %}</div>
+      {{ rows(p.rows) }}
+    </div>
+    {% endfor %}
+    <div class="card pad setcard">{{ filefoot(files.profiles, reads.profiles[0], reads.profiles[1]) }}</div>
+  </section>
+
+  {% set info_org = "The teams the org defines: their projects, manager, techlead seat, members and host. Read by the clients on every use, never by the host agent; edited by hand, or with the team card's Members dialog. A definition is never written from this page." %}
+  <section class="isec" id="sec-org">
+    <div class="row gap sechead"><span class="h2">Org</span>{{ imark("org", "Org", info_org) }}</div>
+    {{ panel("org", info_org) }}
+    {% for o in org_cards %}
+    <div class="card pad setcard">
+      <div class="row gap wrap"><span class="h2 mono">{{ o.name }}</span><span class="note">team</span></div>
+      {{ rows(o.rows) }}
+    </div>
+    {% endfor %}
+    <div class="card pad setcard">{{ filefoot(files.org, reads.org[0], reads.org[1]) }}</div>
+  </section>
+
+  {% set info_settings = "The home's settings.yml itself: everything above that you can change lives here, and it is written only through set_settings — this page, ao gate, ao team until, ao team reserve. Shown here for Open file; nobody edits it by hand while the agent runs." %}
+  <section class="isec" id="sec-settingsfile">
+    <div class="row gap sechead"><span class="h2">settings.yml</span>{{ imark("settingsfile", "settings.yml", info_settings) }}</div>
+    {{ panel("settingsfile", info_settings) }}
+    <div class="card pad setcard">{{ filefoot(files.settings, reads.settings[0], reads.settings[1]) if files.settings else '' }}{% if not files.settings %}<span class="note">not read: the host agent did not answer</span>{% endif %}</div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.settings();</script>{% endblock %}

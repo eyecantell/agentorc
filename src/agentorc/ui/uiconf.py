@@ -100,6 +100,19 @@ def copy_on_select() -> bool:
     return got if isinstance(got, bool) else True
 
 
+def terminal() -> dict[str, Any]:
+    """The person's terminal face and size as last read (design goal 12, §5 `person.terminal`, the
+    Settings page; TD-148): `{size, face}`, each None where they set none — the pane's own default
+    (13 px, JetBrains Mono) stands. `monospace` is appended by the page whatever the face is."""
+    term = _read["person"].get("terminal")
+    term = term if isinstance(term, dict) else {}
+    size, face = term.get("size"), term.get("face")
+    return {
+        "size": size if isinstance(size, int) and not isinstance(size, bool) else None,
+        "face": face.strip() if isinstance(face, str) and face.strip() else None,
+    }
+
+
 def migrate_note() -> str:
     """The line naming a retired `ui.yml` still on disk, or ""."""
     return _read["migrate"][0] if _read["migrate"] else ""

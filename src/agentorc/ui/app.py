@@ -59,6 +59,7 @@ from sessionorc.reports import branch_ref
 
 from . import help as helpmod
 from . import render as rendermod
+from . import settings_page as setmod
 from . import uiconf
 from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
@@ -557,6 +558,10 @@ def editor_link(directory: str, reach: str = "") -> dict[str, str] | None:
     person's own*, TD-095): `{label, url}`, or None for no button."""
     h = hosts.local_host()
     return uiconf.editor_link(directory, local=h.local, remote=h.vscode_host, reach=reach)
+
+
+templates.env.globals["editor_link"] = editor_link  # the Settings page's **Open file** (§4.5a, TD-148)
+templates.env.globals["person_terminal"] = uiconf.terminal  # every page hands it to its terminals (goal 12)
 
 
 # -- view model ------------------------------------------------------------------------------------
@@ -3200,6 +3205,7 @@ def create_app() -> FastAPI:
         _teams_routes,
         _inbox_routes,
         _help_routes,
+        _settings_routes,
         _stream_routes,
     ):
         register(app, h)
@@ -4047,6 +4053,159 @@ def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "volatile": hosts.local_host().volatile,
             },
         )
+
+
+def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """The Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148): the page and its
+    writes. Every write goes through the host agent's `set_settings` — a person's own, refused to a
+    session — and every read of `settings.yml` through its `settings` read; this process reads only
+    the files the clients read (`profiles.yml`, `hosts.yml`, the org, each repo's `.agentorc.yml`)."""
+    call = h.call
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_view(request: Request):
+        agent_down, got, usage, info, why = False, {}, {}, {}, ""
+        try:
+            got = await call("settings")
+            usage = await call("usage")
+            info = await call("host")
+        except HTTPException as e:
+            if e.status_code != 503:
+                why = str(e.detail)  # an agent that refuses the read: its words, the files still drawn
+            else:
+                agent_down = True
+        notes: list[str] = [why] if why else []
+        try:
+            profiles, default = profiles_mod.load()
+        except ValueError as e:
+            profiles, default = {}, ""
+            notes.append(str(e))
+        org, org_notes = org_here()
+        notes += org_notes
+        local = hosts.local_host()
+        node = (info or {}).get("mode") == "node"
+        uiconf.set_read(got or None)
+        term = setmod.you(got.get("person"))
+        return templates.TemplateResponse(
+            request,
+            "settings.html",
+            {
+                "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
+                "teams": setmod.team_cards(org.teams, got.get("teams")),
+                "repos": setmod.repo_cards(local.repos(), got.get("repos")),
+                "you": term,
+                "browser_keys": setmod.BROWSER_KEYS,
+                "host_card": setmod.host_card(
+                    setmod.local_entry(hosts.hosts_file()), local, hosts.home_name(), hosts.nodes()
+                ),
+                "profile_cards": setmod.profile_cards(profiles, default),
+                "org_cards": setmod.org_cards(org.teams),
+                "files": {
+                    "settings": str(got.get("file") or ""),
+                    "profiles": str(profiles_mod.profiles_file()),
+                    "hosts": str(hosts.hosts_file()),
+                    "org": str(org.path or orgmod.org_file()),
+                },
+                "reads": setmod.FILES,
+                "set_at": str((info or {}).get("home") or hosts.home_name()) if node else "",
+                "notes": notes,
+                "migrate": [str(m) for m in got.get("migrate") or []],
+                "editor_note": uiconf.open_in().error,
+                "host": host_name(),
+                "active": "Settings",
+                "agent_down": agent_down,
+                "volatile": local.volatile,
+                "usage": {},
+            },
+        )
+
+    async def body_of(request: Request) -> dict[str, Any]:
+        got = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if not isinstance(got, dict):
+            raise HTTPException(400, "send a JSON object")
+        return got
+
+    def answer(got: Any) -> JSONResponse:
+        h.settings_at["at"] = 0.0  # the next page reads the person's settings again (TD-174)
+        return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+
+    @app.post("/api/settings/usage")
+    async def settings_usage(request: Request):
+        """§4.5a *Settings page: Usage* → **Save** on a profile card: `{profile, reserves: {label:
+        text}}`, each text in `ao gate`'s forms (`30`, `10/day`, empty to clear) — refused in place
+        with the same words when it is not one — then `set_settings {profile, reserves}`."""
+        body = await body_of(request)
+        raw = body.get("reserves")
+        if not isinstance(raw, dict) or not raw:
+            raise HTTPException(400, "usage: send {profile, reserves: {label: reserve}}")
+        try:
+            reserves = {str(k): setmod.parse_reserve_text(v) for k, v in raw.items()}
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return answer(await call("set_settings", profile=str(body.get("profile") or ""), reserves=reserves))
+
+    @app.post("/api/settings/teams")
+    async def settings_teams(request: Request):
+        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?}` — `until`
+        in the CLI's forms (`06:00`, `+8h`, ISO) read in this host's clock and handed over as an
+        instant, `null` to clear; `reserve` a whole percent, `0` or empty clearing it. A team the
+        org does not define is refused, naming the defined ones, as `ao team until` refuses it."""
+        body = await body_of(request)
+        team = str(body.get("team") or "")
+        defined = org_here()[0].teams
+        if team not in defined:
+            raise HTTPException(
+                400, f"no team {team!r}: the org defines {', '.join(sorted(defined)) or 'none'} (design §4.9)"
+            )
+        change: dict[str, Any] = {}
+        if "until" in body:
+            when = str(body.get("until") or "").strip()
+            try:
+                change["until"] = clistop(when) if when else None
+            except AgentError as e:
+                raise HTTPException(400, str(e)) from None
+        if "reserve" in body:
+            r = str(body.get("reserve") if body.get("reserve") is not None else "").strip()
+            if r and not r.isdigit():
+                raise HTTPException(400, f"reserve priority is a whole percent, not {r!r}")
+            change["reserve"] = int(r) if r and int(r) else None  # 0 clears it, as `ao team reserve 0` does
+        if not change:
+            raise HTTPException(400, "teams: send until or reserve")
+        return answer(await call("set_settings", teams={team: change}))
+
+    @app.post("/api/settings/repos")
+    async def settings_repos(request: Request):
+        """§4.5a *Settings page: Repos* → the promote's **auto** switch: `{repo, auto: bool}`, written
+        to `repos.<repo>.promote.auto` through `set_settings`."""
+        body = await body_of(request)
+        repo, auto = str(body.get("repo") or ""), body.get("auto")
+        if not repo or not isinstance(auto, bool):
+            raise HTTPException(400, "repos: send {repo, auto: true|false}")
+        return answer(await call("set_settings", repos={repo: {"promote": {"auto": auto}}}))
+
+    @app.post("/api/settings/you")
+    async def settings_you(request: Request):
+        """§4.5a *Settings page: You* → **Save**: `{open_in?, terminal?: {size?, face?, copy_on_select?}}` into
+        `person:` through `set_settings`, which validates each and refuses a session. `open_in` is
+        `vscode`, `none` or `{label, url}` — a template the UI would refuse (§5: its scheme) is
+        refused here in the same words, before it is written; a `null` clears a key."""
+        body = await body_of(request)
+        change: dict[str, Any] = {}
+        if "open_in" in body:
+            o = body["open_in"]
+            if o is not None:
+                got = uiconf.parse_open_in(o)
+                if got.error:
+                    raise HTTPException(400, got.error)
+            change["open_in"] = o
+        term = body.get("terminal")
+        if term is not None:
+            if not isinstance(term, dict) or not set(term) <= {"size", "face", "copy_on_select"}:
+                raise HTTPException(400, "you: terminal takes size, face and copy_on_select")
+            change["terminal"] = term
+        if not change:
+            raise HTTPException(400, "you: send open_in or terminal")
+        return answer(await call("set_settings", person=change))
 
 
 def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
