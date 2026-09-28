@@ -5,12 +5,15 @@ the card's reading red past it, and `bound 200k` in `ao status -v`."""
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks, wait_for
 
 from agentorc import repoconfig, teams
+from sessionorc.agent import CONTEXT_AGAIN
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import context_over, normalize_context
+from sessionorc.models import ProgressEntry, context_over, normalize_context
 
 
 def test_a_context_setting_is_checked_and_read_as_tokens():
@@ -108,3 +111,127 @@ def test_the_card_draws_the_reading_red_past_the_bound(tmp_path, monkeypatch):
     html = card.render(s=over)
     assert 'class="context over"' in html and "bound 200k — over it" in html
     assert not view(s)["context_over"] and view(s)["context_bound"] == ""
+
+
+# ── step 4: rule 5's line and the reply clause (design §6 rule 5, §4.10 *Busy for hours*) ──────────
+
+
+def _iso(t: datetime) -> str:
+    return t.isoformat().replace("+00:00", "Z")
+
+
+OVER = {"tokens": 231_203, "at": "2026-09-27T20:00:00Z", "window": 1_000_000}
+
+
+async def _member(agent, person, tmp_path, name="w", **kw) -> str:
+    (tmp_path / name).mkdir()
+    params = {
+        "name": name, "dir": str(tmp_path / name), "adapter": "composer0", "unattended": True,
+        "supervised": True, "prompt": "the brief", "context_bound": 200_000,
+    }  # fmt: skip
+    sid = (await person.call("create", **{**params, **kw}))["id"]
+    assert await wait_for(lambda: _painted(agent, sid), timeout=5), "the composer child never painted its prompt"
+    return sid
+
+
+async def _painted(agent, sid: str) -> bool:
+    return any(t.startswith(">>") for t in await agent.rpc_tail(sid, 3))
+
+
+async def _submitted(agent, sid: str) -> list[str]:
+    return [t.rstrip() for t in await agent.rpc_tail(sid, 30) if t.startswith("SUBMITTED ")]
+
+
+@pytest.mark.integration
+async def test_an_idle_member_over_its_bound_is_told_and_told_again_after_twenty_minutes(
+    agent, composerstubs, tmp_path
+):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        await agent.rpc_hook(sid, state="idle")
+        await agent._keep_running(now)
+        assert await _submitted(agent, sid) == [] and rec.context_sent_at is None, "no reading, nothing said"
+        rec.context = dict(OVER)
+        rec.progress = [ProgressEntry(ref="TD-001", status="claimed")]
+        await agent._keep_running(now)
+        assert await _submitted(agent, sid) == [], "a claim in progress is never interrupted"
+        rec.progress = [ProgressEntry(ref="TD-001", status="done", pr=5)]
+        await agent._keep_running(now)
+        lines = await _submitted(agent, sid)
+        assert len(lines) == 1 and "context 231k, over your 200k bound — take nothing new" in lines[0]
+        assert 'ao progress restart --why "context bound"' in lines[0]
+        assert rec.context_sent_at and rec.sends[-1].from_ == "system"
+        await agent._keep_running(now + timedelta(minutes=10))
+        assert len(await _submitted(agent, sid)) == 1, "not again inside twenty minutes"
+        rec.context_sent_at = _iso(now - CONTEXT_AGAIN - timedelta(minutes=1))
+        await agent._keep_running(now)
+        assert len(await _submitted(agent, sid)) == 2, "still idle and over: again"
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_what_the_context_line_leaves_alone(agent, composerstubs, tmp_path):
+    """Under the bound, no bound, working, declared, a seat, a wrap-up, unsupervised: nothing typed."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        cases = {
+            "under": {"context_bound": 300_000},
+            "nobound": {"context_bound": None},
+            "working": {"state": "working"},
+            "declared": {"out_of_work": {"at": _iso(now), "why": "nothing open"}},
+            "restart": {"restart_wanted": {"at": _iso(now), "why": "context bound"}},
+            "seat": {"seat": {"trigger": "asks"}},
+            "wrapping": {"wrapup_at": _iso(now)},
+            "unsupervised": {"supervised": False},
+        }
+        ids = {}
+        for n, fields in cases.items():
+            sid = await _member(agent, person, tmp_path, name=n)
+            await agent.rpc_hook(sid, state="idle")
+            agent.sessions[sid].context = dict(OVER)
+            for k, v in fields.items():
+                setattr(agent.sessions[sid], k, v)
+            ids[n] = sid
+        await agent._keep_running(now)
+        for n, sid in ids.items():
+            assert await _submitted(agent, sid) == [] and agent.sessions[sid].context_sent_at is None, n
+            await person.call("kill", id=sid)
+
+
+async def test_every_reply_to_a_member_over_its_bound_carries_the_clause(agent, tmp_path):
+    from sessionorc import client as clientmod
+
+    async with LocalClient() as person:
+        params = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], "unattended": True}
+        w = (await person.call("create", name="w", context_bound=200_000, **params))["id"]
+    async with LocalClient(caller=w) as wc:
+        await wc.call("get", id=w)
+        assert not (clientmod.last_mail or {}).get("context"), "no reading yet"
+        agent.sessions[w].context = dict(OVER)
+        await wc.call("get", id=w)
+        assert clientmod.last_mail["context"] == "context 231k over the 200k bound"
+        agent.sessions[w].context_bound = 300_000
+        await wc.call("get", id=w)
+        assert not (clientmod.last_mail or {}).get("context")
+    clientmod.last_mail = None
+
+
+def test_the_clause_rides_the_unread_line_or_stands_alone(capsys):
+    import argparse
+
+    from agentorc import cli
+    from sessionorc import client as clientmod
+
+    args = argparse.Namespace(json=False)
+    over = "context 231k over the 200k bound"
+    clientmod.last_mail = {"unread": 0, "wake_budget_spent": False, "context": over}
+    cli.unread_line(args)
+    assert capsys.readouterr().out == f"[agentorc] ({over}) — finish the entry in hand, then declare\n"
+    clientmod.last_mail = {"unread": 2, "wake_budget_spent": False, "context": over}
+    cli.unread_line(args)
+    assert capsys.readouterr().out == f"[agentorc] you have 2 unread messages — run ao inbox ({over})\n"
+    clientmod.last_mail = None

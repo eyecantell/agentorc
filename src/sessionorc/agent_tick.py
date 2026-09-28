@@ -26,6 +26,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     COMPOSER_LINES,
+    CONTEXT_AGAIN,
     DERIVE_EVERY,
     FILL_CEILING,
     FILL_WINDOW,
@@ -63,6 +64,7 @@ from sessionorc.models import (
     SYSTEM,
     Pending,
     Session,
+    context_over_text,
     now_iso,
 )
 from sessionorc.tmux import PaneInfo
@@ -330,7 +332,8 @@ class TickMixin:
 
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
-        restart; rule 3, the seats; rule 4, the idle nudge; rule 6, new work in a lane (TD-195).
+        restart; rule 3, the seats; rule 4, the idle nudge; rule 5, the context bound (TD-190);
+        rule 6, new work in a lane (TD-195).
         **The restarts run at the home** (§4.4a: policies that start run at the home), over this
         host's records and every node's — a member on a host whose link is down is left as it is and
         looked at again on the next tick, refused rather than queued. **Each record's pass is
@@ -344,6 +347,7 @@ class TickMixin:
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
                 await self._idle_nudge(s, now)
+                await self._context_line(s, now)
                 self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
@@ -524,6 +528,38 @@ class TickMixin:
         if line and await self._policy_send(s, line):
             s.nudged_at = now_iso()
             log.info("%s: idle %s with work open — nudged", s.id, IDLE_NUDGE)
+            self._save(s)
+            await self._push_changes()
+
+    async def _context_line(self, s: Session, now: datetime) -> None:
+        """Rule 5 (design §6, TD-190): a supervised member whose context reading is past its role's
+        bound is told so by one fixed line once it is hook-confirmed `idle` and holds no claim in
+        progress — between entries, never mid-turn — and again after `CONTEXT_AGAIN` while it is
+        still idle and over (`context_sent_at`). A wrap-up under way or a gate pause beats it, as it
+        beats the doorbell; a member that declared already (out of work, a restart wanted) is not
+        told. The send needs the pane here: a node's member is not told yet, as rule 4's is not."""
+        if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.host != self.host:
+            return
+        if s.seat is not None or s.out_of_work or s.restart_wanted:
+            return
+        over = context_over_text({"context": s.context, "context_bound": s.context_bound})
+        if not over:
+            return
+        if s.state != "idle" or s.confidence != "hook" or s.pending:
+            return
+        if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
+            return  # a claim in progress: the clause on its `ao` replies says it, and it declares after
+        if s.context_sent_at and now - _parse(s.context_sent_at) < CONTEXT_AGAIN:
+            return
+        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+            return
+        if s.gated or self._profile_gated(s.profile, now, s.team):
+            return
+        line = f"[agentorc] {over.replace(' over the ', ', over your ', 1)} — take nothing new: push, ledger, then "
+        line += '`ao progress restart --why "context bound"`'
+        if await self._policy_send(s, line):
+            s.context_sent_at = now_iso()
+            log.info("%s: %s — told", s.id, over)
             self._save(s)
             await self._push_changes()
 

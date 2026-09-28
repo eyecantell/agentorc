@@ -106,6 +106,9 @@ SEAT_IDLE_GRACE = timedelta(minutes=2)
 # §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
 # the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
 IDLE_NUDGE = timedelta(minutes=20)
+# §6 rule 5 (TD-190): the context-bound line is typed again after this, while the member is still
+# idle and over its bound.
+CONTEXT_AGAIN = timedelta(minutes=20)
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.

@@ -97,6 +97,7 @@ HOME_OWNED = frozenset(
         "restart_blocked",
         "restart_blocked_sent_at",
         "nudged_at",
+        "context_sent_at",
         "seat",
         "seat_due",
         "seat_count",
@@ -640,6 +641,16 @@ def context_reading(session: dict[str, Any], *, of_window: bool = True) -> str:
     return tokens_short(tokens) + (f" of {tokens_short(window)}" if of_window and window > 0 else "")
 
 
+def context_over_text(session: dict[str, Any]) -> str:
+    """*context 231k over the 200k bound* while the record's reading is past its role's bound (§6
+    rule 5, TD-190): the text rule 5's line and the clause on every `ao` reply both carry; "" when
+    it is not over."""
+    if not context_over(session):
+        return ""
+    tokens = int(session["context"].get("tokens") or 0)
+    return f"context {tokens_short(tokens)} over the {tokens_short(session['context_bound'])} bound"
+
+
 def context_over(session: dict[str, Any]) -> bool:
     """Whether the record's context reading is past its role's bound (design §4.8, §6 rule 5,
     TD-190): what draws the card's reading red. False without a reading or without a bound."""
@@ -831,6 +842,9 @@ class Session:
     restart_blocked: dict[str, Any] | None = None
     restart_blocked_sent_at: str | None = None
     nudged_at: str | None = None
+    # Rule 5's (§6, TD-190): when the context-bound line was last typed; again after `CONTEXT_AGAIN`
+    # while the member is still idle and over. The home's, as `nudged_at` is.
+    context_sent_at: str | None = None
     # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.

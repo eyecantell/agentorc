@@ -33,6 +33,7 @@ from sessionorc.agent_common import (
 )
 from sessionorc.models import (
     Session,
+    context_over_text,
 )
 
 
@@ -262,12 +263,17 @@ class ServeMixin:
             # that just read everything carries no line. It types nothing and starts nothing.
             s = self._graph().get(self._caller_address(caller, link_host))
             owed = s.owed() if s is not None else []
-            if s is not None and ((n := s.unread()) or owed):
+            # and the context bound's clause (§6 rule 5, TD-190): a member working past its bound is
+            # not interrupted, so every reply it reads says so
+            over = context_over_text({"context": s.context, "context_bound": s.context_bound}) if s else ""
+            if s is not None and ((n := s.unread()) or owed or over):
                 # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
                 # refusal is not*, and this is the cheapest thing that is neither.
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
                 if owed:
                     resp["mail"]["owed"] = owed
+                if over:
+                    resp["mail"]["context"] = over
         return resp
 
     def _caller_address(self, caller: Any, link_host: str | None) -> str:
