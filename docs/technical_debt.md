@@ -104,7 +104,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
-| TD-202 | *Choose by priority* is one clause in the grinder template, with no order, no tool and no check; `scripts/ledger.py --pickable` sorts by priority but does not filter the header lines | Low | Open — pickable |
 
 
 ---
@@ -1942,18 +1941,3 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
 
-## TD-202: *Choose by priority* is one clause in the grinder template, with no order, no tool and no check
-
-**Priority:** Low
-**Added:** 2026-09-27 (Paul: *when a grinder chooses a TD, are they working them by priority (critical/high) first? Seems like they should be*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/agentorc/briefs/grinder.md` (*Lane*, line 12 at filing: *a `free-pick` lane means scan the ledger and choose by priority*), design §4.8 (the `free-pick` lane); `scripts/ledger.py` is dev-cadence's (SYNCED)
-
-**Why:** the answer to Paul's question is yes, in one clause: the template says *choose by priority*. That is all it says. It doesn't give the order (High, then Medium, then Low; the ledger has no Critical), the tie-break, or what counts as a reason to pass a higher entry over (a sibling's lease, the brief's exclusions, a `Blocked by:`). It names no tool, and nothing checks the pick. dev-cadence's `scripts/ledger.py --pickable` sorts by priority, then Summary-table order, and drops what a `Blocked by:` holds. But it does not read the Owner, Kind and Pickable lines (TD-118), so on its own it lists designer and anchor entries a grinder may not take, and the template never mentions it. A grinder's claim note doesn't give the entry's priority, so the page can't show whether a High was passed over.
-
-**Fix:** (1) spell out the clause in the template: High, then Medium, then Low, ties in Summary-table order, and say why when passing over a higher one. (2) Name the tool: either `ledger.py --pickable` gains `--owner` / `--kind` filters on the header lines (a dev-cadence TD, through its anchor), or the template gives the one-line filter to run. (3) Put the entry's priority in the claim note, which TD-203 would then show. Add the sentence to design §4.8's `free-pick` in the same PR. A running grinder keeps the brief it started with, so the change reaches each grinder at its next start. Done when a grinder's claim note names the entry's priority and a test on the template (or the tool) shows High sorted first.
-
-**Related:** TD-118 (the header lines), TD-203 (priority on TDs in motion, on the parked branch at filing), dev-cadence's TD-064 (`ledger.py --pickable`; not this ledger's TD-064), design §4.8.
