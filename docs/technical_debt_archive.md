@@ -1989,3 +1989,23 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Fix (as filed):** carry each scrolled facet's `scrollTop` across the swap as `denyWhys` does, keyed by the facet (`.facet.fface` for Doing, `.facet.fmotion` for TDs in motion), and keep the person's position unless it was at the top, where new rows should show. Better still, re-render only the facet whose data changed. Test in the page's JS tests if they cover the swap, or a note in the PR on how it was checked by hand. Done when a person can scroll the Doing list while the team works and stay where they scrolled.
 
 **Related:** TD-206 (the same list), TD-176 slice 3 (the summary and its swap).
+
+## TD-197: TDs in motion misreads phases — design-first reads *grind*, and a PR waiting for its reader reads *grind*
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul, at the Org page: *it shows 3 TDs in motion, when only one grinder is running … designer items are being listed as GRIND instead of DESIGN*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (`motion_rows`: `row["phase"] = "design" if e.get("for_page") == "design-first" else …`), `src/sessionorc/ledger.py` (`kind_of`), `src/sessionorc/reports.py` and `src/sessionorc/agent.py` (the derive tick: `review_pr` from the checked-out branch)
+
+**Why:** the count was right. At the screenshot, three claims were open: grinder-ao-1's TD-146 (in hand) and TD-186 (PR #628, waiting for the techlead's read), and designer-ao-1's TD-175 (#603, waiting for its 03:00 MDT merge bound). There is no clean-up delay; a claim leaves the section when its member marks it done or dropped. The phases were wrong, for two reasons:
+1. **Design-first reads *grind*.** `motion_rows` keys the phase on the ledger reading's `for_page`, the page's four-way bucket. `kind_of` puts every `Pickable: yes` entry in *pickable* before it looks at `Kind`. So a design-first entry the designer may pick is never *design*. On 2026-09-26, TD-175, TD-180 and TD-183 each read `kind: design-first`, `for_page: pickable` in `repos.json`; all three have since been designed or parked, so none does today, but the next pickable design-first entry will. It is *grind* without a PR and *review* with one (TD-183 with #623 read *review*). Design §4.5 screen 1: *a claim on a design-first entry is design*.
+2. **A parked PR reads *grind*.** A declared claim gets its PR as `review_pr` only from the derive tick's reading of the branch the session has checked out (`reports.derive`, TD-150). A grinder that opens its PR, asks its reader and moves to the next entry before the next derive pass (`DERIVE_EVERY`) leaves a claim whose PR the tick never saw. grinder-ao-1's TD-186 claim read *grind* on the page while #628 waited for the techlead. The same holds for any held PR, which is the common case for `src/sessionorc/**`.
+
+**Resolved:** 2026-09-27 (PR #677). `motion_rows` in `src/agentorc/ui/app.py` keys *design* on the entry's `kind`, and a claim with no PR takes an open PR whose head branch names its reference (`reports.branch_ref`); open PRs only, so a merged slice never marks the next slice *review*. Design §4.5 screen 1 and §4.5a *team card: TDs in motion*; `tests/test_ui_team_summary.py` (`test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch`). The `ao progress claim --pr N` alternative was not needed.
+
+**Fix (as filed):** (1) key the phase on `e.get("kind") == "design-first"`, not `for_page`, with a test on a pickable design-first entry. (2) Match open PRs to declared claims by head branch (`branch_ref(headRefName)`) across the repo's PR reading, not only the checked-out branch, so a claim's PR is found wherever its branch sits. TD-176's repo facts already hold the open PRs with `headRefName`. Or have `ao progress claim --pr N` recorded when the grinder asks its reader, and say so in the grinder brief. Tests: a claim whose PR was opened on a branch the session has since left reads *review*. Done when the screenshot's three rows would read *design* (TD-175), *review* (TD-186) and *grind* (TD-146).
+
+**Related:** TD-176 (TDs in motion, the repo facts), TD-150 (`review_pr`), TD-198 (the same `kind_of` precedence on the kind bar); design §4.5 screen 1, §4.5a *team card: TDs in motion*.
