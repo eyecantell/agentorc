@@ -105,7 +105,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Open — design-first |
-| TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | Open — pickable |
+| TD-200 | Small Org card misreadings: a seat's *last came* measures when it left, a compact card clips *47 unpushed* to *⚠ 4*, and a record closed by `ao close` reads EXITED | Low | (1)–(2) PR #678; (3) found, fix next |
 | TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
 | TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
@@ -1960,7 +1960,7 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open — (3) needs checking against the design before a fix
+**Status:** (1) and (2) built 2026-09-27 (grinder-ao-1, PR #678). (3) checked: the design wants `closed` (§4.2 *Close* → `closed`, card kept a day); the cause is the killed tool's SessionEnd hook landing after `rpc_close` and `_apply_event` setting `exited` on the closed record, which then is never forgotten after its day — a `src/sessionorc` fix in its own PR, held for the techlead
 **Location:** `src/agentorc/ui/app.py` (the slot's caption: `came = "last came" …; caption = came + f" · {d['age']} ago"` with `d["age"] = _age(s.get("since"))`; `d["flag"]`), `src/agentorc/ui/templates/card.html` (the compact card's row 2), `src/agentorc/ui/static/app.css` (`.flag`, `white-space: nowrap`)
 
 **Why:** three small things the Org page said wrongly on 2026-09-26:
