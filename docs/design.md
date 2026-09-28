@@ -5719,7 +5719,7 @@ code and needs no grant; a session doing the same work does.
      (only the session that exited, never its siblings) — the numbers §4.8 took from OTP, systemd
      and Circus, now constants. Each restart is appended to the record's `restarts: [{at, why}]`
      (home-owned, carried across the supersede so the count survives the restart it counts);
-     `why` is `crash`, `wanted` or `fill`, and a replay that failed keeps its `why` and adds
+     `why` is `crash`, `wanted` or `fill` (and `start`, `schedule` and rule 7's `brief`, each named where it is written), and a replay that failed keeps its `why` and adds
      `error` (the text), so a failed entry still says what it was trying. At the ceiling the policy stops, writes
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
      says *restarts exhausted · 3 in 2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it
@@ -5866,7 +5866,7 @@ code and needs no grant; a session doing the same work does.
      running team's brief; the template is the installed package's, so it is what was promoted.
      A file that cannot be read, or a launch record with no `prompt_from` (`ao new --prompt`, a
      record written before this), replays the stored prompt as before, and the `restarts` entry
-     says so (`brief: stored`). **The tick sees the change.** The record carries
+     says so (`prompt: stored`). **The tick sees the change.** The record carries
      **`brief: {at, sources: [{path, sha}]}`** (home-owned), written at each create from the
      files as they were read; on the reports' cadence the home reads each source the same way
      and, when one differs for **ten minutes** (`BRIEF_SETTLE`: a run of merges is one change),
