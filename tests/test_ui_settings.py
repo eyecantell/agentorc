@@ -44,7 +44,7 @@ def test_usage_cards_group_by_account_and_draw_each_reported_window():
     """A card per profile under its account, as the chip groups them (TD-122); a row per window the
     adapter reports, with the reserve as the field takes it and the line it makes today; a profile
     with no reading draws its reserves' labels and says they are not checked; a metered profile's
-    card has no fields until TD-151 slice 5."""
+    card carries the home's three windows, each an amount with the account's spend beside it."""
     profiles = {
         "grind": profiles_mod.Profile(name="grind", account="paul"),
         "paul": profiles_mod.Profile(name="paul", account="paul"),
@@ -56,12 +56,16 @@ def test_usage_cards_group_by_account_and_draw_each_reported_window():
         "grind": {"tool": "claude-code", "account": "paul", "windows": [
             {"label": "5h", "pct": 41, "resets": NOW.isoformat()}, {"label": "week", "pct": 58, "resets": resets}]},
         "paul": {"tool": "claude-code", "account": "paul", "windows": [{"label": "5h", "pct": 41}]},
+        "api": {"tool": "claude-code", "account": "key", "windows": [
+            {"label": "day", "pct": 64, "resets": resets, "spent": {"total": 9, "cost": 3.2}},
+            {"label": "week", "pct": None, "resets": resets, "spent": {"total": 1_200_000, "cost": 9.8}}]},
     }  # fmt: skip
     gate = {
         "grind": {"reserves": {"5h": 30, "week": {"per_day": 10}}, "windows": [
             {"label": "5h", "line": 70, "reserve": 30, "resets": None, "next": None},
             {"label": "week", "line": 60, "reserve": {"per_day": 10}, "resets": resets, "next": None}]},
         "cold": {"reserves": {"5h": 20}, "windows": []},
+        "api": {"reserves": {"day": "$5", "week": "2M tok"}, "windows": [], "metered": True},
     }  # fmt: skip
     groups = setmod.usage_cards(profiles, gate, usage, NOW)
     assert [g["account"] for g in groups] == ["claude-code · paul", "claude-code · other", "claude-code · key"]
@@ -76,7 +80,14 @@ def test_usage_cards_group_by_account_and_draw_each_reported_window():
     assert cold["rows"] == [{"label": "5h", "value": "20", "line": "no reading yet", "resets": "", "pct": None}]
     assert cold["unchecked"]
     api = groups[2]["cards"][0]
-    assert api["metered"] and api["rows"] == [] and "metered · $3 in / $15 out per M" in api["badge"]
+    assert api["metered"] and "metered · $3 in / $15 out per M" in api["badge"]
+    at = datetime.fromisoformat(resets).astimezone().strftime("%H:%M")
+    assert [(r["label"], r["value"], r["line"]) for r in api["rows"]] == [
+        ("day", "$5", f"spent $3.20 · 64% · resets {at}"),
+        ("week", "2M tok", f"spent 1.2M tok · resets {at}"),
+        ("month", "", "no reading yet"),
+    ]
+    assert setmod.parse_reserve_text(" $5 ") == "$5" and setmod.parse_reserve_text("20M tok") == "20M tok"
 
 
 @pytest.mark.unit
@@ -133,8 +144,9 @@ def test_the_line_preview_is_the_gates_arithmetic():
         head
         + f"""
 const r = (t, at) => window.AO.reserveLine(t, at, {now});
+const a = (t) => window.AO.amountSays(t);
 console.log(JSON.stringify({{flat: r("30"), day: r("10/day", "{resets}"), none: r(""), bad: r("x"),
-  big: r("120"), noreset: r("10/day", "")}}));
+  big: r("120"), noreset: r("10/day", ""), usd: a("$5"), tok: a("20M tok"), pct: a("30"), clear: a("")}}));
 """
     )
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
@@ -144,6 +156,8 @@ console.log(JSON.stringify({{flat: r("30"), day: r("10/day", "{resets}"), none: 
     assert got["day"] == {"line": 60, "says": "→ line 60% · 4 days left"}
     assert got["none"]["line"] is None and "error" in got["bad"] and "error" in got["big"]
     assert got["noreset"]["says"] == "no line — the window reports no reset"
+    assert got["usd"] == {"says": "→ amount $5"} and got["tok"] == {"says": "→ amount 20M tok"}
+    assert "not a percent" in got["pct"]["error"] and got["clear"] == {"says": "no amount"}
 
 
 def test_the_page_draws_every_section_and_the_tab(client, subprocess_agent):

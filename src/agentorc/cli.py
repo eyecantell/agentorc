@@ -980,14 +980,21 @@ def cmd_until(args: argparse.Namespace) -> int:
 
 
 def _reserve(text: str) -> Any:
-    """`30` → 30, `10/day` → `{per_day: 10}`, empty → None (clears that window's reserve)."""
+    """`30` → 30, `10/day` → `{per_day: 10}`, empty → None (clears that window's reserve); an amount
+    — `$5`, `20M tok` — goes as written, a metered profile's (§6 *Usage gate*), and the agent checks
+    it against the profile's billing."""
     t = text.strip()
     if not t:
         return None
+    if t.startswith("$") or t.endswith("tok"):
+        return t
     per_day = t.endswith("/day")
     n = t.removesuffix("/day").strip()
     if not n.isdigit():
-        raise AgentError(f"a reserve is a whole percent (30) or a percent per day (10/day), not {text!r}")
+        raise AgentError(
+            f"a reserve is a whole percent (30), a percent per day (10/day), or on a metered profile an amount "
+            f"($5, 20M tok), not {text!r}"
+        )
     return {"per_day": int(n)} if per_day else int(n)
 
 
@@ -1003,6 +1010,14 @@ def _gate_line(prof: str, windows: list[dict[str, Any]]) -> str:
         head = f"{w['label']} {_reserve_text(w['reserve'])}"
         if w.get("unread"):
             parts.append(f"{head} → no reading yet")
+            continue
+        if w.get("metered"):
+            # an amount is the window's 100 (§6 *Usage gate*): *day $5 → spent $3.20 (64%)*
+            spent = w.get("spent") if isinstance(w.get("spent"), dict) else {}
+            tok = str(w["reserve"]).endswith("tok") or spent.get("cost") is None
+            got = f"{tokens_short(int(spent.get('total') or 0))} tok" if tok else f"${spent['cost']:,.2f}"
+            now = f" ({w['pct']}%)" if isinstance(w.get("pct"), int) else ""
+            parts.append(f"{head} → spent {got}{now}")
             continue
         if w.get("line") is None:
             parts.append(f"{head} → no line (the window reports no reset)")
