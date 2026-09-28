@@ -2677,7 +2677,7 @@ own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it
 **`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, built by TD-176 slices 1, 2 and 6; the reader standing is read from the techlead seat's inbox, which a session may not read, so a session's `ao repo` shows none and a person's does):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
-entries, the board items due, and what the servicing team's members hold; `--all` prints every
+entries (High first, each with its priority: §4.8 *Choosing in a free-pick lane*), the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
 balance rule exists (§10, TD-177), and what a person reads instead of the page.
 
@@ -3160,6 +3160,16 @@ field for every role the team defines, in the definition's order: a role one ses
 *<line> → <name>* (*(on call)* after an empty seat's), a role several hold *<Label>: <line>* — the
 sentences themselves, since no other field is designed (the shorter phrases this paragraph once
 gave as its example, *questions → manager-ao-1*, are not derivable from them). `ao roles` prints it.
+
+**Choosing in a free-pick lane (TD-202).** A `free-pick` worker chooses by priority: High, then
+Medium, then Low (the ledger has no Critical), ties in the ledger's order. It chooses among the
+entries whose header says `Pickable: yes` (TD-118), less what its brief excludes and what a live
+sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities, beside what
+each live member holds, read from the main checkout, which the worker confirms on `origin` before
+it claims. Passing over a higher entry needs a reason: a lease, an exclusion, a `Blocked by:`, or
+the entry's own status. The claim's first `ao doing` line names the entry's priority and, where a
+higher one was passed over, why. The page can then show whether a High was passed over (TD-203).
+Nothing checks the pick: it is the worker's judgement, said where it can be read.
 
 **A role has a context bound (TD-188; built — TD-190).** A preset or a
 `roles:` entry may carry **`context: {bound: 200k}`** — a token count written as the reading is

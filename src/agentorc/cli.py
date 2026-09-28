@@ -1021,6 +1021,9 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs with their
@@ -1076,8 +1079,12 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     print(f"         {st}")
             for kind in ("pickable", "design-first"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
+                # the pick order (design §4.8 *Choosing in a free-pick lane*, TD-202): High, then
+                # Medium, then Low, then an entry with none; ties in file order (a stable sort)
+                ids.sort(key=lambda e: PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)))
                 for e in ids:
-                    print(f"  {kind:<12} {e['id']}  {e['title']}")
+                    prio = str(e.get("priority") or "").capitalize() or "-"
+                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")
