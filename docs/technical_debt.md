@@ -80,7 +80,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
 | TD-146 | Build the one settings file — `settings.yml` home-owned with `teams`, `repos` and `person`, `ui.yml` retired, the `settings` read, the team stop time and reserve priority in the tick, `ao team until` | Medium | Built (three slices); live look after a promote |
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Built 2026-09-27; the live look after a promote |
-| TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2)–(8) done; (1) on a steer |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Partly done — slices 1–2 (billing on the profile, the adapter's spend) built; slice 3, the home's ledger, next |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Built — live walk pending after the next promote |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Designed 2026-09-25 (the designer) — the build is TD-165, TD-166; archives with them |
@@ -1485,23 +1484,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** Paul sets his weekly reserves from the page and the chip's line follows on the next tick; a team's stop time set on the page shows as the members' *stops* note; the promote switch flips `repos.<repo>.promote.auto`; the terminal's size changes on an open Focus without a reload and ligatures stay off; every read-only value shows its file on the *i* mark and Open file opens it; Reset this browser clears the `ao.*` keys after a confirm; a session's request to the page's write route is refused; the page reads at the type scale of TD-144 in both themes at 1440 and 390 px.
 
 **Related:** TD-100, TD-146, TD-147, TD-144 (the type scale), TD-082 (the column), TD-123 (the tab rule), TD-128 (the budget row), TD-133 (the schedule row).
-
-## TD-149: Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port
-
-**Priority:** Low
-**Added:** 2026-09-25 (the settings audit, ADR `docs/decisions/2026-09-25-settings-audit.md`)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Partly done — **(2), (4) and (6) done 2026-09-25 (grinder-ao-1, PR #592)**: `promote:` accepted and checked (`repoconfig._promote`: `run` and `check` required, `auto` refused as `settings.yml`'s); the org `roles:` overlay checked by `_role_block` (the live `org.yml`'s six presets pass unchanged, `review` gaining its default `bound: 2h` as the record already shows); `AGENTORC_TICK` named in §5 as a test knob. **(7) and (8) done 2026-09-26 (grinder-ao-1)**: the UI's bind and port defaults are `agentorc.service.DEFAULT_BIND`/`DEFAULT_PORT`, read by `ao ui`, `agentorc-ui` and `ao service install`; `AGENTORC_PROFILE` left the launch environment; §5's `hosts.yml` field list names what `sessionorc.hosts` reads, `transport`/`ssh` said to arrive with TD-004. **(5) done 2026-09-26 (grinder-ao-1)**: the Org page says *restart pending*, naming each of `local.name`, `home:`, `local.identity` that moved under the running agent (`ui.app.restart_note`). **(3) done 2026-09-26 with TD-146 slice 1** (`settings.yml` in `BACKUP_MEMBERS`). (1) remains, on a steer to Paul (thread m-43f5e3922686). Eight findings, each small, none design: (1) `.agentorc.yml`'s `adapter`, `worktrees`, `anchor`, `unattended`, `ready_when` and `commands` are parsed and read by nothing — implement or remove each, and say which in §5; (2) `promote:` is refused as an unknown key by `repoconfig._apply`, so writing the designed block breaks `ao new` in that repo — accept it now, ahead of TD-132; (3) `BACKUP_MEMBERS` lacks `settings.yml` (TD-146 adds it; remove this item when it lands); (4) the org-level `roles:` overlay skips `_role_block`'s validation — validate it the same way; (5) a hand edit of `hosts.yml`'s `local.name`, `home:` or `local.identity` leaves the agent (start-only) and the UI (per request) disagreeing until a restart — the UI should read the agent's snapshot for those three, or say *restart pending*; (6) `AGENTORC_TICK` is an override §5 does not name — document it as a test knob in §5 or remove it; (7) bind and port live in `ao ui`, `agentorc-ui` and the unit — one source; (8) `AGENTORC_PROFILE` is exported to every pane and read by nothing, and `hosts.yml`'s `transport`/`ssh` are in §5 and not the code — reconcile each way.
-
-**Location:** `src/agentorc/repoconfig.py`, `src/sessionorc/agent.py`, `src/agentorc/org.py`, `src/sessionorc/hosts.py`, `src/agentorc/ui/app.py`, `src/agentorc/service.py`, design §5.
-
-**Why:** a settings page shows what the files hold, and a dead key or a silently unvalidated one is a lie the page would draw.
-
-**Done when** each of the eight is done or struck with a reason, §5 names only keys the code reads, and `pdm run test` covers (2) and (4).
-
-**Related:** TD-100, TD-132, TD-004, TD-060.
 
 ## TD-151: Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip
 
