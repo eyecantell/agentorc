@@ -505,13 +505,15 @@ class Adapter(Protocol):
                                                           # makes, `window` the model's when known; None when it cannot tell (§6
                                                           # rule 5, TD-188). Read on the tick for unattended records once a minute,
                                                           # never a grep (built — TD-190 slice 1)
-    def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
-                        before: int | None = None, turns: int = 20) -> Transcript | None
+    def read_transcript(self, session_id: str, cwd: Path, profile: str, *,
+                        before: int | None = None, turns: int = 20, raw: bool = False) -> Transcript | None
                                                           # the tool's transcript as neutral entries — a prompt, text, a thought, a
                                                           # tool call with its result, a compaction, a sidechain group — the last
                                                           # `turns` before byte `before` (None: the file's end), with the offset that
-                                                          # asks for earlier ones; None when there is no file. No field name of the
-                                                          # tool's leaves this method, as none of `usage` does (§4.5 screen 9, TD-154)
+                                                          # asks for earlier ones; with `raw`, the file's last `turns` lines as text.
+                                                          # Keyed by the profile *name*, as `context` is; None when there is no file
+                                                          # or the profile is unknown. No field name of the tool's leaves this
+                                                          # method, as none of `usage` does (§4.5 screen 9, TD-154, TD-165)
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
     def usage(self, profile: Profile) -> Usage | None     # this account's quota windows: Usage(windows=[Window(label, pct,
                                                           # resets), ...], fetched). The labels are the adapter's; nothing
