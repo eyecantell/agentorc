@@ -109,6 +109,9 @@ IDLE_NUDGE = timedelta(minutes=20)
 # §6 rule 5 (TD-190): the context-bound line is typed again after this, while the member is still
 # idle and over its bound.
 CONTEXT_AGAIN = timedelta(minutes=20)
+# A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
+# who did what, so it is allowed more than `doing`'s 200 characters.
+ROUND_LINE_CAP = 500
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
@@ -134,7 +137,7 @@ HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"}
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
-NODE_READS = frozenset({"tail", "explain"})
+NODE_READS = frozenset({"tail", "explain", "log_tail"})
 
 
 def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[MailEntry]:
@@ -575,13 +578,13 @@ def _pane_title(adapter: Any, pane_title: str) -> str | None:
     return (_clean(str(name)).strip()[:TITLE_CAP] or None) if name else None
 
 
-def _clean(text: str) -> str:
+def _clean(text: str, cap: int = 200) -> str:
     """Strip ANSI/control bytes and cap width: pane output is untrusted everywhere but xterm.js."""
     text = _OSC.sub("", text)
     text = _CSI.sub("", text)
     text = _ESC_OTHER.sub("", text)
     text = "".join(ch for ch in text if ch == "\t" or ch >= " ")
-    return text[:200]
+    return text[:cap]
 
 
 _LINE_BREAKS = re.compile("[\n\r\x0b\x0c\x85\u2028\u2029]")

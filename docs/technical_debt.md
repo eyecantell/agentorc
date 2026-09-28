@@ -100,7 +100,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-188 | Unattended members' context grows unbounded: grinder-ao-1 reached 462k tokens and read 187M input tokens in one run; decide the bound (restart threshold, compaction, or both) | High | Designed 2026-09-26 (the designer) — the build is TD-190; archives with it |
 | TD-189 | Restart an unattended member once its context passes a configurable bound (default 200k), at its next entry boundary; research the sweet spot first | High | Open — research done (grinder 200–250k); after TD-186 and TD-188's design rows |
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Built — slices 1–3 (#654, #659, #660); the live check waits on the promote |
-| TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Open |
+| TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Built — the live look waits on the promote |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
 | TD-196 | `ui/app.py` is one 4,413-line module (views, the summary builders, and seven route groups) changed as often as `agent.py`: split it into modules | Medium | Open — after TD-108 step 1 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
@@ -1858,10 +1858,10 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 
 **Priority:** Medium
 **Added:** 2026-09-26 (the designer, from TD-175's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.8 *A session's round log: `ao log`, never a commit*, §4.7 *Reporting*, §4.6 *The round log*, §4.5a *Focus side panel, Session card: rounds line*; mockup `Focus.dc.html`.
+**Owner:** anchor
+**Kind:** live-check
+**Pickable:** no — built; what is left is the live look after a promote
+**Status:** Built (2026-09-27, grinder-ao-1, PR #661) — all five steps, as the *Fix* lists them (the rounds line is server-rendered, so `app.js` is untouched); the file is `<runs_dir>/<base id>.rounds.log`, the base id being the record's name in its repo (design §4.6). **Left:** after a promote, a manager's round lands in `ao log --tail` and on its Focus Session card, and its launch branch stops gaining commits (the anchor may reset `manager-ao-1`'s branch to `origin/main` once, design §4.8). Design §4.8 *A session's round log: `ao log`, never a commit*, §4.7 *Reporting*, §4.6 *The round log*, §4.5a *Focus side panel, Session card: rounds line*; mockup `Focus.dc.html`.
 
 **Location:** `src/sessionorc/agent.py` (a `log` RPC: append for the caller's own record — `--id` refused, as `doing`'s own-record rule — and a `log_tail` read, ungated; the file under `paths.runs_dir()` named by the record's name in its repo; the prune beside `runs_keep_days`'s), `src/sessionorc/paths.py`, `src/agentorc/cli.py` (`ao log "<line>"`, `ao log --tail n`, `--json`), `src/agentorc/skill.md` (one clause), `src/agentorc/briefs/manager.md` (step 5 → `ao log`; the wind-down pushes nothing; a first read of `ao log --tail 20` on a restart), `docs/briefs/manager-ao-1.md` (*the one thing you commit to it* → *you commit nothing to it*), `src/agentorc/ui/app.py` and `templates/focus.html` (the Session card's rounds line, display only), `src/agentorc/ui/static/app.js`.
 

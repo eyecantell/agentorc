@@ -22,6 +22,13 @@ def runs_dir() -> Path:
     return home() / "runs"
 
 
+def rounds_log(key: str) -> Path:
+    """A session's round log (design §4.8 *A session's round log*, §4.6, TD-191): beside the run
+    logs, keyed by the record's name in its repo — its base id — so a start under the name
+    continues it."""
+    return runs_dir() / f"{key}.rounds.log"
+
+
 def attachments_dir() -> Path:
     return home() / "attachments"
 

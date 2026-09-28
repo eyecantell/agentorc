@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 import time
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -3248,8 +3248,40 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "prompts": [] if s.get("unattended") else await asyncio.to_thread(role_prompts, s),
                 # §4.5a *Focus: copy on select* (TD-174): the person's, from `settings.yml`
                 "copy_on_select": uiconf.copy_on_select(),
+                # §4.5a *Focus side panel, Session card* **rounds** line (TD-191): display only
+                "rounds": rounds_lines(s, await _rounds_tail(call, s)),
             },
         )
+
+
+async def _rounds_tail(call: Callable[..., Any], s: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """The session's last two round-log lines (design §4.8, TD-191), or None when the host agent
+    cannot say (an older one, a node out of reach): the line is then left out, never *no round log*."""
+    try:
+        got = await call("log_tail", id=s["id"], n=2)
+    except HTTPException:
+        return None
+    return got if isinstance(got, list) else None
+
+
+def rounds_lines(s: dict[str, Any], entries: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    """The Session card's **rounds** line (design §4.5a, TD-191): the last two lines with their
+    stamps, each marked *from an earlier run* when it is older than this record's start; `[]` is
+    *no round log*, None is no line at all. Text a session wrote is only text (TD-071)."""
+    if entries is None:
+        return None
+    start = str(s.get("created") or "")[:16] + "Z"  # the stamps are to the minute
+    return {
+        "lines": [
+            {
+                "at": str(e.get("at") or ""),
+                "text": str(e.get("text") or ""),
+                "earlier": bool(start != "Z" and str(e.get("at") or "") < start),
+            }
+            for e in entries
+            if isinstance(e, dict)
+        ]
+    }
 
 
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
