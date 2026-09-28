@@ -850,6 +850,29 @@ def test_within_one_urgency_the_persons_own_sort_first_and_mine_shows_only_them(
     assert 'id="mine" aria-pressed="false"' in html
 
 
+def test_a_seats_last_came_is_its_fill_and_a_compact_flag_keeps_its_count(tmp_path, monkeypatch):
+    """TD-200: (1) a seat that just left reads *last came* from its record's `created` (the fill),
+    never from `since` (when it left: *last came · 0s ago*); (2) the compact card's flag is the
+    count alone, never clipped — *47 unpushed* once read *⚠ 4* — with the full words on hover."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from datetime import UTC, datetime, timedelta
+
+    from agentorc.ui.app import templates, view
+
+    now = datetime.now(UTC)
+    iso = lambda t: t.isoformat().replace("+00:00", "Z")  # noqa: E731
+    left = _card(state="exited", pane=False, created=iso(now - timedelta(hours=2)), since=iso(now))
+    v = view(left, seats={"ao-w": "comes on the next question"})
+    assert v["slot"]["caption"] == "last came · 2h 0m ago"
+    git = {"branch": "w", "dirty": 1, "unpushed": 47, "upstream": "origin/w"}
+    c = view(_card(git=git))
+    assert c["flag"] == "dirty · 47 unpushed" and c["flag_short"] == "dirty · 47"
+    html = templates.get_template("card.html").render(s={**c, "compact": True, "compact_line": "Manager"})
+    assert '<span class="flag" title="dirty · 47 unpushed">⚠ dirty · 47</span>' in html
+    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    assert ".sc .r2 .flag { flex-shrink: 0; }" in css  # the line of its own gives way, never the count
+
+
 def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(tmp_path, monkeypatch):
     """Design §4.5 *The card's anatomy*, TD-097: an `exited` or `closed` record the team definition
     names as a seat is drawn *◇ on call* — composed, as *idle · unseen* is, so the state stays what

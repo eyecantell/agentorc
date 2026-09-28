@@ -874,6 +874,9 @@ def view(
         rw = {k: mail.read_when(None, k, now, seat=True) for k in ("ask", "note")}
     d["read_when"] = {k: str(rw.get(k) or "") for k in ("ask", "note")}
     d["age"] = _age(s.get("since"), now)
+    # a seat's *last came* is when it came — the record's `created`, the fill (§6 rule 3) — not
+    # `since`, which for a seat that has left is when it left (TD-200: *last came · 0s ago*)
+    d["came_age"] = _age(s.get("created"), now) if d["seat"] else ""
     d["scraped"] = s.get("confidence") != "hook"
     # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
     # VS Code link only when a container node's reach names one — the ssh URL below is built from
@@ -923,6 +926,10 @@ def view(
         # the one measure (design §4.2, TD-080): *exists only on this machine*, never *unmerged*
         flags.append(f"{git['unpushed']} unpushed")
     d["flag"] = " · ".join(flags) if state in ("idle", "exited", "stalled?", "needs-you") and flags else ""
+    # the compact card's form (TD-200): clipped to fit, *47 unpushed* once read *⚠ 4* — a different
+    # count. The number alone stays true; the full words are its `title`.
+    short = [f for f in ("dirty" if git.get("dirty") else "", str(git.get("unpushed") or "")) if f]
+    d["flag_short"] = " · ".join(short) if d["flag"] else ""
     prof = s.get("profile") or ""
     if s.get("adapter") == "shell":
         d["profile_line"] = "shell"
@@ -1284,7 +1291,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # never *ready to close ✓*: a seat is not closed while the definition names it (§4.5)
         # *last ran* for a seat with a trigger: it runs its brief rather than answering (§4.5, TD-098)
         came = "last came" if d.get("seat_when") in ("", "comes on the next question") else "last ran"
-        caption = came + (f" · {d['age']} ago" if d.get("age") else "")
+        caption = came + (f" · {d['came_age']} ago" if d.get("came_age") else "")
     elif d["ready_ok"] and state in ("idle", "exited"):
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
