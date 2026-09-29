@@ -365,6 +365,7 @@ async def test_what_the_brief_restart_leaves_alone(agent, tmp_path):
 
     await park_ticks(agent)
     params = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
+    five = (datetime.now(UTC) - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
     cases = {
         "working": {"state": "working"},
         "scraped": {"confidence": "scraped"},
@@ -372,6 +373,10 @@ async def test_what_the_brief_restart_leaves_alone(agent, tmp_path):
         "dirty": {"git": {"dirty": 2, "unpushed": 0}},
         "unknown": {"git": {}},
         "declared": {"out_of_work": {"at": "2026-09-29T07:00:00Z", "why": "x"}},
+        "wanted": {"restart_wanted": {"at": "2026-09-29T07:00:00Z", "why": "x", "early": True}},
+        "pending": {"pending": {"kind": "permission", "text": "x"}},
+        "superseded": {"superseded_by": "ao-other"},
+        "ceiling": {"restarts": [{"at": five, "why": "crash"}] * 3},
         "seat": {"seat": {"trigger": "asks"}},
         "interactive": {"unattended": False},
         "gated": {"gated": {"at": "2026-09-29T07:00:00Z"}},
@@ -388,6 +393,7 @@ async def test_what_the_brief_restart_leaves_alone(agent, tmp_path):
                 setattr(agent.sessions[sid], k, v)
             ids[n] = sid
         await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[ids["ceiling"]].restart_ceiling  # at its ceiling it is the person's
         for n, sid in ids.items():
             assert not [r for r in agent.sessions[sid].restarts if r.get("why") == "brief"], n
             agent.sessions[sid].host = agent.host
@@ -412,7 +418,9 @@ async def test_every_reply_to_a_member_whose_brief_changed_carries_the_clause(ag
 
         cli.unread_line(argparse.Namespace(json=False))
         assert capsys.readouterr().out == f"[agentorc] ({BRIEF_CLAUSE}) — finish the entry in hand, then declare\n"
-        agent.sessions[w].brief_changed = None
-        await wc.call("get", id=w)
+        # a restart it declares now is never early, and once declared the clause is not repeated
+        await wc.call("progress", id=w, ref=None, status="restart", why="brief changed")
+        assert agent.sessions[w].restart_wanted.get("early") is None
         assert not (clientmod.last_mail or {}).get("brief")
+        agent.sessions[w].brief_changed = None
     clientmod.last_mail = None

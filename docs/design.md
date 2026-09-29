@@ -5970,7 +5970,8 @@ code and needs no grant; a session doing the same work does.
      card and `ao status -v` say it (§4.5a **brief changed** chip). Then, as rule 5 does and in
      the same two ways: a member that is **`working`** is not interrupted — every `ao` reply it
      makes ends with *(your brief changed — finish what you hold, then `ao progress restart
-     --why "brief changed"`)*, and rule 2 restarts it on its word; a member that is
+     --why "brief changed"`)*, and rule 2 restarts it on its word — a word said while the record carries
+     the mark is never *early*, and a member that has declared, or a seat, is not given the clause; a member that is
      **hook-confirmed `idle`, holds no claim in progress, has declared nothing, and has nothing
      uncommitted or unpushed** (known, as in rule 2) **is restarted by the tick itself**, closed
      first and replayed, `restarts: [{why: brief}]`, under the ceiling as every replay is. That

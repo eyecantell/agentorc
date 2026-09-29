@@ -359,9 +359,9 @@ class TickMixin:
                 await self._crash_restart(s, now)
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
+                await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
                 await self._idle_nudge(s, now)
                 await self._context_line(s, now)
-                await self._brief_restart(s, now)
                 self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))

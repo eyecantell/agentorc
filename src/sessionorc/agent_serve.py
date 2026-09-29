@@ -268,7 +268,8 @@ class ServeMixin:
             # not interrupted, so every reply it reads says so
             over = context_over_text({"context": s.context, "context_bound": s.context_bound}) if s else ""
             # and rule 7's clause (TD-217 slice 4): a member whose brief changed is not interrupted either
-            changed = BRIEF_CLAUSE if s is not None and s.brief_changed else ""
+            declared = s is not None and (s.restart_wanted or s.out_of_work or s.seat is not None)
+            changed = BRIEF_CLAUSE if s is not None and s.brief_changed and not declared else ""
             if s is not None and ((n := s.unread()) or owed or over or changed):
                 # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
                 # refusal is not*, and this is the cheapest thing that is neither.
