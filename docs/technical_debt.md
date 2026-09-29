@@ -116,7 +116,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Partly done — slice 1 (#714); next the replay |
 | TD-220 | Build the board's horizon: the read without `--due-only`, `person.inbox.board_show` (next n per team, due, n days, all) and its pick on the Settings page, *Board, coming up*, the *not shown* fold and the line on the Inbox and the Repo page, the grinder preset's *on the board, due <date>* | Medium | Partly done — slices 1–2 (the setting, the read and the sort); slice 3 next |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
-| TD-224 | The Org page jumps to the top when scrolled past a certain point, consistently: likely scroll anchoring losing a node the update removes | High | Open — pickable: reproduce first |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
@@ -2232,27 +2231,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Paul's question, 2026-09-28:** *should we consider retiring "pickable" and using ledger.py to determine it based on "blocked by" instead?* The anchor's reading: yes, and it is option (a) taken to its end. One rule decides pickability for every consumer, dev-cadence's (derived from `Blocked by:`, its TD-070 `--list --json`), and the written line goes. What the design round has to add: on 2026-09-28 the ledger held 89 `Pickable: no` lines, 17 `yes` and 23 `Blocked by:`. Most of the *no* reasons are not blocks but states: *built, the live check pending* (16 or more), *designed, the build is TD-n* (13), *for evaluation* (5), *the anchor's*, *Paul's*. Each needs a home the derivation reads: a real dependency becomes `Blocked by: TD-n` or `decision (Paul)`; *designed, the build is TD-n* becomes `Blocked by: TD-n` (the design entry closes with its build); *live check* and *evaluation* are already `Kind:` values that no grinder picks; *the anchor's* and *Paul's* are `Owner:`. So the derived rule is *unblocked, Kind build (or design-first for the designer), Owner the reader's role*. That is also what rule 6's lane match, the kind bar (TD-198) and `ao repo` read. `tests/test_ledger.py`'s header test (TD-118) changes with it, and every open entry's `Pickable:` line migrates in one PR with its reason moved, not dropped.
 
 **Related:** TD-195 (rule 6), TD-214 (the wound-down team, the backlog baseline, the missing Owner check), TD-198 (the kind bar's buckets), dev-cadence's TD-070 (the query script) and TD-064 (`Blocked by`).
-
-## TD-224: The Org page jumps to the top when scrolled past a certain point
-
-**Priority:** High
-**Added:** 2026-09-28 (Paul: *the screen redraws (seen if scrolling, get popped up to top)*; later: *it was there before the promote and is still there now … it seems to be more position based than time based (scrolling past a certain point vertically seems to trigger it) and it happens consistently*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — not reproduced by a session yet; the suspects below are from reading `app.js`.
-**Location:** `src/agentorc/ui/static/app.js` (`syncGroups`: `sum.replaceWith(fresh)`, `box.appendChild(sec)` for every section on every delta; `syncSummaries`: the person's selector state applied after the swap, `AO.restoreScrolls`; `AO.scrolls` reads `scrollTop`; the reload on reconnect, line 748 at filing), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/templates/team_summary.html`
-
-**Why:** the Org page throws the reader back to the top once they scroll past some vertical position, every time, and it was there before the 2026-09-28 promote. TD-205 (#676) fixed the Doing list's own scroll box; this is the page. A person can't read the lower teams or the No-team cards. Being position-based, not time-based, suggests layout, not the update clock.
-
-**Suspects, to confirm or rule out:**
-1. **A forced layout mid-swap.** The template renders every selector variant (`.lv`, `.wv`, `.fv`) with the server's defaults visible and the rest `hidden`. `syncSummaries` applies the person's own choices (the team's Technical debt selector, the window, the answer/doing face) only after `syncGroups` has swapped every team's summary in. Inside that loop, `AO.scrolls` reads `scrollTop` on the next team's scrolled box, which forces a layout while the previous team's fresh summary is still in the server's default state. Where the person's choice differs from the default, that summary is briefly a different height. This alone would shift the page by that difference, not throw it to the top, so it is the weaker suspect.
-2. **Scroll anchoring on a removed node (the likelier).** The browser anchors to a node near the viewport. If that node sits inside a summary that `replaceWith` removes, or a section that `appendChild` detaches and re-inserts, the anchor is lost on every delta and the fallback can be the top.
-3. **A reload.** `ws.onmessage` reloads the page after a reconnect. It would be position-independent, so it is the least likely here, but it explains a jump at a promote.
-
-**Fix:** reproduce first (a headless browser: scroll to a depth below the first team's summary, drive a delta, read `scrollY` before and after; say the depth at which it fires), then: apply the person's selector state and restored scrolls to `fresh` **before** it is inserted; move a section only when it is out of order; read every summary's scroll positions in one pass before any swap; consider `overflow-anchor: none` on the swapped regions if anchoring is the cause. Keep a person's scroll across a reconnect reload (`history.scrollRestoration` or a saved `scrollY`). Done when scrolling to the bottom of a busy Org page stays put through a minute of deltas, with a test of the swap order if the page's JS tests can hold one.
-
-**Related:** TD-205 (the Doing list's own scroll, fixed), TD-176 slice 3 (the summary and its swap), TD-194 (the team fold).
 
 ## TD-225: A restart or close raises an identity alarm from the old run's last hook
 
