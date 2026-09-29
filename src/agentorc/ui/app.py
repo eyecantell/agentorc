@@ -175,6 +175,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     DOING_KEPT,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
+    MOTION_PRIORITIES,  # noqa: F401
     PHASES,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
     ROLLUP_STATES,  # noqa: F401
