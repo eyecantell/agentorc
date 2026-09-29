@@ -25,6 +25,7 @@ are whatever the adapter reports, and nothing here knows one by name.
 from __future__ import annotations
 
 import math
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -239,6 +240,11 @@ def crossed(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
 TEAM_KEYS = ("schedule", "until", "reserve")
 TERMINAL_KEYS = ("size", "face", "copy_on_select")
 TERMINAL_SIZE = (8, 32)  # a readable monospace size in px, either way of the Focus pane's default 13
+INBOX_KEYS = ("board_show",)
+BOARD_SHOW_DEFAULT = "next:10"  # §4.5 screen 6 *The board's horizon*: what the page reads when nothing is set
+BOARD_SHOW_NEXT = (1, 50)  # `next:<n>`, the soonest n per team
+BOARD_SHOW_DAYS = (1, 365)  # `<n>d`, what falls due within n days
+PERSON_KEYS = ("open_in", "terminal", "inbox")
 
 
 def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
@@ -358,7 +364,8 @@ def parse_open_in(v: Any) -> str | dict[str, str]:
 
 
 def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
-    """`person:` — `open_in` and `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164)."""
+    """`person:` — `open_in`, `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164) and
+    `inbox: {board_show}` (TD-220)."""
 
     def terminal(v: Any) -> dict[str, Any]:
         v = _fields(v, TERMINAL_KEYS, "terminal", drop)
@@ -381,8 +388,27 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
 
         return _each(v, {"size": size, "face": face, "copy_on_select": flag}, drop)
 
-    value = _fields(value, ("open_in", "terminal"), "person", drop)
-    return _each(value, {"open_in": parse_open_in, "terminal": terminal}, drop)
+    def inbox(v: Any) -> dict[str, Any]:
+        return _each(_fields(v, INBOX_KEYS, "inbox", drop), {"board_show": parse_board_show}, drop)
+
+    value = _fields(value, PERSON_KEYS, "person", drop)
+    return _each(value, {"open_in": parse_open_in, "terminal": terminal, "inbox": inbox}, drop)
+
+
+def parse_board_show(v: Any) -> str:
+    """`person.inbox.board_show` (§5, §4.5 screen 6 *The board's horizon*, TD-220): which board items the
+    Inbox lists before they are due — `next:<n>` per team (n from 1 to 50), `due`, `<n>d` (n from 1 to
+    365) or `all`. What is due is shown under every mode; this moves only what comes up ahead."""
+    word = v.strip() if isinstance(v, str) else ""
+    if word in ("due", "all"):
+        return word
+    for pattern, (lo, hi) in ((r"next:([0-9]+)", BOARD_SHOW_NEXT), (r"([0-9]+)d", BOARD_SHOW_DAYS)):
+        if (m := re.fullmatch(pattern, word)) and lo <= int(m.group(1)) <= hi:
+            return pattern.replace("([0-9]+)", str(int(m.group(1))))
+    raise ValueError(
+        f"inbox.board_show is next:<n> (n from {BOARD_SHOW_NEXT[0]} to {BOARD_SHOW_NEXT[1]}), due, "
+        f"<n>d (n from {BOARD_SHOW_DAYS[0]} to {BOARD_SHOW_DAYS[1]}) or all, not {v!r}"
+    )
 
 
 def team_extra(doc: dict[str, Any], team: str) -> int:

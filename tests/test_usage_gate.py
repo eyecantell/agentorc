@@ -125,6 +125,35 @@ async def test_a_teams_reserve_priority_pauses_its_sessions_first(agent, tmp_pat
             await person.call("remove", id=s)
 
 
+@pytest.mark.unit
+def test_board_show_takes_the_four_modes_and_the_reader_drops_the_rest():
+    """§5 `person.inbox.board_show`, §4.5 screen 6 *The board's horizon* (TD-220 slice 1): `next:<n>`
+    with n from 1 to 50, `due`, `<n>d` with n from 1 to 365, or `all`; the parser refuses anything
+    else naming the shapes, and the reader drops it so the page falls back to `next:10`."""
+    for word, kept in (
+        ("next:10", "next:10"),
+        ("next:1", "next:1"),
+        ("next:50", "next:50"),
+        ("due", "due"),
+        ("7d", "7d"),
+        ("365d", "365d"),
+        ("all", "all"),
+        (" 07d ", "7d"),
+    ):
+        assert settings.parse_board_show(word) == kept
+    for bad in ("next:0", "next:51", "0d", "366d", "soon", "next:", "d", "", 10, None, "7 d", "next:-1", "\u0667d"):
+        with pytest.raises(ValueError, match="board_show is next:<n>"):
+            settings.parse_board_show(bad)
+    assert settings.BOARD_SHOW_DEFAULT == "next:10"
+    doc = {"person": {"open_in": "none", "inbox": {"board_show": "7d"}}}
+    assert settings.person(doc) == {"open_in": "none", "inbox": {"board_show": "7d"}}
+    doc = {"person": {"open_in": "none", "inbox": {"board_show": "soon", "colour": 1}}}
+    assert settings.person(doc) == {"open_in": "none", "inbox": {}}
+    for bad in ({"inbox": {"board_show": "next:51"}}, {"inbox": {"horizon": "all"}}, {"inbox": "all"}):
+        with pytest.raises(ValueError):
+            settings.parse_person(bad)
+
+
 @pytest.mark.integration
 async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it_makes(agent, tmp_path):
     """§5 (TD-146): teams, repos and person through one RPC, each validated before anything is
@@ -154,6 +183,17 @@ async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it
             await person.call("set_settings", person={"theme": None})
         with pytest.raises(AgentError, match="person.terminal: unknown key sise"):
             await person.call("set_settings", person={"terminal": {"sise": None}})
+        # the board's horizon (TD-220): laid over what is there field by field, refused outside its shapes
+        got = await person.call("set_settings", person={"inbox": {"board_show": "07d"}})
+        assert got["person"] == {"open_in": "none", "terminal": {"size": 14}, "inbox": {"board_show": "7d"}}
+        for bad in ("next:0", "next:51", "0d", "soon"):
+            with pytest.raises(AgentError, match="person: inbox.board_show is next:<n>"):
+                await person.call("set_settings", person={"inbox": {"board_show": bad}})
+        with pytest.raises(AgentError, match="person.inbox: unknown key horizon"):
+            await person.call("set_settings", person={"inbox": {"horizon": None}})
+        assert settings.load()["person"]["inbox"] == {"board_show": "7d"}  # written as parsed
+        await person.call("set_settings", person={"inbox": {"board_show": None}})
+        assert "inbox" not in settings.person(settings.load())
         with pytest.raises(AgentError, match="unknown key resrve"):
             await person.call("set_settings", teams={"ao-grind": {"resrve": None}})
         with pytest.raises(AgentError, match="needs reserves, teams, repos or person"):
