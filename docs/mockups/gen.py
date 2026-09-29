@@ -1401,11 +1401,11 @@ def inbox(picks=False):
         teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
         kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 1, False), ("notes", 3, False), ("trail", 6, False)]
         b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
-        later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Board, coming up</span><span class="n" style="background: transparent; color: #6b7280;">2</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
+        later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Board, coming up</span><span class="n" style="background: transparent; color: #6b7280;">1</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
             + mcard("#cbd0d6", "board", "dev-cadence", "dc-grind", "due in 6 d · Oct 4",
                     '<div class="txt" style="color: #4b5563;">Decide whether the sweep reads worktrees of a repo that is not in the roster.</div>',
                     b("Reply") + b("Snooze ▾") + b("Done") + b("Open board", "ghost"))
-            + '<div class="muted" style="padding: 2px 2px 8px; font-size: 12px;"><span style="font-size: 10px;">▸</span> not shown (14) · showing the next 10 board items per team · the next due Oct 12 — <a href="#">show</a> · <a href="#">Settings</a></div>')
+            + '<div class="muted" style="padding: 2px 2px 8px; font-size: 12px;"><span style="font-size: 10px;">▸</span> not shown (14)</div><div class="muted" style="padding: 2px 2px 8px; font-size: 12px;">showing the next 10 board items per team · 14 not shown, the next due Oct 12 — <a href="#">show</a> · <a href="#">Settings</a></div>')
         body = (isec("Needs you", 6, opened=True) + "".join(needs) + later + isec("Steering", 2) + "".join(steering)
                 + isec("Waiting on them", 1) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
@@ -1605,7 +1605,7 @@ def settings_page():
         b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">.agentorc.yml · read per call · by PR — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     you = card("yours everywhere", "",
         '<div class="txt">' + field("editor", "vscode", "the card’s and Focus’s button; none removes it") + '</div>'
-        '<div class="txt">' + field("terminal size", "13", "px", 60) + field("terminal face", "JetBrains Mono", "monospace always the fallback · ligatures off", 160) + field("board items shown", "the next 10 per team ▾", "or: only what is due · due within n days · all — what is due is always shown; the rest is under not shown (TD-207)", 190) + '</div>',
+        '<div class="txt">' + field("terminal size", "13", "px", 60) + field("terminal face", "JetBrains Mono", "monospace always the fallback · ligatures off", 160) + field("board items shown", "the next 10 per team ▾", "or: only what is past due · due this week · all — what is due is always shown; the rest is under not shown (TD-207)", 190) + '</div>',
         b("Save", "primary"))
     browser = card("this browser", "",
         ro("theme", "dark · the ◐ toggle in the top bar") + ro("mine", "off") + ro("Inbox folds", "FYI open · Answered open") + ro("shell directory", "~"),

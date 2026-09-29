@@ -1902,16 +1902,25 @@ Screens:
    is one the person was meant to see today. **The mode** is `person.inbox.board_show` (§5),
    one of four, and it decides which items that are **not yet due** are drawn:
    - **`next:<n>`**, *the next n per team* (n from 1 to 50; **the default is `next:10`**): for
-     each board, its n soonest open items whatever their dates, the due ones among them, so a
-     board with twelve due shows twelve and none ahead, and one with two due shows eight ahead.
-     A board is a repo's; the row and the line name it by the team that works the repo, and by
-     the repo where no team or more than one does.
-   - **`due`**, *only what is due*: nothing ahead.
-   - **`<n>d`**, *due within n days* (1 to 365): what falls due inside the window.
+     each team, the n soonest open items of the boards it works, whatever their dates, the due
+     ones among them, so a team with twelve due shows twelve and none ahead, and one with two
+     due shows eight ahead. A board's team is the one its row's badge already carries (a repo
+     two teams share is the first's, in definition order); a board no team works is counted
+     by itself and named by its repo.
+   - **`due`**, *only what is past due*: nothing ahead.
+   - **`<n>d`**, *due within n days* (1 to 365): what is due and what falls due inside the
+     window; `7d` is **due this week**, Paul's fourth choice (2026-09-28), and is the name the
+     pick gives it.
    - **`all`**: every open item.
 
+   Three kinds of item stand outside the dates. An item with **no date** sorts after the
+   dated ones: it is shown under `all`, takes a place under `next:` once the dated ones have
+   theirs, and is hidden under `due` and `<n>d`. A **decided** item is a due row whatever its
+   date, as the reader has always surfaced it. An item whose date could not be read
+   (`due_error`) is a due row too, and takes none of the n places.
+
    **Coming up** is what the mode draws ahead, under the due board rows and a plain sub-heading,
-   **Board, coming up (n)**, soonest first: the same row and the same controls
+   **Board, coming up (n)** with the words *not counted* beside it, soonest first: the same row and the same controls
    (Snooze, Done, Reply, Open board), its due words *due in 6 d · Oct 4*, drawn in the quiet
    colour a not-yet-due thing has, and **counted nowhere** — not in the section's count, the top
    bar's number, the rail's *Needs you*, the Org rollup's *m overdue* (`overdue_n`) or the Due
@@ -1925,8 +1934,9 @@ Screens:
    *showing the next 10 board items per team · 14 not shown, the next due Oct 12 — show ·
    Settings*; with nothing hidden, *showing the next 10 board items per team · nothing hidden*;
    under `due`, *showing board items that are due · 5 not shown, the next due Oct 4 — show*;
-   under `7d`, *showing board items due within 7 days · …*; under `all`, *showing every board
-   item*. **show** opens the fold; *Settings* is a link to the **You** card. An
+   under `7d`, *showing board items due this week · 3 not shown, the next due Oct 12 — show*,
+   and under another number of days *due within 14 days*; under `all`, *showing every board
+   item*. Whatever the mode, nothing hidden reads *· nothing hidden* and draws no fold. **show** opens the fold; *Settings* is a link to the **You** card. An
    item whose date the reader could not read (`due_error`) is a due row with the reader's
    words, as today, never hidden by a mode. The Repo page's *Waiting on you* (screen 11) is
    the same rows filtered to the repo, the rows coming up, the fold and the line with them.
@@ -2329,7 +2339,7 @@ noted). If a control is not in this table it does not exist.
 | Due strip / Inbox board row | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
 | Due strip / Inbox board row | **Done** | agent checks the item off and commits |
 | Inbox, Repo page: board rows | **Board, coming up (n)** · **not shown (n)** fold · **show** · *Settings* | designed 2026-09-28 (TD-207; not built — TD-220; §4.5 screen 6 *The board's horizon*). Under the due board rows, the items the person's mode (`person.inbox.board_show`) draws before they are due, soonest first, each the board row with its own Snooze, Done, Reply and Open board and its due words *due in 6 d · Oct 4*, drawn quieter and counted in no number but the rail's *board items*, which counts the board rows on the page. Under them the fold **not shown (n)** holds what the mode hides, closed. One line says the mode and what it hides — *showing the next 10 board items per team · 14 not shown, the next due Oct 12 — show · Settings*: **show** opens the fold for this page view and writes nothing; *Settings* links to the Settings page's **You**. The line is drawn whenever a board is read, with no fold when nothing is hidden. Display and two links: nothing here is built from a session's words |
-| Settings page | **You**: **board items shown** | designed 2026-09-28 (TD-207; not built — TD-220): a pick of four — *the next* `n` *per team* · *only what is due* · *due within* `n` *days* · *all* — the two numbers fields beside their choice (10 and 7 until typed), written to `person.inbox.board_show` (`next:10`, `due`, `7d`, `all`; §5) through `set_settings`, which refuses an n outside 1 to 50 for `next:` and 1 to 365 for days; the default is `next:10`. An item that is due is shown and counted under every choice. Its *i* text: *which board items the Inbox shows before they are due; they are listed under "Board, coming up" and are not counted; what this hides is under "not shown"* |
+| Settings page | **You**: **board items shown** | designed 2026-09-28 (TD-207; not built — TD-220): a pick of four — *the next* `n` *per team* · *only what is past due* · *due this week* (*due within* `n` *days* when n is not 7) · *all* — the two numbers fields beside their choice (10 and 7 until typed), written to `person.inbox.board_show` (`next:10`, `due`, `7d`, `all`; §5) through `set_settings`, which refuses an n outside 1 to 50 for `next:` and 1 to 365 for days; the default is `next:10`. An item that is due is shown and counted under every choice. Its *i* text: *which board items the Inbox shows before they are due; they are listed under "Board, coming up" and are not counted; what this hides is under "not shown"* |
 | Due strip / Inbox board row | **Reply** | designed 2026-09-24 (TD-126, Paul's shape); the file half built (TD-142 slice 1: the button, the composer, `board_reply` writing and committing), the mail half and the standing not yet. Opens the one dialog Reply and Message share, the line's head quoted; **Send** calls `board_reply {board, line, text, reply, refs}` (§4.4 *Board write-back*; `refs` as the reader gave them), the person's alone. What it does, in order: **always writes the reply on the board** — appended to the item's own line as ` — Paul, <date>: <reply>`, one commit — so the line, still due, carries the instruction to the next session that reads the board (through the Inbox row now; through the SessionStart hook once the reader prints a line's reply tails after the head it clips at 200 characters, §4.4); **and mails it as well only when a live session still holds the context**: every live record with an unexpired declared lease (§4.8, `LEASE_TTL`) on one of the line's `refs` gets a `note` from the person, `about` that reference, marked `handed` (§4.8a; it owes an outcome, which shows under *Waiting on them*, §4.10 *Outcomes*), its text the line's head and the reply. A sender that has moved on or exited is not written to (Paul: *will it have moved on and the reply is a distraction, or will it already have the context?* — the lease answers that). The row **says where a reply will go before the press**, beside the sender's name: *still on TD-122 — grinder-ao-2 holds it* (a live lease on one of the line's refs; the reply reaches that session, which need not be the line's author), *moved on* (the named session is live and holds no lease on them), *gone* (no live session by that name and no holder); the result after the press repeats it — *written on the board* / *written on the board · sent to grinder-ao-2 (holds TD-122)* — and the trail says the same. **A reply is not Done**: the line stays counted until the instruction is carried out, and whoever carries it out closes the line as any board line is closed. The file half is written before the mail half, and a mail failure is said in the result with the file half done. `session`, `host` and `refs` are fields of dev-cadence's reader (§4.4), never parsed here; until the reader carries them the row draws no standing and Reply writes on the board alone, saying so |
 | Inbox board row | **standing** | display only (TD-126): *still on <ref> — <session> holds it*, *moved on* or *gone*, as the Reply row defines them, computed by the page from the records it already holds — a live record with a declared `claimed` on one of the item's `refs` younger than `LEASE_TTL`, else whether a live record carries the item's `session` name — and refreshed with the poll. A word, never a control |
 | Due strip | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
