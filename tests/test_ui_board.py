@@ -451,6 +451,22 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
     for mode in ("next:1", "due", "7d", "all", "soon", None):
         assert ids(board_horizon(week, mode)["due"]) == [4]
     assert board_horizon(week, "soon")["mode"] == "next:10"
+    # a past-dated fyi is not due now: it reads the reader's words, and is never the line's next date
+    from agentorc.ui.app import board_rows
+
+    fyi = {
+        "line": 5,
+        "text": "for your read",
+        "due": "2026-09-25",
+        "overdue_days": 3,
+        "due_tag": "3d overdue",
+        "kind": "fyi",
+        "decided": None,
+    }
+    (row,) = board_rows({"today": "2026-09-28", "boards": [{"root": "/r", "board": "/r/b.md", "items": [fyi]}]})
+    assert not row["due_now"] and row["ahead"] == "3d overdue"
+    got = board_horizon([row, _row(6, "2026-10-12")], "due")
+    assert ids(got["hidden"]) == [5, 6] and got["next_due"] == "2026-10-12"
     # a row from before TD-220 carries no due_now: it was the --due-only read's, so it is due
     assert ids(board_horizon([{"line": 7, "due": "2026-10-10"}], "due")["due"]) == [7]
 

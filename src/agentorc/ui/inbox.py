@@ -372,13 +372,17 @@ def board_due_now(it: Mapping[str, Any]) -> bool:
     return bool(it.get("decided")) or bool(it.get("due_error")) or it.get("overdue_days") is not None
 
 
-def _ahead_words(due: str, today: str) -> str:
-    """A not-yet-due item's due words, *due in 6 d · Oct 4*; an undated one's, *no due date*."""
+def _ahead_words(due: str, today: str, tag: str = "") -> str:
+    """A not-yet-due item's due words, *due in 6 d · Oct 4*; an undated one's, *no due date*. An item
+    that is not due now yet dated today or earlier — an undecided `fyi`, which the reader never
+    surfaces as due — takes the reader's own words for it (*3d overdue*), never *due in -3 d*."""
     d, t = _civil(due), _civil(today)
     if d is None:
         return "no due date"
     if t is None:
         return f"due {d:%b} {d.day}"
+    if d <= t:
+        return tag or f"due {d:%b} {d.day}"
     return f"due in {(d - t).days} d · {d:%b} {d.day}"
 
 
@@ -430,7 +434,7 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "due_now": board_due_now(it),
                     "today": today,  # the reader's, which `board_horizon` measures days from
                     "due_error": bool(it.get("due_error")),
-                    "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today),
+                    "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today, tag),
                     "editor": url,
                     "find": _find_text(label, text, tag, "board"),
                 }
@@ -486,7 +490,9 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
                 places[g] = places.get(g, 0) + 1
     shown = {id(r) for r in ahead}
     hidden = [r for r in rest if id(r) not in shown]
-    dated = [str(r["due"]) for r in hidden if r.get("due")]
+    # the line's *the next due* is ahead of today: a hidden past-dated `fyi` is not what comes next
+    now = str(today or next((r.get("today") for r in rows if r.get("today")), "")) or date.today().isoformat()
+    dated = [str(r["due"]) for r in hidden if r.get("due") and str(r["due"]) > now]
     return {"mode": mode, "due": due, "ahead": ahead, "hidden": hidden, "next_due": min(dated) if dated else ""}
 
 
