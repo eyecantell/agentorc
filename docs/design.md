@@ -394,7 +394,10 @@ prompt — often the session's own last prompt — is not an unsubmitted prompt.
 returns only after the session has started on *this* prompt and settled again (`idle`,
 `needs-you`, `exited`, `closed`, `limited`, `stalled?`): a busy session queues the text, so the
 wait first lets the current turn end — a stop on a question or an exit is returned as is, prompt
-still queued — then requires the next turn to start. It fails with `prompt-stalled` when nothing
+still queued — then requires the next turn to start. Busy and *started* are both read against the state as it was
+just before the paste, not after the submit: the tool reports this prompt's own start the moment
+Enter lands, often while the composer is still being checked, so a turn that began, or began and
+ended, during the typing counts as this prompt's (TD-204). It fails with `prompt-stalled` when nothing
 starts within a few seconds of the moment it could, `timeout` after the caller's limit, and
 `removed` if the record goes away — so a policy's wrap-up request (§6) is known to have landed,
 and no text is ever re-sent on a guess (TD-016).

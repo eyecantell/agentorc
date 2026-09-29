@@ -1255,7 +1255,7 @@ class HostAgent(
         if mail.is_person(caller):
             self._refill(s)
         try:
-            await self._submit(id, adapters.get(s.adapter), text)
+            state_sent, rev_sent = await self._submit(id, adapters.get(s.adapter), text)
         except RpcError as e:
             entry.verdict = str(e)
             self.store.save(s)
@@ -1267,11 +1267,16 @@ class HostAgent(
         def left() -> float | None:
             return None if end is None else max(0.0, end - time.monotonic())
 
-        s = self._get(id)
-        if s.state != "idle":
+        # The baseline is what the session was doing when the text was typed, read before the paste
+        # (TD-204): the tool's UserPromptSubmit lands the moment Enter does, often while `_type` is
+        # still confirming the composer emptied, and a baseline read after that took this prompt's
+        # own turn for a busy session's and then waited for a further one that never came. Accepted
+        # residual: an earlier typist's (the doorbell's, a wrap-up's) start that lands late, inside
+        # this paste, reads as this prompt's; nothing ties a hook to the prompt that caused it.
+        rev_before = rev_sent
+        if state_sent != "idle":
             # Busy: the tool queues the text. Wait for the current turn to end; a stop on anything
             # but idle (a question, an exit) is returned as is — the prompt is still queued behind it.
-            rev_sent = s.rev
             if not await self._wait_state(id, lambda x: x.state in SETTLED, left()):
                 self._raise_not_settled(id, timeout)
             s = self._get(id)
@@ -1282,8 +1287,8 @@ class HostAgent(
                 # Accepted residual: a permission answered *and* the rest of that same turn finishing
                 # inside one 0.1 s poll would look the same; a turn does not end that fast.
                 return s.view()
-        rev_before = s.rev
-        # Started: any transition off this idle (a hook's UserPromptSubmit → working, a scraped
+            rev_before = s.rev
+        # Started: any transition since the baseline (a hook's UserPromptSubmit → working, a scraped
         # working, even an exit) within the stall window.
         stall = agent_common.SEND_STALL_SECONDS if left() is None else min(agent_common.SEND_STALL_SECONDS, left())
         if not await self._wait_state(id, lambda x: x.rev != rev_before, stall):
@@ -1321,10 +1326,15 @@ class HostAgent(
         self.store.save(s)
         return entry
 
-    async def _submit(self, sid: str, adapter: Any, text: str) -> None:
-        """`_type`, holding the session's typing lock: one typist per pane (TD-094)."""
+    async def _submit(self, sid: str, adapter: Any, text: str) -> tuple[str, int]:
+        """`_type`, holding the session's typing lock: one typist per pane (TD-094). Returns the
+        record's state and `rev` as they were under the lock just before the paste — the baseline
+        `send --wait` measures *started* from (TD-204)."""
         async with self._typing[sid]:
+            s = self._get(sid)
+            before = (s.state, s.rev)
             await self._type(sid, adapter, text)
+        return before
 
     async def _type(self, sid: str, adapter: Any, text: str) -> None:
         """Paste, Enter, and confirm the prompt left the composer (TD-027, design §4.2). Only an
