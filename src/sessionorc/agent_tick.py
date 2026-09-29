@@ -528,8 +528,7 @@ class TickMixin:
         # record carries no mark. Inside the window the mark stands, as it does for rule 1.
         if s.restart_ceiling and self._window_full(s, now):
             return
-        # the tick's own close, then a replay that failed, leaves it `closed`: still the tick's to retry
-        closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "wanted"
+        closed_by_tick = self._closed_by_tick(s, "wanted")
         if not (s.state == "idle" or (s.state == "exited" and s.pane) or closed_by_tick):
             return
         if (s.run_until and now >= _parse(s.run_until)) or self._profile_gated(s.profile, now, s.team):
@@ -580,11 +579,7 @@ class TickMixin:
             return
         if s.out_of_work or s.restart_wanted:
             return  # it declared: rule 2 or the team's next start is what starts it
-        # the tick's own close or replay that failed leaves it `closed` with an `error` entry: still the
-        # tick's to retry. A successful brief restart leaves a `brief` entry too, so without the error a
-        # `closed` record is a person's Close, never undone (the techlead's read of #748)
-        last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
-        closed_by_tick = s.state == "closed" and last.get("why") == "brief" and bool(last.get("error"))
+        closed_by_tick = self._closed_by_tick(s, "brief")
         if not closed_by_tick:
             if s.state != "idle" or s.confidence != "hook" or s.pending:
                 return
@@ -621,6 +616,16 @@ class TickMixin:
                 await self._push_changes()
                 return
         await self._replay(s, "brief")
+
+    @staticmethod
+    def _closed_by_tick(s: Session, why: str) -> bool:
+        """A `closed` record the tick itself closed and failed to replay (`why` rule 2's `wanted` or rule
+        7's `brief`): its last `restarts` entry is that rule's and carries `error` — both failure paths,
+        the close's and the replay's, write one. A successful restart leaves the same entry without it
+        on the new record, so without the error a `closed` record is a person's Close, never undone
+        (design §6 rule 2; the techlead's read of #748, TD-235)."""
+        last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
+        return s.state == "closed" and last.get("why") == why and bool(last.get("error"))
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:
