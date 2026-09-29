@@ -5693,7 +5693,7 @@ code and needs no grant; a session doing the same work does.
   *Unattended* off still writes one and a later Hand back replays the person's latest choices —
   the host agent writes `launch/<id>.json` under its home — the adapter, the profile, the
   prompt as handed (placeholders filled) and the files and texts it was made from (`prompt_from`,
-  rule 7; designed, not built — TD-217), the lane and the fields above — and a restart is that
+  rule 7; handed and kept since TD-217 slice 1, read by no replay yet), the lane and the fields above — and a restart is that
   record handed to `create` again, its prompt filled afresh from `prompt_from` once rule 7 is built, never the definition re-read (the host agent does not read
   `org.yml`, §4.9). The launch record is deleted with the record on Forget and kept across a
   supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
@@ -5852,15 +5852,19 @@ code and needs no grant; a session doing the same work does.
      definition again (§4.9a), and new work waits for a person's Start — starting on work
      appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
-  7. **Brief changed** (TD-199; designed 2026-09-28; not built — TD-217). A member reads its
+  7. **Brief changed** (TD-199; designed 2026-09-28; `prompt_from` handed and kept — TD-217 slice 1;
+     the replay, the mark and the restart not built — TD-217). A member reads its
      brief once, at its start, and until this rule a restart replayed the prompt its first start
      was handed: manager-ao-1, started 2026-09-25, ran a template two merges old for three days,
      and no restart would have given it the new one. Two halves. **A replay reads the brief's
      files again.** The client that composes a brief (§4.8) hands the create, beside the filled
      `prompt`, what it was made from — **`prompt_from: {base, slots}`**: `base` the template's
-     path as installed, and each slot either `{file: <path>}` (the repo's supplement, the seat's
-     primer) or `{text: …}` (the lane, the techlead's and the manager's ids, `none`) — and the
-     launch record keeps it. A replay — rules 1, 2 and 3, and this one — fills `base`'s slots
+     path as installed (a role with no template: the repo's brief), and each slot, in the order it
+     is filled, either `{file: <path>}` (the repo's supplement, its text stripped and `none` when
+     empty) or `{text: …}` (the lane, the techlead's and the manager's ids, the seat's primer's
+     path, `none`), with **`prefix`** the §4.9 Project block put in front as it stands, since it is
+     the org's reach at the start and no brief's file — and the launch record keeps it; a prompt a
+     person typed whole (`ao new --prompt`, the form's Opening prompt) sends none. A replay — rules 1, 2 and 3, and this one — fills `base`'s slots
      from those files and texts, plain replacement of the slot's name and nothing else, and hands
      that to `create`; the host agent knows a file and a slot and no role, template or team, and
      still never reads a definition. A file inside a checkout is read **as merged** —

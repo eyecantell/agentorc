@@ -654,3 +654,20 @@ def test_start_with_a_team_badges_the_session_and_fills_the_teams_reader(world, 
     (made,) = fleet.creates()
     assert made["team"] == "ao-grind"
     assert made["review"] == {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
+
+
+def test_start_with_a_role_hands_create_what_its_brief_was_made_from(world, client):
+    """TD-217 slice 1 (design §6 rule 7): the form's preset brief goes with `prompt_from`, which filled
+    again gives the prompt; a prompt the person typed fills nothing and sends none."""
+    tmp_path, fleet = world
+    data = {"name": "h", "dir": str(tmp_path / "agentorc"), "role": "hunter", "lane": "TD-9"}
+    assert client.post("/new", data=data, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    base = pathlib.Path(made["prompt_from"]["base"]).read_text(encoding="utf-8")
+    for slot, spec in made["prompt_from"]["slots"].items():
+        base = base.replace(slot, spec["text"])
+    assert base == made["prompt"] and made["prompt_from"]["slots"]["{lane}"] == {"text": "TD-9"}
+    fleet.calls.clear()
+    assert client.post("/new", data={**data, "prompt": "typed"}, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert made["prompt"] == "typed" and "prompt_from" not in made

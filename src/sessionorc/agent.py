@@ -551,6 +551,7 @@ class HostAgent(
         unattended: bool = False,
         resume: str | None = None,
         prompt: str | None = None,
+        prompt_from: dict[str, Any] | None = None,  # kept in the launch record only (§6 rule 7, TD-217)
         capabilities: list[str] | None = None,
         lane: list[str] | None = None,
         controllers: list[str] | None = None,

@@ -319,6 +319,7 @@ class RemoteMixin:
             await self._check_occupancy_for(host, params)
         mux = self._node_mux(host)
         sent = dict(params)
+        sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
         if rid:
             sent["id"] = rid
         for key in ("controllers", "add", "remove") if method in ("create", "set_controllers") else ():
