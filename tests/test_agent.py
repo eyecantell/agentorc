@@ -496,6 +496,52 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         agent.tmux.kill_session(s["id"])
 
 
+async def test_send_wait_hook_lands_while_typing(agent, hookstub, tmp_path, monkeypatch):
+    """TD-204: the tool's UserPromptSubmit lands the moment Enter does, while `_type` is still
+    confirming the composer emptied. The baseline is read before the paste, so this prompt's own
+    turn is its start — never taken for a busy session's turn, with a further one waited for."""
+    monkeypatch.setattr("sessionorc.agent_common.SEND_STALL_SECONDS", 0.6)
+    typed = agent._type
+    during: list[str] = []
+
+    async with LocalClient() as c, LocalClient() as feeder:
+
+        async def slow_type(sid, adapter, text):
+            await typed(sid, adapter, text)  # the Enter has landed
+            for st in during:
+                await feeder.call("hook", session=sid, state=st)
+            await asyncio.sleep(0.3)  # still polling the composer
+
+        monkeypatch.setattr(agent, "_type", slow_type)
+        s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+
+        # idle at send, the turn starts during the typing and ends after it: settled on this turn
+        during[:] = ["working"]
+        task = asyncio.create_task(c.call("send", id=s["id"], text="do it", wait=True, timeout=5))
+        await wait_state(feeder, s["id"], "working")
+        await asyncio.sleep(0.5)
+        assert not task.done()  # started, not settled
+        await feeder.call("hook", session=s["id"], state="idle")
+        assert (await asyncio.wait_for(task, 5))["state"] == "idle"
+
+        # idle at send, the whole turn runs while typing: already started and settled
+        during[:] = ["working", "idle"]
+        got = await c.call("send", id=s["id"], text="quick", wait=True, timeout=5)
+        assert got["state"] == "idle"
+
+        # busy at send, the current turn ends and this prompt is taken while typing: its end settles it
+        await feeder.call("hook", session=s["id"], state="working")
+        during[:] = ["idle", "working"]
+        task = asyncio.create_task(c.call("send", id=s["id"], text="queued", wait=True, timeout=5))
+        await asyncio.sleep(0.8)  # past the stall window: the start was seen
+        assert not task.done()
+        await feeder.call("hook", session=s["id"], state="idle")
+        assert (await asyncio.wait_for(task, 5))["state"] == "idle"
+        agent.tmux.kill_session(s["id"])
+
+
 async def test_a_closed_record_stays_closed_when_its_run_says_it_ended(agent, hookstub, tmp_path):
     """Design §4.2 *Close*, TD-200 (3): `ao close` kills the pane, and the tool's SessionEnd for
     the run it killed lands after the close. Applied, it turned the record `exited` — a card that
