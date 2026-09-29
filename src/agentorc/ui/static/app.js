@@ -982,6 +982,8 @@
     // before anything moves — the read forces a layout, and one taken halfway through the swap let
     // the page's scroll anchoring chase a section being moved, throwing the page to the top (TD-224).
     // They are put back in syncSummaries, once the face each sits in is shown: a hidden box takes no scrollTop.
+    // What the last swap kept and no summary took back (a team whose summary went) is dropped first.
+    Object.keys(scrollKept).forEach((k) => delete scrollKept[k]);
     $$(".tsum", box).forEach((sum) => (scrollKept[sum.dataset.team] = AO.scrolls(sum)));
     const keep = [];
     wanted.forEach((g) => {

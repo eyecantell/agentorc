@@ -79,6 +79,8 @@ def test_the_swap_reads_first_and_moves_only_what_is_out_of_order():
     body = js[start : js.index("\n  }\n", start)]
     # every summary's scroll positions are read before the first node is replaced or moved
     read = body.index("scrollKept[sum.dataset.team] = AO.scrolls(sum)")
+    # …into a fresh map: a position kept for a summary that went is never put on the one that comes back
+    assert body.index("delete scrollKept[k]") < read
     assert read < body.index("sum.replaceWith(fresh)") and read < body.index("AO.placeAt(box, sec")
     assert body.count("AO.scrolls(") == 1  # …and never again inside the loop, where it forces a layout
     # the fresh summary shows the person's faces before it goes in, at the height it will keep
