@@ -111,6 +111,7 @@ not mix:
 - **brief** — the job description a session is started with, written from its role's template. The template holds agentorc's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.
   Describes the job, not the run (TD-042). — *proposed*.
 - **lane** — the list of references a worker was handed, or `free-pick`. — *proposed*. A lane word matches a ledger entry by its header (design §6 rule 6); an `owner:<word>` in the lane narrows it to entries whose `Owner:` is that word or absent (TD-214).
+- **pickable** — of a ledger entry: not blocked, which is derived and never written (design §4.4 *Repo facts*, cadence §2.4, TD-223): no `Blocked by:`, or every entry it names archived and no decision named. Whether a given worker may take it is its lane's kind and owner words. *Not:* the `**Pickable:**` header line, retired. — *proposed* 2026-09-28.
 - **work waiting** — a wound-down team whose lanes gained entries since its members declared (design §6 rule 8, TD-214): the home's `work_waiting`, an Inbox row, and a start only under `teams.<team>.on_work: start`. — *proposed* 2026-09-28.
 - **profile** — `(adapter, account, model)` a session runs under (design §4.2a). — *proposed*.
 - **grant** — a capability on a session record (the field is `capabilities`; prose says

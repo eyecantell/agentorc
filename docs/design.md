@@ -648,7 +648,55 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `**Pickable:**`), kept as `{entries: [...], by_priority, by_kind, at}`; an entry counts while
   its section is in the file, and its kind for the page is *pickable* (`Pickable: yes`),
   *design-first* (`Kind: design-first`), *for you* (`Owner: paul` or `Kind: decision`), else
-  *other*. **Opened and closed in a window** come from the ledger file's git history in the same
+  *other*. **Pickable is derived, never written** (TD-223, TD-198; designed 2026-09-28, not
+  built — TD-228, until when the sentence before this one is what runs). It is cadence §2.4's
+  rule, the one dev-cadence's `scripts/ledger.py --pickable` applies, so a repo's own tool and
+  the home give one answer: an entry is **blocked** while its `**Blocked by:**` names an entry
+  that is not archived — one still open, or one found in neither the ledger nor its archive,
+  which keeps the block — or names a `decision (<who>)`, or holds an item the rule cannot read
+  (neither an id nor a decision, or an item listed after the decision's comma; what follows the
+  decision with no comma is its pointer and is never read), which keeps the block
+  too; every other entry is **pickable**, one with no such line or an empty one included. An
+  id written `<repo>#TD-NNN` (cadence §2.4, TD-071 there; `owner/name#TD-NNN` where two repos
+  share a name) names **another repo's entry**: the home looks for that repo among the
+  checkouts its registry lists (the host's `repos()`), as the script's roster does: `<repo>` is
+  a checkout's directory name and `owner/name` its origin, and it reads that checkout's
+  `docs/technical_debt.md` and `docs/technical_debt_archive.md` at `origin/<default>`, or in the
+  working tree where that ref is missing —
+  archived there, the block lifts; open there, it blocks; a repo the registry does not list, a
+  name two checkouts share, a ledger that cannot be read, or
+  an id in neither of that repo's files, keeps the block. The script asks cadence's roster and
+  the home its own registry: one file by default (`~/.config/dev-cadence/repos.txt`), so the
+  two agree unless `hosts.yml`'s `repos_registry` or the script's `DEV_CADENCE_REG_DIR` moves
+  one of them. The
+  reader takes the archive from beside the ledger (the ledger's name with `_archive` before
+  its suffix, which for the default is cadence's `technical_debt_archive.md`, the one name the script
+  looks for unless it is handed `--archive`; none there,
+  nothing is archived), and each entry carries `type` (`debt` where unwritten), `blocked_by`
+  (what still blocks, the decision and an unread item among them, as the script lists them)
+  and the derived `pickable`. The pick order is cadence's: Priority, then debt before
+  feature, then the summary table's order. **No header line is
+  needed**: an entry with no `Kind:` reads as `build` and one with no `Owner:` as anyone's, so
+  a ledger that carries only Priority, Type, Status and `Blocked by:`, as dev-cadence's does, is
+  read whole. *What a worker may take* is then the lane's (§6 rule 6): pickable, of the
+  lane's kind, of the lane's owners. **The page's kinds**, tested in this order so that each
+  entry has one: *for you* (`Owner: paul`, `Kind: decision`, or blocked by a decision),
+  *design-first* (`Kind: design-first`, blocked by another entry or not: it is the designer's
+  list, less what waits on the person, which the first test took),
+  *pickable* (pickable, `Kind: build` or none: work a grinder can start), else *other* (a
+  build that is blocked, a live check, an evaluation). **While a ledger still writes the
+  line**, a written `Pickable: no` reads as blocked whatever is derived, so nothing a person
+  marked *no* is offered before its reason has been moved; a written `yes` adds nothing. The
+  script reads the line as a field that overrides nothing (cadence §2.12), so while the
+  fallback lasts the home differs from it by exactly the entries written *no*. The
+  migration of this repo's ledger removes the lines, and the fallback goes with TD-228's last
+  slice. **The migration moves no entry into a lane**: a written *no* whose reason is no
+  blocker — *built, the live look is left*, *needs an attended run*, *a synced file* — becomes
+  the `Kind:` or the `Owner:` that says so before its line goes, the lanes carry their owner
+  words first (§6 rule 6), and the PR shows that what each lane matches after it is what was
+  written `yes` before it, naming every difference. Otherwise thirty entries would turn
+  pickable at once, the anchor's among them, and rule 6 would tell every finished member of
+  all of them. **Opened and closed in a window** come from the ledger file's git history in the same
   checkout (one `git log --first-parent -p --unified=0 -- <ledger>`, the headings its diffs add and remove): an
   entry is *opened* at the first commit whose file holds its section and *closed* at the first
   commit whose file no longer does (archived, or done and removed); a file rewritten without a
@@ -2206,9 +2254,10 @@ Screens:
       nothing (§4.10): *waiting on review · 40m* while the `ask` is unanswered, *reviewed* once it
       carries a reply, and nothing when no entry names the PR (a PR outside `held:`, one asked of
       nobody, or a team with no techlead all read the same blank). A PR is GitHub's: no control.
-   2. **Technical debt** — the ledger's open entries in four lists under one heading: **pickable**
-      (`Pickable: yes`), **design-first** (`Kind: design-first`), **for you** (`Owner: paul` or
-      `Kind: decision`), and **other**; each row the id, title, priority and owner, *held by
+   2. **Technical debt** — the ledger's open entries in four lists under one heading: **pickable**,
+      **design-first**, **for you** and **other**, as §4.4 *Repo facts* sorts them (derived
+      since TD-223; not built — TD-228: until then *pickable* is `Pickable: yes` and is tested
+      first); a blocked row says *blocked by TD-n* after its owner; each row the id, title, priority and owner, *held by
       <name>* when a member claims it, sorted by priority then id, a list folded past four rows
       with *+n more*. The heading carries **Open ledger** through the person's `open_in` (§5) —
       an entry is edited in its file, never here — and the count line the card's kind bar has.
@@ -2413,7 +2462,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: passed up | the row's own kind's controls (**Reply** and **suggested answers**; a `steer`'s **Pause** and ***Go with it***) | the asker's question, from the asker, under its own heading (§4.9b, TD-075) — an `ask` in *Needs you*, a `steer` in *Steering* with the time it has left — with one addition: *`<techlead>` recommends: `<line>`*, labelled and drawn as text, and the techlead's suggested answers as the row's answer buttons, its recommendation first. A reply goes to the asker. The line keys on `passed_up` with a structured `recommend` and names the passer by the name it is known by; the suggested-answers group reads *suggested by `<passer>`* on such a row, since the answers are the passer's |
 | Org | **rollup** | (built by TD-176 slice 4; *in the Inbox* is the top bar's count, copied in by the page, and *m overdue* beside it the Needs you board items past their `Due:` date, from the same poll — TD-178) one row of four facets under the title (§4.5 screen 1 *The Org, team-first*, TD-176), sums over every live team, every number a link: **Agents (n)** — a plain coloured pill per state with its count in parentheses, in the grid's urgency order, no glyph; a pill filters the page to that state (the Org filter's `state:` word). **TDs in motion (n)** — a stacked bar by phase, *add · design · grind · review*, a legend under; a segment opens the Repo page of the team holding the most of that phase, filtered to it. **PRs in motion (n)** — the window picker *day · week · month* — **one value per browser** for every window picker on the page, the rollup's, each team's Pull requests and the Repo page's, so they move together — two sized blocks *opened* and *closed* in the window, the open count and how many wait on review under them; a block opens the Repo page's Open PRs of the team with the most. **Needs you (n)** — *answer needed* (members waiting on a permission or a question; scrolls to the first team's Answer needed facet) and *in the Inbox* (the Inbox's Needs you count, with the overdue count; opens the Inbox). Display and links; re-rendered on every delta and on the `repos` event |
 | team card | **summary** | (built by TD-176 slice 3; its links land on the Repo page, slice 5) between the header and the members, three facets in one row (§4.5 screen 1; one column below 1100 px): **Repo**, **TDs in motion**, **Answer needed / Doing** — the rows below. The header carries no state chips (the member cards say it). On a team whose definition names no repo on this host, the Repo facet reads *no repo here* and the other two stand. **A team with nothing live carries it too** (TD-181; built — TD-192), drawn once the team is unfolded: the Repo facet from the live readings, TDs in motion from the claims the members' last records hold (a claim an exited member never cleared is shown, its PR marked when it has merged or closed; *nothing claimed* when none), and the third facet on **Doing**, the team's log as it was left — nobody is there to need an answer. Nothing on it is marked stale: the header's *stopped* / *wound down <t> ago* dates it. Folded, the team is its one row and no summary is drawn. *No team* has none, as before |
-| team card | **Repo facet** | the repo's name (a link to its page) and *open →*; **Technical debt (n open)** with its selector *open · day · week · month*: on *open*, two stacked bars — open entries by priority (High, Medium, Low; one hue darkened by priority; the counts inside) and by kind (pickable, design-first, for you, other; the numbers inside, a legend under) — on a period, two sized blocks, entries *opened* and *closed* in it (§4.4 *Repo facts*, the ledger's history); **Pull requests (n open)** with the window picker *day · week · month* and two sized blocks *opened* and *closed*; under them the oldest open PR's age, how many wait on review (*waiting on review (techlead-1)*), and when the readings were taken. Every segment and block is a link to the Repo page's list filtered to it. The entries' selector is remembered **per team** (a mode, like the fold); the window picker is the page's one value (row *rollup*). A reading that failed reads *could not look*, dimmed, the error on hover. Re-rendered on the `repos` event |
+| team card | **Repo facet** | the repo's name (a link to its page) and *open →*; **Technical debt (n open)** with its selector *open · day · week · month*: on *open*, two stacked bars — open entries by priority (High, Medium, Low; one hue darkened by priority; the counts inside) and by kind (pickable, design-first, for you, other, each entry in one as §4.4 *Repo facts* sorts them: since TD-223 a design-first entry is never counted pickable, TD-198; the numbers inside, a legend under) — on a period, two sized blocks, entries *opened* and *closed* in it (§4.4 *Repo facts*, the ledger's history); **Pull requests (n open)** with the window picker *day · week · month* and two sized blocks *opened* and *closed*; under them the oldest open PR's age, how many wait on review (*waiting on review (techlead-1)*), and when the readings were taken. Every segment and block is a link to the Repo page's list filtered to it. The entries' selector is remembered **per team** (a mode, like the fold); the window picker is the page's one value (row *rollup*). A reading that failed reads *could not look*, dimmed, the error on hover. Re-rendered on the `repos` event |
 | team card | **TDs in motion (n)** | one row per reference a member of the team holds (its `progress` claims), each: the **phase** — *add*, *design*, *grind*, *review* (§4.5 screen 1; derived, never declared) — the reference, the entry's title from the ledger reading (the reference alone when the entry is not in it — a foreign or archived reference), the member's name (a link to its Focus; the person glyph on the person's own session) and its PR when it has one — the claim's own, or else an open PR whose head branch names the reference (`td186-…`), so a PR waiting for its reader after its grinder moved on still counts — (a link to GitHub, marked *merged* / *closed* once it is no longer open, the phase staying *review* until the claim is done or dropped, §4.4); a reference two members hold is one row naming both; a row links to the entry on the Repo page. The heading's line counts the phases. **Priority** (TD-203; designed 2026-09-28, built — TD-232 slice 1): between the phase and the reference one letter, **H**, **M** or **L**, drawn as the Repo facet's priority bar draws a segment — a chip filled with that priority's colour, its letter in the bar's own text colour, since the colours are too pale to be text — with the word as its tooltip and its label for a screen reader; the slot is one fixed width and is left empty, so the references still line up, where the ledger reading has no entry for the reference, or the entry no priority or one that is not High, Medium or Low. Rows sort by phase, then priority with High first and an unmarked row last, then reference, so what is High in a phase is its first row. The Org rollup's count of TDs in motion is unchanged. Display and links |
 | team card | **Answer needed / Doing** | one facet, a toggle at its right (*answer · doing*), remembered until the next change of state. While any member waits on a permission or a question it opens on **Answer needed (n)**, tinted amber: the member, *permission · <tool>* with the command, **Allow**, **Deny** and the *why?* box — the same hook channel as the card's (§4.5a card **Allow / Deny**) — or the question's text with a link to Focus; several members, several blocks. Otherwise it opens on **Doing**: the team's `ao doing` calls newest first, time · doer (a link to Focus) · words, the last fifty (§4.8 *the doing log*), re-rendered on the `doing` event. **Ages and columns** (TD-206; designed 2026-09-28, built — TD-232 slice 2): the time is a short age of one unit — *just now* under a minute, then *5m*, *1h*, *2d*, the largest whole unit and nothing after it, where a card's own ages read *2h 5m* — with the exact time, in the reader's own clock as the page's other times are, as its tooltip, and it ages in the browser from the row's timestamp, once a minute, with no read of the server (a minute is the shape's own grain, so *just now* may stand some seconds long); a time ahead of the clock reads *just now*, and one that cannot be read leaves the cell empty; the three fields are columns that line up down the list: the age right-aligned in a width that fits *just now*, the doer at its full name in a width that fits the team's longest (past eighteen characters cut with an ellipsis, the whole name its tooltip), the words taking the rest on one line, cut with an ellipsis and whole in the tooltip (a tooltip needs a pointer: on a phone the whole words are the Repo page's, where they wrap); the doer's width is set by the server from the names in the list, so a filter that hides rows moves no column, and below 720 px the columns hold, the words wrapping in their own column; a person who scrolled the list stays where they scrolled, and one at its top sees the new rows land. The toggle is the person's to flip either way; a new pending permission flips it back to *answer* |
 | card | **compact** (a team member's card; built by TD-176 slice 3, and for a team with nothing live by TD-192 — so a team coming alive or winding down changes no card's shape) | the shape every member of a live team has (§4.5 screen 1), and of a team with nothing live once it is unfolded (TD-181; built — TD-192): the name, the person glyph on the person's own session, the state pill (word and colour, no glyph), one line of its own — the role and its claim with the PR, or its ending, or the seat's *last came* (measured from its record's `created`, when it came, never from when it left), or the manager's round; the dirty / unpushed flag at the right as its count (*⚠ dirty · 47*), never clipped, the words on hover; a member that has ended and holds a report keeps its last reference after the ending, the PR with its mark (*Grinder · exited · TD-066 → #158 merged*; row *report line*, TD-182; built — TD-193) — and the foot with the full card's rule (the next act outlined, the rest plain, *more* at the right; a `needs-you` member's foot leads with Focus, the answer being the facet's). Every control of the full card's *more* is here too. The full card stays on *No team* and wherever a card is drawn outside a team |
@@ -3314,7 +3363,9 @@ gave as its example, *questions → manager-ao-1*, are not derivable from them).
 
 **Choosing in a free-pick lane (TD-202).** A `free-pick` worker chooses by priority: High, then
 Medium, then Low (the ledger has no Critical), ties in the ledger's order. It chooses among the
-entries whose header says `Pickable: yes` (TD-118), less what its brief excludes and what a live
+entries the ledger reading calls pickable (§4.4 *Repo facts*: derived from `Blocked by:`, TD-223;
+until TD-228 is built, those whose header says `Pickable: yes`, TD-118) and that match its lane,
+less what its brief excludes and what a live
 sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities, beside what
 each live member holds, read from the main checkout, which the worker confirms on `origin` before
 it claims. Passing over a higher entry needs a reason: a lease, an exclusion, a `Blocked by:`, or
@@ -5960,7 +6011,11 @@ code and needs no grant; a session doing the same work does.
      designer's lane — is new and is told; where the history cannot be read, the reading at that
      tick, as before. **A lane word matches by the entry's header, never its prose**:
      `design-first` matches an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
-     matches one with `Pickable: yes` that is not design-first; a lane of references gains
+     matches one with `Pickable: yes` that is not design-first (**with pickable derived**, TD-223,
+     not built — TD-228: `design-first` is a pickable entry of that kind, and `free-pick` a
+     pickable entry whose kind is `build` or unwritten, so a live check, an evaluation and a
+     decision match no lane, and a ledger with no header lines at all gives a `free-pick` lane
+     everything it has unblocked); a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.
      **An `owner:<word>` in a lane narrows it** (TD-214; not built — TD-227): with one or more,
      an entry matches when it matches one of the lane's other words and its `Owner:` is one of
@@ -5969,7 +6024,7 @@ code and needs no grant; a session doing the same work does.
      role's preset), and is compared with the ledger's line alone: a session's role badge is not
      read (§9 invariant 9). A lane with no owner word matches as it did. An owner word is **not a reference and not a lane of its own**: it is set aside before a lane is checked as `free-pick` or a list of references (so `[free-pick, owner:grinder]` is accepted where `free-pick` beside a reference is refused), and it is never counted, nudged about or offered to `ao progress` as something held. When
      a later reading holds a matching id that `lane_seen` does not — an entry filed since, or one
-     whose `Pickable` has become `yes` — and the member is **live** (not `exited`, not `closed`),
+     that has become pickable, its blocker archived or its decision made — and the member is **live** (not `exited`, not `closed`),
      with no wrap-up asked, no stop time passed, not gated and not suspended, the home delivers
      **one `note` from `system`** into its inbox: *your lane gained n entries since you declared
      out of work: TD-180, TD-181, TD-183 — read the ledger on `origin/main`, then claim one or
