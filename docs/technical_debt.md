@@ -2246,7 +2246,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open
+**Status:** Partly done — **slice 1 built 2026-09-29 (grinder-ao-2, PR #741)**: `motion_rows` carries `priority` (`MOTION_PRIORITIES`), `team_summary.html` draws the chip in a fixed `.mprio` slot, rows sort phase, priority, reference. Next: slice 2, the Doing list's ages and columns.
 **Location:** `src/agentorc/ui/org.py` (`motion_rows`, `doing_rows`), `src/agentorc/ui/templates/team_summary.html` and `repo_part.html`, `src/agentorc/ui/static/app.js` and `app.css`, `src/agentorc/ui/common.py` (a short age beside `_age`, which reads *2h 5m*), `tests/test_ui_*`; design §4.5a *team card: TDs in motion*, *Answer needed / Doing*, §4.5 screen 11.
 
 **Why:** TD-203's and TD-206's: a row in motion does not say how much it matters, and the Doing list cannot be scanned.
