@@ -103,9 +103,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Designed 2026-09-28 — the build is TD-217 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
-| TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
+| TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Designed 2026-09-28 — the build is TD-230 |
 | TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — pickable (Paul, 2026-09-28: build the recommended fix) |
-| TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
+| TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Designed 2026-09-28 — the build is TD-230 |
 | TD-207 | The Inbox shows board items only once they are due, and says so nowhere: a grinder's two *act* items due in a week read to Paul as messages that never arrived; a setting for what is shown, said on the page | Medium | Designed 2026-09-28 (the designer) — the build is TD-220; archives with it |
 | TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
@@ -120,6 +120,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
 | TD-224 | The Org page jumps to the top when scrolled past a certain point, consistently: likely scroll anchoring losing a node the update removes | High | Open — pickable: reproduce first |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
+| TD-230 | Build the team card's two readings: the priority letter on a TDs in motion row and its sort, the Doing list's ages and columns on the card and the Repo page | Low | Open — pickable |
 
 
 ---
@@ -2005,8 +2006,9 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Added:** 2026-09-27 (Paul: *add priority to "TDs in Motion" list on the teams card*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-230
+**Status:** Designed 2026-09-28 (the designer, PR #PRNUM): design §4.5a *team card: TDs in motion* (**Priority**): one letter in the priority bar's hue between the phase and the reference, none for a reference the ledger reading does not hold; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-230.
+**Blocked by:** TD-230
 **Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/app.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
 
 **Why:** a row reads *phase · reference · title · holder · PR*. Whether the team has its High entries in hand or is grinding Lows is not visible without opening the ledger. The ledger reading already carries each entry's `priority` (`sessionorc/ledger.py`), so the data is there.
@@ -2037,8 +2039,9 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Added:** 2026-09-27 (Paul: *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-230
+**Status:** Designed 2026-09-28 (the designer, PR #PRNUM): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: an age in the page's shape with the exact time on hover, ticking in the browser; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-230.
+**Blocked by:** TD-230
 **Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
 
 **Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
@@ -2307,3 +2310,25 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** first confirm which case each alarm is. Log, for an outside hook claiming a session, the peer's pid and its start, the session's current and previous pane pids, and the time since the supersede or close. Then (a) on a supersede or restart that reuses the name, record the old pane as gone at that moment, so the grace applies to it too; (b) if some are genuinely later than 10 s, match the old run by its pid and start pair for as long as that process lives, not by a clock. Keep the alarm for a claim from a process that was never that session's pane. Tests: a restart followed by the old run's `SessionEnd` raises no alarm; an unknown process claiming the id still does. Done when a day of team restarts leaves `identity_alarms.json` unchanged.
 
 **Related:** TD-115 (the gone-pane grace), TD-186 (the previous run's end, ignored), TD-077 (identity), TD-201 (hooks outside the turn), design §4.8a.
+
+## TD-230: Build the team card's priority letter and the Doing list's ages and columns
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-09-28 (the designer, from TD-203's and TD-206's designs)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/org.py` (`motion_rows`), `src/agentorc/ui/templates/team_summary.html` and `repo.html`, `src/agentorc/ui/static/app.js` and `app.css`, `src/agentorc/ui/common.py` (a short age beside `_age`, which reads *2h 5m*), `tests/test_ui_*`; design §4.5a *team card: TDs in motion*, *Answer needed / Doing*, §4.5 screen 11.
+
+**Why:** TD-203's and TD-206's: a row in motion does not say how much it matters, and the Doing list cannot be scanned.
+
+**Fix, a PR each:**
+1. **The priority letter**: `motion_rows` carries the entry's `priority` from the ledger reading; the template draws **H**, **M** or **L** between the phase and the reference in the priority bar's colour token, the word as its tooltip, nothing for a reference the reading does not hold; rows sort by phase, then priority (High first, none last), then reference.
+2. **Ages and columns**: each Doing row carries its timestamp; the server draws the short age (one unit: *just now*, *5m*, *1h*, *2d*) and the exact local time as the tooltip; `app.js` re-draws the ages once a minute from the timestamps in the same shape, and on the `doing` event as today; the rows are a three-column grid (the age right-aligned, the doer up to eighteen characters, the words the rest), one line each on the card and wrapping on the Repo page.
+3. **Tests**: a High entry in *grind* sorts above a Low one; a foreign reference draws no letter and sorts last in its phase; an age of 40 s reads *just now*, 5 min *5m*, 26 h *1d*; the script's age and the server's agree on the same instants; a doer of twenty-two characters is cut and whole in its tooltip.
+
+**Done when:** a TDs in motion row reads *grind · H · TD-212 · title · holder* and the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns, on the card and on the Repo page.
+
+**Related:** TD-203, TD-206 (the designs), TD-205 (the same list's scrolling), TD-197 (the phases), TD-176.
