@@ -12,6 +12,14 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-09-28 — `Blocked by` may name another repo's entry: `<repo>#TD-NNN`
+Do: write a wait on another repo's TD as `**Blocked by:** dev-cadence#TD-036` (`owner/name#TD-NNN` if two roster repos share a basename) instead of prose; `ledger.py` lifts it once that repo archives the entry and keeps the block, flagged, when it cannot resolve it.
+See: cadence.md §2.4; ledger.py `XREPO_ITEM_RE`, `Roster`; TD-071.
+
+## 2026-09-28 — query the ledger by any header field with `ledger.py --list` / `--counts` / `--fields`
+Do: pick or count with `ledger.py --list --where FIELD=VALUE` (`--owner`, `--kind`, `--type`, `--pickable yes|no`) instead of grepping; keep an entry's fields in its header block (heading to first blank line); declare a repo's own fields once on a `Fields:` preamble line. A written `Pickable:` line never overrides the derived one.
+See: cadence.md §2.12; ledger.py `header_block()`; TD-070.
+
 ## 2026-09-28 — a ledger entry may say `**Type:** feature`; debt is picked first within a Priority
 Do: add `**Type:** feature` after Priority on an entry that asks for something new rather than fixing something wrong; leave debt unmarked (or `**Type:** debt`). `ledger.py --pickable` shows the type and orders debt before features within a Priority.
 See: cadence.md §2.11; ledger.py `TYPE_RE`.
