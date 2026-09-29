@@ -29,6 +29,7 @@ from typing import Any
 from sessionorc import (
     adapters,
     agent_common,
+    brief,
     build,
     containers,
     hosts,
@@ -786,6 +787,9 @@ class HostAgent(
                 self.store.save(s)
             self._adopt_orphans(self._address(s))  # its name's orphaned questions are its own again (§4.10)
             if self.mode != "node":
+                if prompt_from:  # what the prompt was made from, as this create's client read it (§6 rule 7)
+                    s.brief = await asyncio.to_thread(brief.record, prompt_from, False)
+                    self.store.save(s)
                 if s.supervised:
                     self._write_launch(s.id, s, launch_params(locals()))
                 else:
