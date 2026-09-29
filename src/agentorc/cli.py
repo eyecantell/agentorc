@@ -1799,6 +1799,13 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(warn, file=sys.stderr)
 
     def prose() -> None:
+        if "entry" not in got:
+            # a person's answer to an orphaned question (design §4.10, TD-216): no reply entry — it
+            # was written on the board and mailed to the holders; `note` says where it went
+            print(got.get("note") or "written on the board")
+            if got.get("commit"):
+                print(f"committed {str(got['commit'])[:12]} on {got.get('board') or 'the board'}")
+            return
         e = got["entry"]
         print(
             f"{e['id']} {e['kind']} → {', '.join(got['delivered'])}"
@@ -1965,6 +1972,16 @@ def cmd_inbox(args: argparse.Namespace) -> int:
     if args.sent:
         return _sent(args)
     got = call_sync("inbox", unread=args.unread)
+    # design §4.5a *Inbox row: orphaned question* (TD-216 slice 2): a person's read prints, beside an
+    # orphaned entry, where an answer goes — the standing, from the leases the fleet carries
+    standing: dict[str, dict[str, Any]] = {}
+    if got["id"] == "person" and any(e.get("orphaned") for e in got["entries"]):
+        fleet = call_sync("list")
+        now = datetime.now(UTC)
+        standing = {e["id"]: st for e in got["entries"] if (st := mailmod.orphan_standing(e, fleet, now))}
+        for e in got["entries"]:  # and `--json` carries it on the entry, as the Inbox row's view does
+            if e["id"] in standing:
+                e["standing"] = standing[e["id"]]
 
     def prose() -> None:
         print(INBOX_HEADER)
@@ -1981,6 +1998,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
             head = f"[{e['from_role']}] {e['from']} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}"
             print(f"\n{head} · {_inbox_status(e)}")
+            if st := standing.get(e["id"]):
+                print(f"  {st['text']}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)

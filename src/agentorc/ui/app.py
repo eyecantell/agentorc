@@ -28,7 +28,7 @@ from agentorc import profiles as profiles_mod
 from agentorc import repoconfig, teamrun, teams
 from agentorc import review as reviewmod
 from agentorc.cli import stop_time as clistop
-from sessionorc import hosts, naming, paths
+from sessionorc import hosts, mail, naming, paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import (
@@ -141,6 +141,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
+    _orphan_held,  # noqa: F401
     _outcome_of,  # noqa: F401
     _owing,  # noqa: F401
     _same_ref,  # noqa: F401
@@ -595,6 +596,13 @@ def create_app() -> FastAPI:
                 sender = records.get(e["from"]) or {}
                 e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
             _owing(e, records.get(e["from"]), at)
+            # §4.5a *Inbox row: orphaned question* (TD-216 slice 2): its asker is gone, so the row
+            # is under the name it asked by, opens nothing, and says where an answer goes — the
+            # standing, from the leases the fleet this page read carries
+            if standing := mail.orphan_standing(e, fleet, at):
+                e["from_name"] = str((e.get("orphaned") or {}).get("name") or e["from_name"])
+                e["from_open"] = ""
+                e["standing"] = standing
             e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
             # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
             # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
@@ -2056,6 +2064,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     raise HTTPException(400, "that is not one of the suggested answers")
                 text = offered[answer]
             got = await call("msg", text=text, kind="reply", reply_to=ref, answer=answer)
+            if "entry" not in got:
+                # an orphaned question's answer (§4.10, TD-216): no reply entry — it went on the board
+                # and to the holders, and `note` is the toast's sentence, the standing as a result
+                return JSONResponse({"ok": True, **got})
             return JSONResponse({"ok": True, "id": got["entry"]["id"], "delivered": got["delivered"]})
         if action == "unmail":
             ref = str(body.get("msg") or "").strip()

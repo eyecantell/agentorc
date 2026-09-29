@@ -497,6 +497,13 @@ def _trail_rows(trail: Collection[dict[str, Any]], now: datetime) -> list[dict[s
     return out
 
 
+def _orphan_held(e: dict[str, Any]) -> bool:
+    """An orphaned `steer` whose bound the home cleared (design §4.10 *An orphaned `steer` does not
+    lapse*): nobody is left to take its default, so from its bound it waits on the person — under
+    *Needs you* and counted, as a paused one is. With its clock still running it is *Steering*."""
+    return e.get("kind") == "steer" and bool(e.get("orphaned")) and not e.get("bound")
+
+
 def inbox_sections(
     entries: Collection[dict[str, Any]],
     *,
@@ -577,7 +584,7 @@ def inbox_sections(
         outcome = _outcome_of(e)
         if snoozed and snoozed > at:
             out["snoozed"].append(e)
-        elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at")):
+        elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at") or _orphan_held(e)):
             out["needs"].append(e)
         elif _entry_open(e) and e.get("kind") == "steer":
             out["steering"].append(e)
