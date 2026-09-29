@@ -18,6 +18,7 @@ from conftest import wait_for, wait_state
 from sessionorc import identity, paths
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.identity import Channel, Pane, Proc
+from sessionorc.tmux import PaneInfo
 
 # -- a fabricated /proc ---------------------------------------------------------------------------
 
@@ -456,6 +457,42 @@ async def test_a_hook_just_after_its_pane_ended_is_its_sessions_for_the_grace(ag
     assert (await agent._identify(hook("ao-x"), 130))["error"] == identity.MISMATCH
     agent._id_note_panes({})
     assert "ao-x" not in agent._id_gone and "ao-y" in agent._id_gone
+
+
+async def test_a_restart_under_the_same_name_keeps_the_old_pane_for_the_grace(agent, monkeypatch):
+    """TD-225: a restart or supersede reuses the session's name, so its record never left the pane
+    list — only the pane pid moved — and the old run's `SessionEnd` matched neither the new pane nor
+    a gone one: *outside claimed <itself> on hook* at every team restart. The replaced pane is gone
+    from the moment the list shows another; a process that was never the session's still alarms."""
+    agent.identity_mode = "enforce"
+    agent._id_detached = ""
+    # 130 is the old run's orphaned hook (session 100, terminal 0x8801); 300 is the new pane
+    monkeypatch.setattr(agent, "proc", FakeProc([*BASE, P(130, 1, 100, 0x8801), P(300, 50, 300, 0x8803)]))
+    monkeypatch.setitem(agent.sessions, "ao-x", object())
+    agent._id_panes = [PANES[0]]
+    new = PaneInfo(session="ao-x", created=0, current_command="claude", pane_pid=300, dead=False, dead_status=None)
+    agent._id_note_panes({"ao-x": new})  # the tick after the restart: same name, another pane
+    assert [p.pid for p in agent._id_panes] == [300] and agent._id_gone["ao-x"][0].pid == 100
+
+    def hook(session: str) -> dict:
+        return {"id": 1, "method": "hook", "params": {"session": session, "state": "exited"}}
+
+    assert await agent._identify(hook("ao-x"), 130) is None  # the old run's last hook: its own
+    assert await agent._identify(hook("ao-x"), 300) is None  # the new pane, by ancestry
+    assert (await agent._identify(hook("ao-x"), 50))["error"] == identity.MISMATCH  # never the session's
+    agent._id_note_panes({"ao-x": new})  # the same pane listed again keeps the gone one inside the grace
+    assert agent._id_gone["ao-x"][0].pid == 100
+    agent._id_log_late_hook(50, "ao-x")  # the alarm's log line reads what it names without failing
+    agent._id_log_late_hook(999, "ao-z")
+    # the gone pane listed again under its record (it came back) is no longer gone
+    agent._id_panes = [identity.Pane("ao-x", 300, 0)]
+    old = PaneInfo(session="ao-x", created=0, current_command="claude", pane_pid=100, dead=False, dead_status=None)
+    agent._id_note_panes({"ao-x": old})
+    assert agent._id_gone["ao-x"][0].pid == 300
+    agent._id_panes = [identity.Pane("ao-x", 100, 0)]
+    agent._id_gone = {"ao-x": (identity.Pane("ao-x", 100, 0), agent._id_gone["ao-x"][1])}
+    agent._id_note_panes({"ao-x": old})
+    assert "ao-x" not in agent._id_gone
 
 
 def test_no_read_decides_anything_on_its_caller():

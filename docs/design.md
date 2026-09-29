@@ -3413,12 +3413,15 @@ become whatever reuses its pid. A connection is one of:
   once a fresh list has landed is *outside* or *unknown*. **A hook just after its pane ended**
   is its session's too (TD-115): a tool's last hooks — Claude Code's `Stop` or `SessionEnd` —
   can connect after the tick has seen the pane go, when the walk meets no pane pid. So the host
-  agent keeps each record's pane for `PANE_GONE_GRACE` (ten seconds) after it leaves the list,
-  and a `hook` RPC that matched no live pane is matched against **the pane of the record it
-  names**, if that pane is inside the grace, by the POSIX session id and then the controlling
-  terminal — the two signals an orphaned child keeps. The grace is for `hook` alone and for the
-  record the hook names; every other request, and a hook naming a record whose pane left longer
-  ago, is classified as above.
+  agent keeps each record's pane for `PANE_GONE_GRACE` (ten seconds) after it leaves the list —
+  or after the list shows **another pane under the same record**, since a restart or a supersede
+  reuses the session's name and only the pane pid moves — and a `hook` RPC that matched no live
+  pane is matched against **the pane of the record it names**, if that pane is inside the grace,
+  by the POSIX session id and then the controlling terminal — the two signals an orphaned child
+  keeps. The grace is for `hook` alone and for the record the hook names; every other request,
+  and a hook naming a record whose pane left longer ago, is classified as above. A hook that
+  still alarms is logged with its peer, the record's listed pane and its gone one with its age,
+  so the log says which case an alarm was.
 - **outside** — no ancestor is a pane of ours: a person's terminal, the UI's process, a systemd
   unit, a test harness.
 - **unknown** — the ancestry could not be read (the peer exited before the walk, `/proc` refused),

@@ -42,14 +42,17 @@ class IdentityMixin:
             if not p.dead and sid in self.sessions
         ]
         now = self._id_listed_at = time.monotonic()
-        listed = {p.session for p in self._id_panes}
+        # A pane is gone when its record lists no pane **or another one**: a restart or supersede
+        # reuses the session's name, so the record never leaves the list and only its pane pid
+        # moves — and the old run's last hook then matched neither pane (TD-225).
+        listed = {p.session: p.pid for p in self._id_panes}
         for p in was:
-            if p.session not in listed:
+            if listed.get(p.session) != p.pid:
                 self._id_gone[p.session] = (p, now)
         self._id_gone = {
             sid: (p, at)
             for sid, (p, at) in self._id_gone.items()
-            if sid not in listed and now - at < identity.PANE_GONE_GRACE
+            if listed.get(sid) != p.pid and now - at < identity.PANE_GONE_GRACE
         }
 
     def _id_gone_channel(self, peer: int, session: str | None) -> identity.Channel | None:
@@ -59,6 +62,24 @@ class IdentityMixin:
         if gone is None or time.monotonic() - gone[1] >= identity.PANE_GONE_GRACE:
             return None
         return identity.classify_gone(peer, gone[0], self.proc)
+
+    def _id_log_late_hook(self, peer: int, session: str) -> None:
+        """What a hook that matched no pane of the record it names looked like (TD-225): the peer's
+        pid and start, the record's listed pane, and its gone one with its age — so an alarm says
+        whether it fell outside the grace, at a pane that never left the list, or from a process
+        that was never that session's."""
+        st = self.proc.stat(peer)
+        now_pane = next((p.pid for p in self._id_panes if p.session == session), None)
+        gone = self._id_gone.get(session)
+        log.info(
+            "hook for %s matched no pane: peer %s (start %s, sid %s), listed pane %s, gone pane %s",
+            session,
+            peer,
+            st.start if st else "?",
+            st.sid if st else "?",
+            now_pane,
+            f"{gone[0].pid} {time.monotonic() - gone[1]:.1f}s ago" if gone else None,
+        )
 
     async def _id_read_detached(self, tmux_pid: int | None) -> None:
         """Compute the detached-process check against the tmux server now running. `None` while
@@ -154,6 +175,8 @@ class IdentityMixin:
             ch = late
         verdict = identity.judge(ch, named, rpc, hook_session=hook_session)
         if verdict.alarm is not None:
+            if rpc == "hook" and hook_session:
+                self._id_log_late_hook(peer, hook_session)
             self._id_alarm(verdict.alarm, verdict.about)
         if self.identity_mode != "enforce":
             return None
