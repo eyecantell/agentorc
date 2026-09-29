@@ -205,10 +205,24 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         assert 'name="copy_on_select">' in client.get("/settings").text  # drawn off, as Focus's toggle is
         assert client.post("/api/settings/you", json={"terminal": {"colour": "red"}}).status_code == 400
 
+        # **board items shown** (§4.5a, TD-220 slice 4): drawn at next:10 until set, written, refused out of range
+        page = client.get("/settings").text
+        assert (
+            'name="board_show" value="next" checked' in page and 'name="board_next"' in page and "due this week" in page
+        )
+        assert client.post("/api/settings/you", json={"inbox": {"board_show": "14d"}}).json()["ok"]
+        assert call_sync("settings")["person"]["inbox"] == {"board_show": "14d"}
+        page = client.get("/settings").text
+        assert 'name="board_show" value="days" checked' in page and "due within 14 days" in page
+        for bad in ("next:0", "next:51", "0d", "soon"):
+            assert client.post("/api/settings/you", json={"inbox": {"board_show": bad}}).status_code == 400, bad
+        assert client.post("/api/settings/you", json={"inbox": {"colour": "red"}}).status_code == 400
+        assert call_sync("settings")["person"]["inbox"] == {"board_show": "14d"}
+
         nope = client.post("/api/settings/teams", json={"team": "nobody", "reserve": "10"})
         assert nope.status_code == 400 and "the org defines" in nope.json()["detail"]
     finally:
-        call_sync("set_settings", person={"open_in": None, "terminal": None}, repos={"agentorc": None})
+        call_sync("set_settings", person={"open_in": None, "terminal": None, "inbox": None}, repos={"agentorc": None})
 
 
 def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):

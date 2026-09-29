@@ -144,6 +144,18 @@
       <label class="setrow"><span class="setlabel">copy on select</span>
         <input type="checkbox" name="copy_on_select"{% if you.copy_on_select %} checked{% endif %}>
         <span class="note">a selection in Focus copies itself — the same switch as Focus's <i>more ▾</i></span></label>
+      {#- **board items shown** (§4.5a *Settings page*, §4.5 screen 6 *The board's horizon*; TD-220 slice 4):
+          a pick of four, the two numbers beside their choice, written to `person.inbox.board_show` -#}
+      {% set info_board = "which board items the Inbox shows before they are due; they are listed under \"Board, coming up\" and are not counted; what this hides is under \"not shown\"" %}
+      <div class="setrow setboard" role="radiogroup" aria-label="board items shown"><span class="setlabel">board items shown {{ imark("boardshow", "board items shown", info_board) }}</span>
+        <span class="setpicks">
+          <label><input type="radio" name="board_show" value="next"{% if you.board_mode == "next" %} checked{% endif %}> the next <input class="input setin setnum" name="board_next" type="number" min="{{ you.board_next_bounds[0] }}" max="{{ you.board_next_bounds[1] }}" value="{{ you.board_next }}"> per team</label>
+          <label><input type="radio" name="board_show" value="due"{% if you.board_mode == "due" %} checked{% endif %}> only what is past due</label>
+          <label><input type="radio" name="board_show" value="days"{% if you.board_mode == "days" %} checked{% endif %}> <span class="setdayswords">{% if you.board_days == 7 %}due this week{% else %}due within {{ you.board_days }} days{% endif %}</span> <input class="input setin setnum" name="board_days" type="number" min="{{ you.board_days_bounds[0] }}" max="{{ you.board_days_bounds[1] }}" value="{{ you.board_days }}" aria-label="days"></label>
+          <label><input type="radio" name="board_show" value="all"{% if you.board_mode == "all" %} checked{% endif %}> all</label>
+        </span>
+        <span class="note">what is due is always shown and counted</span></div>
+      {{ panel("boardshow", info_board) }}
       <datalist id="setfaces"><option value="JetBrains Mono"><option value="Cascadia Code"><option value="Fira Code"><option value="Menlo"><option value="Consolas"><option value="DejaVu Sans Mono"></datalist>
       <div class="row gap wrap"><span class="note setsaid">every open terminal takes the size and face at once</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
     </form>

@@ -545,6 +545,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setgroup { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
+.setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220) */
 .setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
 .setpage .setin { width: 100%; }
 .setpage .settemplate { display: flex; flex-direction: column; gap: 10px; }

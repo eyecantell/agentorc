@@ -2942,6 +2942,15 @@
     if (/^\$\s*[\d,]*\.?\d+$/.test(t) || /^\d*\.?\d+\s*[Mm]?\s*tok$/.test(t)) return { says: `→ amount ${t}` };
     return { error: "a metered profile's reserve is an amount ($5, 20M tok), not a percent" };
   };
+  // **board items shown** (§4.5a, TD-220 slice 4): the pick and its number as `person.inbox.board_show`
+  // — `next:<n>`, `due`, `<n>d`, `all`; a number left empty is the one drawn until typed (10, 7), and
+  // one out of range goes to `set_settings`, whose refusal is said in place
+  AO.boardShow = function (mode, next, days) {
+    const n = (v, dflt) => (String(v || "").trim() === "" ? dflt : String(v).trim());
+    if (mode === "next") return `next:${n(next, 10)}`;
+    if (mode === "days") return `${n(days, 7)}d`;
+    return mode === "due" || mode === "all" ? mode : "next:10";
+  };
   AO.settings = function () {
     const page = $("#setpage"); if (!page) return;
     const post = async (section, body) => {
@@ -2962,6 +2971,12 @@
         out.classList.toggle("warn", !!got.error);
       });
     });
+    // the days choice reads *due this week* at 7 and *due within n days* otherwise; typing a number picks its choice
+    $$(".setboard input[type=number]", page).forEach((inp) => inp.addEventListener("input", () => {
+      const row = inp.closest(".setboard"), pick = inp.closest("label").querySelector("input[type=radio]");
+      if (pick) pick.checked = true;
+      if (inp.name === "board_days") { const d = inp.value.trim() || "7"; $(".setdayswords", row).textContent = d === "7" ? "due this week" : `due within ${d} days`; }
+    }));
     const forms = {
       usage: (f) => ["usage", { profile: f.dataset.profile, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
       teams: (f) => {
@@ -2973,7 +2988,7 @@
         const mode = f.elements.open_in.value;
         const open_in = mode === "template" ? { label: f.elements.label.value.trim(), url: f.elements.url.value.trim() } : mode;
         const terminal = { size: f.elements.size.value ? Number(f.elements.size.value) : null, face: f.elements.face.value.trim() || null, copy_on_select: f.elements.copy_on_select.checked };
-        return ["you", { open_in, terminal }];
+        return ["you", { open_in, terminal, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
     };
     page.addEventListener("submit", async (e) => {
