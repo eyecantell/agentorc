@@ -1207,6 +1207,7 @@ class HostAgent(
         s.set_state("closed", confidence="scraped")
         s.pane = False
         s.closed_at = now_iso()
+        s.closed_for = None  # a Close is nobody's restart; the tick writes its own after this returns (§6 rule 2)
         # A `kill` then a `close` before an intervening tick would otherwise strand a `_killed_at`
         # stamp for `CLOSED_KEEP`: the reconcile skips a closed record before it reaches the guard,
         # so nothing else would ever clear it. Harmless — a closed record is never observed either

@@ -1911,3 +1911,27 @@ async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_readi
         assert ledgered() == 3_000_000 and node._usage["api"]["windows"][0]["pct"] == 60
         async with LocalClient() as c:
             await c.call("kill", id=w["id"])
+
+
+async def test_a_close_routed_to_a_node_clears_the_ticks_mark_at_the_home(agent):
+    """TD-237: `closed_for` is the home's, written by the tick after its own close for a restart and
+    cleared by any other. A person's Close of a node's member goes through `_route_act`, which
+    clears it on the home's copy, so the tick never reads that Close as its own failed restart; and
+    a node's report never writes the mark."""
+
+    class Closes(FakeMux):
+        async def request(self, method, timeout=None, **params):
+            self.sent.append((method, params))
+            return record(state="closed", closed_at="2026-09-29T08:00:00Z")
+
+    agent._take_records("laptop", [record(state="idle")], whole=True)
+    held = agent.remote["laptop"]["ao-x-w"]
+    held.closed_for = "wanted"  # a restart the tick closed and failed to replay
+    agent._take_records("laptop", [record(state="idle", closed_for=None)], whole=False)
+    assert held.closed_for == "wanted", "a node's report moves only what the node owns"
+    agent._link_muxes["laptop"] = mux = Closes()
+    agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+    async with LocalClient() as person:
+        await person.call("close", id="ao-x-w@laptop")
+    assert mux.sent[-1][0] == "act" and mux.sent[-1][1]["rpc"] == "close"
+    assert agent.remote["laptop"]["ao-x-w"].closed_for is None
