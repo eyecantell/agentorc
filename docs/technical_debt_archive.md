@@ -2178,3 +2178,33 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-28 (PR #732; grinder-ao-1). Reproduced in headless Firefox against the live Org page: scrolled to any depth from 300 px, the first delta that swapped the groups threw the page to 0 (or near it), every time; with `overflow-anchor: none` injected it held, so the cause was **scroll anchoring** (suspect 2), set off by suspect 1's forced layout. `syncGroups` re-appended every section on every delta and read each summary's `scrollTop` inside the loop, so a layout ran with the sections half re-ordered and the browser moved the page to follow its anchor. Now every summary's scrolls are read before anything moves; a section (`syncGroups`) or a card (`layout`) moves only when it is out of the server's order (`AO.placeAt`); and a fresh summary shows the person's faces (`showSummary`) before it is inserted. The same rig with the fix held at every depth through fifteen swaps each. A reconnect's `location.reload()` already keeps the position (the browser's own scroll restoration, measured). Tests: `tests/test_ui_org_scroll.py` (the placement under node, the swap's order from the source). Live check pending on the board.
 
 **Related:** TD-205 (the Doing list's own scroll, fixed), TD-176 slice 3 (the summary and its swap), TD-194 (the team fold).
+
+## TD-207: The Inbox shows board items only once they are due, and says so nowhere
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *"the Inbox only lists board items once they're due" — we need to add a setting for this so it is obvious to the user*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.5 screen 6 (*Board items*: `--due-only`), §5 `person:` in `settings.yml` (TD-146), §4.5a (the Inbox's board rows and the Settings page's **You**), `src/agentorc/ui/inbox.py` (`board_argv`: `--report --due-only --json`)
+
+**Why:** grinder-dc-1 finished its run on 2026-09-27 telling Paul it had left him two items. They were two `act` lines on dev-cadence's board, each `Due: 2026-10-04`. Paul looked in the Inbox, found nothing, and asked where the two messages were. The Inbox reads boards with `--due-only`, so an item a week out doesn't exist there until its day, and nothing on the page says the Inbox has a horizon or that items wait beyond it. (TD-208 hid these two a second way.) A session that writes a board line reasonably calls it *left for you*; the person reasonably looks in the one place the system sends them.
+
+**Resolved:** 2026-09-29 (built by TD-220, PR #728 … #739). The design is §4.5 screen 6 *The board's horizon*; see TD-220's **Resolved:**.
+
+**Related:** TD-208 (the same rows, read from a stale checkout), TD-069 step 3 (board rows in the Inbox), TD-126 (Reply on a board row), TD-146 (`settings.yml`'s `person:`), dev-cadence's TD-039 (`act` and the other item kinds).
+
+## TD-220: Build the board's horizon
+
+**Priority:** Medium
+**Added:** 2026-09-28 (the designer, from TD-207's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/inbox.py` (`board_argv`: `--report --due-only --json`; the rows built from its items), `src/agentorc/ui/templates/` (the Inbox's board rows, `repo.html`'s *Waiting on you*, the Settings page's **You**), `src/agentorc/ui/static/app.js` (**show**, the fold open for the page view), `src/agentorc/ui/app.py` (`repo_teams`), `src/sessionorc/settings.py` (`parse_person`: `open_in`, `terminal`, now `inbox`), `src/agentorc/briefs/grinder.md`; design §4.5 screen 6 *The board's horizon*, §4.5a, §5. Held path: `src/sessionorc/settings.py` waits for the techlead's read.
+
+**Why:** TD-207's *Why*: a board item due next week does not exist in the Inbox until its day, and the page does not say so.
+
+**Resolved:** 2026-09-29 (PR #728, #731, #733, #737, #739; grinder-ao-2). The read without `--due-only` sorts each board item by its date against the reader's `today` (`board_due_now`, `board_horizon`); `person.inbox.board_show` (`next:<n>`, `due`, `<n>d`, `all`; default `next:10`) is read and validated by `sessionorc/settings.py` and picked on the Settings page's **You**; the Inbox and the Repo page draw *Board, coming up*, the *not shown* fold and the line (`board_horizon.html`, `board_view`, `horizon_of`), counted nowhere; the grinder preset says *on the board, due <date>*; a board Snooze counts from the later of today and the item's date. The lasting account is design §4.5 screen 6 *The board's horizon*, §4.5a and §5; tests in `tests/test_ui_board.py`. The live look at slices 3–4 is on `docs/user_attention.md`.
+
+**Related:** TD-207 (the design), TD-208 (the same rows, read from a checkout behind origin), TD-069 step 3 (board rows), TD-146 (`settings.yml`'s `person:`), TD-148 (the Settings page).

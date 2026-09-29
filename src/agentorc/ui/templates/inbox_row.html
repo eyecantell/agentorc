@@ -542,9 +542,9 @@
   <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-name="{{ e.repo }}'s board" title="your words appended to this line of the board — one commit, never pushed; the line stays due">Reply</button>
   <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
     <div class="menu">
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 day</button>
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 week</button>
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">a date…</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 day</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 week</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">a date…</button>
     </div>
   </details>
   <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-confirm="Check this item off {{ e.repo }}'s board? It is committed in that checkout.">Done</button>

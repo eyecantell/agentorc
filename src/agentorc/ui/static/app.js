@@ -436,7 +436,7 @@
       if (action === "board") {
         body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text };
         if (body.action === "snooze") {
-          const due = boardDue(b.dataset.when);
+          const due = boardDue(b.dataset.when, b.dataset.due);
           if (!due) return;
           body.due = due;
         }
@@ -1209,11 +1209,14 @@
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
   // which is what the entry stores; the prompt is in the person's own clock.
-  // A board item's new `Due:` date (§4.5a Snooze ▾: +1 day · +1 week · a date), counted from today
-  // on this browser's own calendar — the board's dates are civil dates, never instants.
-  function boardDue(when) {
+  // A board item's new `Due:` date (§4.5a Snooze ▾: +1 day · +1 week · a date), counted from the
+  // later of today and the item's own date (`from`, a row coming up, TD-220), on this browser's own
+  // calendar — the board's dates are civil dates, never instants — so a Snooze never brings a date nearer.
+  function boardDue(when, from) {
     const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const d = new Date();
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(from || "");
+    if (m) { const own = new Date(+m[1], +m[2] - 1, +m[3]); if (own > d) d.setTime(own.getTime()); }
     if (when === "1d" || when === "1w") { d.setDate(d.getDate() + (when === "1d" ? 1 : 7)); return day(d); }
     const s = prompt("Snooze to… (YYYY-MM-DD)", (d.setDate(d.getDate() + 1), day(d)));
     if (!s) return null;
