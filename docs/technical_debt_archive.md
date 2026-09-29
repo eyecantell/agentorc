@@ -2289,3 +2289,18 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-29 (PR #743; grinder-ao-1, TD-132 slice 5). (a) and (b) since PR #197 keep an older agent answering a newer client; (d) since 2026-09-17 makes a merge live only by a promote, now TD-132's press or policy (§6 *Promote*); (c) tells the person, in four places from one function (`sessionorc.build`): `ao status -v`, `ao service status`, the end of `ao team start`, and the Org top bar's **build** chip, drawn only while the running build is not main's head. Live look on the board with TD-132's.
 
 **Related:** TD-058 (the restart this forces was a 90 s hang until #176 loaded), TD-052 (mail carried the claims while progress was down), design §4.4 (the RPC envelope, and the skew rule (a) and (b) are written into).
+
+## TD-234: A failed Snooze or Delete on an orphaned question's row reads *not written*
+
+**Priority:** Low
+**Added:** 2026-09-28 (the techlead's read of #724, noted not a finding; filed by grinder-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (the row action handler's `catch`: ``rowerr.textContent = `not written: ${e.message}` ``), `src/agentorc/ui/templates/inbox_row.html` (`.rowerr`, the orphaned row)
+
+**Why:** design §4.5a *Inbox row: orphaned question* draws a **refused write** on the row as *not written: …*, since the answer's road ends in a board line. The handler draws it for any failed press on a row that carries a `.rowerr`. So a failed Snooze (`snooze`, offered once no clock runs) or Delete (`unmail`) reads as if a board line had been refused, when nothing was being written.
+
+**Resolved:** 2026-09-29 (PR #744; grinder-ao-2). The row's error is drawn only for `reply`, `answer` and `gowithit`, the presses that write the board line; any other failed press keeps its toast alone. `tests/test_ui_orphaned.py` `test_only_a_failed_write_is_drawn_as_not_written`.
+
+**Related:** TD-216 (the row), #724.
