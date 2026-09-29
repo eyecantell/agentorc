@@ -623,9 +623,17 @@ class TickMixin:
         7's `brief`): its last `restarts` entry is that rule's and carries `error` — both failure paths,
         the close's and the replay's, write one. A successful restart leaves the same entry without it
         on the new record, so without the error a `closed` record is a person's Close, never undone
-        (design §6 rule 2; the techlead's read of #748, TD-235)."""
+        (design §6 rule 2; the techlead's read of #748, TD-235). The error must also be written at or
+        after the close: the tick's own close comes first and its failure after, while a person's
+        Close of a member whose restart had already failed (an exited one whose replay failed, an idle
+        one whose close failed before it was marked) comes after the entry (TD-236)."""
         last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
-        return s.state == "closed" and last.get("why") == why and bool(last.get("error"))
+        if not (s.state == "closed" and last.get("why") == why and last.get("error")):
+            return False
+        try:
+            return bool(s.closed_at) and _parse(str(last.get("at"))) >= _parse(s.closed_at)
+        except (TypeError, ValueError):
+            return False
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:

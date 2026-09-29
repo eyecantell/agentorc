@@ -279,3 +279,24 @@ async def test_a_person_s_close_after_a_wanted_restart_is_never_undone(agent, co
             await agent._keep_running(tick)
         assert agent.sessions[sid] is new and new.state == "closed"
         assert [r["why"] for r in new.restarts] == ["wanted"], "a person's Close is never undone"
+
+
+async def test_a_person_s_close_after_a_failed_wanted_restart_is_never_undone(agent, composerstubs, tmp_path):
+    """TD-236: a member whose wanted restart already failed without being closed (a replay that
+    failed on an exited run, a close that failed before it marked the record) carries a `wanted`
+    entry with `error`. A person's Close after that entry is the person's: the tick's own close is
+    stamped before its failure, a person's after it."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        rec.git = dict(CLEAN)
+        rec.restarts = [{"at": _iso(now - timedelta(minutes=5)), "why": "wanted", "error": "create failed"}]
+        await person.call("close", id=sid)
+        assert rec.state == "closed" and rec.closed_at > rec.restarts[-1]["at"]
+        for tick in (now, now + timedelta(minutes=5)):
+            await agent._keep_running(tick)
+        assert agent.sessions[sid] is rec and rec.state == "closed" and len(rec.restarts) == 1
