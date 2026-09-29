@@ -99,20 +99,21 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-190 | Build the context bound: `context` on the adapter contract and the record, the card's and `ao status -v`'s reading, `context: {bound}` on the presets, §6 rule 5's fixed line and the `ao` reply clause, the grinder brief's wording | High | Built — slices 1–3 (#654, #659, #660); the live check waits on the promote |
 | TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Built — the live look waits on the promote |
 | TD-195 | Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell | Medium | Built — the live check waits on the promote |
-| TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Open — design-first |
+| TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Designed 2026-09-28 with TD-223 — the build is TD-228 |
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Designed 2026-09-28 — the build is TD-217 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
 | TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first; answered 2026-09-28: teams per repo, aggregated by the home |
-| TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — proposal |
+| TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — answered by TD-223's design; closes with TD-228 |
 | TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Designed 2026-09-28 — the build is TD-226 |
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Designed 2026-09-28 — the build is TD-227 |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Built — slices 1–4 (#714, #745, #747, #748); live check pending |
-| TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
+| TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Designed 2026-09-28 — the build is TD-228 |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — (a) and the log; live check pending |
 | TD-226 | Build the rollback: `ao promote --sha` / `--back` run in a detached worktree at the commit, `last.json`, the hold (`held.json`) under which `auto` waits, `ao promote clear`, the row's *rolled back* reading | Medium | Open — pickable |
 | TD-227 | Build rule 8, work for a team that wound down: `lane_seen` kept for a gone member and first written from the ledger at the declaration, `owner:` lane words, `work_waiting`, `teams.<team>.on_work`, the Inbox row and the replay with its four bounds | Medium | Open — pickable |
+| TD-228 | Build the derived pickable: the reader's `Blocked by:` rule and the archive, the page's kinds in their new order, the lane words, this ledger's migration off the `**Pickable:**` line, the briefs' pick | Medium | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
 
@@ -1920,8 +1921,9 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Added:** 2026-09-26 (found with TD-197)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-228
+**Status:** Designed 2026-09-28 with TD-223 (the designer, PR #PRNUM): the entry's (a), taken one step further. The page's kinds are tested *for you*, *design-first*, *pickable*, *other*, so *pickable* means a build a grinder can start; design §4.4 *Repo facts*. Closes with TD-228.
+**Blocked by:** TD-228
 **Location:** `src/sessionorc/ledger.py` (`kind_of`: *pickable* is decided before *design-first*), the team card's Repo facet and the Repo page's *Technical debt* lists (`src/agentorc/ui/app.py`), design §4.5a *team card: Repo facet*
 
 **Why:** the page sorts each open entry into exactly one of *pickable, design-first, for you, other*, and *pickable* wins. Since TD-118 put `Pickable: yes` on design-first entries the designer may take, those entries count as *pickable* and never as *design-first*. On 2026-09-26 the bar read *19 pickable · 13 design-first*, and 7 of the 19 were designer-owned design-first entries. A reader takes *pickable* to mean *work a grinder can start*, and the Repo page's pickable list mixes the two.
@@ -2028,7 +2030,7 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Owner:** anchor
 **Kind:** decision
 **Pickable:** no — the briefs and the team's filter are the anchor's; a proposal to decide
-**Status:** Open — proposal. The groom added `**Blocked by:**` and `**Type:** feature` beside the existing header lines and changed none of them.
+**Status:** Open — proposal, **answered 2026-09-28 by TD-223's design** (Paul's question there; design §4.4 *Repo facts*): the line retires and pickable is derived; TD-228 builds it and migrates the entries, and this entry closes with it. The groom added `**Blocked by:**` and `**Type:** feature` beside the existing header lines and changed none of them.
 **Location:** `docs/technical_debt.md` (the preamble's three-header paragraph, every entry's `**Pickable:**`), `src/agentorc/briefs/grinder.md` (*Out of work*: filter on Owner/Kind/Pickable), `docs/briefs/designer-ao-1.md`, `docs/briefs/grinder-ao-2.md`, `src/sessionorc/ledger.py` and its readers (the Repo page's kind bar, TD-198; lane news, TD-195), `tests/test_ledger.py` (`HEADER`), `scripts/ledger.py` (SYNCED)
 
 **Why:** cadence §2.4 (synced 2026-09-28) says *Pickable is derived, never written*: an entry is pickable when it has no `**Blocked by:**`, or every entry it names is archived and it names no decision, and `scripts/ledger.py --pickable` prints the pick order (debt before features within a Priority, §2.11). agentorc's own `**Pickable:** yes | no — <why>` line (TD-118) predates that and is what the live team's briefs filter on. The two now answer the same question in two places and disagree already: after the groom `--pickable` lists 80 entries (this one among them) while 13 carry `Pickable: yes`, because a hand-written *no* also says *live-check*, *Paul's*, *the anchor's* or *built, the live look is left* — reasons that are an Owner or a Kind, not a blocker. And a blocker archived tomorrow makes its dependents pickable to `ledger.py` at once, while their hand-written line still says *no — after TD-N* until someone edits it.
@@ -2105,8 +2107,9 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-09-28 (found walking Paul through dc-grind: *I do not see anything in the inbox from dc-grind*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-228
+**Status:** Designed 2026-09-28 (the designer, PR #PRNUM, stacked on #721; the steer to Paul is `STEERID`, bound STEERBOUND): design §4.4 *Repo facts* (**Pickable is derived, never written**: the rule, the archive, no header line needed, the page's kinds in order, the written line while it lasts), §6 rule 6 (the lane words over the derived reading), §4.8 *Choosing in a free-pick lane*, §4.5 screen 10's lists, §4.5a *Repo facet*; the glossary's *pickable*. Option (b), agentorc's own reader held equal to the repo's script by a test. Settles TD-198 and answers TD-211. Closes with TD-228.
+**Blocked by:** TD-228
 **Location:** design §6 rule 6 (*a lane word matches by the entry's header*), `src/sessionorc/ledger.py` (`lane_matches`, `kind_of`), `src/sessionorc/agent_tick.py` (rule 6), the Repo facet's kind bar; dev-cadence's `ledger.py` (pickability derived from `Blocked by:`, its TD-070)
 
 **Why:** rule 6 (TD-195) tells a finished member its lane gained work when an entry matching its lane appears: `free-pick` matches `Pickable: yes` not design-first, `design-first` matches `Kind: design-first` with `Pickable: yes`. dev-cadence's ledger carries none of those lines: its entries have Priority, Type, Status and `Blocked by:`, and its `ledger.py` *derives* pickability from `Blocked by:` (a written `Pickable:` line never overrides, its TD-070). So every dev-cadence entry reads `pickable: ''` in `repos.json`, and rule 6 matches nothing there. On 2026-09-28 dev-cadence's TD-070 (the ledger query script) was pickable by its own tool while grinder-dc-1 sat idle and out of work, its `lane_seen` an empty list. The anchor woke it by hand. The kind bar has the same blind spot: every dev-cadence entry is *other*.
@@ -2179,6 +2182,29 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, an entry merged into a wound-down team's lane puts a *team start* row in the Inbox within `WORK_SETTLE` and two ticks, the same under `on_work: start` starts the team and the card says why, and a promote that turns the rule on tells a finished member of what was filed since it declared.
 
 **Related:** TD-214 (the design), TD-195 (rule 6), TD-133 (the schedule, whose replay slice 4 shares: whichever is built first writes it), TD-223 (what pickable means where the header has no lines).
+
+## TD-228: Build the derived pickable — the reader, the page's kinds, the lane words, the ledger's migration
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-09-28 (the designer, from TD-223's design, with TD-198 and TD-211)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/ledger.py` (`FIELD`, `entries`, `kind_of`, `KINDS`, `lane_matches`), `src/sessionorc/agent_tick.py` (rule 6 reads the same entries), `src/agentorc/cli.py` (`ao repo`), `src/agentorc/ui/` (the kind bar, the Repo page's lists), `tests/test_ledger.py` (`HEADER`, a new equality test), `docs/technical_debt.md` (the preamble, every open entry), `src/agentorc/briefs/grinder.md` and `designer.md`, `docs/briefs/*.md`; design §4.4 *Repo facts*, §6 rule 6. Held paths: the techlead reads slices 1 and 3.
+
+**Why:** TD-223's *Why*: the home reads a written line that dev-cadence's ledger never carries and that cadence §2.4 says is derived, so two tools give two answers and rule 6 is blind in dev-cadence.
+
+**Fix, in slices a PR each:**
+1. **The reader** (`sessionorc`): `entries` reads `**Blocked by:**` and `**Type:**`, takes the archive's ids from `<ledger>_archive.md`, and gives each entry `blocked_by`, `decision` and `pickable` by §4.4's rule, an unknown id keeping the block; a written `Pickable: no` still reads as blocked (the fallback). `kind_of` tests *for you*, *design-first*, *pickable*, *other*. `lane_matches` reads the derived field, with `build` for no Kind. A test holds `entries`' pickable ids equal to `python3 scripts/ledger.py --pickable --json` on this repo's ledger, and a second covers a ledger with no header lines: every unblocked entry matches `free-pick`.
+2. **The page and `ao repo`**: the lists and the bar from the new kinds; a blocked row says *blocked by TD-n*; `ao repo` lists a lane's pickable entries in cadence's order (Priority, then debt before feature).
+3. **The migration and the briefs**, one PR: every open entry's `**Pickable:**` line goes, its reason moved and never dropped. A dependency becomes `**Blocked by:** TD-n`; *designed, the build is TD-n* becomes `**Blocked by:** TD-n`; a wait on Paul becomes `decision (Paul)` with its pointer; *live check pending*, *for evaluation*, *the anchor's*, *Paul's* are already the entry's `Kind:` or `Owner:` and the clause moves to the Status where it says more. The preamble's paragraph and `tests/test_ledger.py`'s `HEADER` lose the line. The briefs pick from `ao repo`, or from `scripts/ledger.py --pickable` filtered by Owner and Kind, and no brief names the line.
+4. **The fallback goes**: `FIELD` stops reading `Pickable`; a ledger that still writes it is read as if it did not.
+
+**Done when:** an entry that becomes unblocked in dev-cadence's ledger tells an idle, finished grinder-dc-1 with no edit to the entry; this ledger has no `**Pickable:**` line and the kind bar counts no design-first entry as pickable; the equality test and the header-less test pass.
+
+**Related:** TD-223, TD-198, TD-211 (each closes with this), TD-227 (rule 8 and the `owner:` lane word, which slice 1 builds on when it is there), TD-118 (the header lines), dev-cadence's TD-070 and TD-064.
 
 ## TD-230: The usage chip shows a stale reading with no age, and the gate acts on it as if fresh
 
