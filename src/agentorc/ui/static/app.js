@@ -715,8 +715,13 @@
   }
   // The Doing list's short age (§4.5a **Ages and columns**, TD-232), in the very words `_short_age` in
   // `ui/common.py` draws: *just now* under a minute and ahead of the clock, then one unit. "" = unreadable.
+  // A stamp with no offset is UTC, as `_instant` reads it, never the browser's local time.
+  function utcParse(iso) {
+    const v = String(iso || "");
+    return Date.parse(/T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(v) ? v + "Z" : v);
+  }
   function fmtShortAge(iso) {
-    const t = Date.parse(iso || "");
+    const t = utcParse(iso);
     if (isNaN(t)) return "";
     const s = Math.floor((Date.now() - t) / 1000);
     if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + "m";
@@ -727,7 +732,7 @@
   // whose one-second tick would write *45s* over it. A cell that cannot be read stays empty.
   function showDoingAges(root) {
     $$("[data-doing-at]", root || document).forEach((el) => {
-      const iso = el.dataset.doingAt, d = new Date(Date.parse(iso || ""));
+      const iso = el.dataset.doingAt, d = new Date(utcParse(iso));
       if (!iso || isNaN(d)) { el.textContent = ""; return; }
       el.textContent = fmtShortAge(iso);
       el.title = d.toLocaleString();
