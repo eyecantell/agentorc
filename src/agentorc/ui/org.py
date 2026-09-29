@@ -15,7 +15,7 @@ from typing import Any
 from sessionorc.reports import branch_ref
 
 from .cards import DEAD
-from .common import _age, _instant
+from .common import _age, _instant, _short_age
 from .inbox import NEEDS_YOU_ROWS, state_kind
 
 # -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
@@ -183,8 +183,15 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def doing_rows(team: str, doing: Mapping[str, Any] | None, names: Mapping[str, str]) -> list[dict[str, Any]]:
-    """**Doing** (§4.8 *the doing log*): the team's `ao doing` calls newest first — time, doer, words."""
+DOER_WIDTH = 18  # the Doing list's doer column at most, in characters; a longer name is cut (§4.5a)
+
+
+def doing_rows(
+    team: str, doing: Mapping[str, Any] | None, names: Mapping[str, str], now: datetime | None = None
+) -> list[dict[str, Any]]:
+    """**Doing** (§4.8 *the doing log*): the team's `ao doing` calls newest first — age, doer, words.
+    `age` is the short age (`_short_age`, TD-232), which the page keeps moving from `at`."""
+    now = now or datetime.now(UTC)
     rows = []
     for e in reversed(list((doing or {}).get(team) or [])):
         if not isinstance(e, dict):
@@ -192,8 +199,8 @@ def doing_rows(team: str, doing: Mapping[str, Any] | None, names: Mapping[str, s
         at = _instant(e.get("at"))
         rows.append(
             {
-                "at": e.get("at") or "",
-                "hm": at.astimezone().strftime("%H:%M") if at else "",
+                "at": str(e.get("at") or "") if at else "",
+                "age": _short_age(e.get("at"), now),
                 "id": str(e.get("id") or ""),
                 "name": names.get(str(e.get("id") or ""), str(e.get("id") or "")),
                 "text": str(e.get("text") or ""),
@@ -224,7 +231,9 @@ def team_summary(
         "motion": motion,
         "phases": {ph: sum(1 for x in motion if x["phase"] == ph) for ph in PHASES},
         "answers": answers,
-        "doing": doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}),
+        "doing": (drows := doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}, now)),
+        # the doer column's width, set here from the names in the list so a filter moves no column (§4.5a)
+        "doer_w": min(max((len(d["name"]) for d in drows), default=1), DOER_WIDTH),
         "face": "answer" if answers else "doing",
         # what the toggle's memory keys on: a person's flip holds until the pending set changes (§4.5a)
         "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}" for a in answers)),

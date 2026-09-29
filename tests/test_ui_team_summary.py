@@ -199,12 +199,65 @@ def test_answer_needed_opens_the_facet_and_doing_is_newest_first():
     assert quiet["face"] == "doing" and quiet["answer_key"] == ""
 
 
+def test_the_doing_list_reads_a_short_age_in_columns_and_the_script_spells_it_the_same():
+    """TD-232 slice 2 (design §4.5a *team card: Answer needed / Doing*, **Ages and columns**): one
+    unit, *just now* under a minute and ahead of the clock, nothing for an unreadable instant; the
+    doer's width is the server's, the longest name up to eighteen; a longer name is cut and whole
+    in its tooltip; the script ages the cell once a minute in the same words."""
+    from agentorc.ui.common import _short_age
+
+    def ago(**kw):
+        return _iso(NOW - timedelta(**kw))
+
+    assert _short_age(ago(seconds=40), NOW) == "just now"
+    assert _short_age(ago(minutes=5), NOW) == "5m" and _short_age(ago(minutes=59, seconds=59), NOW) == "59m"
+    assert _short_age(ago(hours=1, minutes=50), NOW) == "1h" and _short_age(ago(hours=26), NOW) == "1d"
+    assert _short_age(_iso(NOW + timedelta(minutes=3)), NOW) == "just now"  # ahead of the clock
+    assert _short_age("half six", NOW) == "" and _short_age(None, NOW) == "" and _short_age(7, NOW) == ""
+    long = "grinder-with-a-long-nm"  # twenty-two characters
+    ms = [member("g1"), member("t1", name=long)]
+    doing = {
+        "grind": [
+            {"id": "t1", "text": "answering grinder-ao-1's held PR #628", "at": ago(minutes=5)},
+            {"id": "g1", "text": "reading", "at": "not a time"},
+        ]
+    }
+    s = ui.team_summary("grind", ms, {}, doing, now=NOW)
+    assert [(d["age"], d["name"]) for d in s["doing"]] == [("", "g1"), ("5m", long)]
+    assert s["doing"][0]["at"] == ""  # an unreadable instant: the cell stays empty and the tick skips it
+    assert s["doer_w"] == 18  # the longest name, cut at eighteen
+    assert ui.team_summary("grind", [member("g1")], {}, {"grind": [{"id": "g1", "text": "x"}]}, now=NOW)["doer_w"] == 2
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert 'style="--doer-n: 18"' in html
+    assert f'data-doing-at="{ago(minutes=5)}" title="{ago(minutes=5)}">5m</span>' in html
+    assert f'<a class="name" href="/focus/t1" title="{long}">{long}</a>' in html  # whole in its tooltip
+    assert '<span class="dage meta mono" data-doing-at="" title=""></span>' in html
+    css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
+    assert (
+        "width: calc(var(--doer-n, 12) * 1ch)" in css
+        and ".drow .dage { flex: none; width: 8ch; text-align: right; }" in css
+    )
+    js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
+    fn = js[js.index("function fmtShortAge(iso)") :]
+    fn = fn[: fn.index("\n  }\n")]
+    for words in (
+        'return "just now"',
+        'Math.floor(s / 60) + "m"',
+        'Math.floor(s / 3600) + "h"',
+        'Math.floor(s / 86400) + "d"',
+    ):
+        assert words in fn  # the server's shape, unit for unit
+    assert 'if (s < 60) return "just now"' in fn  # a negative age (ahead of the clock) is *just now* too
+    assert "setInterval(() => showDoingAges(), 60000)" in js  # once a minute, not the one-second tick
+    assert '$$("[data-doing-at]"' in js and ".age[data-doing-at]" not in js
+
+
 def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
     # TD-205: the summary is swapped whole on every delta; the feed names itself for the swap to
     # read its scrollTop, and the position goes back once syncSummaries has shown the face again
     s = ui.team_summary("grind", [member("g2")], {}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    assert '<div class="dfeed" data-keep-scroll="doing">' in html
+    assert '<div class="dfeed" data-keep-scroll="doing" style="--doer-n: 1">' in html
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
     sync = js.index("function syncSummaries()")
     restore = js.index("AO.restoreScrolls(sum, scrollKept[sum.dataset.team])")

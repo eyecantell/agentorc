@@ -498,9 +498,15 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .ablock:last-child { border-bottom: 0; }
 .ablock .atext { font-size: var(--t-mono-s); overflow-wrap: anywhere; }
 .dfeed { display: flex; flex-direction: column; gap: 3px; max-height: 12em; overflow: auto; }
-.drow { display: flex; gap: 8px; font-size: var(--t-small); min-width: 0; white-space: nowrap; }
-.drow .name { font-family: "JetBrains Mono", monospace; color: var(--fg); text-decoration: none; flex: none; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; }
-.drow .dtext { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* the Doing list's three columns (§4.5a **Ages and columns**, TD-232): the age right-aligned in a width
+   that fits *just now*, the doer in the server's width (`--doer-n` characters, at most 18), the words
+   the rest; each width is in its own mono font's `ch`, so the columns line up down the list */
+.drow { display: flex; gap: 8px; align-items: baseline; font-size: var(--t-small); min-width: 0; white-space: nowrap; }
+.drow .dage { flex: none; width: 8ch; text-align: right; }
+.drow .name { font-family: "JetBrains Mono", monospace; color: var(--fg); text-decoration: none; flex: none; width: calc(var(--doer-n, 12) * 1ch); overflow: hidden; text-overflow: ellipsis; }
+.drow .dtext { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.repopage .rrow.drow .dtext { white-space: normal; overflow-wrap: anywhere; } /* the Repo page's words wrap */
+@media (max-width: 720px) { .drow .dtext { white-space: normal; overflow-wrap: anywhere; } } /* the columns hold */
 /* the compact card (§4.5a *card: compact*): name and pill, one line, the foot — and no state glyph */
 .sc.compact { gap: 10px; padding: 12px 14px; }
 .pill.nog::before { content: none; }  /* no state glyph: a compact card, a count pill (§4.5a *state icon*) */

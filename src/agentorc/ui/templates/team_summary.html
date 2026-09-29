@@ -82,9 +82,11 @@
     <div class="fv" data-fv="doing"{% if m.face != 'doing' %} hidden{% endif %}>
       <div class="fhead"><span class="kind">Doing</span> <span class="meta">the team's ao doing calls</span><span class="grow"></span>
         <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
-      <div class="dfeed" data-keep-scroll="doing">
+      {# **Ages and columns** (§4.5a, TD-232): age · doer · words in columns; the doer's width is the
+         server's (`doer_w`), the age moves in the browser once a minute from `data-doing-at` #}
+      <div class="dfeed" data-keep-scroll="doing" style="--doer-n: {{ m.doer_w or 1 }}">
       {% for d in m.doing %}
-      <div class="drow" title="{{ d.at }}"><span class="meta mono">{{ d.hm }}</span> <a class="name" href="/focus/{{ d.id }}">{{ d.name }}</a> <span class="dtext" title="{{ d.text }}">{{ d.text }}</span></div>
+      <div class="drow"><span class="dage meta mono" data-doing-at="{{ d.at }}" title="{{ d.at }}">{{ d.age }}</span> <a class="name" href="/focus/{{ d.id }}" title="{{ d.name }}">{{ d.name }}</a> <span class="dtext" title="{{ d.text }}">{{ d.text }}</span></div>
       {% else %}
       <div class="meta">no ao doing calls yet — a member's word for what it is on lands here</div>
       {% endfor %}

@@ -713,6 +713,28 @@
     if (s < 60) return s + "s"; if (s < 3600) return Math.floor(s / 60) + "m";
     if (s < 86400) return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m"; return Math.floor(s / 86400) + "d";
   }
+  // The Doing list's short age (§4.5a **Ages and columns**, TD-232), in the very words `_short_age` in
+  // `ui/common.py` draws: *just now* under a minute and ahead of the clock, then one unit. "" = unreadable.
+  function fmtShortAge(iso) {
+    const t = Date.parse(iso || "");
+    if (isNaN(t)) return "";
+    const s = Math.floor((Date.now() - t) / 1000);
+    if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h"; return Math.floor(s / 86400) + "d";
+  }
+  // Once a minute, the shape's own grain, and at once for rows just put on the page: the age from the
+  // row's timestamp and the exact time in the reader's clock as its tooltip — never `.age[data-since]`,
+  // whose one-second tick would write *45s* over it. A cell that cannot be read stays empty.
+  function showDoingAges(root) {
+    $$("[data-doing-at]", root || document).forEach((el) => {
+      const iso = el.dataset.doingAt, d = new Date(Date.parse(iso || ""));
+      if (!iso || isNaN(d)) { el.textContent = ""; return; }
+      el.textContent = fmtShortAge(iso);
+      el.title = d.toLocaleString();
+    });
+  }
+  AO.showDoingAges = showDoingAges;
+  setInterval(() => showDoingAges(), 60000);
   // A time left, in the very words `_left` in `ui/app.py` renders it into the row (§4.5 screen 6
   // *Layout*, TD-082): the server draws the number, this only keeps it moving, and because both
   // spell it the same way nothing on the row jumps when the first tick lands. "" = already past.
@@ -1088,6 +1110,7 @@
     return { led: store.get("led:" + team, "open"), win: store.get("win", "day"), face };
   }
   function syncSummaries() {
+    AO.showDoingAges(); // the Doing rows just swapped in: their tooltips in the reader's clock (TD-232)
     // the rollup's window picker is the same one value (§4.5a *Org: rollup*), and its *in the
     // Inbox* is the top bar's count
     const ro = $("#rollup .rollup");
