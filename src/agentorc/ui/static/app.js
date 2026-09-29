@@ -504,15 +504,19 @@
       if (action === "allow" || action === "deny") AO.toast(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "wrapup") AO.toast("wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes", true);
-      if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
-      if (action === "answer") AO.toast(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
+      // an orphaned question's answer (§4.10, TD-216): no reply entry — the home wrote it on the board
+      // and mailed the holders, and `note` is its sentence, the row's standing as a result
+      const orphanNote = ["reply", "answer", "gowithit"].includes(action) && res.board ? res.note : "";
+      if (orphanNote) AO.toast(orphanNote, true);
+      else if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
+      if (action === "answer" && !orphanNote) AO.toast(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
       if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
       if (["message", "reply", "answer", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
       if (action === "snooze") AO.toast("snoozed — it comes back at that time; the sender is not told", true);
       if (action === "unsnooze") AO.toast("back in its section", true);
       if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
       if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
-      if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
+      if (action === "gowithit" && !orphanNote) AO.toast("go with it — the sender takes its default now", true);
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
@@ -553,6 +557,9 @@
       }
       const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board" };
       AO.toast(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
+      // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays
+      const rowerr = b.closest(".mailrow") && b.closest(".mailrow").querySelector(".rowerr");
+      if (rowerr) { rowerr.textContent = `not written: ${e.message}`; rowerr.hidden = false; }
       if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     }
   });
@@ -719,7 +726,11 @@
     $$(".timeleft[data-deadline]").forEach((el) => {
       if (!el.dataset.deadline) return;
       const left = fmtLeft(el.dataset.deadline);
-      el.textContent = left ? `${left} left — then it goes with its default` : "the time is up: the sender goes with its default";
+      // an orphaned `steer` (§4.5a *Inbox row: orphaned question*, TD-216): nobody takes its default
+      // at the bound — it waits on the person from then on
+      const then = el.dataset.then;
+      if (then) el.textContent = left ? `${left} left, ${then}` : `the time is up: it waits on you`;
+      else el.textContent = left ? `${left} left — then it goes with its default` : "the time is up: the sender goes with its default";
     });
     showLocalTimes();
   }, 1000);
@@ -1407,6 +1418,22 @@
       if (top) el.scrollTop = top;
     });
   };
+  // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays
+  // — so the words are carried across the poll's swap, by the row's entry id, as a Deny reason is
+  AO.rowErrs = function (root) {
+    const kept = {};
+    if (root) root.querySelectorAll(".rowerr:not([hidden])").forEach((el) => {
+      const row = el.closest(".mailrow");
+      if (row && row.dataset.msg) kept[row.dataset.msg] = el.textContent;
+    });
+    return kept;
+  };
+  AO.restoreRowErrs = function (root, kept) {
+    if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
+      const text = kept[el.closest(".mailrow").dataset.msg];
+      if (text) { el.textContent = text; el.hidden = false; }
+    });
+  };
   AO.restoreDenyWhys = function (root, kept) {
     if (!root) return;
     root.querySelectorAll("input.denywhy").forEach((i) => {
@@ -1464,9 +1491,10 @@
       // its place when a key's press ended it.
       const on = document.activeElement, ring = on && on.matches && on.matches(".mailrow") && el && el.contains(on) ? on : null;
       if (el && AO.maySwapSection(el, ring ? null : on)) {
-        const kept = AO.denyWhys(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
+        const kept = AO.denyWhys(el), errs = AO.rowErrs(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
         el.innerHTML = got.html[k] || "";
         AO.restoreDenyWhys(el, kept);
+        AO.restoreRowErrs(el, errs);
         AO.reopenFolds(el);
         if (ring) {
           const rows = $$(".mailrow", el), back = rows.find((r) => r.dataset.msg === ring.dataset.msg) || rows[at] || rows[rows.length - 1];

@@ -16,7 +16,7 @@ hours of a four-session team, a lead over three free-pick grinders, on 2026-09-1
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -63,6 +63,12 @@ NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonc
 WAKE_BUDGET: int | None = 30  # mail-caused wakes a session may take per WAKE_WINDOW; measured: a lead took 4 an hour
 WAKE_WINDOW = timedelta(hours=1)  # the rolling window the wake budget counts charged wakes in
 WAKES_KEEP = 50  # wake decisions a record keeps (`wakes`): what step 5 measures
+# How long a declared claim holds its reference against another live session's claim (design §4.8
+# "A claim is a lease", TD-056). Renewed by claiming again; released sooner by done/dropped or the
+# holder's record ending. Long enough for one medium TD without a renewal, short enough that a
+# stood-down worker does not hold a reference into the next day. The standing of an orphaned
+# question (below) reads it as the claim's refusal does.
+LEASE_TTL = timedelta(hours=12)
 
 # RPCs that act on a session (design §4.8): a caller that is a session needs the `control`
 # grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
@@ -290,6 +296,61 @@ def unread_line(n: int) -> str:
 def _hours(d: timedelta) -> str:
     h = d.total_seconds() / 3600
     return f"{h:g} h" if h >= 1 else f"{int(d.total_seconds() // 60)} min"
+
+
+# design §4.10 *A question about a reference outlives its asker*, §4.5a *Inbox row: orphaned
+# question* (TD-216 slice 2): how an orphaned question's asker went, in the row's words
+ORPHAN_HOW = {"closed": "was closed", "forgotten": "was forgotten", "cancelled": "was cancelled"}
+_NOT_LIVE = ("exited", "closed", "scheduled")  # a record that holds no lease on anything (§4.8)
+
+
+def lease_holders(ref: str, records: Iterable[Mapping[str, Any]], now: datetime) -> list[Mapping[str, Any]]:
+    """Every live record, as the `list` RPC hands it over, with an unexpired declared lease on
+    `ref` (design §4.8, `LEASE_TTL`) — the reading `_lease_holders` makes at the home when the
+    person's answer is mailed, made again here from the records a page or `ao inbox` already holds."""
+    out: list[Mapping[str, Any]] = []
+    for r in records:
+        if not isinstance(r, Mapping) or r.get("state") in _NOT_LIVE:
+            continue
+        for p in r.get("progress") or ():
+            if not isinstance(p, Mapping) or p.get("ref") != ref or p.get("status") != "claimed":
+                continue
+            if (p.get("source") or "declared") != "declared":
+                continue
+            try:
+                at = datetime.fromisoformat(str(p.get("at") or "").replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if at.tzinfo is not None and now - at < LEASE_TTL and r not in out:
+                out.append(r)
+    return out
+
+
+def orphan_standing(e: Mapping[str, Any], records: Iterable[Mapping[str, Any]], now: datetime) -> dict[str, Any] | None:
+    """The **standing** of an orphaned question (design §4.5a *Inbox row: orphaned question*), or
+    None for an entry that carries no `orphaned`: where the person's answer will go, said before
+    the press, in the board row's words — *its session was closed — grinder-ao-2 holds TD-149:
+    your answer reaches it, and agentorc's board*, or *… — nobody holds TD-180: your answer is
+    written on agentorc's board*. Display only: the home reads the leases again at the press.
+    `holders` is `[{id, name}]`, `text` the line."""
+    o = e.get("orphaned")
+    if not isinstance(o, Mapping):
+        return None
+    ref = str(o.get("ref") or e.get("about") or "")
+    repo = str(o.get("repo") or "")
+    board = f"{repo.rstrip('/').rsplit('/', 1)[-1]}'s board" if repo else ""
+    held = lease_holders(ref, records, now) if ref else []
+    holders = [{"id": str(r.get("id") or ""), "name": str(r.get("name") or r.get("id") or "")} for r in held]
+    went = f"its session {ORPHAN_HOW.get(str(o.get('how') or ''), 'is gone')}"
+    names = ", ".join(h["name"] for h in holders)
+    if holders and board:
+        verb, whom = ("holds", "it") if len(holders) == 1 else ("hold", "them")
+        text = f"{went} — {names} {verb} {ref}: your answer reaches {whom}, and {board}"
+    elif board:
+        text = f"{went} — nobody holds {ref}: your answer is written on {board}"
+    else:  # the home refuses the press in these words' sense (TD-216 slice 1): no repo, no board
+        text = f"{went} and named no repo: there is no board for your answer — Delete declines it"
+    return {"ref": ref, "repo": repo, "board": board, "holders": holders, "text": text}
 
 
 def read_when(

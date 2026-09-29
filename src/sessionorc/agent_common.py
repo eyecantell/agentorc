@@ -44,11 +44,9 @@ PUSH_OPEN = b'{"event": "session", "session": '  # a pushed view's envelope, mea
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
-# How long a declared claim holds its reference against another live session's claim (design §4.8
-# "A claim is a lease", TD-056). Renewed by claiming again; released sooner by done/dropped or the
-# holder's record ending. Long enough for one medium TD without a renewal, short enough that a
-# stood-down worker does not hold a reference into the next day.
-LEASE_TTL = timedelta(hours=12)
+# How long a declared claim holds its reference (design §4.8 "A claim is a lease", TD-056): kept in
+# `sessionorc.mail` since TD-216, where the Inbox's standing of an orphaned question reads it too.
+LEASE_TTL = mail.LEASE_TTL
 # A `restart` declared inside this of the record's own start is marked `early` (design §4.9a
 # *A run that ends with work left*, TD-083). The word still stands — it is the session's — but a
 # controller does not act on an early one and puts it on the board instead: a run that is over

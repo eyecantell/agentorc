@@ -112,9 +112,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first; answered 2026-09-28: teams per repo, aggregated by the home |
 | TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — proposal |
 | TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Open — design-first |
-| TD-213 | Closing a member closes the questions it put to the person (`asker_gone`), even when the ledger still waits on the answer: the wind-down of 2026-09-28 took a steer (TD-149) and an ask (TD-180) out of the Inbox | High | Designed 2026-09-28 — the build is TD-215, TD-216 |
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
-| TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Partly done — slice 1 (the answer's road) PR #717; slice 2 the row |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Partly done — slice 1 (#714); next the replay |
 | TD-220 | Build the board's horizon: the read without `--due-only`, `person.inbox.board_show` (next n per team, due, n days, all) and its pick on the Settings page, *Board, coming up*, the *not shown* fold and the line on the Inbox and the Repo page, the grinder preset's *on the board, due <date>* | Medium | Partly done — slice 1 (the setting); slice 2 next |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
@@ -2149,23 +2147,6 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-132 (the promote), TD-062 (why the live copy is promoted, not edited), #666.
 
-## TD-213: Closing a member closes the questions it put to the person, even when the ledger still waits on the answer
-
-**Priority:** High
-**Added:** 2026-09-28 (Paul: *I do not see a steering item from ao-grind in the inbox*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-215 (the home's half) and TD-216 (the answer and the row)
-**Status:** Designed 2026-09-28 (the designer, PR #699; the steer to Paul is `m-bd30b5cf92af`, bound 2026-09-28 21:11 MDT): design §4.10 *A question about a reference outlives its asker* (and the `asker_gone` clause of *What a person is asked*, *Pause*), §4.4 *Board write-back* (the second add), §4.5a *Inbox row: orphaned question* and the Inbox's count, §4.9a (the wind-down writes no board line for it); the glossary's *orphaned question*. Settled: a question to the person whose envelope carries `about` is **orphaned**, not closed, when its asker is closed, forgotten or cancelled, and one without a reference closes `asker_gone` as before (its FYI row, *closed · the asker is gone*, is already built and is the trail the entry asked for); an orphaned `steer` runs to its bound and then waits on the person, counted, instead of lapsing; the asker's name coming back (a team's Start, a restart, a Resume) adopts the question; the answer to an orphaned one is written on the repo's board at the person's press and mailed `handed` to whoever holds a lease on the reference, as a board reply is (TD-126). Of the entry's options: (a) is taken for the answer and not for the question — the host agent writes no board line unpressed (§4.4), and a brief's rule covers one road to a close out of several; (b) would leave a live holder that refuses the team's next Start; (c) is the lease, not the team (§9 invariant 9). Two choices steered to Paul: the board as where the answer goes, and an orphaned `steer` becoming counted at its bound. This entry archives with TD-216.
-**Blocked by:** TD-215, TD-216
-**Location:** `src/sessionorc/agent_attention.py` (`_asker_gone`: closing or forgetting a record closes the open `ask`s and `steer`s it put to the person, `closed_reason: asker_gone`), design §4.10 *What a person is asked*, §4.9a (the wind-down), `src/agentorc/briefs/manager.md` (*Out of work*)
-
-**Why:** an `ask` to the person never expires, so the design ends it with its asker: closing or forgetting the record closes its open questions, or a forgotten worker's questions would stand forever. The team wind-down closes every finished member. On 2026-09-28 at 06:56Z, ao-grind's wind-down closed grinder-ao-1 and designer-ao-1, and with them grinder-ao-1's steer `m-43f5e3922686` (TD-149 (1): six `.agentorc.yml` keys) and the designer's ask `m-d20bbf79bdbe` (TD-180: who drafts the entry). Both left the person's Inbox before Paul had seen them. The work still waits on them. grinder-ao-1's out-of-work note, written three minutes before its close, says *TD-149 (1) waits on a steer to Paul*, and TD-180's header said *waits on Paul's answer*. The question is gone and the dependency stays, so an entry can wait forever on an answer nobody can give.
-
-**Fix:** design what a question outlives. Options: (a) a question tied to a ledger entry (its `about` or `cites` names a TD) survives its asker's close and moves to the board as a line (*Decide: …*, the steer's default beside it), written by the host agent or by the manager's wind-down step (the brief already boards a passed-up question nobody answered; extend it to the members' own open questions); (b) the wind-down refuses to close a member with open questions to the person and leaves it idle for the person; (c) the question stays open under the team rather than the record, answered to whoever next holds the entry. Also: `asker_gone` on a question the person had not yet seen should at least leave a trail row saying what was withdrawn. Done when a member closed with an open question to the person leaves that question somewhere the person will see it, and a test covers the wind-down case.
-
-**Related:** TD-180, TD-149 (the two questions that went), TD-187 / TD-195 (the same wind-down closed a designer whose lane had work), §4.10, §4.9a.
-
 ## TD-214: A wound-down team never starts again when its lanes gain work
 
 **Priority:** Medium
@@ -2186,29 +2167,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** design (1) a team-level rule: when a wound-down team's lanes (its members' lane words matched against the ledger reading, as rule 6 does) gain an entry filed or made pickable after the wind-down, the home starts the team again, the same sequence as Start. Bounded by the usage gate, the team's stop time, a per-day start budget, and a person's *hold* on the team, and saying so on the team card (*restarted: TD-213 filed*). Or it puts a *Start?* row in the Inbox instead, if an automatic start is too much; the round decides which, maybe per team. (2) `lane_seen`'s first write takes the declaration's time: entries filed, or made pickable, after `out_of_work.at` are new even if the first tick is later. (3) The lane match keys on `Owner` as well (the grinder's lane is `Owner: grinder`, the designer's `Owner: designer`). Then the build. Done when an entry filed into a wound-down team's lane starts the team (or asks the person to) within a tick or two, and a promote that turns rule 6 on does not swallow the backlog.
 
 **Related:** TD-187 / TD-195 (rule 6), TD-133 (schedules), TD-053 (the wind-down), TD-213 (the wind-down drops the person's questions), TD-199 (a running member keeps its start brief).
-
-## TD-216: Build the orphaned question, the answer and the row
-
-**Priority:** High
-**Added:** 2026-09-28 (the designer, from TD-213's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Partly done — **slice 1 (items 1, 2 and 5's road) built 2026-09-28 (grinder-ao-1, PR #717)**: Reply, a suggested answer and *Go with it* on an orphaned question write the board's second add and a `handed` note to each lease holder, and close the entry; `orphaned.repo` falls back to the record's directory, and a board outside the home's registry (an asker on a node) is refused. **Slice 2 (items 3 and 4) built 2026-09-28 (grinder-ao-1, PR #724, stacked on #717; Sonnet-reviewed, findings fixed)**: the row with its standing, the count, `ao inbox`'s standing; it archives this entry and TD-213. **Next:** once #717 merges, retarget #724 to `main` (`gh api -X PATCH …/pulls/724` with `base: main`, then `git rebase --onto origin/main <#717's head> td216-orphaned-row`), run the cadence check and ask the techlead to read it.
-**Location:** `src/sessionorc/agent_inbox.py` (`_board_add_one`, `rpc_board_edit`; the person's reply and `inbox_go_with_it` on an orphaned entry), `src/sessionorc/board.py` (`write_back`'s add), `src/agentorc/ui/app.py` (`inbox_sections`, the mail row's view), `src/agentorc/ui/templates/inbox_row.html`, `src/agentorc/ui/static/app.js`; design §4.10 *A question about a reference outlives its asker*, §4.4 *Board write-back*, §4.5a *Inbox row: orphaned question*. Held path: the techlead reads the PR.
-
-**Why:** TD-213's *Why*. After TD-215 the question stands; this entry gives the person's answer somewhere to go.
-
-**Fix:**
-1. **The answer's road**: a person's reply, suggested answer or *Go with it* naming an entry that carries `orphaned` writes the board line of design §4.10 through the write-back's add on `orphaned.repo`'s board (the host whose checkout it is serves it, as for a board row), committed as `agentorc: answer <item head> (from <entry id>)`; then a `note` from the person, `about` the reference, marked `handed`, to every live record with an unexpired declared lease on it; then the entry closes `replied` or `go_with_it`. A refused write refuses the press and changes nothing. One press per entry at a time, as `_board_adding` does for *Put on the board*. The reply's result carries `board`, `sent` and the sentence the toast draws.
-2. **The handed note owes an outcome** as a handed board reply does (design §4.10 *Outcomes*); with no holder nothing is owed.
-3. **The row** (§4.5a): the standing line from `orphaned` and the records' leases, drawn as the board row's standing is; an orphaned `steer` with a bound under *Steering* with *then it waits on you*, without one under *Needs you* and counted; no Pause, no Open; Snooze once the clock is gone; the refusal drawn on the row. The message page (§4.5 screen 6) draws the same line.
-4. **`ao inbox`** run by a person prints the standing beside an orphaned entry.
-5. **Tests**: an answer with no holder writes one line and mails nothing; with a holder it writes the line and lands one `handed` note that owes an outcome; *Go with it* writes *go with the default: …*; a dirty checkout refuses and the entry stays open; a second press while the first is in flight is refused; the count includes an orphaned `steer` only once its bound is cleared; the row's controls in each case.
-
-**Done when** Paul answers an orphaned question from the Inbox and the answer is on the repo's board and in the inbox of the session that holds the entry, the tests above pass, and design §4.4, §4.5a and §4.10 lose their *not built — TD-216*. TD-213 archives with this entry.
-
-**Related:** TD-213 (the design), TD-215 (the home's half), TD-126 / TD-142 (the board reply this follows; its mail half computes the same lease holders), TD-140 (*Put on the board*, the first add).
 
 ## TD-217: Build rule 7, brief changed
 
