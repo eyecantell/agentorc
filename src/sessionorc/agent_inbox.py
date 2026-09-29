@@ -17,12 +17,12 @@ from sessionorc import (
 )
 from sessionorc.agent_common import (
     BOARD_REPLY_NOTE,
+    LEASE_TTL,
     RpcError,
     _older,
     _parse,
     _prune_tallies,
     log,
-    orphaned_refusal,
 )
 from sessionorc.models import (
     ATTENTION_KINDS,
@@ -276,6 +276,105 @@ class InboxMixin:
         await self._push_changes()
         return out
 
+    def _lease_holders(self, ref: str) -> list[str]:
+        """Every live record with an unexpired declared lease on `ref` (design §4.8, `LEASE_TTL`),
+        by graph address — who still holds the work a question is about."""
+        now = datetime.now(UTC)
+        out = []
+        for addr, r in self._graph().items():
+            if r.state in ("exited", "closed", "scheduled"):
+                continue
+            for p in r.progress:
+                if p.ref == ref and p.status == "claimed" and p.source == "declared":
+                    try:
+                        fresh = now - _parse(p.at) < LEASE_TTL
+                    except ValueError:
+                        fresh = False
+                    if fresh and addr not in out:
+                        out.append(addr)
+        return out
+
+    async def _answer_orphan(self, e: MailEntry, answer: str, reason: str, picked: int | None = None) -> dict[str, Any]:
+        """The person's answer to an **orphaned** question (design §4.10 *A question about a
+        reference outlives its asker*, TD-216): Reply, a suggested answer or *Go with it*. Two
+        things, in order. **The board**: one line at the top of the open items of the asker's
+        repo's board — the question's first paragraph and the answer — by the write-back's second
+        add (§4.4); a refused write refuses the press and touches nothing. **The holders**: a
+        `note` from the person, `about` the reference and marked `handed`, to every live record
+        with a lease on it, which owes an outcome as a handed board reply does; with none, nothing
+        is mailed and nothing is owed. Then the entry closes `replied` or `go_with_it`. One press
+        per entry at a time, as *Put on the board*."""
+        if not e.open:
+            raise RpcError(f"{e.id} is already closed ({e.closed_reason})")
+        if e.id in self._board_adding:
+            raise RpcError(f"{e.id} is already being answered")
+        self._board_adding.add(e.id)
+        try:
+            return await self._answer_orphan_one(e, answer, reason, picked)
+        finally:
+            self._board_adding.discard(e.id)
+
+    async def _answer_orphan_one(self, e: MailEntry, answer: str, reason: str, picked: int | None) -> dict[str, Any]:
+        o = dict(e.orphaned or {})
+        repo, ref = str(o.get("repo") or ""), str(o.get("ref") or e.about or "")
+        if not repo:
+            raise RpcError(
+                f"{e.id}'s asker had no repo, so there is no board to write your answer on: Delete declines it "
+                "(design §4.10)"
+            )
+        root, board = self._board_root(str(Path(repo) / board_mod.BOARD))
+        first = " ".join(e.text.strip().split("\n\n", 1)[0].split())
+        today = datetime.now().date().isoformat()
+        try:
+            done = await asyncio.to_thread(
+                board_mod.add,
+                root,
+                first,
+                today,
+                entry=e.id,
+                session=str(o.get("name") or "") or None,
+                host=str(o.get("host") or "") or self.host,
+                context=e.about,
+                answer=answer,
+            )
+        except board_mod.Refused as err:
+            raise RpcError(str(err)) from None
+        log.info("board %s: %s", root, done["message"])
+        holders = self._lease_holders(ref) if ref else []
+        sent: list[str] = []
+        if holders:
+            how = str(o.get("how") or "closed")
+            text = (
+                f"{answer}\n\nThe person's answer to {e.id}, which {o.get('name') or e.from_} asked about {ref} "
+                f'before its session was {how}: "{first[:600]}". It is on {root.name}\'s board too — close that line '
+                "when you have carried it out."
+            )
+            if len(text.encode()) > mail.TEXT_CAP:  # the answer alone is within the cap; the quote is not counted
+                text = text.encode()[: mail.TEXT_CAP - 3].decode(errors="ignore") + "…"
+            got = await self._msg(PERSON, text, holders, "note", ref, None, None, None)
+            if mid := (got.get("entry") or {}).get("id"):
+                self._mark(mid, handed=True)  # it owes an outcome, as a handed board reply does (§4.10)
+            sent = list(got.get("delivered") or holders)
+        at = now_iso()
+        self._close_entry(e.id, reason, at)
+        # Nobody is left to report what became of it: the entry's own debt is settled here, and the
+        # handed note carries it on to whoever holds the work (§4.10 *Outcomes*).
+        settled = "answered on the board" + (f", sent to {', '.join(sent)}" if sent else "")
+        self._mark(e.id, outcome={"state": "asker_gone", "text": settled, "at": at, "by": ""}, answer=picked)
+        toast = "written on the board" + (f" · sent to {', '.join(sent)} (holds {ref})" if sent else "")
+        await self._push_changes()
+        return {
+            "id": PERSON,
+            "msg": e.id,
+            "closed": e.id,
+            "closed_reason": reason,
+            "board": str(board),
+            **done,
+            "sent": sent,
+            "delivered": sent,
+            "note": toast,
+        }
+
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
         this; do not go on without me*. `paused_at` stops the bound running (the sweep skips the
@@ -325,8 +424,8 @@ class InboxMixin:
             raise RpcError(f"Go with it answers a steer, which carries the default: {msg} is a {e.kind} (§4.10)")
         if not e.open:
             raise RpcError(f"{msg} is already closed ({e.closed_reason})")
-        if e.orphaned:
-            raise RpcError(orphaned_refusal(e))
+        if e.orphaned:  # nobody is left to take the default: it is written down for whoever holds the work
+            return await self._answer_orphan(e, f"go with the default: {e.default}", "go_with_it")
         self._close_entry(msg, "go_with_it", now_iso())
         self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person")
         await self._push_changes()

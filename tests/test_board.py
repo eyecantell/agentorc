@@ -327,3 +327,93 @@ async def test_board_reply_is_the_persons_and_says_nothing_was_sent_yet(agent, r
     assert got["action"] == "reply" and got["sent"] == [] and "no session standing is known" in got["note"]
     assert git(repo, "log", "-1", "--format=%s") == got["message"] and got["message"].startswith("agentorc: reply on")
     assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")
+
+
+async def _orphan(me, repo, tmp_path, text, about, **kw):
+    """A question from a session in `repo` that names `about`, orphaned by closing its asker."""
+    w = (await me.call("create", name="asker", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+    async with LocalClient(caller=w) as s:
+        mid = (await s.call("msg", to="person", text=text, about=about, **kw))["entry"]["id"]
+    await me.call("close", id=w)
+    return mid
+
+
+def _registry(tmp_path, repo):
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+
+
+async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sent_to_its_holder(agent, repo, tmp_path):
+    """TD-216 (design §4.10 *A question about a reference outlives its asker*, §4.4 the second add):
+    with no holder the answer is one line on the asker's repo's board and nothing is mailed; with a
+    holder it is the line and one `handed` note that owes an outcome; *Go with it* writes the
+    default; the entry closes, its own debt settled, since nobody is left to report it."""
+    _registry(tmp_path, repo)
+    async with LocalClient() as me:
+        q = await _orphan(
+            me, repo, tmp_path, "Which fetcher first?\n\nThe reading, for the record.", "TD-149", kind="ask"
+        )
+        got = await me.call("msg", text="the DIU one", kind="reply", reply_to=q)
+        assert got["sent"] == [] and got["closed"] == q and got["note"] == "written on the board"
+        assert got["message"].startswith("agentorc: answer Which fetcher first?") and got["message"].endswith(
+            f"(from {q})"
+        )
+        line = (repo / board.BOARD).read_text().splitlines()[got["line"] - 1]
+        assert line.startswith("- [ ] ") and "(session `asker` on " in line
+        assert "— Which fetcher first? — t, " in line and ": the DIU one. Context: TD-149. Due: " in line
+        assert "The reading" not in line  # the first paragraph only
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
+        assert e["closed_reason"] == "replied" and e["outcome"]["state"] == "asker_gone"  # owes nothing
+        assert git(repo, "status", "--porcelain") == ""  # committed, never left dirty
+
+        # with a holder: the line, and one handed note to the session that holds the reference
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=h) as s:
+            await s.call("progress", id=h, ref="td-149")
+        steer = await _orphan(me, repo, tmp_path, "Drop the key?", "td-149", kind="steer", default="drop it")
+        got = await me.call("inbox_go_with_it", msg=steer)
+        assert (
+            got["sent"] == [h] and got["closed_reason"] == "go_with_it" and f"sent to {h} (holds TD-149)" in got["note"]
+        )
+        assert ": go with the default: drop it. Context: td-149." in (repo / board.BOARD).read_text()
+        handed = [e for e in (await me.call("inbox", id=h))["entries"] if e["from"] == "person"]
+        assert len(handed) == 1 and handed[0]["handed"] and handed[0]["about"] == "TD-149"
+        assert handed[0]["text"].startswith("go with the default: drop it")
+        assert handed[0]["outcome"] is None  # handed and unsettled: the holder owes an outcome (§4.10)
+        assert agent.sessions[h].inbox[-1].owes_for(session_inbox=True)
+        await me.call("kill", id=h)
+
+
+async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_when_the_board_cannot_take_it(
+    agent, repo, tmp_path
+):
+    """TD-216: a dirty board refuses the press and the entry stays open; a second press while the
+    first is in flight is refused; a reply naming another addressee, or a suggested answer that is
+    not word for word, is refused; Pause stays refused (no session to hold)."""
+    import asyncio
+
+    _registry(tmp_path, repo)
+    async with LocalClient() as me:
+        q = await _orphan(me, repo, tmp_path, "Which?", "#702", kind="ask", answers=["this", "that"])
+        (repo / board.BOARD).write_text(BOARD_TEXT + "dirty\n")
+        with pytest.raises(AgentError, match="uncommitted changes"):
+            await me.call("msg", text="this", kind="reply", reply_to=q, answer=0)
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
+        assert e["closed_reason"] is None and e["orphaned"]
+        (repo / board.BOARD).write_text(BOARD_TEXT)
+        with pytest.raises(AgentError, match="suggested answers"):
+            await me.call("msg", text="thus", kind="reply", reply_to=q, answer=0)
+        async with LocalClient() as a, LocalClient() as b:
+            got = await asyncio.gather(
+                a.call("msg", text="this", kind="reply", reply_to=q, answer=0),
+                b.call("msg", text="this", kind="reply", reply_to=q, answer=0),
+                return_exceptions=True,
+            )  # fmt: skip
+        assert sum(isinstance(g, dict) for g in got) == 1
+        refused = str(next(g for g in got if not isinstance(g, dict)))
+        assert "already being answered" in refused or "already closed" in refused
+        assert (repo / board.BOARD).read_text().count(": this. Context: #702.") == 1
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
+        assert e["answer"] == 0

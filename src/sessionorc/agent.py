@@ -136,7 +136,6 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     backup_store,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
-    orphaned_refusal,  # noqa: F401
     read_checkout,  # noqa: F401
 )
 from sessionorc.agent_identity import IdentityMixin

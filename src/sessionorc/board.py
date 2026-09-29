@@ -233,13 +233,23 @@ def add(
     host: str | None = None,
     context: str | None = None,
     today: str | None = None,
+    answer: str | None = None,
 ) -> dict[str, str | int]:
-    """**Put on the board** (design §4.4, the write-back's one add; TD-140): one new line at the top
+    """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new line at the top
     of the open items of the checkout `root`'s board, committed there as `agentorc: board <item
     head> (from <entry id>)`, never pushed. Refused on the same conditions as an edit, touching
-    nothing. Returns `{commit, message, line}` — `line` the new item's line number."""
+    nothing. Returns `{commit, message, line}` — `line` the new item's line number.
+
+    With `answer`, the **second add** (§4.4, §4.10 *A question about a reference outlives its asker*,
+    TD-216): `text` is the orphaned question's first paragraph and the person's answer follows it on
+    the line as a reply does (` — <name>, <date>: <answer>`), committed as `agentorc: answer <item
+    head> (from <entry id>)`."""
     root = Path(root)
-    line = item_line(text, due, today or date.today().isoformat(), session, host, context)
+    today = today or date.today().isoformat()
+    words = text
+    if answer is not None:
+        words = " ".join(str(text or "").split()).rstrip(".") + reply_tail(answer, author(root), today)
+    line = item_line(words, due, today, session, host, context)
     with _EDIT:
         ready(root)
         path = root / BOARD
@@ -255,7 +265,7 @@ def add(
         head = " ".join(str(text).split()).rstrip(".")
         if len(head) > HEAD_MAX:
             head = head[: HEAD_MAX - 1].rstrip() + "…"
-        msg = f"agentorc: board {head} (from {entry})"
+        msg = f"agentorc: {'board' if answer is None else 'answer'} {head} (from {entry})"
         path.write_text("".join(lines), encoding="utf-8")
         try:
             cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))

@@ -1199,7 +1199,7 @@ async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
     closes two members, each with an open question to the person whose `about` names a reference —
     both stay open, stamped `orphaned` from the record; one with no `about`, and one whose `about`
     is prose, close `asker_gone` as before; a forget after the close keeps the first stamp; and an
-    answer is refused until TD-216 builds where it goes, while Delete still declines."""
+    answer with no board to write on is refused, and Delete still declines (TD-216 has the road)."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         a, b = [await mk(n, unattended=True, team="ao-grind") for n in ("a", "b")]
@@ -1222,7 +1222,13 @@ async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
             e = await held(mid)
             assert e["closed_reason"] is None and e["about"] in ("td-149", "#702")  # `about` is not rewritten
             o = e["orphaned"]
-            assert (o["how"], o["ref"], o["name"], o["team"], o["repo"]) == ("closed", ref, name, "ao-grind", "")
+            assert (o["how"], o["ref"], o["name"], o["team"], o["repo"]) == (
+                "closed",
+                ref,
+                name,
+                "ao-grind",
+                str(tmp_path),
+            )
             assert o["host"] == agent.host and o["at"]
         assert (await held(steer))["paused_at"] is None  # a pause is a hold on a session that is gone
         assert [(await held(m))["closed_reason"] for m in (bare, prose)] == ["asker_gone", "asker_gone"]
@@ -1231,10 +1237,10 @@ async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
         first = (await held(ask))["orphaned"]
         await person.call("remove", id=a)
         assert (await held(ask))["orphaned"] == first and (await held(ask))["closed_reason"] is None
-        # an answer has nowhere to go yet (TD-216): refused, and nothing is sent
-        with pytest.raises(AgentError, match="orphaned.*TD-216"):
+        # these askers ran outside any repo: an answer has no board to go on, refused, nothing sent
+        with pytest.raises(AgentError, match="not the board of a repo this host knows"):
             await person.call("msg", text="the first", kind="reply", reply_to=ask)
-        with pytest.raises(AgentError, match="orphaned.*TD-216"):
+        with pytest.raises(AgentError, match="not the board of a repo this host knows"):
             await person.call("inbox_go_with_it", msg=steer)
         with pytest.raises(AgentError, match="orphaned: its asker is gone"):
             await person.call("inbox_pause", msg=steer)

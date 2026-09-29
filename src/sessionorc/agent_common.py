@@ -732,15 +732,3 @@ def _usage_checked_at(reading: dict[str, Any]) -> float | None:
     except (ValueError, TypeError):
         return None
     return time.monotonic() - max(age, 0.0)
-
-
-def orphaned_refusal(e: MailEntry) -> str:
-    """Design §4.10 *A question about a reference outlives its asker*: until TD-216 builds where the
-    answer goes (the board, and whoever holds the reference), an answer to an orphaned question is
-    refused rather than sent to a record that is not there. Delete still declines it."""
-    o = e.orphaned or {}
-    return (
-        f"{e.id} is orphaned: its asker {o.get('name') or e.from_} was {o.get('how') or 'closed'}, and the road "
-        f"an answer about {o.get('ref') or e.about} takes to the board and to its holder is not built yet "
-        f"(TD-216) — nothing was sent; Delete declines it (design §4.10)"
-    )

@@ -804,7 +804,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   checkout never sits dirty and the history is auditable. One **add** (TD-069 step 4, built by
   TD-140): **Put on the board** on an FYI row (§4.5a) writes one new line at the top of the
   open items, in the board's own format, committed as `agentorc: board <item head> (from <entry
-  id>)`. A **second add** (TD-213, designed 2026-09-28; not built — TD-216): the person's answer to
+  id>)`. A **second add** (TD-213, designed 2026-09-28; built — TD-216 slice 1): the person's answer to
   an **orphaned question** (§4.10 *A question about a reference outlives its asker*) is written
   as one new line at the same place, the question's first paragraph and the answer on it,
   committed as `agentorc: answer <item head> (from <entry id>)`, the entry closed once the commit
@@ -4811,8 +4811,7 @@ its own `steer` is released at the bound; one that carried on working meets the 
 `ao inbox`.
 
 **A question about a reference outlives its asker (TD-213, designed 2026-09-28; the home's half
-built — TD-215; where the answer goes and the row not built — TD-216, and until then a person's
-answer to an orphaned question is refused in words, while Delete declines it).** A question is about the work, not about the run that asked it, and a team's
+built — TD-215, where the answer goes — TD-216 slice 1; the row not built — TD-216).** A question is about the work, not about the run that asked it, and a team's
 wind-down closes every finished member (§4.9a): on 2026-09-28 one closed two members and with
 them a `steer` and an `ask` the ledger still waited on, before the person had seen either. So the
 asker's going ends a question **only when the question names no reference**. An open `ask` or
@@ -4864,7 +4863,11 @@ than above: its questions moved with the conversation and are not orphaned.
   have. The file half is written first; a refused write (the checkout dirty or off its default
   branch, a repo with no board, the repo's host not answering) refuses the press and touches
   nothing, and the row says why. Whoever carries the answer out closes the line, as any board line
-  is closed.
+  is closed. The board is the home's to write, as for a board row: `orphaned.repo` (the record's
+  repo, or its directory when it named none) must be a checkout in the home's repos registry, and
+  one that is not — a repo on a node included — is refused in those words. The entry's own outcome
+  is settled at the close (`asker_gone`, its text saying where the answer went): nobody is left to
+  report it, and a holder's debt rides on the `handed` note. One press per entry at a time.
 - **Delete** declines it, as on any open question; there is nobody to tell and nothing is written.
 - **What it holds.** An orphaned question keeps its slot in the two depths under the id that
   asked it, and is never pruned while open. Nothing but the person's answer closes it: a `done`
