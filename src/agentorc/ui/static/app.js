@@ -557,8 +557,11 @@
       }
       const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board" };
       AO.toast(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
-      // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays
-      const rowerr = b.closest(".mailrow") && b.closest(".mailrow").querySelector(".rowerr");
+      // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
+      // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
+      // wrote nothing, and its toast says so in its own words
+      const writes = ["reply", "answer", "gowithit"].includes(action);
+      const rowerr = writes && b.closest(".mailrow") && b.closest(".mailrow").querySelector(".rowerr");
       if (rowerr) { rowerr.textContent = `not written: ${e.message}`; rowerr.hidden = false; }
       if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     }

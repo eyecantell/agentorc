@@ -113,7 +113,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
-| TD-234 | A failed Snooze or Delete on an orphaned question's Inbox row reads *not written: …*, the words for a refused board write | Low | Open |
 
 
 ---
@@ -2160,19 +2159,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** (1) **research** (Sonnet, read-only, with sources): whether Anthropic documents a supported way to read a Pro/Max subscription's usage programmatically (and if not, what the supported surfaces are: the Claude Code `/usage` command, the statusline's input JSON if it carries rate-limit fields, response headers such as `anthropic-ratelimit-*` on the model calls a session already makes); the endpoint's limits if stated anywhere; what the Claude Code client polls and how often; whether a `Retry-After` is sent (the agent's log records only the reason's transitions, so this needs the headers logged). (2) Measure here: count this account's calls to the endpoint across the sessions (is it us, or them?) and log the response headers of a refusal. (3) Then choose, in the design round the research makes needed: read usage from a supported surface (e.g. the headers or statusline data the sessions already receive, reported through the hook), poll less and share the reading, or stop polling while any session can report it. Done when the chip holds a reading under an hour old through a busy evening, and the source is one Anthropic supports or tolerates.
 
 **Related:** TD-230 (the age on the chip, the gate on a stale reading), TD-122 (one poll per account), TD-087 (the reason), TD-073 (the reading), design §4.2, §4.2a.
-
-## TD-234: A failed Snooze or Delete on an orphaned question's row reads *not written*
-
-**Priority:** Low
-**Added:** 2026-09-28 (the techlead's read of #724, noted not a finding; filed by grinder-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (the row action handler's `catch`: ``rowerr.textContent = `not written: ${e.message}` ``), `src/agentorc/ui/templates/inbox_row.html` (`.rowerr`, the orphaned row)
-
-**Why:** design §4.5a *Inbox row: orphaned question* draws a **refused write** on the row as *not written: …*, since the answer's road ends in a board line. The handler draws it for any failed press on a row that carries a `.rowerr`. So a failed Snooze (`snooze`, offered once no clock runs) or Delete (`unmail`) reads as if a board line had been refused, when nothing was being written.
-
-**Fix:** say *not written* only for the presses that write the board line: `reply`, `answer`, `gowithit`. Any other failed press on the row keeps the toast (*<control> failed: …*) and either leaves `.rowerr` hidden or draws it in the control's own words. Test: under the node probe, or from the source, a failed `snooze` on an orphaned row does not produce *not written*.
-
-**Related:** TD-216 (the row), #724.
