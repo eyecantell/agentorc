@@ -574,6 +574,15 @@
     if (!d || !d.matches || !d.matches("details.fold") || !d.dataset.fold) return;
     if (d.open) foldsOpen.add(d.dataset.fold); else foldsOpen.delete(d.dataset.fold);
   }, true);
+  // the board line's **show** (§4.5 screen 6 *The board's horizon*, TD-220): opens the *not shown*
+  // fold beside it for this page view — the fold's own memory above — and writes no setting
+  document.addEventListener?.("click", (ev) => {
+    const a = ev.target && ev.target.closest && ev.target.closest("a.boardshow");
+    if (!a) return;
+    ev.preventDefault();
+    const box = a.closest("#boardhorizon, .inboxpage"), d = box && box.querySelector("details.boardfold");
+    if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
+  });
   AO.reopenFolds = function (root) {
     (root ? $$("details.fold", root) : []).forEach((d) => { if (foldsOpen.has(d.dataset.fold)) d.open = true; });
   };
@@ -1263,6 +1272,8 @@
       ans.open = store.get("inboxanswered", true);
       ans.addEventListener("toggle", () => { store.set("inboxanswered", ans.open); markAnsweredSeen(); });
     }
+    // the board's *not shown* fold (TD-220): its rows join the rail's *board items* while it is open
+    document.addEventListener("toggle", (ev) => { if (ev.target.matches && ev.target.matches("details.boardfold")) inboxFilter(); }, true);
     // design §4.5 screen 6 *The rail* (TD-135): the picks are the page's URL. A bare `/inbox` takes
     // the browser's last picks and writes them back into the URL, so a link copied from the bar is
     // always the page as seen; a press is a history entry, so Back undoes it; typing is not.
@@ -1502,6 +1513,15 @@
         }
       }
     });
+    // the board's horizon (TD-220): *Board, coming up*, the fold and the line, put back whole under
+    // the same rule as a section — an open *not shown* fold is a `.fold`, reopened after the swap
+    const hz = $("#boardhorizon");
+    if (hz && typeof got.html.horizon === "string" && AO.maySwapSection(hz, document.activeElement)) {
+      const errs = AO.rowErrs(hz);
+      hz.innerHTML = got.html.horizon;
+      AO.restoreRowErrs(hz, errs);
+      AO.reopenFolds(hz);
+    }
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
     const w = $("#sec-waiting");
@@ -1572,9 +1592,12 @@
     return String(find || "").toLowerCase().split(/\s+/).map(trim).filter(Boolean);
   };
   const railKey = { team: "team", sec: "section", kind: "kind" };
+  // the board's rows coming up and the fold's (TD-220) sit under *Needs you* and are picked with it
+  const RAIL_UNDER = { coming: "needs", unshown: "needs" };
   function railPasses(r, picks, words, skip) {
     for (const g of ["team", "sec", "kind"]) {
-      if (g !== skip && picks[g].length && !picks[g].includes(r[railKey[g]])) return false;
+      const v = g === "sec" ? RAIL_UNDER[r.section] || r.section : r[railKey[g]];
+      if (g !== skip && picks[g].length && !picks[g].includes(v)) return false;
     }
     return words.every((w) => r.find.includes(w));
   }
@@ -1610,7 +1633,9 @@
       const r = railRow(el);
       el.hidden = !railPasses(r, rail, words, r.section === "snoozed" ? "sec" : "");
     });
-    const rows = $$(RAIL_SECS.map((k) => `#rows-${k} .mailrow`).join(", ")).map(railRow);
+    // …and the board's rows coming up, and the fold's once it is open (TD-220): the rail's *board
+    // items* counts the board rows on the page, and no section's number counts either
+    const rows = $$([...RAIL_SECS.map((k) => `#rows-${k} .mailrow`), "#rows-coming .mailrow", "details.boardfold[open] #rows-unshown .mailrow"].join(", ")).map(railRow);
     const c = AO.railCounts(rows, rail);
     // a team line for a picked team the poll no longer carries, so the pick can be undone
     const rt = $("#railteams");
@@ -1913,6 +1938,7 @@
           const unfolded = $$("[data-unfolded]", box).map((el) => el.dataset.unfolded), scrolled = AO.scrolls(box);
           box.innerHTML = await res.text();
           AO.restoreDenyWhys(box, kept);
+          AO.reopenFolds(box);  // the board's *not shown* fold, opened for this page view (TD-220)
           open.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = false; });
           unfolded.forEach((k) => unfold(k));
           apply();

@@ -490,10 +490,63 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
                 places[g] = places.get(g, 0) + 1
     shown = {id(r) for r in ahead}
     hidden = [r for r in rest if id(r) not in shown]
-    # the line's *the next due* is ahead of today: a hidden past-dated `fyi` is not what comes next
     now = str(today or next((r.get("today") for r in rows if r.get("today")), "")) or date.today().isoformat()
-    dated = [str(r["due"]) for r in hidden if r.get("due") and str(r["due"]) > now]
-    return {"mode": mode, "due": due, "ahead": ahead, "hidden": hidden, "next_due": min(dated) if dated else ""}
+    return {
+        "mode": mode,
+        "due": due,
+        "ahead": ahead,
+        "hidden": hidden,
+        "next_due": _next_due(hidden, now),
+        "today": now,
+    }
+
+
+def _next_due(hidden: Collection[Mapping[str, Any]], today: str) -> str:
+    """The line's *the next due*: the soonest date among the hidden that is ahead of today — a hidden
+    past-dated `fyi` is not what comes next."""
+    dated = [str(r["due"]) for r in hidden if r.get("due") and str(r["due"]) > today]
+    return min(dated) if dated else ""
+
+
+def horizon_of(h: Mapping[str, Any], root: str | Path) -> dict[str, Any]:
+    """The Repo page's *Waiting on you* (§4.5 screen 11): the Inbox's horizon filtered to one repo —
+    the same rows the Inbox draws, each list cut to this checkout, and the line's next date from what
+    is left hidden. The mode's places are the Inbox's, so a row is coming up here exactly when it is
+    there."""
+    want = str(Path(root).resolve())
+
+    def mine(rs: Collection[Mapping[str, Any]]) -> list[Any]:
+        return [r for r in rs if r.get("root") and str(Path(str(r["root"])).resolve()) == want]
+
+    hidden = mine(h.get("hidden") or ())
+    return {**h, "due": mine(h.get("due") or ()), "ahead": mine(h.get("ahead") or ()), "hidden": hidden,
+            "next_due": _next_due(hidden, str(h.get("today") or ""))}  # fmt: skip
+
+
+def board_line(h: Mapping[str, Any]) -> dict[str, Any]:
+    """The line that closes the board rows (§4.5 screen 6 *The board's horizon*, §4.5a): the page
+    saying its mode — *showing the next 10 board items per team* — then what it hides, *14 not shown,
+    the next due Oct 12*, or *nothing hidden*. `n` is the count hidden: with none there is no fold
+    and no **show**."""
+    mode = str(h.get("mode") or settings_mod.BOARD_SHOW_DEFAULT)
+    if mode == "all":
+        says = "showing every board item"
+    elif mode == "due":
+        says = "showing board items that are due"
+    elif mode == "7d":
+        says = "showing board items due this week"
+    elif mode.endswith("d"):
+        says = f"showing board items due within {mode[:-1]} days"
+    else:
+        n = int(mode.split(":", 1)[1]) if mode.startswith("next:") else 10
+        says = f"showing the next {n} board item{'' if n == 1 else 's'} per team"
+    hidden = len(h.get("hidden") or ())
+    nd = _civil(h.get("next_due"))
+    if not hidden:
+        rest = "nothing hidden"
+    else:
+        rest = f"{hidden} not shown" + (f", the next due {nd:%b} {nd.day}" if nd else "")
+    return {"says": says, "rest": rest, "n": hidden}
 
 
 def _needs_key(item: dict[str, Any]) -> tuple[int, str]:
@@ -731,6 +784,9 @@ RAIL_KIND_NAMES = {
     "notes": "notes",
     "trail": "trail",
 }
+# the board's rows coming up and the fold's (TD-220) are drawn under *Needs you* and picked with it,
+# but are in none of its numbers: a section pick reads them as the section they sit in
+RAIL_UNDER = {"coming": "needs", "unshown": "needs"}
 RAIL_NO_TEAM = "none"  # a row that carries no team, in the URL and on the rail's *no team* line
 _FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
 
@@ -815,9 +871,11 @@ def rail_picks(query: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def rail_rows(sections: Mapping[str, Any]) -> list[dict[str, str]]:
+def rail_rows(sections: Mapping[str, Any], ahead: Collection[Mapping[str, Any]] = ()) -> list[dict[str, str]]:
     """Every row on the page that the rail counts, as the four things a pick reads: its section,
-    team (`none` for no team), coarse kind and find text. The snoozed list is in no count."""
+    team (`none` for no team), coarse kind and find text. The snoozed list is in no count. `ahead` is
+    the board's rows coming up (TD-220), in section `coming`: counted by the rail's *board items* and
+    in no section's number; the fold's rows (`unshown`) join only once it is opened, in the browser."""
     return [
         {
             "section": sec,
@@ -825,8 +883,8 @@ def rail_rows(sections: Mapping[str, Any]) -> list[dict[str, str]]:
             "kind": rail_kind(e),
             "find": row_find(e, sec),
         }
-        for sec in RAIL_SECTIONS
-        for e in sections.get(sec) or ()
+        for sec, rows in [*((s, sections.get(s) or ()) for s in RAIL_SECTIONS), ("coming", ahead)]
+        for e in rows
     ]
 
 
@@ -845,7 +903,8 @@ def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -
 
     def passes(r: Mapping[str, str], skip: str = "") -> bool:
         for g, want in pick.items():
-            if g != skip and want and r[key[g]] not in want:
+            v = RAIL_UNDER.get(r[key[g]], r[key[g]]) if g == "sec" else r[key[g]]
+            if g != skip and want and v not in want:
                 return False
         return find_matches(r["find"], words)
 

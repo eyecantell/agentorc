@@ -339,7 +339,8 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
     with TestClient(uiapp.create_app()) as c:
         page = c.get("/inbox").text
         assert "decide the thing" in page and needs_line(page) == "1"
-        assert "look next week" not in page  # not yet due: counted nowhere (TD-220; drawn by slice 3)
+        # not yet due: drawn under *Board, coming up*, counted nowhere (TD-220 slice 3)
+        assert "look next week" in page and "Board, coming up" in page and needs_line(page) == "1"
         assert "a note from the reader" in page and 'id="boardnote"' in page
         got = c.get("/api/person/inbox").json()
         assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
@@ -487,3 +488,118 @@ def test_the_mode_is_the_persons_setting_as_last_read():
         assert uiconf.board_show() == "next:10"
     finally:
         uiconf.set_read({"person": {}, "migrate": []})
+
+
+@pytest.mark.unit
+def test_the_line_says_the_mode_and_what_it_hides():
+    """§4.5 screen 6 *The board's horizon*: the line that closes the board rows, in each mode's words."""
+    from agentorc.ui.app import board_line
+
+    def line(mode, hidden=0, next_due=""):
+        return board_line({"mode": mode, "hidden": [{}] * hidden, "next_due": next_due})
+
+    assert line("next:10", 14, "2026-10-12") == {
+        "says": "showing the next 10 board items per team",
+        "rest": "14 not shown, the next due Oct 12",
+        "n": 14,
+    }
+    assert line("next:10")["rest"] == "nothing hidden" and line("next:10")["n"] == 0
+    assert line("next:1")["says"] == "showing the next 1 board item per team"
+    assert line("due", 5, "2026-10-04")["says"] == "showing board items that are due"
+    assert line("7d", 3)["says"] == "showing board items due this week" and line("7d", 3)["rest"] == "3 not shown"
+    assert line("14d")["says"] == "showing board items due within 14 days"
+    assert line("all")["says"] == "showing every board item"
+
+
+@pytest.mark.unit
+def test_the_repo_page_cuts_the_inboxs_horizon_to_its_repo():
+    """§4.5 screen 11 *Waiting on you*: the Inbox's rows, lists and line filtered to the repo."""
+    from agentorc.ui.app import board_horizon, horizon_of
+
+    rows = [
+        _row(1, "2026-09-20", due_now=True, root="/a"),
+        _row(2, "2026-10-01", root="/a"),
+        _row(3, "2026-10-02", root="/b"),
+        _row(4, "2026-10-20", root="/a"),
+        _row(5, "2026-10-05", root="/b"),
+    ]
+    h = board_horizon(rows, "next:3")  # one team: the due row, then 2 and 3 take the places
+    got = horizon_of(h, "/a")
+    assert [r["line"] for r in got["due"]] == [1] and [r["line"] for r in got["ahead"]] == [2]
+    assert [r["line"] for r in got["hidden"]] == [4] and got["next_due"] == "2026-10-20"
+    assert h["next_due"] == "2026-10-05" and got["mode"] == "next:3"
+
+
+@pytest.mark.unit
+def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path, monkeypatch):
+    """§4.5 screen 6 *The board's horizon* (TD-220 slice 3): under the due board rows, *Board, coming
+    up (n)* with its due words, the *not shown* fold closed, and the line with **show** and Settings;
+    the counts are the due rows' alone under every mode, and the poll brings the same markup."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+    from agentorc.ui import uiconf
+
+    root = tmp_path / "proj"
+
+    def ahead(line, text, due):
+        return {"line": line, "text": text, "due": due, "overdue_days": None, "due_tag": f"due {due}"}
+
+    items = [item(3, "decide the thing", "2026-09-20", "2d overdue")]
+    items += [ahead(10 + i, f"later item {i}", f"2026-10-{i + 1:02d}") for i in range(12)]
+    rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (rows, ""))
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            return {"list": [], "inbox": {"entries": [], "trail": []}, "host": {"name": "kmaster"}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    try:
+        with TestClient(uiapp.create_app()) as c:
+            page = c.get("/inbox").text
+            assert needs_line(page) == "1"
+            assert 'Board, coming up</span><span class="meta">(9)</span>' in page  # ten places, one due
+            assert "due in 3 d · Oct 1" in page and 'data-section="coming"' in page
+            assert '<summary>not shown (3)</summary>' in page and "later item 11" in page
+            assert "showing the next 10 board items per team · 3 not shown, the next due Oct 10" in page
+            assert 'class="boardshow"' in page and 'href="/settings#sec-you"' in page
+            # the rail's *board items* counts every board row on the page; its *Needs you* the due one
+            assert 'data-value="board"' in page
+            got = c.get("/api/person/inbox").json()
+            assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
+            assert "Board, coming up" in got["html"]["horizon"] and "later item 0" not in got["html"]["needs"]
+            uiconf.set_read({"person": {"inbox": {"board_show": "due"}}})
+            page = c.get("/inbox").text
+            assert "Board, coming up" not in page and needs_line(page) == "1"
+            assert "showing board items that are due · 12 not shown, the next due Oct 1" in page
+            uiconf.set_read({"person": {"inbox": {"board_show": "all"}}})
+            page = c.get("/inbox").text
+            assert "showing every board item · nothing hidden" in page and "not shown (" not in page
+            assert "boardshow" not in page and needs_line(page) == "1"
+    finally:
+        uiconf.set_read({"person": {}, "migrate": []})
+
+
+@pytest.mark.unit
+def test_the_rail_counts_coming_up_as_board_items_and_in_no_section():
+    """§4.5 screen 6: the rail's *board items* counts the rows coming up; *Needs you* does not, and a
+    *Needs you* pick keeps them, as they sit in its section."""
+    from agentorc.ui.app import rail_counts, rail_picks, rail_rows
+
+    due = {"row": "board", "id": "b1", "team": "t", "find": "now"}
+    later = {"row": "board", "id": "b2", "team": "t", "find": "later"}
+    rows = rail_rows({"needs": [due]}, [later])
+    got = rail_counts(rows, rail_picks({}))
+    assert got["kinds"]["board"]["all"] == 2 and got["sections"]["needs"]["all"] == 1
+    assert got["heads"]["needs"]["all"] == 1 and got["teams"]["t"]["all"] == 1
+    picked = rail_counts(rows, rail_picks({"sec": "needs", "kind": "board"}))
+    assert picked["kinds"]["board"]["shown"] == 2 and picked["heads"]["needs"]["shown"] == 1

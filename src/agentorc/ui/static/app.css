@@ -232,6 +232,11 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .mailrow .st { font-size: var(--t-mono-s); color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
 /* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
 .inboxpage .mailrow .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* the board's horizon (§4.5 screen 6, TD-220): rows not yet due in the quiet colour, a sub-heading, the fold and the line */
+.inboxpage .mailrow[data-section="coming"] .body, .inboxpage .mailrow[data-section="unshown"] .body { color: var(--muted); }
+.boardsub { margin: 12px 0 6px; align-items: baseline; } .boardsubh { font-weight: 600; }
+details.boardfold { margin: 6px 0 2px; } details.boardfold > .inboxrows { margin-top: 6px; }
+.boardline { padding: 6px 2px 2px; }
 /* design §4.5a **Inbox row: details** (§4.10, TD-138): a message's text is rendered from the closed
    markdown subset, so its paragraphs are elements and `pre-wrap` would double every break. The fold
    is a quiet, unbordered *details* line — a disclosure, not one of the row's bordered controls. A

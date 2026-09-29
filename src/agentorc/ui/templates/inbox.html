@@ -70,6 +70,8 @@
     <div class="note warn{% if not board_note %} hidden{% endif %}" id="boardnote">{{ board_note }}</div>
     <div class="inboxrows" id="rows-needs">{% with rows = sections.needs, section = 'needs' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is waiting on you.</div>
+    {#- the board's horizon (TD-220): coming up, the fold and the line — its own box, which the poll puts back -#}
+    <div id="boardhorizon">{% with hz = horizon %}{% include "board_horizon.html" %}{% endwith %}</div>
   </section>
 
   <section class="isec" id="sec-steering">
