@@ -117,7 +117,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
-| TD-232 | Build the team card's two readings: the priority letter on a TDs in motion row and its sort, the Doing list's ages and columns on the card and the Repo page | Low | Open — pickable |
+| TD-232 | Build the team card's two readings: the priority letter on a TDs in motion row and its sort, the Doing list's ages and columns on the card and the Repo page | Low | Partly done — slice 1 (#741); next the Doing list's ages and columns |
 | TD-234 | A failed Snooze or Delete on an orphaned question's Inbox row reads *not written: …*, the words for a refused board write | Low | Open |
 
 
@@ -2246,7 +2246,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open
+**Status:** Partly done — **slice 1 built 2026-09-29 (grinder-ao-2, PR #741)**: `motion_rows` carries `priority` (`MOTION_PRIORITIES`), `team_summary.html` draws the chip in a fixed `.mprio` slot, rows sort phase, priority, reference. Next: slice 2, the Doing list's ages and columns.
 **Location:** `src/agentorc/ui/org.py` (`motion_rows`, `doing_rows`), `src/agentorc/ui/templates/team_summary.html` and `repo_part.html`, `src/agentorc/ui/static/app.js` and `app.css`, `src/agentorc/ui/common.py` (a short age beside `_age`, which reads *2h 5m*), `tests/test_ui_*`; design §4.5a *team card: TDs in motion*, *Answer needed / Doing*, §4.5 screen 11.
 
 **Why:** TD-203's and TD-206's: a row in motion does not say how much it matters, and the Doing list cannot be scanned.

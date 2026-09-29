@@ -52,6 +52,7 @@
     {% for x in m.motion %}
     <div class="mrow">
       <span class="phase ph-{{ x.phase }}">{{ x.phase }}</span>
+      {% if x.priority %}<span class="mprio bseg p-{{ x.priority }}" title="{{ x.priority | capitalize }}" aria-label="priority {{ x.priority | capitalize }}">{{ x.priority[0] | upper }}</span>{% else %}<span class="mprio"></span>{% endif %}
       <a class="mono strong" href="{{ m.repo.url if m.repo else '#' }}#{{ x.ref }}">{{ x.ref }}</a>
       <span class="mtitle" title="{{ x.title }}">{{ x.title }}</span>
       <span class="mwho">{% for w in x.members %}<a class="name" href="/focus/{{ w.id }}">{{ w.name }}</a>{% if w.mine %}{{ role_svg('person') }}{% endif %}{{ ', ' if not loop.last }}{% endfor %}</span>

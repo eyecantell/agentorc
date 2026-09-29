@@ -110,6 +110,9 @@ def _pr_states(r: Mapping[str, Any] | None) -> dict[int, dict[str, Any]]:
     return out
 
 
+MOTION_PRIORITIES = ("high", "medium", "low")  # the letters a row in motion draws, in sort order
+
+
 def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
     a `claimed` progress entry, with its **phase** derived here, never declared — *design* on an
@@ -118,8 +121,10 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     `review_pr`, or else an open PR whose head branch names the reference — the tick reads only the
     branch checked out, and a grinder that asked its reader has moved on), *grind* without one; a PR
     that is no longer open keeps *review*, marked *merged* / *closed*, until the member marks the
-    claim done or dropped. A reference two members hold is one row naming both. Rows in phase
-    order, then by reference."""
+    claim done or dropped. A reference two members hold is one row naming both. Each row carries
+    the entry's `priority` — *high*, *medium* or *low*, else '' (a foreign or archived reference, an
+    entry with none or another word), drawn as a letter (TD-232). Rows in phase order, then priority
+    with High first and an unmarked row last, then by reference."""
     entries = {e["id"]: e for e in ((r or {}).get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
     # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
@@ -146,10 +151,13 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
         state = str((known or {}).get("state") or "")
         row["phase"] = "design" if e.get("kind") == "design-first" else "review" if pr else "grind"
         row["title"] = str(e.get("title") or "")
+        prio = str(e.get("priority") or "").lower()
+        row["priority"] = prio if prio in MOTION_PRIORITIES else ""
         row["pr_state"] = state if state in ("merged", "closed") else ""
         row["pr_url"] = str((known or {}).get("url") or (f"{web}/pull/{pr}" if pr and web else ""))
         out.append(row)
-    out.sort(key=lambda x: (PHASES.index(x["phase"]), x["ref"]))
+    rank = {p: i for i, p in enumerate(MOTION_PRIORITIES)}
+    out.sort(key=lambda x: (PHASES.index(x["phase"]), rank.get(x["priority"], len(rank)), x["ref"]))
     return out
 
 
