@@ -2061,7 +2061,7 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-227
-**Status:** Designed 2026-09-28 (the designer, PR #PRNUM; the steer to Paul is `STEERID`, bound STEERBOUND): design §6 *Keeping a team running* rule 8 (**Work for a team that wound down**) and rule 6 (the first write at the declaration, the `owner:` lane word), §4.9a, §5 `teams.<team>.on_work`, §4.7 `ao team on-work`, §4.5a *Inbox row: team start*, *work waiting* note and the Settings page's Teams row; the glossary. The default is `ask`; `start` is the person's setting. The owner words themselves are `org.yml`'s, on the board for Paul. Closes with TD-227.
+**Status:** Designed 2026-09-28 (the designer, PR #721; the steer to Paul is `m-9bcd1abd8d1a`, bound 2026-09-29 10:14 MDT): design §6 *Keeping a team running* rule 8 (**Work for a team that wound down**) and rule 6 (the first write at the declaration, the `owner:` lane word), §4.9a, §5 `teams.<team>.on_work`, §4.7 `ao team on-work`, §4.5a *Inbox row: team start*, *work waiting* note and the Settings page's Teams row; the glossary. The default is `ask`; `start` is the person's setting. The owner words themselves are `org.yml`'s, on the board for Paul. Closes with TD-227.
 **Blocked by:** TD-227
 **Location:** design §6 (*Keeping a team running*, rule 6), §4.9a (wind-down), `src/sessionorc/agent_tick.py` (rule 6: `lane_seen`), the team's Start (`agentorc.teamrun`), TD-133 (schedules)
 
