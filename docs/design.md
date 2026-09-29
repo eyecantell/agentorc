@@ -5998,8 +5998,8 @@ code and needs no grant; a session doing the same work does.
   **(2) checks green**; **(3) nothing in flight and no failure standing** for that repo. With
   **`auto: true`** (§5 `settings.yml` `repos.<repo>.promote.auto`, the Settings page's switch — the one part of the block a person flips, so it left the checked-in file on 2026-09-25) the home promotes when live ≠ main, the three hold, and main has stood still
   for `PROMOTE_SETTLE` (ten minutes) — a burst of merges is one promote, since for this repo every
-  promote restarts the host agent. **`auto` acts only on a live it has read**: while `check` has
-  never answered (live *unknown*, with its reason), the home waits for a reading rather than take
+  promote restarts the host agent. **`auto` acts only on a live it has read**: while `check` is not
+  answering (live *unknown*, with its reason, a last good reading kept beside it), the home waits for a reading rather than take
   unknown for behind, and the row still offers the person's press (Paul, 2026-09-28). With **`auto: false`** the Inbox row (§4.5a *Inbox row:
   promote*) and `ao promote` (§4.7) are the press: refused, naming it, on (1) or (3); on (2) a
   person may press through `pending`, `failed` or `unknown` — a rollback (`--sha`) or a hotfix past

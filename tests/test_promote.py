@@ -183,6 +183,18 @@ def test_auto_waits_for_a_reading_of_live(checkout, monkeypatch, tmp_path):
     assert readings["repo"]["inflight"]["sha"] == main
 
 
+def test_auto_waits_while_check_stops_answering_though_a_last_reading_is_kept(checkout, monkeypatch, tmp_path):
+    monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    first = readings["repo"]["live"]
+    assert first and readings["repo"]["inflight"] is None  # live is main: nothing to do
+    (tmp_path / "live").unlink()  # `check` stops answering
+    _merge(checkout, "b")
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["live"] == first and r["live_why"] and r["inflight"] is None
+
+
 def test_auto_promotes_once_and_the_outcome_is_read_from_check(checkout, monkeypatch):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
     _merge(checkout, "b")

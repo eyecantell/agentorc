@@ -403,9 +403,11 @@ def survey(
             r["inflight"] = inflight(repo)
         r["auto"] = bool(auto.get(repo))
         behind = bool(r.get("main")) and r.get("live") != r["main"]
-        # `auto` acts only on a live it has read (§6, Paul 2026-09-28): a `check` that never
-        # answered is *unknown*, not behind — the row still offers the person's press
-        if r["auto"] and behind and r.get("live") and unmet(r) is None and settled(r.get("moved"), now):
+        # `auto` acts only on a live it has read (§6, Paul 2026-09-28): a `check` that is not
+        # answering is *unknown*, not behind — even with a last good reading kept beside its why —
+        # and the row still offers the person's press
+        read = bool(r.get("live")) and not r.get("live_why")
+        if r["auto"] and behind and read and unmet(r) is None and settled(r.get("moved"), now):
             r["inflight"] = start(root, repo, r["main"], b["run"], "auto", r.get("ahead"))
         u = unmet(r)
         r["unmet"] = {"name": u[0], "text": u[1]} if u else None
