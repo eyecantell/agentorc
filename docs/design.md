@@ -5954,8 +5954,10 @@ code and needs no grant; a session doing the same work does.
      still never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a
      running team's brief; the template is the installed package's, so it is what was promoted.
-     A file that cannot be read, or a launch record with no `prompt_from` (`ao new --prompt`, a
-     record written before this), replays the stored prompt as before — the one the last create
+     *Origin's default* is `origin/HEAD`, else `origin/main`, else `origin/master`; a file in a
+     checkout with no origin is read from disk. A file that cannot be read, a launch record with
+     no `prompt_from` (`ao new --prompt`, a record written before this), or a member on a node
+     (its files are that host's, and the home reads its own disk) replays the stored prompt as before — the one the last create
      was handed, a refill included — and the `restarts` entry says so (`prompt: stored`). **The tick sees the change.** The record carries
      **`brief: {at, sources: [{path, sha}]}`** (home-owned), written at each create from the
      files as they were read; on the reports' cadence the home reads each source the same way

@@ -165,6 +165,27 @@ async def test_a_prompt_typed_whole_replays_as_stored(agent, tmp_path):
         await person.call("kill", id=sid)
 
 
+async def test_a_member_on_a_node_replays_its_stored_prompt(agent, tmp_path):
+    """The techlead's read of #745: a member on a node replays as stored — its `prompt_from` names
+    files on that host, and the home reads its own disk — even when the home could read a file of
+    that path; the `restarts` entry says `prompt: stored`."""
+    from types import SimpleNamespace
+
+    repo = _repo(tmp_path)
+    _merge(repo, "merged\n")
+    made = _made_from(tmp_path, repo)
+    params = {"prompt": "as handed", "prompt_from": made}
+    entry: dict = {}
+    node = SimpleNamespace(id="ao-w", host=f"{agent.host}-node")
+    assert await agent._refill_prompt(node, params, entry) is None
+    assert entry == {"prompt": "stored"} and params["prompt"] == "as handed"
+    # the same launch record on the home refills from the merged file
+    entry = {}
+    here = SimpleNamespace(id="ao-w", host=agent.host)
+    assert (await agent._refill_prompt(here, params, entry))["sources"]
+    assert entry == {} and params["prompt"] == "P\nbase: merged / lane TD-1\n"
+
+
 @pytest.mark.integration
 async def test_a_scheduled_start_keeps_prompt_from_and_fills_it_at_the_instant(agent, tmp_path):
     """The techlead's note on #714: a create with `start_at` keeps `prompt_from` through
