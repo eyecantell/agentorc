@@ -1418,6 +1418,22 @@
       if (top) el.scrollTop = top;
     });
   };
+  // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays
+  // — so the words are carried across the poll's swap, by the row's entry id, as a Deny reason is
+  AO.rowErrs = function (root) {
+    const kept = {};
+    if (root) root.querySelectorAll(".rowerr:not([hidden])").forEach((el) => {
+      const row = el.closest(".mailrow");
+      if (row && row.dataset.msg) kept[row.dataset.msg] = el.textContent;
+    });
+    return kept;
+  };
+  AO.restoreRowErrs = function (root, kept) {
+    if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
+      const text = kept[el.closest(".mailrow").dataset.msg];
+      if (text) { el.textContent = text; el.hidden = false; }
+    });
+  };
   AO.restoreDenyWhys = function (root, kept) {
     if (!root) return;
     root.querySelectorAll("input.denywhy").forEach((i) => {
@@ -1475,9 +1491,10 @@
       // its place when a key's press ended it.
       const on = document.activeElement, ring = on && on.matches && on.matches(".mailrow") && el && el.contains(on) ? on : null;
       if (el && AO.maySwapSection(el, ring ? null : on)) {
-        const kept = AO.denyWhys(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
+        const kept = AO.denyWhys(el), errs = AO.rowErrs(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
         el.innerHTML = got.html[k] || "";
         AO.restoreDenyWhys(el, kept);
+        AO.restoreRowErrs(el, errs);
         AO.reopenFolds(el);
         if (ring) {
           const rows = $$(".mailrow", el), back = rows.find((r) => r.dataset.msg === ring.dataset.msg) || rows[at] || rows[rows.length - 1];
