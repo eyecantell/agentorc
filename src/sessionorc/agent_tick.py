@@ -580,8 +580,11 @@ class TickMixin:
             return
         if s.out_of_work or s.restart_wanted:
             return  # it declared: rule 2 or the team's next start is what starts it
-        # the tick's own close, then a replay that failed, leaves it `closed`: still the tick's to retry
-        closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "brief"
+        # the tick's own close or replay that failed leaves it `closed` with an `error` entry: still the
+        # tick's to retry. A successful brief restart leaves a `brief` entry too, so without the error a
+        # `closed` record is a person's Close, never undone (the techlead's read of #748)
+        last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
+        closed_by_tick = s.state == "closed" and last.get("why") == "brief" and bool(last.get("error"))
         if not closed_by_tick:
             if s.state != "idle" or s.confidence != "hook" or s.pending:
                 return

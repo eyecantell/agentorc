@@ -5974,7 +5974,9 @@ code and needs no grant; a session doing the same work does.
      the mark is never *early*, and a member that has declared, or a seat, is not given the clause; a member that is
      **hook-confirmed `idle`, holds no claim in progress, has declared nothing, and has nothing
      uncommitted or unpushed** (known, as in rule 2) **is restarted by the tick itself**, closed
-     first and replayed, `restarts: [{why: brief}]`, under the ceiling as every replay is. That
+     first and replayed, `restarts: [{why: brief}]`, under the ceiling as every replay is; a close
+     or replay that failed keeps its `brief` entry with `error`, counts toward the ceiling, and is
+     tried again by the tick, while a Close by anyone else is never undone. That
      second case is the manager's: it sits idle between rounds, its round log is a file and not
      its context (§4.8 *A session's round log*), and nothing of a round is lost with the run.
      Never a seat (each fill is a replay and so reads the files anyway), never a member that

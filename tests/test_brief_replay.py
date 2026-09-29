@@ -6,6 +6,7 @@ carries `brief: {at, sources: [{path, sha}]}` from each create."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -353,7 +354,15 @@ async def test_an_idle_member_whose_brief_changed_is_restarted_once_on_the_new_b
         new.state, new.confidence, new.git = "idle", "hook", {"dirty": 0, "unpushed": 0}
         await agent._keep_running(now + RESTART_SETTLE + timedelta(seconds=1))
         assert [r["why"] for r in agent.sessions[sid].restarts] == ["brief"]  # no mark, no second restart
-        await person.call("kill", id=sid)
+        # marked again, then closed by a person: a Close is never undone (the techlead's read of #748)
+        again = agent.sessions[sid]
+        _mark(again)
+        await person.call("close", id=sid)
+        await agent._keep_running(now + 2 * RESTART_SETTLE + timedelta(seconds=2))
+        assert agent.sessions[sid].state == "closed"
+        assert [r["why"] for r in agent.sessions[sid].restarts] == ["brief"]
+        with contextlib.suppress(Exception):
+            await person.call("kill", id=sid)
 
 
 @pytest.mark.integration
