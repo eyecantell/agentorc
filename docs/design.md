@@ -655,7 +655,13 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   that is not archived — one still open, or one found in neither the ledger nor its archive,
   which keeps the block — or names a `decision (<who>)`, or holds an item the rule cannot read
   (neither an id nor a decision, or anything listed after the decision), which keeps the block
-  too; every other entry is **pickable**, one with no such line or an empty one included. The
+  too; every other entry is **pickable**, one with no such line or an empty one included. An
+  id written `<repo>#TD-NNN` (cadence §2.4, TD-071 there; `owner/name#TD-NNN` where two repos
+  share a name) names **another repo's entry**: the home looks for that repo among the
+  checkouts its registry lists and reads that repo's ledger and archive as it reads any —
+  archived there, the block lifts; open there, it blocks; a repo the registry does not list, or
+  an id in neither of that repo's files, keeps the block. The script asks cadence's roster and
+  the home its own registry, so the two agree wherever both list the repo. The
   reader takes the archive from beside the ledger (the ledger's name with `_archive` before
   its suffix, which for the default is cadence's `technical_debt_archive.md`; none there,
   nothing is archived), and each entry carries `type` (`debt` where unwritten), `blocked_by`
