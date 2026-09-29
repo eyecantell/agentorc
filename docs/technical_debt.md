@@ -2010,7 +2010,7 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-232
 **Blocked by:** TD-232
-**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: TDs in motion* (**Priority**): one letter between the phase and the reference, drawn as the priority bar's chip in a slot of fixed width, empty for a reference the ledger reading does not hold or an entry with no known priority; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-232.
+**Status:** Designed 2026-09-28 (the designer, PR #730, which replaced #727): design §4.5a *team card: TDs in motion* (**Priority**): one letter between the phase and the reference, drawn as the priority bar's chip in a slot of fixed width, empty for a reference the ledger reading does not hold or an entry with no known priority; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-232.
 **Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/org.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
 
 **Why:** a row reads *phase · reference · title · holder · PR*. Whether the team has its High entries in hand or is grinding Lows is not visible without opening the ledger. The ledger reading already carries each entry's `priority` (`sessionorc/ledger.py`), so the data is there.
@@ -2043,7 +2043,7 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-232
 **Blocked by:** TD-232
-**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: a short age of one unit with the exact time, in the reader's clock, on hover, ticking in the browser once a minute; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-232.
+**Status:** Designed 2026-09-28 (the designer, PR #730, which replaced #727): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: a short age of one unit with the exact time, in the reader's clock, on hover, ticking in the browser once a minute; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-232.
 **Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
 
 **Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
