@@ -887,7 +887,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
   `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `restart_blocked`,
-  `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5),
+  `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` and `brief_changed` (§6 rule 7, TD-199; not built),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
@@ -2385,6 +2385,7 @@ noted). If a control is not in this table it does not exist.
 | New session | **At** field | designed (TD-026, §6 *Start time*; built 2026-09-27 — TD-152): the start time the session waits for: `20:00` (the next one, in your clock), `+2h`, or an ISO time; empty means start now. Refused on a session that is not **Unattended**, as **Until** is, and refused with an Until that is not after it; Start then creates a `scheduled` record and the Org shows its card with the *starts* note |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line (TD-053). On a card it moves into the slot (TD-095): the fixed words, then the first line of the reason as text, clamped, the whole of it and the time of the declaration on hover — and no age of its own, since a card has one clock; the Focus header keeps the chip. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a). The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller does not act on one — so it is drawn as wanting a person instead |
+| card / Focus header | **brief changed** chip | designed 2026-09-28 (TD-199; not built — TD-217; §6 *Keeping a team running* rule 7). When the record carries `brief_changed`: fixed words, and on hover, as text, the files that changed by name and when (*manager.md · changed 2026-09-26 14:02*) — paths the home read, nothing a session wrote. Drawn as the *restart wanted* chip is and where it is, and for the same reason a mark, never pressable, and not a state. It goes when the member is next started. `ao status -v` prints `brief: changed <when> (<files>)`, and `--json` carries `brief` and `brief_changed`. No Inbox row: nothing waits on the person — the tick restarts an idle member and a working one is told on its `ao` replies; a member it cannot restart reaches the Inbox as any restart past its ceiling does (*Inbox row: restart*) |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a, TD-053); on the team's card, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
 | Org | team card: **starts** note | display only (TD-026, §6 *Schedule*; not built — TD-133): on a team card with nothing live whose name carries a rule in `settings.yml` (`teams.<team>.schedule`), beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant from the account's reading, in the reader's clock, by the formatter the *stops* note uses. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
@@ -3121,8 +3122,9 @@ carries `role` and the repo's `ledger:` (so the derived-report tick reads the ri
 **A repo's brief is a supplement, never a replacement** (TD-114). A template holds the mechanics of
 agentorc — the round and `ao wait`, the declarations a run ends with, the crash-restart ceiling and
 the seat rules, the usage gate's pause, mail's kinds and outcomes, permission triage, the never-list
-of `ao` verbs — and it ships in the package, so a promote changes every team's rules at once, as it
-changes the host agent that enforces them. What a repo writes is only what the package cannot know:
+of `ao` verbs — and it ships in the package, so a promote changes every team's rules, as it
+changes the host agent that enforces them: at a member's next start, and for a running member by
+§6 *Keeping a team running* rule 7 (TD-199; designed, not built — until then a running member keeps the brief it started with, and a restart replays it). What a repo writes is only what the package cannot know:
 the first reads, the gate command, the standing rules that are that repo's own (what is never
 deployed, which files keep CRLF, what waits on the person), the shape of its lane. That text — a
 team definition's `brief:` on a manager or a member, a repo's `roles.<name>.brief`, and `ao new
@@ -5688,8 +5690,9 @@ code and needs no grant; a session doing the same work does.
   record carries `supervised` — attended or not, so a *Resume with changes…* that leaves
   *Unattended* off still writes one and a later Hand back replays the person's latest choices —
   the host agent writes `launch/<id>.json` under its home — the adapter, the profile, the
-  prompt as handed (placeholders filled), the lane and the fields above — and a restart is that
-  record handed to `create` again, never the definition re-read (the host agent does not read
+  prompt as handed (placeholders filled) and the files and texts it was made from (`prompt_from`,
+  rule 7; designed, not built — TD-217), the lane and the fields above — and a restart is that
+  record handed to `create` again, its prompt filled afresh from `prompt_from` once rule 7 is built, never the definition re-read (the host agent does not read
   `org.yml`, §4.9). The launch record is deleted with the record on Forget and kept across a
   supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
   live session — is not retried silently: it counts toward the ceiling as any restart does, keeping its `why` and carrying the
@@ -5716,7 +5719,7 @@ code and needs no grant; a session doing the same work does.
      (only the session that exited, never its siblings) — the numbers §4.8 took from OTP, systemd
      and Circus, now constants. Each restart is appended to the record's `restarts: [{at, why}]`
      (home-owned, carried across the supersede so the count survives the restart it counts);
-     `why` is `crash`, `wanted` or `fill`, and a replay that failed keeps its `why` and adds
+     `why` is `crash`, `wanted` or `fill` (and `start`, `schedule` and rule 7's `brief`, each named where it is written), and a replay that failed keeps its `why` and adds
      `error` (the text), so a failed entry still says what it was trying. At the ceiling the policy stops, writes
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
      says *restarts exhausted · 3 in 2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it
@@ -5847,6 +5850,46 @@ code and needs no grant; a session doing the same work does.
      definition again (§4.9a), and new work waits for a person's Start — starting on work
      appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
+  7. **Brief changed** (TD-199; designed 2026-09-28; not built — TD-217). A member reads its
+     brief once, at its start, and until this rule a restart replayed the prompt its first start
+     was handed: manager-ao-1, started 2026-09-25, ran a template two merges old for three days,
+     and no restart would have given it the new one. Two halves. **A replay reads the brief's
+     files again.** The client that composes a brief (§4.8) hands the create, beside the filled
+     `prompt`, what it was made from — **`prompt_from: {base, slots}`**: `base` the template's
+     path as installed, and each slot either `{file: <path>}` (the repo's supplement, the seat's
+     primer) or `{text: …}` (the lane, the techlead's and the manager's ids, `none`) — and the
+     launch record keeps it. A replay — rules 1, 2 and 3, and this one — fills `base`'s slots
+     from those files and texts, plain replacement of the slot's name and nothing else, and hands
+     that to `create`; the host agent knows a file and a slot and no role, template or team, and
+     still never reads a definition. A file inside a checkout is read **as merged** —
+     `origin/<default>:<path>` as last fetched — so a branch checked out there is never a
+     running team's brief; the template is the installed package's, so it is what was promoted.
+     A file that cannot be read, or a launch record with no `prompt_from` (`ao new --prompt`, a
+     record written before this), replays the stored prompt as before, and the `restarts` entry
+     says so (`prompt: stored`). **The tick sees the change.** The record carries
+     **`brief: {at, sources: [{path, sha}]}`** (home-owned), written at each create from the
+     files as they were read; on the reports' cadence the home reads each source the same way
+     and, when one differs for **ten minutes** (`BRIEF_SETTLE`: a run of merges is one change),
+     writes **`brief_changed: {at, paths}`**, cleared by the next create under the name. The
+     card and `ao status -v` say it (§4.5a **brief changed** chip). Then, as rule 5 does and in
+     the same two ways: a member that is **`working`** is not interrupted — every `ao` reply it
+     makes ends with *(your brief changed — finish what you hold, then `ao progress restart
+     --why "brief changed"`)*, and rule 2 restarts it on its word; a member that is
+     **hook-confirmed `idle`, holds no claim in progress, has declared nothing, and has nothing
+     uncommitted or unpushed** (known, as in rule 2) **is restarted by the tick itself**, closed
+     first and replayed, `restarts: [{why: brief}]`, under the ceiling as every replay is. That
+     second case is the manager's: it sits idle between rounds, its round log is a file and not
+     its context (§4.8 *A session's round log*), and nothing of a round is lost with the run.
+     Never a seat (each fill is a replay and so reads the files anyway), never a member that
+     declared `out_of_work` (its next start is the team's), never an interactive session, never
+     past a stop time, into a wrap-up, a gate pause or a suspension, and not on a node yet, as
+     rule 4's nudge is not. **The manager stays outside rule 5's context bound** (§4.8): this
+     rule and a crash are what restart it, and its reading is drawn for a person to judge.
+     **Not covered, on purpose**: a team's first start still reads a `brief:` from the checkout's
+     working tree (§4.9); when that differs from what is merged, the record says *brief changed*
+     ten minutes later and the rule above brings the merged text, which is the honest reading of
+     a team started from a branch. `org.yml` is not a brief's file: a changed lane, profile or
+     member is a person's Start or **Members…**.
 
 - **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
   `sessionorc.promote`; the press — `promote`, `clear_promote`, `ao promote` — slice 2; the Inbox
