@@ -370,7 +370,25 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
         mode, label, url = (str(o) if o in ("vscode", "none") else "vscode"), "", ""
     term = person.get("terminal") if isinstance(person.get("terminal"), dict) else {}
     lo, hi = settings_mod.TERMINAL_SIZE
+    # **board items shown** (§4.5a, TD-220 slice 4): the pick of four and its two numbers, 10 and 7 until typed
+    inbox = person.get("inbox") if isinstance(person.get("inbox"), dict) else {}
+    try:
+        show = settings_mod.parse_board_show(inbox.get("board_show"))
+    except ValueError:
+        show = settings_mod.BOARD_SHOW_DEFAULT
+    board_next, board_days = 10, 7
+    if show.startswith("next:"):
+        board_mode, board_next = "next", int(show.split(":", 1)[1])
+    elif show.endswith("d"):
+        board_mode, board_days = "days", int(show[:-1])
+    else:
+        board_mode = show
     return {
+        "board_mode": board_mode,
+        "board_next": board_next,
+        "board_days": board_days,
+        "board_next_bounds": settings_mod.BOARD_SHOW_NEXT,
+        "board_days_bounds": settings_mod.BOARD_SHOW_DAYS,
         "open_in": mode,
         "label": label,
         "url": url,

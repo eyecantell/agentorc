@@ -1703,9 +1703,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/you")
     async def settings_you(request: Request):
-        """§4.5a *Settings page: You* → **Save**: `{open_in?, terminal?: {size?, face?, copy_on_select?}}` into
-        `person:` through `set_settings`, which validates each and refuses a session. `open_in` is
-        `vscode`, `none` or `{label, url}` — a template the UI would refuse (§5: its scheme) is
+        """§4.5a *Settings page: You* → **Save**: `{open_in?, terminal?: {size?, face?, copy_on_select?},
+        inbox?: {board_show?}}` into `person:` through `set_settings`, which validates each and refuses a
+        session. `open_in` is `vscode`, `none` or `{label, url}` — a template the UI would refuse (§5: its scheme) is
         refused here in the same words, before it is written; a `null` clears a key."""
         body = await body_of(request)
         change: dict[str, Any] = {}
@@ -1721,8 +1721,13 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not isinstance(term, dict) or not set(term) <= {"size", "face", "copy_on_select"}:
                 raise HTTPException(400, "you: terminal takes size, face and copy_on_select")
             change["terminal"] = term
+        inbox = body.get("inbox")
+        if inbox is not None:  # **board items shown** (§4.5a, TD-220 slice 4); `set_settings` refuses a bad value
+            if not isinstance(inbox, dict) or not set(inbox) <= {"board_show"}:
+                raise HTTPException(400, "you: inbox takes board_show")
+            change["inbox"] = inbox
         if not change:
-            raise HTTPException(400, "you: send open_in or terminal")
+            raise HTTPException(400, "you: send open_in, terminal or inbox")
         return answer(await call("set_settings", person=change))
 
 
