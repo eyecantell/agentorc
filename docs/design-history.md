@@ -334,6 +334,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-28 (TD-213, the designer): a row for the **orphaned question** — the question's own row with a standing line in the board row's words, no Pause and no Open — and the Inbox's count gains the orphaned `steer` past its bound.
 - 2026-09-28 (TD-199, the designer): the **brief changed** chip, beside *restart wanted* and drawn as it is.
 - 2026-09-28 (TD-207, the designer): two rows — **Board, coming up** with the **not shown** fold and its line, and the Settings page's **board items shown**.
+- 2026-09-28 (TD-203 and TD-206, the designer; Paul, 2026-09-27: *add priority to "TDs in Motion" list on the teams card*, and *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*): a TDs in motion row gained its priority as one letter in the priority bar's hue and sorts by it inside a phase; the Doing list's clock time, which had been cut to *21:…*, became an age that ticks in the browser, and its three fields columns. A row had read phase, reference, title, holder, with nothing to say a High entry was in hand.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
