@@ -5626,7 +5626,7 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   invariant 2, not a per-repo choice.
 
   **`promote:`** (TD-120 step 2, designed 2026-09-24; read by the home since TD-132 slice 1, run
-  under `auto` alone until the press is built; the block is accepted and
+  under `auto` or at a person's press; this repo carries one since TD-132 slice 4; the block is accepted and
   checked already — `run` and `check`, both required, `auto` refused as `settings.yml`'s — so
   writing it does not break `ao new`, TD-149) is the repo's own
   answer to *how does `main` become what is running*, and nothing in agentorc names pip, a venv,
@@ -5973,7 +5973,7 @@ code and needs no grant; a session doing the same work does.
 
 - **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
   `sessionorc.promote`; the press — `promote`, `clear_promote`, `ao promote` — slice 2; the Inbox
-  row slice 3; this repo's block not yet): a repo's live copy — the
+  row slice 3; this repo's block slice 4, `.agentorc.yml`): a repo's live copy — the
   host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`
   by **a person's press or this policy, never by a session** (CLAUDE.md: a worker never promotes;
   the `promote` RPC is refused to a session as `set_settings` is, §4.7). It runs **at the home**
@@ -5998,7 +5998,9 @@ code and needs no grant; a session doing the same work does.
   **(2) checks green**; **(3) nothing in flight and no failure standing** for that repo. With
   **`auto: true`** (§5 `settings.yml` `repos.<repo>.promote.auto`, the Settings page's switch — the one part of the block a person flips, so it left the checked-in file on 2026-09-25) the home promotes when live ≠ main, the three hold, and main has stood still
   for `PROMOTE_SETTLE` (ten minutes) — a burst of merges is one promote, since for this repo every
-  promote restarts the host agent. With **`auto: false`** the Inbox row (§4.5a *Inbox row:
+  promote restarts the host agent. **`auto` acts only on a live it has read**: while `check` has
+  never answered (live *unknown*, with its reason), the home waits for a reading rather than take
+  unknown for behind, and the row still offers the person's press (Paul, 2026-09-28). With **`auto: false`** the Inbox row (§4.5a *Inbox row:
   promote*) and `ao promote` (§4.7) are the press: refused, naming it, on (1) or (3); on (2) a
   person may press through `pending`, `failed` or `unknown` — a rollback (`--sha`) or a hotfix past
   a flaky check is the person's word — with the row saying what the checks said. **The run is
@@ -6020,8 +6022,13 @@ code and needs no grant; a session doing the same work does.
   **nothing further is promoted for that repo, auto or press, until the person clears it** — the
   row's Dismiss, or a press that succeeds. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
-  contract, and a blocked `wait` ends with the socket as §4.7 says. Until this repo's block (TD-132
-  slice 4) lands, the anchor promotes by hand as CLAUDE.md says.
+  contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
+  pair: `run` rebuilds the live venv from the checkout (its path from where it runs, never written
+  in) and `ao service install` replaces client and host agent together; `check` prints the live
+  install's build commit (§4.4 *What is running says which commit it is*), or exits 1 with *build
+  unknown*. The home reads it from the checkout, so it stands as soon as the checkout's `main` holds
+  it; with `auto` off, the row or `ao promote` is the person's press, and CLAUDE.md's pair by hand
+  stays the fallback while the agent is down.
 - **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general

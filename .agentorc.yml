@@ -1,0 +1,11 @@
+# agentorc's own answer to how `main` becomes what is running (design §5 `promote:`, §6 *Promote*;
+# TD-132 slice 4). The home runs both in this checkout. `run` is CLAUDE.md's promote pair: it
+# rebuilds the live venv from this checkout and replaces the client and the host agent together,
+# which restarts the agent that started it (sessions live in tmux and survive it). `check` prints
+# the commit the live install was built from, or fails saying why. Whether the home promotes on
+# its own is `auto`, the Settings page's switch (`settings.yml`), never this file.
+promote:
+  run: V="$HOME/.local/share/agentorc-venv/bin"; "$V/pip" install --upgrade "$(pwd -P)[ui]" && "$V/ao" service install
+  check: >-
+    "$HOME/.local/share/agentorc-venv/bin/python" -c 'import sys; from sessionorc import build;
+    c = build.info().get("commit"); print(c) if c else sys.exit("build unknown: the live install carries no build record")'
