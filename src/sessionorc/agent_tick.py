@@ -1554,7 +1554,7 @@ class TickMixin:
         # its bound runs whatever becomes of the addressee, so the sender's copy lapses on time.
         for e in [e for e in gone.inbox if e.open and e.kind != "steer"]:
             self._close_entry(e.id, "expired", now_iso())
-        self._asker_gone(gone, self._address(gone))
+        self._asker_gone(gone, self._address(gone), how="forgotten")
         self._attention_gone(gone, "forgotten")
         self.sessions.pop(sid, None)
         self.store.delete(sid)

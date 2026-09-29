@@ -4810,8 +4810,9 @@ spent budget cannot hold a sender past the bound it set itself. A sender blocked
 its own `steer` is released at the bound; one that carried on working meets the line at its next
 `ao inbox`.
 
-**A question about a reference outlives its asker (TD-213, designed 2026-09-28; not built —
-TD-215, TD-216).** A question is about the work, not about the run that asked it, and a team's
+**A question about a reference outlives its asker (TD-213, designed 2026-09-28; the home's half
+built — TD-215; where the answer goes and the row not built — TD-216, and until then a person's
+answer to an orphaned question is refused in words, while Delete declines it).** A question is about the work, not about the run that asked it, and a team's
 wind-down closes every finished member (§4.9a): on 2026-09-28 one closed two members and with
 them a `steer` and an `ask` the ledger still waited on, before the person had seen either. So the
 asker's going ends a question **only when the question names no reference**. An open `ask` or
@@ -4844,7 +4845,8 @@ than above: its questions moved with the conversation and are not orphaned.
   `reply`, carrying the question's `about`, and the session owes the outcome (*Outcomes*, below).
   A `steer` adopted before its bound lapses to the successor on time, and because the successor
   did not write it the `system` note names what it needs: *steer m-… about TD-149 lapsed: the
-  default was "<default>"*. One adopted after its bound was cleared stays without a clock.
+  default was "<default>"* (the entry keeps `adopted_at` for it). A create the home did not see —
+  a node's — is adopted on the next sweep, before any bound is read. One adopted after its bound was cleared stays without a clock.
 - **Where the person's answer goes while it is orphaned** is where a board reply goes (§4.5a *Due
   strip / Inbox board row → Reply*, TD-126): the question is the same one — who still holds the
   context — and the lease answers it. **Reply**, a suggested answer and ***Go with it*** do two

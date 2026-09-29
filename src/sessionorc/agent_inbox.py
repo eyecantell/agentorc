@@ -22,6 +22,7 @@ from sessionorc.agent_common import (
     _parse,
     _prune_tallies,
     log,
+    orphaned_refusal,
 )
 from sessionorc.models import (
     ATTENTION_KINDS,
@@ -290,6 +291,8 @@ class InboxMixin:
             raise RpcError(f"{msg} is closed ({e.closed_reason}): there is no clock left to stop (design §4.10)")
         if e.paused_at:
             raise RpcError(f"{msg} is already paused")
+        if e.orphaned:  # a pause tells a session to hold, and there is none (§4.5a *orphaned question*: no Pause)
+            raise RpcError(f"{msg} is orphaned: its asker is gone, so there is no session to hold (design §4.10)")
         self._mark(msg, paused_at=now_iso())
         self._system_note(e.from_, f"steer {msg} paused by the person: do not take your default yet", wake="person")
         await self._push_changes()
@@ -322,6 +325,8 @@ class InboxMixin:
             raise RpcError(f"Go with it answers a steer, which carries the default: {msg} is a {e.kind} (§4.10)")
         if not e.open:
             raise RpcError(f"{msg} is already closed ({e.closed_reason})")
+        if e.orphaned:
+            raise RpcError(orphaned_refusal(e))
         self._close_entry(msg, "go_with_it", now_iso())
         self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person")
         await self._push_changes()
@@ -337,6 +342,7 @@ class InboxMixin:
         outright, whatever `bound` reads. An `ask` to the person carries no bound at all, so nothing
         here ever reaches it."""
         stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        self._adopt_orphans()  # before the bounds: an adopted `steer` lapses to its successor on time
         for r in list(self._graph().values()):
             for e in list(r.inbox):
                 if not e.open or e.paused_at:
@@ -380,10 +386,20 @@ class InboxMixin:
         """A bound that ran out (design §4.10): a `steer` **lapses** — `closed_reason: lapsed`,
         never `expired_at`, because nothing failed — and the sender is told by a `system` note that
         wakes it **uncharged**, so a spent budget cannot hold it past the bound it set itself. An
-        `ask` or a `conflict` expires, as it always has."""
-        if e.kind == "steer":
+        `ask` or a `conflict` expires, as it always has.
+
+        **An orphaned `steer` does not lapse** (§4.10 *A question about a reference outlives its
+        asker*): nobody is left to take the default, so its `bound` is cleared and it stays open —
+        from then on an `ask` for this sweep — and nothing is told. One **adopted** by a successor
+        lapses as any does, but the successor did not write it, so the note names the default."""
+        if e.kind == "steer" and e.orphaned:
+            self._mark(e.id, bound=None)
+        elif e.kind == "steer":
             self._close_entry(e.id, "lapsed", stamp)
-            self._system_note(e.from_, f"steer {e.id} lapsed: go with your default", wake="uncharged")
+            text = f"steer {e.id} lapsed: go with your default"
+            if e.adopted_at:
+                text = f'steer {e.id} about {e.about} lapsed: the default was "{e.default}"'
+            self._system_note(e.from_, text, wake="uncharged")
         else:
             self._close_entry(e.id, "expired", stamp)
 

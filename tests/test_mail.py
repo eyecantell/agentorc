@@ -1194,6 +1194,130 @@ async def test_asker_gone_closes_the_persons_questions_on_close_and_forget_but_n
         assert await reason(asks[a]) == "asker_gone"
 
 
+async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
+    """Design §4.10 *A question about a reference outlives its asker* (TD-213, TD-215): a wind-down
+    closes two members, each with an open question to the person whose `about` names a reference —
+    both stay open, stamped `orphaned` from the record; one with no `about`, and one whose `about`
+    is prose, close `asker_gone` as before; a forget after the close keeps the first stamp; and an
+    answer is refused until TD-216 builds where it goes, while Delete still declines."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        a, b = [await mk(n, unattended=True, team="ao-grind") for n in ("a", "b")]
+        async with LocalClient(caller=a) as s:
+            ask = (await s.call("msg", to="person", text="which?", kind="ask", about="td-149"))["entry"]["id"]
+            bare = (await s.call("msg", to="person", text="and?", kind="ask"))["entry"]["id"]
+        async with LocalClient(caller=b) as s:
+            steer = (await s.call("msg", to="person", text="or?", kind="steer", default="this", about="#702"))["entry"][
+                "id"
+            ]
+            prose = (await s.call("msg", to="person", text="so?", kind="ask", about="the board line"))["entry"]["id"]
+        await person.call("inbox_pause", msg=steer)
+
+        async def held(mid: str):
+            return [e for e in (await person.call("inbox"))["entries"] if e["id"] == mid][0]
+
+        for sid in (a, b):  # the wind-down: `team stop --close` closes each finished member
+            await person.call("close", id=sid)
+        for mid, ref, name in ((ask, "TD-149", "a"), (steer, "#702", "b")):
+            e = await held(mid)
+            assert e["closed_reason"] is None and e["about"] in ("td-149", "#702")  # `about` is not rewritten
+            o = e["orphaned"]
+            assert (o["how"], o["ref"], o["name"], o["team"], o["repo"]) == ("closed", ref, name, "ao-grind", "")
+            assert o["host"] == agent.host and o["at"]
+        assert (await held(steer))["paused_at"] is None  # a pause is a hold on a session that is gone
+        assert [(await held(m))["closed_reason"] for m in (bare, prose)] == ["asker_gone", "asker_gone"]
+        assert (await held(bare))["orphaned"] is None
+        # a forget after the close keeps the first stamp
+        first = (await held(ask))["orphaned"]
+        await person.call("remove", id=a)
+        assert (await held(ask))["orphaned"] == first and (await held(ask))["closed_reason"] is None
+        # an answer has nowhere to go yet (TD-216): refused, and nothing is sent
+        with pytest.raises(AgentError, match="orphaned.*TD-216"):
+            await person.call("msg", text="the first", kind="reply", reply_to=ask)
+        with pytest.raises(AgentError, match="orphaned.*TD-216"):
+            await person.call("inbox_go_with_it", msg=steer)
+        with pytest.raises(AgentError, match="orphaned: its asker is gone"):
+            await person.call("inbox_pause", msg=steer)
+        assert (await held(ask))["closed_reason"] is None and (await held(steer))["closed_reason"] is None
+        # Delete declines it, as on any open question
+        await person.call("inbox_delete", msg=ask)
+        assert (await held(ask))["closed_reason"] == "declined"
+
+
+async def test_an_orphaned_steer_loses_its_bound_instead_of_lapsing(agent, tmp_path):
+    """Design §4.10: at an orphaned `steer`'s bound nobody is left to take the default, so the home
+    clears `bound` and leaves it open — an `ask` for the sweep from then on — and nothing is told."""
+    async with LocalClient() as person:
+        w = await _mk(person, tmp_path)("w", unattended=True)
+        async with LocalClient(caller=w) as s:
+            steer = (await s.call("msg", to="person", text="or?", kind="steer", default="x", about="TD-5", bound=0.2))[
+                "entry"
+            ]["id"]
+        await person.call("close", id=w)
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        await agent._sweep_mail(datetime.now(UTC))
+        e = [e for e in (await person.call("inbox"))["entries"] if e["id"] == steer][0]
+        assert (e["closed_reason"], e["bound"], e["orphaned"]["how"]) == (None, None, "closed")
+        assert (await person.call("inbox", id=w))["entries"] == []  # nothing told: no lapse note
+
+
+async def test_a_create_under_the_askers_name_adopts_its_orphaned_questions(agent, tmp_path):
+    """Design §4.10 *The name coming back adopts it*: a create under the id an orphaned entry's
+    `from` names clears `orphaned`, whether or not it resumed the conversation; a reply then lands
+    in the new record's inbox, and an adopted `steer` lapses to it with a note naming the default."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        async with LocalClient(caller=w) as s:
+            ask = (await s.call("msg", to="person", text="which?", kind="ask", about="TD-149"))["entry"]["id"]
+            sent = await s.call("msg", to="person", text="or?", kind="steer", default="the x", about="TD-7", bound=1)
+            steer = sent["entry"]["id"]
+        await person.call("close", id=w)
+        w2 = await mk("w", unattended=True)
+        assert w2 == w  # the name's own id, superseded in place (§4.1)
+        entries = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+        assert entries[ask]["orphaned"] is None and entries[ask]["adopted_at"]
+        assert entries[steer]["orphaned"] is None and entries[steer]["closed_reason"] is None
+        rep = await person.call("msg", text="the first", kind="reply", reply_to=ask)
+        assert rep["delivered"] == [w2]
+        await asyncio.sleep(1.1)
+        await agent._sweep_mail(datetime.now(UTC))
+        told = [e["text"] for e in (await person.call("inbox", id=w2))["entries"] if e["from"] == "system"]
+        assert told == [f'steer {steer} about TD-7 lapsed: the default was "the x"']
+
+
+async def test_a_cancelled_start_orphans_its_question_and_the_sweep_adopts_for_a_later_record(agent, tmp_path):
+    """`how` is `cancelled` when a scheduled record is cancelled before its start; and the sweep's
+    pass adopts for a record it did not see created (a node's report), as the create does."""
+    from sessionorc.models import MailEntry, now_iso
+
+    async with LocalClient() as person:
+        v = await person.call(
+            "create",
+            name="w",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc"],
+            unattended=True,
+            start_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+        )
+        sid = v["id"]
+        agent.person_inbox.append(
+            MailEntry(id="m-orph1", from_=sid, to=["person"], at=now_iso(), kind="ask", text="q", about="TD-9")
+        )
+        await person.call("close", id=sid)  # Close of a scheduled record is its Cancel
+        e = [e for e in agent.person_inbox if e.id == "m-orph1"][0]
+        assert e.open and e.orphaned["how"] == "cancelled" and e.orphaned["ref"] == "TD-009"
+        await agent._sweep_mail(datetime.now(UTC))
+        assert e.orphaned is not None  # nothing under the id: still orphaned
+        w = await _mk(person, tmp_path)("w", unattended=True)
+        assert w == sid
+        e.orphaned, e.adopted_at = {"how": "closed"}, None  # as if the create had been a node's
+        await agent._sweep_mail(datetime.now(UTC))
+        assert e.orphaned is None and e.adopted_at
+
+
 async def test_a_system_note_is_written_straight_into_the_mailbox_and_is_not_replyable(agent, tmp_path):
     """Design §4.10 "How the sender hears that one closed without a reply": the home writes the
     note **straight into the mailbox** — it does not pass through the send path, so no gate, no
@@ -1980,7 +2104,7 @@ async def test_asking_again_on_the_thread_settles_the_first_and_owes_its_own(age
             with pytest.raises(AgentError, match="has not been answered yet"):
                 await w.call("msg", to="person", text="still?", kind="ask", thread=first["id"])
             await person.call("msg", to=worker, text="merge it", kind="reply", reply_to=first["id"])
-            again = (await w.call("msg", to="person", text="merge into what?", kind="ask", thread=first["id"]))
+            again = await w.call("msg", to="person", text="merge into what?", kind="ask", thread=first["id"])
             assert again["entry"]["root"] == first["root"]  # the thread the person can read above it
             entries = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
             assert entries[first["id"]]["outcome"]["state"] == "asked_again"

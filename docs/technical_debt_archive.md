@@ -2069,3 +2069,29 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Fix (as filed):** move the view builders into modules by page (`ui/org.py`, `ui/repo.py`, `ui/inbox.py`, `ui/focus.py` or similar) and each route group beside its views, keeping `agentorc.ui.app` as the assembly (`create_app`). Keep the tests' patch points working: the patched names (`LocalClient`, `rpc`, `PtySession`, …) are looked up through `app` at call time, or the tests move to the new paths in the same PR. No behaviour change; the full suite passes unchanged in count. Done in small PRs as TD-108's step 1 is, and then the lanes are redrawn along with TD-108's step 2.
 
 **Related:** TD-108 (the host agent's split, and the page split within this module), TD-188 (context per run).
+
+## TD-215: Build the orphaned question, the home's half
+
+**Priority:** High
+**Added:** 2026-09-28 (the designer, from TD-213's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+
+**Resolved:** 2026-09-28 (PR #712). `orphaned` and `adopted_at` on `MailEntry`, `reference_of` in `models.py`, `_asker_gone(how=)` and `_adopt_orphans` in `agent_attention.py`, the orphaned `steer`'s cleared bound and the adopted lapse note in `_lapse_or_expire`, the refusal `orphaned_refusal` until TD-216; design §4.10 *A question about a reference outlives its asker*; tests in `tests/test_mail.py` (`test_a_question_about_a_reference_outlives_its_asker` and the three after it).
+
+**Location:** `src/sessionorc/agent_attention.py` (`_asker_gone`, called from `rpc_close`, `_forget`, `_cancel_start` and the tick), `src/sessionorc/models.py` (`MailEntry`: `orphaned`), `src/sessionorc/agent_inbox.py` (`_lapse_or_expire` and the lapse sweep), `src/sessionorc/agent.py` (`rpc_create`'s supersede in place), `src/sessionorc/agent_mail.py` (the person's reply path, `_person_holds`); design §4.10 *A question about a reference outlives its asker*. Held path: the techlead reads the PR.
+
+**Why:** TD-213's *Why*: a wind-down closed two members and took a `steer` and an `ask` the ledger still waited on out of the Inbox before Paul saw them.
+
+**Fix (as filed):**
+1. **`orphaned` on the entry**: `{at, how, ref, name, repo, host, team}`, persisted with the person inbox, in the `inbox` RPC's view of an entry. `how` is `closed`, `forgotten` or `cancelled`.
+2. **`_asker_gone` orphans instead of closing** an open `ask` or `steer` from the record whose `about` names a reference — it has one of the two shapes `normalize_ref` canonicalises, a ledger id or a PR number (`normalize_ref` itself passes any other text through, so the test is the shape, not the call), and the canonical form is kept on the stamp as `ref`, which is what TD-216 matches a lease on; `about` itself is free text and is not rewritten: the stamp is written from the record, `paused_at` is cleared, and nothing closes. An entry with no `about`, or one of any other shape (a session's id, a board line, prose), closes `asker_gone` as today. An entry already orphaned (a close, then the forget a day later) keeps its first stamp. The outcome half of `_asker_gone` is unchanged, and so is the `superseded_by` return.
+3. **The bound**: the lapse sweep, on an orphaned `steer` whose bound has run out, clears `bound` and leaves the entry open; nothing is told. An entry with `orphaned` and no `bound` is skipped by the sweep as an `ask` to the person is.
+4. **Adoption**: a create that puts a live record under the id an orphaned entry's `from` names clears `orphaned` on each such entry, whether or not it resumed the conversation. A `steer` adopted with its bound still ahead lapses as any does, and its `system` note reads *steer m-… about <about> lapsed: the default was "<default>"* when the entry was ever orphaned (keep a mark for it, such as `adopted_at`).
+5. **Until TD-216**, a person's reply or *Go with it* naming an orphaned entry is refused with a sentence that says its asker is gone and the answer's road is not built, so nothing is sent to a record that is not there; Delete declines it as on any open question.
+6. **Tests** (`tests/test_mail.py`): the wind-down case — two members each with an open question to the person that names a reference, `team stop --close` closes both, and both questions are still open in the person inbox with `orphaned.how == "closed"`; a question with no `about`, and one whose `about` is prose, closes `asker_gone`; a forget after a close keeps the stamp; an orphaned `steer` past its bound is open with no bound and no `lapsed`; a paused one loses its pause; a create under the same name clears the stamp and a reply then lands in the new record's inbox; an adopted `steer` lapses with the note naming the default; the existing resume tests (`test_a_resumed_askers_questions…`) pass unchanged. `test_asker_gone_closes_the_persons_questions_on_close_and_forget_but_not_on_exit` changes to cover both kinds of question.
+
+**Done when** a member closed with an open question to the person that names a reference leaves that question open in the person inbox, the wind-down test passes, and design §4.10's *not built — TD-215* is corrected in the same PR.
+
+**Related:** TD-213 (the design), TD-216 (the answer and the row), TD-069 (the needed rule and `asker_gone`), TD-081 (the resume under the same name).
