@@ -6,6 +6,7 @@ carries `brief: {at, sources: [{path, sha}]}` from each create."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -316,3 +317,119 @@ def test_a_crlf_file_fills_as_the_client_reads_it(tmp_path):
     base = tmp_path / "b.md"
     base.write_bytes(b"one\r\ntwo {x}\r\n")
     assert brief.fill({"base": str(base), "slots": {"{x}": {"text": "X"}}})[0] == "one\ntwo X\n"
+
+
+def _mark(rec) -> None:
+    """What a settled `_brief_pass` leaves, and the state rule 7's restart reads."""
+    rec.brief_changed = {"at": "2026-09-29T07:00:00Z", "paths": ["/r/docs/b.md"]}
+    rec.state, rec.confidence, rec.pending = "idle", "hook", None
+    rec.git = {"dirty": 0, "unpushed": 0}
+
+
+@pytest.mark.integration
+async def test_an_idle_member_whose_brief_changed_is_restarted_once_on_the_new_brief(agent, tmp_path):
+    """Rule 7's second telling (TD-217 slice 4): an idle member, holding nothing, declared nothing,
+    its work pushed, is closed and replayed by the tick, `why: brief`; the new record carries no mark,
+    so it is restarted once."""
+    await park_ticks(agent)
+    repo = _repo(tmp_path)
+    _merge(repo, "first {lane}\n")
+    made = _made_from(tmp_path, repo)
+    work = tmp_path / "work"
+    work.mkdir()
+    async with LocalClient() as person:
+        params = {"dir": str(work), "adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
+        sid = (
+            await person.call(
+                "create", name="m", unattended=True, supervised=True, prompt="old", prompt_from=made, **params
+            )
+        )["id"]
+        _merge(repo, "second {lane}\n")
+        _mark(agent.sessions[sid])
+        now = datetime.now(UTC)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert [r["why"] for r in new.restarts] == ["brief"] and new.brief_changed is None
+        assert _launched(sid) == "P\nbase: second TD-1 / lane TD-1\n"
+        new.state, new.confidence, new.git = "idle", "hook", {"dirty": 0, "unpushed": 0}
+        await agent._keep_running(now + RESTART_SETTLE + timedelta(seconds=1))
+        assert [r["why"] for r in agent.sessions[sid].restarts] == ["brief"]  # no mark, no second restart
+        # marked again, then closed by a person: a Close is never undone (the techlead's read of #748)
+        again = agent.sessions[sid]
+        _mark(again)
+        await person.call("close", id=sid)
+        await agent._keep_running(now + 2 * RESTART_SETTLE + timedelta(seconds=2))
+        assert agent.sessions[sid].state == "closed"
+        assert [r["why"] for r in agent.sessions[sid].restarts] == ["brief"]
+        with contextlib.suppress(Exception):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_what_the_brief_restart_leaves_alone(agent, tmp_path):
+    """Never a working member, one holding a claim, one with work left or unknown, a declared one, a
+    seat, an interactive one, a gated or suspended one, one past its stop time or wrapping up, and
+    not a node's."""
+    from sessionorc.models import ProgressEntry
+
+    await park_ticks(agent)
+    params = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
+    five = (datetime.now(UTC) - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    cases = {
+        "working": {"state": "working"},
+        "scraped": {"confidence": "scraped"},
+        "claim": {"progress": [ProgressEntry(ref="TD-1", status="claimed", source="declared")]},
+        "dirty": {"git": {"dirty": 2, "unpushed": 0}},
+        "unknown": {"git": {}},
+        "declared": {"out_of_work": {"at": "2026-09-29T07:00:00Z", "why": "x"}},
+        "wanted": {"restart_wanted": {"at": "2026-09-29T07:00:00Z", "why": "x", "early": True}},
+        "pending": {"pending": {"kind": "permission", "text": "x"}},
+        "superseded": {"superseded_by": "ao-other"},
+        "ceiling": {"restarts": [{"at": five, "why": "crash"}] * 3},
+        "seat": {"seat": {"trigger": "asks"}},
+        "interactive": {"unattended": False},
+        "gated": {"gated": {"at": "2026-09-29T07:00:00Z"}},
+        "wrapup": {"wrapup_sent_at": "2026-09-29T07:00:00Z"},
+        "stopped": {"run_until": "2000-01-01T00:00:00Z"},
+        "node": {"host": "elsewhere"},
+    }
+    async with LocalClient() as person:
+        ids = {}
+        for n, fields in cases.items():
+            sid = (await person.call("create", name=n, unattended=True, supervised=True, prompt="p", **params))["id"]
+            _mark(agent.sessions[sid])
+            for k, v in fields.items():
+                setattr(agent.sessions[sid], k, v)
+            ids[n] = sid
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[ids["ceiling"]].restart_ceiling  # at its ceiling it is the person's
+        for n, sid in ids.items():
+            assert not [r for r in agent.sessions[sid].restarts if r.get("why") == "brief"], n
+            agent.sessions[sid].host = agent.host
+            await person.call("kill", id=sid)
+
+
+async def test_every_reply_to_a_member_whose_brief_changed_carries_the_clause(agent, tmp_path, capsys):
+    from agentorc import cli
+    from sessionorc import client as clientmod
+    from sessionorc.agent import BRIEF_CLAUSE
+
+    async with LocalClient() as person:
+        params = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], "unattended": True}
+        w = (await person.call("create", name="w", **params))["id"]
+    async with LocalClient(caller=w) as wc:
+        await wc.call("get", id=w)
+        assert not (clientmod.last_mail or {}).get("brief")
+        agent.sessions[w].brief_changed = {"at": "2026-09-29T07:00:00Z", "paths": ["/r/b.md"]}
+        await wc.call("get", id=w)
+        assert clientmod.last_mail["brief"] == BRIEF_CLAUSE
+        import argparse
+
+        cli.unread_line(argparse.Namespace(json=False))
+        assert capsys.readouterr().out == f"[agentorc] ({BRIEF_CLAUSE}) — finish the entry in hand, then declare\n"
+        # a restart it declares now is never early, and once declared the clause is not repeated
+        await wc.call("progress", id=w, ref=None, status="restart", why="brief changed")
+        assert agent.sessions[w].restart_wanted.get("early") is None
+        assert not (clientmod.last_mail or {}).get("brief")
+        agent.sessions[w].brief_changed = None
+    clientmod.last_mail = None

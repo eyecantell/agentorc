@@ -23,6 +23,7 @@ from sessionorc import (
     paths,
 )
 from sessionorc.agent_common import (
+    BRIEF_CLAUSE,
     NODE_READS,
     PUSH_OPEN,
     RpcError,
@@ -266,7 +267,10 @@ class ServeMixin:
             # and the context bound's clause (§6 rule 5, TD-190): a member working past its bound is
             # not interrupted, so every reply it reads says so
             over = context_over_text({"context": s.context, "context_bound": s.context_bound}) if s else ""
-            if s is not None and ((n := s.unread()) or owed or over):
+            # and rule 7's clause (TD-217 slice 4): a member whose brief changed is not interrupted either
+            declared = s is not None and (s.restart_wanted or s.out_of_work or s.seat is not None)
+            changed = BRIEF_CLAUSE if s is not None and s.brief_changed and not declared else ""
+            if s is not None and ((n := s.unread()) or owed or over or changed):
                 # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
                 # refusal is not*, and this is the cheapest thing that is neither.
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
@@ -274,6 +278,8 @@ class ServeMixin:
                     resp["mail"]["owed"] = owed
                 if over:
                     resp["mail"]["context"] = over
+                if changed:
+                    resp["mail"]["brief"] = changed
         return resp
 
     def _caller_address(self, caller: Any, link_host: str | None) -> str:

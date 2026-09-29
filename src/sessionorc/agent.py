@@ -50,6 +50,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     BACKUP_KEEP,  # noqa: F401
     BACKUP_MEMBERS,  # noqa: F401
     BOARD_REPLY_NOTE,  # noqa: F401
+    BRIEF_CLAUSE,  # noqa: F401
     BRIEF_SETTLE,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401
     COMPOSER_LINES,  # noqa: F401
@@ -1778,7 +1779,9 @@ class HostAgent(
             # applied here because the home holds the start time; the controller reads a field.
             mark = {"at": now_iso(), "why": why.strip()}
             with contextlib.suppress(ValueError, TypeError):
-                if datetime.now(UTC) - _parse(s.created) < RESTART_EARLY:
+                # a restart its changed brief asked for (§6 rule 7) is never early: the run is not over
+                # on its own account, and rule 2 is what brings the new brief
+                if datetime.now(UTC) - _parse(s.created) < RESTART_EARLY and not s.brief_changed:
                     mark["early"] = True
             s.restart_wanted = mark
         return await self._report(s, True, None)

@@ -3194,7 +3194,7 @@ agentorc — the round and `ao wait`, the declarations a run ends with, the cras
 the seat rules, the usage gate's pause, mail's kinds and outcomes, permission triage, the never-list
 of `ao` verbs — and it ships in the package, so a promote changes every team's rules, as it
 changes the host agent that enforces them: at a member's next start, and for a running member by
-§6 *Keeping a team running* rule 7 (TD-199; a restart reads the brief's files again since TD-217 slice 2, and the record is marked *brief changed* since slice 3; the two tellings and the tick's own restart not built — until then a running member keeps the brief it started with until something restarts it). What a repo writes is only what the package cannot know:
+§6 *Keeping a team running* rule 7 (TD-199; a restart reads the brief's files again since TD-217 slice 2, the record is marked *brief changed* since slice 3, and since slice 4 a working member is told on its `ao` replies and an idle one is restarted by the tick). What a repo writes is only what the package cannot know:
 the first reads, the gate command, the standing rules that are that repo's own (what is never
 deployed, which files keep CRLF, what waits on the person), the shape of its lane. That text — a
 team definition's `brief:` on a manager or a member, a repo's `roles.<name>.brief`, and `ao new
@@ -5941,7 +5941,7 @@ code and needs no grant; a session doing the same work does.
      appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
   7. **Brief changed** (TD-199; designed 2026-09-28; `prompt_from` handed and kept — TD-217 slice 1;
-     the replay and the record's `brief` — slice 2; the mark and the chip — slice 3; the two tellings and the restart not built — TD-217). A member reads its
+     the replay and the record's `brief` — slice 2; the mark and the chip — slice 3; the two tellings — slice 4). A member reads its
      brief once, at its start, and until this rule a restart replayed the prompt its first start
      was handed: manager-ao-1, started 2026-09-25, ran a template two merges old for three days,
      and no restart would have given it the new one. Two halves. **A replay reads the brief's
@@ -5970,10 +5970,13 @@ code and needs no grant; a session doing the same work does.
      card and `ao status -v` say it (§4.5a **brief changed** chip). Then, as rule 5 does and in
      the same two ways: a member that is **`working`** is not interrupted — every `ao` reply it
      makes ends with *(your brief changed — finish what you hold, then `ao progress restart
-     --why "brief changed"`)*, and rule 2 restarts it on its word; a member that is
+     --why "brief changed"`)*, and rule 2 restarts it on its word — a word said while the record carries
+     the mark is never *early*, and a member that has declared, or a seat, is not given the clause; a member that is
      **hook-confirmed `idle`, holds no claim in progress, has declared nothing, and has nothing
      uncommitted or unpushed** (known, as in rule 2) **is restarted by the tick itself**, closed
-     first and replayed, `restarts: [{why: brief}]`, under the ceiling as every replay is. That
+     first and replayed, `restarts: [{why: brief}]`, under the ceiling as every replay is; a close
+     or replay that failed keeps its `brief` entry with `error`, counts toward the ceiling, and is
+     tried again by the tick, while a Close by anyone else is never undone. That
      second case is the manager's: it sits idle between rounds, its round log is a file and not
      its context (§4.8 *A session's round log*), and nothing of a round is lost with the run.
      Never a seat (each fill is a replay and so reads the files anyway), never a member that
