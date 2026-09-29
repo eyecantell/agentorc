@@ -32,6 +32,11 @@ def blob_sha(data: bytes) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()  # noqa: S324 — git's own id, not a secret
 
 
+def _text(data: bytes) -> str:
+    """As the client reads a file (`Path.read_text`): universal newlines, so a CRLF file fills alike."""
+    return data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _git(directory: Path, *args: str) -> bytes | None:
     try:
         cp = subprocess.run(["git", "-C", str(directory), *args], capture_output=True, timeout=GIT_TIMEOUT)
@@ -60,12 +65,12 @@ def read(path: str, merged: bool = True) -> tuple[str, str]:
                 data = _git(root, "show", f"{ref}:{rel}")
                 if data is None:
                     raise Unreadable(f"{rel} is not on {ref} in {root}")
-                return data.decode("utf-8", errors="replace"), blob_sha(data)
+                return _text(data), blob_sha(data)
     try:
         data = p.read_bytes()
     except OSError as e:
         raise Unreadable(f"{path}: {e.strerror or e}") from None
-    return data.decode("utf-8", errors="replace"), blob_sha(data)
+    return _text(data), blob_sha(data)
 
 
 def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[dict[str, str]]]:

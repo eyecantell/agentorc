@@ -5955,8 +5955,8 @@ code and needs no grant; a session doing the same work does.
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a
      running team's brief; the template is the installed package's, so it is what was promoted.
      A file that cannot be read, or a launch record with no `prompt_from` (`ao new --prompt`, a
-     record written before this), replays the stored prompt as before, and the `restarts` entry
-     says so (`prompt: stored`). **The tick sees the change.** The record carries
+     record written before this), replays the stored prompt as before — the one the last create
+     was handed, a refill included — and the `restarts` entry says so (`prompt: stored`). **The tick sees the change.** The record carries
      **`brief: {at, sources: [{path, sha}]}`** (home-owned), written at each create from the
      files as they were read; on the reports' cadence the home reads each source the same way
      and, when one differs for **ten minutes** (`BRIEF_SETTLE`: a run of merges is one change),

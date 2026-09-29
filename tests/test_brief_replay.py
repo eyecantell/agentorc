@@ -197,3 +197,11 @@ async def test_a_scheduled_start_keeps_prompt_from_and_fills_it_at_the_instant(a
         assert [r["why"] for r in new.restarts] == ["start"] and "prompt" not in new.restarts[0]
         assert _launched(sid) == "P\nbase: now TD-1 / lane TD-1\n"
         await person.call("kill", id=sid)
+
+
+@pytest.mark.unit
+def test_a_crlf_file_fills_as_the_client_reads_it(tmp_path):
+    """The review of #745: the client reads with universal newlines, so the replay does too."""
+    base = tmp_path / "b.md"
+    base.write_bytes(b"one\r\ntwo {x}\r\n")
+    assert brief.fill({"base": str(base), "slots": {"{x}": {"text": "X"}}})[0] == "one\ntwo X\n"
