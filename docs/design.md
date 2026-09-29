@@ -653,22 +653,34 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   rule, the one dev-cadence's `scripts/ledger.py --pickable` applies, so a repo's own tool and
   the home give one answer: an entry is **blocked** while its `**Blocked by:**` names an entry
   that is not archived — one still open, or one found in neither the ledger nor its archive,
-  which keeps the block — or names a `decision (<who>)`; every other entry is **pickable**,
-  one with no such line included. The reader takes the archive from beside the ledger
-  (`<ledger>_archive.md`; none there, nothing is archived), and each entry carries `blocked_by`
-  (the ids still blocking), `decision` and the derived `pickable`. **No header line is
+  which keeps the block — or names a `decision (<who>)`, or holds an item the rule cannot read
+  (neither an id nor a decision, or anything listed after the decision), which keeps the block
+  too; every other entry is **pickable**, one with no such line or an empty one included. The
+  reader takes the archive from beside the ledger (the ledger's name with `_archive` before
+  its suffix, which for the default is cadence's `technical_debt_archive.md`; none there,
+  nothing is archived), and each entry carries `type` (`debt` where unwritten), `blocked_by`
+  (what still blocks, the decision and an unread item among them, as the script lists them)
+  and the derived `pickable`. The pick order is cadence's: Priority, then debt before
+  feature, then the summary table's order. **No header line is
   needed**: an entry with no `Kind:` reads as `build` and one with no `Owner:` as anyone's, so
-  a ledger that carries only Priority, Status and `Blocked by:`, as dev-cadence's does, is
+  a ledger that carries only Priority, Type, Status and `Blocked by:`, as dev-cadence's does, is
   read whole. *What a worker may take* is then the lane's (§6 rule 6): pickable, of the
   lane's kind, of the lane's owners. **The page's kinds**, tested in this order so that each
   entry has one: *for you* (`Owner: paul`, `Kind: decision`, or blocked by a decision),
-  *design-first* (`Kind: design-first`, blocked or not: it is the designer's list),
+  *design-first* (`Kind: design-first`, blocked by another entry or not: it is the designer's
+  list, less what waits on the person, which the first test took),
   *pickable* (pickable, `Kind: build` or none: work a grinder can start), else *other* (a
   build that is blocked, a live check, an evaluation). **While a ledger still writes the
   line**, a written `Pickable: no` reads as blocked whatever is derived, so nothing a person
   marked *no* is offered before its reason has been moved; a written `yes` adds nothing. The
   migration of this repo's ledger removes the lines, and the fallback goes with TD-228's last
-  slice. **Opened and closed in a window** come from the ledger file's git history in the same
+  slice. **The migration moves no entry into a lane**: a written *no* whose reason is no
+  blocker — *built, the live look is left*, *needs an attended run*, *a synced file* — becomes
+  the `Kind:` or the `Owner:` that says so before its line goes, the lanes carry their owner
+  words first (§6 rule 6), and the PR shows that what each lane matches after it is what was
+  written `yes` before it, naming every difference. Otherwise thirty entries would turn
+  pickable at once, the anchor's among them, and rule 6 would tell every finished member of
+  all of them. **Opened and closed in a window** come from the ledger file's git history in the same
   checkout (one `git log --first-parent -p --unified=0 -- <ledger>`, the headings its diffs add and remove): an
   entry is *opened* at the first commit whose file holds its section and *closed* at the first
   commit whose file no longer does (archived, or done and removed); a file rewritten without a
