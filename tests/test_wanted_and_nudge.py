@@ -330,3 +330,30 @@ async def test_the_ticks_own_failed_close_is_marked_and_a_person_s_close_in_the_
         for tick in (now, now + timedelta(minutes=5)):
             await agent._keep_running(tick)
         assert agent.sessions[sid] is rec and rec.state == "closed" and len(rec.restarts) == 1
+
+
+async def test_a_close_that_fails_before_marking_the_record_leaves_no_mark(agent, composerstubs, tmp_path, monkeypatch):
+    """TD-237, from the review of #752: a close that raised before it marked the record closed leaves it
+    idle with its `error` entry and no `closed_for`, so a later close some other way is never read as
+    the tick's own; the next tick retries it from `idle`."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        rec.git = dict(CLEAN)
+        real_close = agent.rpc_close
+
+        async def fail_at_once(id):
+            raise RuntimeError("kill failed")
+
+        monkeypatch.setattr(agent, "rpc_close", fail_at_once)
+        await agent._keep_running(now)
+        assert rec.state == "idle" and rec.closed_for is None and "kill failed" in rec.restarts[-1]["error"]
+        monkeypatch.setattr(agent, "rpc_close", real_close)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["wanted", "wanted"]
+        await person.call("kill", id=sid)

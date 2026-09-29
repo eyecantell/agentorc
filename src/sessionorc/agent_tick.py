@@ -560,7 +560,8 @@ class TickMixin:
                 # `rpc_close` marks the record closed before its own tail runs, so a failure there
                 # leaves it `closed` with nothing replayed: the entry and `closed_for` are what let the
                 # next tick retry it (`closed_by_tick`) rather than strand it (review of PR #461)
-                s.closed_for = "wanted"
+                if s.state == "closed":  # a close that failed before it marked the record leaves no mark
+                    s.closed_for = "wanted"
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", "error": f"close: {e}"}]
                 log.warning("%s: the close before a wanted restart failed: %s", s.id, e)
                 self._save(s)
@@ -613,7 +614,8 @@ class TickMixin:
                 await self.rpc_close(s.id)
                 s.closed_for = "brief"
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
-                s.closed_for = "brief"
+                if s.state == "closed":  # a close that failed before it marked the record leaves no mark
+                    s.closed_for = "brief"
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "brief", "error": f"close: {e}"}]
                 log.warning("%s: the close before a brief restart failed: %s", s.id, e)
                 self._save(s)
