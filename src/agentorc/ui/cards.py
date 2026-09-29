@@ -299,6 +299,7 @@ def view(
     d["out_of_work"] = (
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )
+    d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
     # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
@@ -309,7 +310,6 @@ def view(
     # **does not act on it** — a run that was over before it began did not run out of context. So
     # an early one must not read as an ordinary one: a person seeing the same chip would expect the
     # same thing to happen next, and nothing will.
-    d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     rw = s.get("restart_wanted")
     rw = rw if isinstance(rw, dict) else {}
     d["restart_wanted"] = (

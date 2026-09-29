@@ -392,7 +392,11 @@ class TickMixin:
             del self._brief_differs[sid]
         dirty = False
         for s in live:
-            paths, shas = read[s.id]
+            if self.sessions.get(s.id) is not s or s.state in ("exited", "closed") or s.superseded_by:
+                continue  # forgotten, replaced or ended while the files were read: never saved back
+            paths, shas, whole = read[s.id]
+            if not whole:
+                continue  # a source not read this time says nothing: the mark and the settle stand
             if not paths:
                 self._brief_differs.pop(s.id, None)
                 if s.brief_changed is not None:

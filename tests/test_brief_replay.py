@@ -153,15 +153,15 @@ def test_changed_names_what_reads_otherwise_as_merged_and_skips_what_cannot_be_r
     (repo / "docs" / "b.md").write_text("an unmerged edit\n")  # the working tree is no change
     assert brief.changed(rec)[0] == []
     _merge(repo, "two\n")
-    paths_, shas = brief.changed(rec)
+    paths_, shas, _whole = brief.changed(rec)
     assert paths_ == [str(repo / "docs" / "b.md")] and shas[1] == _git(repo, "rev-parse", "origin/main:docs/b.md")
     Path(made["base"]).unlink()  # unreadable now: nothing is claimed about it
-    assert brief.changed(rec)[0] == [str(repo / "docs" / "b.md")]
-    assert brief.changed(None) == ([], ())
+    assert brief.changed(rec)[0] == [str(repo / "docs" / "b.md")] and brief.changed(rec)[2] is False
+    assert brief.changed(None) == ([], (), True)
 
 
 @pytest.mark.integration
-async def test_a_merged_change_marks_brief_changed_after_the_settle(agent, tmp_path):
+async def test_a_merged_change_marks_brief_changed_after_the_settle(agent, tmp_path, monkeypatch):
     """Rule 7's mark (TD-217 slice 3): a source that reads otherwise as merged marks the record once
     the difference has stood `BRIEF_SETTLE`; another merge restarts the settle and keeps a mark
     already made; the files as recorded again take it away."""
@@ -203,6 +203,27 @@ async def test_a_merged_change_marks_brief_changed_after_the_settle(agent, tmp_p
         t1 = t0 + BRIEF_SETTLE + timedelta(minutes=1)
         await agent._brief_pass(t1)
         assert agent._brief_differs[sid][1] == t1 and rec.brief_changed["paths"] == [b]
+        # a source that cannot be read this time: the mark and the settle stand
+        base = Path(made["base"])
+        kept = base.read_text()
+        base.unlink()
+        await agent._brief_pass(t1 + timedelta(seconds=30))
+        assert rec.brief_changed["paths"] == [b] and agent._brief_differs[sid][1] == t1
+        base.write_text(kept)
+        # a record forgotten while the files were read is never saved back
+        real = brief.changed
+
+        def forget_meanwhile(bf):
+            agent.sessions.pop(sid, None)
+            return real(bf)
+
+        saved = []
+        with monkeypatch.context() as m:
+            m.setattr(brief, "changed", forget_meanwhile)
+            m.setattr(agent, "_save", lambda r: saved.append(r.id))
+            await agent._brief_pass(t1 + timedelta(seconds=40))
+        assert saved == []
+        agent.sessions[sid] = rec
         # the files read as recorded again: the mark goes
         _merge(repo, "first\n")
         await agent._brief_pass(t1 + timedelta(minutes=1))

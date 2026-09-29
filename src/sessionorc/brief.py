@@ -107,14 +107,15 @@ def record(prompt_from: dict[str, Any], merged: bool = True) -> dict[str, Any] |
         return None
 
 
-def changed(brief: dict[str, Any] | None) -> tuple[list[str], tuple[str, ...]]:
+def changed(brief: dict[str, Any] | None) -> tuple[list[str], tuple[str, ...], bool]:
     """Rule 7's comparison (design §6, TD-217 slice 3): the paths of `brief`'s sources whose text as
-    merged differs from what the record's create read, and the blob ids read now — the second is
-    what a settle keys on, so a run of merges restarts it. A source that cannot be read now is no
-    change: nothing is claimed about what could not be read."""
+    merged differs from what the record's create read, the blob ids read now — what a settle keys
+    on, so a run of merges restarts it — and whether every source was read. A source that cannot
+    be read now is no change: nothing is claimed about what could not be read."""
     sources = brief.get("sources") if isinstance(brief, dict) else None
     paths: list[str] = []
     now: list[str] = []
+    whole = True
     for src in sources if isinstance(sources, list) else []:
         path = src.get("path") if isinstance(src, dict) else None
         if not isinstance(path, str):
@@ -122,8 +123,9 @@ def changed(brief: dict[str, Any] | None) -> tuple[list[str], tuple[str, ...]]:
         try:
             sha = read(path, True)[1]
         except Unreadable:
+            whole = False
             continue
         now.append(sha)
         if sha != src.get("sha"):
             paths.append(path)
-    return paths, tuple(now)
+    return paths, tuple(now), whole
