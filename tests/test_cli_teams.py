@@ -64,6 +64,10 @@ def world(tmp_path, monkeypatch):
         state["calls"].append((method, params))
         if method == "list":
             return state["sessions"]
+        if method == "host":  # the build line `ao team start` ends with (design §4.7, TD-132 slice 5)
+            if "host" not in state:
+                raise cli.AgentError("unknown method: host")  # a stub agent that answers no `host`
+            return state["host"]
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
         if method == "host_dir":
@@ -158,6 +162,18 @@ def test_an_exited_holder_is_superseded_and_the_start_goes_ahead(world):
     state["verdicts"]["grind-1"] = {"name": "grind-1", "verdict": "supersede", "holder_state": "exited"}
     assert cli.main(["team", "start", "ao-grind"]) == 0
     assert [p["name"] for p in creates(state)] == ["orc-ao", "grind-1", "grind-2", "hunt"]
+
+
+def test_a_start_ends_with_the_build_line_once_and_never_refuses_on_it(world, capsys):
+    """Design §4.7 `ao team start`, TD-132 slice 5 (TD-062): what the team runs under is said once,
+    after the members — a build behind main is the person's to promote, and the start goes on."""
+    tmp_path, state = world
+    state["host"] = {"built_from": {}, "started_at": "2026-09-29T00:00:00Z"}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("host agent: build unknown") == 1
+    assert out.rstrip().splitlines()[-1].startswith("host agent: build unknown")
+    assert [m for m, _ in state["calls"]].count("host") == 1
 
 
 def test_a_missing_checkout_aborts_naming_it(world, capsys):

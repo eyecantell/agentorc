@@ -94,6 +94,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_hover,  # noqa: F401
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
+    build_chip,  # noqa: F401
     editor_link,  # noqa: F401
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
@@ -769,6 +770,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "person_overdue": person_overdue,
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
+                "build_chip": await asyncio.to_thread(build_chip, info),
                 "identity_note": identity_note(id_info),
                 "restart_note": "" if agent_down else restart_note(info, id_info),
                 "editor_note": uiconf.open_in().error,

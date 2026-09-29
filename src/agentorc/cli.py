@@ -734,6 +734,10 @@ def cmd_team_start(args: argparse.Namespace) -> int:
                 "to unattended",
                 file=sys.stderr,
             )
+        # what the team runs under (design §4.7, TD-132 slice 5): said once, never a refusal — a
+        # build behind main is the person's to promote, and the start has already gone on
+        if running := _running_build():
+            print(running["line"])
 
     return emit(args, result, prose)
 

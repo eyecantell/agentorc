@@ -80,6 +80,8 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 #usagechip { font-size: var(--t-small); color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
 #usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
 #usagechip .stale { opacity: .6; font-style: italic; }  /* a held reading whose last poll was refused (TD-087) */
+#buildchip { font-size: var(--t-small); color: var(--topdim); white-space: nowrap; vertical-align: middle; }  /* §4.5a build chip (TD-132 slice 5) */
+#buildchip.behind { color: var(--topfg); font-weight: 600; } #buildchip.unknown { font-style: italic; }
 #usagemore { cursor: default; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: var(--t-btn); font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }

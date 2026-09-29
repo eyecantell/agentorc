@@ -157,3 +157,13 @@ def test_the_org_top_bar_counts_the_row_as_the_inbox_does(page):
     c, _calls, _ = page
     got = c.get("/")
     assert got.status_code == 200 and 'id="personneeds">1<' in got.text
+
+
+def test_the_org_top_bar_draws_the_build_chip_only_when_not_current(page, monkeypatch):
+    """Design §4.5a Org top bar **build** chip (TD-132 slice 5): display only, absent in the common
+    case; the agent here reports no build, so it reads *build unknown* with `build.line` on hover."""
+    c, _calls, _ = page
+    html = c.get("/").text
+    assert 'id="buildchip" title="host agent: build unknown' in html and ">build unknown</span>" in html
+    monkeypatch.setattr(uiapp, "build_chip", lambda info: None)
+    assert 'id="buildchip"' not in c.get("/").text
