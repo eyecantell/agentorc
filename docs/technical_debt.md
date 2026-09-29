@@ -106,7 +106,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-203 | TDs in motion shows no priority: a row reads phase, reference, title, holder, with nothing to say a High entry is in hand | Low | Open — design-first |
 | TD-204 | `send --wait` reads the tool's own start of this prompt as a previous turn when its hook lands during the paste, and reports `prompt-stalled` for a prompt that ran | Medium | Open — mechanism and a recommended fix; the shape is Paul's (board, 2026-09-12) |
 | TD-206 | The Doing list's times are clock times cut to *21:…*, and its fields run together: fuzzy relative times (*just now, 5m, 1h, 2d*) and columns | Low | Open — design-first |
-| TD-207 | The Inbox shows board items only once they are due, and says so nowhere: a grinder's two *act* items due in a week read to Paul as messages that never arrived; a setting for the horizon, drawn on the page | Medium | Open — design-first |
+| TD-207 | The Inbox shows board items only once they are due, and says so nowhere: a grinder's two *act* items due in a week read to Paul as messages that never arrived; a setting for what is shown, said on the page | Medium | Designed 2026-09-28 (the designer) — the build is TD-220; archives with it |
 | TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Open — design-first |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first; answered 2026-09-28: teams per repo, aggregated by the home |
@@ -116,6 +116,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 | TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — TD-215 merged (PR #712) |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Partly done — slice 1 (#714); next the replay |
+| TD-220 | Build the board's horizon: the read without `--due-only`, `person.inbox.board_show` (next n per team, due, n days, all) and its pick on the Settings page, *Board, coming up*, the *not shown* fold and the line on the Inbox and the Repo page, the grinder preset's *on the board, due <date>* | Medium | Open — pickable |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
 | TD-224 | The Org page jumps to the top when scrolled past a certain point, consistently: likely scroll anchoring losing a node the update removes | High | Open — pickable: reproduce first |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
@@ -2053,9 +2054,10 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Added:** 2026-09-27 (Paul: *"the Inbox only lists board items once they're due" — we need to add a setting for this so it is obvious to the user*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
-**Location:** design §4.5 screen 6 (*Board items*: `--due-only`), §5 `person:` in `settings.yml` (TD-146), §4.5a (the Inbox's board rows and the Settings page's **You**), `src/agentorc/ui/app.py` (`board_argv`: `--report --due-only --json`)
+**Pickable:** no — designed; the build is TD-220
+**Blocked by:** TD-220
+**Status:** Designed 2026-09-28 (the designer, PR #713; the steer to Paul is `m-f2a7a9d2cf06`, bound 2026-09-29 09:41 MDT; **revised 2026-09-28 on Paul's word on the PR**, a mode in place of a number of days): design §4.5 screen 6 *The board's horizon*, §4.5a the **Board, coming up** row and the Settings page's **board items shown**, §5 `person.inbox.board_show`; mockup `Inbox.dc.html` (the rows coming up, the fold and the line; rendered as `docs/mockups/reviews/2026-09-28-td207-board-horizon.png`) and `Settings.dc.html` (the pick). Settled, by the Fix's numbers: (1) the setting is `person.inbox.board_show` — `next:<n>` per team, `due`, a number of days, `all` — default `next:10`, and an item that is due is shown under every one; (2) the line is drawn whatever the mode and names it, the count it hides and the next date, with **show**; (3) an item shown before it is due is drawn quieter under *Board, coming up* and counted in no number, so every count keeps meaning *due now*, and the fold holds what the mode hides; (4) the grinder preset says *on the board, due <date>* when a summary names a board line, and dates a line the person should see today as due today.
+**Location:** design §4.5 screen 6 (*Board items*: `--due-only`), §5 `person:` in `settings.yml` (TD-146), §4.5a (the Inbox's board rows and the Settings page's **You**), `src/agentorc/ui/inbox.py` (`board_argv`: `--report --due-only --json`)
 
 **Why:** grinder-dc-1 finished its run on 2026-09-27 telling Paul it had left him two items. They were two `act` lines on dev-cadence's board, each `Due: 2026-10-04`. Paul looked in the Inbox, found nothing, and asked where the two messages were. The Inbox reads boards with `--due-only`, so an item a week out doesn't exist there until its day, and nothing on the page says the Inbox has a horizon or that items wait beyond it. (TD-208 hid these two a second way.) A session that writes a board line reasonably calls it *left for you*; the person reasonably looks in the one place the system sends them.
 
@@ -2227,6 +2229,30 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when** a template change that is promoted, or a supplement change that is merged, reaches a running manager within a round — the tick restarts it on the new brief — and until it does the card says *brief changed*; design §6 rule 7, §4.8, §4.4a and §4.5a lose their *not built*.
 
 **Related:** TD-199 (the design), TD-114 (supplements), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-190 (rule 5, whose two tellings this follows), TD-191 (the round log that makes a manager's restart cheap).
+
+## TD-220: Build the board's horizon
+
+**Priority:** Medium
+**Added:** 2026-09-28 (the designer, from TD-207's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/inbox.py` (`board_argv`: `--report --due-only --json`; the rows built from its items), `src/agentorc/ui/templates/` (the Inbox's board rows, `repo.html`'s *Waiting on you*, the Settings page's **You**), `src/agentorc/ui/static/app.js` (the fold's memory, **show**), `src/sessionorc/settings.py` (`parse_person`: `open_in`, `terminal`), `src/agentorc/briefs/grinder.md`; design §4.5 screen 6 *The board's horizon*, §4.5a, §5. Held path: `src/sessionorc/settings.py` waits for the techlead's read.
+
+**Why:** TD-207's *Why*: a board item due next week does not exist in the Inbox until its day, and the page does not say so.
+
+**Fix, in slices a PR each:**
+1. **The setting**: `person.inbox.board_show` in `parse_person` and `set_settings` — `next:<n>` with n from 1 to 50, `due`, `all`, or `<n>d` with n from 1 to 365; anything else refused by `set_settings` and dropped by the reader, the default `next:10` kept; replicated with the file as every setting is.
+2. **The read and the rows**: `board_argv` without `--due-only`; the page sorts items by `due` against the reader's `today` into due rows (as today, counted, shown under every mode), rows coming up (what the mode shows ahead: per board the n soonest less the due ones, or what falls inside the days, or all) and hidden ones; a board is named by the one team that works its repo, else by the repo; the top bar's number, the section's count and the Org rollup's *m overdue* (`overdue_n`) count due rows only (the Due strip is not built); an item with `due_error` stays a due row.
+3. **Coming up, the fold and the line**: *Board, coming up (n)* under the due board rows on the Inbox and on the Repo page's *Waiting on you*, soonest first, each row with its write-back controls; the fold *not shown (n)*, closed, holding what the mode hides; the line with the mode, the count hidden, the next date, **show** (opens the fold, this page view only) and the link to Settings.
+4. **The pick**: **board items shown** on the Settings page's **You**, four choices and two number fields, with its *i* text.
+5. **The preset's word**: the grinder preset says that a summary naming a board line says *on the board, due <date>*, and that a line the person should see today is dated today.
+6. **Tests**: under `next:10` a board with twelve due items shows twelve and none coming up, and one with two due shows eight coming up and hides the rest; an item due in six days is coming up under `7d`, hidden under `due` and counted by the line; a due item is a counted row under all four modes, one dated today included; the counts do not move when the mode does; **show** draws an item due in forty days and writes no setting; `set_settings` refuses `next:0`, `next:51`, `0d` and `soon`; a Snooze on a row coming up moves its date; the rail's *board items* count is the rows on the page, the same from `rail_counts` and `AO.railCounts`, and rises when **show** opens the fold.
+
+**Done when** a board item due next week can be seen from the Inbox without a press under the default, in one press under `due`, each of Paul's three choices (all, what is due, the next n per team) can be picked on the Settings page, and the page says the mode it uses; design §4.5, §4.5a and §5 lose their *not built* for this entry, and TD-207 archives with this one.
+
+**Related:** TD-207 (the design), TD-208 (the same rows, read from a checkout behind origin), TD-069 step 3 (board rows), TD-146 (`settings.yml`'s `person:`), TD-148 (the Settings page).
 
 ## TD-223: Rule 6 matches nothing in a ledger without Pickable, Owner and Kind lines
 
