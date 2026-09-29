@@ -892,7 +892,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   or edited is left as it was; a commit that fails (a hook, say) or does not finish inside twenty
   seconds puts the board back as it was, and edits on one host are made one at a time, so two
   presses never interleave a read and a write. Each refusal says why and what to do, in words the
-  Inbox shows.
+  Inbox shows. A row the page read from origin offers no edit (TD-208; §4.5 screen 6 *Boards are read
+  against origin*): the write-back is asked only for a line the checkout holds.
 
 ### 4.4a Home and nodes: one session graph across hosts
 
@@ -1997,6 +1998,54 @@ Screens:
    naming a board line says *on the board, due <date>*, and that a line the person should see
    today is dated today — so *left for you* never sends the person to a page that does not draw it.
 
+   **Boards are read against origin (TD-208; designed 2026-09-28, not built — TD-221).** Every
+   board line a session writes reaches origin by a merged PR, and the registry's roots are main
+   checkouts that move only when someone pulls: on 2026-09-27 three of six boards differed from
+   origin, and the two items Paul looked for were on a board ten commits behind. So the read
+   passes the reader's own **`--fetch`**: it fetches each repo's origin (serially, hang-proofed,
+   pruning nothing; it moves the remote-tracking ref and no local branch or working file) and,
+   where the checkout's board is **merely behind** — untouched here since the merge-base, moved
+   on origin — reads the board from `origin/<default>`. The fetch is the reader's, never a
+   second one of ours beside it, and whether a board was read from origin is the reader's `source`
+   field; which note is drawn is chosen by the fixed opening phrase of its `fetch_note` (the
+   reader gives the cases no other field, and a field for them is asked of dev-cadence with
+   TD-221), and the reader's sentence itself is never drawn but for a skipped fetch's reason.
+   **The read is in the UI's process and off the page's loop, as built; three things are new.**
+   (1) *One read at a time, and the last reading drawn while it runs*: a request that finds
+   the reading older than a minute starts a read if none is running and is answered from the
+   last reading, where today it waits for the read. (2) *A bound of its own*: a fetching read
+   is stopped at `BOARD_FETCH_TIMEOUT` (45 s: the reader's fetch is 30 s a repo with no
+   aggregate bound once `--due-only` is dropped, TD-220, and without it the reader also makes
+   an `ls-remote` and a `gh` call a repo), and a read that is stopped or fails
+   is followed at once by a plain read without `--fetch`, so a dead remote costs the origin
+   view and never the board: the rows are the checkouts', under the note *origin could not be
+   reached*. (3) *The read after a press* — Snooze, Done, Reply — is a plain read of that one
+   board, laid over the last reading, so a press never waits on the network and the other
+   repos' rows do not move.
+   What the reader found is said, by board, in **one note above that repo's first board row**,
+   drawn as text:
+   - *matches origin*, or *no board on origin*: no note.
+   - *behind*: *read from origin/main: this checkout has not pulled it yet* — nothing is hidden.
+   - *local edits not pushed*: *board edits made here are not on origin* — nothing is hidden;
+     the rows are the checkout's.
+   - *both sides changed*, or no common history: *this checkout's board and origin's have both
+     changed: showing the checkout's, and what origin added is not shown — pull* — drawn in the
+     warning colour, since rows are hidden and the page must not look clear when it is not.
+   - *fetch skipped*, or the read stopped at its bound: *origin could not be reached (<the
+     reason>): showing the checkout's board as of its last pull*.
+   **A row read from origin is read-only until the checkout is pulled.** The write-back edits
+   the checkout's file on the line and the text it is given (§4.4), and that file does not hold
+   origin's line yet; so on a board whose `source` is origin, Snooze, Done and Reply are drawn
+   disabled, their reason beside them — *on origin, not in this checkout yet: pull to act on
+   it* — and **Open board** stays. **The host agent does not pull**: the main checkout is the
+   person's (§4.9 *Home and reach*; §6 *Promote*: *the tree is a person's*), a fast-forward moves
+   tracked files under a live anchor session, and the reader's *behind* is about the board file
+   and not the branch, so a fast-forward would be refused on any checkout with a commit of its
+   own. Whether the host agent may ever move that tree, and how a write-back reaches origin, is
+   one decision of the person's (TD-222). **Not covered**: a board that exists on origin and
+   not in the checkout at all (the read names the boards it finds on disk), and `ao repo`'s
+   due count (§4.7), which stays a read of the checkout.
+
    **Layout (TD-082; mockup `Inbox.dc.html`).** *The page is one centred column*, 1100 px at
    most: a queue reads in order, top to bottom, and a message's text runs the width of its row.
    Rejected: a grid of rows — it breaks the order. *A section is a heading, not a box*: its name,
@@ -2401,6 +2450,7 @@ noted). If a control is not in this table it does not exist.
 | Due strip / Inbox board row | **Done** | agent checks the item off and commits |
 | Inbox, Repo page: board rows | **Board, coming up (n)** · **not shown (n)** fold · **show** · *Settings* | designed 2026-09-28 (TD-207; built 2026-09-28 — TD-220 slice 3; §4.5 screen 6 *The board's horizon*). Under the due board rows, the items the person's mode (`person.inbox.board_show`) draws before they are due, soonest first, each the board row with its own Snooze, Done, Reply and Open board and its due words *due in 6 d · Oct 4*, drawn quieter and counted in no number but the rail's *board items*, which counts the board rows on the page. Under them the fold **not shown (n)** holds what the mode hides, closed. One line says the mode and what it hides — *showing the next 10 board items per team · 14 not shown, the next due Oct 12 — show · Settings*: **show** opens the fold for this page view and writes nothing; *Settings* links to the Settings page's **You**. The line is drawn whenever a board is read, with no fold when nothing is hidden. Display and two links: nothing here is built from a session's words |
 | Settings page | **You**: **board items shown** | designed 2026-09-28 (TD-207; built 2026-09-28 — TD-220 slice 4): a pick of four — *the next* `n` *per team* · *only what is past due* · *due this week* (*due within* `n` *days* when n is not 7) · *all* — the two numbers fields beside their choice (10 and 7 until typed), written to `person.inbox.board_show` (`next:10`, `due`, `7d`, `all`; §5) through `set_settings`, which refuses an n outside 1 to 50 for `next:` and 1 to 365 for days; the default is `next:10`. An item that is due is shown and counted under every choice. Its *i* text: *which board items the Inbox shows before they are due; they are listed under "Board, coming up" and are not counted; what this hides is under "not shown"* |
+| Inbox, Repo page: board rows | **origin note** | display only (TD-208; designed 2026-09-28, not built — TD-221; §4.5 screen 6 *Boards are read against origin*): one line above a repo's first board row saying where its board was read and what that hides — *read from origin/main: this checkout has not pulled it yet*; *board edits made here are not on origin*; *this checkout's board and origin's have both changed: showing the checkout's, and what origin added is not shown — pull* (the warning colour); *origin could not be reached (timeout): showing the checkout's board as of its last pull*. No note when the board matches origin or origin has none. The words are ours, chosen by the reader's per-board `source` (read from origin or not) and the fixed opening phrase of its `fetch_note`, which carry no count, so the note gives none. On a board read from origin the rows' **Snooze ▾**, **Done** and **Reply** are disabled with *on origin, not in this checkout yet: pull to act on it*; **Open board** stays |
 | Due strip / Inbox board row | **Reply** | designed 2026-09-24 (TD-126, Paul's shape); the file half built (TD-142 slice 1: the button, the composer, `board_reply` writing and committing), the mail half and the standing not yet. Opens the one dialog Reply and Message share, the line's head quoted; **Send** calls `board_reply {board, line, text, reply, refs}` (§4.4 *Board write-back*; `refs` as the reader gave them), the person's alone. What it does, in order: **always writes the reply on the board** — appended to the item's own line as ` — Paul, <date>: <reply>`, one commit — so the line, still due, carries the instruction to the next session that reads the board (through the Inbox row now; through the SessionStart hook once the reader prints a line's reply tails after the head it clips at 200 characters, §4.4); **and mails it as well only when a live session still holds the context**: every live record with an unexpired declared lease (§4.8, `LEASE_TTL`) on one of the line's `refs` gets a `note` from the person, `about` that reference, marked `handed` (§4.8a; it owes an outcome, which shows under *Waiting on them*, §4.10 *Outcomes*), its text the line's head and the reply. A sender that has moved on or exited is not written to (Paul: *will it have moved on and the reply is a distraction, or will it already have the context?* — the lease answers that). The row **says where a reply will go before the press**, beside the sender's name: *still on TD-122 — grinder-ao-2 holds it* (a live lease on one of the line's refs; the reply reaches that session, which need not be the line's author), *moved on* (the named session is live and holds no lease on them), *gone* (no live session by that name and no holder); the result after the press repeats it — *written on the board* / *written on the board · sent to grinder-ao-2 (holds TD-122)* — and the trail says the same. **A reply is not Done**: the line stays counted until the instruction is carried out, and whoever carries it out closes the line as any board line is closed. The file half is written before the mail half, and a mail failure is said in the result with the file half done. `session`, `host` and `refs` are fields of dev-cadence's reader (§4.4), never parsed here; until the reader carries them the row draws no standing and Reply writes on the board alone, saying so |
 | Inbox board row | **standing** | display only (TD-126): *still on <ref> — <session> holds it*, *moved on* or *gone*, as the Reply row defines them, computed by the page from the records it already holds — a live record with a declared `claimed` on one of the item's `refs` younger than `LEASE_TTL`, else whether a live record carries the item's `session` name — and refreshed with the poll. A word, never a control |
 | Due strip | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
