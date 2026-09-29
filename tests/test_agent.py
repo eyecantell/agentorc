@@ -504,12 +504,12 @@ async def test_send_wait_hook_lands_while_typing(agent, hookstub, tmp_path, monk
     typed = agent._type
     during: list[str] = []
 
-    async with LocalClient() as c, LocalClient() as feeder:
+    async with LocalClient() as c, LocalClient() as feeder, LocalClient() as tool:
 
         async def slow_type(sid, adapter, text):
             await typed(sid, adapter, text)  # the Enter has landed
-            for st in during:
-                await feeder.call("hook", session=sid, state=st)
+            for st in during:  # the tool's hooks, on a connection of their own
+                await tool.call("hook", session=sid, state=st)
             await asyncio.sleep(0.3)  # still polling the composer
 
         monkeypatch.setattr(agent, "_type", slow_type)
@@ -535,7 +535,7 @@ async def test_send_wait_hook_lands_while_typing(agent, hookstub, tmp_path, monk
         await feeder.call("hook", session=s["id"], state="working")
         during[:] = ["idle", "working"]
         task = asyncio.create_task(c.call("send", id=s["id"], text="queued", wait=True, timeout=5))
-        await asyncio.sleep(0.8)  # past the stall window: the start was seen
+        await asyncio.sleep(0.8)  # past the stall window, and no prompt-stalled: the start was seen
         assert not task.done()
         await feeder.call("hook", session=s["id"], state="idle")
         assert (await asyncio.wait_for(task, 5))["state"] == "idle"

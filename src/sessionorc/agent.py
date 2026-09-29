@@ -1270,7 +1270,9 @@ class HostAgent(
         # The baseline is what the session was doing when the text was typed, read before the paste
         # (TD-204): the tool's UserPromptSubmit lands the moment Enter does, often while `_type` is
         # still confirming the composer emptied, and a baseline read after that took this prompt's
-        # own turn for a busy session's and then waited for a further one that never came.
+        # own turn for a busy session's and then waited for a further one that never came. Accepted
+        # residual: an earlier typist's (the doorbell's, a wrap-up's) start that lands late, inside
+        # this paste, reads as this prompt's; nothing ties a hook to the prompt that caused it.
         rev_before = rev_sent
         if state_sent != "idle":
             # Busy: the tool queues the text. Wait for the current turn to end; a stop on anything
