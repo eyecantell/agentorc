@@ -107,11 +107,12 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first; answered 2026-09-28: teams per repo, aggregated by the home |
 | TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — proposal |
 | TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Designed 2026-09-28 — the build is TD-226 |
-| TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
+| TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Designed 2026-09-28 — the build is TD-227 |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Built — slices 1–4 (#714, #745, #747, #748); live check pending |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — (a) and the log; live check pending |
 | TD-226 | Build the rollback: `ao promote --sha` / `--back` run in a detached worktree at the commit, `last.json`, the hold (`held.json`) under which `auto` waits, `ao promote clear`, the row's *rolled back* reading | Medium | Open — pickable |
+| TD-227 | Build rule 8, work for a team that wound down: `lane_seen` kept for a gone member and first written from the ledger at the declaration, `owner:` lane words, `work_waiting`, `teams.<team>.on_work`, the Inbox row and the replay with its four bounds | Medium | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
 
@@ -2059,8 +2060,9 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Added:** 2026-09-28 (Paul: *it looks like the dc-grind and ao-grind teams both have work to do but are both idle — should they restart automatically?*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-227
+**Status:** Designed 2026-09-28 (the designer, PR #721; the steer to Paul is `m-9bcd1abd8d1a`, bound 2026-09-29 10:14 MDT): design §6 *Keeping a team running* rule 8 (**Work for a team that wound down**) and rule 6 (the first write at the declaration, the `owner:` lane word), §4.9a, §5 `teams.<team>.on_work`, §4.7 `ao team on-work`, §4.5a *Inbox row: team start*, *work waiting* note and the Settings page's Teams row; the glossary. The default is `ask`; `start` is the person's setting. The owner words themselves are `org.yml`'s, on the board for Paul. Closes with TD-227.
+**Blocked by:** TD-227
 **Location:** design §6 (*Keeping a team running*, rule 6), §4.9a (wind-down), `src/sessionorc/agent_tick.py` (rule 6: `lane_seen`), the team's Start (`agentorc.teamrun`), TD-133 (schedules)
 
 **Why:** ao-grind wound down at 2026-09-28T06:56Z. Every member had declared out of work, so the manager closed them and exited. Over the next day the designer's lane gained entries (TD-198, 199, 203, 206, 207, 208, 210, 212, 213, and TD-180 once answered), and nothing started the team again; Paul noticed at the Org page and the anchor pressed Start. Three gaps:
@@ -2153,6 +2155,30 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch repo with a `promote:` block, `ao promote --back` puts live on the commit before the last promote in one command while the checkout sits on a branch, `ao promote status` and the Inbox row read *rolled back from*, `auto` leaves it there until the person promotes or clears, and slice 4's tests pass.
 
 **Related:** TD-212 (the design), TD-132 (the promote; its slice 4, this repo's block, writes a `run` that installs the tree it is started in), TD-062.
+
+## TD-227: Build rule 8 — work for a team that wound down
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-28 (the designer, from TD-214's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/ledger.py` (`lane_matches`), `src/sessionorc/agent_common.py` (`_lane`, the three `WORK_*` constants) and `src/agentorc/org.py` (`_lane`), `src/sessionorc/agent_tick.py` (`_lane_news`, `_nudge_line`, `_keep_running`, `_replay`), `src/sessionorc/gitinfo.py` (the ledger at a commit), `src/sessionorc/settings.py` (`teams.<team>.on_work`), `src/sessionorc/models.py` and the `host` record (`work_waiting`), `src/sessionorc/modes.py`, `src/agentorc/cli.py` (`ao team on-work`, `ao team list`), `src/agentorc/ui/` (the Inbox row, the card's note, the Settings page's picker, `help.py`); design §6 rules 6 and 8, §5, §4.7, §4.5a. Held path: the techlead reads the PRs.
+
+**Why:** TD-214's *Why*: a wound-down team sat a day with ten entries in its designer's lane, and rule 6's first tick took a day's backlog as seen.
+
+**Fix, in slices a PR each:**
+1. **Rule 6's two repairs** (`sessionorc`): `lane_matches` takes the whole lane, so `owner:<word>` narrows the other words (an entry with no `Owner:` matches; a lane with no owner word matches as today). Owner words are set aside before `_lane`'s checks in both packages, so `[free-pick, owner:grinder]` is accepted, and every reader of a lane as references leaves them out: `_nudge_line`, the card's lane count, the brief's lane slot, `ao progress`. `lane_seen`'s first write reads the ledger at the last commit of `origin/<default>` before `out_of_work.at` (`git rev-list -1 --before`, which reads committer dates, right for squash merges; then the file at that commit, at the record's `ledger` path, through the reader `ledger.entries` already is), and falls back to the current reading when no commit or no file is found, the log saying which was used.
+2. **`work_waiting`** (`sessionorc`): `_lane_news` already writes `lane_seen` for a member that is gone and stops before the telling; the new part is the team's pass. It reads a team as wound down from the records — unattended sessions only, a seat known by the record's `seat` field and not by the definition's names — written once in `sessionorc` and imported by `teamrun.wound_down`, whose answer for the card must not change (a test holds the two equal on a team with a seat and a person's session). It writes `work_waiting` on `host` once `WORK_SETTLE` has passed since the home first read the newest id. `teams.<team>.on_work` in `settings.py` with its three values, refused otherwise; `set_settings` takes it. A `clear_work` RPC, a person's own, in `modes.HOME_EDITS`, is Dismiss's half.
+3. **The row and the words**: the Inbox row from `work_waiting`, its Start the team card's, Snooze by time in the attention store under `work:<team>`, Dismiss through `clear_work`; the card's *work waiting* note; `ao team list`'s words; `ao team on-work`; the Settings page's picker. The help entries for the row and the picker are this slice's wording, in §4.5a's help list and `ui/help.py` together.
+4. **The start**: under `on_work: start` the replay of the team's launch records, `why: work`, the four bounds read first and each leaving the row with its reason; `work_started` counts a start once however many records it replayed; the card's *started … for* line. `docs/briefs/techlead-context.md` §2 says the host agent *starts nothing new by itself*: the PR that builds this slice rewords it, and the techlead reads that PR.
+5. **Tests**: a member that declared at T with an entry merged at T+1 h and a first tick at T+1 d is told of it; a history that cannot be read falls back; `[free-pick, owner:grinder]` leaves out an entry owned by the anchor and takes one with no `Owner:`; a wound-down team whose lane gains an entry gets `work_waiting` after the settle and not before; a stopped team (one member killed) gets none; `ask` starts nothing; `start` replays every launch record once and is held back by each of the four bounds in turn, the row saying which; Dismiss adds the ids to `lane_seen` and a later entry asks again; `off` writes nothing.
+
+**Done when:** on a scratch home, an entry merged into a wound-down team's lane puts a *team start* row in the Inbox within `WORK_SETTLE` and two ticks, the same under `on_work: start` starts the team and the card says why, and a promote that turns the rule on tells a finished member of what was filed since it declared.
+
+**Related:** TD-214 (the design), TD-195 (rule 6), TD-133 (the schedule, whose replay slice 4 shares: whichever is built first writes it), TD-223 (what pickable means where the header has no lines).
 
 ## TD-230: The usage chip shows a stale reading with no age, and the gate acts on it as if fresh
 
