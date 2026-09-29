@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from sessionorc import hosts
+from sessionorc import settings as settings_mod
 from sessionorc.models import (
     normalize_ref,
 )
@@ -252,8 +253,9 @@ BOARD_TIMEOUT = 20.0
 
 
 def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
-    """The command that reads the due items of these repos' boards, or None and a note saying why
-    nothing is read. No board anywhere is not a fault and has no note; boards with no reader do,
+    """The command that reads every open item of these repos' boards — not `--due-only` since TD-220
+    (§4.5 screen 6 *The board's horizon*): the page sorts what is due from what comes up — or None
+    and a note saying why nothing is read. No board anywhere is not a fault and has no note; boards with no reader do,
     since the Inbox would otherwise look clear when it is not (§4.5 *no silent failure path*)."""
     rs = [Path(r).expanduser() for r in roots]
     boards = [str(r / BOARD_FILE) for r in rs if (r / BOARD_FILE).is_file()]
@@ -262,7 +264,7 @@ def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
     script = next((r / BOARD_SCRIPT for r in rs if (r / BOARD_SCRIPT).is_file()), None)
     if script is None:
         return None, f"board items are not shown: no repo here carries {BOARD_SCRIPT}, dev-cadence's reader"
-    argv = [sys.executable, str(script), "--report", "--due-only", "--json"]
+    argv = [sys.executable, str(script), "--report", "--json"]
     for b in boards:
         argv += ["--board", b]
     return argv, ""
@@ -360,13 +362,46 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
     return out
 
 
+def board_due_now(it: Mapping[str, Any]) -> bool:
+    """Whether a reader's item is **due now** (§4.5 screen 6 *The board's horizon*): what the
+    `--due-only` read surfaced, and so a counted *Needs you* row under every mode — a decided item
+    whatever its date, one whose date could not be read (`due_error`), one due today or earlier; an
+    undecided `fyi` item never (the reader's own `surfaces_at_start`, read here from its fields)."""
+    if it.get("kind") == "fyi" and not it.get("decided"):
+        return False
+    return bool(it.get("decided")) or bool(it.get("due_error")) or it.get("overdue_days") is not None
+
+
+def _ahead_words(due: str, today: str, tag: str = "") -> str:
+    """A not-yet-due item's due words, *due in 6 d · Oct 4*; an undated one's, *no due date*. An item
+    that is not due now yet dated today or earlier — an undecided `fyi`, which the reader never
+    surfaces as due — takes the reader's own words for it (*3d overdue*), never *due in -3 d*."""
+    d, t = _civil(due), _civil(today)
+    if d is None:
+        return "no due date"
+    if t is None:
+        return f"due {d:%b} {d.day}"
+    if d <= t:
+        return tag or f"due {d:%b} {d.day}"
+    return f"due in {(d - t).days} d · {d:%b} {d.day}"
+
+
+def _civil(v: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(v or ""))
+    except ValueError:
+        return None
+
+
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
-    per item the report says is due today or overdue — its repo, its due words, the whole text, and
-    the board at that line in the editor. `at` is the due date, so *oldest first* in **Needs you**
+    per open item of the report — its repo, its due words, the whole text, and the board at that
+    line in the editor — with `due_now` saying which are due (`board_due_now`) and `ahead` the due
+    words of one that is not (TD-220). `at` is the due date, so *oldest first* in **Needs you**
     puts the longest overdue first among the states and the mail. The text is the board's, shown as
     text: nothing here is a control built from it (TD-071 item 8)."""
     rows: list[dict[str, Any]] = []
+    today = str(report.get("today") or "") if isinstance(report, dict) else ""
     boards = report.get("boards") if isinstance(report, dict) else None
     for b in boards if isinstance(boards, list) else ():
         if not isinstance(b, dict):
@@ -396,11 +431,69 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "due": str(it.get("due") or ""),
                     "due_tag": tag,
                     "at": str(it.get("due") or ""),
+                    "due_now": board_due_now(it),
+                    "today": today,  # the reader's, which `board_horizon` measures days from
+                    "due_error": bool(it.get("due_error")),
+                    "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today, tag),
                     "editor": url,
                     "find": _find_text(label, text, tag, "board"),
                 }
             )
     return rows
+
+
+def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, today: str = "") -> dict[str, Any]:
+    """The board's horizon (design §4.5 screen 6, §5 `person.inbox.board_show`; TD-220): the board rows
+    sorted into `due` — due now, a counted *Needs you* row under every mode — `ahead`, what the mode
+    draws before it is due (*Board, coming up*), and `hidden`, what it does not (the *not shown*
+    fold); soonest first, an undated item after the dated ones. `mode` is the setting as read,
+    `next:10` when it is unset or does not parse; `today` is the reader's (each row carries it),
+    for the days a `<n>d` reaches. A row with no `due_now` is due: a row from before TD-220 was the `--due-only` read's.
+
+    - `next:<n>`: per team, the n soonest open items of its boards, the due ones among them, so
+      what is due takes places first; a due row whose date could not be read takes none. A board
+      no team works is its repo's own group. The team is the row's badge (`repo_teams`).
+    - `due`: nothing ahead. `<n>d`: what falls due within n days of `today`; an undated item is
+      hidden. `all`: every open item.
+
+    `next_due` is the soonest date among the hidden, for the line (*the next due Oct 12*)."""
+    try:
+        mode = settings_mod.parse_board_show(mode)
+    except ValueError:
+        mode = settings_mod.BOARD_SHOW_DEFAULT
+    due = [r for r in rows if r.get("due_now", True)]
+    rest = sorted(
+        (r for r in rows if not r.get("due_now", True)),
+        key=lambda r: (not r.get("due"), str(r.get("due") or ""), str(r.get("repo") or ""), r.get("line") or 0),
+    )
+    ahead: list[dict[str, Any]] = []
+    if mode == "all":
+        ahead = rest
+    elif mode.endswith("d"):
+        t = _civil(today or next((r.get("today") for r in rows if r.get("today")), "")) or date.today()
+        until = (t + timedelta(days=int(mode[:-1]))).isoformat()
+        ahead = [r for r in rest if r.get("due") and str(r["due"]) <= until]
+    elif mode.startswith("next:"):
+        n = int(mode.split(":", 1)[1])
+
+        def group(r: Mapping[str, Any]) -> str:
+            return f"team:{r['team']}" if r.get("team") else f"repo:{r.get('root') or r.get('repo') or ''}"
+
+        places: dict[str, int] = {}
+        for r in due:
+            if not r.get("due_error"):
+                places[group(r)] = places.get(group(r), 0) + 1
+        for r in rest:
+            g = group(r)
+            if places.get(g, 0) < n:
+                ahead.append(r)
+                places[g] = places.get(g, 0) + 1
+    shown = {id(r) for r in ahead}
+    hidden = [r for r in rest if id(r) not in shown]
+    # the line's *the next due* is ahead of today: a hidden past-dated `fyi` is not what comes next
+    now = str(today or next((r.get("today") for r in rows if r.get("today")), "")) or date.today().isoformat()
+    dated = [str(r["due"]) for r in hidden if r.get("due") and str(r["due"]) > now]
+    return {"mode": mode, "due": due, "ahead": ahead, "hidden": hidden, "next_due": min(dated) if dated else ""}
 
 
 def _needs_key(item: dict[str, Any]) -> tuple[int, str]:

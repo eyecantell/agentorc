@@ -1879,8 +1879,8 @@ Screens:
    from one fresh `list` on each render, since the pushed stream is per record and this page is
    per person — a row whose state changed between polls is corrected by the next one, and a
    permission answered here leaves at once. **Board items** (TD-069 step 3) are read by
-   dev-cadence's own `nudge_user_attention.py --report --due-only --json` (the read as built;
-   *The board's horizon*, below, drops `--due-only` — TD-220) over the boards of the
+   dev-cadence's own `nudge_user_attention.py --report --json` (every open item since TD-220 slice 2;
+   the page sorts what is due, *The board's horizon* below) over the boards of the
    repos in this host's registry — never a second parser — at most once a minute and off the page's
    loop, and read again at once after a Snooze, Done or Reply; each due item is a counted *Needs you* row
    (its repo, the team whose projects hold it, its due words, the whole text as text, **Open board**
@@ -1889,7 +1889,8 @@ Screens:
    write-back (TD-126). A reader that fails is said
    in a note above the rows, never shown as a clear board.
 
-   **The board's horizon (TD-207; designed 2026-09-28, not built — TD-220).** Paul was told by a
+   **The board's horizon (TD-207; designed 2026-09-28; the read, the setting and the sort are built,
+   and the page draws only the due rows — *Board, coming up*, the fold and the line are not built, TD-220).** Paul was told by a
    session that it had left him two items, looked in the Inbox and found nothing: both were due
    a week out, the read was `--due-only`, and nothing on the page said the Inbox had a horizon.
    So what the Inbox shows of a board is a setting, and the page says which is in force (Paul,

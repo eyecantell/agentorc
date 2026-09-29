@@ -71,8 +71,8 @@ def test_the_reader_runs_over_every_board_here_with_the_first_script_found(tmp_p
     b = repo(tmp_path, "b", "- [ ] y\n")
     argv, note = board_argv([a, bare, b])
     assert note == "" and argv[1] == str(b / "scripts" / "nudge_user_attention.py")
-    assert argv[2:5] == ["--report", "--due-only", "--json"]
-    assert argv[5:] == ["--board", str(a / "docs/user_attention.md"), "--board", str(b / "docs/user_attention.md")]
+    assert argv[2:4] == ["--report", "--json"]  # every open item: the page sorts what is due (TD-220)
+    assert argv[4:] == ["--board", str(a / "docs/user_attention.md"), "--board", str(b / "docs/user_attention.md")]
 
 
 @pytest.mark.unit
@@ -240,7 +240,8 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
 @pytest.mark.unit
 def test_read_boards_runs_dev_cadences_reader_and_says_when_it_cannot(tmp_path, monkeypatch):
     """End to end over a real board and the real reader: an overdue item and one due today are
-    rows, an undated one and one due next week are not; the team comes from the org's projects."""
+    due-now rows, an undated one and one due next week are rows not yet due (TD-220); the team
+    comes from the org's projects."""
     past = (date.today() - timedelta(days=3)).isoformat()
     later = (date.today() + timedelta(days=7)).isoformat()
     board = (
@@ -261,7 +262,18 @@ def test_read_boards_runs_dev_cadences_reader_and_says_when_it_cannot(tmp_path, 
 
     rows, note = uiapp.read_boards()
     assert note == ""
-    assert [r["text"].split(".")[0] for r in rows] == ["overdue thing", "due today"]
+    # every open item is read (TD-220), the ones due now marked; the closed one is not an item
+    assert [(r["text"].split(".")[0], r["due_now"]) for r in rows] == [
+        ("overdue thing", True),
+        ("due today", True),
+        ("undated thing", False),
+        ("next week", False),
+    ]
+    assert [r["ahead"] for r in rows[2:]] == [
+        "no due date",
+        f"due in 7 d · {date.today() + timedelta(days=7):%b} {(date.today() + timedelta(days=7)).day}",
+    ]
+    rows = [r for r in rows if r["due_now"]]
     assert rows[0]["line"] == 3 and rows[0]["repo"] == "proj" and rows[0]["team"] == "proj-grind"
     assert "overdue" in rows[0]["due_tag"]
 
@@ -293,7 +305,8 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
     from agentorc.ui import app as uiapp
 
     root = tmp_path / "proj"
-    rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue")))
+    later = {**item(4, "look next week", "2026-09-30", "due 2026-09-30"), "overdue_days": None}
+    rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue"), later))
     calls = []
 
     def fake(run=None):
@@ -326,6 +339,7 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
     with TestClient(uiapp.create_app()) as c:
         page = c.get("/inbox").text
         assert "decide the thing" in page and needs_line(page) == "1"
+        assert "look next week" not in page  # not yet due: counted nowhere (TD-220; drawn by slice 3)
         assert "a note from the reader" in page and 'id="boardnote"' in page
         got = c.get("/api/person/inbox").json()
         assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
@@ -361,3 +375,115 @@ def test_with_the_host_agent_down_no_surface_counts_the_board(tmp_path, monkeypa
         page = c.get("/inbox").text
         assert "decide the thing" not in page and needs_line(page) == "0"
         assert c.get("/api/person/inbox").json()["needs"] is None
+
+
+def _row(line, due, team="t", *, due_now=False, **kw):
+    return {
+        "row": "board",
+        "id": f"board:r:{line}",
+        "line": line,
+        "repo": "r",
+        "root": "/r",
+        "team": team,
+        "due": due,
+        "due_now": due_now,
+        "today": "2026-09-28",
+        **kw,
+    }
+
+
+@pytest.mark.unit
+def test_what_is_due_is_the_readers_due_only_set():
+    """§4.5 screen 6 *The board's horizon* (TD-220): due now is what `--due-only` surfaced — due today
+    or earlier, decided whatever its date, a date that could not be read — and never an undecided fyi."""
+    from agentorc.ui.app import board_due_now
+
+    assert board_due_now({"overdue_days": 0}) and board_due_now({"overdue_days": 3})
+    assert board_due_now({"overdue_days": None, "decided": {"text": "go", "date": "2026-09-27"}})
+    assert board_due_now({"overdue_days": None, "due_error": "Due: soonish"})
+    assert not board_due_now({"overdue_days": None, "due": "2026-10-04"})
+    assert not board_due_now({"overdue_days": None})  # undated
+    assert not board_due_now({"overdue_days": 2, "kind": "fyi"})
+    assert board_due_now({"overdue_days": None, "kind": "fyi", "decided": {"text": "x", "date": "2026-09-27"}})
+
+
+@pytest.mark.unit
+def test_the_horizon_sorts_the_rows_by_the_mode():
+    """§4.5 screen 6 *The board's horizon*, §5 `person.inbox.board_show` (TD-220 slice 2)."""
+    from agentorc.ui.app import board_horizon
+
+    def ids(rows):
+        return [r["line"] for r in rows]
+
+    # next:10 — a team with twelve due shows twelve and none ahead; one with two due shows eight ahead
+    busy = [_row(i, "2026-09-20", "busy", due_now=True) for i in range(12)] + [_row(99, "2026-09-29", "busy")]
+    got = board_horizon(busy, None)
+    assert got["mode"] == "next:10" and len(got["due"]) == 12 and got["ahead"] == [] and ids(got["hidden"]) == [99]
+    quiet = [_row(i, "2026-09-20", due_now=True) for i in range(2)] + [
+        _row(100 + i, f"2026-10-{i + 1:02d}") for i in range(12)
+    ]
+    got = board_horizon(quiet, "next:10")
+    assert ids(got["ahead"]) == [100 + i for i in range(8)] and ids(got["hidden"]) == [108, 109, 110, 111]
+    assert got["next_due"] == "2026-10-09"
+    # a team that works two boards shows n across both; a board no team works is its repo's own group
+    two = [_row(1, "2026-10-01", root="/a"), _row(2, "2026-10-02", root="/b"), _row(3, "2026-10-03", root="/a")]
+    assert ids(board_horizon(two, "next:2")["ahead"]) == [1, 2]
+    lone = [_row(1, "2026-10-01", ""), _row(2, "2026-10-02", "", root="/other")]
+    assert ids(board_horizon(lone, "next:1")["ahead"]) == [1, 2]
+    # a due_error row is a due row and takes no place of the n
+    bad = [_row(1, "", due_now=True, due_error=True), _row(2, "2026-10-01")]
+    got = board_horizon(bad, "next:1")
+    assert ids(got["due"]) == [1] and ids(got["ahead"]) == [2]
+    # 7d: six days out is coming up, forty is hidden and counted by the line; undated is hidden
+    week = [_row(1, "2026-10-04"), _row(2, "2026-11-07"), _row(3, None), _row(4, "2026-09-27", due_now=True)]
+    got = board_horizon(week, "7d")
+    assert ids(got["due"]) == [4] and ids(got["ahead"]) == [1] and ids(got["hidden"]) == [2, 3]
+    assert got["next_due"] == "2026-11-07"
+    # due: nothing ahead; all: everything, the undated last
+    got = board_horizon(week, "due")
+    assert ids(got["due"]) == [4] and got["ahead"] == [] and ids(got["hidden"]) == [1, 2, 3]
+    got = board_horizon(week, "all")
+    assert ids(got["ahead"]) == [1, 2, 3] and got["hidden"] == [] and got["next_due"] == ""
+    # an undated item takes a place under next: once the dated ones have theirs
+    assert ids(board_horizon(week, "next:3")["ahead"]) == [1, 2]
+    assert ids(board_horizon(week, "next:4")["ahead"]) == [1, 2, 3]
+    # the due rows never move with the mode, and a mode that does not parse is next:10
+    for mode in ("next:1", "due", "7d", "all", "soon", None):
+        assert ids(board_horizon(week, mode)["due"]) == [4]
+    assert board_horizon(week, "soon")["mode"] == "next:10"
+    # a past-dated fyi is not due now: it reads the reader's words, and is never the line's next date
+    from agentorc.ui.app import board_rows
+
+    fyi = {
+        "line": 5,
+        "text": "for your read",
+        "due": "2026-09-25",
+        "overdue_days": 3,
+        "due_tag": "3d overdue",
+        "kind": "fyi",
+        "decided": None,
+    }
+    (row,) = board_rows({"today": "2026-09-28", "boards": [{"root": "/r", "board": "/r/b.md", "items": [fyi]}]})
+    assert not row["due_now"] and row["ahead"] == "3d overdue"
+    got = board_horizon([row, _row(6, "2026-10-12")], "due")
+    assert ids(got["hidden"]) == [5, 6] and got["next_due"] == "2026-10-12"
+    # a row from before TD-220 carries no due_now: it was the --due-only read's, so it is due
+    assert ids(board_horizon([{"line": 7, "due": "2026-10-10"}], "due")["due"]) == [7]
+
+
+@pytest.mark.unit
+def test_the_mode_is_the_persons_setting_as_last_read():
+    """§5 `person.inbox.board_show` through the agent's `settings` read (TD-220): unset or bad is next:10."""
+    from agentorc.ui import uiconf
+
+    try:
+        uiconf.set_read({"person": {}})
+        assert uiconf.board_show() == "next:10"
+        uiconf.set_read({"person": {"inbox": {"board_show": "7d"}}})
+        assert uiconf.board_show() == "7d"
+        uiconf.set_read({"person": {"inbox": {"board_show": "next:0"}}})
+        assert uiconf.board_show() == "next:10"
+        uiconf.set_read({"person": {"inbox": "all"}})
+        assert uiconf.board_show() == "next:10"
+    finally:
+        uiconf.set_read({"person": {}, "migrate": []})
