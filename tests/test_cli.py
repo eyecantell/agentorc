@@ -227,13 +227,12 @@ def test_send_wait(subprocess_agent, tmp_path, capsys):
     call_sync("hook", session=sid, state="idle")
     wait_state(sid, "idle")
 
-    # Turns until the send returns, rather than one turn on a timer (TD-063). `rpc_send` captures
-    # the revision it waits for *after* `_submit` — a paste, a settle and a composer check — so on a
-    # slow runner a single working→idle pair posted 0.3 s and 0.6 s in can both land before that
-    # read: the record is idle, its revision is already past, nothing else ever moves it, and the
-    # stall window expires. CI saw exactly that (`showed no activity within 4.69821 s`). Whichever
-    # cycle lands after the read satisfies both waits, at any load, and the loop ends on idle so the
-    # settled state the command prints is unchanged.
+    # Turns until the send returns, rather than one turn on a timer (TD-063). Until TD-204 `rpc_send`
+    # read the revision it waits for *after* `_submit`, so on a slow runner a single working→idle
+    # pair could land before that read and the stall window expired (CI: `showed no activity within
+    # 4.69821 s`). The baseline is now read before the paste, but a pair that lands before the send
+    # begins typing is still no start of it: whichever cycle lands after the paste satisfies both
+    # waits, at any load, and the loop ends on idle so the settled state the command prints is unchanged.
     done = threading.Event()
 
     def turns():
