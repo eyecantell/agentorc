@@ -176,7 +176,12 @@ def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(
     got = build_chip(info)
     assert got["text"] == f"live {built[:7]} · main 3 commits ahead" and "3 commits ahead" in got["title"]
     assert build_chip({**info, "promotes": {"src": {**reading, "ahead": 0, "main": built}}}) is None
+    # main moved to a line the build is not on (a force-push, a branch build): the row shows, and so
+    # does the chip, with no count (the review of #743)
+    for n in (0, None):
+        off = build_chip({**info, "promotes": {"src": {**reading, "ahead": n}}})
+        assert off["text"] == f"live {built[:7]} · main unknown" and "cannot count back to" in off["title"]
     # a reading of another live commit, another checkout, or no count: measured here
-    for other in ({**reading, "live": "0" * 40}, {**reading, "root": str(repo.parent)}, {**reading, "ahead": None}):
+    for other in ({**reading, "live": "0" * 40}, {**reading, "root": str(repo.parent)}, {**reading, "main": None}):
         assert build_chip({**info, "promotes": {"src": other}})["text"].endswith("main 1 commit ahead")
     assert build_chip(None) is None
