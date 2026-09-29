@@ -1,9 +1,6 @@
 """`.agentorc.yml`: one repo's checked-in configuration (design §5), and the role presets over it (§4.8).
 
 ```yaml
-adapter: claude-code
-worktrees: .claude/worktrees
-anchor: main-checkout-single
 unattended: {workers: 3, ...}         # kept as a block; the loader only knows it is present
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
@@ -14,6 +11,10 @@ teams: {...}                          # §4.9; passed through for the team step
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands: [{name: test, run: pdm run test}]
 ```
+
+`unattended`, `ready_when` and `commands` are accepted and read by nothing yet: each waits on the
+feature that reads it (§5). `adapter`, `worktrees` and `anchor` are refused, naming where each is
+decided instead (`RETIRED`, TD-149).
 
 Missing file: the defaults §5 lists. A malformed file: a `ValueError` naming the key. Read on every
 use and cached nowhere (the profiles rule), by the clients only — the host agent never reads it, so
@@ -37,9 +38,13 @@ import yaml
 from sessionorc.models import GRANTS, normalize_context, normalize_review
 
 FILE = ".agentorc.yml"
-DEFAULT_ADAPTER = "claude-code"
-DEFAULT_WORKTREES = ".claude/worktrees"
-DEFAULT_ANCHOR = "main-checkout-single"
+# Keys the file once carried and nothing ever read (TD-149 (1)): each is decided elsewhere, so a
+# repo writing one is told where rather than left believing it took effect.
+RETIRED = {
+    "adapter": "the adapter is chosen per session (`ao new --adapter`, the New session form) and per profile",
+    "worktrees": "a session's worktree is always `<repo>/.claude/worktrees/<name>` (sessionorc.gitinfo)",
+    "anchor": "one agent session per directory is invariant 2 (design §9), not a per-repo setting",
+}
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
 ROLE_KEYS = (
@@ -319,9 +324,6 @@ class Role:
 class RepoConfig:
     root: Path | None = None  # the directory the file was looked for in
     path: Path | None = None  # the file itself, when it exists
-    adapter: str = DEFAULT_ADAPTER
-    worktrees: str = DEFAULT_WORKTREES
-    anchor: str = DEFAULT_ANCHOR
     unattended: dict[str, Any] | None = None  # the whole block, or None: no unattended mode
     roles: dict[str, dict[str, Any]] = field(default_factory=dict)  # the repo's own overrides, per key
     controllers: list[str] = field(default_factory=list)
@@ -379,10 +381,10 @@ def discover(start: Path | str) -> RepoConfig:
 
 def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
     where = f"{path}: `{key}`"
-    if key in ("adapter", "worktrees", "anchor", "ledger"):
+    if key == "ledger":
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{where} must be a non-empty string")
-        setattr(cfg, key, value.strip())
+        cfg.ledger = value.strip()
     elif key == "unattended":
         if value is None:
             cfg.unattended = None
@@ -403,6 +405,8 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         cfg.teams = _mapping(value, where)
     elif key == "promote":
         cfg.promote = _promote(value, where)
+    elif key in RETIRED:
+        raise ValueError(f"{where} is not a `.agentorc.yml` key any more (design §5): {RETIRED[key]}")
     else:
         raise ValueError(f"{where} is not a `.agentorc.yml` key (design §5)")
 

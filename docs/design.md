@@ -5518,10 +5518,7 @@ person:                                       # the person's own — nothing her
 - Per repo: `.agentorc.yml` (checked in):
 
 ```yaml
-adapter: claude-code
-worktrees: .claude/worktrees         # where new-session worktrees go
-anchor: main-checkout-single         # refuse a 2nd agent session on the main checkout (shells exempt)
-unattended:
+unattended:                           # read by nothing yet (below)
   workers: 3
   brief: ~/.tdgrind/{name}-prompt.md
   window: {weekday: "20:00-06:00", weekend: all}
@@ -5541,8 +5538,8 @@ controllers: [manager-ao-1]           # §4.8: who may act on a session started 
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
   grind: {manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
-ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
-commands:
+ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]   # read by nothing yet
+commands:                             # read by nothing yet
   - name: test        ; run: pdm run test
   - name: cluster     ; run: ./scripts/cluster-status.sh
   - name: attention   ; run: python scripts/nudge_user_attention.py --report
@@ -5550,6 +5547,16 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   run: scripts/promote.sh             # makes `main` live from this checkout; run at the home, in the checkout
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
 ```
+
+  **Read by nothing yet** (TD-149): `unattended:` (the New session switch's precondition, §4.5
+  screen 3; the window and wrap-up are `settings.yml`'s and the tick's today), `ready_when:` (§4.2's
+  checks, which are fixed today and not chosen per repo) and `commands:` (the Commands page, §4.5
+  screen 5, phase 4) are accepted and checked, so a file written ahead of its feature does not break
+  `ao new`, and nothing acts on them until that feature is built. **Not keys**: `adapter:`,
+  `worktrees:` and `anchor:` are refused, the error naming where each is decided — the adapter per
+  session and per profile, a session's worktree always `<repo>/.claude/worktrees/<name>` (the host
+  agent never reads this file, so it could not move it), and one agent session per directory is §9
+  invariant 2, not a per-repo choice.
 
   **`promote:`** (TD-120 step 2, designed 2026-09-24; read by the home since TD-132 slice 1, run
   under `auto` alone until the press is built; the block is accepted and
