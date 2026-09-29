@@ -488,6 +488,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
 .mrow { display: flex; gap: 8px; align-items: baseline; min-width: 0; font-size: var(--t-small); }
 .mrow .mtitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--strong); }
+.mrow .mprio { flex: none; width: 18px; min-width: 18px; min-height: 0; padding: 0; align-self: center; line-height: 16px; } /* one fixed slot, empty when unmarked (TD-232) */
 .mrow .mwho { flex: none; font-family: "JetBrains Mono", monospace; }
 .mrow .mwho .name { color: var(--fg); text-decoration: none; }
 .phase { flex: none; font-size: var(--t-cap); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 3px; color: var(--seg-fg); }

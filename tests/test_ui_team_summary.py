@@ -135,6 +135,49 @@ def test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch()
     assert rows["TD-146"]["phase"] == "grind" and rows["TD-146"]["pr"] is None
 
 
+def test_tds_in_motion_carry_the_entrys_priority_as_a_letter_and_sort_by_it():
+    """TD-232 slice 1 (design §4.5a *team card: TDs in motion*, **Priority**): one letter between the
+    phase and the reference, a chip in a slot of fixed width; the slot is empty for a reference the
+    ledger reading does not hold and for an entry with no priority or another word; within a phase,
+    High first and an unmarked row last."""
+    r = reading("/r/s")
+    r["ledger"]["entries"] += [
+        {"id": "TD-100", "title": "a low one", "for_page": "pickable", "priority": "low"},
+        {"id": "TD-200", "title": "no priority", "for_page": "pickable", "priority": ""},
+        {"id": "TD-250", "title": "a word outside the three", "for_page": "pickable", "priority": "critical"},
+    ]
+    ms = [
+        member("g1", progress=[claim("TD-100"), claim("TD-200")]),
+        member("g2", progress=[claim("TD-301"), claim("TD-250"), claim("TD-999")]),
+    ]
+    rows = ui.motion_rows(ms, r)
+    # High, Low, then the three unmarked (none, a word outside the three, not in the reading) by reference
+    assert [(x["ref"], x["priority"]) for x in rows] == [
+        ("TD-301", "high"),
+        ("TD-100", "low"),
+        ("TD-200", ""),
+        ("TD-250", ""),
+        ("TD-999", ""),
+    ]
+    ms[0]["progress"][0]["pr"] = 5  # a phase comes before a priority: a Low in review sorts after them all
+    assert [x["ref"] for x in ui.motion_rows(ms, r)][-1] == "TD-100"
+    ms[0]["progress"][0]["pr"] = None
+    ms.append(member("g3", progress=[claim("TD-301")]))
+    r["ledger"]["entries"].append({"id": "TD-050", "title": "high", "for_page": "pickable", "priority": "High"})
+    ms.append(member("g4", progress=[claim("TD-050")]))
+    rows = ui.motion_rows(ms, r)
+    assert [x["ref"] for x in rows][:3] == ["TD-050", "TD-301", "TD-100"]  # High first, by reference
+    s = ui.team_summary("grind", ms, {"/r/samscrape": r}, {}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    chips = re.findall(r'<span class="mprio[^"]*"[^>]*>[^<]*</span>', html)
+    assert len(chips) == len(rows)  # one slot per row, filled or empty
+    assert '<span class="mprio bseg p-high" title="High" aria-label="priority High">H</span>' in html
+    assert '<span class="mprio bseg p-low" title="Low" aria-label="priority Low">L</span>' in html
+    assert chips.count('<span class="mprio"></span>') == 3  # TD-200, TD-250, TD-999
+    row = html[html.index('<div class="mrow">') :]
+    assert row.index('class="phase') < row.index('class="mprio') < row.index("TD-050")  # between the two
+
+
 def test_answer_needed_opens_the_facet_and_doing_is_newest_first():
     perm = {"kind": "permission", "text": "Bash git push -u origin td301-fix", "tool_use_id": "t1"}
     ms = [member("g1", state="needs-you", pending=perm), member("g2")]
