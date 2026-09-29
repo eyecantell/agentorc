@@ -22,7 +22,6 @@ from sessionorc.agent_common import (
     _oldest_first,
     _parse,
     _prune_tallies,
-    orphaned_refusal,
 )
 from sessionorc.models import (
     ASK_KINDS,
@@ -300,8 +299,23 @@ class MailMixin:
                     "a system note reports what happened to your own message; there is nobody to reply to "
                     "(design §4.10)"
                 )
+            if sender == PERSON and replied.orphaned and not replied.open:
+                raise RpcError(
+                    f"{reply_to} is already closed ({replied.closed_reason}): its asker is gone (design §4.10)"
+                )
             if sender == PERSON and replied.orphaned:
-                raise RpcError(orphaned_refusal(replied))
+                # §4.10 *A question about a reference outlives its asker*: the answer goes to the
+                # board and to whoever holds the reference, never to a record that is not there
+                if kind != "reply" or named:
+                    raise RpcError(f"{reply_to} is orphaned: the person answers it with a reply alone (design §4.10)")
+                if answer is not None and (
+                    isinstance(answer, bool)
+                    or not isinstance(answer, int)
+                    or not 0 <= answer < len(replied.answers)
+                    or text != replied.answers[answer]
+                ):
+                    raise RpcError("that is not one of the suggested answers, word for word (design §4.10)")
+                return await self._answer_orphan(replied, text, "replied", answer)
             if not named and replied.answered:
                 # A reply to an *answered for you* FYI (§4.9b) — the Overrule path — goes to the
                 # asker with a copy to the answerer, on the question's own thread: the ordinary

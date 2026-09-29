@@ -165,8 +165,9 @@ class AttentionMixin:
         **A question about a reference outlives its asker** (§4.10, TD-213): an open question whose
         `about` names a ledger id or a PR number is **orphaned** instead — it stays open, stamped
         `orphaned` from the record as it is now (`how`: `closed`, `forgotten` or `cancelled`), and
-        a pause on it is cleared, there being no session left to hold. One already orphaned (a
-        close, then the forget a day later) keeps its first stamp."""
+        a pause on it is cleared, there being no session left to hold. `repo` is the record's, or
+        its directory when it names none (a session in a main checkout), which is where its board
+        is. One already orphaned (a close, then the forget a day later) keeps its first stamp."""
         if s.superseded_by:
             return
         at = now_iso()
@@ -177,7 +178,7 @@ class AttentionMixin:
             if ref is None:
                 self._close_entry(e.id, "asker_gone", at)
                 continue
-            stamp = {"at": at, "how": how, "ref": ref, "name": s.name, "repo": s.repo or "", "host": s.host or ""}
+            stamp = {"at": at, "how": how, "ref": ref, "name": s.name, "repo": s.repo or s.dir, "host": s.host or ""}
             self._mark(e.id, orphaned={**stamp, "team": s.team or ""}, paused_at=None)
         # And the debt goes with the asker (design §4.10 *Outcomes*): a question the person
         # answered whose asker was **closed or forgotten** is settled `asker_gone` — nobody is left
