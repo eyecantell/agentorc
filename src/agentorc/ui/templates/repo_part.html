@@ -65,7 +65,7 @@
   <div class="secinfo meta" id="info-doing" hidden>every <code>ao doing</code> call of the servicing team's members, the last fifty (design §4.8)</div>
   {% if doing %}<div class="row gap wrap dchips"><span class="meta">show</span>{% for c in chips %}<button type="button" class="chip" data-who="{{ c.who }}" aria-pressed="{{ 'true' if not c.who else 'false' }}">{{ c.label }} ({{ c.n }})</button>{% endfor %}</div>{% endif %}
   <div class="rlist">
-  {% for d in doing %}<div class="rrow drow" data-who="{{ d.name }}" title="{{ d.at }}"><span class="meta mono">{{ d.hm }}</span><a class="mono" href="/focus/{{ d.id }}">{{ d.name }}</a><span class="rtitle">{{ d.text }}</span></div>
+  {% for d in doing %}<div class="rrow drow" data-who="{{ d.name }}" style="--doer-n: {{ doer_w or 1 }}"><span class="dage meta mono" data-doing-at="{{ d.at }}" title="{{ d.at }}">{{ d.age }}</span><a class="name mono" href="/focus/{{ d.id }}" title="{{ d.name }}">{{ d.name }}</a><span class="dtext">{{ d.text }}</span></div>
   {% else %}<div class="rrow meta">{{ 'no team services this repo' if not teams else 'no ao doing calls yet' }}</div>{% endfor %}
   </div>
 </section>

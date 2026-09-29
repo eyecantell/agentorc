@@ -631,6 +631,24 @@ def _instant(iso: Any) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
+def _short_age(iso: Any, now: datetime) -> str:
+    """An instant as a short age of one unit (§4.5a *team card: Answer needed / Doing*, **Ages and
+    columns**, TD-232): *just now* under a minute and for an instant ahead of the clock, then *5m*,
+    *1h*, *2d* — the largest whole unit and nothing after it — or "" for anything this cannot read.
+    `app.js`'s `fmtShortAge` spells it the same way, so the minute's tick changes nothing it lands on."""
+    dt = _instant(iso)
+    if dt is None:
+        return ""
+    secs = int((now - dt).total_seconds())
+    if secs < 60:
+        return "just now"
+    if secs < 3600:
+        return f"{secs // 60}m"
+    if secs < 86400:
+        return f"{secs // 3600}h"
+    return f"{secs // 86400}d"
+
+
 def _age(iso: str | None, now: datetime) -> str:
     """An instant off a record as *2h 5m*, or "" for anything this cannot read.
 

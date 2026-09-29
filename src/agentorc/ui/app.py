@@ -89,6 +89,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _metered_chip,  # noqa: F401
     _money,  # noqa: F401
     _reserve_why,  # noqa: F401
+    _short_age,  # noqa: F401
     _str_list,  # noqa: F401
     _usage_hover,  # noqa: F401
     _usage_line,  # noqa: F401
@@ -172,6 +173,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_rows,  # noqa: F401
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
+    DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
@@ -815,6 +817,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "phases": {},
                 "answers": [],
                 "doing": [],
+                "doer_w": 1,
                 "face": "doing",
                 "answer_key": "",
                 "noteam": True,
@@ -841,6 +844,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "horizon": hz,
             "doing": summary["doing"],
             "chips": doing_chips(summary["doing"]),
+            "doer_w": summary.get("doer_w") or 1,
             "ledger_editor": editor_link(ledger_file) if ledger_file else None,
             "host": host_name(),
             "active": "",
