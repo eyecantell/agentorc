@@ -417,3 +417,39 @@ async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_whe
         assert (repo / board.BOARD).read_text().count(": this. Context: #702.") == 1
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
         assert e["answer"] == 0
+
+
+async def test_a_refused_note_to_the_holder_is_said_beside_the_committed_line_and_closes_the_entry(
+    agent, repo, tmp_path, monkeypatch
+):
+    """Review of PR #717: the line is committed before the holder is mailed, so a refused send is
+    reported with the result and the entry closes — a second press must not write the line twice.
+    A reply naming another addressee, and a reply to a closed orphaned entry, are refused."""
+    from sessionorc.agent_common import RpcError
+
+    _registry(tmp_path, repo)
+    async with LocalClient() as me:
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=h) as s:
+            await s.call("progress", id=h, ref="TD-5")
+        q = await _orphan(me, repo, tmp_path, "Which?", "TD-5", kind="ask")
+        with pytest.raises(AgentError, match="a reply alone"):
+            await me.call("msg", to=[h], text="x", kind="reply", reply_to=q)
+
+        real = agent._msg
+
+        async def full(sender, text, to, kind, *a, **k):
+            if kind == "note":  # the holder's note, not the person's reply that leads to it
+                raise RpcError("its mailbox is full")
+            return await real(sender, text, to, kind, *a, **k)
+
+        monkeypatch.setattr(agent, "_msg", full)
+        got = await me.call("msg", text="this one", kind="reply", reply_to=q)
+        monkeypatch.undo()
+        assert got["sent"] == [] and got["mail_refused"] == "its mailbox is full" and "not sent to" in got["note"]
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
+        assert e["closed_reason"] == "replied" and "its mailbox is full" in e["outcome"]["text"]
+        with pytest.raises(AgentError, match="already closed"):
+            await me.call("msg", text="again", kind="reply", reply_to=q)
+        assert (repo / board.BOARD).read_text().count(": this one. Context: TD-5.") == 1
+        await me.call("kill", id=h)

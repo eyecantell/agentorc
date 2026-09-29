@@ -342,6 +342,7 @@ class InboxMixin:
         log.info("board %s: %s", root, done["message"])
         holders = self._lease_holders(ref) if ref else []
         sent: list[str] = []
+        mail_refused = ""
         if holders:
             how = str(o.get("how") or "closed")
             text = (
@@ -351,17 +352,26 @@ class InboxMixin:
             )
             if len(text.encode()) > mail.TEXT_CAP:  # the answer alone is within the cap; the quote is not counted
                 text = text.encode()[: mail.TEXT_CAP - 3].decode(errors="ignore") + "…"
-            got = await self._msg(PERSON, text, holders, "note", ref, None, None, None)
-            if mid := (got.get("entry") or {}).get("id"):
-                self._mark(mid, handed=True)  # it owes an outcome, as a handed board reply does (§4.10)
-            sent = list(got.get("delivered") or holders)
+            try:
+                got = await self._msg(PERSON, text, holders, "note", ref, None, None, None)
+            except RpcError as err:
+                # The line is committed, so the press succeeded: the refusal is said beside it, never
+                # raised, or a second press would write the line twice (as `_board_add_one`)
+                mail_refused = str(err)
+            else:
+                if mid := (got.get("entry") or {}).get("id"):
+                    self._mark(mid, handed=True)  # it owes an outcome, as a handed board reply does (§4.10)
+                sent = list(got.get("delivered") or holders)
         at = now_iso()
         self._close_entry(e.id, reason, at)
         # Nobody is left to report what became of it: the entry's own debt is settled here, and the
         # handed note carries it on to whoever holds the work (§4.10 *Outcomes*).
         settled = "answered on the board" + (f", sent to {', '.join(sent)}" if sent else "")
-        self._mark(e.id, outcome={"state": "asker_gone", "text": settled, "at": at, "by": ""}, answer=picked)
         toast = "written on the board" + (f" · sent to {', '.join(sent)} (holds {ref})" if sent else "")
+        if mail_refused:
+            settled += f"; not sent to {', '.join(holders)}: {mail_refused}"
+            toast += f" · not sent to {', '.join(holders)} (holds {ref}): {mail_refused}"
+        self._mark(e.id, outcome={"state": "asker_gone", "text": settled, "at": at, "by": ""}, answer=picked)
         await self._push_changes()
         return {
             "id": PERSON,
@@ -373,6 +383,7 @@ class InboxMixin:
             "sent": sent,
             "delivered": sent,
             "note": toast,
+            **({"mail_refused": mail_refused} if mail_refused else {}),
         }
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:

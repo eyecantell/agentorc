@@ -299,7 +299,11 @@ class MailMixin:
                     "a system note reports what happened to your own message; there is nobody to reply to "
                     "(design §4.10)"
                 )
-            if sender == PERSON and replied.orphaned and replied.open:
+            if sender == PERSON and replied.orphaned and not replied.open:
+                raise RpcError(
+                    f"{reply_to} is already closed ({replied.closed_reason}): its asker is gone (design §4.10)"
+                )
+            if sender == PERSON and replied.orphaned:
                 # §4.10 *A question about a reference outlives its asker*: the answer goes to the
                 # board and to whoever holds the reference, never to a record that is not there
                 if kind != "reply" or named:
