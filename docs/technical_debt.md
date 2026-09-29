@@ -115,8 +115,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Open — design-first |
 | TD-213 | Closing a member closes the questions it put to the person (`asker_gone`), even when the ledger still waits on the answer: the wind-down of 2026-09-28 took a steer (TD-149) and an ask (TD-180) out of the Inbox | High | Designed 2026-09-28 — the build is TD-215, TD-216 |
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
-| TD-215 | Build the orphaned question, the home's half: `_asker_gone` orphans a question that names a reference, `orphaned` on the entry, a `steer` that waits from its bound, adoption at a create under the asker's id, the lapse note that names the default | High | Open — pickable |
-| TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — after TD-215 |
+| TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — TD-215 merged (PR #712) |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Open — pickable |
 
 
@@ -2197,38 +2196,14 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-187 / TD-195 (rule 6), TD-133 (schedules), TD-053 (the wind-down), TD-213 (the wind-down drops the person's questions), TD-199 (a running member keeps its start brief).
 
-## TD-215: Build the orphaned question, the home's half
-
-**Priority:** High
-**Added:** 2026-09-28 (the designer, from TD-213's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/sessionorc/agent_attention.py` (`_asker_gone`, called from `rpc_close`, `_forget`, `_cancel_start` and the tick), `src/sessionorc/models.py` (`MailEntry`: `orphaned`), `src/sessionorc/agent_inbox.py` (`_lapse_or_expire` and the lapse sweep), `src/sessionorc/agent.py` (`rpc_create`'s supersede in place), `src/sessionorc/agent_mail.py` (the person's reply path, `_person_holds`); design §4.10 *A question about a reference outlives its asker*. Held path: the techlead reads the PR.
-
-**Why:** TD-213's *Why*: a wind-down closed two members and took a `steer` and an `ask` the ledger still waited on out of the Inbox before Paul saw them.
-
-**Fix:**
-1. **`orphaned` on the entry**: `{at, how, ref, name, repo, host, team}`, persisted with the person inbox, in the `inbox` RPC's view of an entry. `how` is `closed`, `forgotten` or `cancelled`.
-2. **`_asker_gone` orphans instead of closing** an open `ask` or `steer` from the record whose `about` names a reference — it has one of the two shapes `normalize_ref` canonicalises, a ledger id or a PR number (`normalize_ref` itself passes any other text through, so the test is the shape, not the call), and the canonical form is kept on the stamp as `ref`, which is what TD-216 matches a lease on; `about` itself is free text and is not rewritten: the stamp is written from the record, `paused_at` is cleared, and nothing closes. An entry with no `about`, or one of any other shape (a session's id, a board line, prose), closes `asker_gone` as today. An entry already orphaned (a close, then the forget a day later) keeps its first stamp. The outcome half of `_asker_gone` is unchanged, and so is the `superseded_by` return.
-3. **The bound**: the lapse sweep, on an orphaned `steer` whose bound has run out, clears `bound` and leaves the entry open; nothing is told. An entry with `orphaned` and no `bound` is skipped by the sweep as an `ask` to the person is.
-4. **Adoption**: a create that puts a live record under the id an orphaned entry's `from` names clears `orphaned` on each such entry, whether or not it resumed the conversation. A `steer` adopted with its bound still ahead lapses as any does, and its `system` note reads *steer m-… about <about> lapsed: the default was "<default>"* when the entry was ever orphaned (keep a mark for it, such as `adopted_at`).
-5. **Until TD-216**, a person's reply or *Go with it* naming an orphaned entry is refused with a sentence that says its asker is gone and the answer's road is not built, so nothing is sent to a record that is not there; Delete declines it as on any open question.
-6. **Tests** (`tests/test_mail.py`): the wind-down case — two members each with an open question to the person that names a reference, `team stop --close` closes both, and both questions are still open in the person inbox with `orphaned.how == "closed"`; a question with no `about`, and one whose `about` is prose, closes `asker_gone`; a forget after a close keeps the stamp; an orphaned `steer` past its bound is open with no bound and no `lapsed`; a paused one loses its pause; a create under the same name clears the stamp and a reply then lands in the new record's inbox; an adopted `steer` lapses with the note naming the default; the existing resume tests (`test_a_resumed_askers_questions…`) pass unchanged. `test_asker_gone_closes_the_persons_questions_on_close_and_forget_but_not_on_exit` changes to cover both kinds of question.
-
-**Done when** a member closed with an open question to the person that names a reference leaves that question open in the person inbox, the wind-down test passes, and design §4.10's *not built — TD-215* is corrected in the same PR.
-
-**Related:** TD-213 (the design), TD-216 (the answer and the row), TD-069 (the needed rule and `asker_gone`), TD-081 (the resume under the same name).
-
 ## TD-216: Build the orphaned question, the answer and the row
 
 **Priority:** High
 **Added:** 2026-09-28 (the designer, from TD-213's design)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** no — after TD-215, which writes the field this reads
-**Status:** Open
+**Pickable:** yes
+**Status:** Open — TD-215 built the home's half (PR #712): `orphaned` is on the entry, and a person's answer to one is refused in words until this entry replaces the refusal
 **Blocked by:** TD-215
 **Location:** `src/sessionorc/agent_inbox.py` (`_board_add_one`, `rpc_board_edit`; the person's reply and `inbox_go_with_it` on an orphaned entry), `src/sessionorc/board.py` (`write_back`'s add), `src/agentorc/ui/app.py` (`inbox_sections`, the mail row's view), `src/agentorc/ui/templates/inbox_row.html`, `src/agentorc/ui/static/app.js`; design §4.10 *A question about a reference outlives its asker*, §4.4 *Board write-back*, §4.5a *Inbox row: orphaned question*. Held path: the techlead reads the PR.
 
