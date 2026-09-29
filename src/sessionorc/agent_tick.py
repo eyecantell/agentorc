@@ -555,10 +555,12 @@ class TickMixin:
                     await self.rpc_close(s.id)
                 else:
                     await self._route_act("close", {"id": s.id}, None, s.host)
+                s.closed_for = "wanted"
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 # `rpc_close` marks the record closed before its own tail runs, so a failure there
-                # leaves it `closed` with nothing replayed: the entry is what lets the next tick
-                # retry it (`closed_by_tick`) rather than strand it (review of PR #461)
+                # leaves it `closed` with nothing replayed: the entry and `closed_for` are what let the
+                # next tick retry it (`closed_by_tick`) rather than strand it (review of PR #461)
+                s.closed_for = "wanted"
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", "error": f"close: {e}"}]
                 log.warning("%s: the close before a wanted restart failed: %s", s.id, e)
                 self._save(s)
@@ -609,7 +611,9 @@ class TickMixin:
         if s.state == "idle":
             try:
                 await self.rpc_close(s.id)
+                s.closed_for = "brief"
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
+                s.closed_for = "brief"
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "brief", "error": f"close: {e}"}]
                 log.warning("%s: the close before a brief restart failed: %s", s.id, e)
                 self._save(s)
@@ -620,20 +624,12 @@ class TickMixin:
     @staticmethod
     def _closed_by_tick(s: Session, why: str) -> bool:
         """A `closed` record the tick itself closed and failed to replay (`why` rule 2's `wanted` or rule
-        7's `brief`): its last `restarts` entry is that rule's and carries `error` — both failure paths,
-        the close's and the replay's, write one. A successful restart leaves the same entry without it
-        on the new record, so without the error a `closed` record is a person's Close, never undone
-        (design §6 rule 2; the techlead's read of #748, TD-235). The error must also be written at or
-        after the close: the tick's own close comes first and its failure after, while a person's
-        Close of a member whose restart had already failed (an exited one whose replay failed, an idle
-        one whose close failed before it was marked) comes after the entry (TD-236)."""
+        7's `brief`): the tick wrote `closed_for` after its own close, and the last `restarts` entry is
+        that rule's and carries `error` — both failure paths, the close's and the replay's, write one.
+        Any other close clears `closed_for`, so a person's Close is never undone (design §6 rule 2),
+        whatever the clocks say and whenever it lands (TD-235, TD-236, TD-237)."""
         last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
-        if not (s.state == "closed" and last.get("why") == why and last.get("error")):
-            return False
-        try:
-            return bool(s.closed_at) and _parse(str(last.get("at"))) >= _parse(s.closed_at)
-        except (TypeError, ValueError):
-            return False
+        return s.state == "closed" and s.closed_for == why and last.get("why") == why and bool(last.get("error"))
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:

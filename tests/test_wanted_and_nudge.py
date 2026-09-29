@@ -300,3 +300,33 @@ async def test_a_person_s_close_after_a_failed_wanted_restart_is_never_undone(ag
         for tick in (now, now + timedelta(minutes=5)):
             await agent._keep_running(tick)
         assert agent.sessions[sid] is rec and rec.state == "closed" and len(rec.restarts) == 1
+
+
+async def test_the_ticks_own_failed_close_is_marked_and_a_person_s_close_in_the_same_second_clears_it(
+    agent, composerstubs, tmp_path, monkeypatch
+):
+    """TD-237: the tick writes `closed_for` after its own close, so its failed restart is retried; a
+    person's Close clears it, even in the same second as the failed entry, and is never undone."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        rec.git = dict(CLEAN)
+        real_close = agent.rpc_close
+
+        async def close_then_fail(id):
+            await real_close(id)
+            raise RuntimeError("push failed")
+
+        monkeypatch.setattr(agent, "rpc_close", close_then_fail)
+        await agent._keep_running(now)
+        monkeypatch.setattr(agent, "rpc_close", real_close)
+        assert rec.state == "closed" and rec.closed_for == "wanted" and rec.restarts[-1]["error"]
+        await person.call("close", id=sid)  # the person's Close, within the second
+        assert rec.closed_for is None
+        for tick in (now, now + timedelta(minutes=5)):
+            await agent._keep_running(tick)
+        assert agent.sessions[sid] is rec and rec.state == "closed" and len(rec.restarts) == 1

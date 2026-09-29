@@ -317,6 +317,11 @@ class RemoteMixin:
             raise RpcError(f"no session {rid}@{host}")
         if method == "create":
             await self._check_occupancy_for(host, params)
+        home_copy = self.remote.get(host, {}).get(rid) if method == "close" else None
+        if home_copy is not None and home_copy.closed_for:
+            # any close clears the tick's mark; the tick writes its own after this returns (§6 rule 2, TD-237)
+            home_copy.closed_for = None
+            self._save(home_copy)
         mux = self._node_mux(host)
         sent = dict(params)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
