@@ -142,3 +142,46 @@ async def test_status_v_prints_the_running_build(agent, repo, capsys):
     agent.build = {}  # a build with no record says so, rather than nothing
     assert await asyncio.to_thread(cli.main, ["status", "-v"]) == 0
     assert "host agent: build unknown" in capsys.readouterr().out
+
+
+def test_the_chip_is_nothing_when_current_and_says_behind_or_unknown(repo):
+    """Design §4.5a Org top bar **build** chip (TD-132 slice 5): hidden at main's head, as the unread
+    chip at zero; otherwise short, with `line` on hover."""
+    built = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    b = {"commit": built, "source": str(repo), "built_at": "t"}
+    assert build.chip(b) is None
+    _commit(repo, "2\n")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    c = build.chip(b, "s")
+    assert c == {"text": f"live {built[:7]} · main 1 commit ahead", "title": build.line(b, "s"), "cls": "behind"}
+    assert build.chip(b, a={"ref": "origin/main", "ahead": 4})["text"].endswith("main 4 commits ahead")
+    assert build.chip({})["text"] == "build unknown" and build.chip({})["cls"] == "unknown"
+    gone = build.chip({"commit": built, "source": str(repo / "gone")})
+    assert gone["text"] == f"live {built[:7]} · main unknown" and "not on this host" in gone["title"]
+
+
+def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(repo):
+    """The techlead's read of TD-132 slice 5: where the home's `promotes` reading holds the checkout
+    the build came from, at the same live commit, the chip takes main's distance from it — the
+    Inbox's Promote row's number — rather than this checkout's last fetch; otherwise it measures here."""
+    from agentorc.ui.common import build_chip
+
+    built = _git(repo, "rev-parse", "HEAD")
+    _commit(repo, "2\n")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")  # the checkout: 1 ahead
+    b = {"commit": built, "source": str(repo), "built_at": "t"}
+    reading = {"root": str(repo), "live": built, "main": "9" * 40, "ahead": 3}  # the home's fetch: 3 ahead
+    info = {"built_from": b, "started_at": "s", "promotes": {"src": reading}}
+    got = build_chip(info)
+    assert got["text"] == f"live {built[:7]} · main 3 commits ahead" and "3 commits ahead" in got["title"]
+    assert build_chip({**info, "promotes": {"src": {**reading, "ahead": 0, "main": built}}}) is None
+    # main moved to a line the build is not on (a force-push, a branch build): the row shows, and so
+    # does the chip, with no count (the review of #743)
+    for n in (0, None):
+        off = build_chip({**info, "promotes": {"src": {**reading, "ahead": n}}})
+        assert off["text"] == f"live {built[:7]} · main unknown" and "cannot count back to" in off["title"]
+    # a reading of another live commit, another checkout, or no count: measured here
+    for other in ({**reading, "live": "0" * 40}, {**reading, "root": str(repo.parent)}, {**reading, "main": None}):
+        assert build_chip({**info, "promotes": {"src": other}})["text"].endswith("main 1 commit ahead")
+    assert build_chip(None) is None

@@ -25,7 +25,7 @@ from markupsafe import Markup
 from agentorc import org as orgmod
 from agentorc import repoconfig, teamrun, teams
 from agentorc.cli import stop_time as clistop
-from sessionorc import hosts, identity, mail
+from sessionorc import build, hosts, identity, mail
 from sessionorc.client import AgentError
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import (
@@ -442,6 +442,37 @@ def node_banner(info: dict[str, Any] | None) -> str:
         f"node of {home}: unreachable since {link.get('since') or '?'} — {link.get('why') or 'no link'} · "
         f"offline: this host's sessions only; mail, reports and home-owned edits wait for the link"
     )
+
+
+def build_chip(info: dict[str, Any] | None) -> dict[str, str] | None:
+    """The Org top bar's **build** chip (design §4.5a, TD-132 slice 5): `build.chip` over the
+    running host agent's `built_from` from `host`. How far main is ahead is the home's own
+    `promotes` reading when it holds one, with a main, for the checkout the build came from and read
+    the same live commit — shown exactly when the Inbox's Promote row would be, with its count —
+    and otherwise measured here, on the UI's side, as `ao status -v` measures it (§4.4). None
+    with nothing to say: the build is main's head, or the agent did not answer. Runs git: call it
+    in a thread."""
+    if not info:
+        return None
+    b = info.get("built_from") if isinstance(info.get("built_from"), dict) else {}
+    a = None
+    source, commit = b.get("source"), b.get("commit")
+    if isinstance(source, str) and commit:
+        for r in (info.get("promotes") or {}).values():
+            if not isinstance(r, dict) or not r.get("root") or r.get("live") != commit:
+                continue
+            if Path(str(r["root"])).resolve() != Path(source).resolve() or not r.get("main"):
+                continue
+            # the row's own test (`promote_rows`: main set and live ≠ main), so the two are drawn
+            # together; a live main does not descend from has no count, and says so
+            if r["main"] == commit:
+                a = {"ref": build.REF, "ahead": 0}
+            elif isinstance(r.get("ahead"), int) and r["ahead"] > 0:
+                a = {"ref": build.REF, "ahead": r["ahead"]}
+            else:
+                a = {"ref": build.REF, "why": f"main is at {str(r['main'])[:12]}, which it cannot count back to"}
+            break
+    return build.chip(b, str(info.get("started_at") or ""), a)
 
 
 def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) -> str:

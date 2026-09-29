@@ -58,16 +58,17 @@ def ahead(build: dict[str, Any], ref: str = REF) -> dict[str, Any]:
     return {"ref": ref, "ahead": int(cp.stdout.strip())}
 
 
-def line(build: dict[str, Any], started_at: str = "") -> str:
+def line(build: dict[str, Any], started_at: str = "", a: dict[str, Any] | None = None) -> str:
     """One line for a person: what is running, and whether `main` has moved past it. An agent too
     old to report a build says so, rather than nothing, since *unknown* is the case this exists
-    for."""
+    for. `a` is an `ahead` the caller already holds (the Org's chip passes the home's promote
+    reading, so the chip and the Inbox's Promote row cannot disagree); measured here when absent."""
     if not build or not build.get("commit"):
         return "host agent: build unknown — it predates build reporting, or runs from an editable install"
     commit = str(build["commit"])[:12]
     dirty = " (with uncommitted changes)" if build.get("dirty") else ""
     started = f", started {started_at}" if started_at else ""
-    a = ahead(build)
+    a = a if a is not None else ahead(build)
     if "ahead" not in a:
         tail = f" — cannot compare with {a['ref']}: {a['why']}"
     elif a["ahead"]:
@@ -76,3 +77,24 @@ def line(build: dict[str, Any], started_at: str = "") -> str:
     else:
         tail = f" — current with {a['ref']}"
     return f"host agent: built from {commit}{dirty} at {build.get('built_at') or '?'}{started}{tail}"
+
+
+def chip(build: dict[str, Any], started_at: str = "", a: dict[str, Any] | None = None) -> dict[str, str] | None:
+    """The Org top bar's **build** chip (design §4.5a, TD-132 slice 5): None when the running build
+    is `main`'s head — nothing shown in the common case, as the unread chip — otherwise
+    `{"text", "title", "cls"}`: the same facts as `line`, short enough for the bar, with `line`
+    itself on hover. `cls` is `behind` when main is ahead of it, `unknown` when that cannot be said."""
+    if not build or not build.get("commit"):
+        return {"text": "build unknown", "title": line(build, started_at), "cls": "unknown"}
+    a = a if a is not None else ahead(build)
+    live = str(build["commit"])[:7]
+    if "ahead" not in a:
+        return {"text": f"live {live} · main unknown", "title": line(build, started_at, a), "cls": "unknown"}
+    n = a["ahead"]
+    if not n:
+        return None
+    return {
+        "text": f"live {live} · main {n} commit{'' if n == 1 else 's'} ahead",
+        "title": line(build, started_at, a),
+        "cls": "behind",
+    }
