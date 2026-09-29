@@ -1922,7 +1922,7 @@ Done when a grinder whose context passes 200k finishes its entry, declares `rest
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-228
-**Status:** Designed 2026-09-28 with TD-223 (the designer, PR #PRNUM): the entry's (a), taken one step further. The page's kinds are tested *for you*, *design-first*, *pickable*, *other*, so *pickable* means a build a grinder can start; design §4.4 *Repo facts*. Closes with TD-228.
+**Status:** Designed 2026-09-28 with TD-223 (the designer, PR #723): the entry's (a), taken one step further. The page's kinds are tested *for you*, *design-first*, *pickable*, *other*, so *pickable* means a build a grinder can start; design §4.4 *Repo facts*. Closes with TD-228.
 **Blocked by:** TD-228
 **Location:** `src/sessionorc/ledger.py` (`kind_of`: *pickable* is decided before *design-first*), the team card's Repo facet and the Repo page's *Technical debt* lists (`src/agentorc/ui/app.py`), design §4.5a *team card: Repo facet*
 
@@ -2108,7 +2108,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-228
-**Status:** Designed 2026-09-28 (the designer, PR #PRNUM, stacked on #721; the steer to Paul is `STEERID`, bound STEERBOUND): design §4.4 *Repo facts* (**Pickable is derived, never written**: the rule, the archive, no header line needed, the page's kinds in order, the written line while it lasts), §6 rule 6 (the lane words over the derived reading), §4.8 *Choosing in a free-pick lane*, §4.5 screen 10's lists, §4.5a *Repo facet*; the glossary's *pickable*. Option (b), agentorc's own reader held equal to the repo's script by a test. Settles TD-198 and answers TD-211. Closes with TD-228.
+**Status:** Designed 2026-09-28 (the designer, PR #723, stacked on #721; the steer to Paul is `m-1280433e8140`, bound 2026-09-29 10:24 MDT): design §4.4 *Repo facts* (**Pickable is derived, never written**: the rule, the archive, no header line needed, the page's kinds in order, the written line while it lasts), §6 rule 6 (the lane words over the derived reading), §4.8 *Choosing in a free-pick lane*, §4.5 screen 10's lists, §4.5a *Repo facet*; the glossary's *pickable*. Option (b), agentorc's own reader held equal to the repo's script by a test. Settles TD-198 and answers TD-211. Closes with TD-228.
 **Blocked by:** TD-228
 **Location:** design §6 rule 6 (*a lane word matches by the entry's header*), `src/sessionorc/ledger.py` (`lane_matches`, `kind_of`), `src/sessionorc/agent_tick.py` (rule 6), the Repo facet's kind bar; dev-cadence's `ledger.py` (pickability derived from `Blocked by:`, its TD-070)
 
