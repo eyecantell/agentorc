@@ -1070,14 +1070,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # picker was prefilled from the repo's or preset's `controllers:` when the page loaded, so
         # what is ticked is what was meant — a person unticking the default is a decision.
         refs = [r.strip() for r in lane.split(",") if r.strip()]
-        preset = brief = ledger = None
+        preset = brief = ledger = made_from = None
         if adapter != "shell":
             try:
                 cfg = repoconfig.discover(dir.strip() or os.getcwd())
                 ledger = cfg.ledger
                 if role.strip():
                     preset = repoconfig.resolve_role(cfg, role.strip())
-                    brief = preset.brief_text(refs or None)
+                    brief, made_from = preset.compose(refs or None)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
         # design §4.5a New session **Project** picker (§4.9 "Home and reach"): the same block
@@ -1091,10 +1091,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if team.strip() and adapter != "shell" and review is None:
             review = (await asyncio.to_thread(team_reader, team.strip(), dir.strip()))["review"]
         text = prompt.strip() or brief
+        # what the brief was made from (design §6 rule 7, TD-217): only when the brief is the preset's
+        made_from = None if prompt.strip() else made_from
         if project.strip():
             block, _note = teams.reach_block(orgmod.load(), project.strip(), dir.strip() or os.getcwd(), host_name())
             if block:
                 text = block + text if text else block
+                made_from = repoconfig.prefixed(made_from, block)
         s = await call(
             "create",
             name=name.strip() or "session",
@@ -1115,6 +1118,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             role=preset.name if preset else "",
             review=review,  # who reads its PRs (design §4.9b *The reader*): the role's, else the team's
             context_bound=preset.context_bound if preset else None,  # §4.8 *A role has a context bound*
+            **({"prompt_from": made_from} if made_from else {}),
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
             project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)
