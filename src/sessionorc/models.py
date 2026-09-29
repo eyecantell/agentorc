@@ -324,6 +324,14 @@ class MailEntry:
     # key on these fields, never on the role of whoever answered (§9 invariant 9).
     source: str | None = None
     answered: dict[str, str] | None = None
+    # Orphaned (design §4.10 *A question about a reference outlives its asker*, TD-213/TD-215): an
+    # open `ask` or `steer` to the person whose `about` names a reference, left standing when its
+    # asker's record was closed, forgotten or cancelled. `{at, how, ref, name, repo, host, team}` —
+    # `how` one of `closed`, `forgotten`, `cancelled`, `ref` the canonical reference, the rest
+    # copied from the record then, since a forgotten record can be asked nothing afterwards. A
+    # create under the id `from` names clears it (`adopted_at` then keeps that it ever was).
+    orphaned: dict[str, str] | None = None
+    adopted_at: str | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
@@ -492,6 +500,16 @@ def normalize_context(context: Any) -> int | None:
     if n <= 0:
         raise ValueError(f"context: bound is a token count above zero, not {bound!r}")
     return n
+
+
+def reference_of(about: str | None) -> str | None:
+    """The canonical reference `about` names, or None when it has neither machine-readable shape
+    (design §4.10 *A question about a reference outlives its asker*): `normalize_ref` passes any
+    other text through, so the test is the shape, not the call. A session's id or prose is None."""
+    r = " ".join(str(about or "").split())
+    if re.fullmatch(r"(?i)[a-z]{2,6}-\d{1,4}", r) or re.fullmatch(r"#?\d{1,6}", r):
+        return normalize_ref(r)
+    return None
 
 
 def normalize_ref(ref: str) -> str:

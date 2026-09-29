@@ -136,6 +136,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     backup_store,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
+    orphaned_refusal,  # noqa: F401
     read_checkout,  # noqa: F401
 )
 from sessionorc.agent_identity import IdentityMixin
@@ -783,6 +784,7 @@ class HostAgent(
                 # session it becomes (§6 *Start time*): mail sent to it before the instant is its own
                 self._move_mail(holder, s)
                 self.store.save(s)
+            self._adopt_orphans(self._address(s))  # its name's orphaned questions are its own again (§4.10)
             if self.mode != "node":
                 if s.supervised:
                     self._write_launch(s.id, s, launch_params(locals()))
@@ -1539,7 +1541,7 @@ class HostAgent(
         """A scheduled record cancelled (design §6 *Start time*): forgotten with its launch record, and
         its open questions closed with it, as a close does."""
         view = {**s.view(), "state": "closed", "cancelled": True}
-        self._asker_gone(s, self._address(s))
+        self._asker_gone(s, self._address(s), how="cancelled")
         self._forget(s.id)
         log.info("%s: its scheduled start cancelled", s.id)
         await self._push_changes()
