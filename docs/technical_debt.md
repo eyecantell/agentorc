@@ -116,7 +116,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-213 | Closing a member closes the questions it put to the person (`asker_gone`), even when the ledger still waits on the answer: the wind-down of 2026-09-28 took a steer (TD-149) and an ask (TD-180) out of the Inbox | High | Designed 2026-09-28 — the build is TD-215, TD-216 |
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 | TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — TD-215 merged (PR #712) |
-| TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Open — pickable |
+| TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Partly done — slice 1 (#714); next the replay |
 
 
 ---
@@ -2227,7 +2227,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open
+**Status:** Partly done — **slice 1 built 2026-09-28 (grinder-ao-2, PR #714)**: `Role.compose` returns `prompt_from` `{base, slots, prefix}` beside the text; `ao team start`, `ao new --role/--brief` and the New session form hand it to `create`; `LAUNCH_KEYS` keeps it; a create routed to a node drops it (the home keeps the launch record). For slice 2: slots fill in order, the `{repo}` file's text stripped and `none` when empty, `{context}` is the primer's path as text, `prefix` (the Project block) goes in front; a `{file}` read across the link (a team on a machine node) is a path on that node, not the home. Next: slice 2, the replay — mostly `src/sessionorc`.
 **Location:** `src/agentorc/repoconfig.py` (`Role.brief_text`: the slots and their sources), `src/agentorc/teams.py` (`_brief`), `src/agentorc/cli.py` (`ao new --brief`, `ao status -v`), `src/sessionorc/agent.py` (`rpc_create`), `src/sessionorc/agent_tick.py` (`_write_launch`, the replay, the keep-running passes), `src/sessionorc/models.py` (`brief`, `brief_changed`, `HOME_OWNED`), `src/sessionorc/gitinfo.py` (a file read at `origin/<default>`), `src/agentorc/ui/` (the chip), `src/agentorc/briefs/*.md` (what the reply clause means); design §6 *Keeping a team running* rule 7. Held path: the techlead reads the PR.
 
 **Why:** TD-199's *Why*, and what its design found: a restart replays the stored prompt, so a changed template reached nobody short of a team's Start.
