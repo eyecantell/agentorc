@@ -101,6 +101,7 @@ HOME_OWNED = frozenset(
         "restart_blocked_sent_at",
         "nudged_at",
         "context_sent_at",
+        "brief",
         "seat",
         "seat_due",
         "seat_count",
@@ -886,6 +887,10 @@ class Session:
     # Rule 5's (§6, TD-190): when the context-bound line was last typed; again after `CONTEXT_AGAIN`
     # while the member is still idle and over. The home's, as `nudged_at` is.
     context_sent_at: str | None = None
+    # Rule 7's (§6, TD-217): `{at, sources: [{path, sha}]}`, the files the prompt was made from as
+    # they were read at this create — the working tree's at a client's start, as merged at a replay —
+    # each with its git blob id. None for a prompt typed whole. The home's.
+    brief: dict[str, Any] | None = None
     # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.

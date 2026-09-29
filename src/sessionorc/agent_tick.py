@@ -22,6 +22,7 @@ from sessionorc import (
     paths,
     reports,
 )
+from sessionorc import brief as brief_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
@@ -694,8 +695,10 @@ class TickMixin:
         entry: dict[str, Any] = {"at": now_iso(), "why": why}
         history = [*s.restarts, entry]
         address = self._address(s)
+        read: dict[str, Any] | None = None
         try:
             params = {**self._read_launch(address), **extra, "supervised": True}
+            read = await self._refill_prompt(s, params, entry)
             if s.host == self.host:
                 view = await self.rpc_create(**params)
             else:
@@ -711,8 +714,32 @@ class TickMixin:
         new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
         if new is not None:
             new.restarts = history
+            if read is not None:  # the files as this replay read them, not as the create's check did
+                new.brief = read
             self._save(new)
             await self._push_changes()
+
+    async def _refill_prompt(self, s: Session, params: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any] | None:
+        """Rule 7's first half (design §6, TD-217 slice 2): a replay fills the brief again from what
+        it was made from (`prompt_from`), with its files as merged, and hands `create` that prompt
+        in place of the stored one; returns the record's `brief` as read. A launch record with no
+        `prompt_from` (a prompt typed whole, a record written before it), a file that cannot be read,
+        or a member on a node (its files are that host's, not the home's) replays the stored prompt,
+        and the `restarts` entry says `prompt: stored`."""
+        made = params.get("prompt_from")
+        if not params.get("prompt"):
+            return None  # nothing was typed at its start, and nothing is now
+        if not isinstance(made, dict) or s.host != self.host:
+            entry["prompt"] = "stored"
+            return None
+        try:
+            text, sources = await asyncio.to_thread(brief_mod.fill, made, True)
+        except brief_mod.Unreadable as e:
+            log.info("%s: replaying the stored prompt: %s", s.id, e)
+            entry["prompt"] = "stored"
+            return None
+        params["prompt"] = text
+        return {"at": now_iso(), "sources": sources}
 
     def _read_launch(self, address: str) -> dict[str, Any]:
         """A launch record as `create`'s arguments (design §6): what `_write_launch` kept, less its own
