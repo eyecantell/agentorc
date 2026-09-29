@@ -2224,3 +2224,49 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-29 (PR #740; grinder-ao-1). `_submit` returns the record's state and `rev` read under the typing lock just before the paste, and `rpc_send` decides busy and *started* from them, so a turn that began, or began and ended, during the typing is this prompt's. `tests/test_agent.py::test_send_wait_hook_lands_while_typing` fires the hooks from inside a slowed `_type` after its Enter; on the old code it fails with `prompt-stalled`. Design §4.7 (`send`) says where the baseline is read. Not reproduced live: the board item of 2026-09-12 is the live evidence.
 
 **Related:** TD-078 (the test's race, fixed in #672), TD-016 / TD-027 (the wait and the composer check, archived), the board item of 2026-09-12 (*`ao send --wait` reported `prompt-stalled` for a prompt that in fact ran*).
+
+## TD-203: TDs in motion shows no priority
+
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *add priority to "TDs in Motion" list on the teams card*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/org.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** a row reads *phase · reference · title · holder · PR*. Whether the team has its High entries in hand or is grinding Lows is not visible without opening the ledger. The ledger reading already carries each entry's `priority` (`sessionorc/ledger.py`), so the data is there.
+
+**Resolved:** 2026-09-29 (built by TD-232 slice 1, PR #741). The design is §4.5a *team card: TDs in motion* (**Priority**); see TD-232's **Resolved:**.
+
+**Related:** TD-197 (the same rows' phases), TD-202 (grinders picking by priority), TD-176 (archived: TDs in motion).
+
+## TD-206: The Doing list's times are clock times cut short, and its fields run together
+
+**Priority:** Low
+**Added:** 2026-09-27 (Paul: *format times on the doing list to be relative/fuzzy (just now, 1h, 2d, etc) and put the data in columns*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
+
+**Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
+
+**Resolved:** 2026-09-29 (built by TD-232 slice 2, PR #742). The design is §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11; see TD-232's **Resolved:**.
+
+**Related:** TD-205 (the same list's scrolling), TD-176 slice 2 (the doing log), §4.8 *the doing log*.
+
+## TD-232: Build the team card's priority letter and the Doing list's ages and columns
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-09-28 (the designer, from TD-203's and TD-206's designs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/org.py` (`motion_rows`, `doing_rows`), `src/agentorc/ui/templates/team_summary.html` and `repo_part.html`, `src/agentorc/ui/static/app.js` and `app.css`, `src/agentorc/ui/common.py` (a short age beside `_age`, which reads *2h 5m*), `tests/test_ui_*`; design §4.5a *team card: TDs in motion*, *Answer needed / Doing*, §4.5 screen 11.
+
+**Why:** TD-203's and TD-206's: a row in motion does not say how much it matters, and the Doing list cannot be scanned.
+
+**Resolved:** 2026-09-29 (PR #741, #742; grinder-ao-2). A row in *TDs in motion* carries its entry's priority as the bar's chip, **H** / **M** / **L**, in a fixed `.mprio` slot empty for an unmarked row, rows sorting by phase, priority, reference (`motion_rows`, `MOTION_PRIORITIES`); the Doing list reads *age · doer · words* in columns on the card and the Repo page — `_short_age` and `fmtShortAge` in the same words, re-drawn once a minute from `data-doing-at` with the reader's clock as the tooltip, the doer's width `doer_w` (at most 18). The lasting account is design §4.5a and §4.5 screens 1 and 11; tests in `tests/test_ui_team_summary.py`. The live look is on `docs/user_attention.md`.
+
+**Related:** TD-203, TD-206 (the designs), TD-205 (the same list's scrolling), TD-197 (the phases), TD-176.
