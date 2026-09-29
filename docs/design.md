@@ -5821,7 +5821,9 @@ code and needs no grant; a session doing the same work does.
      is never undone, as in rule 1 — with **no stop time passed**, **not `early`**, not suspended,
      **not gated**, with **nothing uncommitted and nothing unpushed** on its git fields (known, not merely absent: an unknown git state is left alone)
      is closed if it is still there — the one close a policy makes outside a wrap-up, safe because
-     the work is pushed — and restarted as rule 1 does, under the same ceiling (`why: wanted`).
+     the work is pushed — and restarted as rule 1 does, under the same ceiling (`why: wanted`); a
+     close or replay that failed keeps its `wanted` entry with `error` and is tried again by the
+     tick, while a `closed` record whose last entry carries no `error` is a Close by someone else.
      With work left it is **not** restarted: one send of fixed text naming what is left (the dirty
      files' count and the unpushed count, from the record, never a session's words), once
      (`restart_blocked_sent_at`) — typed only into an idle member's empty composer on the home's

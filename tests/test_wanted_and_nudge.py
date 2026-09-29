@@ -251,3 +251,31 @@ async def test_a_ceiling_whose_window_emptied_lets_a_clean_wanted_restart_run(ag
         assert new is not rec and new.restart_ceiling is None
         assert [r["why"] for r in new.restarts][-1] == "wanted"
         await person.call("kill", id=sid)
+
+
+async def test_a_person_s_close_after_a_wanted_restart_is_never_undone(agent, composerstubs, tmp_path):
+    """TD-235: a successful wanted restart leaves its `wanted` entry, with no `error`, on the new
+    record. That run declares again and a person closes it: the `closed` record is the person's,
+    and the tick never starts it again (design §6 rule 2)."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        first = agent.sessions[sid]
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        first.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        first.git = dict(CLEAN)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not first and [r["why"] for r in new.restarts] == ["wanted"]
+        assert "error" not in new.restarts[-1]
+        later = now + timedelta(hours=1)
+        await _idle_for(agent, sid, later, timedelta(minutes=1))
+        new.restart_wanted = {"at": _iso(later), "why": "context is long again"}
+        new.git = dict(CLEAN)
+        await person.call("close", id=sid)
+        assert new.state == "closed"
+        for tick in (later, later + timedelta(minutes=5)):
+            await agent._keep_running(tick)
+        assert agent.sessions[sid] is new and new.state == "closed"
+        assert [r["why"] for r in new.restarts] == ["wanted"], "a person's Close is never undone"
