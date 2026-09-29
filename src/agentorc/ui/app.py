@@ -137,12 +137,14 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_NO_TEAM,  # noqa: F401
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
+    RAIL_UNDER,  # noqa: F401
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
     _civil,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
+    _next_due,  # noqa: F401
     _orphan_held,  # noqa: F401
     _outcome_of,  # noqa: F401
     _owing,  # noqa: F401
@@ -152,9 +154,11 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_choices,  # noqa: F401
     board_due_now,  # noqa: F401
     board_horizon,  # noqa: F401
+    board_line,  # noqa: F401
     board_rows,  # noqa: F401
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
+    horizon_of,  # noqa: F401
     inbox_sections,  # noqa: F401
     promote_rows,  # noqa: F401
     rail_counts,  # noqa: F401
@@ -541,6 +545,16 @@ def create_app() -> FastAPI:
             board_cache.update(at=now, rows=[r for r in rows if r.get("due_now", True)], all=rows, note=note)
         return board_cache["rows"], board_cache["note"]
 
+    async def board_view(fresh: bool = False) -> tuple[dict[str, Any], str]:
+        """The board's horizon (§4.5 screen 6, TD-220) over every open row the cache holds, sorted by
+        the person's `inbox.board_show`, and the reader's note: `due` is `board_items`' rows, `ahead`
+        *Board, coming up*, `hidden` the *not shown* fold, and `line` the words that say the mode —
+        None when no board was read (a reader that failed says so in its note instead)."""
+        _, note = await board_items(fresh)
+        h = board_horizon(board_cache["all"], uiconf.board_show())
+        h["line"] = board_line(h) if board_cache["all"] or (not note and board_choices()) else None
+        return h, note
+
     async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
         fleet the request already read. Every host the home knows, exactly as the Org shows them —
@@ -654,6 +668,7 @@ def create_app() -> FastAPI:
         person_view=person_view,
         person_inbox=person_inbox,
         board_items=board_items,
+        board_view=board_view,
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
     )
@@ -674,7 +689,7 @@ def create_app() -> FastAPI:
 def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The Org page and Focus (design §4.5)."""
     call, seats_of, identity_info, board_items = h.call, h.seats_of, h.identity_info, h.board_items
-    repo_facts = h.repo_facts
+    repo_facts, board_view = h.repo_facts, h.board_view
 
     @app.get("/", response_class=HTMLResponse)
     async def org(request: Request):
@@ -811,11 +826,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     standing.update(pr_standing((await call("inbox", id=m["id"])).get("entries") or [], now))
         rel = (r.get("ledger") or {}).get("path") or ""
         ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
-        boards = [
-            b
-            for b in (await board_items())[0]
-            if str(Path(str(b.get("root") or "")).resolve()) == str(Path(str(r.get("root") or "")).resolve())
-        ]
+        # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)
+        hz = horizon_of((await board_view())[0], str(r.get("root") or ""))
+        boards = hz["due"]
         ctx = {
             "r": r,
             "name": name,
@@ -824,6 +837,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "prs": pr_rows(r, members, standing, now),
             "lists": ledger_lists(r, summary["motion"]),
             "boards": boards,
+            "horizon": hz,
             "doing": summary["doing"],
             "chips": doing_chips(summary["doing"]),
             "ledger_editor": editor_link(ledger_file) if ledger_file else None,
@@ -1715,6 +1729,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The person's Inbox: the page, its payload and its controls (design §4.10, §4.5a)."""
     call, person_view, inbox_html, board_items = h.call, h.person_view, h.inbox_html, h.board_items
+    board_view = h.board_view
 
     @app.get("/inbox", response_class=HTMLResponse)
     async def inbox_page(request: Request):
@@ -1730,13 +1745,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got, states, agent_down = {"entries": []}, [], True  # the banner + Retry, never a bare 503
         # with the host agent down nothing is claimed as waiting — the Org's top bar and the poll say
         # the same — so the board is left unread rather than counted on this page alone (review of #472)
-        boards, board_note = ([], "") if agent_down else await board_items()
+        hz, board_note = (
+            ({"due": [], "ahead": [], "hidden": [], "line": None}, "") if agent_down else await board_view()
+        )
         sections = inbox_sections(
             got["entries"],
             states=states,
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
-            boards=boards,
+            boards=hz["due"],
         )
         picks = rail_picks(request.query_params)
         return templates.TemplateResponse(
@@ -1745,9 +1762,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 "sections": sections,
                 "picks": picks,
-                "rail": rail_counts(rail_rows(sections), picks),
+                "rail": rail_counts(rail_rows(sections, hz["ahead"]), picks),
                 "origin": page_origin(request),
                 "board_note": board_note,
+                "horizon": hz,
                 "board_choices": board_choices(),
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
@@ -1868,13 +1886,13 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "agent_down": True,
                 "why": str(e.detail),
             }
-        boards, board_note = await board_items()
+        hz, board_note = await board_view()
         sections = inbox_sections(
             got["entries"],
             states=states,
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
-            boards=boards,
+            boards=hz["due"],
         )
         got["agent_down"] = False
         got["board_note"] = board_note
@@ -1891,10 +1909,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
         got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
         got["html"] = inbox_html(sections, page_origin(request))
+        # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
+        got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=page_origin(request))
         # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its rows,
         # so the poll brings the group's markup as it brings the rows'; the script presses the lines
         # the URL picks and recounts every line from the rows on the page
-        rail = rail_counts(rail_rows(sections), rail_picks({}))
+        rail = rail_counts(rail_rows(sections, hz["ahead"]), rail_picks({}))
         got["html"]["rail_teams"] = str(
             templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
         )

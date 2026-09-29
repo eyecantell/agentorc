@@ -51,10 +51,11 @@
   <div class="row gap rsh"><span class="h2">Waiting on you</span> <span class="meta">{{ boards | length }} due</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-wait" title="About this list">i</button>
     <span class="grow"></span>{% if teams %}<a class="meta" href="/inbox?team={{ teams[0] }}&kind=board">open in the Inbox →</a>{% endif %}</div>
-  <div class="secinfo meta" id="info-wait" hidden>the repo's board items due today or overdue, as the Inbox shows them — Reply, Snooze and Done write the board</div>
+  <div class="secinfo meta" id="info-wait" hidden>the repo's board items due today or overdue, as the Inbox shows them — Reply, Snooze and Done write the board; under them, what your board items shown setting draws before it is due, not counted</div>
   <div class="inboxpage"><div class="inboxrows">
   {% for e in boards %}{{ ir.row(e, 'needs') }}{% else %}<div class="rrow meta">nothing on the board is due</div>{% endfor %}
-  </div></div>
+  </div>
+  {% with hz = horizon %}{% include "board_horizon.html" %}{% endwith %}</div>
 </section>
 
 {# (4) Doing — the team's ao doing calls, newest first, with a chip per doer #}

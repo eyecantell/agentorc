@@ -1280,7 +1280,8 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
         for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
             menu = 'class="more"' in tag
             section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
-            fold = 'class="fold"' in tag
+            # …or the board's *not shown* fold (TD-220): rows with controls, and never closed by a press
+            fold = 'class="fold"' in tag or 'class="fold boardfold"' in tag
             # …or a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
             side = "data-side=" in tag
             assert menu + section + fold + side == 1, f"{tpl.name}: {tag} is not a menu, a known section or a fold"
@@ -2605,9 +2606,10 @@ def test_the_script_counts_the_rail_as_the_server_does():
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
     from agentorc.ui.app import find_words, rail_counts, rail_picks, rail_rows
 
-    rows = rail_rows(_rail_fixture())
+    # …with a board row coming up (TD-220): in *board items*, in no section's number, kept by a *Needs you* pick
+    rows = rail_rows(_rail_fixture(), [{"row": "board", "id": "b9", "team": "grind", "find": "later on"}])
     queries = ["", "?team=grind", "?team=grind,cm&sec=needs", "?sec=fyi&kind=notes", "?team=none&find=home",
-               "?kind=questions&find=517%2C", "?team=gone"]  # fmt: skip
+               "?kind=questions&find=517%2C", "?team=gone", "?sec=needs&kind=board"]  # fmt: skip
     tmp = pathlib.Path(tempfile.mkdtemp())
     (tmp / "probe.js").write_text(RAIL_PROBE)
     (tmp / "cases.json").write_text(json.dumps({"rows": rows, "picks": queries}))

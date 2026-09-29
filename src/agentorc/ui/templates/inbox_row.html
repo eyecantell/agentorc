@@ -532,7 +532,7 @@
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-board">board</span>
   <span class="grow"></span>
-  <span class="st" title="Due: {{ e.due }}">{{ e.due_tag }}</span>
+  <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
 </div>
 <div class="body">{{ e.text }}</div>
 <div class="row gap wrap mfoot">
