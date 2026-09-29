@@ -164,6 +164,13 @@ def repeated_headings(text: str) -> list[str]:
     return [h for h, n in seen.items() if n > 1]
 
 
+def prefixed(prompt_from: dict[str, Any] | None, block: str) -> dict[str, Any] | None:
+    """`prompt_from` with the text put in front of the brief (§4.9's Project block) as `prefix`,
+    which a replay puts back in front as it is: the block is the org's reach at the start, not a
+    brief's file (design §6 rule 7)."""
+    return {**prompt_from, "prefix": block} if prompt_from and block else prompt_from
+
+
 def _read_here(path: Path) -> str | None:
     return path.read_text(encoding="utf-8") if path.is_file() else None
 
@@ -209,10 +216,12 @@ class Role:
         whole brief) and for `plain`."""
         return (PRESETS.get(self.name) or {}).get("brief")
 
-    def _read(self, brief: str, read: Reader | None) -> str:
+    def _path(self, brief: str) -> Path:
         path = Path(brief).expanduser()
-        if not path.is_absolute():
-            path = (self.root or Path.cwd()) / path
+        return path if path.is_absolute() else (self.root or Path.cwd()) / path
+
+    def _read(self, brief: str, read: Reader | None) -> str:
+        path = self._path(brief)
         try:
             text = (read or _read_here)(path)
         except OSError as e:
@@ -231,6 +240,21 @@ class Role:
         manager: str | None = None,
         supplement: str | None = None,
     ) -> str | None:
+        """The opening prompt alone: `compose`'s text (below)."""
+        return self.compose(
+            lane, read=read, techlead=techlead, context=context, manager=manager, supplement=supplement
+        )[0]
+
+    def compose(
+        self,
+        lane: list[str] | None = None,
+        *,
+        read: Reader | None = None,
+        techlead: str | None = None,
+        context: str | None = None,
+        manager: str | None = None,
+        supplement: str | None = None,
+    ) -> tuple[str | None, dict[str, Any] | None]:
         """The opening prompt this role gives a session: its template with `{repo}` filled from the
         repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114) — `supplement`, a path,
         when a team definition or `ao new --brief` gives one, in place of the role's own
@@ -240,21 +264,39 @@ class Role:
         A role the package ships no template for takes the repo's brief as the whole brief; None
         for one with neither (`plain`). `read` reads a repo's file — this host's disk by default, or
         another host's checkout across the link (design §4.4a "Teams across hosts", TD-057 step
-        4b.3); a template is always the package's own."""
+        4b.3); a template is always the package's own.
+
+        Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
+        `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
+        for a role with no template; `slots` each placeholder, in the order it is filled, as
+        `{file: <absolute path>}` (the repo's brief, whose text goes in stripped, `none` when empty) or
+        `{text: …}` — so
+        a replay can fill `base` again from the files as they are then. None with no text."""
         own = self.brief if self.brief and self.brief_source not in ("", "built-in") else None
         extra = supplement or own
+        slots: dict[str, dict[str, str]] = {}
         if self.template is None:
             if not extra:
-                return None
+                return None, None
             text = self._read(extra, read)
+            base = str(self._path(extra))
         else:
-            text = resources.files("agentorc").joinpath("briefs", self.template).read_text(encoding="utf-8")
+            src = resources.files("agentorc").joinpath("briefs", self.template)
+            text = src.read_text(encoding="utf-8")
+            base = str(src)
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
-        text = text.replace(TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD)
-        text = text.replace(MANAGER_PLACEHOLDER, manager or NO_MANAGER)
-        text = text.replace(CONTEXT_PLACEHOLDER, context or NO_CONTEXT)
-        return text.replace(LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)")
+            slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
+        fills = (
+            (TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD),
+            (MANAGER_PLACEHOLDER, manager or NO_MANAGER),
+            (CONTEXT_PLACEHOLDER, context or NO_CONTEXT),
+            (LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)"),
+        )
+        for slot, value in fills:
+            text = text.replace(slot, value)
+            slots[slot] = {"text": value}
+        return text, {"base": base, "slots": slots}
 
     def to_dict(self) -> dict[str, Any]:
         return {

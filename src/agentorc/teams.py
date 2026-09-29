@@ -126,6 +126,7 @@ class Launch:
     host: str = ""  # the host this session lands on; "" is the host the start runs on
     review: dict[str, Any] | None = None  # who reads its PRs, from its role (design §4.9b *The reader*)
     context_bound: int | None = None  # tokens past which rule 5 tells it to end its run (§4.8, TD-190)
+    prompt_from: dict[str, Any] | None = None  # what `prompt` was made from (§6 rule 7, TD-217)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -158,6 +159,7 @@ class Launch:
             **({"seat": dict(self.trigger)} if self.trigger else {}),
             **({"review": dict(self.review)} if self.review else {}),
             **({"context_bound": self.context_bound} if self.context_bound else {}),
+            **({"prompt_from": self.prompt_from} if self.prompt_from else {}),
         }
 
 
@@ -290,13 +292,13 @@ def _brief(
     techlead: str = "",
     context: str = "",
     manager: str = "",
-) -> str | None:
+) -> tuple[str | None, dict[str, Any] | None]:
     """The role's template with the member's `brief:` in its `{repo}` slot — in place of the role's
     own `roles.<name>.brief`, never beside it (design §4.8, TD-114) — and `{lane}`, `{techlead}`,
     `{manager}` and `{context}` filled. The `brief:` is read from the home checkout, where `role`
-    was resolved."""
+    was resolved. Beside it, what it was made from (`Role.compose`, §6 rule 7)."""
     supplement = member.brief if member is not None and member.brief else None
-    return role.brief_text(lane, read=read, techlead=techlead, context=context, manager=manager, supplement=supplement)
+    return role.compose(lane, read=read, techlead=techlead, context=context, manager=manager, supplement=supplement)
 
 
 def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, home: str, host: str, here: str) -> str:
@@ -415,11 +417,12 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, lane, read, techlead, context, manager)
+        prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
         prompt = block + prompt if prompt else block
+        prompt_from = repoconfig.prefixed(prompt_from, block)
     return Launch(
         name=name,
         role=role.name,
@@ -439,6 +442,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         host=host if host != here else "",
         review=dict(role.review) if role.review else None,
         context_bound=role.context_bound,
+        prompt_from=prompt_from,
     )
 
 

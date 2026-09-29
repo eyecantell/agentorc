@@ -432,7 +432,8 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         # relative to the repo the session starts in, as every brief path is (design §4.9), not to
         # the shell's cwd: `ao new --dir` from elsewhere must read the same file (review of PR #463)
         supplement = brief or None
-        prompt = args.prompt or role.brief_text(lane, supplement=supplement)
+        # what the brief was made from goes with it (design §6 rule 7); a typed --prompt fills nothing
+        prompt, prompt_from = (args.prompt, None) if args.prompt else role.compose(lane, supplement=supplement)
         # TD-114's transition (design §4.8): a whole brief given as a supplement repeats the template
         for heading in repoconfig.repeated_headings(prompt or "") if supplement else []:
             print(
@@ -442,6 +443,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
             )
         if block := _project_block(getattr(args, "project", None), cfg, directory):
             prompt = block + prompt if prompt else block
+            prompt_from = repoconfig.prefixed(prompt_from, block)
     except (KeyError, ValueError) as e:
         raise AgentError(str(e).strip('"')) from None
     controllers = list(args.controller or [])
@@ -468,6 +470,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "profile": args.profile or role.profile or "",
         "prompt": prompt,
+        **({"prompt_from": prompt_from} if prompt_from else {}),  # sent only when set (§4.4 skew rule)
         "capabilities": list(dict.fromkeys([*role.grants, *(args.grant or [])])),
         "controllers": ids,
         "lane": lane,
