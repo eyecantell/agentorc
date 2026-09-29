@@ -804,8 +804,12 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   checkout never sits dirty and the history is auditable. One **add** (TD-069 step 4, built by
   TD-140): **Put on the board** on an FYI row (§4.5a) writes one new line at the top of the
   open items, in the board's own format, committed as `agentorc: board <item head> (from <entry
-  id>)`; the only line this system ever adds to a board, and only at a person's press — no session
-  and no policy adds one (a session writes its own lines by PR, cadence §4). **Reply** (TD-126,
+  id>)`. A **second add** (TD-213, designed 2026-09-28; not built — TD-216): the person's answer to
+  an **orphaned question** (§4.10 *A question about a reference outlives its asker*) is written
+  as one new line at the same place, the question's first paragraph and the answer on it,
+  committed as `agentorc: answer <item head> (from <entry id>)`, the entry closed once the commit
+  lands. These two are the only lines this system ever adds to a board, and only at a person's
+  press — no session and no policy adds one (a session writes its own lines by PR, cadence §4). **Reply** (TD-126,
   2026-09-24; its file half built — TD-142 slice 1, the mail half not yet) is the third edit: the person's words appended to the item's own
   line as ` — Paul, <date>: <text>`, the name the checkout's git `user.name` (the commit's author; *the person* when unset) and the words joined onto the one line (`agentorc: reply on <item> (session <name>)`) — an item is one
   line by the board's Format, and the reader and the SessionStart hook read lines, so a reply under
@@ -2318,7 +2322,7 @@ noted). If a control is not in this table it does not exist.
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here (TD-052) |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10, TD-052). No Reply on an entry the person sent: a person does not answer themselves — the session's answer lands in the top bar's person inbox, where the person replies |
 | card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control (TD-052). One dialog shared with Reply; **the composer opens on `ask`** — a person's message to a session is usually a question, and only an `ask` fills an on-call seat (§4.9b), so `note` is the choice a person makes, not the one they fall into; an `ask` takes the default bound. Its placeholder asks the person the shape §4.10 asks of a session's message to them — *first what you want, then why* (TD-127; TD-139). **Under the kind selector, one sentence says when the message will be read** (§4.10 *When it is read*, TD-158; built by TD-168): from the addressee's record as the card draws it — *on call — an ask fills this seat now; a note waits for its next question*, *exited — read when it is resumed or started again under this name*, *working — read when its turn ends*, *idle — rung within a tick* — and it changes as the kind is switched, before anything is typed. The `read_when` pair (`ask`, `note`) rides on the record's view, so the dialog opens with it and no request is made; the Reply dialog shows the same line for its kind — the Inbox page's and the Focus panel's Reply the sender's, **Overrule** the asker's, since that is whom it writes to. **The composer's first line is the role's `message:` sentence** (§4.8 *A role says when to message it*, TD-162; built — TD-171), under the addressee's name and above the when-read line — *whether this is the one to write to*, then *when it will be read* — and the same sentence is the control's `title` on the card's *more ▾* entry, a seat card's **Message…** and the Focus header's button, so hover answers it before the press; absent for a role without one, and for `plain`. Never the session's words: the definition's (§9 invariant 9) |
-| Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, TD-069). The top bar's **Inbox** opens it, and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. It is not the Org's needs-you count, which is session states alone: the Inbox's number adds open `ask`s to the person, paused `steer`s and due board items, so the two may differ, and each says on hover what it counts and how it differs from the other (on the Inbox, the rail's *Needs you* line since TD-129; the title-row pill it replaced is gone). The count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10); the state rows join *Needs you* in that same computation, so the two numbers cannot disagree. The page's mail is polled from the `inbox` RPC (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). The filters are **the rail** (next row; TD-129), designed 2026-09-24 in place of the typed `team:name` box; due board items joined the count 2026-09-23 (TD-069 step 3) |
+| Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, TD-069). The top bar's **Inbox** opens it, and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person; and an orphaned one past its bound: a ledger entry is, TD-213, not built), so the number means *what is waiting on a person*. It is not the Org's needs-you count, which is session states alone: the Inbox's number adds open `ask`s to the person, paused `steer`s and due board items, so the two may differ, and each says on hover what it counts and how it differs from the other (on the Inbox, the rail's *Needs you* line since TD-129; the title-row pill it replaced is gone). The count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10); the state rows join *Needs you* in that same computation, so the two numbers cannot disagree. The page's mail is polled from the `inbox` RPC (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). The filters are **the rail** (next row; TD-129), designed 2026-09-24 in place of the typed `team:name` box; due board items joined the count 2026-09-23 (TD-069 step 3) |
 | Inbox page: **the rail** | **Urgency**, **Teams**, **Kinds** — every line a toggle — **Clear filters**, **find** | §4.5 screen 6 *The rail* (TD-129; designed 2026-09-24, built 2026-09-25 — TD-135). Left of the column, sticky, starting under the title (*Inbox* alone on the top line): **Clear filters**, the find box, then three groups of toggles: *Urgency* — the sections in the page's order, each with its count; the teams a row on the page carries and *no team*, each with its **Needs you** count; the kinds — *questions*, *steering*, *session states*, *board items*, *notes*, *trail* — each with its count. Within a group the picks are OR'd, across groups AND'd, and nothing picked means all; every count is a count of the rows on the page now — a picked line its share, an unpicked line in a group with a pick *0*, dimmed, an unpicked line in a group without one its share under the other groups' picks — written as a plain number while nothing is picked or typed and *n of all* while anything is, *all* the line's unfiltered count, on rail lines and section headings alike; a *0* line stays so a pick can be undone. A section not picked is not drawn; one picked and emptied by the other groups draws its heading and its empty line — a filter shows or hides rows and never re-orders the queue. **Clear filters**, drawn only while anything is picked or typed, clears the lot, the find box included. The picks are the URL (`team`, `sec`, `kind`, `find`), remembered per browser for a bare `/inbox` and written back with `replaceState`; the top bar's number stays the unfiltered *Needs you*; the title row is *Inbox* alone, the needs-you pill and its hover moved to the rail's *Needs you* line. A row's team badge is the same press as the rail's line for its team; the typed `team:` syntax is retired. A press is a history entry (Back undoes it); typing in the find replaces the URL rather than adding one per keystroke. **Dismiss all** in FYI dismisses the rows on screen, which under a filter are the rows the rail shows. Counts from `rail_counts` over `inbox_sections`' rows for the first paint (the URL's picks, so a link opens filtered), and from `AO.railCounts` — the same rule over the rows in the DOM, held to one answer with it by a test — on every press, keystroke and poll, so the rail, the headings and the rows cannot disagree; a *Teams* line counts that team's *Needs you* rows. Below 720 px: a pinned **Filters ▾** chip with the number of picks, then the teams as chips, picked ones first; the chip opens a full-screen sheet with the three groups, the find box, Clear filters and Done (*Narrow*; TD-137). Client-side but for the counts; nothing written |
 | Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
 | Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; built 2026-09-25 — TD-136): one mail entry whole, reached from the row's text and its *whole entry ›* link, and from `Enter` on the ringed row (a trail row's *re* is not a link yet). **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
@@ -2354,6 +2358,7 @@ noted). If a control is not in this table it does not exist.
 | team header | **PRs waiting** count | built (TD-093 slice 3, #479; the field slice 1; §4.9b *The reader*): *`n` PRs waiting · oldest `<age>`* from the seat's `prs_waiting: {n, oldest}` — a count and a time, never the entries; display only, not pressable (the entries are `ao inbox <seat>`'s), and never a board line — a held PR's wait is here and in the reader's inbox, nowhere else (§4.9a, TD-125). Absent without a seat, or when no session of the team carries `review`. And on the person's Inbox, an `ask` that carries `pr` (a `reader: person` repo) draws `#<n>` as a link to the PR beside its text — the number is a structured field, the text stays text |
 | team header | **answered for you** count | the number of *answered for you* entries from this team's sessions since the person last opened that group (TD-075) — a mark, never pressable; the group is reached from the Inbox. *Since the person last opened that group* is this browser's memory, as FYI's *new* mark is — the newest row seen while the Inbox's group is open and the tab in view — so the home keeps no read state for it; the poll gives each row's team and time (`answered_marks`), never its text, and the header's mark is filled in by the page (the Org reads the poll at load for it) |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text in its shape (first paragraph, *details*; TD-127), the default it will take, and the time left; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and is counted while paused — a session is held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused |
+| Inbox row: orphaned question | **Reply**, **suggested answers**, **Go with it** (a `steer`), **Delete**, **Snooze** (no clock only) | designed 2026-09-28 (TD-213; not built — TD-216; §4.10 *A question about a reference outlives its asker*). An open `ask` or `steer` whose entry carries `orphaned`: the row is the question's own — the text in its shape, `about`, age, the suggested answers — under the asker's name from `orphaned.name`, with a **standing** line in the board row's words and drawn the same way, display only, from the records the page already holds: *its session was closed — grinder-ao-2 holds TD-149: your answer reaches it, and agentorc's board* (a live lease on `about`), or *its session was closed — nobody holds TD-180: your answer is written on agentorc's board* (*was forgotten*, *was cancelled*, by `orphaned.how`). An orphaned `steer` with its clock running is listed under *Steering*, uncounted, its time reading *21m left, then it waits on you* and its default as *its asker would have gone with: …*; with `bound` cleared it is under *Needs you*, counted, with no countdown. **Reply**, a suggested answer and ***Go with it*** write the answer on the board and mail it to the holder (§4.10; §4.4 the second add), and the toast repeats the standing as a result — *written on the board* / *written on the board · sent to grinder-ao-2 (holds TD-149)*; a refused write is drawn on the row, which stays. **Delete** confirms and declines. **No Pause**: a pause tells a session to hold, and there is none. **No Open**: there is no session to open; `about` links to the ledger entry as on any row. **Snooze** as on an `ask`, offered once the clock is gone. A question whose asker's name has come back carries no `orphaned` and is the ordinary `ask` or `steer` row |
 | Inbox section: **Waiting on them** | **Dismiss** | answered questions that owe an outcome (§4.10 *Outcomes*, TD-079) and whose asker is still live: the question, the answer given, how long ago, the asker's name and `doing` line. Never counted — it waits on a session, not on the person. **Dismiss** says *I do not need to hear back*, ends the debt and tells the asker by a `system` note (`inbox_dismiss`, person-only). When the asker has exited without reporting, or reported `blocked`, the row is under *Needs you* instead, counted, with **Open** / **Reply** and **Dismiss**. The answer given is what the person inbox still holds: a pressed suggested answer is in the entry itself (§4.10 *Suggested answers*), a typed reply is not — it went to the asker's inbox — so the row says *you answered* or *you let it go with its default* rather than inventing words the person did not write |
 | Inbox: the FYI count, **Dismiss all** | the top bar's second number; one button | *Inbox 1 · 5*: the second number is FYI's entries, never added to the first (§4.10 *The Inbox is a queue*, TD-079). The FYI section opens itself when its count is higher than this browser last saw. **Dismiss all** confirms once and dismisses the ids this browser has on screen — the trail and closed questions included, never an open question, never mail that arrived after the page was drawn |
 | Inbox row: `note` and the rest of FYI | **Dismiss** | the text in its shape (first paragraph, *details*; TD-127); Dismiss deletes. A manager's wind-down report is one such `note` — two lines, what the run merged and what each member did not find (§4.9a, TD-125) — and is drawn as any note, from its sender. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. No Reply here — an FYI row has Dismiss and **Put on the board** (the row below), and a `system` note could not be replied to in any case (§4.10) |
@@ -3461,7 +3466,7 @@ not an answer to the alarm.
   by you*, at the home and on a node's routed act alike.
 - **Log TD** files the alarm where work is picked up (TD-077 b). The host agent does not write a
   repo's ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
-  write-back (§4.4) only edits an item already on a board, or adds one from an FYI row, at a person's press — so *filing* is handing it to the session that answers for this
+  write-back (§4.4) only edits an item already on a board, or adds one from an FYI row or from the answer to an orphaned question, at a person's press — so *filing* is handing it to the session that answers for this
   one: **the record's first live controller**, in the order `controllers` holds them — the
   session that created it (§4.8 *Create adds the creator*), a team member's manager (§4.9) — read
   from the control graph, never from a badge (§9 invariant 9; the host agent does not read
@@ -3996,7 +4001,9 @@ open because it holds uncommitted or unpushed work, a start or a close the host 
 naming a session. Each is an act the person must take; the report is not one. **A PR held for
 its reader is never on the board**: its wait is `prs_waiting` on the seat and the reader's own
 inbox (§4.9b *The reader*), and the reader is not the person — a held PR in wind-down text is
-the same pointer twice. A board line is a counted item the person must clear, and a counted
+the same pointer twice. **Nor is a member's own open question to the person**: one that names a
+reference stays in the Inbox when the wind-down closes its asker (§4.10 *A question about a
+reference outlives its asker*, TD-213), so the manager writes no line for it. A board line is a counted item the person must clear, and a counted
 item that asks for nothing teaches the person to clear without reading (TD-115's lesson,
 again). The report is the point of the whole mechanism — the org has finished the work a person
 defined, and the next move is a person's — and it says so where a person reads without owing
@@ -4744,7 +4751,8 @@ person is one of three things, and the envelope says which:
   open until one of four things closes it, each a `closed_reason` on the entry beside `closed_at`:
   **`replied`** (the person's `reply`, as for any `ask`); **`declined`** (the person deleted it —
   a deletion is an answer, and silence is not); **`asker_gone`** (the asker's record was **closed or
-  forgotten**; an asker that merely *exited* leaves it open, since a resume may still want the
+  forgotten** and the question names no reference — one that names a reference is orphaned and
+  stands, *A question about a reference outlives its asker*, below; an asker that merely *exited* leaves it open, since a resume may still want the
   answer, and a record closed because a resume superseded it is not a gone asker — the
   conversation continues under the new id, which its questions move to); or the refusal below.
   The asker does not wait on it: it takes other work, or declares itself out of work (§4.9a), and a
@@ -4800,6 +4808,76 @@ spent budget cannot hold a sender past the bound it set itself. A sender blocked
 its own `steer` is released at the bound; one that carried on working meets the line at its next
 `ao inbox`.
 
+**A question about a reference outlives its asker (TD-213, designed 2026-09-28; not built —
+TD-215, TD-216).** A question is about the work, not about the run that asked it, and a team's
+wind-down closes every finished member (§4.9a): on 2026-09-28 one closed two members and with
+them a `steer` and an `ask` the ledger still waited on, before the person had seen either. So the
+asker's going ends a question **only when the question names no reference**. An open `ask` or
+`steer` in the person inbox whose **`about` names a reference** is **orphaned**
+when its asker's record is closed, forgotten, or cancelled before its start: it stays open, and
+the home writes **`orphaned: {at, how, ref, name, repo, host, team}`** on the entry — `how` one of
+`closed`, `forgotten`, `cancelled`, the rest copied from the record at that moment, since a
+forgotten record can be asked nothing afterwards. **`about` is free text nobody checks at the
+send** (*Outcomes*, below), so the home checks it here: it names a reference when it has one of
+the two machine-readable shapes a claim's reference is canonicalised to (§4.8, `normalize_ref`):
+a ledger id (`TD-027`) or a PR number (`#59`). A board line is prose to the home and is not one
+here. The entry is held under the canonical form, which is the form a lease's `ref` has and so
+what the holder is matched on. It is the envelope's field that is read, never the message's text. A question
+with no `about`, or one whose `about` is a session's id or prose, closes `asker_gone` as before,
+and its FYI row says so. A record a resume superseded is no more a gone asker here
+than above: its questions moved with the conversation and are not orphaned.
+
+- **An orphaned `steer` does not lapse.** Its clock runs on, and the row says what the bound now
+  means; at the bound, with nobody left to take the default, the home **clears `bound`** instead
+  of closing the entry — and `paused_at` with it, at the orphaning, a pause being a hold on a
+  session that is no longer there. From then on it is an `ask` for the lapse sweep and for the
+  count: listed under *Needs you* and counted, as a paused `steer` is and for the same reason —
+  something is held on the person, here a ledger entry and not a session. `default` stays on the
+  entry as the line the asker would have taken, and *Go with it* answers with it.
+- **The name coming back adopts it.** A create that supersedes the closed record in place (§4.1:
+  a team's Start, the tick's restart, a person's Resume) puts a live record under the id `from`
+  names; the home clears `orphaned` at that create, whether or not the create resumed the
+  conversation — the successor holds the name and the lane, and the ledger entry says what waits.
+  The question is then an ordinary open question of that session: a Reply lands in its inbox as a
+  `reply`, carrying the question's `about`, and the session owes the outcome (*Outcomes*, below).
+  A `steer` adopted before its bound lapses to the successor on time, and because the successor
+  did not write it the `system` note names what it needs: *steer m-… about TD-149 lapsed: the
+  default was "<default>"*. One adopted after its bound was cleared stays without a clock.
+- **Where the person's answer goes while it is orphaned** is where a board reply goes (§4.5a *Due
+  strip / Inbox board row → Reply*, TD-126): the question is the same one — who still holds the
+  context — and the lease answers it. **Reply**, a suggested answer and ***Go with it*** do two
+  things, in order. **The answer is always written on the board**: one line at the top of the
+  open items of the asker's repo's board (`orphaned.repo`), by the write-back's second add (§4.4),
+  in the board's own format — `- [ ] <today> (session <orphaned.name> on <orphaned.host>) — <the
+  question's first paragraph> — <name>, <date>: <the answer>. Context: <about>. Due: <today>.` —
+  the answer being the reply's text, the suggested answer's text, or for *Go with it* *go with the
+  default: <default>*. **And it is mailed as well to whoever holds the reference**: every live
+  record with an unexpired declared lease on `orphaned.ref` (§4.8, `LEASE_TTL`) gets a `note` from the
+  person, `about` that reference, marked `handed` (§4.8a), its text the question's first
+  paragraph and the answer, and owes an outcome as a handed board reply does (*Outcomes*, below).
+  With no holder nothing is mailed and nothing is owed: the line on the board is what the next
+  session that reads the board finds. The entry then closes `replied` or `go_with_it`, as it would
+  have. The file half is written first; a refused write (the checkout dirty or off its default
+  branch, a repo with no board, the repo's host not answering) refuses the press and touches
+  nothing, and the row says why. Whoever carries the answer out closes the line, as any board line
+  is closed.
+- **Delete** declines it, as on any open question; there is nobody to tell and nothing is written.
+- **What it holds.** An orphaned question keeps its slot in the two depths under the id that
+  asked it, and is never pruned while open. Nothing but the person's answer closes it: a `done`
+  declared on its reference by another session does not, since the home would be inferring that
+  the question is moot — the row shows who holds the reference (§4.5a *Inbox row: orphaned
+  question*), and the person deletes what no longer matters.
+
+**The host agent still writes no board line by itself** (§4.4): this one is written at the
+person's press, as *Put on the board*'s is. Rejected: *the wind-down refuses to close a member
+that has an open question* — the record would sit idle under its name, and the team's next Start
+would be refused by a live holder; *the manager's wind-down writes each open question on the
+board* — a rule in a brief, for one of the several roads by which a record closes (a person's
+Close, a Forget, the tick's close before a restart), and a second copy of a question the Inbox
+already holds; *the home moves the question to the board at the close* — a line no person
+pressed for; *the question stays open under the team* — nothing keys on a team (§9 invariant 9),
+and the lease already says who holds the work.
+
 **One way of being closed.** `closed_reason` is set whenever an entry closes, by whatever path,
 and **an entry is open exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason`**
 — which is what *never pruned while open*, the depths above and the FYI list all read. The older
@@ -4822,7 +4900,8 @@ moves `bound` later by the time it was held and then clears `paused_at`, in one 
 never sees a resumed entry with its old bound and what was left is what is left; the sender is
 told again. **Reply** and **Go with it** close a paused `steer` as they close a running one. A
 paused `steer` holds its sender's slot in the depths like any open one, and an `asker_gone` closes
-it like any other. Only a `steer` can be paused — an `ask` to the person has no clock — and a
+it like any other — or orphans it, its pause cleared, when it names a reference (*A question about a
+reference outlives its asker*, above). Only a `steer` can be paused — an `ask` to the person has no clock — and a
 `steer` addressed to a session cannot be: the pause is the person's. **Snooze, Pause, Resume and
 *Go with it* act on the person inbox only**; named on an entry in a session's inbox they answer
 that the person inbox holds no such entry (whether a person should be able to hold a `steer` put
@@ -5642,7 +5721,7 @@ code and needs no grant; a session doing the same work does.
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
      says *restarts exhausted · 3 in 2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it
      under *Needs you* (§4.5a **Inbox row: restart**). The host agent writes no board line
-     (§4.4's write-back acts at a person's press — an edit, or *Put on the board*'s one add — and never on a session's behalf); the Inbox row is the person's channel, and a manager
+     (§4.4's write-back acts at a person's press — an edit, or one of its two adds — and never on a session's behalf); the Inbox row is the person's channel, and a manager
      reads the field.
   2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`, or
      `exited` by a natural exit (`pane` true) — a kill or a Close, a person's or the stop time's,
