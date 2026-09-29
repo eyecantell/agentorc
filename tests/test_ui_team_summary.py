@@ -163,10 +163,9 @@ def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     assert '<div class="dfeed" data-keep-scroll="doing">' in html
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
-    assert "scrollKept[g.team] = AO.scrolls(sum);" in js
-    swap, sync = js.index("scrollKept[g.team] = AO.scrolls(sum)"), js.index("function syncSummaries()")
+    sync = js.index("function syncSummaries()")
     restore = js.index("AO.restoreScrolls(sum, scrollKept[sum.dataset.team])")
-    assert restore > sync and restore > js.index('el.hidden = el.dataset.fv !== st.face', sync) and swap
+    assert restore > js.index("showSummary(sum);", sync) > sync  # the face is shown, then the box scrolled
     # …and the Repo page, which includes the same summary and re-reads its part whole
     assert "scrolled = AO.scrolls(box);" in js and "AO.restoreScrolls(box, scrolled);" in js
 

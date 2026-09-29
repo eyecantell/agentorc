@@ -2156,3 +2156,25 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Done when** Paul answers an orphaned question from the Inbox and the answer is on the repo's board and in the inbox of the session that holds the entry, the tests above pass, and design §4.4, §4.5a and §4.10 lose their *not built — TD-216*. TD-213 archives with this entry.
 
 **Related:** TD-213 (the design), TD-215 (the home's half), TD-126 / TD-142 (the board reply this follows; its mail half computes the same lease holders), TD-140 (*Put on the board*, the first add).
+
+## TD-224: The Org page jumps to the top when scrolled past a certain point
+
+**Priority:** High
+**Added:** 2026-09-28 (Paul: *the screen redraws (seen if scrolling, get popped up to top)*; later: *it was there before the promote and is still there now … it seems to be more position based than time based (scrolling past a certain point vertically seems to trigger it) and it happens consistently*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`syncGroups`: `sum.replaceWith(fresh)`, `box.appendChild(sec)` for every section on every delta; `syncSummaries`: the person's selector state applied after the swap, `AO.restoreScrolls`; `AO.scrolls` reads `scrollTop`; the reload on reconnect, line 748 at filing), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** the Org page throws the reader back to the top once they scroll past some vertical position, every time, and it was there before the 2026-09-28 promote. TD-205 (#676) fixed the Doing list's own scroll box; this is the page. A person can't read the lower teams or the No-team cards. Being position-based, not time-based, suggests layout, not the update clock.
+
+**Suspects, to confirm or rule out:**
+1. **A forced layout mid-swap.** The template renders every selector variant (`.lv`, `.wv`, `.fv`) with the server's defaults visible and the rest `hidden`. `syncSummaries` applies the person's own choices (the team's Technical debt selector, the window, the answer/doing face) only after `syncGroups` has swapped every team's summary in. Inside that loop, `AO.scrolls` reads `scrollTop` on the next team's scrolled box, which forces a layout while the previous team's fresh summary is still in the server's default state. Where the person's choice differs from the default, that summary is briefly a different height. This alone would shift the page by that difference, not throw it to the top, so it is the weaker suspect.
+2. **Scroll anchoring on a removed node (the likelier).** The browser anchors to a node near the viewport. If that node sits inside a summary that `replaceWith` removes, or a section that `appendChild` detaches and re-inserts, the anchor is lost on every delta and the fallback can be the top.
+3. **A reload.** `ws.onmessage` reloads the page after a reconnect. It would be position-independent, so it is the least likely here, but it explains a jump at a promote.
+
+**Fix:** reproduce first (a headless browser: scroll to a depth below the first team's summary, drive a delta, read `scrollY` before and after; say the depth at which it fires), then: apply the person's selector state and restored scrolls to `fresh` **before** it is inserted; move a section only when it is out of order; read every summary's scroll positions in one pass before any swap; consider `overflow-anchor: none` on the swapped regions if anchoring is the cause. Keep a person's scroll across a reconnect reload (`history.scrollRestoration` or a saved `scrollY`). Done when scrolling to the bottom of a busy Org page stays put through a minute of deltas, with a test of the swap order if the page's JS tests can hold one.
+
+**Resolved:** 2026-09-28 (PR #732; grinder-ao-1). Reproduced in headless Firefox against the live Org page: scrolled to any depth from 300 px, the first delta that swapped the groups threw the page to 0 (or near it), every time; with `overflow-anchor: none` injected it held, so the cause was **scroll anchoring** (suspect 2), set off by suspect 1's forced layout. `syncGroups` re-appended every section on every delta and read each summary's `scrollTop` inside the loop, so a layout ran with the sections half re-ordered and the browser moved the page to follow its anchor. Now every summary's scrolls are read before anything moves; a section (`syncGroups`) or a card (`layout`) moves only when it is out of the server's order (`AO.placeAt`); and a fresh summary shows the person's faces (`showSummary`) before it is inserted. The same rig with the fix held at every depth through fifteen swaps each. A reconnect's `location.reload()` already keeps the position (the browser's own scroll restoration, measured). Tests: `tests/test_ui_org_scroll.py` (the placement under node, the swap's order from the source). Live check pending on the board.
+
+**Related:** TD-205 (the Doing list's own scroll, fixed), TD-176 slice 3 (the summary and its swap), TD-194 (the team fold).

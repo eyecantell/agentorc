@@ -935,7 +935,7 @@
       // `card_order` in app.py: urgency, then an interactive session ahead of an unattended one (TD-095)
       cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank)
         || (!!b.dataset.mine - !!a.dataset.mine) || a.dataset.name.localeCompare(b.dataset.name))
-        .forEach((c) => grid.appendChild(c));
+        .forEach((c, i) => AO.placeAt(grid, c, i));
     });
     applyFilter();
     const shown = $$("#groups .sc").filter((c) => !c.hidden);
@@ -978,6 +978,13 @@
     const box = $("#groups"); if (!box) return;
     box.classList.toggle("flat", !gs);
     const wanted = gs || [{ team: "", manager: "", ids: $$("#groups .sc").map((c) => c.dataset.id), html: "" }];
+    // a scrolled list keeps where the person left it (TD-205): every summary's boxes are read here,
+    // before anything moves — the read forces a layout, and one taken halfway through the swap let
+    // the page's scroll anchoring chase a section being moved, throwing the page to the top (TD-224).
+    // They are put back in syncSummaries, once the face each sits in is shown: a hidden box takes no scrollTop.
+    // What the last swap kept and no summary took back (a team whose summary went) is dropped first.
+    Object.keys(scrollKept).forEach((k) => delete scrollKept[k]);
+    $$(".tsum", box).forEach((sum) => (scrollKept[sum.dataset.team] = AO.scrolls(sum)));
     const keep = [];
     wanted.forEach((g) => {
       let sec = sections().find((s) => s.dataset.team === g.team);
@@ -999,18 +1006,16 @@
       if (g.summary) {
         const tpl = document.createElement("template"); tpl.innerHTML = g.summary.trim();
         const fresh = tpl.content.firstElementChild;
+        showSummary(fresh);  // the person's own faces before it is inserted, so it lands at the height it keeps
         if (sum) {
           const kept = AO.denyWhys(sum);
-          // a scrolled list keeps where the person left it (TD-205): put back in syncSummaries,
-          // once the face it sits in is shown again — a hidden box takes no scrollTop
-          scrollKept[g.team] = AO.scrolls(sum);
           sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
         }
         else { const h = $(".ghead", sec); if (h) h.after(fresh); else sec.prepend(fresh); }
       } else if (sum) sum.remove();
       const grid = $(".grid", sec);
       (g.ids || []).forEach((id) => { const c = $(`#card-${CSS.escape(id)}`); if (c && c.parentElement !== grid) grid.appendChild(c); });
-      box.appendChild(sec);  // in the server's order
+      AO.placeAt(box, sec, keep.length);  // in the server's order
       keep.push(sec);
     });
     sections().forEach((sec) => {
@@ -1088,16 +1093,19 @@
       if (od && overdueN !== null) { od.textContent = String(overdueN); od.parentElement.classList.toggle("hidden", !overdueN); }
     }
     $$(".tsum").forEach((sum) => {
-      const st = summaryState(sum);
-      $$(".lv", sum).forEach((el) => (el.hidden = el.dataset.lv !== st.led));
-      $$(".wv", sum).forEach((el) => (el.hidden = el.dataset.wv !== st.win));
-      $$(".fv", sum).forEach((el) => (el.hidden = el.dataset.fv !== st.face));
-      $(".fface", sum)?.classList.toggle("answering", st.face === "answer" && !!sum.dataset.answerKey);
+      showSummary(sum);
       AO.restoreScrolls(sum, scrollKept[sum.dataset.team]); delete scrollKept[sum.dataset.team];
-      $$(".seg[data-pick]", sum).forEach((seg) => {
-        const v = st[seg.dataset.pick];
-        $$("button", seg).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === v ? "true" : "false"));
-      });
+    });
+  }
+  function showSummary(sum) {
+    const st = summaryState(sum);
+    $$(".lv", sum).forEach((el) => (el.hidden = el.dataset.lv !== st.led));
+    $$(".wv", sum).forEach((el) => (el.hidden = el.dataset.wv !== st.win));
+    $$(".fv", sum).forEach((el) => (el.hidden = el.dataset.fv !== st.face));
+    $(".fface", sum)?.classList.toggle("answering", st.face === "answer" && !!sum.dataset.answerKey);
+    $$(".seg[data-pick]", sum).forEach((seg) => {
+      const v = st[seg.dataset.pick];
+      $$("button", seg).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === v ? "true" : "false"));
     });
   }
   function pickSummary(b) {
@@ -1410,6 +1418,13 @@
     if (!root) return kept;
     root.querySelectorAll("[data-keep-scroll]").forEach((el) => { if (el.scrollTop > 0) kept[el.dataset.keepScroll] = el.scrollTop; });
     return kept;
+  };
+  // Put `node` at child index `i` of `parent`, and leave it alone when it is there already. Every
+  // delta re-orders the Org's sections and cards; appending each one detached it even when it had
+  // not moved, and the node the page's scroll anchoring holds on to went with it (TD-224).
+  AO.placeAt = function (parent, node, i) {
+    const at = parent.children[i] || null;
+    if (at !== node) parent.insertBefore(node, at);
   };
   AO.restoreScrolls = function (root, kept) {
     if (!root || !kept) return;
