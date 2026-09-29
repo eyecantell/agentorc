@@ -106,11 +106,12 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open |
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Open — design-first; answered 2026-09-28: teams per repo, aggregated by the home |
 | TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — proposal |
-| TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Open — design-first |
+| TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Designed 2026-09-28 — the build is TD-226 |
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Built — slices 1–4 (#714, #745, #747, #748); live check pending |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — (a) and the log; live check pending |
+| TD-226 | Build the rollback: `ao promote --sha` / `--back` run in a detached worktree at the commit, `last.json`, the hold (`held.json`) under which `auto` waits, `ao promote clear`, the row's *rolled back* reading | Medium | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
 
@@ -2041,8 +2042,9 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Added:** 2026-09-28 (Paul, answering grinder-ao-1's board line of 2026-09-27: *add a design TD for ao promote --sha*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-226
+**Status:** Designed 2026-09-28 (the designer, PR #719; the steer to Paul is `m-4ceaaf71206c`, bound 2026-09-29 10:08 MDT): design §6 *A rollback* (which commit, the detached worktree, the preconditions, what the repo may refuse, the hold, what it does not reach), §4.7 (`--sha`, `--back`, `ao promote clear`), §5 `promote:` (`run` makes live the tree it is started in), §4.5a *Inbox row: promote* (the held row), the glossary's *rollback*. Of the entry's three ways, (a) the scratch worktree; (b) the kept wheel and (c) the quicker revert were turned down, the history says why. Closes with TD-226.
+**Blocked by:** TD-226
 **Location:** design §4.7 (`ao promote`), §6 *Promote*, `src/sessionorc/promote.py` and the promote's `run` (TD-132, the build #666 refuses `--sha`)
 
 **Why:** design §4.7 promised `ao promote --sha <commit>`, a promote of an older commit, which is the rollback. TD-132's build (#666, grinder-ao-1) refuses it: the promote's `run` installs the checkout's tree, and precondition (1) holds that tree at main's head, so an older commit has no way to reach `run`. The techlead, reading #666, asked for it on the board since it narrows what the design promised. Today a rollback is a revert merged to main and then a press, which is slow when the live copy is broken (TD-062's 31 minutes).
@@ -2128,6 +2130,29 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** first confirm which case each alarm is. Log, for an outside hook claiming a session, the peer's pid and its start, the session's current and previous pane pids, and the time since the supersede or close. Then (a) on a supersede or restart that reuses the name, record the old pane as gone at that moment, so the grace applies to it too; (b) if some are genuinely later than 10 s, match the old run by its pid and start pair for as long as that process lives, not by a clock. Keep the alarm for a claim from a process that was never that session's pane. Tests: a restart followed by the old run's `SessionEnd` raises no alarm; an unknown process claiming the id still does. Done when a day of team restarts leaves `identity_alarms.json` unchanged.
 
 **Related:** TD-115 (the gone-pane grace), TD-186 (the previous run's end, ignored), TD-077 (identity), TD-201 (hooks outside the turn), design §4.8a.
+
+## TD-226: Build the rollback — `ao promote --sha`, `--back`, the hold, `ao promote clear`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-28 (the designer, from TD-212's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/promote.py` (the commit's resolution, the worktree, `start`'s `cwd` and environment, `last.json`, `held.json`, `unmet`, `survey`, `_conclude`, `note_text`), `src/sessionorc/agent_promote.py` (`rpc_promote`'s `sha` and `back`, `rpc_clear_promote`), `src/agentorc/cli.py` (`--sha`, `--back`, `clear`, `_promote_line`), `src/agentorc/ui/` (`promote_rows`, the held row), `src/agentorc/ui/help.py` (the promote row's entry), `CLAUDE.md` (the by-hand rollback), `tests/test_promote.py`; design §6 *A rollback*, §4.7, §5 `promote:`, §4.5a *Inbox row: promote*. Held path: the techlead reads the PR.
+
+**Why:** TD-212's *Why*: a rollback today is a revert merged to main and then a press, which waits on CI while the live copy is broken.
+
+**Fix, in slices a PR each:**
+1. **The commit and the run** (`sessionorc`): `promote(repo, sha, back)` resolves the commit in the checkout after the fetch (hex of seven to forty only, then `rev-parse --verify <x>^{commit}`, `merge-base --is-ancestor <sha> origin/main`) and refuses as §6 lists, each refusal naming its reason; `back` reads `last.json` and is refused under a hold. The worktree at `~/.agentorc/promotes/<repo>/tree` (the one a previous run left is removed first, then `worktree prune`; it is kept after the run, since this repo's `_build.json` names it as `source`), `run` started there with the three `AGENTORC_PROMOTE_*` variables, which a plain promote is handed too. The intent gains `from`, `kind` (`promote` or `rollback`) and `tree`. `unmet` takes the kind: a rollback skips `tree` and `failed`. `_conclude` writes `last.json` on success (for every promote), and words the note by kind.
+2. **The hold**: a rollback that concludes writes `held.json`; the reading carries `held`; `survey` starts nothing under `auto` while it stands, and `unmet` names it for the policy and not for a press; a plain press that concludes clears it, and `clear_promote` clears a failure, or the hold when no failure stands, and says which; a second rollback under a hold keeps `from`. `ao promote --sha`, `--back`, `ao promote clear`; `ao promote status` prints *rolled back from* and *auto on · held*.
+3. **The row and the words**: `promote_rows` draws the held row under *Needs you* whatever `auto` says, with Promote and Dismiss; the promote row has no help entry today: one is added to §4.5a's help list and `ui/help.py` together (bound by `tests/test_help.py`), saying what Promote, Snooze and Dismiss do, the hold included; CLAUDE.md's *The live copy is promoted* gains the by-hand rollback for a live copy that does not start: the worktree, then the pair with the worktree's path.
+4. **Tests**: a rollback with the checkout on a branch and dirty goes through and leaves the checkout's `HEAD`, index and files as they were; a commit not on main, an ambiguous prefix and the live commit are each refused by name; `--back` with no `last.json` is refused; a rollback with a failure standing starts, and clears the failure when it concludes; under `auto: true` and a hold nothing starts as main moves, and starts after `clear_promote`; a `run` that exits before changing anything reads as a failure with live unchanged; a branch name, a tag and `HEAD~1` are refused as not hex; `--back` under a hold is refused; Dismiss with a failure and a hold clears the failure first; a leftover tree does not stop the next rollback.
+
+**Done when:** on a scratch repo with a `promote:` block, `ao promote --back` puts live on the commit before the last promote in one command while the checkout sits on a branch, `ao promote status` and the Inbox row read *rolled back from*, `auto` leaves it there until the person promotes or clears, and slice 4's tests pass.
+
+**Related:** TD-212 (the design), TD-132 (the promote; its slice 4, this repo's block, writes a `run` that installs the tree it is started in), TD-062.
 
 ## TD-230: The usage chip shows a stale reading with no age, and the gate acts on it as if fresh
 
