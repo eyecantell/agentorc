@@ -2304,3 +2304,20 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Resolved:** 2026-09-29 (PR #744; grinder-ao-2). The row's error is drawn only for `reply`, `answer` and `gowithit`, the presses that write the board line; any other failed press keeps its toast alone. `tests/test_ui_orphaned.py` `test_only_a_failed_write_is_drawn_as_not_written`.
 
 **Related:** TD-216 (the row), #724.
+
+## TD-235: Rule 2's wanted restart undoes a person's Close
+
+**Priority:** Medium
+**Added:** 2026-09-29 (grinder-ao-1, from the techlead's read of #748)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_wanted_restart`: `closed_by_tick`)
+
+**Why:** `_wanted_restart` treats a `closed` record whose last `restarts` entry has `why: wanted` as the tick's own close followed by a failed replay, and replays it. A successful wanted restart leaves that same entry on the new record. So a member that was restarted once by rule 2, declared `restart_wanted` again, and was then closed by a person is started again on the next tick. The closed path also skips the idle and git tests. Design §6 rule 2 says a kill or a Close is never undone. Rule 7's `_brief_restart` had the same hole; #748 fixed it there by requiring the entry's `error`.
+
+**Fix:** retry a closed record only when its last entry is a `wanted` entry that carries `error` (both failure paths write one: `close: …` and the replay's). Test: restarted once by rule 2, declares again, is closed by a person, and is not restarted. Consider one helper shared with `_brief_restart`.
+
+**Resolved:** 2026-09-29 (PR #749; grinder-ao-1). `_closed_by_tick(s, why)` in `agent_tick.py` serves rules 2 and 7: a `closed` record is the tick's to retry only when its last entry is that rule's and carries `error`. Design §6 rule 2 says so. Test: `test_a_person_s_close_after_a_wanted_restart_is_never_undone` in `tests/test_wanted_and_nudge.py`.
+
+**Related:** TD-217 (rule 7, same fix in #748), TD-186 (the restart rules' races), design §6 rule 2.

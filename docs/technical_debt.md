@@ -113,7 +113,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — (a) and the log; live check pending |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
-| TD-235 | Rule 2's wanted restart undoes a person's Close: a record `closed` whose last restart entry is `wanted` is taken as the tick's own failed close and replayed | Medium | Open — pickable |
 
 
 ---
@@ -2160,19 +2159,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** (1) **research** (Sonnet, read-only, with sources): whether Anthropic documents a supported way to read a Pro/Max subscription's usage programmatically (and if not, what the supported surfaces are: the Claude Code `/usage` command, the statusline's input JSON if it carries rate-limit fields, response headers such as `anthropic-ratelimit-*` on the model calls a session already makes); the endpoint's limits if stated anywhere; what the Claude Code client polls and how often; whether a `Retry-After` is sent (the agent's log records only the reason's transitions, so this needs the headers logged). (2) Measure here: count this account's calls to the endpoint across the sessions (is it us, or them?) and log the response headers of a refusal. (3) Then choose, in the design round the research makes needed: read usage from a supported surface (e.g. the headers or statusline data the sessions already receive, reported through the hook), poll less and share the reading, or stop polling while any session can report it. Done when the chip holds a reading under an hour old through a busy evening, and the source is one Anthropic supports or tolerates.
 
 **Related:** TD-230 (the age on the chip, the gate on a stale reading), TD-122 (one poll per account), TD-087 (the reason), TD-073 (the reading), design §4.2, §4.2a.
-
-## TD-235: Rule 2's wanted restart undoes a person's Close
-
-**Priority:** Medium
-**Added:** 2026-09-29 (grinder-ao-1, from the techlead's read of #748)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_wanted_restart`: `closed_by_tick`)
-
-**Why:** `_wanted_restart` treats a `closed` record whose last `restarts` entry has `why: wanted` as the tick's own close followed by a failed replay, and replays it. A successful wanted restart leaves that same entry on the new record. So a member that was restarted once by rule 2, declared `restart_wanted` again, and was then closed by a person is started again on the next tick. The closed path also skips the idle and git tests. Design §6 rule 2 says a kill or a Close is never undone. Rule 7's `_brief_restart` had the same hole; #748 fixed it there by requiring the entry's `error`.
-
-**Fix:** retry a closed record only when its last entry is a `wanted` entry that carries `error` (both failure paths write one: `close: …` and the replay's). Test: restarted once by rule 2, declares again, is closed by a person, and is not restarted. Consider one helper shared with `_brief_restart`.
-
-**Related:** TD-217 (rule 7, same fix in #748), TD-186 (the restart rules' races), design §6 rule 2.
