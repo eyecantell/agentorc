@@ -120,6 +120,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
 | TD-232 | Build the team card's two readings: the priority letter on a TDs in motion row and its sort, the Doing list's ages and columns on the card and the Repo page | Low | Open — pickable |
+| TD-234 | A failed Snooze, Delete or Dismiss on an Inbox mail row with a `.rowerr` reads *not written: …*, the words for a refused board write | Low | Open |
 
 
 ---
@@ -2301,3 +2302,19 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a TDs in motion row reads *grind · H · TD-212 · title · holder* and the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns, on the card and on the Repo page.
 
 **Related:** TD-203, TD-206 (the designs), TD-205 (the same list's scrolling), TD-197 (the phases), TD-176.
+
+## TD-234: A failed Snooze, Delete or Dismiss on an orphaned question's row reads *not written*
+
+**Priority:** Low
+**Added:** 2026-09-28 (the techlead's read of #724, noted not a finding; filed by grinder-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the row action handler's `catch`: ``rowerr.textContent = `not written: ${e.message}` ``), `src/agentorc/ui/templates/inbox_row.html` (`.rowerr`, the orphaned row)
+
+**Why:** design §4.5a *Inbox row: orphaned question* draws a **refused write** on the row as *not written: …*, since the answer's road ends in a board line. The handler draws it for any failed press on a row that carries a `.rowerr`. So a failed Snooze (`snooze`), Delete (`unmail`) or Dismiss reads as if a board line had been refused, when nothing was being written.
+
+**Fix:** say *not written* only for the presses that write the board line: `reply`, `answer`, `gowithit`. Any other failed press on the row keeps the toast (*<control> failed: …*) and either leaves `.rowerr` hidden or draws it in the control's own words. Test: under the node probe, or from the source, a failed `snooze` on an orphaned row does not produce *not written*.
+
+**Related:** TD-216 (the row), #724.
