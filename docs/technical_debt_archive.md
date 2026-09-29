@@ -2333,6 +2333,6 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Why:** after TD-235, a `closed` record counts as the tick's own failed restart when its last `restarts` entry is `wanted` (or `brief`) and carries `error`. A member whose restart failed without being closed carries that same entry. That is an exited one whose replay failed, or an idle one whose close failed before `rpc_close` marked it. If a person then Closes it, the next tick read the record as its own and started it again. `rpc_close` records no closer, so the entry alone cannot tell the two apart. Design §6 rule 2 says a Close is never undone.
 
-**Resolved:** 2026-09-29 (grinder-ao-1). `_closed_by_tick` also requires the entry's `at` to be at or after the record's `closed_at`. The tick's own close is stamped before its failure is written; a person's Close comes after the entry. Design §6 rule 2 says so. Test: `test_a_person_s_close_after_a_failed_wanted_restart_is_never_undone` in `tests/test_wanted_and_nudge.py`.
+**Resolved:** 2026-09-29 (PR #750; grinder-ao-1). `_closed_by_tick` also requires the entry's `at` to be at or after the record's `closed_at`. The tick's own close is stamped before its failure is written; a person's Close comes after the entry. Design §6 rule 2 says so. Test: `test_a_person_s_close_after_a_failed_wanted_restart_is_never_undone` in `tests/test_wanted_and_nudge.py`.
 
 **Related:** TD-235 (the same rule's first hole, #749), design §6 rules 2 and 7.
