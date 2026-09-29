@@ -117,9 +117,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 | TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — TD-215 merged (PR #712) |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Open — pickable |
-| TD-221 | The Org page jumps to the top when scrolled past a certain point, consistently: a summary swap mid-layout, scroll anchoring, or the sections' re-append | High | Open — pickable: reproduce first |
-| TD-222 | A restart or close raises an identity alarm: the old run's last hook arrives from a pane that is gone, is judged *outside*, and alarms before the tick ignores it | Low | Open — pickable |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
+| TD-224 | The Org page jumps to the top when scrolled past a certain point, consistently: likely scroll anchoring losing a node the update removes | High | Open — pickable: reproduce first |
+| TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
 
 
 ---
@@ -2246,43 +2246,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-199 (the design), TD-114 (supplements), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-190 (rule 5, whose two tellings this follows), TD-191 (the round log that makes a manager's restart cheap).
 
-## TD-221: The Org page jumps to the top when scrolled past a certain point
-
-**Priority:** High
-**Added:** 2026-09-28 (Paul: *the screen redraws (seen if scrolling, get popped up to top)*; later: *it was there before the promote and is still there now … it seems to be more position based than time based (scrolling past a certain point vertically seems to trigger it) and it happens consistently*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — not reproduced by a session yet; the suspects below are from reading `app.js`.
-**Location:** `src/agentorc/ui/static/app.js` (`syncGroups`: `sum.replaceWith(fresh)`, `box.appendChild(sec)` for every section on every delta; `syncSummaries`: the variants' `hidden` set after the swap, `AO.restoreScrolls`; `AO.scrolls` reads `scrollTop`; the reload on reconnect, line 748 at filing), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/templates/team_summary.html`
-
-**Why:** the Org page throws the reader back to the top once they scroll past some vertical position, every time, and it was there before the 2026-09-28 promote. TD-205 (#676) fixed the Doing list's own scroll box; this is the page. A person can't read the lower teams or the No-team cards. Being position-based, not time-based, suggests layout, not the update clock.
-
-**Suspects, to confirm or rule out:**
-1. **A forced layout mid-swap with every variant showing.** The summary is rendered with every variant of its selectors (`.lv`, `.wv`, `.fv`) and hidden by `syncSummaries` after `syncGroups` has swapped it in. `AO.scrolls` reads `scrollTop` on the next team's summary, which forces a layout while the previous team's fresh summary still shows every variant, so the document is briefly much taller, then shorter. Once the reader has scrolled past that point, the browser's scroll anchoring can land at the top.
-2. **Scroll anchoring on a removed node.** The browser anchors to a node near the viewport. If that node sits inside a summary that `replaceWith` removes, or a section that `appendChild` detaches and re-inserts, the anchor is lost on every delta and the fallback can be the top.
-3. **A reload.** `ws.onmessage` reloads the page after a reconnect. It would be position-independent, so it is the least likely here, but it explains a jump at a promote.
-
-**Fix:** reproduce first (a headless browser: scroll to a depth below the first team's summary, drive a delta, read `scrollY` before and after; say the depth at which it fires), then: apply the summary's state (hidden variants, restored scrolls) to `fresh` **before** it is inserted; move a section only when it is out of order; read every summary's scroll positions in one pass before any swap; consider `overflow-anchor: none` on the swapped regions if anchoring is the cause. Keep a person's scroll across a reconnect reload (`history.scrollRestoration` or a saved `scrollY`). Done when scrolling to the bottom of a busy Org page stays put through a minute of deltas, with a test of the swap order if the page's JS tests can hold one.
-
-**Related:** TD-205 (the Doing list's own scroll, fixed), TD-176 slice 3 (the summary and its swap), TD-194 (the team fold).
-
-## TD-222: A restart or close raises an identity alarm from the old run's last hook
-
-**Priority:** Low
-**Added:** 2026-09-28 (Paul, on the anchor's report of the alarms: *yes file a TD for the alarms*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/sessionorc/agent_identity.py` (`_id_channel`: a peer that matches no pane is *outside*), `src/sessionorc/agent_tick.py` (`_apply_event`: *ignored the end of a previous run*, TD-186), `~/.agentorc/identity_alarms.json`
-
-**Why:** every alarm on record is the same shape: `channel: outside`, `rpc: hook`, a session's own id claimed, at the moment that session was restarted or closed. designer-ao-1 three times (latest 2026-09-29T03:22:37Z, two seconds after its restart), grinder-ao-1 at 03:23:24Z, techlead-ao-1 at its close at 2026-09-28T06:56:02Z, manager-ao-1 on 2026-09-24 and manager-dc-1 on 2026-09-25. When a run ends, its tool fires `SessionEnd` from a process whose pane is gone, so the identity check finds no pane and calls the caller *outside*. The tick then ignores the event as the end of a previous run (TD-186), rightly, but the alarm is already raised. The alarms are false, and they train the person to dismiss the list that exists to catch a real impersonation.
-
-**Fix:** judge the stale-run case before the alarm. A hook whose `adapter_id` is not the record's current run, or that arrives within a grace period of the record's own close or supersede, from a process that was that pane's (the pid and start pair `identity.py` already keeps), is the old run ending: ignored, and at most logged at info. Keep the alarm for everything else. Tests: a close followed by the old run's SessionEnd raises no alarm; a hook from a truly unknown process claiming the id still does. Done when a day of team restarts leaves `identity_alarms.json` unchanged.
-
-**Related:** TD-186 (the previous run's end, ignored), TD-077 (identity), TD-201 (hooks outside the turn), design §4.8a.
-
 ## TD-223: Rule 6 matches nothing in a ledger without Pickable, Owner and Kind lines
 
 **Priority:** Medium
@@ -2298,3 +2261,40 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** design one reading of pickability for every consumer. Either (a) agentorc reads each repo's ledger through that repo's own `ledger.py` once dev-cadence's TD-070 lands (`--list --json` gives the derived `pickable`, `owner`, `kind`, `type` and the raw header fields), so the header lines are one repo's convention and not the rule's; or (b) agentorc's reader derives pickability from `Blocked by:` as dev-cadence's does when the header has no `Pickable:`. Also decide what a lane word means where there is no `Owner:` (dev-cadence's grinder is the repo's only builder: everything unblocked is its lane). Then rule 6, the kind bar and `ao repo` all read the same way. Done when an entry that becomes pickable in dev-cadence tells an idle, finished grinder-dc-1, and a test covers a ledger with no header lines.
 
 **Related:** TD-195 (rule 6), TD-214 (the wound-down team, the backlog baseline, the missing Owner check), TD-198 (the kind bar's buckets), dev-cadence's TD-070 (the query script) and TD-064 (`Blocked by`).
+
+## TD-224: The Org page jumps to the top when scrolled past a certain point
+
+**Priority:** High
+**Added:** 2026-09-28 (Paul: *the screen redraws (seen if scrolling, get popped up to top)*; later: *it was there before the promote and is still there now … it seems to be more position based than time based (scrolling past a certain point vertically seems to trigger it) and it happens consistently*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — not reproduced by a session yet; the suspects below are from reading `app.js`.
+**Location:** `src/agentorc/ui/static/app.js` (`syncGroups`: `sum.replaceWith(fresh)`, `box.appendChild(sec)` for every section on every delta; `syncSummaries`: the person's selector state applied after the swap, `AO.restoreScrolls`; `AO.scrolls` reads `scrollTop`; the reload on reconnect, line 748 at filing), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/templates/team_summary.html`
+
+**Why:** the Org page throws the reader back to the top once they scroll past some vertical position, every time, and it was there before the 2026-09-28 promote. TD-205 (#676) fixed the Doing list's own scroll box; this is the page. A person can't read the lower teams or the No-team cards. Being position-based, not time-based, suggests layout, not the update clock.
+
+**Suspects, to confirm or rule out:**
+1. **A forced layout mid-swap.** The template renders every selector variant (`.lv`, `.wv`, `.fv`) with the server's defaults visible and the rest `hidden`. `syncSummaries` applies the person's own choices (the team's Technical debt selector, the window, the answer/doing face) only after `syncGroups` has swapped every team's summary in. Inside that loop, `AO.scrolls` reads `scrollTop` on the next team's scrolled box, which forces a layout while the previous team's fresh summary is still in the server's default state. Where the person's choice differs from the default, that summary is briefly a different height. This alone would shift the page by that difference, not throw it to the top, so it is the weaker suspect.
+2. **Scroll anchoring on a removed node (the likelier).** The browser anchors to a node near the viewport. If that node sits inside a summary that `replaceWith` removes, or a section that `appendChild` detaches and re-inserts, the anchor is lost on every delta and the fallback can be the top.
+3. **A reload.** `ws.onmessage` reloads the page after a reconnect. It would be position-independent, so it is the least likely here, but it explains a jump at a promote.
+
+**Fix:** reproduce first (a headless browser: scroll to a depth below the first team's summary, drive a delta, read `scrollY` before and after; say the depth at which it fires), then: apply the person's selector state and restored scrolls to `fresh` **before** it is inserted; move a section only when it is out of order; read every summary's scroll positions in one pass before any swap; consider `overflow-anchor: none` on the swapped regions if anchoring is the cause. Keep a person's scroll across a reconnect reload (`history.scrollRestoration` or a saved `scrollY`). Done when scrolling to the bottom of a busy Org page stays put through a minute of deltas, with a test of the swap order if the page's JS tests can hold one.
+
+**Related:** TD-205 (the Doing list's own scroll, fixed), TD-176 slice 3 (the summary and its swap), TD-194 (the team fold).
+
+## TD-225: A restart or close raises an identity alarm from the old run's last hook
+
+**Priority:** Low
+**Added:** 2026-09-28 (Paul, on the anchor's report of the alarms: *yes file a TD for the alarms*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent_identity.py` (`_id_channel`: a peer that matches no pane is *outside*), `src/sessionorc/agent_tick.py` (`_apply_event`: *ignored the end of a previous run*, TD-186), `~/.agentorc/identity_alarms.json`
+
+**Why:** every alarm on record has the same shape: `channel: outside`, `rpc: hook`, a session's own id claimed. grinder-ao-1 14 times (2026-09-23T23:48:09Z to 2026-09-29T03:23:24Z), designer-ao-1 3 (latest 2026-09-29T03:22:37Z), grinder-ao-2, manager-ao-1, manager-dc-1 and techlead-ao-1 once each. The two that can be placed fell at a restart or a close: designer-ao-1's latest two seconds after the host agent restarted it (03:22:35Z, *superseded the closed session of the same name*), techlead-ao-1's at its close (06:56:02Z). TD-115 already covers part of this. A hook that matches no live pane is judged against the pane its record held if that pane left the list less than `PANE_GONE_GRACE` (10 s) before (`_id_gone_channel`, `identity.classify_gone`). The alarms still fire, so something falls outside it. The likeliest: a **restart reuses the tmux session name**, so the old pane never leaves the list as *gone*. The name at once has the new pane, and the old run's last hook (its `SessionEnd`, which the tick then ignores as the end of a previous run, TD-186) matches neither the new pane nor a gone one. designer-ao-1's alarm two seconds after its restart fits that, not the grace running out. Others may be hooks later than 10 s. The false alarms train the person to dismiss the list that exists to catch a real impersonation.
+
+**Fix:** first confirm which case each alarm is. Log, for an outside hook claiming a session, the peer's pid and its start, the session's current and previous pane pids, and the time since the supersede or close. Then (a) on a supersede or restart that reuses the name, record the old pane as gone at that moment, so the grace applies to it too; (b) if some are genuinely later than 10 s, match the old run by its pid and start pair for as long as that process lives, not by a clock. Keep the alarm for a claim from a process that was never that session's pane. Tests: a restart followed by the old run's `SessionEnd` raises no alarm; an unknown process claiming the id still does. Done when a day of team restarts leaves `identity_alarms.json` unchanged.
+
+**Related:** TD-115 (the gone-pane grace), TD-186 (the previous run's end, ignored), TD-077 (identity), TD-201 (hooks outside the turn), design §4.8a.
