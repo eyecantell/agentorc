@@ -2007,9 +2007,9 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-230
-**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: TDs in motion* (**Priority**): one letter in the priority bar's hue between the phase and the reference, none for a reference the ledger reading does not hold; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-230.
 **Blocked by:** TD-230
-**Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/app.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
+**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: TDs in motion* (**Priority**): one letter between the phase and the reference, drawn as the priority bar's chip in a slot of fixed width, empty for a reference the ledger reading does not hold or an entry with no known priority; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-230.
+**Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/org.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
 
 **Why:** a row reads *phase · reference · title · holder · PR*. Whether the team has its High entries in hand or is grinding Lows is not visible without opening the ledger. The ledger reading already carries each entry's `priority` (`sessionorc/ledger.py`), so the data is there.
 
@@ -2040,8 +2040,8 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-230
-**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: an age in the page's shape with the exact time on hover, ticking in the browser; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-230.
 **Blocked by:** TD-230
+**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: a short age of one unit with the exact time, in the reader's clock, on hover, ticking in the browser once a minute; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-230.
 **Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
 
 **Why:** on the 2026-09-26 screenshot the Doing facet read *21:… techlead-ao… answering grinder-ao-1's held PR #628…*. The time is a clock time cut to fit (*21:…*), and the doer's name is cut too (*techlead-ao…*). With no columns, the time, the doer and the words run together and the eye can't scan down the list.
@@ -2320,14 +2320,14 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Kind:** build
 **Pickable:** yes
 **Status:** Open
-**Location:** `src/agentorc/ui/org.py` (`motion_rows`), `src/agentorc/ui/templates/team_summary.html` and `repo.html`, `src/agentorc/ui/static/app.js` and `app.css`, `src/agentorc/ui/common.py` (a short age beside `_age`, which reads *2h 5m*), `tests/test_ui_*`; design §4.5a *team card: TDs in motion*, *Answer needed / Doing*, §4.5 screen 11.
+**Location:** `src/agentorc/ui/org.py` (`motion_rows`, `doing_rows`), `src/agentorc/ui/templates/team_summary.html` and `repo_part.html`, `src/agentorc/ui/static/app.js` and `app.css`, `src/agentorc/ui/common.py` (a short age beside `_age`, which reads *2h 5m*), `tests/test_ui_*`; design §4.5a *team card: TDs in motion*, *Answer needed / Doing*, §4.5 screen 11.
 
 **Why:** TD-203's and TD-206's: a row in motion does not say how much it matters, and the Doing list cannot be scanned.
 
-**Fix, a PR each:**
-1. **The priority letter**: `motion_rows` carries the entry's `priority` from the ledger reading; the template draws **H**, **M** or **L** between the phase and the reference in the priority bar's colour token, the word as its tooltip, nothing for a reference the reading does not hold; rows sort by phase, then priority (High first, none last), then reference.
-2. **Ages and columns**: each Doing row carries its timestamp; the server draws the short age (one unit: *just now*, *5m*, *1h*, *2d*) and the exact local time as the tooltip; `app.js` re-draws the ages once a minute from the timestamps in the same shape, and on the `doing` event as today; the rows are a three-column grid (the age right-aligned, the doer up to eighteen characters, the words the rest), one line each on the card and wrapping on the Repo page.
-3. **Tests**: a High entry in *grind* sorts above a Low one; a foreign reference draws no letter and sorts last in its phase; an age of 40 s reads *just now*, 5 min *5m*, 26 h *1d*; the script's age and the server's agree on the same instants; a doer of twenty-two characters is cut and whole in its tooltip.
+**Fix, 1 and 2 a PR each with their tests:**
+1. **The priority letter**: `motion_rows` carries the entry's `priority` from the ledger reading; the template draws **H**, **M** or **L** between the phase and the reference as the bar's chip (the background `var(--p-high)`, `--p-medium` or `--p-low`, the text as `.bseg.p-*` has it: the tokens are too pale to be a text colour), the word as its `title` and `aria-label`, in a slot of fixed width that is empty for a reference the reading does not hold and for a priority outside the three; rows sort by phase, then priority (High first, none last), then reference.
+2. **Ages and columns**: each Doing row carries its timestamp (`doing_rows` draws a server-clock `%H:%M` today); the server draws the short age (one unit: *just now*, *5m*, *1h*, *2d*) and the tooltip is the browser's own time through `.localtime[data-at]`; `app.js` re-draws the ages once a minute from the timestamps in the same shape, on an element that is **not** `.age[data-since]`, whose one-second tick would write *45s* over it; a future instant reads *just now* and an unreadable one leaves the cell empty and is skipped by the tick; the doer's width is `min(longest, 18)ch`, set by the server; below 720 px the columns hold and the words wrap under them; and on the `doing` event as today; the rows are a three-column grid (the age right-aligned, the doer up to eighteen characters, the words the rest), one line each on the card and wrapping on the Repo page.
+3. **Tests**: a High entry in *grind* sorts above a Low one; a foreign reference, an entry with no priority and one reading `critical` each draw an empty slot and sort last in their phase; an age of 40 s reads *just now*, 5 min *5m*, 26 h *1d*, an instant ahead of the clock *just now*, a bad value nothing; the script's age and the server's agree on the same instants; a doer of twenty-two characters is cut and whole in its tooltip.
 
 **Done when:** a TDs in motion row reads *grind · H · TD-212 · title · holder* and the Doing list reads *5m · techlead-ao-1 · answering …* in aligned columns, on the card and on the Repo page.
 
