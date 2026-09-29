@@ -402,9 +402,9 @@ def parse_board_show(v: Any) -> str:
     word = v.strip() if isinstance(v, str) else ""
     if word in ("due", "all"):
         return word
-    for pattern, (lo, hi) in ((r"next:(\d+)", BOARD_SHOW_NEXT), (r"(\d+)d", BOARD_SHOW_DAYS)):
+    for pattern, (lo, hi) in ((r"next:([0-9]+)", BOARD_SHOW_NEXT), (r"([0-9]+)d", BOARD_SHOW_DAYS)):
         if (m := re.fullmatch(pattern, word)) and lo <= int(m.group(1)) <= hi:
-            return pattern.replace(r"(\d+)", str(int(m.group(1))))
+            return pattern.replace("([0-9]+)", str(int(m.group(1))))
     raise ValueError(
         f"inbox.board_show is next:<n> (n from {BOARD_SHOW_NEXT[0]} to {BOARD_SHOW_NEXT[1]}), due, "
         f"<n>d (n from {BOARD_SHOW_DAYS[0]} to {BOARD_SHOW_DAYS[1]}) or all, not {v!r}"

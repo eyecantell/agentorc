@@ -652,10 +652,9 @@ class WakeMixin:
             else:
                 out[key] = value
         try:
-            settings_mod.parse_person(out)
+            return settings_mod.parse_person(out)  # as parsed: `07d` is written `7d`
         except ValueError as e:
             raise RpcError(f"person: {e}") from None
-        return out
 
     async def rpc_adapters(self) -> list[str]:
         return adapters.names()
