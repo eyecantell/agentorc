@@ -592,7 +592,7 @@ def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path,
     the page and hidden until true."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import templates, view
+    from agentorc.ui.app import card_slot, templates, view
 
     base = {"id": "ao-m1", "name": "m1", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
             "state": "idle", "since": "2026-09-21T01:00:00Z", "confidence": "hook", "pane": True,
@@ -613,6 +613,12 @@ def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path,
         if where == "focus":
             chip = html.split('id="fbc"')[1].split("</span>")[0]
             assert "data-act" not in chip and 'class="badge bc" id="fbc"' in html
+    # not an ending: a working member's `doing` line keeps the slot, the mark takes it from the tail
+    said = {"text": "TD-9: reading the fetcher", "at": "2026-09-21T01:00:00Z"}
+    working = view({**base, "state": "working", "doing": said, "brief_changed": bc})
+    assert "TD-9: reading the fetcher" in card.render(s=working)
+    assert ">brief changed<" not in card.render(s=working).replace("\n", "")
+    assert card_slot(view({**base, "state": "working", "brief_changed": bc}))["text"] == "brief changed"
     # a malformed field costs the chip, never the grid
     assert view({**base, "brief_changed": "yes"})["brief_changed"] is None
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()

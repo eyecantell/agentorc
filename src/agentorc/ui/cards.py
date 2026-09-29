@@ -526,8 +526,8 @@ def _first_line(text: str) -> str:
 def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     """The card's slot (design §4.5 *The card's anatomy*, row 5; §4.5a **doing**, TD-095): **one
     text, the first that applies**, and a caption. (a) what needs a person or explains a stop, (b)
-    an ending — exited, closed, or a declaration — (c) what the session says it is doing, (d) its
-    last output. The caption: the time a pending answer has left, else *ready to close ✓* whenever
+    an ending — exited, closed, or a declaration — (c) what the session says it is doing, then the
+    *brief changed* mark where it says nothing, (d) its last output. The caption: the time a pending answer has left, else *ready to close ✓* whenever
     the checklist passes, else *says · age* under a `doing` line. `text` is a session's or a tool's
     words: escaped by the template, shown, never a control.
 
@@ -600,9 +600,6 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         full = f"{words}{when} — {why or 'no reason recorded'}"
         if not d["out_of_work"] and said["early"]:
             full += " — asked inside its own first half hour, so a controller does not act on it (design §4.9a)"
-    elif d.get("brief_changed"):
-        # rule 7's mark (§4.5a **brief changed**, TD-217): drawn where *restart wanted* is, below it
-        text, full = d["brief_changed"]["text"], d["brief_changed"]["full"]
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (
@@ -611,6 +608,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         )
     elif d["doing"]:
         kind, text = "doing", d["doing"]["text"]
+    elif d.get("brief_changed"):
+        # rule 7's mark (§4.5a **brief changed**, TD-217): not an ending — it stands on a working member
+        # — so it takes the slot only where no `doing` line does, in place of the tail
+        text, full = d["brief_changed"]["text"], d["brief_changed"]["full"]
     elif state in ("working", "stalled?"):
         # the pane's last two lines, as they stand — for a shell or a command run that is the work
         tail = [str(line) for line in (d.get("tail") or [])[-2:] if str(line).strip()]
