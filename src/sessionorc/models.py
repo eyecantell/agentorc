@@ -102,6 +102,7 @@ HOME_OWNED = frozenset(
         "nudged_at",
         "context_sent_at",
         "brief",
+        "brief_changed",
         "seat",
         "seat_due",
         "seat_count",
@@ -891,6 +892,10 @@ class Session:
     # they were read at this create — the working tree's at a client's start, as merged at a replay —
     # each with its git blob id. None for a prompt typed whole. The home's.
     brief: dict[str, Any] | None = None
+    # Rule 7's mark (§6, TD-217 slice 3): `{at, paths}` once a source of `brief` has read otherwise,
+    # as merged, for `BRIEF_SETTLE`; gone at the next create, or when the files read as recorded
+    # again. The home's.
+    brief_changed: dict[str, Any] | None = None
     # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.

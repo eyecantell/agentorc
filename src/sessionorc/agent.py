@@ -355,6 +355,11 @@ class HostAgent(
         self._derive_task: asyncio.Task[None] | None = None
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
+        # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
+        # ran, and per record the blob ids that first read otherwise and since when
+        self._brief_task: asyncio.Task[None] | None = None
+        self._brief_read_at = datetime.min.replace(tzinfo=UTC)
+        self._brief_differs: dict[str, tuple[tuple[str, ...], datetime]] = {}
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
         # trust dialog case — takes the classifier's verdict at once (TD-015)

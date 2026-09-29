@@ -1894,3 +1894,30 @@ def test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses(tmp_path, 
     assert "report: TD-066 → #158 · 1/1 done" in capsys.readouterr().out  # unmarked, never guessed
     assert cli.main(["--json", "status"]) == 0
     assert json.loads(capsys.readouterr().out) == [rec]
+
+
+def test_status_v_says_a_brief_changed_with_its_files(tmp_path, monkeypatch, capsys):
+    """Design §4.5a **brief changed**, §6 rule 7 (TD-217 slice 3): `ao status -v` prints
+    `brief: changed <when> (<files>)`, and `--json` carries the field as it is."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
+    rec = {
+        "id": "ao-x-m",
+        "name": "m",
+        "state": "idle",
+        "confidence": "hook",
+        "since": "2026-09-27T10:00:00Z",
+        "adapter": "shell",
+        "brief_changed": {"at": "2026-09-27T10:00:00Z", "paths": ["/r/docs/briefs/m.md", "/v/briefs/manager.md"]},
+    }
+
+    def fake(method, **params):
+        if method == "list":
+            return [rec]
+        raise AgentError(f"unknown method {method}")
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    assert cli.main(["status", "-v"]) == 0
+    assert re.search(r"brief:  changed \S+ ago \(m\.md, manager\.md\)", capsys.readouterr().out)
+    assert cli.main(["--json", "status"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["brief_changed"] == rec["brief_changed"]

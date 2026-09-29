@@ -26,6 +26,7 @@ from sessionorc import brief as brief_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
+    BRIEF_SETTLE,
     COMPOSER_LINES,
     CONTEXT_AGAIN,
     DERIVE_EVERY,
@@ -369,6 +370,43 @@ class TickMixin:
             # detached, as the reports are: `gh` talks to the network, and the tick must not wait on it
             self._seat_counted_at = now
             self._seat_count_task = asyncio.create_task(self._count_seats(records))
+        if (self._brief_task is None or self._brief_task.done()) and now - self._brief_read_at > DERIVE_EVERY:
+            self._brief_read_at = now
+            self._brief_task = asyncio.create_task(self._brief_pass(now))
+
+    async def _brief_pass(self, now: datetime) -> None:
+        """Rule 7's mark (design §6 *Keeping a team running*, TD-217 slice 3): each live record of
+        this host with a `brief` has its sources read again as merged, in a thread; a difference
+        that has stood `BRIEF_SETTLE` with the same blob ids writes `brief_changed: {at, paths}`,
+        and files that read as recorded again take it away. A node's member is not read: its files
+        are that host's (as the replay, slice 2)."""
+        live = [
+            s for s in self.sessions.values() if s.brief and s.state not in ("exited", "closed") and not s.superseded_by
+        ]
+        try:
+            read = await asyncio.to_thread(lambda: {s.id: brief_mod.changed(s.brief) for s in live})
+        except Exception:  # noqa: BLE001 — a failed read is no mark, never the tick's
+            log.exception("the brief pass failed")
+            return
+        for sid in [k for k in self._brief_differs if k not in read]:
+            del self._brief_differs[sid]
+        dirty = False
+        for s in live:
+            paths, shas = read[s.id]
+            if not paths:
+                self._brief_differs.pop(s.id, None)
+                if s.brief_changed is not None:
+                    s.brief_changed, dirty = None, True
+                    self._save(s)
+                continue
+            was = self._brief_differs.get(s.id)
+            if was is None or was[0] != shas:  # a new difference, or another merge: the settle restarts
+                self._brief_differs[s.id] = was = (shas, now)
+            if now - was[1] >= BRIEF_SETTLE and (s.brief_changed or {}).get("paths") != paths:
+                s.brief_changed, dirty = {"at": was[1].isoformat().replace("+00:00", "Z"), "paths": paths}, True
+                self._save(s)
+        if dirty:
+            await self._push_changes()
 
     def _crashed(self, s: Session, now: datetime) -> bool:
         """Rule 1's test: a supervised, unattended member that is not a seat, `exited` by a
@@ -714,8 +752,10 @@ class TickMixin:
         new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
         if new is not None:
             new.restarts = history
-            if read is not None:  # the files as this replay read them, not as the create's check did
-                new.brief = read
+            # the files as this replay read them, not as the create's check did; a replay of the stored
+            # prompt carries none, since the create's working-tree read is not what the prompt was made
+            # from, and the mark must not compare it (the techlead's read of #745)
+            new.brief = read
             self._save(new)
             await self._push_changes()
 

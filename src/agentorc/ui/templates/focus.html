@@ -52,6 +52,10 @@
          declared or cleared one (review of PR #323). #}
       <span class="badge rw{% if s.restart_wanted and s.restart_wanted.early %} early{% endif %}{% if not s.restart_wanted %} hidden{% endif %}" id="frw"
             title="{{ (s.restart_wanted or {}).why or 'no reason recorded' }}{% if s.restart_wanted and s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted and s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted and s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>
+      {# design §4.5a **brief changed** (§6 rule 7, TD-217): a mark, never pressable, the files and
+         when on hover; always in the page and hidden until true, kept current from the delta. #}
+      <span class="badge bc{% if not s.brief_changed %} hidden{% endif %}" id="fbc"
+            title="{{ (s.brief_changed or {}).full }}">brief changed</span>
       {# design §4.5a **paused · usage** (§6 *Usage gate*, TD-100): shown regardless of what else
          the slot holds, and not pressable — the way out is Take over, or a lower reserve. Always in
          the page and hidden until true, kept current from the pushed delta as the two above are. #}

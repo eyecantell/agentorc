@@ -309,6 +309,7 @@ def view(
     # **does not act on it** — a run that was over before it began did not run out of context. So
     # an early one must not read as an ordinary one: a person seeing the same chip would expect the
     # same thing to happen next, and nothing will.
+    d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     rw = s.get("restart_wanted")
     rw = rw if isinstance(rw, dict) else {}
     d["restart_wanted"] = (
@@ -497,6 +498,27 @@ def _middle(text: str, width: int) -> str:
     return f"{text[: keep - keep // 2]}…{text[len(text) - keep // 2 :]}"
 
 
+def brief_changed_view(bc: Any) -> dict[str, str] | None:
+    """Design §4.5a **brief changed** chip (§6 rule 7, TD-217): the fixed words, and on hover the
+    files that changed by name and when — paths the home read, nothing a session wrote. A mark,
+    never pressable, and not a state; a malformed field costs the chip and not the grid."""
+    if not isinstance(bc, dict) or not bc.get("at"):
+        return None
+    try:
+        when = datetime.fromisoformat(str(bc["at"]).replace("Z", "+00:00")).astimezone().strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        when = "?"
+    paths = bc.get("paths") if isinstance(bc.get("paths"), list) else []
+    names = ", ".join(Path(str(p)).name for p in paths) or "its files"
+    return {
+        "text": "brief changed",
+        "full": (
+            f"brief changed — {names} · changed {when}: a file its brief was made from reads otherwise as "
+            "merged; it takes the new brief when it is next started (design §6 rule 7)"
+        ),
+    }
+
+
 def _first_line(text: str) -> str:
     return text.strip().splitlines()[0] if text.strip() else ""
 
@@ -578,6 +600,9 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         full = f"{words}{when} — {why or 'no reason recorded'}"
         if not d["out_of_work"] and said["early"]:
             full += " — asked inside its own first half hour, so a controller does not act on it (design §4.9a)"
+    elif d.get("brief_changed"):
+        # rule 7's mark (§4.5a **brief changed**, TD-217): drawn where *restart wanted* is, below it
+        text, full = d["brief_changed"]["text"], d["brief_changed"]["full"]
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (
