@@ -927,6 +927,13 @@ def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
             assert "mail it, then end the turn" in text, p.name
 
 
+def test_the_grinder_preset_says_a_board_line_is_named_with_its_due_date():
+    """TD-220 slice 5 (design §4.5 screen 6 *The board's horizon*): the Inbox draws a line not yet due
+    only as far as the person's mode reaches, so a worker that names one says when it is due."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    assert "*on the board, due <date>*" in text and "is dated today" in text
+
+
 def test_the_grinder_preset_reads_the_inbox_before_a_claim_and_before_the_declaration():
     """TD-141 (design §4.9a): the briefs say it twice — before a claim and before the declaration —
     and the refusal is what holds when they are not read."""

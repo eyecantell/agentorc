@@ -607,3 +607,64 @@ def test_the_rail_counts_coming_up_as_board_items_and_in_no_section():
     assert got["heads"]["needs"]["all"] == 1 and got["teams"]["t"]["all"] == 1
     picked = rail_counts(rows, rail_picks({"sec": "needs", "kind": "board"}))
     assert picked["kinds"]["board"]["shown"] == 2 and picked["heads"]["needs"]["shown"] == 1
+
+
+@pytest.mark.unit
+def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out(tmp_path, monkeypatch):
+    """§4.5 screen 6 *The board's horizon*, §4.5a *Due strip / Inbox board row* **Snooze ▾** (TD-220
+    slice 6): a row coming up carries Snooze with its own date, and +1 day / +1 week count from the
+    later of today and that date, so a Snooze moves it later, never nearer; under `7d` an item due in
+    forty days is in the closed fold, which **show** opens without a request — no setting is written."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+    from agentorc.ui import uiconf
+
+    root = tmp_path / "proj"
+
+    def ahead(line, text, due):
+        return {"line": line, "text": text, "due": due, "overdue_days": None, "due_tag": f"due {due}"}
+
+    items = [ahead(10, "next week's item", "2026-10-04"), ahead(11, "forty days out", "2026-11-07")]
+    rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (rows, ""))
+    calls = []
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append(method)
+            return {"list": [], "inbox": {"entries": [], "trail": []}, "host": {"name": "kmaster"}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    try:
+        with TestClient(uiapp.create_app()) as c:
+            c.get("/inbox")  # the first request reads the settings; the mode is set after it
+            uiconf.set_read({"person": {"inbox": {"board_show": "7d"}}})
+            page = c.get("/inbox").text
+            coming = page[page.index('id="rows-coming"') : page.index("<summary>not shown (")]
+        for when in ("1d", "1w", "pick"):
+            assert f'data-board-act="snooze" data-when="{when}" data-due="2026-10-04"' in coming
+        fold = page[page.index('<details class="fold boardfold"') :]
+        fold = fold[: fold.index("</details>")]
+        assert "forty days out" in fold and "next week's item" not in fold
+        assert "3 d" not in fold and 'data-due="2026-11-07"' in fold
+        assert "1 not shown, the next due Nov 7 — " in page and 'class="boardshow"' in page
+        assert "set_settings" not in calls
+    finally:
+        uiconf.set_read({"person": {}, "migrate": []})
+    js = (pathlib.Path(uiapp.__file__).parent / "static" / "app.js").read_text()
+    assert "boardDue(b.dataset.when, b.dataset.due)" in js
+    body = js[js.index("function boardDue(when, from)") :]
+    body = body[: body.index("\n  }\n")]
+    assert "if (own > d) d.setTime(own.getTime())" in body  # the later of today and its own date
+    show = js[js.index('closest("a.boardshow")') :]
+    show = show[: show.index("});")]
+    assert "fetch" not in show and "settings" not in show  # show writes nothing
