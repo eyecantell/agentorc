@@ -113,6 +113,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — (a) and the log; live check pending |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
+| TD-237 | A person's Close in the same second as a failed restart, or on a node whose clock runs behind the home's, is still read as the tick's own and started again: the record does not say who closed it | Low | Open — pickable |
 
 
 ---
@@ -2159,3 +2160,24 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** (1) **research** (Sonnet, read-only, with sources): whether Anthropic documents a supported way to read a Pro/Max subscription's usage programmatically (and if not, what the supported surfaces are: the Claude Code `/usage` command, the statusline's input JSON if it carries rate-limit fields, response headers such as `anthropic-ratelimit-*` on the model calls a session already makes); the endpoint's limits if stated anywhere; what the Claude Code client polls and how often; whether a `Retry-After` is sent (the agent's log records only the reason's transitions, so this needs the headers logged). (2) Measure here: count this account's calls to the endpoint across the sessions (is it us, or them?) and log the response headers of a refusal. (3) Then choose, in the design round the research makes needed: read usage from a supported surface (e.g. the headers or statusline data the sessions already receive, reported through the hook), poll less and share the reading, or stop polling while any session can report it. Done when the chip holds a reading under an hour old through a busy evening, and the source is one Anthropic supports or tolerates.
 
 **Related:** TD-230 (the age on the chip, the gate on a stale reading), TD-122 (one poll per account), TD-087 (the reason), TD-073 (the reading), design §4.2, §4.2a.
+
+## TD-237: The record does not say who closed it, so a person's Close can still read as the tick's failed restart
+
+**Priority:** Low
+**Added:** 2026-09-29 (the techlead's read of #750; filed by grinder-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_closed_by_tick`, the tick's closes in `_wanted_restart` and `_brief_restart`), `src/sessionorc/agent.py` (`rpc_close`), `src/sessionorc/models.py` (a closer on the record, and whether the home or the node owns it)
+
+**Why:** after TD-235 and TD-236, `_closed_by_tick` reads a `closed` record as the tick's own failed restart when its last `restarts` entry is that rule's, carries `error`, and was written at or after `closed_at`. Two cases still undo a person's Close (design §6 rule 2):
+1. `now_iso()` is whole seconds and the comparison is `>=`, as it has to be, since the tick's close and its failure usually share a second. So a person's Close in the same second as the failed entry reads as the tick's.
+2. For a node's member, `closed_at` is the node's clock and the entry is the home's. If the node's clock runs behind, a person's Close there can read as earlier than an entry the home wrote before it. Rule 2 acts on node members; rule 7 does not yet.
+
+Both go away only when the record says who closed it.
+
+**Fix:** the tick's own close records that it was the tick's, for example a `closed_by` field that the tick's close sets and any other close clears. `_closed_by_tick` then reads that field in place of the clock comparison. For a node's member, decide whether the home owns the field on its mirror (so an older node needs no new RPC parameter, per the skew rules in design §4.4) or the node owns it. A record with no closer reads as a person's Close. Design §6 rule 2 is changed first.
+
+**Related:** TD-235 (#749), TD-236 (#750), design §6 rules 2 and 7, §4.4 (the RPC skew rules).
+
