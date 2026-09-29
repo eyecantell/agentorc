@@ -324,7 +324,11 @@ async def test_the_ticks_own_failed_close_is_marked_and_a_person_s_close_in_the_
         monkeypatch.setattr(agent, "rpc_close", close_then_fail)
         await agent._keep_running(now)
         monkeypatch.setattr(agent, "rpc_close", real_close)
-        assert rec.state == "closed" and rec.closed_for == "wanted" and rec.restarts[-1]["error"]
+        assert (
+            rec.state == "closed"
+            and rec.closed_for == {"why": "wanted", "closed_at": rec.closed_at}
+            and rec.restarts[-1]["error"]
+        )
         await person.call("close", id=sid)  # the person's Close, within the second
         assert rec.closed_for is None
         for tick in (now, now + timedelta(minutes=5)):

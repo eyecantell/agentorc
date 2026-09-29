@@ -2357,3 +2357,18 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-09-29 (PR #752; grinder-ao-1). `closed_for` is a new home-owned field on the record. The tick writes it after its own close for a restart, and any other close clears it: `rpc_close`, and `_route_act` for a close routed to a node. `_closed_by_tick` reads the mark in place of the clocks. Design §6 rule 2 and §4.4's home-owned list say so. Tests: `test_the_ticks_own_failed_close_is_marked_and_a_person_s_close_in_the_same_second_clears_it` in `tests/test_wanted_and_nudge.py`, `test_a_close_routed_to_a_node_clears_the_ticks_mark_at_the_home` in `tests/test_link.py`.
 
 **Related:** TD-235 (#749), TD-236 (#750), design §6 rules 2 and 7, §4.4 (the RPC skew rules).
+
+## TD-238: A person's Close made at a node leaves the tick's mark on the home's copy, and the tick starts it again
+
+**Priority:** Low
+**Added:** 2026-09-29 (the techlead's read of #752; filed by grinder-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_mark_closed`, `_closed_by_tick`), `src/sessionorc/models.py` (`closed_for`)
+
+**Why:** TD-237's `closed_for` is cleared by any close the home runs. A person's Close made at the node itself never leaves the node (`modes.py`: *a person's act on a pane never leaves the node*), so it cleared nothing. Take a node's member the tick closed and failed to replay, which a person then closes again at the node: it kept the home's mark, and the tick started it again. Before #752, TD-236's `closed_at` test caught that case. Also, rule 2 said a failed close "is tried again by the tick", but a close routed to a node whose verdict never came back leaves no mark, so that restart strands.
+
+**Resolved:** 2026-09-29 (grinder-ao-1). The mark is `{why, closed_at}`, naming the `closed_at` the tick's own close wrote. For a node's member that is the node's stamp, taken from the close's reply, which `_route_act` applies before it returns. A Close at the node writes a new `closed_at`, and `_closed_by_tick` requires the two to be equal: a comparison for equality, not an order between two hosts' clocks. The unknown-verdict routed close is left as it was, since it fails safe, and design §6 rule 2 now says so. Residual: a person's re-Close at the node within the same whole second as the tick's close writes an equal stamp. Test: `test_a_persons_close_at_the_node_no_longer_matches_the_ticks_mark` in `tests/test_link.py`.
+
+**Related:** TD-237 (#752), TD-236 (#750), TD-235 (#749), design §6 rule 2.

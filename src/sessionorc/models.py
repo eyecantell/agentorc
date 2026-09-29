@@ -878,11 +878,12 @@ class Session:
     # reached: the tick stops and the session is a person's. Both the home's (§4.4a).
     restarts: list[dict[str, Any]] = field(default_factory=list)
     restart_ceiling: dict[str, Any] | None = None
-    # The rule whose own close this was (`wanted`, rule 2's, or `brief`, rule 7's), written by the tick
-    # after it closed the record for a restart and cleared by any other close, the local one or one
-    # routed to a node: what tells the tick's failed restart from a person's Close (§6 rule 2,
-    # TD-237). The home's, so a node's clock or an older node's RPC never enters into it.
-    closed_for: str | None = None
+    # The tick's mark after its own close for a restart, `{why, closed_at}`: the rule (`wanted`, rule 2's,
+    # or `brief`, rule 7's) and the `closed_at` that close wrote. Any close the home runs clears it, and
+    # a close it never hears of as an act (a person's at the node) writes a new `closed_at` that no
+    # longer matches: what tells the tick's failed restart from a person's Close (§6 rule 2, TD-237,
+    # TD-238). The home's, so an older node is sent nothing new.
+    closed_for: dict[str, Any] | None = None
     # Rule 2, the wanted restart (§6, TD-103 slice 4): a `restart_wanted` with work left is not
     # restarted. `restart_blocked_sent_at` is when the one fixed send naming what is left was typed,
     # and `restart_blocked` is `{at, dirty, unpushed}` once the git fields still show work
