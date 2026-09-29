@@ -654,16 +654,24 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   the home give one answer: an entry is **blocked** while its `**Blocked by:**` names an entry
   that is not archived — one still open, or one found in neither the ledger nor its archive,
   which keeps the block — or names a `decision (<who>)`, or holds an item the rule cannot read
-  (neither an id nor a decision, or anything listed after the decision), which keeps the block
+  (neither an id nor a decision, or an item listed after the decision's comma; what follows the
+  decision with no comma is its pointer and is never read), which keeps the block
   too; every other entry is **pickable**, one with no such line or an empty one included. An
   id written `<repo>#TD-NNN` (cadence §2.4, TD-071 there; `owner/name#TD-NNN` where two repos
   share a name) names **another repo's entry**: the home looks for that repo among the
-  checkouts its registry lists and reads that repo's ledger and archive as it reads any —
-  archived there, the block lifts; open there, it blocks; a repo the registry does not list, or
+  checkouts its registry lists (the host's `repos()`), as the script's roster does: `<repo>` is
+  a checkout's directory name and `owner/name` its origin, and it reads that checkout's
+  `docs/technical_debt.md` and `docs/technical_debt_archive.md` at `origin/<default>`, or in the
+  working tree where that ref is missing —
+  archived there, the block lifts; open there, it blocks; a repo the registry does not list, a
+  name two checkouts share, a ledger that cannot be read, or
   an id in neither of that repo's files, keeps the block. The script asks cadence's roster and
-  the home its own registry, so the two agree wherever both list the repo. The
+  the home its own registry: one file by default (`~/.config/dev-cadence/repos.txt`), so the
+  two agree unless `hosts.yml`'s `repos_registry` or the script's `DEV_CADENCE_REG_DIR` moves
+  one of them. The
   reader takes the archive from beside the ledger (the ledger's name with `_archive` before
-  its suffix, which for the default is cadence's `technical_debt_archive.md`; none there,
+  its suffix, which for the default is cadence's `technical_debt_archive.md`, the one name the script
+  looks for unless it is handed `--archive`; none there,
   nothing is archived), and each entry carries `type` (`debt` where unwritten), `blocked_by`
   (what still blocks, the decision and an unread item among them, as the script lists them)
   and the derived `pickable`. The pick order is cadence's: Priority, then debt before
@@ -679,6 +687,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   build that is blocked, a live check, an evaluation). **While a ledger still writes the
   line**, a written `Pickable: no` reads as blocked whatever is derived, so nothing a person
   marked *no* is offered before its reason has been moved; a written `yes` adds nothing. The
+  script reads the line as a field that overrides nothing (cadence §2.12), so while the
+  fallback lasts the home differs from it by exactly the entries written *no*. The
   migration of this repo's ledger removes the lines, and the fallback goes with TD-228's last
   slice. **The migration moves no entry into a lane**: a written *no* whose reason is no
   blocker — *built, the live look is left*, *needs an attended run*, *a synced file* — becomes
