@@ -2007,7 +2007,7 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-230
-**Status:** Designed 2026-09-28 (the designer, PR #PRNUM): design §4.5a *team card: TDs in motion* (**Priority**): one letter in the priority bar's hue between the phase and the reference, none for a reference the ledger reading does not hold; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-230.
+**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: TDs in motion* (**Priority**): one letter in the priority bar's hue between the phase and the reference, none for a reference the ledger reading does not hold; rows sort by phase, priority, reference; the rollup unchanged. Closes with TD-230.
 **Blocked by:** TD-230
 **Location:** design §4.5a *team card: TDs in motion* (row 2291 at filing), `src/agentorc/ui/app.py` (`motion_rows`: the ledger reading's `priority` is at hand beside `title`), `src/agentorc/ui/templates/team_summary.html`
 
@@ -2040,7 +2040,7 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-230
-**Status:** Designed 2026-09-28 (the designer, PR #PRNUM): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: an age in the page's shape with the exact time on hover, ticking in the browser; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-230.
+**Status:** Designed 2026-09-28 (the designer, PR #727): design §4.5a *team card: Answer needed / Doing* (**Ages and columns**) and §4.5 screen 11 item 4: an age in the page's shape with the exact time on hover, ticking in the browser; three aligned columns; the Repo page's rows the same with the words wrapping. Closes with TD-230.
 **Blocked by:** TD-230
 **Location:** design §4.5a *team card: Answer needed / Doing* (*time · doer · words*), §4.5 screen 11 (the Repo page's Doing section), `src/agentorc/ui/templates/team_summary.html`, `repo.html`, `src/agentorc/ui/static/app.js`
 
