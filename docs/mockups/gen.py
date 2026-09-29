@@ -1131,6 +1131,48 @@ def help_page():
 
 
 
+def add_entry():
+    """The **Add entry…** form (design §4.9 *Add an entry to the ledger*, §4.5a, TD-180): one form from
+    the Repo page and the team card, two ways out — mail to the techlead seat, or an interactive
+    session with the composer filled and not sent."""
+    words = ("The Inbox lists a board item only once it is due. I looked for two items I knew were on the "
+             "board and could not find them. There should be a setting for it, and the page should say "
+             "which it is showing.")
+    return head("Add entry") + f'''<div style="width: 1440px; min-height: 860px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">agentorc · docs/technical_debt.md</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div class="note">Write what you have: a title, or a page. The number, the header lines and the file locations are found for you, and you are asked only what cannot be found.</div>
+    <div class="field"><label>What</label><span class="input" style="height: 132px; align-items: flex-start; padding: 8px 10px;">{words}</span></div>
+    <div class="field"><label>Type</label><div style="display: flex; gap: 10px;">
+      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>debt</div><div class="note">something wrong now</div></div></div>
+      <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>feature</div><div class="note">something new</div></div></div>
+    </div></div>
+    <div style="border-top: 1px solid #eceef1; padding-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span class="btn primary" style="align-self: flex-start;">Hand to the techlead</span>
+        <span class="note"><b>techlead-ao-1</b> {pill("oncall")} drafts the entry and lands it by PR. Its questions come to your Inbox; the entry's id and PR come back as the outcome.</span>
+        <span class="note">When it is read: fills this seat — a session starts on the next tick and reads it first.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span class="btn" style="align-self: flex-start;">Open a session</span>
+        <span class="note">Starts <b>an interactive techlead session, entry-3, in a new worktree</b>, and opens its Focus with these words in the composer, not sent. You talk the entry through.</span>
+        <span class="note">With Type <i>feature</i>: an interactive designer session (the team's <span class="mono">entries:</span>).</span>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600;">After Open a session: Focus on entry-3, the composer</span><span style="flex-grow: 1;"></span>{pill("idle")}</div>
+    <span class="input" style="height: 150px; align-items: flex-start; padding: 8px 10px; flex-direction: column; gap: 6px;"><span class="muted">Draft a ledger entry with me for agentorc (type: debt), in docs/technical_debt.md. Read the ledger's template and its newest entries, find the next free number over main and the open PRs, ask me what you cannot find, and land the entry by PR with its Summary row.</span><span>{words}</span></span>
+    <div style="display: flex; gap: 8px; align-items: center;"><span class="note">filled and focused, not sent — edit it, then Send</span><span style="flex-grow: 1;"></span><span class="btn primary">Send</span></div>
+  </div>
+  <div class="note" style="width: 760px;">Design notes, not page text. One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session.</div>
+</div>
+</div>
+''' + TAIL
+
+
 def members_dialog():
     """The team card's **Members…** dialog (design §4.9 *Add or remove a member from the team card*,
     TD-163): the definition as the file holds it, the session holding each entry, Add member and Remove."""
@@ -1673,6 +1715,7 @@ files = {
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Members.dc.html": members_dialog(),
+    "AddEntry.dc.html": add_entry(),
     "Help.dc.html": help_page(),
     "Transcript.dc.html": transcript(),
     "Message.dc.html": message_dialogs(),
@@ -1705,6 +1748,7 @@ LAYOUT = [
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Members.dc.html", "Members — the team card's dialog", 0),
+    ("AddEntry.dc.html", "Add entry — the form, and the composer it fills", 0),
     ("Help.dc.html", "Help", 0),
     ("Transcript.dc.html", "Transcript", 0),
     ("Message.dc.html", "Message — when it is read", 0),
@@ -1739,7 +1783,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 11 (2026-09-25, TD-157): screen 10, Help, and the i marks on the team card's header and the Focus header.\nRound 13 (2026-09-25, TD-160): New session gains the Team pick, with the reader it brings.\nRound 14 (2026-09-25, TD-161): prompt chips beside Send on Focus and beside the opening prompt on New session.\nRound 15 (2026-09-25, TD-162): the team header's who-for-what line and the composer's role line.\nRound 16 (2026-09-25, TD-163): Members… on the team card and its dialog.\nRound 17 (2026-09-25, TD-164): the copy-on-select toggle on the Focus header.\nRound 21 (2026-09-28, TD-207): the Inbox's Board, coming up rows, the not shown fold and the line that says the mode; board items shown on the Settings page's You.\nRound 19 (2026-09-26, TD-188): the context reading on the Focus Session card.\nRound 18 (2026-09-26, TD-175): the Focus side panel's rounds line.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 11 (2026-09-25, TD-157): screen 10, Help, and the i marks on the team card's header and the Focus header.\nRound 13 (2026-09-25, TD-160): New session gains the Team pick, with the reader it brings.\nRound 14 (2026-09-25, TD-161): prompt chips beside Send on Focus and beside the opening prompt on New session.\nRound 15 (2026-09-25, TD-162): the team header's who-for-what line and the composer's role line.\nRound 16 (2026-09-25, TD-163): Members… on the team card and its dialog.\nRound 17 (2026-09-25, TD-164): the copy-on-select toggle on the Focus header.\nRound 21 (2026-09-28, TD-207): the Inbox's Board, coming up rows, the not shown fold and the line that says the mode; board items shown on the Settings page's You.\nRound 20 (2026-09-28, TD-180): Add entry… on the Repo page and the team card's Repo facet, and its form — Hand to the techlead, or Open a session with the composer filled and not sent.\nRound 19 (2026-09-26, TD-188): the context reading on the Focus Session card.\nRound 18 (2026-09-26, TD-175): the Focus side panel's rounds line.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }

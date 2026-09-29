@@ -2260,7 +2260,9 @@ Screens:
       first); a blocked row says *blocked by TD-n* after its owner; each row the id, title, priority and owner, *held by
       <name>* when a member claims it, sorted by priority then id, a list folded past four rows
       with *+n more*. The heading carries **Open ledger** through the person's `open_in` (§5) —
-      an entry is edited in its file, never here — and the count line the card's kind bar has.
+      an entry is edited in its file, never here — **Add entry…** beside it (TD-180; not built —
+      TD-219: the form of §4.9 *Add an entry to the ledger*, which writes no file itself), and
+      the count line the card's kind bar has.
    3. **Waiting on you** — the repo's board items that are due, and the
       rows coming up, the fold and the line of screen 6 *The board's horizon* under them: the Inbox's own board rows with
       their Snooze, Done and Reply (§4.5a *Inbox board row*), filtered to the repo, so acting here
@@ -2468,6 +2470,9 @@ noted). If a control is not in this table it does not exist.
 | card | **compact** (a team member's card; built by TD-176 slice 3, and for a team with nothing live by TD-192 — so a team coming alive or winding down changes no card's shape) | the shape every member of a live team has (§4.5 screen 1), and of a team with nothing live once it is unfolded (TD-181; built — TD-192): the name, the person glyph on the person's own session, the state pill (word and colour, no glyph), one line of its own — the role and its claim with the PR, or its ending, or the seat's *last came* (measured from its record's `created`, when it came, never from when it left), or the manager's round; the dirty / unpushed flag at the right as its count (*⚠ dirty · 47*), never clipped, the words on hover; a member that has ended and holds a report keeps its last reference after the ending, the PR with its mark (*Grinder · exited · TD-066 → #158 merged*; row *report line*, TD-182; built — TD-193) — and the foot with the full card's rule (the next act outlined, the rest plain, *more* at the right; a `needs-you` member's foot leads with Focus, the answer being the facet's). Every control of the full card's *more* is here too. The full card stays on *No team* and wherever a card is drawn outside a team |
 | Repo page | **the team's facets** | the page opens with the servicing team's three facets, the rows above, drawn by the same partial — the same numbers, selectors and links; a repo two teams share names every team and draws the first's |
 | Repo page | **Open ledger** | the Technical debt heading's button, through the person's `open_in` on the ledger file (§5); drawn only when `open_in` is set and not `none` — an entry is edited in its file, never on the page |
+| Repo page, team card: Repo facet | **Add entry…** | designed 2026-09-28 (TD-180; not built — TD-219). On the Repo page beside **Open ledger** on the Technical debt heading; on the team card at the end of the Repo facet's *Technical debt (n open)* line. Both open one form (§4.9 *Add an entry to the ledger*) with the repo filled from where the press was made, shown and not editable: **What** — a text area with no limit on lines, the person's words as far as they have them; **Type** — *debt* · *feature* (the ledger's `Type:` field, cadence §2.11; *debt* selected, as an entry with no field reads). Nothing else is asked: the number, the header lines, the locations and the priority are the drafter's to find or to ask. Drawn on every repo that has a ledger file, a team or none; the form's two buttons are the rows below. The page writes no file: an entry is still edited in its file, never on the page |
+| Add entry form | **Hand to the techlead** | designed 2026-09-28 (TD-180; not built — TD-218 the mail, TD-219 the form). Sends the words as an `ask` from the person to the techlead seat of the repo's team (the first servicing team, `repo_teams`), carrying `entry: {repo, type}` and marked `handed` (§4.10 *An entry handed to a seat*): it fills the seat, the seat drafts the entry and lands it by PR, asks what it cannot find as an `ask` in the Inbox under the person's words, and reports the entry's id and PR as the outcome. Under the button the sentence of §4.10 *When it is read*, as the Message composer draws it (*fills this seat: a session starts on the next tick and reads it first*). Disabled, with its reason beside it, where the repo's team defines no techlead seat (*this team has no techlead seat*) or no team services the repo (*no team services this repo*); disabled while **What** is empty. The toast names the message (*handed to techlead-ao-1 · m-…*), a link to its page in the Inbox, where it waits under *Waiting on them* until the outcome |
+| Add entry form | **Open a session** | designed 2026-09-28 (TD-180, Paul's second way through; not built — TD-219). Starts a new **interactive** session in a new worktree of the repo, in the repo's team as *A person in the team* starts one (§4.9), with the role the team's `entries:` names for the picked Type, else `techlead`, and `plain` with no team badge where no team services the repo; named `entry-<n>`, the first number free in the repo. It is started at the prompt — no opening prompt, and the role's brief is not sent — and the page goes to its Focus with the composer holding the package's fixed opening lines for an entry (`entry.md`: the repo, the type, the ledger file, how an entry lands) followed by the person's words: **filled, focused and not sent**, as Shift+press on a prompt chip fills it. The text travels in the browser and is kept there as that session's draft until it is sent (the keeping is new with this control: Focus holds no draft today); nothing is typed into the pane and nothing is stored on the record. Enabled with **What** empty: the composer then holds the opening lines alone. One line under the button says what will start: *an interactive designer session, entry-3, in a new worktree* |
 | Repo page | **board rows: Snooze / Done / Reply** | the Inbox's own board rows (§4.5a *Inbox board row*, *Due strip / Inbox board row*), filtered to the repo — the same partial, the same routes, the same write-back (§4.4); nothing on this page is a second way to edit the board |
 | Repo page | **doing filters** | one row of chips above the Doing section: *all (n)* and one per agent that appears in the window, *orc-1 (12)*, each with its count; a chip shows that agent's calls alone, *all* every call; remembered per browser as the rail's picks are (§4.5a *the rail*) |
 | Repo page | **section heading, the *i* mark** | as the Inbox's (§4.5a *Inbox: section heading, the i mark*): what the section counts and where it is read from — the remote every five minutes, the ledger file and its history, the board, the members' records, the doing log — and when it was last read |
@@ -2838,6 +2843,17 @@ hand-started session the project's reach block. A nested `{team: …}` member is
 refused with its name (the nested case itself is not built). A start ends with the running host
 agent's build line (§4.4 *What is running says which commit it is*), once and not per member: a
 build behind main is said and never refused on, since the promote is the person's (§6 *Promote*).
+
+**Entries (§4.9 *Add an entry to the ledger*, TD-180; designed 2026-09-28, not built — TD-218).**
+`ao td add [--repo <name>] [--type debt|feature] ["<words>"]` is the terminal's form of **Hand to
+the techlead**: the words — the argument, or standard input when there is none — go as the
+person's `ask` to the techlead seat of the repo's team, carrying `entry` and marked `handed`. The
+repo defaults to the one the command is run in. It prints the message's id and when it will be
+read, as `ao msg` does, and is refused in words where the form's button is disabled. **A person's
+only**, refused to every session as the board write-back is: a session that wants an entry in the
+ledger writes it on its branch (cadence §2), or files an `ao finding`. The form's other way has no
+verb of its own: `ao new <name> --team <team> --role <role>` starts the session, and a terminal
+has no composer to fill.
 
 **Mail (§4.10, TD-052).** `ao msg <to>… "…"` `[--kind note|ask|steer|reply|conflict]
 [--default <line>] [--bound <seconds>] [--about <ref>] [--reply-to <id>] [--answer <line>]…
@@ -3315,7 +3331,7 @@ what was true on a day.
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
 | `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep, so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
-| `techlead` (TD-075, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail, and nothing else |
+| `techlead` (TD-075, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail; and a ledger entry, by PR, when the person hands it one (§4.9 *Add an entry to the ledger*, TD-180) |
 | `auditor` (TD-098, §4.9b *Seats with a trigger*) | a hunter for one seat: check one area — what the PRs its trigger counts changed (the last *n*, or those merged inside its period, read from `ao team list --json`), against the docs or the tests the repo's own brief names — file each problem with evidence and never fix it; declare nothing (a seat is not counted in a wind-down); end when the pass is done | — (the area is its brief's; a seat has no lane) | none | `findings` |
 | `plain` | — (no template) | — | none | whatever it declares |
 
@@ -3905,6 +3921,11 @@ anywhere in a definition names a file that has to be repeatable (§4.8): this co
 restart, so a brief written for one run strands the next one. The start warns and proceeds when
 it finds a clock time or a run number in the text it is about to hand over.
 
+`entries` (on the team, TD-180; not built — TD-219): `{feature: <role>, debt: <role>}`, the role an
+interactive session takes when the person opens one from **Add entry…** (*Add an entry to the
+ledger*, below); either key may be left out and reads `techlead`; a role nothing resolves is an
+error naming it, as an unknown key is.
+
 Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
 `name` (the prefix; default the role), `home`, `lane`, `brief` (the repo's supplement to the role's template, §4.8),
 `profile`, `grants` (default the role's), `unattended` (default **true** — a team is what runs
@@ -4049,6 +4070,87 @@ its §2 called the org file *a team editor in waiting*, and this is the first ke
 - **The ADR's line, restated.** A definition is edited by a control on the thing it defines, as
   text, preserving the file; a setting by the Settings page through `set_settings`. Nothing here
   writes `settings.yml`, and nothing on the Settings page writes `org.yml`.
+
+**Add an entry to the ledger (TD-180; designed 2026-09-28, not built — TD-218, TD-219).** Paul:
+*it will look like the user giving short info, then an agent fleshing it out — asking questions
+as needed, then generating the TD.* An entry reaches the ledger only through a session: the
+person tells one in its terminal, and it writes the entry on a branch. A thought the person has
+while looking at the Org or the Repo page has no way in, and most of what makes an entry good is
+work the person should not do — the next number, the header lines, the evidence, the file
+locations, the neighbours in the design. The person is needed for the *why* and for a choice
+between readings.
+
+- **One door, one form.** **Add entry…** on the Repo page's Technical debt heading and on the
+  team card's Repo facet (§4.5a) opens one form: the repo, fixed by where the press was made;
+  **What**, a text area the person fills with as much as they have — a title, or a page; and
+  **Type**, *debt* or *feature* (cadence §2.11). The team card's button is the Repo page's: there
+  is one mechanism, reached from two places.
+- **Two ways out, and the same rules behind both.** What an entry needs — the ledger's template,
+  the three-line header, the next free number, the Summary row, how it lands — is written once,
+  in the package's `entry.md`, and both ways read it: it is a section of the `techlead` preset's
+  brief, and the opening lines of the composer the session way fills.
+  1. **Hand to the techlead.** The words go as an `ask` from the person to the team's techlead
+     seat, carrying `entry: {repo, type}` and marked `handed` (§4.10 *An entry handed to a
+     seat*). A question fills a seat (§4.9b), so the seat comes on the next tick, reads the
+     repo, and drafts the entry on a branch of its own. What it cannot find out — a priority
+     nothing in the words or the repo settles, which of two readings is meant, what *done* is —
+     it asks the person: an `ask` on the thread (`--thread <the entry's id>`), two to four
+     suggested answers, drawn in *Needs you* with the person's own words above it. **It pushes
+     its branch and opens the PR as a draft before it asks**, because the seat ends its turn to
+     wait, the entry stops counting toward the seat while its question is open, and the tick
+     closes an idle seat with nothing due (§6 rule 3): the person's reply closes the question,
+     the entry counts again (§4.9b, `asks_waiting`), and the seat that comes starts cold, with its mail and the pushed
+     branch and nothing else. A person who walks away loses nothing: a question to the person
+     never expires, the draft is an open PR on the Repo page, and the message waits under
+     *Waiting on them*.
+  2. **Open a session.** Paul (2026-09-28): the form offers **Open an interactive session**
+     beside submitting, *with everything typed so far as a prompt in its composer, filled but
+     not submitted*, and the person talks the entry through. The session is a person's own in
+     the team (*A person in the team*, above): interactive, in a new worktree named `entry-<n>`,
+     the team's badge, its live manager a controller, the team's reader on its `review`. **Its
+     role is the definition's word for the Type**: a team may carry
+     **`entries: {feature: <role>, debt: <role>}`**, each a role the team's definition or the
+     presets resolve, and a type it does not name takes `techlead` — for ao-grind, `entries:
+     {feature: designer}` gives Paul's split, an interactive designer for a new feature and a
+     techlead for everything else. The role gives the session its profile, its label and icon,
+     and its prompt chips; **its brief is not sent**, since a role's brief is written for an
+     unattended run (*nobody is driving you*), and the session is started at the prompt. The
+     composer holds `entry.md`'s opening lines with `{repo}`, `{type}` and `{ledger}` filled,
+     then the person's words, unsent (§4.5a **Open a session**). Nothing keys on the role's name
+     (§9 invariant 9): the form reads the definition at the press, and the record carries a
+     badge.
+- **The mail way goes to the techlead whatever the Type.** Only a seat is filled by a question
+  (§4.9a *One member back, today*): mail to an exited designer waits for a person's Resume. And
+  a feature's entry is the short one — its header says `Kind: design-first` and `Pickable: yes`,
+  and the design round does the fleshing out: a member whose lane is `design-first` and that
+  declared itself out of work is told by the tick when the entry lands (§6 rule 6).
+- **How it lands: as every ledger change does.** A branch, a PR, the docs fact-check, the
+  cadence check, a squash merge (cadence §4); the entry's Summary row in the same PR. The number
+  is the first free over the ledger and the archive on `origin/main` **and the open PRs**, read
+  again before the merge and changed when another PR took it. The entry's `**Added:**` line
+  names both hands: *<date> (<the person>, through Add entry; drafted by <session>)*. **The
+  board write-back's committed add is not the path** (§4.4): it commits on the default branch
+  of one checkout and never pushes, which suits a line the person reads on that host and would
+  leave an entry where no team reads it.
+- **The person does not approve the entry before it is filed.** The outcome — `ao msg person
+  --outcome done "TD-NNN <title> — PR #n" --for <id>` — names the entry and the PR, and lands
+  under the person's words; an entry that reads wrong is a line's edit in its file or a reply on
+  the thread. A gate before every filing would make the person read each entry twice.
+- **Where there is no seat.** A team without a techlead seat, or a repo no team services, offers
+  the session way alone, the first button disabled with its reason; a repo no team services
+  starts a `plain` session with no team badge. A repo two teams service hands to the first in
+  definition order, the team whose card holds the repo (`repo_teams`).
+- **The *add* phase stays reserved** (§4.5 screen 1): a seat declares no progress, and a phase is
+  derived from a claim.
+
+Rejected: **a seat of its own for drafting** (a line of `org.yml` for every team and a preset
+whose brief repeats the techlead's — read the repo, check the claim, say where it is written —
+for a job that comes a few times a week; `seats:` can carry one later if drafting crowds the
+techlead's answers, and nothing here would change but the addressee); **the team's designer by
+mail** (a member is not filled by a question); **a one-shot unattended session for each press**
+(a card for each entry that waits for a person's Close, where a seat closes itself); **a stub
+with no agent** (the number, the header and the locations are the work the form exists to take
+off the person).
 
 **The Org page** (TD-040 step d). The home route and nav item are **Org** (the noun does not
 change with what is inside, ADR). The page is the card grid of §4.5, flat only when no session
@@ -4411,7 +4513,10 @@ team has one, the techlead answers it or passes it up, and the person is the top
   waiting: N*) and carried in `wake_digest`, so a manager blocked in `ao wait` returns when a
   question lands on an empty seat. An entry counts when it is open, an `ask` or a `steer`, and
   names the record in `to` — compared whole, host included, since names are unique per host
-  (§4.4a); a copy does not, nor does an entry the record has passed up. The wake digest carries *whether* any
+  (§4.4a); a copy does not, nor does an entry the record has passed up, **nor a handed entry while a question of the
+  seat's own on its thread waits on the person** (TD-180; not built — TD-218; §4.10 *An entry
+  handed to a seat*): the seat has nothing to do until the answer comes, so it is closed as an
+  idle seat is, and the answer closes the question, the entry counts again and the seat is filled. The wake digest carries *whether* any
   wait, not how many: a manager wakes when the count leaves zero, not on 1→2. A node holds no
   inbox, so the home pushes it the count with the unread hint and a node's own view shows that.
   **The manager's rule for the seat**: `idle` with `asks_waiting` 0 → `ao close` it (it writes no
@@ -4801,7 +4906,8 @@ kind — and drawn in the composer (§4.5a **Message**), returned by `msg` per a
 |---|---|
 | a person's session (`unattended: false`) | *lands in its inbox and wakes nothing: a person's session is never rung (invariant 5) — the card's unread chip shows it* |
 | a seat on call (no live record, the definition names it), kind `ask` | *fills this seat: a session starts on the next tick and reads it first* — the trigger counts questions (§4.9b `asks_waiting`) |
-| a seat on call, kind `note` or `reply` | *waits in the seat's mailbox: a note fills no seat, and is read at the next fill, which a question causes* |
+| a seat on call, a person's `reply` to a question the seat asked on a handed entry's thread (TD-180; not built — TD-218) | *fills this seat: a session starts on the next tick and reads it first* — the answer closes the question, and the entry counts toward the seat again (§4.9b `asks_waiting`) |
+| a seat on call, kind `note`, or any other `reply` | *waits in the seat's mailbox: a note fills no seat, and is read at the next fill, which a question causes* |
 | `exited` or `closed`, not a seat | *read when this session is resumed, or started again under this name* — the mail moves with the name (*The lifecycle of an entry*) |
 | `scheduled` (§6 *Start time*, TD-152) | *read when it starts, at <time>* |
 | `unreachable` | *lands at the home; its host cannot be reached, so it is delivered when the link is back* (§4.4a) |
@@ -4819,7 +4925,7 @@ to a person reads *budget spent*; from a session the same function sees the budg
 without waking it: its wake budget is spent, read on its next look* — the `wake_budget_spent` the
 `msg` reply already carries, as one sentence. **The kind**: the seat's sentence is the only one the
 kind changes, and it changes as the person switches `ask` ↔ `note` in the composer, before typing;
-an `ask` adds its bound (*an ask takes the default bound of n h*, after every sentence but the seat's note, its own bound where the sender gave one). A `reply` reads as a `note` does. A record on another host whose link is down reads the `unreachable` row whatever its last state, since the home overlays that on the view rather than the record.
+an `ask` adds its bound (*an ask takes the default bound of n h*, after every sentence but the seat's note, its own bound where the sender gave one). A `reply` reads as a `note` does, but for a person's answer on a handed entry's thread to a seat on call, which has the row above. A record on another host whose link is down reads the `unreachable` row whatever its last state, since the home overlays that on the view rather than the record.
 The sentence names states in the page's words (*on call*, *wrapping up*) and never a field's; it is
 advice, never a refusal — a note to a seat lands and waits, as `ao msg` delivers to an exited record,
 because refusing it would turn information into a question just to get it delivered, which this
@@ -5346,6 +5452,29 @@ without reporting**; the row offers **Open** (the session's details, Resume) and
 **FYI** — a `done` or `dropped` outcome, shown under the question it closes: *you said "merge it"
 → done: merged as #261*. A lapsed `steer` owes nothing — nobody answered — and a declined question
 owes nothing either.
+
+**An entry handed to a seat (TD-180; designed 2026-09-28, not built — TD-218).** The Add entry
+form's **Hand to the techlead** and `ao td add` (§4.9 *Add an entry to the ledger*) send an `ask`
+from the person whose envelope carries **`entry: {repo, type}`** — the repo's name in the home's
+registry and `debt` or `feature`, both from the form's fields and never read out of the text —
+and the mark `handed` (§4.8a), through one person-only RPC, **`entry_add {repo, type, text}`**,
+refused to every session as `board_edit` is and served by the home, which resolves the repo's
+team and its techlead seat and refuses in words where there is none. It is an `ask`, so it fills
+the seat; **it carries no bound and never lapses**, as a question to the person never does —
+the default bound of an `ask` is not put on it, and it ends by its outcome or the person's
+Dismiss alone; **it counts toward the seat (`asks_waiting`, §4.9b) while it owes its outcome,
+read or not, except while a question of the seat's on its thread is open** — so a seat that
+exited with the entry half done is filled again, under the fill ceiling, and a seat waiting on
+the person is not; and it is `handed`, so **it closes by its outcome and not by a reply**: the seat owes
+`--outcome done|blocked|dropped --for <id>`, *done* naming the entry's id and its PR, and the row
+waits under *Waiting on them* from the press until then, while the definition names the seat,
+filled or on call. The seat's own questions about it are `ask`s to the person with `--thread
+<id>`, which takes a handed entry's id as it takes the caller's own question's: each is drawn
+with the person's words above it, is an ordinary `ask` for every bound, and leaves the entry's
+debt standing (it settles nothing as `asked_again`: the entry is the person's, not a question of
+the seat's). A `blocked` outcome lands in *Needs you* as any does. The person's **Dismiss** on
+the row ends the debt and tells the seat by a `system` note; a draft PR it leaves is GitHub's to
+close.
 
 **A board reply owes an outcome too (TD-126, 2026-09-24).** When a person's Reply on a board row
 reaches a live session that holds the lease on the line's reference (§4.4 *Board write-back*,
