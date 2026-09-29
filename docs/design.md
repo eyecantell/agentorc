@@ -2403,7 +2403,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
 | Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three restarts (§6, TD-186) |
-| Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; built 2026-09-27 — TD-132 slice 3; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row only and clears the failure — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is not a failure leaves when live catches up |
+| Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; built 2026-09-27 — TD-132 slice 3; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha` or `--back`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row and on a held one, and clears the failure or the hold — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is neither leaves when live catches up. **After a rollback** (§6 *A rollback*, TD-212; designed 2026-09-28, not built — TD-226) the row is drawn while the hold stands, whatever `auto` says, under **Needs you**, counted: *`<repo>` · live `<sha7>`, rolled back from `<sha7>` <t> · main `<sha7>`, n commits ahead · checks … · auto held*, the word *rolled back* from the home's `held` reading. **Promote** on it goes to main's head and ends the hold when it concludes; Dismiss ends the hold and leaves live where it is |
 | Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | §4.8a *An alarm's answers* is the full text (TD-077). One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and counted: an alarm is a bug of ours or a session misbehaving, and a person should know which. Not built: under *Steering*, uncounted, while a techlead holds it (§4.8a *Who answers first*). The row lists the alarms in words — channel, what was claimed, the rpc, the count, first–last in the person's clock, *(others)* as *and n more distinct claims* — and the host's identity mode, since *observe* records what *enforce* would refuse. Two of the four are answers and only an answer ends the row (§4.10 *The Inbox is a queue*): **Dismiss** (wire name `identity_ack`) clears that list, the record's or the host's; trail *dismissed by you*. **Log TD** (`identity_log`) hands the alarm, in words the home composes from its fields, to the record's first live controller — read from the control graph, never a badge (`alarm_to`, the home's answer, which the RPC reads too) — as mail from the person that owes an outcome (§4.8a, TD-079's debt), clears the list; trail *logged by you → `<controller>`*. Drawn only where such a session exists — not on the host's row, not on a record with no live controller (a manager's own is one); elsewhere the row reads *no session answers for this one* (or *for the host's own list*); its confirm names that session and the outcome owed; a controller gone between draw and press is the agent's refusal, in words, as the toast, and the refreshed row says nobody answers. The other two act on the session and leave the row standing: **Open** focuses it while its record is here; **Suspend** (`rpc_suspend`) stops it at once — no wrap-up — keeps worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); offered only on a record's row while that session is live — not the host's row, not a record already suspended, `exited` or `closed`; its confirm says what it does. A suspended record's row says so in a flat mark — its only record, since a suspension ends no row and writes no trail; the mark is drawn wherever the record is (card, Focus header, Inbox state row), never pressable, with the when, who and why on hover, tolerant of a record another build wrote (it costs that card its mark, never the grid). No Unsuspend control anywhere, by design: a person's **Resume** and **Forget** lift it. The New session form's `suspended` verdict keeps Start enabled, since a person's create *is* the lift; the form prints the agent's sentence and adds what pressing Start does. All four are a person's own acts, caller-less and refused to every session as `inbox_delete` is (one exception, not built and never on a host that carries a person: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is a never-gated read — a session that could clear the list could erase evidence of its own forgery, one that could suspend could stop its rival. The host agent's log keeps every alarm, a line each. On the card the alarm is a mark and nothing more, as is *suspended*. A node's record is answered at that node: alarms are node-owned, an `id` naming another host is routed there (§4.4a step 4a), the node clears its list and the home takes the cleared record from the reply. **Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed. The host's own list is whichever host was asked, and never travels |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the text in its shape — the first paragraph drawn, the rest under *details* (row below; §4.10 *How a message to a person is written*, TD-127) — sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below |
 | Inbox row: **details** | one disclosure per mail row | §4.10 *How a message to a person is written* (TD-127; designed 2026-09-24, built 2026-09-25 — TD-138). A mail row — `ask`, `steer`, `note`, a reply, *answered for you*, a passed-up question — on the Inbox and in the Focus Inbox panel alike, draws its text's **first paragraph**, up to the first blank line, and the rest under a native `<details>` whose summary reads *details*: closed by default, a tab stop, `Enter` or `Space` on the summary as on any disclosure, remembered open per row while the page lives and never across loads (a fold is not state). Both halves are rendered from the closed markdown subset by the UI's own renderer (§4.10); the row's controls and suggested answers sit at the foot outside the fold, so a row is answered folded. **Backstop for text nobody shaped** — no blank line and longer than `FOLD_CHARS` (300): the first paragraph is the text up to the last sentence end before 300 characters, else the first 300, and the rest goes under *details*; a shorter text draws whole with no disclosure. A `steer`'s default, a passed-up question's recommendation and the suggested answers are fields, drawn where they are today, never inside the fold; the *answered for you* row's quotation is the question's first paragraph. The message page (§4.5 screen 6, TD-136) draws the same row with *details* open. A rendered link is the one thing on a row built from the text that is pressable, drawn as §4.10 says |
@@ -2841,10 +2841,10 @@ reserve <team> 0` clears the priority; `ao schedule`'s key path (`teams.<team>.s
 with the schedule itself.
 
 **`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; built 2026-09-27 — TD-132 slice 2, all
-but `--sha`, below): the
-press from a terminal. `ao promote [<repo>] [--sha <commit>]` promotes the registered checkout —
-the current directory's repo when none is named — to main's head, or to `--sha` for a rollback or
-a hotfix, through the `promote` RPC at the home, **refused to a session** (a person's own, as
+but `--sha`, `--back` and `clear`, below): the
+press from a terminal. `ao promote [<repo>] [--sha <commit> | --back]` promotes the registered checkout —
+the current directory's repo when none is named — to main's head, or to an older commit of main
+for a rollback, through the `promote` RPC at the home, **refused to a session** (a person's own, as
 `set_settings` is; a worker never promotes, CLAUDE.md) and refused, naming which, on §6's
 preconditions (1) and (3); on (2) it says what the checks read and goes on, since the press is the
 person's word; a repo whose live is main's head already is refused as having nothing to promote,
@@ -2853,9 +2853,17 @@ on a later tick, as §6 says, and for this repo the command's own host agent goe
 `ao promote status` prints every promotable repo's readings — *agentorc · live 485d28b · main
 9c1e0f2, 3 ahead · checks green · auto off*, in flight or failed with the log — and `--json` the
 `promotes` field of `host`. `ao status -v`'s build line stays: it is this repo's `check` read from
-the client's side, and the one line a session may read. **`--sha` is refused for now**: `run`
-installs the checkout's tree, which precondition (1) holds at main's head, so how a rollback's
-commit would reach `run` is not designed (TD-132). Dismiss's half is the `clear_promote` RPC, a
+the client's side, and the one line a session may read. **The rollback** (TD-212, designed
+2026-09-28; not built — TD-226, until when `--sha` is refused): `--sha <commit>` takes a full
+commit or a prefix that names one, and **`--back`** is the commit that was live before the last
+promote that concluded, so putting the live copy back takes no looking up. §6 *A rollback* says
+what is refused (a commit that is not on main, one that is live already, a run in flight), how
+the commit reaches `run`, and that the automatic promote then waits for the person. It prints
+*rolling back `<repo>` to `<sha7>` from `<sha7>`*, what the checks on that commit read, and the
+log's path; `ao promote status` then reads *agentorc · live 485d28b, rolled back from 9c1e0f2 ·
+main 9c1e0f2, 3 ahead · checks green · auto held*. **`ao promote clear [<repo>]`** is Dismiss
+from a terminal: it clears a failure standing or a rollback's hold, because the page may be the
+thing that is broken. Dismiss's half is the `clear_promote` RPC, a
 person's own as `promote` is; both are home edits a node forwards or refuses (§4.4a).
 
 **`ao schedule`** (TD-026; §6 *Schedule*, §5 `settings.yml`; designed, not built — TD-133): with no
@@ -5625,7 +5633,7 @@ commands:                             # read by nothing yet
   - name: cluster     ; run: ./scripts/cluster-status.sh
   - name: attention   ; run: python scripts/nudge_user_attention.py --report
 promote:                              # §6 *Promote* (TD-120): how a merge to `main` becomes the live copy
-  run: scripts/promote.sh             # makes `main` live from this checkout; run at the home, in the checkout
+  run: scripts/promote.sh             # makes the tree it is started in live; run at the home
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
 ```
 
@@ -5647,8 +5655,12 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   systemd, skaffold or wrangler: this repo's `run` is the pip pair of CLAUDE.md and its `check`
   prints the installed build's commit (`sessionorc.build.info()`); samscrape's would be its
   skaffold run and the deployed image's tag; contractmatch's a wrangler deploy and the deployment's
-  commit; dev-cadence's its sync. Both are commands run **in the checkout, at the home** (§6
-  *Promote* says when): `run` makes the checkout's `main` live and is judged by what `check` says
+  commit; dev-cadence's its sync. Both are commands run **at the home** (§6
+  *Promote* says when), `check` in the checkout and `run` in the tree it is to make live: the
+  checkout, on main's head, for a promote, and a detached worktree at the commit for a rollback
+  (§6 *A rollback*, TD-212). So **`run` makes live the tree it is started in**, names no path to
+  the checkout, and finds the checkout in `AGENTORC_PROMOTE_ROOT` when it needs what no commit
+  holds. It is judged by what `check` says
   afterwards, never by its exit code; `check` prints one full commit on stdout and exits 0, or
   exits non-zero with the reason on stderr (*not deployed*, *no cluster*), which the row shows as
   *live: unknown — <reason>*. `auto` lives in `settings.yml` (`repos.<repo>.promote.auto`, the Settings page's switch; 2026-09-25) and is `false` when absent: the row offers a press. A repo with no
@@ -6059,6 +6071,54 @@ code and needs no grant; a session doing the same work does.
   unknown*. The home reads it from the checkout, so it stands as soon as the checkout's `main` holds
   it; with `auto` off, the row or `ao promote` is the person's press, and CLAUDE.md's pair by hand
   stays the fallback while the agent is down.
+  **A rollback** (TD-212, designed 2026-09-28; not built — TD-226) is a person's press with a
+  commit: `ao promote --sha <commit>` or `--back` (§4.7), never the policy's and never the page's,
+  since the page may be what broke.
+  - **Which commit.** The home fetches, then resolves the commit in the checkout. It is refused
+    when it names no commit or more than one, when it is **not an ancestor of `origin/main`** (a
+    branch is never promoted, CLAUDE.md; a hotfix is a merge and then a press), and when it is
+    live already. Main's head is the plain press, by the path above. `--back` is `from` in
+    `~/.agentorc/promotes/<repo>/last.json` — `{sha, from, at, by}`, written when a promote
+    concludes, `from` being what `check` read before the run — and is refused when there is no
+    such record or its `from` was never read.
+  - **How it reaches `run`.** The checkout stays where the person left it. The home adds a
+    detached worktree of the checkout at the commit, `~/.agentorc/promotes/<repo>/tree` (`git
+    worktree add --detach`; one left by an earlier run is removed first), and starts `run`
+    **there**, which is why §5 says `run` makes live *the tree it is started in*. It is the one
+    write the promote makes to a repo: an entry in the repo's worktree list, touching no branch,
+    no index and no file of the person's tree. The block is read from the checkout as ever, so
+    `run` names a path, and what runs is that path as the commit had it; a commit older than the
+    script fails to start, and reads as any failure does. The tree is removed when the run
+    concludes, either way; the log stays.
+  - **What stands in its way.** Precondition (1) is not asked: the checkout's tree is not what
+    is installed, so a rollback goes through with a branch checked out there or a change left in
+    it, which is when it is needed. (2) is the person's word, as on any press, and the reply says
+    what the checks read on *that* commit. Of (3), a run in flight refuses it and **a failure
+    standing does not**: a failed promote is the first reason to go back, and a rollback that
+    concludes clears the failure.
+  - **What the repo may refuse.** `run` is started with `AGENTORC_PROMOTE_SHA` (the commit),
+    `AGENTORC_PROMOTE_FROM` (what is live, empty when unread) and `AGENTORC_PROMOTE_ROOT` (the
+    checkout, for what a run needs that no commit holds), on every promote. The home knows no
+    repo's schema, so a commit that cannot be gone back to (one older than a migration) is the
+    repo's `run` to refuse, by exiting before it changes anything: live reads as it did, and the
+    row is a failure with the script's own words in the log's last lines.
+  - **The outcome** is `check`'s, as ever: live reads the commit → done, `last.json` written, and
+    the note reads *rolled back `<repo>` to `<sha7>` from `<sha7>` — main is n commits ahead*.
+    The wheel and the nodes follow as after any promote: the run writes the wheel of what it
+    installed, and that is the newest.
+  - **The hold.** A rollback that concludes writes `~/.agentorc/promotes/<repo>/held.json` —
+    `{sha, from, main, at}` — and the reading carries it as `held`. **While it stands the policy
+    starts nothing for that repo**, whatever `auto` says and however far main moves: the commit
+    the person went back from is still on main, and a later merge that is not its cure would
+    put it live again. The hold ends by the person's word alone: a plain press that concludes
+    (main's head, by then holding the cure or the revert), or Dismiss — `ao promote clear` — after
+    which `auto` goes on as if nothing had been held. The row (§4.5a) is drawn while it stands
+    and says *rolled back*, never *behind*: live is older than main because a person put it
+    there.
+  - **What it does not reach.** The press is an RPC, so it needs a host agent that answers and an
+    `ao` that runs. A live copy that does not start is below it: the person makes the worktree
+    and starts the repo's `run` in it by hand, and this repo's CLAUDE.md says so beside the
+    promote's own pair.
 - **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general
