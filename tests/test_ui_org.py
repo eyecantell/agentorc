@@ -586,6 +586,45 @@ console.log(JSON.stringify(out));
 """
 
 
+def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path, monkeypatch):
+    """design §4.5a **brief changed** (§6 rule 7, TD-217 slice 3): fixed words, the files by name and
+    when on hover, drawn where *restart wanted* is; a mark, never pressable, and on Focus always in
+    the page and hidden until true."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import card_slot, templates, view
+
+    base = {"id": "ao-m1", "name": "m1", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+            "state": "idle", "since": "2026-09-21T01:00:00Z", "confidence": "hook", "pane": True,
+            "tail": ["…"], "created": "2026-09-21T00:00:00Z"}  # fmt: skip
+    card, focus = templates.get_template("card.html"), templates.get_template("focus.html")
+    assert view(base)["brief_changed"] is None and "brief changed" not in card.render(s=view(base))
+    hidden = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org")
+    assert 'class="badge bc hidden" id="fbc"' in hidden
+
+    bc = {"at": "2026-09-26T20:02:00Z", "paths": ["/r/docs/briefs/manager-ao-1.md", "/v/briefs/manager.md"]}
+    v = view({**base, "brief_changed": bc})
+    assert v["brief_changed"]["text"] == "brief changed"
+    assert "manager-ao-1.md, manager.md · changed 2026-09-2" in v["brief_changed"]["full"]
+    pages = [("card", card.render(s=v))]
+    pages.append(("focus", focus.render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")))
+    for where, html in pages:
+        assert "brief changed" in html and "manager-ao-1.md" in html, where
+        if where == "focus":
+            chip = html.split('id="fbc"')[1].split("</span>")[0]
+            assert "data-act" not in chip and 'class="badge bc" id="fbc"' in html
+    # not an ending: a working member's `doing` line keeps the slot, the mark takes it from the tail
+    said = {"text": "TD-9: reading the fetcher", "at": "2026-09-21T01:00:00Z"}
+    working = view({**base, "state": "working", "doing": said, "brief_changed": bc})
+    assert "TD-9: reading the fetcher" in card.render(s=working)
+    assert ">brief changed<" not in card.render(s=working).replace("\n", "")
+    assert card_slot(view({**base, "state": "working", "brief_changed": bc}))["text"] == "brief changed"
+    # a malformed field costs the chip, never the grid
+    assert view({**base, "brief_changed": "yes"})["brief_changed"] is None
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert '$("#fbc")' in js  # kept current from the pushed delta
+
+
 def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on_those(tmp_path, monkeypatch):
     """design §4.5a **restart wanted** (§4.9a *A run that ends with work left*, TD-083): the third
     ending — *my run is over and my lane is not*. A **mark**, never pressable, and not a state: the

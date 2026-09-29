@@ -299,6 +299,7 @@ def view(
     d["out_of_work"] = (
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )
+    d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
     # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
@@ -497,6 +498,27 @@ def _middle(text: str, width: int) -> str:
     return f"{text[: keep - keep // 2]}…{text[len(text) - keep // 2 :]}"
 
 
+def brief_changed_view(bc: Any) -> dict[str, str] | None:
+    """Design §4.5a **brief changed** chip (§6 rule 7, TD-217): the fixed words, and on hover the
+    files that changed by name and when — paths the home read, nothing a session wrote. A mark,
+    never pressable, and not a state; a malformed field costs the chip and not the grid."""
+    if not isinstance(bc, dict) or not bc.get("at"):
+        return None
+    try:
+        when = datetime.fromisoformat(str(bc["at"]).replace("Z", "+00:00")).astimezone().strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        when = "?"
+    paths = bc.get("paths") if isinstance(bc.get("paths"), list) else []
+    names = ", ".join(Path(str(p)).name for p in paths) or "its files"
+    return {
+        "text": "brief changed",
+        "full": (
+            f"brief changed — {names} · changed {when}: a file its brief was made from reads otherwise as "
+            "merged; it takes the new brief when it is next started (design §6 rule 7)"
+        ),
+    }
+
+
 def _first_line(text: str) -> str:
     return text.strip().splitlines()[0] if text.strip() else ""
 
@@ -504,9 +526,10 @@ def _first_line(text: str) -> str:
 def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     """The card's slot (design §4.5 *The card's anatomy*, row 5; §4.5a **doing**, TD-095): **one
     text, the first that applies**, and a caption. (a) what needs a person or explains a stop, (b)
-    an ending — exited, closed, or a declaration — (c) what the session says it is doing, (d) its
-    last output. The caption: the time a pending answer has left, else *ready to close ✓* whenever
-    the checklist passes, else *says · age* under a `doing` line. `text` is a session's or a tool's
+    an ending — exited, closed, or a declaration — (c) what the session says it is doing, then the
+    *brief changed* mark where it says nothing, (d) its last output. The caption: the time a pending
+    answer has left, else *ready to close ✓* whenever the checklist passes, else *says · age* under a
+    `doing` line. `text` is a session's or a tool's
     words: escaped by the template, shown, never a control.
 
     `kind` picks the rule's colour (`needs`, `lim`, `bad`, `ok`, `doing`, `tail`, or "") and `full`
@@ -586,6 +609,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         )
     elif d["doing"]:
         kind, text = "doing", d["doing"]["text"]
+    elif d.get("brief_changed"):
+        # rule 7's mark (§4.5a **brief changed**, TD-217): not an ending — it stands on a working member
+        # — so it takes the slot only where no `doing` line does, in place of the tail
+        text, full = d["brief_changed"]["text"], d["brief_changed"]["full"]
     elif state in ("working", "stalled?"):
         # the pane's last two lines, as they stand — for a shell or a command run that is the work
         tail = [str(line) for line in (d.get("tail") or [])[-2:] if str(line).strip()]

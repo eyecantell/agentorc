@@ -107,6 +107,10 @@ IDLE_NUDGE = timedelta(minutes=20)
 # §6 rule 5 (TD-190): the context-bound line is typed again after this, while the member is still
 # idle and over its bound.
 CONTEXT_AGAIN = timedelta(minutes=20)
+# Rule 7 (§6, TD-217 slice 3): a source of a record's brief that reads otherwise, as merged, marks
+# `brief_changed` once the difference has stood this long unchanged — a run of merges is one change.
+# Read at the reports' cadence (`DERIVE_EVERY`), detached from the tick: each read is a `git show`.
+BRIEF_SETTLE = timedelta(minutes=10)
 # A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
 # who did what, so it is allowed more than `doing`'s 200 characters.
 ROUND_LINE_CAP = 500

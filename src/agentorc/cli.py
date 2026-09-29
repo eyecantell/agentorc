@@ -297,6 +297,10 @@ def cmd_status(args: argparse.Namespace) -> int:
             if rw := s.get("restart_wanted"):
                 early = " (early)" if rw.get("early") else ""
                 print(f"{'':<{w}}      restart wanted{early} {_age(rw['at'])}: {rw['why']}")
+            # rule 7's mark (§6, TD-217): a file the brief was made from reads otherwise, as merged
+            if (bc := s.get("brief_changed")) and isinstance(bc, dict) and bc.get("at"):
+                names = ", ".join(pathlib.Path(str(p)).name for p in bc.get("paths") or [])
+                print(f"{'':<{w}}      brief:  changed {_age(bc['at'])} ago ({names})")
             # design §4.8 `doing` (TD-074): what the session says it is doing, always with its age —
             # which is what makes a stale line read as stale
             if (doing := s.get("doing")) and doing.get("text"):

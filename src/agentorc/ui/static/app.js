@@ -2499,6 +2499,11 @@
           + (early ? " — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a)" : "");
         rw.textContent = "restart wanted" + (early ? " · early" : "") + (r && r.age ? ` ${r.age}` : "");
       }
+      const bc = $("#fbc");
+      if (bc) {
+        bc.classList.toggle("hidden", !v.brief_changed);
+        bc.title = (v.brief_changed && v.brief_changed.full) || "";
+      }
       // …and the usage gate's pause (§4.5a **paused · usage**, TD-100): written and cleared by the
       // host agent's tick while a person may be watching, so it rides the delta too.
       const gt = $("#fgated");
