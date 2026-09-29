@@ -4867,7 +4867,11 @@ than above: its questions moved with the conversation and are not orphaned.
   repo, or its directory when it named none) must be a checkout in the home's repos registry, and
   one that is not — a repo on a node included — is refused in those words. The entry's own outcome
   is settled at the close (`asker_gone`, its text saying where the answer went): nobody is left to
-  report it, and a holder's debt rides on the `handed` note. One press per entry at a time.
+  report it, and a holder's debt rides on the `handed` note. **A refused note never refuses the
+  press**: the line is committed first, so when the mail gate refuses the note (a full inbox, say)
+  the entry still closes, the result and the entry's outcome text say who was not reached and why,
+  that holder owes nothing, and the line on the board is what it finds. The gate takes the note
+  whole, so with several holders one refusal sends it to none. One press per entry at a time.
 - **Delete** declines it, as on any open question; there is nobody to tell and nothing is written.
 - **What it holds.** An orphaned question keeps its slot in the two depths under the id that
   asked it, and is never pruned while open. Nothing but the person's answer closes it: a `done`
