@@ -114,7 +114,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-212 | `ao promote --sha` (a rollback to an older commit) is refused: the promote installs main's head, so an older commit cannot reach `run`; design the rollback | Medium | Open — design-first |
 | TD-213 | Closing a member closes the questions it put to the person (`asker_gone`), even when the ledger still waits on the answer: the wind-down of 2026-09-28 took a steer (TD-149) and an ask (TD-180) out of the Inbox | High | Designed 2026-09-28 — the build is TD-215, TD-216 |
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
-| TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — TD-215 merged (PR #712) |
+| TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Partly done — slice 1 (the answer's road) PR #717; slice 2 the row |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Partly done — slice 1 (#714); next the replay |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
 | TD-224 | The Org page jumps to the top when scrolled past a certain point, consistently: likely scroll anchoring losing a node the update removes | High | Open — pickable: reproduce first |
@@ -2187,8 +2187,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open — TD-215 built the home's half (PR #712): `orphaned` is on the entry, and a person's answer to one is refused in words until this entry replaces the refusal
-**Blocked by:** TD-215
+**Status:** Partly done — **slice 1 (items 1, 2 and 5's road) built 2026-09-28 (grinder-ao-1, PR #717)**: Reply, a suggested answer and *Go with it* on an orphaned question write the board's second add and a `handed` note to each lease holder, and close the entry; `orphaned.repo` falls back to the record's directory, and a board outside the home's registry (an asker on a node) is refused. **Next: slice 2**, items 3 and 4 — the Inbox row with its standing, the count, `ao inbox`'s standing (`src/agentorc/**`).
 **Location:** `src/sessionorc/agent_inbox.py` (`_board_add_one`, `rpc_board_edit`; the person's reply and `inbox_go_with_it` on an orphaned entry), `src/sessionorc/board.py` (`write_back`'s add), `src/agentorc/ui/app.py` (`inbox_sections`, the mail row's view), `src/agentorc/ui/templates/inbox_row.html`, `src/agentorc/ui/static/app.js`; design §4.10 *A question about a reference outlives its asker*, §4.4 *Board write-back*, §4.5a *Inbox row: orphaned question*. Held path: the techlead reads the PR.
 
 **Why:** TD-213's *Why*. After TD-215 the question stands; this entry gives the person's answer somewhere to go.
