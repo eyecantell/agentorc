@@ -482,6 +482,17 @@ async def test_a_restart_under_the_same_name_keeps_the_old_pane_for_the_grace(ag
     assert (await agent._identify(hook("ao-x"), 50))["error"] == identity.MISMATCH  # never the session's
     agent._id_note_panes({"ao-x": new})  # the same pane listed again keeps the gone one inside the grace
     assert agent._id_gone["ao-x"][0].pid == 100
+    agent._id_log_late_hook(50, "ao-x")  # the alarm's log line reads what it names without failing
+    agent._id_log_late_hook(999, "ao-z")
+    # the gone pane listed again under its record (it came back) is no longer gone
+    agent._id_panes = [identity.Pane("ao-x", 300, 0)]
+    old = PaneInfo(session="ao-x", created=0, current_command="claude", pane_pid=100, dead=False, dead_status=None)
+    agent._id_note_panes({"ao-x": old})
+    assert agent._id_gone["ao-x"][0].pid == 300
+    agent._id_panes = [identity.Pane("ao-x", 100, 0)]
+    agent._id_gone = {"ao-x": (identity.Pane("ao-x", 100, 0), agent._id_gone["ao-x"][1])}
+    agent._id_note_panes({"ao-x": old})
+    assert "ao-x" not in agent._id_gone
 
 
 def test_no_read_decides_anything_on_its_caller():
