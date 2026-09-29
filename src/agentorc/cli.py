@@ -2753,10 +2753,12 @@ def unread_line(args: argparse.Namespace) -> None:
     goes to stderr, so a caller parsing stdout never meets it. A command that never reached the
     agent (`ao --skill`, `ao roles`) has no response to read and prints nothing."""
     m = clientmod.last_mail
-    if not m or not (m.get("unread") or m.get("owed") or m.get("context")):
+    if not m or not (m.get("unread") or m.get("owed") or m.get("context") or m.get("brief")):
         return
     lines = []
     over = str(m.get("context") or "")  # §6 rule 5 (TD-190): past the role's context bound
+    # §6 rule 7 (TD-217): the brief it was started on changed, as merged — rides as the context clause does
+    over = "; ".join(x for x in (over, str(m.get("brief") or "")) if x)
     if n := int(m.get("unread") or 0):
         lines.append(mailmod.unread_line(n))
         if m.get("wake_budget_spent"):

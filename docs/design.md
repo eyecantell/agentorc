@@ -3194,7 +3194,7 @@ agentorc — the round and `ao wait`, the declarations a run ends with, the cras
 the seat rules, the usage gate's pause, mail's kinds and outcomes, permission triage, the never-list
 of `ao` verbs — and it ships in the package, so a promote changes every team's rules, as it
 changes the host agent that enforces them: at a member's next start, and for a running member by
-§6 *Keeping a team running* rule 7 (TD-199; a restart reads the brief's files again since TD-217 slice 2, and the record is marked *brief changed* since slice 3; the two tellings and the tick's own restart not built — until then a running member keeps the brief it started with until something restarts it). What a repo writes is only what the package cannot know:
+§6 *Keeping a team running* rule 7 (TD-199; a restart reads the brief's files again since TD-217 slice 2, the record is marked *brief changed* since slice 3, and since slice 4 a working member is told on its `ao` replies and an idle one is restarted by the tick). What a repo writes is only what the package cannot know:
 the first reads, the gate command, the standing rules that are that repo's own (what is never
 deployed, which files keep CRLF, what waits on the person), the shape of its lane. That text — a
 team definition's `brief:` on a manager or a member, a repo's `roles.<name>.brief`, and `ao new
@@ -5941,7 +5941,7 @@ code and needs no grant; a session doing the same work does.
      appearing is a schedule (TD-026), which this is not. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
   7. **Brief changed** (TD-199; designed 2026-09-28; `prompt_from` handed and kept — TD-217 slice 1;
-     the replay and the record's `brief` — slice 2; the mark and the chip — slice 3; the two tellings and the restart not built — TD-217). A member reads its
+     the replay and the record's `brief` — slice 2; the mark and the chip — slice 3; the two tellings — slice 4). A member reads its
      brief once, at its start, and until this rule a restart replayed the prompt its first start
      was handed: manager-ao-1, started 2026-09-25, ran a template two merges old for three days,
      and no restart would have given it the new one. Two halves. **A replay reads the brief's

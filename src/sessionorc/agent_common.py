@@ -111,6 +111,8 @@ CONTEXT_AGAIN = timedelta(minutes=20)
 # `brief_changed` once the difference has stood this long unchanged — a run of merges is one change.
 # Read at the reports' cadence (`DERIVE_EVERY`), detached from the tick: each read is a `git show`.
 BRIEF_SETTLE = timedelta(minutes=10)
+# Rule 7's clause on every `ao` reply to a member whose record carries `brief_changed` (TD-217 slice 4)
+BRIEF_CLAUSE = 'your brief changed — finish what you hold, then `ao progress restart --why "brief changed"`'
 # A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
 # who did what, so it is allowed more than `doing`'s 200 characters.
 ROUND_LINE_CAP = 500

@@ -361,6 +361,7 @@ class TickMixin:
                 await self._seat_pass(s, now, records)
                 await self._idle_nudge(s, now)
                 await self._context_line(s, now)
+                await self._brief_restart(s, now)
                 self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
@@ -565,6 +566,58 @@ class TickMixin:
                 await self._push_changes()
                 return
         await self._replay(s, "wanted")
+
+    async def _brief_restart(self, s: Session, now: datetime) -> None:
+        """Rule 7's second telling (design §6, TD-217 slice 4): a member whose record carries
+        `brief_changed` and that is hook-confirmed `idle`, holds no claim in progress, has declared
+        nothing, and has its git fields known and showing nothing uncommitted or unpushed is closed
+        and replayed by the tick itself, `why: brief`, under the ceiling as every replay is. Never a
+        seat, an interactive session, one past its stop time, into a wrap-up, a gate pause or a
+        suspension, and not on a node yet. A working member is told on its `ao` replies instead."""
+        if not (s.brief_changed and s.supervised and s.unattended) or s.seat is not None:
+            return
+        if s.superseded_by or s.suspended or s.gated or s.host != self.host:
+            return
+        if s.out_of_work or s.restart_wanted:
+            return  # it declared: rule 2 or the team's next start is what starts it
+        # the tick's own close, then a replay that failed, leaves it `closed`: still the tick's to retry
+        closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "brief"
+        if not closed_by_tick:
+            if s.state != "idle" or s.confidence != "hook" or s.pending:
+                return
+            if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
+                return  # a claim in progress: the clause on its `ao` replies says it
+        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+            return
+        if self._profile_gated(s.profile, now, s.team) or self._just_restarted(s, now):
+            return
+        git = s.git or {}
+        clean = (
+            git.get("dirty") == 0
+            and git.get("unpushed") == 0
+            and all(isinstance(git.get(k), int) for k in ("dirty", "unpushed"))
+        )
+        if not (closed_by_tick or clean):
+            return  # work left, or not known: its replies keep saying it, and it declares when it can
+        if self._window_full(s, now):
+            if not s.restart_ceiling:
+                recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+                s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
+                log.warning("%s: the brief changed at its restart ceiling — it is a person's now", s.id)
+                self._save(s)
+                await self._push_changes()
+            return
+        log.info("%s: its brief changed and it is idle with its work pushed: restarting it", s.id)
+        if s.state == "idle":
+            try:
+                await self.rpc_close(s.id)
+            except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": "brief", "error": f"close: {e}"}]
+                log.warning("%s: the close before a brief restart failed: %s", s.id, e)
+                self._save(s)
+                await self._push_changes()
+                return
+        await self._replay(s, "brief")
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:
