@@ -137,7 +137,9 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_NO_TEAM,  # noqa: F401
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
+    _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
+    _civil,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
@@ -148,6 +150,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _trail_rows,  # noqa: F401
     board_argv,  # noqa: F401
     board_choices,  # noqa: F401
+    board_due_now,  # noqa: F401
+    board_horizon,  # noqa: F401
     board_rows,  # noqa: F401
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
@@ -218,7 +222,8 @@ def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
 
 
 def read_boards(run: Any = subprocess.run) -> tuple[list[dict[str, Any]], str]:
-    """The due board items of the repos this host knows, as Inbox rows, and a note when they could
+    """The open board items of the repos this host knows, as Inbox rows — each saying whether it is
+    due now (`due_now`, TD-220) — and a note when they could
     not be read — a reader that failed is said in words, never shown as an empty board (§4.5 *no
     silent failure path*). On a node the org is the home's (§4.4a), so a node reads none."""
     if hosts.is_node():
@@ -521,17 +526,19 @@ def create_app() -> FastAPI:
                 identity_cache.update(at=now, info={})
         return identity_cache["info"] or {}
 
-    board_cache: dict[str, Any] = {"at": None, "rows": [], "note": ""}
+    board_cache: dict[str, Any] = {"at": None, "rows": [], "all": [], "note": ""}
 
     async def board_items(fresh: bool = False) -> tuple[list[dict[str, Any]], str]:
-        """The Inbox's board rows and the note beside them (TD-069 step 3), read at most once every
-        `BOARD_TTL` seconds and off the event loop: the reader is a subprocess over every board on
-        the host, and the page and the top bar both poll every few seconds. `fresh` reads now — after
-        a Snooze or Done, so the row the person answered is gone from the next refresh."""
+        """The Inbox's **due** board rows and the note beside them (TD-069 step 3), read at most once
+        every `BOARD_TTL` seconds and off the event loop: the reader is a subprocess over every board
+        on the host, and the page and the top bar both poll every few seconds. `fresh` reads now —
+        after a Snooze or Done, so the row the person answered is gone from the next refresh. Every
+        open row, the ones not yet due too, stays in the cache as `all` for the board's horizon
+        (TD-220): what is counted is what is due, under every mode."""
         now = time.monotonic()
         if fresh or board_cache["at"] is None or now - board_cache["at"] > BOARD_TTL:
             rows, note = await asyncio.to_thread(read_boards)
-            board_cache.update(at=now, rows=rows, note=note)
+            board_cache.update(at=now, rows=[r for r in rows if r.get("due_now", True)], all=rows, note=note)
         return board_cache["rows"], board_cache["note"]
 
     async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
+from sessionorc.settings import BOARD_SHOW_DEFAULT, parse_board_show
+
 REFUSED_SCHEMES = ("javascript", "data", "vbscript", "file")
 _SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*)://")
 # Cursor's own documentation (cursor.com/docs/reference/deeplinks, read 2026-09-21) documents only
@@ -111,6 +113,17 @@ def terminal() -> dict[str, Any]:
         "size": size if isinstance(size, int) and not isinstance(size, bool) else None,
         "face": face.strip() if isinstance(face, str) and face.strip() else None,
     }
+
+
+def board_show() -> str:
+    """The person's `inbox.board_show` as last read (design §5 `person:`, §4.5 screen 6 *The board's
+    horizon*; TD-220): which board items the Inbox lists before they are due. Unset, or a value that
+    does not parse, is the default `next:10`."""
+    inbox = _read["person"].get("inbox")
+    try:
+        return parse_board_show(inbox.get("board_show") if isinstance(inbox, dict) else None)
+    except ValueError:
+        return BOARD_SHOW_DEFAULT
 
 
 def migrate_note() -> str:
