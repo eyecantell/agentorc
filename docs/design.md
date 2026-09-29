@@ -2493,6 +2493,7 @@ noted). If a control is not in this table it does not exist.
 | Org | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.agentorc.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above); the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, or an idle seat — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it |
 | Org | team card: **Members…** | (TD-163; designed 2026-09-25, built 2026-09-26 — TD-172) beside Start on a stopped team and beside Wind down on a live one: the dialog of §4.9 *Add or remove a member from the team card* — the definition's manager, techlead seat and member entries, each with the session holding it, **Add member** and **Remove**. Absent on a team defined in a repo's `.agentorc.yml` (a note says *defined in the repo — edit it by PR*) and on *No team* |
 | Members dialog | **Add member** / **Remove** | **Add member**: role, name (defaulted to the team's pattern) and lane, then one press: `org.yml` edited as text in place (a `count:` bumped, or one member line appended), re-parsed, and on a live team the member created under the manager as `ao team start` creates one — refused with the reason when the edit cannot be one line or the file fails to parse, the bytes restored. **Remove**: a confirm naming the file edit and, on a live member, the wind-down it sends (Wrap up's, never a kill); the record stays a card until Forget. The manager and the techlead seat carry no Remove. A person's act, through the UI process, never the host agent (§4.4a: the org file is the clients') |
+| Org | team card: **Members…** on a repo-defined team | designed 2026-09-28 (TD-210; not built — TD-229; §4.9 *The org is an aggregate*): drawn disabled on a team whose definition's source is a repo's `.agentorc.yml`, its reason beside it — *defined in `<repo>`'s .agentorc.yml — changed by PR* — with **Open file** through the person's `open_in`, replacing today's note (*defined in the repo — edit it by PR*, no button); the dialog opens for a team of the org file as before. The source is the definition's own field, as `ao team list` prints it |
 | Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1). Live, stopped, concluded and wound down are read over the team's **unattended** sessions, and Wind down's and Stop now's confirm name a person's session in the team apart — *your session main-ao stays: a team act never stops an interactive session* — and leave it alone (§4.9 *A person in the team*, TD-160; built — TD-173) |
 | Org | team header **✉ n** | display only: on a folded team's header (any folded team, live or not — TD-183, built by TD-194), the sum of its folded sessions' unread counts — the count each card's **unread** chip shows, which the fold hides; nothing at zero, and gone while the team is unfolded or a filter shows its cards. The mail stays where it is: unread never ages out (§4.10 *The lifecycle of an entry*), and a start under the same name moves the old record's mail to the new session (§4.10, TD-081), so what a folded team holds unread is what its next run reads first. Unfold to read or dismiss it (TD-071 item 2) |
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is a plain session |
@@ -2814,6 +2815,18 @@ target: one `set_controllers` call per target, so a refusal names the session it
 rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` prints one line when
 a session starts with nobody able to act on it. `ao status -v` prints both directions: `under:`
 from the record, `members:` derived across the records, never stored.
+
+**`ao org`** (TD-210; designed 2026-09-28, not built — TD-229) prints the org as the clients
+aggregate it (§4.9 *The org is an aggregate*): each team with its source file, its repo, the host
+it lands on and why (*place*, *registered here*, *registered on devenv*), a shadowed or twice-named
+team said so; then the remainder's files with their last commit. **`ao org check`** is the same
+reading as a verdict, exit 1 when something is lacking, each lack on a line: a registered
+checkout that is not there, a team whose role names a profile `profiles.yml` does not hold, a
+brief that is not in the checkout, a name defined twice, a `place:` naming no linked host, a
+team in `settings.yml` that no definition names (a repo renamed its team); and, as warnings
+that do not fail it, a registered checkout off its default branch or holding changes. On a
+node both refuse and name the home. It
+reads and writes nothing; a session may run it.
 
 **Teams (§4.9, TD-040).** `ao team start <name>` launches a definition from `~/.agentorc/org.yml`
 or the repo's `.agentorc.yml` — every check first, then the manager, then each member with
@@ -3757,8 +3770,9 @@ name its manager (§4.8); the definition only says how to start them.
 
 **Where definitions live.** One org-level file per UI host, `~/.agentorc/org.yml`, beside
 `profiles.yml` and `hosts.yml`, holding `projects:`, `teams:` and an optional org-wide `roles:`.
-A project spans repos and a team spans projects, so neither belongs in one repo's
-`.agentorc.yml`; the org is per install (ADR), so its file is. A repo's `.agentorc.yml` may also
+A project spans repos and a team may span projects, so what spans belongs in no one repo's
+`.agentorc.yml`; that remainder is per install (the ADR of 2026-09-13 says *one org per install*;
+TD-210 amends it: a team of one repo is defined in the repo, *The org is an aggregate*, below), so its file is. A repo's `.agentorc.yml` may also
 carry `teams:` — teams whose only project is that repo; on a name collision the org file wins,
 and `ao team list` names each definition's source. Both files are read on every use and cached
 nowhere (the profiles rule), so editing the file is the whole edit. They are read by the
@@ -3766,6 +3780,72 @@ nowhere (the profiles rule), so editing the file is the whole edit. They are rea
 team start is an ordinary sequence of `create` RPCs, and the host agent stores `team` and
 `project` as two plain strings on the record. `sessionorc` stays free of org vocabulary (it never
 imports `agentorc`), and the host agent needs no restart when a definition changes.
+
+**The org is an aggregate of what the repos define** (TD-210, TD-209; Paul, 2026-09-28: *should
+org.yml actually be an aggregate of each of the repos that support a team?*; designed that day,
+not built — TD-229. Today the pages already read `teams:` from every checkout in the host's
+registry, while `ao team` reads only the repo it is run in, and a name two repos define goes
+silently to the later one). A team that works one repo is **defined in that repo**, in
+its `.agentorc.yml` — `teams:`, the `roles:` it uses with their `review:` paths, the briefs
+beside them — so it has the repo's history, is changed by PR and is read by whoever clones the
+repo. The org a client sees is the union:
+- **Every registered checkout's teams.** The clients, `ao` and the pages alike, read `teams:`
+  from the `.agentorc.yml` of each checkout in the host's repos registry (§5 `hosts.yml`
+  `repos_registry`; it is dev-cadence's list, so every repo on it is read, and one with no
+  `teams:` adds nothing), **as it is checked out**: a branch checked out in a registered
+  checkout changes the org while it sits there, as it changes a brief, and `ao org check`
+  says which checkouts are off their default branch or hold changes. **The repo is the team's project**,
+  unsaid: its name the checkout's directory name, its path on a host that host's registry
+  entry; where the org file has a project of that name, it is that project as it stands. A
+  `projects:` key, a `host:` and a nested `{team: …}` member on a repo's team are each
+  refused: spanning, placing and nesting are the org file's. A brief and a seat's `context:`
+  are read from the checkout on the host the team lands on.
+- **The org file's**, which is now the remainder: a **project of more than one repo** and a
+  **team that spans repos**; the org-wide **`roles:`** overlay, which is where a role gets this
+  install's profile; and **`place:`**, `{<team>: <host>}`, for a repo-defined team that lands
+  on a node. A repo's file names no host. A `profile:` written there is only a name, which the
+  install's `profiles.yml` has to hold; the overlay is the better place for it, and `ao org
+  check` says when a name is not held.
+- **Where a repo's team lands**: `place:` when it names the team; else this host when its
+  registry holds the repo; else the one linked node whose registry does (asked over the link);
+  with the repo on several nodes and no `place:`, the start is refused, naming them.
+- **Names are the org's.** Two repos that define one team name are both refused, each naming
+  the other, since a team's name keys its settings (§5 `teams.<team>`) and its badge. The org
+  file still wins a name over a repo, which is how an install overrides a repo's team without
+  a PR; `ao team list` says *shadowed by org.yml* on the repo's.
+- **A repo's held paths are the repo's** (TD-209). `review:` is written whole, `reader` and
+  `held` together, on the role in the repo's own `.agentorc.yml`, the last layer of a preset
+  (a layer's `review:` replaces the one under it, and one with no `held:` holds every path),
+  so agentorc's `src/sessionorc/**` is not carried into dev-cadence by an org-wide role. **The
+  org file's role carries no `review:`**, only the profile: a role with none takes its team's
+  (*A person in the team*, below), which is none where the repo wrote none.
+- **On a node** nothing changes: `ao team`, `ao org` and the pages refuse and name the home,
+  where the org is read (§4.4a).
+- **Members…** (below) edits the org file and nothing else. On a repo-defined team it is
+  drawn disabled, *defined in agentorc's .agentorc.yml — changed by PR*, with **Open file**
+  (today's card says so in a note and draws no button): a
+  press that committed to a repo's default branch would go round the repo's review. A team a
+  person wants to reshape from the page stays in the org file.
+
+**What is left at the home has a history** (TD-210). `org.yml`, `profiles.yml` and
+`settings.yml` stay files under `~/.agentorc/`, where every reader finds them, and at the home
+the directory becomes a git work tree that tracks those three and ignores the rest: sessions,
+runs and mail are state, and `hosts.yml` is this machine's own name and links, which another
+machine must not inherit. **The home's host agent is the one committer**, so two writers never
+meet on the index: it commits after its own `set_settings` (*settings: usage_gate.grind.week
+30 → 20*), when a client asks with the act's words after **Members…** wrote (*org: ao-grind
++grinder-ao-3*, the `commit_defs` RPC, a person's own), and on the reports' cadence for a hand
+edit, as *edited by hand*. It runs `git add` and `git commit` on the three and reads none of
+them for meaning (it still reads no `org.yml`); a file that does not parse as YAML is left
+uncommitted until it does, and a commit that fails is logged and never fails the write. So
+`git -C ~/.agentorc log -p org.yml` is the file's history and the `org.yml.bak-*` copies have
+no more work to do. A node's replica of `settings.yml` is not tracked. **The home never
+pushes and adds no remote**: a copy off the machine is the person's own `git remote add` and
+push, or the backup's, and no secret is in any of the three (Doppler holds them). **Standing
+the org up on another machine** is then the repos and the remainder: clone the repos and
+register them, bring the three files (a clone of the person's remote, or a copy), write that
+machine's `hosts.yml` as any new host's is written, and `ao org check` says what the
+aggregate finds and what it lacks.
 
 **Projects.** A named set of one or more repos, each with its checkout path per host:
 
@@ -5687,7 +5767,7 @@ roles:                                # §4.8 presets; every key optional, built
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
-teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
+teams:                                # §4.9: the repo's own teams, aggregated into the org (TD-210); org.yml wins a name
   grind: {manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]   # read by nothing yet
 commands:                             # read by nothing yet
@@ -5732,7 +5812,12 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   policy that acts needs its declaration where the policy runs; `ledger:` travels on the record
   instead because it is a session's.
 
-- Org (§4.9): `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
+- Org (§4.9): the teams each registered repo defines in its own `.agentorc.yml`, aggregated with
+  the org file, which holds what no one repo can: projects and teams that span repos, `place:`
+  and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` are tracked
+  by a git work tree in `~/.agentorc/` at the home (§4.9 *The org is an aggregate*, *What is
+  left at the home has a history*; TD-210, not built — TD-229).
+  The org file: `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
   exactly as a repo's `roles:` is (TD-149). Read by the clients on every use, never by the host agent:
 

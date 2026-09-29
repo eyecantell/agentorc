@@ -81,7 +81,7 @@ not mix:
 
 - **org** — everything one person runs through agentorc, across hosts; also the name of the home
   page. One per install. *Not:* fleet, herd. — *proposed* (ADR 2026-09-13); retiring *fleet* in
-  prose and UI is **decided** 2026-09-16 (Paul) — code variable names keep it.
+  prose and UI is **decided** 2026-09-16 (Paul) — code variable names keep it. Since TD-210 (2026-09-28, designed) the org is an **aggregate**: the teams each registered repo defines in its own `.agentorc.yml`, with the org file holding only what spans repos or belongs to one install (design §4.9 *The org is an aggregate*).
 - **team** — a manager (or the person) plus its workers, defined once and started many times.
   A team may contain teams. — *proposed* (ADR 2026-09-13).
 - **project** — a named set of one or more repos that belong together. — *proposed* (ADR
