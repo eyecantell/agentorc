@@ -55,6 +55,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     alarm_to_view,  # noqa: F401
     alarm_view,  # noqa: F401
     alarm_words,  # noqa: F401
+    brief_changed_view,  # noqa: F401
     card_order,  # noqa: F401
     card_slot,  # noqa: F401
     gated_view,  # noqa: F401

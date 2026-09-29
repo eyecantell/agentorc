@@ -50,6 +50,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     BACKUP_KEEP,  # noqa: F401
     BACKUP_MEMBERS,  # noqa: F401
     BOARD_REPLY_NOTE,  # noqa: F401
+    BRIEF_SETTLE,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401
     COMPOSER_LINES,  # noqa: F401
     CONTEXT_AGAIN,  # noqa: F401
