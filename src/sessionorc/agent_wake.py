@@ -452,8 +452,8 @@ class WakeMixin:
           team set to None removed. The team's name is the client's to check against the org's
           definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
         - `repos`: `{repo: {promote: {auto: bool}} | None}`.
-        - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}}`, a None clearing that key
-          (or that terminal field)."""
+        - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?}}`, a None
+          clearing that key (or that field of terminal or inbox)."""
         if not mail.is_person(caller):
             raise RpcError("set_settings is a person's own: refused to a session (design §5 settings.yml)")
         if reserves is None and teams is None and repos is None and person is None:
@@ -623,33 +623,32 @@ class WakeMixin:
 
     @staticmethod
     def _person_change(current: Any, change: Any) -> dict[str, Any]:
-        """`person:` with `change` laid over it: a key set to None cleared; `terminal` merged field by
-        field, a field set to None cleared. Validated whole before it is returned."""
+        """`person:` with `change` laid over it: a key set to None cleared; `terminal` and `inbox` merged
+        field by field, a field set to None cleared. Validated whole before it is returned."""
+        known = settings_mod.PERSON_KEYS
+        nested = {"terminal": settings_mod.TERMINAL_KEYS, "inbox": settings_mod.INBOX_KEYS}
         if not isinstance(change, dict) or not change:
-            raise RpcError("set_settings: person is a mapping of open_in and terminal (design §5)")
-        if unknown := sorted(set(map(str, change)) - {"open_in", "terminal"}):
-            raise RpcError(f"person: unknown key {', '.join(unknown)} (known: open_in, terminal)")
-        term_change = change.get("terminal")
-        if isinstance(term_change, dict) and (
-            bad := sorted(set(map(str, term_change)) - set(settings_mod.TERMINAL_KEYS))
-        ):
-            raise RpcError(
-                f"person.terminal: unknown key {', '.join(bad)} (known: {', '.join(settings_mod.TERMINAL_KEYS)})"
-            )
+            raise RpcError(f"set_settings: person is a mapping of {', '.join(known)} (design §5)")
+        if unknown := sorted(set(map(str, change)) - set(known)):
+            raise RpcError(f"person: unknown key {', '.join(unknown)} (known: {', '.join(known)})")
+        for key, keys in nested.items():
+            sub = change.get(key)
+            if isinstance(sub, dict) and (bad := sorted(set(map(str, sub)) - set(keys))):
+                raise RpcError(f"person.{key}: unknown key {', '.join(bad)} (known: {', '.join(keys)})")
         out = dict(current) if isinstance(current, dict) else {}
         for key, value in change.items():
             if value is None:
                 out.pop(key, None)
-            elif key == "terminal" and isinstance(value, dict):
-                term = dict(out.get("terminal") or {}) if isinstance(out.get("terminal"), dict) else {}
+            elif key in nested and isinstance(value, dict):
+                sub = dict(out.get(key) or {}) if isinstance(out.get(key), dict) else {}
                 for f, v in value.items():
                     if v is None:
-                        term.pop(f, None)
+                        sub.pop(f, None)
                     else:
-                        term[f] = v
-                out["terminal"] = term
-                if not term:
-                    out.pop("terminal")
+                        sub[f] = v
+                out[key] = sub
+                if not sub:
+                    out.pop(key)
             else:
                 out[key] = value
         try:

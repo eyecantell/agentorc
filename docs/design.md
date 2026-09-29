@@ -5529,7 +5529,7 @@ person:                                       # the person's own — nothing her
   open_in: vscode                             # the editor button, below
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a, TD-164; default on)
-  inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (TD-207; not built — TD-220)
+  inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (TD-207; read and written, drawn by nothing yet — TD-220)
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it (the gate reads amounts since TD-151 slice 3; `set_settings`, `ao gate` and the Settings page take them since slice 5). A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has

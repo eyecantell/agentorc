@@ -116,7 +116,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-214 | A wound-down team never starts again when its lanes gain work, and rule 6 took the backlog of its first tick as seen: ao-grind sat idle with ten design-first entries until Paul asked | Medium | Open — design-first |
 | TD-216 | Build the orphaned question, the answer and the row: the board write-back's second add, the `handed` note to the lease holder, the Inbox row with its standing, the count | High | Open — TD-215 merged (PR #712) |
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Partly done — slice 1 (#714); next the replay |
-| TD-220 | Build the board's horizon: the read without `--due-only`, `person.inbox.board_show` (next n per team, due, n days, all) and its pick on the Settings page, *Board, coming up*, the *not shown* fold and the line on the Inbox and the Repo page, the grinder preset's *on the board, due <date>* | Medium | Open — pickable |
+| TD-220 | Build the board's horizon: the read without `--due-only`, `person.inbox.board_show` (next n per team, due, n days, all) and its pick on the Settings page, *Board, coming up*, the *not shown* fold and the line on the Inbox and the Repo page, the grinder preset's *on the board, due <date>* | Medium | Partly done — slice 1 (the setting); slice 2 next |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Open — design-first |
 | TD-224 | The Org page jumps to the top when scrolled past a certain point, consistently: likely scroll anchoring losing a node the update removes | High | Open — pickable: reproduce first |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
@@ -2236,7 +2236,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open
+**Status:** Partly done — **slice 1 built 2026-09-28 (grinder-ao-2, PR #PR)**: `settings.parse_board_show` and `person.inbox` in `parse_person` (the reader drops a bad value), `set_settings` merging `inbox` field by field (`agent_wake._person_change`), `BOARD_SHOW_DEFAULT` for the page to fall back on. Next: slice 2, the read and the rows — `src/agentorc/ui` only.
 **Location:** `src/agentorc/ui/inbox.py` (`board_argv`: `--report --due-only --json`; the rows built from its items), `src/agentorc/ui/templates/` (the Inbox's board rows, `repo.html`'s *Waiting on you*, the Settings page's **You**), `src/agentorc/ui/static/app.js` (**show**, the fold open for the page view), `src/agentorc/ui/app.py` (`repo_teams`), `src/sessionorc/settings.py` (`parse_person`: `open_in`, `terminal`), `src/agentorc/briefs/grinder.md`; design §4.5 screen 6 *The board's horizon*, §4.5a, §5. Held path: `src/sessionorc/settings.py` waits for the techlead's read.
 
 **Why:** TD-207's *Why*: a board item due next week does not exist in the Inbox until its day, and the page does not say so.
