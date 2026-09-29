@@ -117,7 +117,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Open — pickable |
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Open — design-first |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Open — design-first: the statusline feed |
-| TD-232 | Build the team card's two readings: the priority letter on a TDs in motion row and its sort, the Doing list's ages and columns on the card and the Repo page | Low | Open — pickable |
+| TD-232 | Build the team card's two readings: the priority letter on a TDs in motion row and its sort, the Doing list's ages and columns on the card and the Repo page | Low | Partly done — slice 1 (#741); next the Doing list's ages and columns |
 | TD-234 | A failed Snooze or Delete on an orphaned question's Inbox row reads *not written: …*, the words for a refused board write | Low | Open |
 
 
