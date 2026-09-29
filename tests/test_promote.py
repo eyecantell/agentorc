@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import yaml
 from conftest import park_ticks
 
 from sessionorc import hosts, promote
@@ -166,6 +167,32 @@ def test_auto_waits_for_main_to_settle(checkout, monkeypatch):
     later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_SETTLE + 1)
     readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
     assert readings["repo"]["inflight"]["by"] == "auto"
+
+
+def test_auto_waits_for_a_reading_of_live(checkout, monkeypatch, tmp_path):
+    """§6 (Paul, 2026-09-28): `auto` never acts on a live it could not read; the press still can."""
+    monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
+    (tmp_path / "live").unlink()  # `check` fails: live is unknown, with why
+    main = _merge(checkout, "b")
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["live"] is None and r["live_why"] and r["inflight"] is None
+    assert r["unmet"] is None and promote.unmet(r, press=True) is None  # nothing refuses the person's press
+    (tmp_path / "live").write_text(_git(checkout, "rev-parse", "HEAD~1") + "\n")  # a reading lands
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    assert readings["repo"]["inflight"]["sha"] == main
+
+
+def test_auto_waits_while_check_stops_answering_though_a_last_reading_is_kept(checkout, monkeypatch, tmp_path):
+    monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    first = readings["repo"]["live"]
+    assert first and readings["repo"]["inflight"] is None  # live is main: nothing to do
+    (tmp_path / "live").unlink()  # `check` stops answering
+    _merge(checkout, "b")
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["live"] == first and r["live_why"] and r["inflight"] is None
 
 
 def test_auto_promotes_once_and_the_outcome_is_read_from_check(checkout, monkeypatch):
@@ -388,3 +415,15 @@ async def test_a_press_that_finds_its_run_done_files_the_note(agent, checkout):
             await person.call("promote", repo="repo")
     assert [e.text for e in agent.person_inbox if e.from_ == "system"] == [f"promoted `repo` `{main[:7]}` — 1 commit"]
     assert agent._promotes["repo"]["inflight"] is None
+
+
+def test_this_repos_block_is_the_promote_pair_read_from_the_checkout():
+    """TD-132 slice 4: agentorc's own `.agentorc.yml` carries `promote:` alone — `run` is CLAUDE.md's
+    pair with the checkout's path taken from where it runs, `check` the live venv's build record."""
+    root = Path(__file__).resolve().parent.parent
+    doc = yaml.safe_load((root / ".agentorc.yml").read_text())
+    assert list(doc) == ["promote"] and set(doc["promote"]) == {"run", "check"}  # `auto` is settings.yml's
+    b = promote.block(root)
+    assert "/agentorc-venv/bin" in b["run"] and '"$(pwd -P)[ui]"' in b["run"] and b["run"].endswith("service install")
+    assert "/home/kmaster" not in b["run"] + b["check"]  # never a hard-coded checkout or home
+    assert "build.info()" in b["check"] and "sys.exit(" in b["check"]  # no record → exit 1 saying why
