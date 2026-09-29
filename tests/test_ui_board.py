@@ -528,6 +528,10 @@ def test_the_repo_page_cuts_the_inboxs_horizon_to_its_repo():
     assert [r["line"] for r in got["due"]] == [1] and [r["line"] for r in got["ahead"]] == [2]
     assert [r["line"] for r in got["hidden"]] == [4] and got["next_due"] == "2026-10-20"
     assert h["next_due"] == "2026-10-05" and got["mode"] == "next:3"
+    # the line is the repo's own: its hidden count and next date, not the Inbox's
+    got = horizon_of({**h, "line": {"says": "x", "rest": "y", "n": 2}}, "/a")
+    assert got["line"]["rest"] == "1 not shown, the next due Oct 20" and got["line"]["n"] == 1
+    assert horizon_of(h, "/a").get("line") is None
 
 
 @pytest.mark.unit

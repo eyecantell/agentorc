@@ -519,8 +519,11 @@ def horizon_of(h: Mapping[str, Any], root: str | Path) -> dict[str, Any]:
         return [r for r in rs if r.get("root") and str(Path(str(r["root"])).resolve()) == want]
 
     hidden = mine(h.get("hidden") or ())
-    return {**h, "due": mine(h.get("due") or ()), "ahead": mine(h.get("ahead") or ()), "hidden": hidden,
-            "next_due": _next_due(hidden, str(h.get("today") or ""))}  # fmt: skip
+    out = {**h, "due": mine(h.get("due") or ()), "ahead": mine(h.get("ahead") or ()), "hidden": hidden,
+           "next_due": _next_due(hidden, str(h.get("today") or ""))}  # fmt: skip
+    if h.get("line") is not None:  # the line says this repo's hidden count and next date, not the Inbox's
+        out["line"] = board_line(out)
+    return out
 
 
 def board_line(h: Mapping[str, Any]) -> dict[str, Any]:
