@@ -890,7 +890,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -5823,10 +5823,16 @@ code and needs no grant; a session doing the same work does.
      is closed if it is still there — the one close a policy makes outside a wrap-up, safe because
      the work is pushed — and restarted as rule 1 does, under the same ceiling (`why: wanted`); a
      close or replay that failed keeps its `wanted` entry with `error` and is tried again by the
-     tick. The tick writes `closed_for: wanted` (rule 7's `brief`) on the record after its own close,
-     and any other close clears it — the local one and one routed to a node — so a `closed` record
-     is the tick's to retry only when it carries the mark and its last entry the `error`; any other
-     is a Close by someone else, whatever the clocks say.
+     tick. The tick writes `closed_for: {why: wanted, closed_at}` (rule 7's `brief`) on the record
+     after its own close, naming the `closed_at` that close wrote — a node's own stamp for a node's
+     member, taken from the close's reply. Any close the home runs clears it, the local one and one
+     routed to a node, and a person's Close made at the node, which never crosses as an act, writes a
+     new `closed_at` that no longer matches. So a `closed` record is the tick's to retry only when it
+     carries the mark, the mark names its `closed_at`, and its last entry carries the `error`; any
+     other is a Close by someone else. One failed close is not retried: a close routed to a node
+     whose verdict never came back (the link dropped, or no answer in time) leaves no mark, so if
+     the node did close it the record reads as someone else's Close and waits for a person — a
+     stranded restart, never an undone Close.
      With work left it is **not** restarted: one send of fixed text naming what is left (the dirty
      files' count and the unpushed count, from the record, never a session's words), once
      (`restart_blocked_sent_at`) — typed only into an idle member's empty composer on the home's

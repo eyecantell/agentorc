@@ -1926,12 +1926,29 @@ async def test_a_close_routed_to_a_node_clears_the_ticks_mark_at_the_home(agent)
 
     agent._take_records("laptop", [record(state="idle")], whole=True)
     held = agent.remote["laptop"]["ao-x-w"]
-    held.closed_for = "wanted"  # a restart the tick closed and failed to replay
+    held.closed_for = {"why": "wanted", "closed_at": None}  # a restart the tick closed and failed to replay
     agent._take_records("laptop", [record(state="idle", closed_for=None)], whole=False)
-    assert held.closed_for == "wanted", "a node's report moves only what the node owns"
+    assert held.closed_for == {"why": "wanted", "closed_at": None}, "a node's report moves only what the node owns"
     agent._link_muxes["laptop"] = mux = Closes()
     agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
     async with LocalClient() as person:
         await person.call("close", id="ao-x-w@laptop")
     assert mux.sent[-1][0] == "act" and mux.sent[-1][1]["rpc"] == "close"
     assert agent.remote["laptop"]["ao-x-w"].closed_for is None
+
+
+async def test_a_persons_close_at_the_node_no_longer_matches_the_ticks_mark(agent):
+    """TD-238: a person's Close made at the node never crosses as an act, so the home's mark is not
+    cleared; but the node's close writes its own `closed_at`, and the mark names the one the tick's
+    close wrote, so the record no longer reads as the tick's failed restart."""
+    tick_close = "2026-09-29T08:00:00Z"
+    agent._take_records("laptop", [record(state="closed", closed_at=tick_close)], whole=True)
+    held = agent.remote["laptop"]["ao-x-w"]
+    held.restarts = [{"at": tick_close, "why": "wanted", "error": "create failed"}]
+    agent._mark_closed(held, "wanted")
+    assert held.closed_for == {"why": "wanted", "closed_at": tick_close}
+    assert agent._closed_by_tick(held, "wanted") and not agent._closed_by_tick(held, "brief")
+    # a person closes it again at the node, in a later second: the report carries that close's stamp
+    agent._take_records("laptop", [record(state="closed", closed_at="2026-09-29T08:00:07Z")], whole=False)
+    assert held.closed_for == {"why": "wanted", "closed_at": tick_close}, "the mark is the home's"
+    assert not agent._closed_by_tick(held, "wanted")

@@ -555,13 +555,13 @@ class TickMixin:
                     await self.rpc_close(s.id)
                 else:
                     await self._route_act("close", {"id": s.id}, None, s.host)
-                s.closed_for = "wanted"
+                self._mark_closed(s, "wanted")
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 # `rpc_close` marks the record closed before its own tail runs, so a failure there
                 # leaves it `closed` with nothing replayed: the entry and `closed_for` are what let the
                 # next tick retry it (`closed_by_tick`) rather than strand it (review of PR #461)
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
-                    s.closed_for = "wanted"
+                    self._mark_closed(s, "wanted")
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", "error": f"close: {e}"}]
                 log.warning("%s: the close before a wanted restart failed: %s", s.id, e)
                 self._save(s)
@@ -612,10 +612,10 @@ class TickMixin:
         if s.state == "idle":
             try:
                 await self.rpc_close(s.id)
-                s.closed_for = "brief"
+                self._mark_closed(s, "brief")
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
-                    s.closed_for = "brief"
+                    self._mark_closed(s, "brief")
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "brief", "error": f"close: {e}"}]
                 log.warning("%s: the close before a brief restart failed: %s", s.id, e)
                 self._save(s)
@@ -624,14 +624,31 @@ class TickMixin:
         await self._replay(s, "brief")
 
     @staticmethod
+    def _mark_closed(s: Session, why: str) -> None:
+        """The tick's mark after its own close for a restart: the rule and the `closed_at` that close
+        wrote — the node's own stamp for a node's member, applied from the close's reply — so a later
+        Close, which writes its own `closed_at`, no longer matches, even one made at the node that the
+        home never hears of as an act (TD-238)."""
+        s.closed_for = {"why": why, "closed_at": s.closed_at}
+
+    @staticmethod
     def _closed_by_tick(s: Session, why: str) -> bool:
         """A `closed` record the tick itself closed and failed to replay (`why` rule 2's `wanted` or rule
-        7's `brief`): the tick wrote `closed_for` after its own close, and the last `restarts` entry is
-        that rule's and carries `error` — both failure paths, the close's and the replay's, write one.
-        Any other close clears `closed_for`, so a person's Close is never undone (design §6 rule 2),
-        whatever the clocks say and whenever it lands (TD-235, TD-236, TD-237)."""
+        7's `brief`): it carries the tick's mark for that rule and the close the mark names is still the
+        record's (`closed_at` unchanged), and the last `restarts` entry is that rule's and carries
+        `error` — both failure paths, the close's and the replay's, write one. Any other close clears the
+        mark or writes a new `closed_at`, so a person's Close is never undone (design §6 rule 2; TD-235
+        to TD-238)."""
         last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
-        return s.state == "closed" and s.closed_for == why and last.get("why") == why and bool(last.get("error"))
+        mark = s.closed_for if isinstance(s.closed_for, dict) else {}
+        return (
+            s.state == "closed"
+            and mark.get("why") == why
+            and bool(s.closed_at)
+            and mark.get("closed_at") == s.closed_at
+            and last.get("why") == why
+            and bool(last.get("error"))
+        )
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:
