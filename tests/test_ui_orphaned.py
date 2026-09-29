@@ -104,6 +104,19 @@ def test_the_orphaned_row_draws_the_standing_and_offers_no_pause_and_no_open():
     assert 'data-act="snooze"' in html and 'data-act="gowithit"' in html and "timeleft" not in html
 
 
+@pytest.mark.unit
+def test_only_a_failed_write_is_drawn_as_not_written():
+    """TD-234: *not written* is the refused board line (§4.5a), so only Reply, a suggested answer and
+    Go with it draw it on the row; a failed Snooze or Delete wrote nothing and keeps only its toast.
+    Read from the source: the row's error is gated by the three presses that write."""
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    catch = js[js.index("const named = { identity_log:") : js.index("not written: ${e.message}")]
+    assert 'const writes = ["reply", "answer", "gowithit"].includes(action);' in catch
+    assert "const rowerr = writes && " in catch
+    for press in ("snooze", "unmail", "pause"):
+        assert f'"{press}"' not in catch.split("const writes = ")[1].split(";")[0]
+
+
 # -- the reply route and `ao inbox`, end to end ---------------------------------------------------
 
 
