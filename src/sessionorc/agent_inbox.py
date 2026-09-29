@@ -291,6 +291,8 @@ class InboxMixin:
             raise RpcError(f"{msg} is closed ({e.closed_reason}): there is no clock left to stop (design §4.10)")
         if e.paused_at:
             raise RpcError(f"{msg} is already paused")
+        if e.orphaned:  # a pause tells a session to hold, and there is none (§4.5a *orphaned question*: no Pause)
+            raise RpcError(f"{msg} is orphaned: its asker is gone, so there is no session to hold (design §4.10)")
         self._mark(msg, paused_at=now_iso())
         self._system_note(e.from_, f"steer {msg} paused by the person: do not take your default yet", wake="person")
         await self._push_changes()

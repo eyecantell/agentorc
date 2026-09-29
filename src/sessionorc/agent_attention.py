@@ -189,7 +189,8 @@ class AttentionMixin:
 
     def _adopt_orphans(self, address: str | None = None) -> None:
         """**The name coming back adopts it** (§4.10 *A question about a reference outlives its
-        asker*): a live record under the id an orphaned question's `from` names clears `orphaned`,
+        asker*): a record under the id an orphaned question's `from` names — any the create left
+        there, which is neither closed nor still scheduled — clears `orphaned`,
         whether or not its create resumed the conversation — the successor holds the name and the
         lane. `adopted_at` keeps that it ever was, which is what a later lapse's note reads.
         `address`: the record a create just made, at that create; with none, every orphaned entry

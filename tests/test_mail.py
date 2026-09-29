@@ -1236,6 +1236,8 @@ async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
             await person.call("msg", text="the first", kind="reply", reply_to=ask)
         with pytest.raises(AgentError, match="orphaned.*TD-216"):
             await person.call("inbox_go_with_it", msg=steer)
+        with pytest.raises(AgentError, match="orphaned: its asker is gone"):
+            await person.call("inbox_pause", msg=steer)
         assert (await held(ask))["closed_reason"] is None and (await held(steer))["closed_reason"] is None
         # Delete declines it, as on any open question
         await person.call("inbox_delete", msg=ask)
