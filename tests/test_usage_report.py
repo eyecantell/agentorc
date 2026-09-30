@@ -335,6 +335,13 @@ def test_a_node_adopts_each_window_the_home_confirmed_later_and_keeps_its_own_wo
     assert usage.adopt(held, old)["fetched"] == "2026-10-01T01:00:00Z"
     assert usage.adopt(held, None) == held and usage.adopt(None, {})["windows"] == []
 
+    # a reset one side does not know is no roll: the newer confirmation stands (the review)
+    unknown = usage.merge(None, [w("5h", 45.0, None)], at="2026-10-01T02:00:00Z", source="reported", fresh=True)
+    assert pcts(usage.adopt(unknown, theirs))["5h"] == 45.0
+    # the home's history is kept in order, whatever order it came in
+    shuffled = {"windows": [{**theirs["windows"][0], "history": theirs["windows"][0]["history"][::-1]}]}
+    assert [h["pct"] for h in usage.adopt(None, shuffled)["windows"][0]["history"]] == [50.0, 55.0]
+
 
 class _Mux:
     def __init__(self):
@@ -422,18 +429,22 @@ async def test_after_a_home_restart_a_nodes_account_keeps_its_history(agent, hoo
     held = usage.merge(None, [w("5h", 60.0)], at=iso(t0), source="reported", fresh=True)
     held = usage.merge(held, [w("5h", 61.0)], at=iso(t0 + timedelta(minutes=20)), source="reported", fresh=True)
     agent._usage["pn"] = held | {"account": "laptop-paul", "tool": "hookstub"}
-    agent._take_records("laptop", [node_record()], whole=True)
+    agent._usage["pq"] = held | {"account": "laptop-paul", "tool": "hookstub"}
+    agent._usage_restored |= {"pn"}  # as `usage.json` gave it at the start; `pq` came later
+    agent._take_records("laptop", [node_record(), node_record("ao-x-q", name="nq", profile="pq")], whole=True)
     await agent._refresh_usage_inner()
     assert pcts(agent._usage["pn"]) == {"5h": 61.0}  # kept while no report has keyed it
+    assert "pq" not in agent._usage  # a profile not restored at the start is shown by the rule
 
     report = {"id": "ao-x-w", "account": "hookstub:laptop-paul", "windows": [w("5h", 62.0)], "fresh": True}
     await agent._take_usage_report("laptop", report)
     assert [h["pct"] for h in agent._usage["pn"]["windows"][0]["history"]] == [60.0, 61.0, 62.0]
 
-    agent._usage_acct.clear()
-    agent._usage["pn"] = held | {"account": "someone-else", "tool": "hookstub"}
-    await agent._take_usage_report("laptop", report | {"account": "hookstub:laptop-paul"})
-    assert [h["pct"] for h in agent._usage["pn"]["windows"][0]["history"]] == [62.0]
+    for other in ({"account": "someone-else"}, {}):  # another account's, or one that names none
+        agent._usage_acct.clear()
+        agent._usage["pn"] = held | other | {"tool": "hookstub"}
+        await agent._take_usage_report("laptop", report)
+        assert [h["pct"] for h in agent._usage["pn"]["windows"][0]["history"]] == [62.0]
 
 
 async def test_a_nodes_report_under_a_profile_metered_here_is_taken(agent, hookstub, monkeypatch):

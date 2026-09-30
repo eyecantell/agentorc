@@ -319,7 +319,7 @@ class WakeMixin:
         key = key or _usage_key(ad, s.adapter, s.profile)[0]
         # an account first met since a restart takes the reading its profile held, if it is of this
         # account — a node's included, so its history does not start again (the techlead's read of #783)
-        self._usage_seed(key, [s.profile])
+        self._usage_seed(key, [s.profile], strict=self.sessions.get(s.id) is not s)
         was = self._usage_acct.get(key)
         merged = usage_mod.merge(was, cleaned, at=now_iso(), source="reported", fresh=fresh, by=s.name)
         if merged != was:

@@ -395,6 +395,8 @@ class HostAgent(
         # the `usage` RPC and the chip read.
         self.usage_store = UsageStore()
         self._usage: dict[str, dict[str, Any]] = self.usage_store.load()
+        # the profiles restored above: a node's keeps its reading until the node's first report
+        self._usage_restored: set[str] = set(self._usage)
         self._usage_acct: dict[str, dict[str, Any]] = {}
         # (node, profile) → the account key that node keys the profile by (§4.4 *A node's sessions
         # report to their node*, TD-233 slice 2): its credentials decide, not a profile of that name here

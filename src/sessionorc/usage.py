@@ -172,18 +172,22 @@ def adopt(held: dict[str, Any] | None, theirs: Any) -> dict[str, Any]:
             continue
         label = clean[0]["label"]
         o = old.get(label)
-        if o is not None and not _later(clean[0]["resets"], o.get("resets")):
-            if _later(o.get("resets"), clean[0]["resets"]):
+        # a roll is read only between two known resets: a window whose reset one side does not know
+        # is the same window, and its newer confirmation stands (the review of this send)
+        known = o is not None and _instant(o.get("resets")) is not None and _instant(clean[0]["resets"]) is not None
+        if o is not None and not (known and _later(clean[0]["resets"], o.get("resets"))):
+            if known and _later(o.get("resets"), clean[0]["resets"]):
                 continue  # the home's is the window before its reset: the node has seen it roll
             if not (_older(o.get("at"), w.get("at")) or (o.get("at") is None and _instant(w.get("at")))):
                 continue  # one window, and the node confirmed it no earlier than the home
         n: dict[str, Any] = {**clean[0], "at": w.get("at") if _instant(w.get("at")) else None}
         n["source"] = w.get("source") if w.get("source") in ("reported", "asked") else "reported"
-        n["history"] = [
-            {"at": h["at"], "pct": p}
-            for h in (w.get("history") if isinstance(w.get("history"), list) else ())[-(HISTORY_POINTS):]
+        points = [
+            {"at": str(h["at"]), "pct": p}
+            for h in (w.get("history") if isinstance(w.get("history"), list) else ())
             if isinstance(h, dict) and _instant(h.get("at")) is not None and (p := _pct(h.get("pct"))) is not None
         ]
+        n["history"] = sorted(points, key=lambda h: _instant(h["at"]))[-HISTORY_POINTS:]  # type: ignore[arg-type, return-value]
         out[label] = n
     reading: dict[str, Any] = {**held, "windows": list(out.values())}
     if _instant(theirs.get("fetched")) is not None and (

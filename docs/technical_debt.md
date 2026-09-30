@@ -122,6 +122,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Open — pickable |
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slice 1 built (the setting and the mark); slices 2–6 open |
 | TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Open — design-first |
+| TD-242 | `test_a_metered_accounts_spend_is_summed_noted_and_gated` fails when the suite runs within an hour of local midnight | Low | Open — pickable |
 
 
 ---
@@ -2227,7 +2228,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1, PR #784):** `lane_matches(lane, entry)` with owner words (`models.owner_word`, `lane_refs`, `OWNER_WORD`), `agent_common._lane` setting them aside, the nudge, the report line and the brief's `{lane}` slot (`repoconfig._no_owner`) leaving them out; `lane_seen`'s first write from `ledger.entries_before`. Slices 2–5 open.
+**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1, PR #784):** `lane_matches(lane, entry)` with owner words (`models.owner_word`, `lane_refs`, `OWNER_WORD`), `agent_common._lane` setting them aside, the nudge, the report line and the brief's `{lane}` slot (`repoconfig._no_owner`) leaving them out; `lane_seen`'s first write from `ledger.entries_before`. Slices 2–5 open. **For slice 2, from the techlead's read of #784:** rule 6's sentence *so no tick, this one or a later one reading the checkout, tells as new an entry `origin/<default>` does not hold* is true only of the entries the checkout held at the first write — an entry that appears in the checkout's reading alone after it (the anchor checking out a ledger branch) is still told once, with *read the ledger on `origin/main`*, where it is not. Either narrow the sentence to the first write, or have a later tick leave out an id origin's tip lacks, which changes rule 6's last sentence (*the ledger read is the checkout's file at the home*) in the same diff
 **Location:** `src/sessionorc/ledger.py` (`lane_matches`), `src/sessionorc/agent_common.py` (`_lane`, the three `WORK_*` constants) and `src/agentorc/org.py` (`_lane`), `src/sessionorc/agent_tick.py` (`_lane_news`, `_nudge_line`, `_keep_running`, `_replay`), `src/sessionorc/ledger.py` (`entries_before`, the ledger at a commit, built), `src/sessionorc/settings.py` (`teams.<team>.on_work`), `src/sessionorc/models.py` and the `host` record (`work_waiting`), `src/sessionorc/modes.py`, `src/agentorc/cli.py` (`ao team on-work`, `ao team list`), `src/agentorc/ui/` (the Inbox row, the card's note, the Settings page's picker, `help.py`); design §6 rules 6 and 8, §5, §4.7, §4.5a. Held path: the techlead reads the PRs.
 
 **Why:** TD-214's *Why*: a wound-down team sat a day with ten entries in its designer's lane, and rule 6's first tick took a day's backlog as seen.
@@ -2389,3 +2390,20 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** design the team's *finished* as a reading the home makes, not a judgement a session keeps. Options: (a) the tick, which already derives *concluded* for the page, winds a team down itself when every member is finished and its seats are idle (a policy beside TD-214's rule 8, which restarts it when work arrives); (b) the manager's round reads `ao team status --json` (the members' `unattended`, `state`, `out_of_work`) every round and is told never to rely on an earlier round's reading; (c) the page's *concluded* stops requiring the manager's own declaration when every member has declared, and offers **Start** (which closes the concluded sessions first) then. The round may take more than one. Also: the team card's controls should say why Start is absent (*live: manager-dc-1 has not declared*). Done when a team whose members have all declared out of work reads concluded, or winds down, within a tick or a round, and a test covers a manager that has not declared.
 
 **Related:** TD-199 (a running member keeps its start brief), TD-214 (rule 8, a wound-down team gaining work), TD-213 (archived: the wind-down's closes took the person's questions), TD-053 (wind-down), §4.9a, §4.5a **team groups**.
+
+## TD-242: `test_a_metered_accounts_spend_is_summed_noted_and_gated` fails near local midnight
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-09-29 (grinder-ao-1, seen in its own suite runs late in the evening; filed at the techlead's read of #784)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `tests/test_spend.py` (`test_a_metered_accounts_spend_is_summed_noted_and_gated`)
+
+**Why:** the test fails on `main` when the suite runs shortly before local midnight, and passes otherwise; a flaky test in the gate costs every PR a rerun. Not reproduced on purpose. The likely cause, read from the test and not confirmed: after the pause at the day's amount it runs the gate again at `now + timedelta(hours=1)` (*a restart of the home*), and a day window is the home's local day (§4.2a), so within an hour of midnight that instant is past the window's reset and the pause is lifted rather than held.
+
+**Fix:** reproduce it first (a fixed clock for the spend pass and the gate, or `now` set to 23:30 local), then run the second gate inside the same day — the restart needs a later instant, not an hour — or pin the day. Done when the test passes with the clock at 23:30 and 00:30 local.
+
+**Related:** TD-151 (the metered spend), TD-128.
