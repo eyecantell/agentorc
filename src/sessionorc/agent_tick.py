@@ -1031,7 +1031,8 @@ class TickMixin:
         team's records are replayed (`_work_replays`, the lead first), each `restarts` entry
         `why: work` with the ids it was started for, the instant appended to `work_started` on the
         home's record once however many records it replayed, and None is returned: the mark goes.
-        A member on a node whose link is down holds the whole start to the next tick, unmarked."""
+        A member on a node whose link is down holds the whole start as `held: {why: link, host}`, looked
+        at again on the next tick (the techlead's read of #792)."""
         started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
         if started != (rec.get("work_started") or []):
             rec["work_started"] = started  # a start older than the day counts for nothing
@@ -1040,10 +1041,12 @@ class TickMixin:
         replays = self._work_replays(records, now)
         held = self._work_held(replays, started, conf, now, team)
         bare = {k: v for k, v in mark.items() if k != "held"}
+        if held is None:
+            down = next((r.host for r in replays if r.host != self.host and r.host not in self._link_muxes), None)
+            if down is not None:
+                held = {"why": "link", "host": down}  # the whole team waits for it, looked at again next tick (§4.4a)
         if held is not None:
             return {**bare, "held": held}
-        if any(r.host != self.host and r.host not in self._link_muxes for r in replays):
-            return bare  # its link is down: the whole team waits for it, looked at again next tick (§4.4a)
         ids = list(dict.fromkeys(i for got in (mark.get("members") or {}).values() for i in got))
         rec["work_started"] = [*started, now_iso()]
         log.info("rule 8: starting %s again for %s (%d records)", team, ids, len(replays))
@@ -1058,13 +1061,18 @@ class TickMixin:
         """What a start by rule 8 replays: the team's crew records that ended — the wound-down reading
         has every one that is not a seat declared — seats included, none superseded, suspended, at
         its ceiling or without a launch record (no launch record, no start: the rule never invents a
-        team). The records other ones name as a controller come first, so the lead is up before its
-        members, as a person's start makes it."""
+        team). A seat's `fill` entries are not counted toward `RESTART_CEILING`, as rule 3 never counts
+        them (the techlead's read of #792). The records other ones name as a controller come first, so
+        the lead is up before its members, as a person's start makes it."""
         out = []
         for r in work_mod.crew(records):
             if r.state not in work_mod.DEAD or r.superseded_by or r.suspended or r.restart_ceiling:
                 continue
-            recent = [e for e in r.restarts if isinstance(e, dict) and _recent(e.get("at"), now, RESTART_WINDOW)]
+            recent = [
+                e
+                for e in r.restarts
+                if isinstance(e, dict) and e.get("why") != "fill" and _recent(e.get("at"), now, RESTART_WINDOW)
+            ]
             if len(recent) >= RESTART_CEILING:
                 continue
             if not (paths.launch_dir() / f"{self._address(r)}.json").is_file():
