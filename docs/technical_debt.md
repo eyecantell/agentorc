@@ -123,6 +123,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slices 1–3 and 6 built (the setting, the mark, the refusal, the notes, the tests); slices 4–5 open |
 | TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Designed 2026-09-29 — the build is TD-241 |
 | TD-241 | Build finished as the home's reading: `finished` in `sessionorc`, the page's *concluded* and the *not concluded* line from it, rule 9's wind-down by the tick with its send, close, mark and announcement, `ao team status --json`'s fields, the manager brief | Medium | Open — pickable |
+| TD-244 | Groom the agentorc attention board onto the Inbox's features: 52 open items and none carries `Answers:`; close what is done, give every question its answers and a `(default)`, ledger what is overdue 14 days behind `Blocked by: decision (Paul)` | High | Open — pickable |
 
 
 ---
@@ -2415,3 +2416,29 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, a team whose two grinders declared `none` while its manager sits idle reads *concluded* on the card with Start as its one control within a tick, and, left alone, is wound down by the tick within `FINISHED_SETTLE` + `WRAPUP_GRACE` with one note in the person's inbox and *wound down · by the tick* on the card.
 
 **Related:** TD-240 (the design), TD-199 and TD-217 (a member's stale memory of its brief, the same shape), TD-214 / TD-227 (rule 8 starts a wound-down team again), TD-237 and TD-238 (`closed_for`), TD-125 (the announcement), TD-053 (the wind-down).
+
+## TD-244: Groom the agentorc attention board onto the Inbox's features
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-09-30 (Paul: *set up a session to groom the inbox — we want to use the new features, e.g. recommended options, blocked by*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `docs/user_attention.md` (this repo's board only), `docs/technical_debt.md` (the entries the groom ledgers), `docs/user_attention_archive.md` (§3.4's archive PR), `scripts/board_edit.py`, `scripts/ledger.py`
+
+**Why:** on 2026-09-30 the board holds 52 open items (`BOARD_SIZE_WARN` is 15) and the SessionStart line warns of it on every start. Not one carries cadence §3.5's `Answers:`, so the Inbox draws no answer buttons and no recommended answer on any of them, and Paul must read each item whole to find what he is asked. Several are overdue 14 days or more, which cadence §3.3 says are ledgered and closed; others are *merged, live look pending* for work since promoted, or name PRs that merged or closed. The ledger was groomed onto `**Blocked by:**` on 2026-09-28 (PR #693); the board never was.
+
+**Fix — one pass over every open item, one PR** (a second PR only for §3.4's archive). For each item, in the board's order, exactly one of:
+1. **Done already** — the PR merged and, where the item needs it live, the promote is on record, or the thing it waits for has happened: close it with `scripts/board_edit.py done --why "<evidence: PR #N merged <date>, …>"`. A *live look* item stays open: the look is Paul's, never a session's reading of the code.
+2. **A question** (Paul chooses): append, after `Due:`, `Answers: <a> | <b> | ….` — a handful, each short, read from the item's own `Context:` (the TD, the PR, the design) — with the one you recommend ending ` (default)`, at most one per item (§3.5, TD-066). Put the kind word `decide` before the date if it has none. Never write `Decided:`; that is `board_edit.py decide` on Paul's action. If the item does not say enough to offer answers, rewrite nothing and list it in the PR as *answers unclear*.
+3. **Overdue 14 days or more, or snoozed twice** (§3.3 *Escalation*): ledger it as a new TD — the question in *Status*, `**Owner:** paul` and `**Kind:** decision` where it is his choice, else the work with `**Blocked by:** decision (Paul) — <the question>` (and any `TD-NNN` it also waits on, ids first) — then close the board line with `Closed: … — ledgered as TD-NNN`. The ledgered entry carries the `Answers:` and the default in its *Status*, so the recommendation is not lost.
+4. **An act, watch or fyi item still live**: set its kind word if missing (`act`, `watch`, `fyi`; an `fyi` has no `Due:`), and a `Due:` matched to real urgency — snooze is the date, nothing else.
+5. **A duplicate** (two items for one thing): close the later with `Closed: … — duplicate of the <date> item`.
+
+Rules: the board is append-only (§3.4): close, never delete, and never reword an item's existing text beyond adding `Answers:`, the kind word and `Due:`. Other sessions append while you work: rebase often, and a board conflict takes both sides. Re-read `main` for the next TD number before each ledgered entry (a number can be taken while the PR is open). This entry is the one exception to the lane's *anything on the board awaiting Paul's decision*: the groom reshapes those items and never answers them. Nothing here touches `src/` or `docs/briefs/`, so the PR is not held. The samscrape and dev-cadence boards are their own repos' sessions' and are out of scope, and so is the person inbox's mail, which is Paul's to dismiss.
+
+**Done when:** the board has 15 or fewer open items; every open `decide` item carries `Answers:` with at most one `(default)`; none is overdue 14 days or more; every ledgered item's entry is listed by `python3 scripts/ledger.py --pickable` as blocked on `decision (Paul)` or its TD, or is `Owner: paul`; the PR body carries one table row per item the board held at the start — the line's first words, what was done (closed / answers / ledgered TD-NNN / kind and due / duplicate / answers unclear), and the evidence or the default — so Paul can check the groom from the PR alone; and, once 10 or more lines are closed, §3.4's archive PR has moved them.
+
+**Related:** cadence §3.3–§3.5, TD-036 and TD-066 (`Answers:` and the default), TD-064 (`Blocked by:`), TD-223 and TD-228 (pickable derived), TD-218 and TD-219 (the Inbox's handed entries), PR #693 (the ledger's groom).
