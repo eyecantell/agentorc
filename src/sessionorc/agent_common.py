@@ -66,6 +66,11 @@ LANE_NEWS_NAMED = 5  # rule 6's note names this many new entries, then *and n mo
 # Rule 8 (§6, TD-227): a wound-down team's lanes' news is written as `work_waiting` once this long has
 # passed since the home first read the newest of its entries, so entries filed together are one event
 WORK_SETTLE = timedelta(minutes=10)
+# Rule 8's `on_work: start` (§6, TD-227 slice 4): at most this many starts of one team by the rule in
+# `WORK_DAY`, and none inside `WORK_EARLY` of the last — a team that found nothing, started into the same nothing
+WORK_STARTS_DAY = 3
+WORK_DAY = timedelta(hours=24)
+WORK_EARLY = timedelta(minutes=30)
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)

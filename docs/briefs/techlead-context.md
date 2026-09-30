@@ -37,7 +37,9 @@ person is `docs/user_attention.md`.
   creates, kills or types into an `ao-*` tmux session (§9 invariant 1). It serves RPCs on a unix
   socket, ticks, keeps each session's **record** (`src/sessionorc/models.py`) and its run log.
   **It starts nothing new by itself and does not read `org.yml`**: a start is a person's act or
-  a controller's, and scheduling is unbuilt (TD-026). **A restart is not a start** (§6 *Keeping
+  a controller's, or a person's standing word — `teams.<team>.on_work: start` (§6 rule 8), under
+  which the home starts a wound-down team whose lanes gained work by replaying its members' launch
+  records; team scheduling is unbuilt (TD-026). **A restart is not a start** (§6 *Keeping
   a team running*): for a *supervised* session its tick restarts a crash, carries out a wanted
   restart and fills a seat, each by replaying the session's launch record, and sends one fixed
   nudge to a member idle with work open.
