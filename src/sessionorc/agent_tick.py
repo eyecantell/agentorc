@@ -47,10 +47,10 @@ from sessionorc.agent_common import (
     SETTLED,
     STALL_AFTER,
     TAIL_LINES,
-    USAGE_BACKOFF_MAX,
     RpcError,
     _cap,
     _clean,
+    _cool_left,
     _duration,
     _is_branch_claim,
     _pane_title,
@@ -1343,9 +1343,11 @@ class TickMixin:
                 self.store.save(live)
 
     async def _refresh_usage(self) -> None:
-        """Ask each account a live agent session's profile names for its usage every
-        `USAGE_EVERY`, once per account (§4.2a, TD-122), in a thread; a fetch failure keeps the
-        last answer and never gates anything (design §6).
+        """Ask each account a live agent session's profile names for its usage, once per account
+        (§4.2a, TD-122), in a thread, and only on demand (§4.4 *Usage*, TD-233 slice 3): when its
+        reading is older than `USAGE_FRESH`, at most once per `USAGE_FRESH`, and not for
+        `USAGE_COOL` after a 429. A fetch failure keeps the last answer and never gates anything
+        (design §6).
         Then the `limited` rule: an interactive session on a profile at 100% of a window shows
         `limited` with the reset time, and goes back to what it was once the window resets."""
         try:
@@ -1390,8 +1392,8 @@ class TickMixin:
             self._usage_seed(key, profs)
         due: dict[str, tuple[Any, str]] = {}
         for key in groups:
-            wait = self._usage_wait.get(key, agent_common.USAGE_EVERY)
-            if mono - self._usage_checked.get(key, -wait) >= wait:
+            wait = self._usage_wait.get(key, agent_common.USAGE_FRESH)
+            if mono - self._usage_checked.get(key, -wait) >= wait and not self._usage_young(key):
                 due[key] = ask[key]
         changed = False
         if due:
@@ -1438,17 +1440,37 @@ class TickMixin:
                 s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
                 self.store.save(s)
 
+    def _usage_young(self, key: str) -> bool:
+        """Whether the account's reading is younger than `USAGE_FRESH` by its own time (§4.4
+        *Usage*, TD-233 slice 3): an account whose reading is fresh is not asked, whatever put
+        it there. A reading with no readable time is not young, nor is one stamped ahead of the
+        clock: a clock that stepped back must not hold the poll off for as long as it is behind
+        (`_usage_checked`, seeded at now for such a reading, still waits one period)."""
+        try:
+            age = (datetime.now(UTC) - _parse(str((self._usage_acct.get(key) or {}).get("fetched")))).total_seconds()
+        except (ValueError, TypeError):
+            return False
+        return 0 <= age < agent_common.USAGE_FRESH
+
     def _usage_seed(self, key: str, profs: list[str]) -> None:
         """An account the poll has not met since the agent started takes its reading, and its
         poll's allowance, from the newest reading its profiles hold (TD-087, TD-122): a restart
-        keeps the chip and does not ask sooner than `fetched + USAGE_EVERY`. A reading with no
+        keeps the chip and does not ask sooner than `fetched + USAGE_FRESH`. A reading with no
         readable time is polled at once."""
         held = [self._usage[p] for p in profs if isinstance(self._usage.get(p), dict)]
         if key not in self._usage_acct and held:
             newest = max(held, key=lambda r: str(r.get("fetched") or ""))
             self._usage_acct[key] = {k: v for k, v in newest.items() if k not in ("account", "tool")}
-        if key not in self._usage_checked and (seen := [m for r in held if (m := _usage_checked_at(r)) is not None]):
+        first = key not in self._usage_checked
+        if first and (seen := [m for r in held if (m := _usage_checked_at(r)) is not None]):
             self._usage_checked[key] = max(seen)
+        # …and so does a cool-off (TD-233 slice 3): a promote inside the hour after a 429 does not
+        # ask at once because the held reading's `fetched` is old
+        if first and key not in self._usage_wait:
+            left = [s for r in held if (s := _cool_left(r)) is not None]
+            if left and max(left) > 0:
+                self._usage_checked[key] = time.monotonic()
+                self._usage_wait[key] = max(left)
 
     def _usage_reading(self, key: str, r: Any) -> dict[str, Any] | None:
         """One poll's answer folded into what this account already had (TD-087, TD-122: `key` is
@@ -1460,23 +1482,21 @@ class TickMixin:
         replaced only by a newer reading — a failure **keeps the last one**, with the reason
         beside it, because *the chip went out* and *the allowance is spent* are different things
         to a person and a five-hour window does not change while we are refused. The backoff is
-        set here too: a 429 waits the endpoint's own `Retry-After`, or doubles to a ceiling; any
-        other answer, good or bad, goes back to the ordinary cadence, since only a 429 is the
-        endpoint telling us to ask less often."""
+        set here too: a 429 waits `USAGE_COOL`, or the endpoint's own `Retry-After` when that is
+        longer (TD-233 slice 3; the doubling it replaced could not learn a window the endpoint
+        never names, TD-231); any other answer, good or bad, goes back to the ordinary cadence,
+        since only a 429 is the endpoint telling us to ask less often."""
         if isinstance(r, BaseException) or not isinstance(r, dict):
             r = {"reason": "error"}
         reason = str(r.get("reason") or ("ok" if r.get("windows") is not None else "error"))
         if reason == "rate_limited":
             after = r.get("retry_after")
-            prev = self._usage_wait.get(key, agent_common.USAGE_EVERY)
-            # the endpoint's own word is floored at the ordinary cadence and **not** capped: a
-            # server saying *an hour and a half* is telling us something our ceiling is guessing
-            # at. The ceiling is for our own doubling, which has no such word behind it.
-            self._usage_wait[key] = (
-                max(float(after), agent_common.USAGE_EVERY)
-                if isinstance(after, int | float)
-                else min(prev * 2, USAGE_BACKOFF_MAX)
-            )
+            # a fixed hour, and the endpoint's own word only where it is longer: it answered with
+            # `Retry-After` 0 or none while refusing for six hours (TD-231), so a shorter word is
+            # not believed, and a longer one is kept, never capped
+            cool = agent_common.USAGE_COOL
+            self._usage_wait[key] = max(float(after), cool) if isinstance(after, int | float) else cool
+            until = datetime.now(UTC) + timedelta(seconds=self._usage_wait[key])
         else:
             self._usage_wait.pop(key, None)
         was = self._usage_acct.get(key) or {}
@@ -1489,6 +1509,9 @@ class TickMixin:
             out = {**{k: v for k, v in was.items() if k in ("windows", "fetched")}, "reason": reason}
             if isinstance(r.get("retry_after"), int | float):
                 out["retry_after"] = r["retry_after"]
+            if reason == "rate_limited":
+                # when the cool-off ends, held in `usage.json` so a restart keeps it (`_usage_seed`)
+                out["cool_until"] = until.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         return out if out != was else None
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:

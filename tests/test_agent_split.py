@@ -16,7 +16,7 @@ pytestmark = pytest.mark.unit
 
 # patched by the suite as `sessionorc.agent_common.X`
 PATCHED = {
-    "TICK_SECONDS", "USAGE_EVERY", "SUBMIT_SECONDS", "CREATE_GRACE", "WRAPUP_GRACE", "SEND_STALL_SECONDS",
+    "TICK_SECONDS", "USAGE_FRESH", "SUBMIT_SECONDS", "CREATE_GRACE", "WRAPUP_GRACE", "SEND_STALL_SECONDS",
     "REPORT_WRITE", "CLOSED_KEEP", "TRAIL_KEEP", "ID_RECHECK", "RESTART_SETTLE",
 }  # fmt: skip
 

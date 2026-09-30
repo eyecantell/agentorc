@@ -202,15 +202,17 @@ FILE_CAP = 256 * 1024
 BACKUP_KEEP = 7
 BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml", "settings.yml")
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
-# Seconds between usage polls per account (TD-001, TD-122): a slow cadence, never per tick. **Five
-# minutes, not one** (TD-087): the shortest window the endpoint reports is five hours, so a
-# minute buys nothing and spends an allowance shared with the tool itself.
-USAGE_EVERY = 300.0
+# The usage endpoint is the fallback, asked on demand (design §4.4 *Usage*, TD-233 slice 3): an
+# account is asked only when its reading is older than `USAGE_FRESH`, at most once per
+# `USAGE_FRESH`, and not for `USAGE_COOL` after a `rate_limited` answer (a longer `Retry-After` is
+# kept). The endpoint refused five-minute polls for hours (TD-231), and a back-off that doubled
+# could not learn a window the endpoint never names; the tool itself spends the same allowance.
+USAGE_FRESH = 900.0
+USAGE_COOL = 3600.0
 # Seconds between reads of the repo facts (design §4.4 *Repo facts*, TD-176): each registered
 # checkout's PRs through `gh` and its ledger's git history, in a thread. The ledger itself is
 # re-read on any tick its file's mtime moved, since that read is a local file.
 REPOS_EVERY = 300.0
-USAGE_BACKOFF_MAX = 3600.0  # the ceiling a 429 doubles up to, when the endpoint sends no Retry-After
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
 
@@ -727,6 +729,15 @@ def _usage_key(adapter: Any, name: str, profile: str) -> tuple[str, str]:
         account = None
     account = str(account or profile or "default")
     return f"{name}:{account}", account
+
+
+def _cool_left(reading: dict[str, Any]) -> float | None:
+    """Seconds left of the cool-off a 429 set on `reading` (`cool_until`, TD-233 slice 3), or None
+    when it names none or not a time; zero or less once it has passed."""
+    try:
+        return (_parse(str(reading.get("cool_until"))) - datetime.now(UTC)).total_seconds()
+    except (ValueError, TypeError):
+        return None
 
 
 def _usage_checked_at(reading: dict[str, Any]) -> float | None:
