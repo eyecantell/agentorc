@@ -28,12 +28,14 @@ from sessionorc import link, mail, paths
 from sessionorc.models import (
     GRANTS,
     HOME_OWNED,
+    OWNER_WORD,
     SOURCES,
     MailEntry,
     Session,
     normalize_context,
     normalize_ref,
     normalize_review,
+    owner_word,
     report_line,
 )
 
@@ -509,14 +511,23 @@ def _controllers(ids: list[Any]) -> list[str]:
 
 def _lane(refs: list[str]) -> list[str]:
     """The references a session was handed (design §4.8), in the order given and each canonical, so
-    a lane item and the session's own claim are the same string. `free-pick` is a lane of its own."""
+    a lane item and the session's own claim are the same string. `free-pick` is a lane of its own.
+    An `owner:<word>` narrows the lane (§6 rule 6, TD-227): set aside before the checks, kept last
+    as `owner:<word>`, and never a lane by itself."""
+    owners = list(dict.fromkeys(f"{OWNER_WORD}{o}" for r in refs if (o := owner_word(r))))
+    bad = [r for r in refs if str(r).strip().lower().startswith(OWNER_WORD) and owner_word(r) is None]
+    if bad:
+        raise RpcError(f"an owner word names an owner: `owner:<word>`, not {bad[0]!r}")
+    refs = [r for r in refs if owner_word(r) is None]
+    if owners and not refs:
+        raise RpcError("an owner word narrows a lane and is not one: give it `free-pick` or references")
     if [r for r in refs if str(r).strip() == "free-pick"]:
         if len(refs) > 1:
             raise RpcError("a lane is either `free-pick` or a list of references, not both")
-        return ["free-pick"]
+        return ["free-pick", *owners]
     # deduped after canonicalisation: `--lane TD-027,td-27` is one item, or the lane count the card
     # shows (*1 of 2*) would be a lie about how much work there is (review 2026-09-11)
-    return list(dict.fromkeys(_ref(r) for r in refs))
+    return [*dict.fromkeys(_ref(r) for r in refs), *owners]
 
 
 def _review(review: Any) -> dict[str, Any] | None:

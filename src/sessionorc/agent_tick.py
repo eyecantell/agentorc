@@ -71,6 +71,7 @@ from sessionorc.models import (
     Pending,
     Session,
     context_over_text,
+    lane_refs,
     now_iso,
 )
 from sessionorc.tmux import PaneInfo
@@ -459,7 +460,7 @@ class TickMixin:
                 await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
                 await self._idle_nudge(s, now)
                 await self._context_line(s, now)
-                self._lane_news(s, now)
+                await self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
         if (
@@ -828,28 +829,50 @@ class TickMixin:
             self._save(s)
             await self._push_changes()
 
-    def _lane_news(self, s: Session, now: datetime) -> None:
+    async def _lane_news(self, s: Session, now: datetime) -> None:
         """Rule 6 (design §6, TD-195): a supervised member, not a seat, that declared out of work is
         told when its lane gains entries. The first tick that sees the declaration writes
         `lane_seen` — the ids in its repo's ledger reading that match its lane; a later reading
         holding a matching id not in it, while the member is live, not winding down, not gated and
         not suspended, becomes one `note` from `system` naming the new ids, which are then added,
         so each is told once. The doorbell does the waking; nothing is typed here. No reading —
-        the repo not in this home's registry, or its file unreadable — writes nothing."""
+        the repo not in this home's registry, or its file unreadable — writes nothing.
+
+        **The first write is the ledger at the declaration** (TD-227): the file as the last commit of
+        `origin/<default>` before `out_of_work.at` held it, so an entry merged between the
+        declaration and a first tick that comes late (a promote, a home down) is new and is told;
+        where the history cannot be read, the reading at this tick, the log saying which."""
         if not (s.supervised and s.out_of_work) or s.seat is not None or s.superseded_by:
             return
         led = (self._repos.get(s.repo or "") or {}).get("ledger") or {}
         if "error" in led or not isinstance(led.get("entries"), list):
             return
-        ids = [
-            str(e["id"])
-            for e in led["entries"]
-            if isinstance(e, dict) and e.get("id") and any(ledger_mod.lane_matches(w, e) for w in s.lane)
-        ]
+
+        def matching(got: list[Any]) -> list[str]:
+            return [
+                str(e["id"]) for e in got if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(s.lane, e)
+            ]
+
+        ids = matching(led["entries"])
         if s.lane_seen is None:
-            s.lane_seen = {"at": now_iso(), "ids": ids}
+            seen, read = ids, "the reading at this tick"
+            root, rel = (self._repos.get(s.repo or "") or {}).get("root") or s.repo, s.ledger or led.get("path")
+            try:
+                at = _parse(str((s.out_of_work or {}).get("at")))
+            except (ValueError, TypeError):
+                at = None
+            if root and rel and at is not None:
+                then, why = await asyncio.to_thread(ledger_mod.entries_before, root, str(rel), at)
+                if not s.out_of_work or s.lane_seen is not None:
+                    return  # the declaration moved while git was read: the next tick looks afresh
+                if then is not None:
+                    seen, read = matching(then), f"the ledger at the declaration ({why})"
+                else:
+                    read = f"the reading at this tick ({why})"
+            s.lane_seen = {"at": now_iso(), "ids": seen}
             self._save(s)
-            return
+            log.info("%s: lane_seen from %s", self._address(s), read)
+            # and on: an entry merged since the declaration is told on this tick
         seen = set(s.lane_seen.get("ids") or [])
         new = [i for i in ids if i not in seen]
         if not new or s.state in ("exited", "closed") or s.suspended:
@@ -888,7 +911,7 @@ class TickMixin:
             return "[agentorc] " + "; ".join(parts)
         ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
         claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
-        ref = next((r for r in [*s.lane, *claimed] if r != "free-pick" and r not in ended), None)
+        ref = next((r for r in [*lane_refs(s.lane), *claimed] if r not in ended), None)
         if ref is None:
             return None
         return (
