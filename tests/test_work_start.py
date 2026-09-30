@@ -142,6 +142,43 @@ async def test_no_launch_record_no_start(agent, tmp_path, monkeypatch):
     assert "work_started" not in _team_rec(agent)
 
 
+async def test_a_seats_fills_do_not_count_toward_the_ceiling(agent, tmp_path, monkeypatch):
+    """The techlead's read of #792: rule 3 never counts a fill toward `RESTART_CEILING`, so a seat
+    filled three times in the window is still started; three restarts of another kind leave it out."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    now = _iso(datetime.now(UTC))
+    fills = [{"at": now, "why": "fill"} for _ in range(3)]
+    later = await _settled(
+        agent, tmp_path,
+        _rec("grinder-ao-1"),
+        _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None, restarts=fills),
+        _rec("auditor-ao", seat={"trigger": "asks"}, out_of_work=None, restarts=[{"at": now, "why": "work"}] * 3),
+    )  # fmt: skip
+    await agent._work_marks(later)
+    assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "techlead-ao"]
+
+
+async def test_a_member_behind_a_down_link_holds_the_start_as_link(agent, tmp_path, monkeypatch):
+    """The techlead's read of #792: the start waits for the link, and says so, so the row is drawn."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    far = _rec("grinder-ao-2")
+    later = await _settled(agent, tmp_path, _rec("grinder-ao-1"), far)
+    far.host = "far-node"
+    _launch(agent._address(far))  # a node's record is launched under its address at the home
+    await agent._work_marks(later)
+    assert replays.calls == [] and _team_rec(agent)["work_waiting"]["held"] == {"why": "link", "host": "far-node"}
+    assert "work_started" not in _team_rec(agent)
+    far.host = agent.host  # the link is back: the next tick starts the team
+    await agent._work_marks(later)
+    assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "grinder-ao-2"]
+
+
 @pytest.mark.integration
 async def test_a_start_by_the_rule_replays_the_records_under_their_names(agent, tmp_path):
     await park_ticks(agent)

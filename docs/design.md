@@ -6429,8 +6429,11 @@ code and needs no grant; a session doing the same work does.
      from the checkout's history, so an entry merged between the declaration and the first tick
      that looks — a day later, when the rule went live on 2026-09-28 with ten entries in the
      designer's lane — is new and is told; an entry the checkout's reading holds and that ref's tip does not
-     (a branch checked out at the home) is written into it untold, so no tick, this one or a later
-     one reading the checkout, tells as new an entry `origin/<default>` does not hold;
+     (a branch checked out at the home) is written into it untold, so neither that tick nor a later
+     one tells as new an entry the checkout held at the first write and `origin/<default>` does not.
+     That is the first write's alone: an entry that appears in the checkout's reading only after it
+     (the anchor checking out a ledger branch) is told once, as any new id is, though its note's
+     *read the ledger on `origin/main`* will not find it there — the ledger read is the checkout's file;
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      with pickable derived (§4.4 *Repo facts*, TD-223; built — TD-228 slice 1), `design-first`
      is a pickable entry with `Kind: design-first`, and `free-pick` a pickable entry whose kind
@@ -6541,7 +6544,8 @@ code and needs no grant; a session doing the same work does.
      - **`start`**: a person's standing press, as a schedule is. The home replays the team: the
        launch record of every record carrying the badge that ended by the team's own ending, as
        §6 *Schedule* replays at the reset and under its rules (seats included, no launch record
-       no start, a suspended record or one at its ceiling left out), `why: work`, each entry
+       no start, a suspended record or one at its ceiling left out — a seat's fills, which rule 3
+       never counts toward `RESTART_CEILING`, not counted here either), `why: work`, each entry
        carrying the `ids` it was started for, the records other ones name as a controller first so
        the lead is up before its members, and a seat with its mail kept as a fill keeps it. It starts
        **the whole team**, a member whose lane gained nothing included: the manager decides
@@ -6556,8 +6560,8 @@ code and needs no grant; a session doing the same work does.
        A bound that holds writes **`held: {why}`** on `work_waiting` — `usage` with the `profile`,
        `until` with the instant, `day` with the `count`, `early` with the last start — re-read on
        every tick, so the start follows on the tick the bound lifts; a team with no record left
-       to replay is held as `nothing`. The row is drawn from `held`. A member on a node whose link
-       is down holds the whole start to a later tick, unmarked.
+       to replay is held as `nothing`, and one with a member on a node whose link is down as `link`
+       with that `host`, the whole start waiting for a tick the link is up. The row is drawn from `held`.
      - **`off`**: nothing is written and nothing drawn; the team waits for Start or its schedule.
 
      Dismiss — `clear_work {team}`, a person's own RPC and the home's alone (`modes.HOME_EDITS`:
