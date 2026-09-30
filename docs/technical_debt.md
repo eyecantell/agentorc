@@ -2171,7 +2171,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Kind:** build
 **Pickable:** yes
 **Status:** Partly done — **slices 1–2 built 2026-09-29 (grinder-ao-2):** `board_argv(fetch=, only=)`, `BOARD_FETCH_TIMEOUT`, `read_boards(fetch=, board=)` with the plain-read fallback marking *fetch skipped (<why>)*, each row's `source` and `fetch_note`; `board_items`' one fetching read at a time in the background, the first read plain, the read after a press of that one board laid over the last reading; tests in `tests/test_ui_board.py`. Left: slice 3 (the note, the read-only rows, the phrase table and the field asked of dev-cadence) and the rest of slice 4's tests (after a pull the row is pressable, the two-sided note)
-**Location:** `src/agentorc/ui/inbox.py` (`board_argv`, `BOARD_TTL`, `BOARD_TIMEOUT`), `src/agentorc/ui/app.py` (`read_boards`, `board_items` and its `fresh` reads after Snooze, Done and Reply), the Inbox's and the Repo page's templates; design §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note**. No held path: the host agent's write-back (`src/sessionorc/board.py`) is not changed.
+**Location:** `src/agentorc/ui/inbox.py` (`board_argv`, `BOARD_TTL`, `BOARD_TIMEOUT`), `src/agentorc/ui/app.py` (`read_boards`, `board_items`, `board_fetch`, and the read of one board after Snooze, Done, Reply and Put on the board), the Inbox's and the Repo page's templates; design §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note**. No held path: the host agent's write-back (`src/sessionorc/board.py`) is not changed.
 
 **Why:** TD-208's *Why*: a board line merged on origin is invisible in the Inbox until the main checkout is pulled.
 

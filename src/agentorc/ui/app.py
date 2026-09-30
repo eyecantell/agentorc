@@ -589,7 +589,11 @@ def create_app() -> FastAPI:
         began before the edit and would put the answered row back until the next one."""
         began = time.monotonic()
         try:
-            rows, note = await asyncio.to_thread(read_boards, fetch=True)
+            try:
+                rows, note = await asyncio.to_thread(read_boards, fetch=True)
+            except Exception as e:  # never a silent retry every poll: said, and backed off for the TTL
+                board_cache.update(note=f"board items could not be read again: {e}", at=time.monotonic())
+                return
             pressed = {b for b, at in board_cache["pressed"].items() if at >= began}
             if pressed:
                 rows = [r for r in rows if r.get("board") not in pressed] + [
@@ -617,8 +621,9 @@ def create_app() -> FastAPI:
         if board and board_cache["at"] is not None:
             rows, note = await asyncio.to_thread(read_boards, board=board)
             board_cache["pressed"][board] = time.monotonic()
-            if not note:
-                board_store([r for r in board_cache["all"] if r.get("board") != board] + rows, board_cache["note"])
+            # the answered row is never left drawn as if nothing happened: a failed read of the
+            # pressed board drops its rows and says why
+            board_store([r for r in board_cache["all"] if r.get("board") != board] + rows, note or board_cache["note"])
         elif fresh or board or board_cache["at"] is None:
             rows, note = await asyncio.to_thread(read_boards)
             board_store(rows, note)
