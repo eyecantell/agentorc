@@ -1395,13 +1395,12 @@ def cmd_gate(args: argparse.Namespace) -> int:
     a person's own, which the host agent refuses to a session. `-` names the unnamed default
     profile; `label=` alone clears that window's reserve. `--max-age` sets `usage.max_age` (TD-233):
     an age, `off`, or `default` to clear it back to the hour."""
+    age: dict[str, Any] = {}
     if args.max_age is not None:
-        value = None if args.max_age.strip().lower() == "default" else args.max_age.strip()
-        set_age = call_sync("set_settings", usage={"max_age": value})
+        age = {"usage": {"max_age": None if args.max_age.strip().lower() == "default" else args.max_age.strip()}}
         if not args.profile:
+            set_age = call_sync("set_settings", **age)
             return emit(args, set_age, lambda: print(_max_age_said(set_age["usage"]["max_age"])))
-        if not args.json:  # with reserves too, `--json` prints the reserves' answer alone
-            print(_max_age_said(set_age["usage"]["max_age"]))
     if not args.profile:
         got = call_sync("gate")
         try:  # each reading's age (TD-233 slice 1): `gate` carries the lines, `usage` the time
@@ -1430,9 +1429,12 @@ def cmd_gate(args: argparse.Namespace) -> int:
             raise AgentError(f"{item!r}: a reserve is <label>=<reserve>, e.g. 5h=30 or week=10/day")
         reserves[label] = _reserve(value)
     prof = "" if args.profile == "-" else args.profile
-    got = call_sync("set_settings", profile=prof, reserves=reserves)
+    # one write with the reserves: `set_settings` checks every key before it writes any
+    got = call_sync("set_settings", profile=prof, reserves=reserves, **age)
 
     def said() -> None:
+        if "usage" in got:
+            print(_max_age_said(got["usage"]["max_age"]))
         if not got["reserves"]:
             print(f"{prof or '(default)'}: no reserves — the gate pauses nothing on this profile")
         else:

@@ -1833,25 +1833,30 @@ def test_ao_gate_max_age_sets_the_setting(subprocess_agent, capsys, monkeypatch)
     from sessionorc import settings as settings_mod
 
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
-    assert cli.main(["gate", "--max-age", "90m"]) == 0
-    assert capsys.readouterr().out.startswith("max_age 90m: ")
-    assert settings_mod.load()["usage"] == {"max_age": "90m"}
-    assert cli.main(["--json", "gate", "--max-age", "off"]) == 0
-    assert json.loads(capsys.readouterr().out)["usage"] == {"max_age": "off"}
-    assert cli.main(["--json", "gate"]) == 0
-    assert json.loads(capsys.readouterr().out)["max_age"] == "off"
-    assert cli.main(["gate", "--max-age", "default"]) == 0
-    assert "max_age 1h" in capsys.readouterr().out and "usage" not in settings_mod.load()
-    assert cli.main(["gate", "--max-age", "2m"]) != 0
-    assert "from 5m to 7d" in capsys.readouterr().err
-    assert cli.main(["gate", "--max-age", "2h", "grind", "5h=30"]) == 0
-    out = capsys.readouterr().out
-    assert out.startswith("max_age 2h: ") and "grind · 5h 30" in out
-    monkeypatch.setenv("AGENTORC_SESSION", "s-nobody")
-    assert cli.main(["gate", "--max-age", "off"]) != 0
-    assert settings_mod.load()["usage"] == {"max_age": "2h"}
-    monkeypatch.delenv("AGENTORC_SESSION")
-    assert cli.main(["gate", "--max-age", "default", "grind", "5h="]) == 0  # the agent is shared: leave it bare
+    try:
+        assert cli.main(["gate", "--max-age", "90m"]) == 0
+        assert capsys.readouterr().out.startswith("max_age 90m: ")
+        assert settings_mod.load()["usage"] == {"max_age": "90m"}
+        assert cli.main(["--json", "gate", "--max-age", "off"]) == 0
+        assert json.loads(capsys.readouterr().out)["usage"] == {"max_age": "off"}
+        assert cli.main(["--json", "gate"]) == 0
+        assert json.loads(capsys.readouterr().out)["max_age"] == "off"
+        assert cli.main(["gate", "--max-age", "default"]) == 0
+        assert "max_age 1h" in capsys.readouterr().out and "usage" not in settings_mod.load()
+        assert cli.main(["gate", "--max-age", "2m"]) != 0
+        assert "from 5m to 7d" in capsys.readouterr().err
+        assert cli.main(["gate", "--max-age", "3h", "grind", "5h=200"]) != 0  # a bad reserve writes neither
+        capsys.readouterr()
+        assert settings_mod.load().get("usage") is None
+        assert cli.main(["gate", "--max-age", "2h", "grind", "5h=30"]) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("max_age 2h: ") and "grind · 5h 30" in out
+        monkeypatch.setenv("AGENTORC_SESSION", "s-nobody")
+        assert cli.main(["gate", "--max-age", "off"]) != 0
+        assert settings_mod.load()["usage"] == {"max_age": "2h"}
+    finally:
+        monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+        assert cli.main(["gate", "--max-age", "default", "grind", "5h="]) == 0  # the agent is shared: leave it bare
     assert "usage" not in settings_mod.load() and not settings_mod.load().get("usage_gate")
 
 
