@@ -152,6 +152,40 @@ HELP: tuple[Help, ...] = (
             "Wait leaves the session where it is until the account resets."
         ),
     ),
+    Help(
+        "promote",
+        "Promote",
+        "Inbox row: promote",
+        (
+            "Makes main's head live for this repo: the home starts the repo's own promote run with it, and a "
+            "note says when it is live. Press it when what is merged should be what runs, and on a held row "
+            "once main holds the cure: a press that concludes ends the hold. It never goes back to an older "
+            "commit — that is `ao promote --sha` or `--back` — and it is refused, in words, while a run is "
+            "in flight, a failure stands, or the checkout is not clean on main."
+        ),
+    ),
+    Help(
+        "promote-snooze",
+        "Snooze ▾",
+        "Inbox row: promote",
+        (
+            "Sets this row aside until the time you pick: +1 day, +1 week or a date. Press it when you "
+            "promote in batches and want to be left alone until then. It changes nothing at the home: more "
+            "merges meanwhile do not bring the row back, and a snoozed failure or hold still stops the "
+            "policy."
+        ),
+    ),
+    Help(
+        "promote-dismiss",
+        "Dismiss",
+        "Inbox row: promote",
+        (
+            "Clears the home's own mark on this repo: a failed promote first, and a rollback's hold when no "
+            "failure stands. Press it once you have read the failure, or when what a rollback went back from "
+            "may go live again. It moves nothing live: once neither stands, promoting goes on — under `auto`, "
+            "to main's head at the next pass."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -173,6 +207,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("start", "wind-down", "stop-now", "fold", "forget-all", "forget", "close", "message", "switch-profile"),
     ),
     ("focus", "Focus", ("wrap-up", "kill", "resume")),
+    ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss")),
 )
 
 
