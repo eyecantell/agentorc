@@ -87,6 +87,32 @@ def test_what_cannot_be_read_is_said_and_never_guessed(tmp_path):
     assert brief.record({**made, "base": str(tmp_path / "gone.md")}) is None
 
 
+@pytest.mark.unit
+def test_a_brief_under_the_homes_work_tree_is_read_from_disk_whatever_its_remote(tmp_path, monkeypatch):
+    """§4.9: the home is a work tree of its three definition files, not a checkout a brief is merged
+    into — with a remote named `origin` added there, a brief kept under it still reads (the techlead's
+    read of #800)."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    home.mkdir()
+    _git(home, "init", "-q", "-b", "main")
+    _git(home, "config", "user.email", "t@example.com")
+    _git(home, "config", "user.name", "t")
+    (home / "org.yml").write_text("teams: {}\n")
+    _git(home, "add", "org.yml")
+    _git(home, "commit", "-q", "-m", "defs")
+    _git(home, "update-ref", "refs/remotes/origin/main", "HEAD")  # the person's own remote, fetched
+    (home / "briefs").mkdir()
+    (home / "briefs" / "mine.md").write_text("my own brief\n")  # untracked, as every brief there is
+    assert brief.read(str(home / "briefs" / "mine.md"))[0] == "my own brief\n"
+    # a checkout that is not the home still refuses what is not merged
+    repo = _repo(tmp_path)
+    _merge(repo, "x\n")
+    (repo / "docs" / "new.md").write_text("only here\n")
+    with pytest.raises(brief.Unreadable, match="not on origin/"):
+        brief.read(str(repo / "docs" / "new.md"))
+
+
 def _crash(agent, sid: str) -> None:
     rec = agent.sessions[sid]
     rec.state, rec.pane, rec.exit_code = "exited", True, 1

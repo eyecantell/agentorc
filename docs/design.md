@@ -4047,7 +4047,7 @@ the directory becomes a git work tree that tracks those three and ignores the re
 runs and mail are state, and `hosts.yml` is this machine's own name and links, which another
 machine must not inherit. **The home's host agent is the one committer**, so two writers never
 meet on the index: it commits after its own `set_settings` (*settings: usage_gate.grind.week
-30 → 20*), when a client asks with the act's words after **Members…** wrote (*org: ao-grind
+30 → 20*; detached from the reply, so a slow git never holds Save), when a client asks with the act's words after **Members…** wrote (*org: ao-grind
 +grinder-ao-3*, the `commit_defs` RPC, a person's own), and on the reports' cadence for a hand
 edit, as *edited by hand*. It runs `git add` and `git commit` on the three and reads none of
 them for meaning (it still reads no `org.yml`); a file that does not parse as YAML is left
@@ -4058,7 +4058,9 @@ install` makes it one. So
 `git -C ~/.agentorc log -p org.yml` is the file's history and the `org.yml.bak-*` copies have
 no more work to do. A node's replica of `settings.yml` is not tracked. **The home never
 pushes and adds no remote**: a copy off the machine is the person's own `git remote add` and
-push, or the backup's, and no secret is in any of the three (Doppler holds them). **Standing
+push; the daily backup carries the three files, not their history. No secret is in any of the
+three (Doppler holds them). The home's work tree is never a checkout a brief is merged into: a
+brief kept under `~/.agentorc` is read from disk, whatever remote the person adds (§6 rule 7). **Standing
 the org up on another machine** is then the repos and the remainder: clone the repos and
 register them, bring the three files (a clone of the person's remote, or a copy), write that
 machine's `hosts.yml` as any new host's is written, and `ao org check` says what the

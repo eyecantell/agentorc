@@ -4,7 +4,9 @@ host agent is its one committer — after `set_settings`, on `commit_defs`, and 
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,6 +25,17 @@ def _log(home: Path, *paths_: str) -> list[str]:
 
 def _tracked(home: Path) -> set[str]:
     return set(subprocess.run(["git", "-C", str(home), "ls-files"], capture_output=True, text=True).stdout.split())
+
+
+async def _committed(agent) -> None:
+    """The commit after `set_settings` runs detached (`_bg`): wait for it, bounded, so a task that
+    is not a commit fails the test rather than hanging it."""
+
+    async def drained() -> None:
+        while agent._bg:
+            await asyncio.gather(*list(agent._bg), return_exceptions=True)
+
+    await asyncio.wait_for(drained(), 15)
 
 
 def test_init_tracks_the_three_files_and_ignores_the_rest(tmp_path):
@@ -93,6 +106,7 @@ async def test_set_settings_leaves_one_commit_and_a_failed_commit_leaves_the_wri
     defs.init(home)
     async with LocalClient() as person:
         await person.call("set_settings", person={"open_in": "tab"})
+        await _committed(agent)
         assert _log(home, "settings.yml")[0] == "settings: person.open_in none → tab"
 
         def boom(*a, **k):
@@ -100,9 +114,26 @@ async def test_set_settings_leaves_one_commit_and_a_failed_commit_leaves_the_wri
 
         monkeypatch.setattr(defs, "commit", boom)
         got = await person.call("set_settings", person={"open_in": "window"})
+        await _committed(agent)
         assert got["person"]["open_in"] == "window", "the write stands"
     assert "window" in (home / "settings.yml").read_text()
     assert len(_log(home, "settings.yml")) == 1, "the failed commit made none"
+
+
+async def test_a_wedged_commit_holds_no_save(agent, monkeypatch):
+    """The commit after `set_settings` is detached, as the tick's is: a git that hangs holds the
+    history back, never the reply (the techlead's read of #800)."""
+    await park_ticks(agent)
+    defs.init(paths.home())
+    release = threading.Event()
+    monkeypatch.setattr(defs, "commit", lambda *a, **k: release.wait(10) and False)
+    try:
+        async with LocalClient() as person:
+            got = await asyncio.wait_for(person.call("set_settings", person={"open_in": "tab"}), 5)
+        assert got["person"]["open_in"] == "tab" and agent._bg, "answered while the commit still runs"
+    finally:
+        release.set()
+    await _committed(agent)
 
 
 async def test_commit_defs_is_a_persons_own_and_the_homes(agent):
