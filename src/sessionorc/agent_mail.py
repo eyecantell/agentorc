@@ -383,6 +383,7 @@ class MailMixin:
         # **home** verifies — unlike `--about`, which is free text nobody checks.
         settle: MailEntry | None = None
         taken: MailEntry | None = None  # the caller's own open question to a session, taken to the person
+        onto: MailEntry | None = None  # a handed entry whose thread a question joins, its debt left standing
         state = str(outcome or "").strip()
         if state and not for_:
             raise RpcError("an outcome names the question it settles: --for <ask id> (design §4.10 *Outcomes*)")
@@ -414,7 +415,14 @@ class MailMixin:
                 raise RpcError("--thread follows up a question put to the person: name `person` as the addressee")
             taken = self._question_to_take_up(me, str(thread))
             if taken is None:
-                settle = self._owing_question(sender, str(thread))
+                owed = self._owing_question(sender, str(thread))
+                # a question about an entry the person handed the caller goes on its thread and settles
+                # nothing: the entry is the person's, not a question of the caller's, and it still owes
+                # its outcome (§4.10 *An entry handed to a seat*, TD-218 slice 3)
+                if owed.handed_entry:
+                    onto = owed
+                else:
+                    settle = owed
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
 
@@ -464,7 +472,7 @@ class MailMixin:
         # A reporting note and a follow-up both belong to the **question's own thread** (design
         # §4.10 *Outcomes*): the person reads the answer and what came of it in one place, and the
         # thread's exchange bound counts them where they belong (review of PR #267).
-        on_thread = settle or taken
+        on_thread = settle or taken or onto
         root = on_thread.root if on_thread is not None else (replied.root if replied is not None else "")
         now = datetime.now(UTC)
         if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
@@ -938,6 +946,16 @@ class MailMixin:
                             "on_handed": e.open and e.kind == "ask" and handed.get(e.root) == e.from_,
                         }
                         for e in held
+                    ],
+                    # work the person handed a session (§4.10 *An entry handed to a seat*, TD-218 slice 3):
+                    # its one copy is the holder's, so the person's read lists it beside the inbox —
+                    # while it owes its outcome, or came back `blocked` — for the row under *Waiting on
+                    # them*; Dismiss names its id, and its outcome is written on that copy
+                    "handed": [
+                        {**e.to_dict(), "holder": addr, "holder_name": r.name, "holder_state": r.state}
+                        for addr, r in self._graph().items()
+                        for e in r.inbox
+                        if e.handed_entry and (e.owes or (e.outcome or {}).get("state") == "blocked")
                     ],
                     "threads": {},
                     "sends": [],

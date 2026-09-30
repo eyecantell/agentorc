@@ -101,6 +101,21 @@ class InboxMixin:
         for e in [x for x in self.person_inbox if x.id in wanted and x.owes]:
             self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": ""})
             self._system_note(e.from_, f"the person dismissed {e.id}: no outcome is owed on it")
+        # work the person handed a session lives in that session's inbox, not the person's: its row
+        # under *Waiting on them* is dismissed the same way — the debt ends, the holder is told
+        # (§4.10 *An entry handed to a seat*, TD-218 slice 3)
+        handed: list[str] = []
+        for addr, r in list(self._graph().items()):
+            for e in r.inbox:
+                if (
+                    e.id in wanted
+                    and e.id not in handed
+                    and e.handed
+                    and (e.owes or (e.outcome or {}).get("state") == "blocked")  # a blocked row is dismissed too
+                ):
+                    self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": ""})
+                    self._system_note(addr, f"the person dismissed {e.id}: no outcome is owed on it")
+                    handed.append(e.id)
         dismissed = [e.id for e in self.person_inbox if e.id in wanted]
         if dismissed:
             self.person_inbox = [e for e in self.person_inbox if e.id not in wanted]
@@ -111,8 +126,8 @@ class InboxMixin:
             self.attention_store.save(self.trail, self.attention_snoozed)
         return {
             "id": PERSON,
-            "dismissed": [*dismissed, *dropped],
-            "skipped": [i for i in ids if i not in (*dismissed, *dropped)],
+            "dismissed": [*dismissed, *handed, *dropped],
+            "skipped": [i for i in ids if i not in (*dismissed, *handed, *dropped)],
             "unread": sum(1 for e in self.person_inbox if not e.read_at),
         }
 
