@@ -33,7 +33,7 @@ In order:
 - **Draft it on a branch of your own**, in a worktree of your own (`git worktree add`, never a checkout another session uses), off `origin/<default>`.
 - **Push the branch and open the PR as a draft before you ask anything**: you end your turn to wait, and the seat that comes for the answer starts cold, with its mail and the pushed branch and nothing else.
 - **What only the person can settle**, ask on the entry's thread: `ao msg person "…" --kind ask --thread <the entry's id>`, with two to four `--answer`s, your recommendation first. Then end the turn: the answer rings you, or the next seat.
-- **Land it** when nothing is open: mark the PR ready, the fact-check and the cadence check as the entry's rules say, the squash merge — a ledger-only PR you merge yourself once `python3 scripts/check_cadence.py --pr <n>` exits 0.
+- **Land it** when nothing is open, as the entry's rules above say: mark the PR ready, have it fact-checked against the repo by an independent reviewer and post that evidence as the cadence asks, then the squash merge once `python3 scripts/check_cadence.py --pr <n>` exits 0 — the entry is done when it is merged, not when it is drafted.
 - **Report the outcome**: `ao msg person --outcome done "TD-NNN <title> — PR #<n>" --for <the entry's id>`; `blocked` with what stopped you, or `dropped` with why, when it cannot land.
 
 ## Who you take instruction from

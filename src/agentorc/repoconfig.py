@@ -313,7 +313,7 @@ class Role:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
-        if ENTRY_PLACEHOLDER in text:  # the techlead's template alone carries it, so only it records the slot
+        if self.template is not None and ENTRY_PLACEHOLDER in text:  # the techlead's template alone carries it
             handed = entry_text(*(HANDED_ENTRY[slot] for slot in ENTRY_SLOTS))
             text = text.replace(ENTRY_PLACEHOLDER, handed)
             slots[ENTRY_PLACEHOLDER] = {"text": handed}

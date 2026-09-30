@@ -200,7 +200,7 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
     text, made = tl.compose([])
     assert "{entry}" not in text and "## An entry handed to you" in text
-    assert repoconfig.entry_text(*repoconfig.HANDED_ENTRY.values()) in text
+    assert repoconfig.entry_text(*(repoconfig.HANDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS)) in text
     assert list(made["slots"])[:2] == ["{repo}", "{entry}"]  # a replay fills it after the repo's brief
     for name in ("grinder", "hunter", "manager", "auditor"):
         _, made = repoconfig.resolve_role(repoconfig.RepoConfig(), name).compose([])
