@@ -110,6 +110,9 @@ def test_report_due_on_a_change_or_a_minute_and_fresh_on_new_work():
     # a new process under the same name counts its API time from nothing again
     restarted = usage_report(payload(work=300, sid="u2"))
     assert hook_mod.report_due(restarted, {**last, "sent": 0.0}, now=1070.0)["fresh"] is True
+    # and so does the same tool session resumed in a new process: its running total started over
+    resumed = usage_report(payload(work=300))
+    assert hook_mod.report_due(resumed, {**last, "sent": 0.0}, now=1070.0)["fresh"] is True
 
 
 class FakeAgent:

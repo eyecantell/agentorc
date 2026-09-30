@@ -149,7 +149,7 @@ def call_agent(params: dict[str, Any], timeout: float | None, method: str = "hoo
     if caller:
         req["caller"] = caller
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-        s.settimeout(min(5.0, timeout) if timeout else 5.0)
+        s.settimeout(timeout if method == "usage_report" else 5.0)  # a report waits no longer to connect
         s.connect(str(paths.socket_path()))
         s.settimeout(timeout)
         s.sendall((json.dumps(req) + "\n").encode())
@@ -189,12 +189,12 @@ def report_due(rep: dict[str, Any], last: dict[str, Any] | None, now: float) -> 
     if same and isinstance(sent, int | float) and 0 <= now - sent < STATUSLINE_REFRESH:
         return None
     work, was = rep.get("work"), last.get("work")
-    if last.get("sid") != rep.get("sid"):
+    if not isinstance(was, int | float) or isinstance(was, bool) or last.get("sid") != rep.get("sid"):
         was = 0  # a new process under the same name counts its API time from nothing again
-    if work is None:
-        fresh = not same  # no running total to read: only a changed number says anything happened
-    else:
-        fresh = work > (was if isinstance(was, int | float) and not isinstance(was, bool) else 0)
+    elif work is not None and work < was:
+        was = 0  # the same tool session resumed in a new process: its running total started over
+    # with no running total to read, only a changed number says anything happened
+    fresh = not same if work is None else work > was
     return {"windows": rep["windows"], "fresh": fresh}
 
 
@@ -214,7 +214,7 @@ def report_usage(session: str, payload: dict[str, Any], now: float) -> None:
         return
     call_agent(params, timeout=REPORT_TIMEOUT, method="usage_report", caller=session)
     f.parent.mkdir(parents=True, exist_ok=True)
-    tmp = f.with_suffix(".tmp")
+    tmp = f.with_name(f"{f.stem}.{os.getpid()}.tmp")  # two status lines of one session may overlap
     tmp.write_text(json.dumps({**rep, "sent": now}), encoding="utf-8")
     tmp.replace(f)
 
@@ -253,13 +253,14 @@ def statusline() -> int:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
+    # The person's line first, so a host agent slow to answer never delays what the pane shows.
+    with contextlib.suppress(Exception):
+        if out := chained_output(raw, payload):
+            sys.stdout.write(out)
+            sys.stdout.flush()
     if session := os.environ.get("AGENTORC_SESSION"):
         with contextlib.suppress(Exception):
             report_usage(session, payload, time.time())
-    with contextlib.suppress(Exception):
-        out = chained_output(raw, payload)
-        if out:
-            sys.stdout.write(out)
     return 0
 
 
