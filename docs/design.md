@@ -730,8 +730,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Usage, **reported first and asked for last** (TD-231, TD-230; designed 2026-09-28, partly
   built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the report,
   the merge, the history and the hourly ask for an endpoint-only window are slice 2, a node's
-  report to the home with them; the home's send of the reading to its nodes is not built, so a
-  node's gate reads its own sessions' reports and its own asks). The usage
+  report to the home and the home's reading sent back to it with them). The usage
   endpoint is no documented interface, and on 2026-09-28 it refused every poll for six hours
   though agentorc asked once per account: the tool's own clients read it too, and its refusals
   carry no usable `Retry-After`. What a session of the tool is *told* about its limits is
@@ -790,8 +789,22 @@ Python, one process per host, started by the same systemd user unit. Responsibil
     asking the endpoint for it; a profile a session at the home runs under keeps the home's own
     account's reading, and one two nodes key to two accounts shows the first node's by name,
     since a reading is per profile; a node's key is forgotten once no live session of that node
-    runs under the profile, and a report for a record that is no live tool session sets none. The home holds the account's reading and
-    sends it to the nodes as it sends the metered sums (not built: a node reads its own).
+    runs under the profile, and a report for a record that is no live tool session sets none. A
+    profile metered at the home is no bar to a node's report under that name, since the node
+    withholds its own metered profiles and the name may be another login there. After a restart
+    the home keeps the reading a node's profile held in `usage.json` until the node's first
+    report, which merges onto it — history and all — when it is of the account the node names.
+    **The home holds the account's reading and sends it back** to each node that keyed a live
+    session to it, as `usage_reading {account, reading}` (home → node, a notification on the
+    road the settings take: the windows, `fetched`, `source` and `by`), whenever it moved since
+    that link was last told and once more on each new link, never before its snapshot, refused
+    not queued. The node takes it for an account one of its live tool sessions is keyed to and
+    no other, **window by window**: a window the home confirmed later, or saw roll, is the
+    home's — number, `at` and history — and one the node confirmed no earlier, or saw roll
+    first, stays the node's; `fetched` follows the newer confirmation, and `reason` and the
+    cool-off stay the node's own, since only the node asks for its account. So a node's chip,
+    gate and projection read every host's reports, and a node whose sessions are idle is not
+    asked for while another host's sessions report the account.
   - **The endpoint is the fallback, on demand**: asked only when an account a live session's
     profile names has no reading younger than `USAGE_FRESH` (fifteen minutes), at most once
     per `USAGE_FRESH` per account, and after a `rate_limited` answer not for a fixed hour
@@ -1564,6 +1577,8 @@ call by call.
   caller. Refused, not queued, as the intent push is. The same road carries a metered account's
   sums, `usage {account, sums}`, home → node — the account's window sums, not a reading, since
   `pct` is the profile's — whenever a profile the node named moves a whole point or a window rolls,
+  and a subscription account's reading, `usage_reading {account, reading}`, whenever it moves (§4.4
+  *A node's sessions report to their node*; built — TD-233 slice 2),
   and the node's turns travel the other way as `spend {account, profile, prices, turns, cursors}`,
   a method whose reply carries the cursors and the sums, its first on each dial a read (§4.4
   *Usage*; built — TD-151 slice 4). **Derived reports from a node.** The tick's

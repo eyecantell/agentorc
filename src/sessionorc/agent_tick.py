@@ -1700,18 +1700,25 @@ class TickMixin:
             self.usage_store.save(self._usage)  # once for the batch: the file is whole either way
         # Only profiles a live session is running under are shown (TD-073, Paul 2026-09-19): one
         # account in use is one chip, and last night's profile does not sit in the top bar all day.
-        for key in [k for k in self._usage_acct if k not in groups]:
+        # a node's account is kept while its session lives, shown or not (a profile a session here
+        # runs under, or one a second node keys to another account), since the home sends it back
+        keyed = {k for (h, p), k in self._usage_remote_keys.items()}
+        for key in [k for k in self._usage_acct if k not in groups and k not in keyed]:
             self._usage_acct.pop(key, None)
             self._usage_checked.pop(key, None)
             self._usage_wait.pop(key, None)
             self._usage_only_at.pop(key, None)
-        shown = {p for profs in groups.values() for p in profs} | metered
+        # …and a node's profile not yet keyed since a restart keeps what it held, which its first
+        # report is merged onto (`_usage_seed`)
+        waiting = {s.profile for s in self._usage_remote_live() if (s.host, s.profile) not in self._usage_remote_keys}
+        shown = {p for profs in groups.values() for p in profs} | metered | waiting
         if dropped := [p for p in self._usage if p not in shown]:
             for prof in dropped:
                 self._usage.pop(prof, None)
                 await self._broadcast({"event": "usage", "profile": prof, "usage": None})
             self.usage_store.save(self._usage)
         self._usage_limits(live, metered)
+        await self._push_usage_readings()
 
     def _usage_limits(self, live: list[Session], metered: set[str]) -> None:
         """The `limited` rule over the readings `_usage` holds (§4.2), for the poll and for a report

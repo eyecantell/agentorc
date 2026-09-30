@@ -21,6 +21,9 @@ HISTORY_SPAN = timedelta(hours=3)
 # Two resets this close are one window: the status line hands epoch seconds and the endpoint an
 # instant of its own, and a rolling window's reset moves by a little between two reads of it.
 RESET_SLACK = timedelta(minutes=5)
+# The most history points a window can hold (one per step over the span, and the newest): what a
+# reading from the home is cut to.
+HISTORY_POINTS = int(HISTORY_SPAN / HISTORY_STEP) + 2
 
 
 def _instant(value: Any) -> datetime | None:
@@ -145,6 +148,51 @@ def merge(
         reading.update(fetched=at, source=source)
         if by:
             reading["by"] = by
+        else:
+            reading.pop("by", None)
+    reading.setdefault("reason", "ok")
+    return reading
+
+
+def adopt(held: dict[str, Any] | None, theirs: Any) -> dict[str, Any]:
+    """`held`, a node's reading of an account, with the home's reading of it taken in (§4.4 *A
+    node's sessions report to their node*): the home merges every host's reports and holds the
+    account's reading, so each window the home confirmed later than the node did, or whose reset
+    is later, is the home's — its number, `at` and history — and every other window stays as the
+    node holds it, a window only one of them has included. `fetched`, `source` and `by` follow the
+    newer confirmation. `reason`, `retry_after` and `cool_until` stay the node's: they are its own
+    asks' word, and the home never asks for a node's account."""
+    held = held or {}
+    if not isinstance(theirs, dict):
+        return held
+    old = {str(w.get("label")): w for w in held.get("windows") or () if isinstance(w, dict)}
+    out: dict[str, dict[str, Any]] = {k: dict(v) for k, v in old.items()}
+    for w in theirs.get("windows") or ():
+        if not isinstance(w, dict) or not (clean := clean_windows([w])):
+            continue
+        label = clean[0]["label"]
+        o = old.get(label)
+        if o is not None and not _later(clean[0]["resets"], o.get("resets")):
+            if _later(o.get("resets"), clean[0]["resets"]):
+                continue  # the home's is the window before its reset: the node has seen it roll
+            if not (_older(o.get("at"), w.get("at")) or (o.get("at") is None and _instant(w.get("at")))):
+                continue  # one window, and the node confirmed it no earlier than the home
+        n: dict[str, Any] = {**clean[0], "at": w.get("at") if _instant(w.get("at")) else None}
+        n["source"] = w.get("source") if w.get("source") in ("reported", "asked") else "reported"
+        n["history"] = [
+            {"at": h["at"], "pct": p}
+            for h in (w.get("history") if isinstance(w.get("history"), list) else ())[-(HISTORY_POINTS):]
+            if isinstance(h, dict) and _instant(h.get("at")) is not None and (p := _pct(h.get("pct"))) is not None
+        ]
+        out[label] = n
+    reading: dict[str, Any] = {**held, "windows": list(out.values())}
+    if _instant(theirs.get("fetched")) is not None and (
+        _instant(held.get("fetched")) is None or _older(held.get("fetched"), theirs.get("fetched"))
+    ):
+        reading["fetched"] = str(theirs["fetched"])
+        reading["source"] = theirs.get("source") if theirs.get("source") in ("reported", "asked") else "reported"
+        if isinstance(theirs.get("by"), str) and theirs["by"]:
+            reading["by"] = theirs["by"][:80]
         else:
             reading.pop("by", None)
     reading.setdefault("reason", "ok")

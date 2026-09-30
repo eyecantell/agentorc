@@ -399,6 +399,9 @@ class HostAgent(
         # (node, profile) → the account key that node keys the profile by (§4.4 *A node's sessions
         # report to their node*, TD-233 slice 2): its credentials decide, not a profile of that name here
         self._usage_remote_keys: dict[tuple[str, str], str] = {}
+        # (node, account key) → (the link, what it was last sent): the home's reading goes to a node
+        # when it moves, and again on a new link
+        self._usage_told: dict[tuple[str, str], tuple[Any, str]] = {}
         # …and the **allowance** survives with it (anchor's read of PR #307): a held reading is as
         # good as a poll made at its `fetched`, so the first poll after a promote waits until
         # `fetched + USAGE_FRESH`, never sooner. A reading with no readable time is polled at once.
