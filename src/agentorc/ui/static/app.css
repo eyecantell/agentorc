@@ -79,7 +79,8 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
    "one too many", and inline-block is what gives a span a width to measure at all. */
 #usagechip { font-size: var(--t-small); color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
 #usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
-#usagechip .stale { opacity: .6; font-style: italic; }  /* a held reading whose last poll was refused (TD-087) */
+#usagechip .old { opacity: .6; }  /* a reading past USAGE_FRESH (TD-233) */
+#usagechip .unknown { opacity: .6; font-style: italic; }  /* no reading yet, or none the chip still offers (TD-233) */
 #buildchip { font-size: var(--t-small); color: var(--topdim); white-space: nowrap; vertical-align: middle; }  /* §4.5a build chip (TD-132 slice 5) */
 #buildchip.behind { color: var(--topfg); font-weight: 600; } #buildchip.unknown { font-style: italic; }
 #usagemore { cursor: default; }
@@ -554,6 +555,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setgroup { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
+.setpage .setage { grid-column: 3; margin-top: -8px; }  /* the reading's age under its line (TD-233) */
 .setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220) */
 .setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
 .setpage .setin { width: 100%; }
@@ -567,6 +569,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setfoot .note { overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .setpage .setrow, .setpage .setvals { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .setpage .setage { grid-column: auto; margin-top: 0; }
   .setpage .setvals dd { margin-bottom: 6px; }
 }
 

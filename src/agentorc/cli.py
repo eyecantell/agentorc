@@ -1054,9 +1054,30 @@ def _reserve_text(r: Any) -> str:
     return f"{r['per_day']}/day" if isinstance(r, dict) else str(r)
 
 
-def _gate_line(prof: str, windows: list[dict[str, Any]]) -> str:
-    """*grind · 5h 30 → line 70% · week 10/day → line 60% (4 days left, moves Thu 07:00)* (design
-    §4.7). A row with `unread` set is a reserve on a profile with no usage reading yet."""
+# Where a usage reading came from (design §4.4 *Usage*), as `ao gate` prints it: one with no
+# `source` was asked of the endpoint, the one source before TD-233's report.
+GATE_SOURCE = {"asked": "asked", "reported": "reported"}
+
+
+def _gate_read(reading: Any) -> str:
+    """*· read 6h ago (asked)* (design §4.7 `ao gate`, TD-233 slice 1), or "" when the profile's
+    reading carries no time — an agent too old to say."""
+    fetched = reading.get("fetched") if isinstance(reading, dict) else None
+    try:
+        age = _age(fetched) if isinstance(fetched, str) and fetched else "?"
+    except TypeError:  # a stamp with no offset: not this reader's to guess
+        age = "?"
+    if age == "?":
+        return ""
+    source = str(reading.get("source") or "asked")
+    return f" · read {age} ago ({GATE_SOURCE.get(source, source)})"
+
+
+def _gate_line(prof: str, windows: list[dict[str, Any]], read: str = "") -> str:
+    """*grind · 5h 30 → line 70% · read 6h ago (asked) · week 10/day → line 60% (4 days left, moves
+    Thu 07:00) · read 6h ago (asked)* (design §4.7). A row with `unread` set is a reserve on a
+    profile with no usage reading yet; `read` is the reading's age, `_gate_read`'s, after each
+    window read from it."""
     parts = [prof or "(default)"]
     for w in windows:
         head = f"{w['label']} {_reserve_text(w['reserve'])}"
@@ -1084,7 +1105,7 @@ def _gate_line(prof: str, windows: list[dict[str, Any]]) -> str:
                 when = datetime.fromisoformat(str(w["next"]).replace("Z", "+00:00")).astimezone()
                 extra += f", moves {when:%a %H:%M}"
             extra = f" ({extra})"
-        parts.append(f"{head} → line {w['line']}%{now}{extra}")
+        parts.append(f"{head} → line {w['line']}%{now}{extra}{read}")
     return " · ".join(parts)
 
 
@@ -1350,13 +1371,21 @@ def cmd_gate(args: argparse.Namespace) -> int:
     profile; `label=` alone clears that window's reserve."""
     if not args.profile:
         got = call_sync("gate")
+        try:  # each reading's age (TD-233 slice 1): `gate` carries the lines, `usage` the time
+            usage = call_sync("usage")
+        except AgentError:
+            usage = {}
+        for prof, v in got["profiles"].items():
+            reading = usage.get(prof) if isinstance(usage, dict) else None
+            if isinstance(reading, dict) and not v.get("metered"):
+                v["fetched"], v["source"] = reading.get("fetched"), reading.get("source") or "asked"
 
         def prose() -> None:
             if not got["profiles"]:
                 print(f"no usage gate: no reserves in {got['file']}")
             for prof, v in got["profiles"].items():
                 rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
-                print(_gate_line(prof, rows))
+                print(_gate_line(prof, rows, "" if v.get("metered") else _gate_read(v)))
 
         return emit(args, got, prose)
     if not args.reserves:
