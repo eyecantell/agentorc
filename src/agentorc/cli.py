@@ -1092,6 +1092,11 @@ def _gate_line(prof: str, windows: list[dict[str, Any]], read: str = "") -> str:
             now = f" ({w['pct']}%)" if isinstance(w.get("pct"), int) else ""
             parts.append(f"{head} → spent {got}{now}")
             continue
+        if w.get("unknown") == "reset":
+            # §6 *Usage gate*: a window past its reset has no number, and pauses nothing
+            was = f" (was {w['pct']}%)" if isinstance(w.get("pct"), int | float) else ""
+            parts.append(f"{head} → unknown since its reset{was}{read}")
+            continue
         if w.get("line") is None:
             parts.append(f"{head} → no line (the window reports no reset)")
             continue

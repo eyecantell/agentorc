@@ -201,7 +201,10 @@ def lines(
     """Every reported window that has a reserve, with its line: `{label, pct, line, resets, next,
     reserve}` (`line` None where the reserve makes none). Windows without a reserve are left out.
     `extra` is a team's reserve priority (§6 *Usage gate*, TD-146), added to the reserve on every
-    window that has one — it lowers a line, never makes one — and carried on the row when it is set."""
+    window that has one — it lowers a line, never makes one — and carried on the row when it is set.
+    A window whose `resets` has passed carries `unknown: "reset"` (§6 *Usage gate*: *a window that is
+    unknown pauses nothing*): its number is the last window's, not this one's, so `crossed` skips it
+    while the row still shows what was last read."""
     out = []
     for w in windows or []:
         label = str(w.get("label"))
@@ -209,6 +212,7 @@ def lines(
             continue
         r = by_label[label]
         nxt = moves(r, w.get("resets"), now)
+        ended = (t := _when(w.get("resets"))) is not None and t <= now
         out.append(
             {
                 "label": label,
@@ -218,6 +222,7 @@ def lines(
                 "next": nxt.isoformat().replace("+00:00", "Z") if nxt else None,
                 "reserve": r,
                 **({"extra": extra} if extra else {}),
+                **({"unknown": "reset"} if ended else {}),
             }
         )
     return out
@@ -228,8 +233,11 @@ def _lowered(line_: int | None, extra: int) -> int | None:
 
 
 def crossed(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """The first window at or over its line, or None when every window is under its line."""
+    """The first window at or over its line, or None when every window is under its line. A window
+    past its reset (`unknown`) is never over: the gate has no number for it (§6 *Usage gate*)."""
     for row in rows:
+        if row.get("unknown"):
+            continue
         if row["line"] is not None and isinstance(row["pct"], int | float) and row["pct"] >= row["line"]:
             return row
     return None

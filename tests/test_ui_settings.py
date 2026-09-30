@@ -119,6 +119,7 @@ def test_the_line_text_is_ao_gates():
     assert setmod.line_text(row, NOW) == "→ line 60% · 1 day left"
     assert setmod.line_text({"line": None}, NOW) == "no line — the window reports no reset"
     assert setmod.line_text(None, NOW) == "no line"
+    assert setmod.line_text({"line": 95, "pct": 99, "unknown": "reset"}, NOW).startswith("unknown since its reset")
 
 
 @pytest.mark.unit

@@ -456,3 +456,49 @@ async def test_a_moved_team_stop_time_leaves_a_member_a_person_took_over(agent, 
         assert agent.sessions[sid].run_until is None, "a Clear takes the team's instant back all the same"
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+@pytest.mark.unit
+def test_a_window_past_its_reset_is_unknown_and_never_over_its_line():
+    """TD-233, §6 *Usage gate*: *a window that is unknown pauses nothing*. Last week's 99%, held
+    because the endpoint has refused since before the reset, is not this week's number."""
+    past, ahead = _iso(NOW - timedelta(minutes=1)), _iso(NOW + timedelta(days=6))
+    rows = settings.lines({"wk": 5}, [{"label": "wk", "pct": 99, "resets": past}], NOW)
+    assert rows[0]["unknown"] == "reset" and rows[0]["pct"] == 99  # still shown as what was last read
+    assert settings.crossed(rows) is None
+    rows = settings.lines({"wk": 5}, [{"label": "wk", "pct": 99, "resets": ahead}], NOW)
+    assert "unknown" not in rows[0] and settings.crossed(rows)["label"] == "wk"
+    # another window still over its line is still crossed
+    both = [{"label": "wk", "pct": 99, "resets": past}, {"label": "5h", "pct": 90, "resets": ahead}]
+    assert settings.crossed(settings.lines({"wk": 5, "5h": 30}, both, NOW))["label"] == "5h"
+    # no reset, or one that cannot be read, is not a past one
+    for resets in (None, "soon"):
+        rows = settings.lines({"wk": 5}, [{"label": "wk", "pct": 99, "resets": resets}], NOW)
+        assert "unknown" not in rows[0] and settings.crossed(rows) is not None
+
+
+@pytest.mark.integration
+async def test_last_weeks_reading_pauses_nothing_and_a_pause_on_it_lifts(agent, tmp_path):
+    """The night of 2026-09-29: the endpoint refused from 23:07Z, the week reset, and the gate
+    paused every member twice on the old 99%."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _worker(person, tmp_path)
+        now = datetime.now(UTC)
+        resets = now + timedelta(minutes=30)
+        agent._usage[""] = {"windows": [{"label": "wk", "pct": 99, "resets": _iso(resets)}], "reason": "ok"}
+        await person.call("set_settings", profile="", reserves={"wk": 5})
+        rec = agent.sessions[sid]
+        await agent._enforce_usage_gate(now)
+        assert rec.gated and rec.gated["pct"] == 99  # before the reset: a crossing
+        assert agent._profile_gated("", now)
+        # the reset passes with no new reading: the window is unknown, and the pause lifts
+        later = resets + max(RESUME_MIN, timedelta(minutes=1))
+        assert not agent._profile_gated("", later)
+        await agent._enforce_usage_gate(later)
+        assert rec.gated is None
+        # and a fresh start on the same held reading is not paused
+        await agent._enforce_usage_gate(later + timedelta(minutes=1))
+        assert rec.gated is None
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
