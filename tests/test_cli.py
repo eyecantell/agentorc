@@ -1810,6 +1810,56 @@ def test_ao_gate_says_how_old_each_reading_is():
     assert _gate_line("grind", unread, " · read 1m ago (asked)") == "grind · 5h 30 → no reading yet"
 
 
+def test_ao_gate_prints_a_projection_and_a_window_with_no_rate():
+    """design §4.7 `ao gate` (TD-233 slice 4): a window past `usage.max_age` prints the reading it
+    held, then *· projected 96%*; one with no rate to project by says so, and pauses nothing."""
+    from agentorc.cli import _gate_line, _max_age_said
+
+    pr = {"label": "week", "reserve": 5, "line": 95, "pct": 96.0, "next": None,
+          "projected": {"from": 88, "rate": 1.33, "age": 21600}}  # fmt: skip
+    got = _gate_line("grind", [pr], " · read 6h ago (asked)")
+    assert got == "grind · week 5 → line 95%, now 88% · read 6h ago (asked) · projected 96%"
+    no_rate = {"label": "week", "reserve": 5, "line": 95, "pct": 88, "next": None, "unknown": "rate", "age": 7200}
+    got = _gate_line("grind", [no_rate], " · read 2h ago (asked)")
+    assert got == "grind · week 5 → line 95%, now 88% · read 2h ago (asked) · no rate to project by"
+    assert _max_age_said("off") == "max_age off: the gate never projects a reading"
+    assert _max_age_said("90m").startswith("max_age 90m: ")
+
+
+def test_ao_gate_max_age_sets_the_setting(subprocess_agent, capsys, monkeypatch):
+    """`ao gate --max-age` (design §4.7, §5 `usage.max_age`, TD-233): an age or `off` lands in
+    settings.yml through `set_settings`, `default` clears it back to the hour, a bad age is the
+    host agent's refusal, and a session is refused as for the reserves."""
+    from sessionorc import settings as settings_mod
+
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    try:
+        assert cli.main(["gate", "--max-age", "90m"]) == 0
+        assert capsys.readouterr().out.startswith("max_age 90m: ")
+        assert settings_mod.load()["usage"] == {"max_age": "90m"}
+        assert cli.main(["--json", "gate", "--max-age", "off"]) == 0
+        assert json.loads(capsys.readouterr().out)["usage"] == {"max_age": "off"}
+        assert cli.main(["--json", "gate"]) == 0
+        assert json.loads(capsys.readouterr().out)["max_age"] == "off"
+        assert cli.main(["gate", "--max-age", "default"]) == 0
+        assert "max_age 1h" in capsys.readouterr().out and "usage" not in settings_mod.load()
+        assert cli.main(["gate", "--max-age", "2m"]) != 0
+        assert "from 5m to 7d" in capsys.readouterr().err
+        assert cli.main(["gate", "--max-age", "3h", "grind", "5h=200"]) != 0  # a bad reserve writes neither
+        capsys.readouterr()
+        assert settings_mod.load().get("usage") is None
+        assert cli.main(["gate", "--max-age", "2h", "grind", "5h=30"]) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("max_age 2h: ") and "grind · 5h 30" in out
+        monkeypatch.setenv("AGENTORC_SESSION", "s-nobody")
+        assert cli.main(["gate", "--max-age", "off"]) != 0
+        assert settings_mod.load()["usage"] == {"max_age": "2h"}
+    finally:
+        monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+        assert cli.main(["gate", "--max-age", "default", "grind", "5h="]) == 0  # the agent is shared: leave it bare
+    assert "usage" not in settings_mod.load() and not settings_mod.load().get("usage_gate")
+
+
 def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys, monkeypatch):
     """`ao gate` end to end: the reserves land in settings.yml through `set_settings`, `ao gate`
     shows them, a session's `ao gate` is refused by the host agent, and `ao new --unattended`

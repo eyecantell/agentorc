@@ -1104,7 +1104,10 @@ def _gate_line(prof: str, windows: list[dict[str, Any]], read: str = "") -> str:
         if w.get("line") is None:
             parts.append(f"{head} → no line (the window reports no reset)")
             continue
-        now = f", now {w['pct']}%" if isinstance(w.get("pct"), int | float) else ""
+        # past `usage.max_age` the row's `pct` is the projection and `projected.from` the reading (§6)
+        pr = w.get("projected") if isinstance(w.get("projected"), dict) else None
+        held = pr.get("from") if pr else w.get("pct")
+        now = f", now {held}%" if isinstance(held, int | float) else ""
         extra = ""
         if isinstance(w.get("reserve"), dict) and w.get("resets"):
             resets = datetime.fromisoformat(str(w["resets"]).replace("Z", "+00:00"))
@@ -1114,8 +1117,21 @@ def _gate_line(prof: str, windows: list[dict[str, Any]], read: str = "") -> str:
                 when = datetime.fromisoformat(str(w["next"]).replace("Z", "+00:00")).astimezone()
                 extra += f", moves {when:%a %H:%M}"
             extra = f" ({extra})"
-        parts.append(f"{head} → line {w['line']}%{now}{extra}{read}")
+        after = ""
+        if pr and isinstance(w.get("pct"), int | float):
+            after = f" · projected {w['pct']:g}%"  # *· projected 96%* (§4.7 `ao gate`, TD-233)
+        elif w.get("unknown") == "rate":
+            after = " · no rate to project by"  # past max_age, too few readings: pauses nothing (§6)
+        parts.append(f"{head} → line {w['line']}%{now}{extra}{read}{after}")
     return " · ".join(parts)
+
+
+def _max_age_said(value: Any) -> str:
+    """`usage.max_age` as `ao gate --max-age` confirms it (design §4.7, §6 *A reading the gate can no
+    longer trust*)."""
+    if value == "off":
+        return "max_age off: the gate never projects a reading"
+    return f"max_age {value}: a reading older than that is projected while unattended sessions work"
 
 
 def _main_checkout(start: str) -> str | None:
@@ -1377,7 +1393,14 @@ def cmd_gate(args: argparse.Namespace) -> int:
     """`ao gate` / `ao gate <profile> <label>=<reserve>…` (design §4.7, §6 *Usage gate*, TD-100):
     print every profile's reserves and the lines they make now, or set them through `set_settings` —
     a person's own, which the host agent refuses to a session. `-` names the unnamed default
-    profile; `label=` alone clears that window's reserve."""
+    profile; `label=` alone clears that window's reserve. `--max-age` sets `usage.max_age` (TD-233):
+    an age, `off`, or `default` to clear it back to the hour."""
+    age: dict[str, Any] = {}
+    if args.max_age is not None:
+        age = {"usage": {"max_age": None if args.max_age.strip().lower() == "default" else args.max_age.strip()}}
+        if not args.profile:
+            set_age = call_sync("set_settings", **age)
+            return emit(args, set_age, lambda: print(_max_age_said(set_age["usage"]["max_age"])))
     if not args.profile:
         got = call_sync("gate")
         try:  # each reading's age (TD-233 slice 1): `gate` carries the lines, `usage` the time
@@ -1406,9 +1429,12 @@ def cmd_gate(args: argparse.Namespace) -> int:
             raise AgentError(f"{item!r}: a reserve is <label>=<reserve>, e.g. 5h=30 or week=10/day")
         reserves[label] = _reserve(value)
     prof = "" if args.profile == "-" else args.profile
-    got = call_sync("set_settings", profile=prof, reserves=reserves)
+    # one write with the reserves: `set_settings` checks every key before it writes any
+    got = call_sync("set_settings", profile=prof, reserves=reserves, **age)
 
     def said() -> None:
+        if "usage" in got:
+            print(_max_age_said(got["usage"]["max_age"]))
         if not got["reserves"]:
             print(f"{prof or '(default)'}: no reserves — the gate pauses nothing on this profile")
         else:
@@ -2522,6 +2548,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
     p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")
     p.add_argument("reserves", nargs="*", help="<label>=<reserve>: 5h=30, week=10/day; week= clears it")
+    p.add_argument(
+        "--max-age",
+        metavar="AGE",
+        help="trust a reading for AGE (1h, 90m), then project it; off never projects; default clears it (§6)",
+    )
     p.set_defaults(fn=cmd_gate)
 
     for name, help_ in (

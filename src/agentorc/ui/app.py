@@ -1853,6 +1853,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "settings.html",
             {
                 "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
+                "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 "profiles_file": str(profiles_mod.profiles_file()),
                 "teams": setmod.team_cards(org.teams, got.get("teams")),
                 "repos": setmod.repo_cards(local.repos(), got.get("repos")),
@@ -1907,6 +1908,15 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
         return answer(await call("set_settings", profile=str(body.get("profile") or ""), reserves=reserves))
+
+    @app.post("/api/settings/max_age")
+    async def settings_max_age(request: Request):
+        """§4.5a *Settings page: Usage* → **trust a reading for** (TD-233): `{max_age: text}` — an age
+        (`90m`, `2h`) or `off`, empty clearing it back to the hour — to `set_settings {usage}`, whose
+        refusal names the bounds."""
+        body = await body_of(request)
+        text = str(body.get("max_age") or "").strip()
+        return answer(await call("set_settings", usage={"max_age": text or None}))
 
     @app.post("/api/settings/teams")
     async def settings_teams(request: Request):
