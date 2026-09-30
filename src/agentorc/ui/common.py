@@ -575,19 +575,19 @@ def identity_note(info: dict[str, Any] | None) -> str:
 
 
 def org_here() -> tuple[orgmod.Org, list[str]]:
-    """The definitions the Org page acts on (design §4.9): `~/.agentorc/org.yml`, plus the `teams:`
-    of every repo in this host's registry — the page is not *in* a directory the way `ao team` is,
-    so "a repo's own teams" means every repo the host knows about. The org file wins a name
-    collision. Read on every use and cached nowhere; a malformed file is a note beside the strip,
-    never a 500 — the rest of the page is still the fleet. On a node the org is not here (design
-    §4.4a: `org.yml` lives on the home), which is a note too."""
+    """The definitions the Org page acts on (design §4.9 *The org is an aggregate*, TD-229):
+    `~/.agentorc/org.yml`, plus the `teams:` of every repo in this host's registry, by the one
+    function `ao team` reads too. The org file wins a name collision, and a name two repos define
+    is refused in both, a note. Read on every use and cached nowhere; a malformed file is a note
+    beside the strip, never a 500 — the rest of the page is still the fleet. On a node the org is
+    not here (design §4.4a: `org.yml` lives on the home), which is a note too."""
     if hosts.is_node():
         return orgmod.Org(path=orgmod.org_file()), [node_org_note()]
     try:
         org = orgmod.load()
     except ValueError as e:
         return orgmod.Org(path=orgmod.org_file()), [str(e)]
-    return teamrun.org_with_repo_teams(org, list(hosts.local_host().repos()))
+    return orgmod.with_repos(org, hosts.local_host().repos())
 
 
 def projects_view() -> list[dict[str, Any]]:

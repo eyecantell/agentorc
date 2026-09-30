@@ -197,6 +197,8 @@ def find(org: orgmod.Org, name: str) -> orgmod.TeamDef:
     try:
         return org.teams[name]
     except KeyError:
+        if name in org.refused:  # two repos define it (§4.9 *Names are the org's*): say so, not "unknown"
+            raise TeamError(org.refused[name]) from None
         known = ", ".join(sorted(org.teams)) or "none defined"
         raise TeamError(f"unknown team {name!r}; defined: {known}") from None
 

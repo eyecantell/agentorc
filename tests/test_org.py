@@ -234,13 +234,11 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     assert merged.roles == base.roles
     # nothing to merge leaves the org as it was, and the repo is not made a project for nothing
     assert org.merge_repo_teams(base, repo, None).projects.keys() == base.projects.keys()
-    # a repo team can nest an org team, and its errors name the repo's file
-    merged = org.merge_repo_teams(base, repo, {"outer": {"members": [{"team": "ao-grind"}]}})
-    assert merged.teams["outer"].members[0].team == "ao-grind"
-    with pytest.raises(
-        ValueError, match=r"\.agentorc\.yml: teams\.bad\.members\[0\]\.team: 'nope' is not a defined team"
-    ):
-        org.merge_repo_teams(base, repo, {"bad": {"members": [{"team": "nope"}]}})
+    # the repo's team the org file wins over is recorded, for `ao team list`'s *shadowed* (TD-229)
+    assert merged.shadowed == {"ao-grind": [repo / ".agentorc.yml"]} and base.shadowed == {}
+    # nesting is the org file's (§4.9 *The org is an aggregate*), and the error names the repo's file
+    with pytest.raises(ValueError, match=r"\.agentorc\.yml: teams\.bad\.members\[0\]\.team: a nested team"):
+        org.merge_repo_teams(base, repo, {"bad": {"members": [{"team": "ao-grind"}]}})
     # an org project of the repo's name is used as it stands
     doc = dict(ORG, projects={**ORG["projects"], "myrepo": {"repos": {"myrepo": {"elsewhere": "/x"}}}})
     merged = org.merge_repo_teams(org.load(write(tmp_path, doc)), repo, repo_teams)

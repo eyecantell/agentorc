@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from agentorc import org as orgmod
-from agentorc import repoconfig, teams
+from agentorc import teams
 
 Call = Callable[..., Any]
 
@@ -105,21 +105,6 @@ def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[d
     lead_name = team.manager.name if team and team.manager.role != orgmod.PERSON else None
     lead = next((s for s in sessions if s.get("name") == lead_name), None)
     return lead, sorted((s for s in sessions if s is not lead), key=lambda s: s.get("name") or s["id"])
-
-
-def org_with_repo_teams(org: orgmod.Org, roots: list[Path | str]) -> tuple[orgmod.Org, list[str]]:
-    """Fold each repo's own `teams:` into the org (design §4.9: a repo may ship its own grind team;
-    the org file wins a name collision). A repo whose `.agentorc.yml` cannot be read is skipped and
-    named in the returned notes — one broken file must not empty the strip or the pick-list."""
-    notes: list[str] = []
-    for root in roots:
-        try:
-            cfg = repoconfig.load(Path(root).expanduser())
-            if cfg.teams and cfg.root:
-                org = orgmod.merge_repo_teams(org, cfg.root, cfg.teams, cfg.roles)
-        except (OSError, ValueError) as e:
-            notes.append(f"{root}: {str(e).strip(chr(34))}")
-    return org, notes
 
 
 def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> str | None:

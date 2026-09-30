@@ -45,7 +45,14 @@ def world(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("AGENTORC_HOME", str(home))
-    monkeypatch.setattr(cli.hosts, "local_host", lambda: cli.hosts.Host(name=HOST, vscode_host=HOST, local=True))
+    # both checkouts registered: `ao team` reads every registered checkout's `teams:` (§4.9, TD-229)
+    registry = home / "repos.txt"
+    registry.write_text("".join(f"{tmp_path / r}\n" for r in ("agentorc", "ao-api")))
+    monkeypatch.setattr(
+        cli.hosts,
+        "local_host",
+        lambda: cli.hosts.Host(name=HOST, vscode_host=HOST, local=True, repos_registry=registry),
+    )
     for repo in ("agentorc", "ao-api"):
         (tmp_path / repo / ".git").mkdir(parents=True)
     (home / "profiles.yml").write_text(
@@ -462,6 +469,45 @@ def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     assert made[0]["project"] == "agentorc"  # the repo's own project, named for the checkout
 
 
+def test_the_org_is_one_aggregate_of_the_registered_checkouts(world, capsys, monkeypatch):
+    """TD-229 slice 1, design §4.9 *The org is an aggregate*: `ao team` reads every registered
+    checkout's `teams:` from any directory, as the pages do; a name two repos define is refused in
+    both, each naming the other, never the later one winning silently; the org file wins a name and
+    the repo's reads *shadowed*; and spanning, placing and nesting are refused on a repo's team."""
+    tmp_path, state = world
+    monkeypatch.chdir(tmp_path / "home")  # not in either repo: the registry is what is read
+    team = {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"twice": team, "ao-grind": team}}))
+    (tmp_path / "ao-api" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"twice": team, "api": team}}))
+    assert cli.main(["--json", "team", "list"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert sorted(r["name"] for r in got["teams"]) == ["ao-grind", "api"]
+    why = got["refused"]["twice"]
+    assert str(tmp_path / "agentorc" / ".agentorc.yml") in why and str(tmp_path / "ao-api" / ".agentorc.yml") in why
+    assert got["shadowed"] == {"ao-grind": [str(tmp_path / "agentorc" / ".agentorc.yml")]}
+    assert cli.main(["team", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "ao-grind  shadowed by org.yml" in out and "twice     refused: team 'twice' is defined twice" in out
+    assert cli.main(["team", "start", "twice"]) == 1
+    assert "defined twice" in capsys.readouterr().err and creates(state) == []
+    # the pages read the same function: the refusal is a note beside the strip
+    from agentorc import org as orgmod
+
+    org, notes = orgmod.with_repos(orgmod.load(), cli.hosts.local_host().repos())
+    assert "twice" not in org.teams and any("defined twice" in n for n in notes)
+    # spanning, placing and nesting are the org file's: the repo is skipped and named
+    for bad, key in (
+        ({"projects": ["ao"]}, "projects"),
+        ({"host": "devenv"}, "host"),
+        ({"members": [{"team": "ao-grind"}]}, "members[0].team"),
+    ):
+        (tmp_path / "ao-api" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"api": {**team, **bad}}}))
+        assert cli.main(["--json", "team", "list"]) == 0
+        captured = capsys.readouterr()
+        assert "api" not in {r["name"] for r in json.loads(captured.out)["teams"]}
+        assert f"teams.api.{key}:" in captured.err
+
+
 # ── stop, status, list ────────────────────────────────────────────────────────────────────────
 
 
@@ -663,7 +709,7 @@ def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(w
     assert teamrun.concluded([rec("grind-1", out_of_work=out), rec("techlead-ao", "working")], seat) is None
     assert teamrun.concluded([rec("techlead-ao")], seat) is None  # only a seat live: nobody said anything
     # the definition's row carries it only while something is live
-    org = cli._org_here(tmp_path / "agentorc")
+    org = cli._org_here()
     (row,) = teamrun.rows(org, [rec("orc-ao", out_of_work=out)])
     assert row["live"] == 1 and row["concluded"]["at"] == out["at"] and row["wound_down"] is None
     (row,) = teamrun.rows(org, [rec("orc-ao", "closed", out_of_work=out)])
@@ -1294,7 +1340,7 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
-    org = cli._org_here(tmp_path / "agentorc")
+    org = cli._org_here()
     (row,) = teamrun.rows(org, sessions)
     assert row["wound_down"] == "2026-09-21T06:00:00Z" and row["techlead"] == "techlead-ao"
     # a seat that came up suffixed (a stale tmux session held its id) is still the seat; a member
@@ -1303,7 +1349,7 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
     doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3", "home": "agentorc"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
-    org = cli._org_here(tmp_path / "agentorc")
+    org = cli._org_here()
     assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}
     # the page's *on call* keys on the same rule, by id, and only under the team's own badge (TD-097)
     other = {"id": "c", "name": "techlead-ao", "team": "other", "state": "exited"}
@@ -1355,7 +1401,7 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert cli.main(["team", "list", "--json"]) == 0
     (row,) = json.loads(capsys.readouterr().out)["teams"]
     assert row["seats"] == [{"name": "audit-ao", "role": "hunter", "trigger": "every", "after": "6h"}]
-    org = cli._org_here(tmp_path / "agentorc")
+    org = cli._org_here()
     done = {"at": "2026-09-21T06:00:00Z", "why": "nothing left"}
     sessions = [
         {"id": "a", "name": "grind-1", "team": "ao-grind", "state": "exited", "out_of_work": done},
