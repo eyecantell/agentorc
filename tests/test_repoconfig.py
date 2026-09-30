@@ -188,6 +188,25 @@ def test_techlead_placeholder_names_the_seat_or_says_none():
         assert "`ao-agentorc-techlead-ao-1`" in role.brief_text(techlead="ao-agentorc-techlead-ao-1")
 
 
+def test_entry_rules_are_written_once_and_read_both_ways():
+    """TD-219 slice 1, design §4.9 *Add an entry to the ledger*: `entry.md` holds what a new ledger
+    entry needs, with `{repo}`, `{type}` and `{ledger}` slots. The session way fills them from the form;
+    the techlead's brief takes the same text through `{entry}`, the slots said in words since the repo
+    and type ride on the handed message — and no other preset carries it."""
+    filled = repoconfig.entry_text("agentorc", "feature", "docs/technical_debt.md")
+    assert "ledger of agentorc: docs/technical_debt.md, with Type feature" in filled
+    assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" in filled
+    assert not any(slot in filled for slot in repoconfig.ENTRY_SLOTS)
+    tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
+    text, made = tl.compose([])
+    assert "{entry}" not in text and "## An entry handed to you" in text
+    assert repoconfig.entry_text(*repoconfig.HANDED_ENTRY.values()) in text
+    assert list(made["slots"])[:2] == ["{repo}", "{entry}"]  # a replay fills it after the repo's brief
+    for name in ("grinder", "hunter", "manager", "auditor"):
+        _, made = repoconfig.resolve_role(repoconfig.RepoConfig(), name).compose([])
+        assert "{entry}" not in made["slots"]
+
+
 def test_grants_orchestrate_in_a_role_is_an_unknown_grant(tmp_path):
     """TD-107: `grants: [orchestrate]` in a `roles:` block is refused like any unknown grant."""
     (tmp_path / ".agentorc.yml").write_text("roles:\n  reviewer: {grants: [orchestrate, control]}\n")

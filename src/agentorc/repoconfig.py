@@ -87,6 +87,27 @@ NO_CONTEXT = "none"
 # *This repo's rules* section; `none` where the repo gives nothing, and the template stands alone.
 REPO_PLACEHOLDER = "{repo}"
 NO_REPO = "none"
+# What a new ledger entry needs (design §4.9 *Add an entry to the ledger*, TD-219): written once, in
+# the package's `entry.md`, and read both ways — a section of the techlead's brief, where `{entry}`
+# takes it with its own slots said in words (the repo and type ride on the handed message), and the
+# opening lines of the composer a person's entry session starts with, the slots filled from the form.
+ENTRY_TEMPLATE = "entry.md"
+ENTRY_PLACEHOLDER = "{entry}"
+ENTRY_SLOTS = ("{repo}", "{type}", "{ledger}")
+HANDED_ENTRY = {
+    "{repo}": "the repo its `entry` names",
+    "{type}": "the `type` its `entry` carries",
+    "{ledger}": "that repo's ledger file (`.agentorc.yml`'s `ledger:`, `docs/technical_debt.md` by default)",
+}
+
+
+def entry_text(repo: str, type_: str, ledger: str) -> str:
+    """`entry.md` with its three slots filled: the rules a drafter of a new ledger entry follows."""
+    text = resources.files("agentorc").joinpath("briefs", ENTRY_TEMPLATE).read_text(encoding="utf-8")
+    for slot, value in zip(ENTRY_SLOTS, (repo, type_, ledger), strict=True):
+        text = text.replace(slot, value)
+    return text.strip()
+
 
 # The built-in presets (design §4.8's table): each a brief template shipped with the package
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
@@ -292,6 +313,10 @@ class Role:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
+        if ENTRY_PLACEHOLDER in text:  # the techlead's template alone carries it, so only it records the slot
+            handed = entry_text(*(HANDED_ENTRY[slot] for slot in ENTRY_SLOTS))
+            text = text.replace(ENTRY_PLACEHOLDER, handed)
+            slots[ENTRY_PLACEHOLDER] = {"text": handed}
         fills = (
             (TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD),
             (MANAGER_PLACEHOLDER, manager or NO_MANAGER),
