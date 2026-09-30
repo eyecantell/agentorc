@@ -174,14 +174,24 @@ def _usage_line(w: dict[str, Any], lines: Any) -> dict[str, Any] | None:
     return None
 
 
+def _projected(row: dict[str, Any] | None) -> float | None:
+    """The projection the gate reads for this window (§6 *A reading the gate can no longer trust*,
+    TD-233): the row's `pct` when `usage.project` marked it `projected`, else None."""
+    if row is None or not isinstance(row.get("projected"), dict):
+        return None
+    pct = row.get("pct")
+    return pct if isinstance(pct, int | float) and not isinstance(pct, bool) else None
+
+
 def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
     """One window on the chip's hover: its number, and where it has a line the line, the reserve,
-    the days left a per-day reserve counts and when the line next moves (§4.5a **usage**)."""
+    the days left a per-day reserve counts and when the line next moves (§4.5a **usage**); the
+    gate's projection after the number when it is projecting."""
     if row is None:
         return f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})"
-    return (
-        f"{w.get('label')} {w['pct']}% / line {row['line']:g}% ({_reserve_why(row)}; resets {w.get('resets') or '?'})"
-    )
+    pr = _projected(row)
+    now = f"{w['pct']}%" + (f", projected {pr:g}%" if pr is not None else "")
+    return f"{w.get('label')} {now} / line {row['line']:g}% ({_reserve_why(row)}; resets {w.get('resets') or '?'})"
 
 
 def _reserve_why(row: dict[str, Any]) -> str:
@@ -376,8 +386,15 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
     # A window past its reset is unknown until it is read again — never zero, never a cap (§4.4)
     gone = {id(w) for w in windows if (r := _instant(w.get("resets"))) is not None and r <= now}
     rows = [(w, _usage_line(w, u.get("lines"))) for w in windows]
-    ws = sorted(rows, key=lambda x: (id(x[0]) in gone, (x[1]["line"] if x[1] else 100) - x[0]["pct"], -x[0]["pct"]))
+
+    def shown(w: dict[str, Any], r: dict[str, Any] | None) -> float:
+        """The number the gate reads: the projection while it projects (§6, TD-233), else the reading."""
+        pr = _projected(r)
+        return w["pct"] if pr is None else pr
+
+    ws = sorted(rows, key=lambda x: (id(x[0]) in gone, (x[1]["line"] if x[1] else 100) - shown(*x), -shown(*x)))
     worst, row = ws[0]
+    projected = None if id(worst) in gone else _projected(row)
     parts = []
     for w, r in ws:
         if id(w) in gone:
@@ -389,22 +406,26 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
     title = ". ".join([*head, *([why] if why else []), " · ".join(parts)])
     if sharing:
         title += f". {sharing}"
-    unknown = id(worst) in gone or (read is not None and read["secs"] > USAGE_UNKNOWN)
+    # a projection is what the chip shows past USAGE_UNKNOWN too (§4.5a *The age*): the gate reads it
+    unknown = id(worst) in gone or (projected is None and read is not None and read["secs"] > USAGE_UNKNOWN)
     if unknown:
         # the number is no longer offered as the account's (§4.5a *The age*); it stays on the hover
         since = _instant(worst["resets"]) if id(worst) in gone else _instant(u.get("fetched"))
         text = f"{prof} · {worst.get('label')} unknown since {usage_clock(since, now)} (was {worst['pct']}%)"
         return {"text": text, "title": title, "pct": 0, "cls": "unknown", "near": False}
-    near = worst["pct"] >= 100 or (worst["pct"] >= row["line"] - 10 if row else worst["pct"] >= NEAR_CAP)
-    cls = "cap" if worst["pct"] >= 100 else "near" if near else ""
+    n = shown(worst, row)
+    near = n >= 100 or (n >= row["line"] - 10 if row else n >= NEAR_CAP)
+    cls = "cap" if n >= 100 else "near" if near else ""
     text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *Claude · paul · week 24%* (TD-122)
-    if row:
+    if row and projected is None:
         text += f" / {row['line']:g}%"  # *grind · week 61% / 70%* (§4.5a, TD-100)
     if read and read["secs"] > USAGE_AGED:
         text += f" · {read['age']}"  # *Claude · paul · week 88% · 6h* (TD-230)
+    if row and projected is not None:
+        text += f" · projected {projected:g}% / {row['line']:g}%"  # *week 88% · 2h · projected 96% / 95%* (TD-233)
     if read and read["secs"] > USAGE_FRESH:
         cls = f"{cls} old".strip()  # still red at a cap: it is the best evidence there is
-    return {"text": text, "title": title, "pct": worst["pct"], "cls": cls, "near": near}
+    return {"text": text, "title": title, "pct": n, "cls": cls, "near": near}
 
 
 def with_lines(usage: Any, gate: Any) -> dict[str, Any]:
