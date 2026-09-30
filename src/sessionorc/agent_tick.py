@@ -474,6 +474,12 @@ class TickMixin:
         if (self._brief_task is None or self._brief_task.done()) and now - self._brief_read_at > DERIVE_EVERY:
             self._brief_read_at = now
             self._brief_task = asyncio.create_task(self._brief_pass(now))
+        if (
+            self.mode == "home" and (self._defs_task is None or self._defs_task.done())
+        ) and now - self._defs_read_at > DERIVE_EVERY:
+            # a hand edit of the three files is committed on the reports' cadence (§4.9), detached
+            self._defs_read_at = now
+            self._defs_task = asyncio.create_task(self._commit_defs("edited by hand"))
 
     async def _brief_pass(self, now: datetime) -> None:
         """Rule 7's mark (design §6 *Keeping a team running*, TD-217 slice 3): each live record of

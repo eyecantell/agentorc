@@ -115,6 +115,15 @@ def install(
         wheel = None
     if wheel is not None:
         written.append(str(wheel))
+    # At the home the directory becomes a work tree that tracks its three definition files (design
+    # §4.9 *What is left at the home has a history*, TD-229); never on a node, never fatal to the units.
+    try:
+        tree = _home_history(home)
+    except Exception as e:  # noqa: BLE001
+        print(f"agentorc: the home's history could not be set up ({type(e).__name__}: {e})", file=sys.stderr)
+        tree = None
+    if tree is not None:
+        print(f"agentorc: {tree} now keeps the history of org.yml, profiles.yml and settings.yml")
     _systemctl("daemon-reload")
     # Always enable (a reboot must not need a human, design §8); --no-start only defers the start.
     cp = _systemctl("enable", *(["--now"] if start else []), *[f"{u}.service" for u in UNITS])
@@ -126,6 +135,17 @@ def install(
         # agent unit never takes tmux down (KillMode=process); the UI's terminals reconnect.
         _systemctl("restart", *[f"{u}.service" for u in UNITS])
     return written
+
+
+def _home_history(home: str | None) -> str | None:
+    """`~/.agentorc` made a git work tree tracking `org.yml`, `profiles.yml` and `settings.yml`, when
+    this host is the home and it is not one yet: its `.git`, or None."""
+    from sessionorc import defs, hosts, paths
+
+    if hosts.home_name() != hosts.local_host().name:
+        return None  # a node: its settings are the home's replica, and nothing of it is tracked
+    root = Path(home).expanduser() if home else paths.home()
+    return str(root / ".git") if defs.init(root) else None
 
 
 def uninstall() -> None:

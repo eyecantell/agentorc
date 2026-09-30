@@ -369,6 +369,10 @@ class HostAgent(
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
         # ran, and per record the blob ids that first read otherwise and since when
         self._brief_task: asyncio.Task[None] | None = None
+        # §4.9 *What is left at the home has a history*: one committer, so one git at a time
+        self._defs_lock = asyncio.Lock()
+        self._defs_task: asyncio.Task[None] | None = None
+        self._defs_read_at = datetime.min.replace(tzinfo=UTC)
         self._brief_read_at = datetime.min.replace(tzinfo=UTC)
         self._brief_differs: dict[str, tuple[tuple[str, ...], datetime]] = {}
         # §6 *A reading the gate can no longer trust* (TD-233 slice 4): the accounts told of a pause
