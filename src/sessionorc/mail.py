@@ -364,6 +364,7 @@ def read_when(
     unreachable: bool = False,
     rings: bool = True,
     refills: bool = False,
+    lapses: bool = True,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -376,9 +377,10 @@ def read_when(
     `rings` is whether its adapter has a composer the doorbell can type into (`_bell_blocked`).
     `refills` is a person's `reply` on a handed entry's thread (TD-218): to a seat on call it
     closes the seat's question and the entry counts toward the seat again, so it fills it as an
-    `ask` does. Advice, never a refusal."""
+    `ask` does. `lapses` False is an `ask` that carries no bound — a handed entry, which never lapses
+    (§4.10 *An entry handed to a seat*) — so the sentence names none. Advice, never a refusal."""
     ask = kind == "ask"
-    tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask else ""
+    tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask and lapses else ""
     if s is not None and not mail_wakes(s):
         return (
             "lands in its inbox and wakes nothing: a person's session is never rung (invariant 5)"

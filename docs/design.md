@@ -5582,13 +5582,17 @@ without reporting**; the row offers **Open** (the session's details, Resume) and
 → done: merged as #261*. A lapsed `steer` owes nothing — nobody answered — and a declined question
 owes nothing either.
 
-**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add`, the close by its outcome and `ao td add` not built — TD-218).** The Add entry
+**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add` built 2026-09-29 — TD-218 slice 2; the close by its outcome and `ao td add` not built — TD-218).** The Add entry
 form's **Hand to the techlead** and `ao td add` (§4.9 *Add an entry to the ledger*) send an `ask`
 from the person whose envelope carries **`entry: {repo, type}`** — the repo's name in the home's
 registry and `debt` or `feature`, both from the form's fields and never read out of the text —
 and the mark `handed` (§4.8a), through one person-only RPC, **`entry_add {repo, type, text}`**,
 refused to every session as `board_edit` is and served by the home, which resolves the repo's
-team and its techlead seat and refuses in words where there is none. It is an `ask`, so it fills
+team and its techlead seat and refuses in words where there is none. The host agent does not read
+`org.yml`, so the caller hands it the teams that service the repo, in definition order, as
+`teams: [{team, seat}]` — `seat` the id the team's techlead takes, empty where the team defines
+none — as `board_reply`'s `refs` come from the board reader; the repo is named or given as its
+checkout's path, and is resolved in the home's registry. It is an `ask`, so it fills
 the seat; **it carries no bound and never lapses**, as a question to the person never does —
 the default bound of an `ask` is not put on it, and it ends by its outcome or the person's
 Dismiss alone; **it counts toward the seat (`asks_waiting`, §4.9b) while it owes its outcome,
