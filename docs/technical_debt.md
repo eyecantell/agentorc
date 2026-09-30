@@ -2227,7 +2227,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1, PR #TBD):** `lane_matches(lane, entry)` with owner words (`models.owner_word`, `lane_refs`, `OWNER_WORD`), `agent_common._lane` setting them aside, the nudge, the report line and the brief's `{lane}` slot (`repoconfig._no_owner`) leaving them out; `lane_seen`'s first write from `ledger.entries_before`. Slices 2–5 open.
+**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1, PR #784):** `lane_matches(lane, entry)` with owner words (`models.owner_word`, `lane_refs`, `OWNER_WORD`), `agent_common._lane` setting them aside, the nudge, the report line and the brief's `{lane}` slot (`repoconfig._no_owner`) leaving them out; `lane_seen`'s first write from `ledger.entries_before`. Slices 2–5 open.
 **Location:** `src/sessionorc/ledger.py` (`lane_matches`), `src/sessionorc/agent_common.py` (`_lane`, the three `WORK_*` constants) and `src/agentorc/org.py` (`_lane`), `src/sessionorc/agent_tick.py` (`_lane_news`, `_nudge_line`, `_keep_running`, `_replay`), `src/sessionorc/gitinfo.py` (the ledger at a commit), `src/sessionorc/settings.py` (`teams.<team>.on_work`), `src/sessionorc/models.py` and the `host` record (`work_waiting`), `src/sessionorc/modes.py`, `src/agentorc/cli.py` (`ao team on-work`, `ao team list`), `src/agentorc/ui/` (the Inbox row, the card's note, the Settings page's picker, `help.py`); design §6 rules 6 and 8, §5, §4.7, §4.5a. Held path: the techlead reads the PRs.
 
 **Why:** TD-214's *Why*: a wound-down team sat a day with ten entries in its designer's lane, and rule 6's first tick took a day's backlog as seen.
