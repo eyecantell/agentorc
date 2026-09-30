@@ -152,9 +152,11 @@ async def test_the_home_marks_a_team_over_its_line_and_clears_it(agent, tmp_path
         # under the line: the mark goes, from the record, the file and the reading served
         agent._repos[root] = {"name": "repo", **_prs(8)}
         await agent._balance_marks(datetime.now(UTC))
-        assert "grind" not in agent._host_rec["teams"]
-        assert json.loads(paths.host_file().read_text()) == {"teams": {}}
+        assert "balance" not in agent._host_rec["teams"]["grind"]  # what was told is kept for the flap window
+        assert "balance" not in json.loads(paths.host_file().read_text())["teams"]["grind"]
         assert "balance" not in (await person.call("repos"))[root]
+        await agent._balance_marks(datetime.now(UTC) + balance.FLAP)
+        assert json.loads(paths.host_file().read_text()) == {"teams": {}}
 
 
 async def test_a_team_with_no_key_or_no_live_member_has_no_mark(agent, tmp_path):
@@ -411,3 +413,102 @@ async def test_a_refused_member_is_neither_nudged_nor_told_of_its_lane_while_the
         rec.lane, rec.out_of_work, rec.lane_seen = ["TD-001"], None, None
         await agent._idle_nudge(rec, now)
         assert len(sent) == 1 and "TD-001" in sent[0][1]
+
+
+# -- the notes (slice 3) ----------------------------------------------------------------------------
+
+
+def _system(entries) -> list[str]:
+    return [e.text for e in entries if e.from_ == "system"]
+
+
+async def test_a_crossing_and_its_clearing_tell_the_manager_and_the_person_once_and_ring_the_refused(agent, tmp_path):
+    """Design §6 *Balance*, *Who is told*: a crossing sends one `system` note to the controller the
+    members share and one to the person; a mark still standing sends nothing more; the clearing sends
+    the pair again and rings each member refused while it stood, once, removing `balance_refused`."""
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        await person.call("set_settings", teams={"grind": {"balance": {"prs": 8}}})
+        mgr = await _member(person, tmp_path, "mgr", unattended=True)
+        g1 = await _member(person, tmp_path, "g1", unattended=True)
+        g2 = await _member(person, tmp_path, "g2", unattended=True)
+        for g in (g1, g2):
+            agent.sessions[g].controllers = [mgr]
+            agent.sessions[g].repo = root
+        agent._repos[root] = {"name": "repo", **_prs(9)}
+
+        await agent._balance_marks(now)
+        (to_mgr,) = _system(agent.sessions[mgr].inbox)
+        assert to_mgr.startswith("grind is over its line since ") and "9 open PRs, the line is 8" in to_mgr
+        assert _system(agent.person_inbox) == [to_mgr]
+        assert not _system(agent.sessions[g1].inbox), "a member is told by its refusal, not by a note"
+
+        agent._repos[root] = {"name": "repo", **_prs(12)}
+        await agent._balance_marks(now + timedelta(minutes=30))  # still over: nothing more
+        assert len(_system(agent.sessions[mgr].inbox)) == len(_system(agent.person_inbox)) == 1
+
+        with pytest.raises(AgentError, match="over its line"):
+            await person.call("progress", id=g1, ref="TD-900", status="claimed")
+        assert agent.sessions[g1].balance_refused
+
+        agent._repos[root] = {"name": "repo", **_prs(8)}
+        await agent._balance_marks(now + timedelta(minutes=40))
+        cleared = _system(agent.sessions[mgr].inbox)[-1]
+        assert (
+            cleared.startswith("grind is under its line again (over since ") and len(_system(agent.person_inbox)) == 2
+        )
+        assert _system(agent.sessions[g1].inbox) == [balance.CLEAR] and agent.sessions[g1].balance_refused is None
+        assert not _system(agent.sessions[g2].inbox), "only a member that was refused is rung"
+        saved = json.loads((paths.sessions_dir() / f"{g1}.json").read_text())
+        assert saved.get("balance_refused") is None
+
+        await agent._balance_marks(now + timedelta(minutes=41))  # nothing rings twice
+        assert len(_system(agent.sessions[g1].inbox)) == 1 and len(_system(agent.person_inbox)) == 2
+
+
+async def test_a_mark_that_flaps_inside_ten_minutes_tells_one_pair(agent, tmp_path):
+    """A crossing inside `FLAP` of the last one told waits until it has stood that long: a mark that
+    comes and goes tells once, and one that comes back to stay is told once the window is over."""
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        await person.call("set_settings", teams={"grind": {"balance": {"prs": 8}}})
+        g = await _member(person, tmp_path, "g1", unattended=True)
+        agent.sessions[g].repo = root
+
+        def told() -> list[str]:
+            return _system(agent.person_inbox)
+
+        for minute, n in ((0, 9), (2, 8), (4, 9), (6, 8), (8, 9)):
+            agent._repos[root] = {"name": "repo", **_prs(n)}
+            await agent._balance_marks(now + timedelta(minutes=minute))
+        assert [t.split(" since")[0] for t in told()] == [
+            "grind is over its line",
+            "grind is under its line again (over",
+        ]
+        assert "balance" in agent._host_rec["teams"]["grind"], "the mark itself is not held back"
+
+        await agent._balance_marks(now + timedelta(minutes=10))  # stood past the window: told now
+        assert len(told()) == 3 and told()[2].startswith("grind is over its line")
+
+
+async def test_a_told_crossing_survives_a_restart_and_a_wound_down_team_tells_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        await person.call("set_settings", teams={"grind": {"balance": {"prs": 8}}})
+        g = await _member(person, tmp_path, "g1", unattended=True)
+        agent.sessions[g].repo = root
+        agent._repos[root] = {"name": "repo", **_prs(9)}
+        await agent._balance_marks(now)
+        assert json.loads(paths.host_file().read_text())["teams"]["grind"]["balance_told"]["state"] == "over"
+        assert len(_system(agent.person_inbox)) == 1
+
+        await person.call("kill", id=g)
+        agent.sessions[g].state = "exited"
+        await agent._balance_marks(now + timedelta(minutes=1))
+        assert agent._host_rec["teams"] == {} and len(_system(agent.person_inbox)) == 1
