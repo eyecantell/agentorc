@@ -239,3 +239,70 @@ async def test_entry_add_is_refused_in_words(agent, tmp_path):
             await person.call("entry_add", **{**ok, "teams": []})
         with pytest.raises(AgentError, match="ao-grind has no techlead seat"):
             await person.call("entry_add", **{**ok, "teams": [{"team": "ao-grind", "seat": ""}]})
+
+
+# -- slice 3: closed by its outcome — `--for`, `--thread` and the person's Dismiss -------------------
+
+
+async def _seat_with_entry(person, agent, tmp_path) -> str:
+    sid = (
+        await person.call(
+            "create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, supervised=True, prompt="the seat's brief", seat={"trigger": "asks"},
+        )  # fmt: skip
+    )["id"]
+    agent.sessions[sid].inbox.append(_handed(to=sid))
+    return sid
+
+
+@pytest.mark.integration
+async def test_a_question_on_a_handed_entrys_thread_leaves_its_debt_standing(agent, tmp_path):
+    """Review of #760: `--thread <handed id>` took the entry as the caller's own question and wrote
+    `asked_again` on it, so it stopped owing and never counted again. Now the question joins the
+    entry's thread and settles nothing; the person's answer counts the entry again."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _seat_with_entry(person, agent, tmp_path)
+        rec = agent.sessions[sid]
+        async with LocalClient(caller=sid) as tl:
+            q = (await tl.call("msg", to=PERSON, kind="ask", text="debt or feature?", thread="m-entry"))["entry"]
+        e = next(x for x in rec.inbox if x.id == "m-entry")
+        assert q["root"] == "m-entry", "on the entry's own thread"
+        assert e.outcome is None and e.owes, "the entry still owes its outcome"
+        assert rec.asks_waiting() == 0, "the seat waits on the person"
+        await person.call("msg", to=sid, kind="reply", reply_to=q["id"], text="debt")
+        assert rec.asks_waiting() == 1, "the answer counts the entry again"
+        # a reply to the entry itself does not close it: an outcome does
+        async with LocalClient(caller=sid) as tl:
+            await tl.call("msg", to=PERSON, kind="note", outcome="done", for_="m-entry", text="TD-240, PR #800")
+        assert e.outcome and e.outcome["state"] == "done" and rec.asks_waiting() == 0
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_the_persons_dismiss_ends_a_handed_entry_and_tells_the_seat(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _seat_with_entry(person, agent, tmp_path)
+        rec = agent.sessions[sid]
+        got = await person.call("inbox_dismiss", msg=["m-entry"])
+        assert got["dismissed"] == ["m-entry"]
+        e = next(x for x in rec.inbox if x.id == "m-entry")
+        assert e.outcome["state"] == "dismissed" and not e.owes and rec.asks_waiting() == 0
+        assert any(x.from_ == "system" and "dismissed m-entry" in x.text for x in rec.inbox)
+        assert (await person.call("inbox_dismiss", msg=["m-entry"]))["skipped"] == ["m-entry"]
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+def test_the_seats_nudge_names_a_handed_entry_by_its_outcome(agent):
+    s = _seat("idle")
+    s.seat_due = {"at": "t", "by": "asks"}
+    e = _handed(to=s.id)
+    e.read_at = "2026-09-29T11:05:00Z"
+    s.inbox.append(e)
+    line = agent._nudge_line(s)
+    assert "questions waiting" not in line and "1 entry the person handed you owes its outcome" in line
+    q = MailEntry(id="m-q", from_="ao-mgr", to=[s.id], at="2026-09-29T11:00:00Z", kind="ask", text="?")
+    s.inbox.append(q)
+    assert agent._nudge_line(s).startswith("[agentorc] you have 1 questions waiting — run `ao inbox`; 1 entry")

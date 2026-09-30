@@ -5582,7 +5582,7 @@ without reporting**; the row offers **Open** (the session's details, Resume) and
 → done: merged as #261*. A lapsed `steer` owes nothing — nobody answered — and a declined question
 owes nothing either.
 
-**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add` built 2026-09-29 — TD-218 slice 2; the close by its outcome and `ao td add` not built — TD-218).** The Add entry
+**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add` built 2026-09-29 — TD-218 slice 2; the close by its outcome, `--thread` on it and the person's Dismiss (`inbox_dismiss` naming its id) built 2026-09-29 — TD-218 slice 3, listed by the person's `inbox` read as `handed` with its holder, its row under *Waiting on them* not drawn yet — TD-219; `ao td add` not built — TD-218).** The Add entry
 form's **Hand to the techlead** and `ao td add` (§4.9 *Add an entry to the ledger*) send an `ask`
 from the person whose envelope carries **`entry: {repo, type}`** — the repo's name in the home's
 registry and `debt` or `feature`, both from the form's fields and never read out of the text —
@@ -6300,7 +6300,10 @@ code and needs no grant; a session doing the same work does.
      you have been idle 20 minutes with `<ref>` open — end the run with one of `ao progress done
      <ref> --pr N`, `ao progress drop <ref> --why`, `ao progress none --why` or `ao progress
      restart --why`*, naming the first open reference — for a seat, the number waiting: *you have N questions
-     waiting — run `ao inbox`* — and nothing a session wrote; it is recorded on `sends` as the home's
+     waiting — run `ao inbox`*, and an entry the person handed it (§4.10 *An entry handed to a
+     seat*) named apart, since one already read wants its outcome and not another read: *1 entry
+     the person handed you owes its outcome — `ao msg person --outcome done|blocked|dropped "…"
+     --for <id>`* (TD-218 slice 3) — and nothing a session wrote; it is recorded on `sends` as the home's
      own (`system`). A node's member is not nudged yet: the composer is read on the member's host,
      and no node act does that (TD-103). Once per idle
      stretch (`nudged_at`; a stretch ends when the state changes), never a second before the

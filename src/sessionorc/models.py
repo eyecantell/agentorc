@@ -1004,7 +1004,7 @@ class Session:
     def unread(self) -> int:
         return sum(1 for e in self.inbox if not e.read_at)
 
-    def asks_waiting(self, *, home: str | None = None) -> int:
+    def asks_waiting(self, *, home: str | None = None, handed_only: bool = False) -> int:
         """Design §4.9b (TD-075 step 4): the open `ask`s and `steer`s **addressed** to this record —
         a copy is not addressed to it — as a number and never their text, since nobody reads
         another session's inbox. What a manager reads to fill an empty techlead seat; computed
@@ -1015,7 +1015,9 @@ class Session:
         An address is compared whole, host included (§4.4a): names are unique per host, not per
         org, so `tl@laptop` is not this record's address merely because its id is `tl`. A bare
         address names a session on the host whose store holds the entry — `home` when the reader
-        says which, else the record's own host, which is the same thing for a record of this host."""
+        says which, else the record's own host, which is the same thing for a record of this host.
+        `handed_only` counts the handed entries among them alone: the nudge names those apart, since
+        one already read wants its outcome, not another `ao inbox` (TD-218 slice 3)."""
         storing = home or self.host
         mine = (self.id, self.host or storing)
 
@@ -1037,6 +1039,7 @@ class Session:
                 else (e.open and e.kind in ("ask", "steer") and not e.passed_up)
             )  # passed up: the person's to answer now (§4.9b), no seat need be filled for it
             and any(where(x) == mine for x in e.to)
+            and (not handed_only or e.handed_entry)
         )
 
     def prs_waiting(self, *, home: str | None = None) -> dict[str, Any] | None:

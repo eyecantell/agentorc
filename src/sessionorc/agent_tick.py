@@ -777,7 +777,18 @@ class TickMixin:
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
             n = s.asks_waiting(home=self.host) if s.seat_due else 0
-            return f"[agentorc] you have {n} questions waiting — run `ao inbox`" if n else None
+            if not n:
+                return None
+            # an entry the person handed the seat, read already, owes its outcome rather than a read (TD-218)
+            h = s.asks_waiting(home=self.host, handed_only=True)
+            parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []
+            if h:
+                parts.append(
+                    f"{h} {'entry' if h == 1 else 'entries'} the person handed you "
+                    f"{'owes its' if h == 1 else 'owe their'} outcome — "
+                    '`ao msg person --outcome done|blocked|dropped "…" --for <id>`'
+                )
+            return "[agentorc] " + "; ".join(parts)
         ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
         claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
         ref = next((r for r in [*s.lane, *claimed] if r != "free-pick" and r not in ended), None)
