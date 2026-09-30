@@ -8,8 +8,8 @@ key is the usage gate's reserves, per profile, per window label as the adapter n
     usage_gate:
       grind: {"5h": 30, wk: {per_day: 10}}
 
-Four keys since 2026-09-25 (§5 *The settings a person moves*, TD-146): `usage_gate`, `teams`, `repos`
-and `person`. Each has a reader here that drops whatever is not valid — a hand edit can put anything
+Five keys (§5 *The settings a person moves*, TD-146, TD-233): `usage_gate`, `usage` (`max_age`),
+`teams`, `repos` and `person`. Each has a reader here that drops whatever is not valid — a hand edit can put anything
 in the file, and a malformed entry must act on nothing — and a `parse_*` that raises, which is what
 `set_settings` validates a write with. `person:` is the person's own and reaches no policy: the gate
 and the tick read the file by key and never that one.
@@ -204,7 +204,8 @@ def lines(
     window that has one — it lowers a line, never makes one — and carried on the row when it is set.
     A window whose `resets` has passed carries `unknown: "reset"` (§6 *Usage gate*: *a window that is
     unknown pauses nothing*): its number is the last window's, not this one's, so `crossed` skips it
-    while the row still shows what was last read."""
+    while the row still shows what was last read. A window the one reader marked (`usage.project`)
+    carries its mark: `unknown: "rate"`, or `projected`, whose `pct` is then the projection."""
     out = []
     for w in windows or []:
         label = str(w.get("label"))
@@ -213,6 +214,7 @@ def lines(
         r = by_label[label]
         nxt = moves(r, w.get("resets"), now)
         ended = (t := _when(w.get("resets"))) is not None and t <= now
+        unknown = "reset" if ended else w.get("unknown")  # `rate`: past max_age with none to project by
         out.append(
             {
                 "label": label,
@@ -222,7 +224,9 @@ def lines(
                 "next": nxt.isoformat().replace("+00:00", "Z") if nxt else None,
                 "reserve": r,
                 **({"extra": extra} if extra else {}),
-                **({"unknown": "reset"} if ended else {}),
+                **({"unknown": unknown} if unknown else {}),
+                **({"age": w["age"]} if unknown == "rate" and "age" in w else {}),
+                **({"projected": w["projected"]} if w.get("projected") and not ended else {}),
             }
         )
     return out
@@ -241,6 +245,54 @@ def crossed(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         if row["line"] is not None and isinstance(row["pct"], int | float) and row["pct"] >= row["line"]:
             return row
     return None
+
+
+# -- usage: max_age (§5 `usage.max_age`, §6 *A reading the gate can no longer trust*, TD-233) -------
+
+USAGE_KEYS = ("max_age",)
+MAX_AGE_DEFAULT = "1h"
+MAX_AGE_BOUNDS = (5 * 60, 7 * 86400)  # five minutes to a week: shorter projects a reading still fresh
+_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+
+
+def parse_max_age(value: Any) -> str:
+    """`off`, or an age as `90m`, `1h`, `2d` or whole seconds — kept as written, normalised to one
+    unit. Raises on anything else, as every `parse_*` does."""
+    if isinstance(value, str) and value.strip().lower() == "off":
+        return "off"
+    if isinstance(value, bool):
+        raise ValueError(f"max_age is an age like 1h or 90m, or off — not {value!r}")
+    m = re.fullmatch(r"\s*(\d+)\s*([smhd]?)\s*", str(value)) if isinstance(value, int | str) else None
+    if m is None:
+        raise ValueError(f"max_age is an age like 1h or 90m, or off — not {value!r}")
+    secs = int(m.group(1)) * _UNITS[m.group(2) or "s"]
+    lo, hi = MAX_AGE_BOUNDS
+    if not lo <= secs <= hi:
+        raise ValueError(f"max_age is from 5m to 7d, not {value!r}")
+    return f"{m.group(1)}{m.group(2) or 's'}"
+
+
+def max_age(doc: dict[str, Any]) -> float | None:
+    """The age in seconds past which the gate projects a reading, None under `off`. An unset or
+    malformed value is the default hour: a hand edit's typo must not switch the projection off."""
+    raw = doc.get("usage")
+    raw = raw.get("max_age") if isinstance(raw, dict) else None
+    try:
+        kept = parse_max_age(MAX_AGE_DEFAULT if raw is None else raw)
+    except ValueError:
+        kept = MAX_AGE_DEFAULT
+    if kept == "off":
+        return None
+    return float(int(kept[:-1]) * _UNITS[kept[-1]])
+
+
+def usage(doc: dict[str, Any]) -> dict[str, Any]:
+    """The `usage:` key as kept: `{max_age}`, the default when unset or malformed."""
+    raw = doc.get("usage")
+    try:
+        return {"max_age": parse_max_age(raw["max_age"])} if isinstance(raw, dict) and "max_age" in raw else {}
+    except ValueError:
+        return {}
 
 
 # -- teams, repos, person (§5, TD-146) -------------------------------------------------------------
