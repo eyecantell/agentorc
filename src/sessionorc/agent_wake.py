@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sessionorc import (
     adapters,
+    defs,
     mail,
     paths,
     waits,
@@ -524,6 +526,7 @@ class WakeMixin:
         if reserves is None and teams is None and repos is None and person is None and usage is None:
             raise RpcError("set_settings needs reserves, teams, repos, person or usage (design §5 settings.yml)")
         doc = settings_mod.load()
+        before = copy.deepcopy(doc)
         before_teams = settings_mod.teams(doc)
         out: dict[str, Any] = {}
         if reserves is not None:
@@ -592,7 +595,35 @@ class WakeMixin:
         held = [k for k in ("usage_gate", "usage", "teams", "repos", "person") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
+        await self._commit_defs(defs.settings_message(before, doc), ("settings.yml",))  # a slow git delays no node
         return out
+
+    async def rpc_commit_defs(self, message: str = "", caller: Any = None) -> dict[str, Any]:
+        """Commit the home's definition files with the act's words (design §4.9 *What is left at the
+        home has a history*, TD-229 slice 5): a client calls it after it wrote `org.yml` itself —
+        **Members…**'s `edit_members` — as `org: ao-grind +grinder-ao-3`. A person's own, and the
+        home's alone (`modes.HOME_EDITS`). `{committed}`: false when nothing changed, the home is no
+        work tree, or git failed (logged; the write it follows stands)."""
+        if not mail.is_person(caller):
+            raise RpcError("commit_defs is a person's own: refused to a session (design §4.9)")
+        if self.mode != "home":
+            raise RpcError("commit_defs runs at the home (design §4.9): this host is a node")
+        message = " ".join(str(message or "").split())
+        if not message:
+            raise RpcError("commit_defs needs the act's words as its message")
+        return {"committed": await self._commit_defs(message[:200])}
+
+    async def _commit_defs(self, message: str, files: tuple[str, ...] = defs.TRACKED) -> bool:
+        """The home's one committer (§4.9): at the home only, one git at a time, in a thread; never
+        raises, since the write it follows has already happened."""
+        if self.mode != "home":
+            return False  # a node's replica of `settings.yml` is not tracked
+        try:
+            async with self._defs_lock:
+                return await asyncio.to_thread(defs.commit, message, files=files)
+        except Exception:  # noqa: BLE001 — a history that fails is a log line, never the write's failure
+            log.exception("committing the home's definitions failed")
+            return False
 
     async def rpc_clear_work(self, team: str = "", caller: Any = None) -> dict[str, Any]:
         """Dismiss's half of the **Inbox row: team start** (design §6 rule 8, §4.5a, TD-227): the ids

@@ -33,6 +33,8 @@ from sessionorc.mail import self_decide_refusal
 # holds the replica the home last sent, which the next frame overwrites.
 # **`clear_work`** (§6 rule 8, TD-227): Dismiss writes the members' `lane_seen` and the home's own
 # `host` record, where `work_waiting` lives; at a node both would be the replica's.
+# **`commit_defs`** (§4.9 *What is left at the home has a history*, TD-229): the tracked files and
+# their work tree are the home's; a node's `settings.yml` is a replica nobody commits.
 HOME_EDITS = frozenset(
     {
         "set_controllers",
@@ -47,6 +49,7 @@ HOME_EDITS = frozenset(
         "set_settings",
         "entry_add",
         "clear_work",
+        "commit_defs",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the

@@ -4037,7 +4037,7 @@ repo. The org a client sees is the union:
   press that committed to a repo's default branch would go round the repo's review. A team a
   person wants to reshape from the page stays in the org file.
 
-**What is left at the home has a history** (TD-210). `org.yml`, `profiles.yml` and
+**What is left at the home has a history** (TD-210; built — TD-229 slice 5). `org.yml`, `profiles.yml` and
 `settings.yml` stay files under `~/.agentorc/`, where every reader finds them, and at the home
 the directory becomes a git work tree that tracks those three and ignores the rest: sessions,
 runs and mail are state, and `hosts.yml` is this machine's own name and links, which another
@@ -4047,7 +4047,10 @@ meet on the index: it commits after its own `set_settings` (*settings: usage_gat
 +grinder-ao-3*, the `commit_defs` RPC, a person's own), and on the reports' cadence for a hand
 edit, as *edited by hand*. It runs `git add` and `git commit` on the three and reads none of
 them for meaning (it still reads no `org.yml`); a file that does not parse as YAML is left
-uncommitted until it does, and a commit that fails is logged and never fails the write. So
+uncommitted until it does, and a commit that fails is logged and never fails the write. It
+commits as *agentorc*, with the person's git hooks and signing set aside for its own commits
+(`sessionorc.defs`), and a home that is not a work tree yet commits nothing until `ao service
+install` makes it one. So
 `git -C ~/.agentorc log -p org.yml` is the file's history and the `org.yml.bak-*` copies have
 no more work to do. A node's replica of `settings.yml` is not tracked. **The home never
 pushes and adds no remote**: a copy off the machine is the person's own `git remote add` and
@@ -6148,7 +6151,7 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   the org file, which holds what no one repo can: projects and teams that span repos, `place:`
   and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` are tracked
   by a git work tree in `~/.agentorc/` at the home (§4.9 *The org is an aggregate*, *What is
-  left at the home has a history*; TD-210, not built — TD-229).
+  left at the home has a history*; TD-210, built — TD-229 slice 5).
   The org file: `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
   exactly as a repo's `roles:` is (TD-149). Read by the clients on every use, never by the host agent:

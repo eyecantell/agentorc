@@ -13,6 +13,7 @@ a terminal or a page — the callers do that from the returned records.
 
 from __future__ import annotations
 
+import contextlib
 import re
 import time
 from collections.abc import Callable, Collection
@@ -594,6 +595,13 @@ def _names(org: orgmod.Org, name: str) -> list[str]:
     return [n for m in team.members if m.team is None for n in m.names()]
 
 
+def _commit(call: Call, message: str) -> None:
+    """The home commits the org file with the act's words (design §4.9 *What is left at the home has
+    a history*): the edit is written already, so a refusal or an older agent costs only the entry."""
+    with contextlib.suppress(Exception):
+        call("commit_defs", message=message)
+
+
 def add_member(
     call: Call, path: Path, name: str, host: str, *, role: str, member: str = "", lane: list[str] | None = None
 ) -> dict[str, Any]:
@@ -603,6 +611,7 @@ def add_member(
     team, the definition only: the next Start brings the new shape."""
     before = _names(orgmod.load(path), name)
     did = orgmod.edit_members(path, name, add={"role": role, "name": member, "lane": lane or []})
+    _commit(call, f"org: {name} {did}")
     org = orgmod.load(path)
     new = [n for n in _names(org, name) if n not in before]
     up = live(crew(name, call("list")))
@@ -636,6 +645,7 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str) -
         raise teams.TeamError(f"team {name} has no member entry {index + 1} — reload and try again")
     gone = team.members[index].names()[-1] if team.members[index].team is None else ""
     did = orgmod.edit_members(path, name, remove=index, role=role)
+    _commit(call, f"org: {name} {did}")
     out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}
     s = next((s for s in live(crew(name, call("list"))) if s.get("name") == gone), None)
     if s is not None:
