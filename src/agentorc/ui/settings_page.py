@@ -142,7 +142,7 @@ def _account(p: profiles_mod.Profile, reading: Mapping[str, Any] | None) -> tupl
     return f"{tool} · {acct}", acct
 
 
-def reading_age(w: Mapping[str, Any], read: Mapping[str, Any] | None, reading: Any, now: datetime) -> str:
+def reading_age(w: Mapping[str, Any], read: Mapping[str, Any] | None, now: datetime) -> str:
     """A window's reading as the chip's hover gives it (§4.5a *Settings page: Usage*, *The reading's
     age*; TD-233 slice 1): *week 88% · read 6h ago, asked of the endpoint*; past its reset or past
     `USAGE_UNKNOWN`, *unknown since 22:21 (was 88%)*. Empty for a reading with no time on it."""
@@ -190,7 +190,7 @@ def usage_cards(
                     "line": line_text(rows_by.get(label), now) if label in reserves else "no line",
                     "resets": str(w.get("resets") or ""),
                     "pct": w.get("pct") if _is_num(w.get("pct")) else None,
-                    "age": reading_age(w, read, reading, now),
+                    "age": reading_age(w, read, now),
                 }
             )
         for label, r in reserves.items():  # a reserve on a label no reading has shown yet

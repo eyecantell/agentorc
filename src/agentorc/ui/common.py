@@ -144,7 +144,10 @@ def usage_age(secs: float) -> str:
 
 def usage_clock(dt: datetime, now: datetime) -> str:
     """When a reading was taken, in local time: *22:21*, with the day in front once it is a day old."""
-    local = dt.astimezone()
+    try:
+        local = dt.astimezone()
+    except (OverflowError, ValueError, OSError):  # year 1 or 9999 off a hand-repaired file: UTC, never a raise
+        local = dt
     return local.strftime("%a %H:%M") if (now - dt).total_seconds() >= 86400 else local.strftime("%H:%M")
 
 

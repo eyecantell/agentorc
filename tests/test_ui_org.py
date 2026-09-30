@@ -509,6 +509,10 @@ def test_a_refused_usage_poll_keeps_the_held_reading_and_its_age_says_how_old_it
     assert got["all_reset"]["text"] == f"grind · 5h unknown since {_clock('2026-09-20T19:00:00Z')} (was 97%)"
     assert got["all_reset"]["cls"] == "unknown" and got["all_reset"]["near"] is False
     assert all("stale" not in (c or {}).get("text", "") for c in got.values())  # the word is gone
+    # a junk instant costs the chip its number, never the page, whatever the zone (review of TD-233 slice 1)
+    year_one = {"windows": [{"label": "week", "pct": 5, "resets": "9999-12-31T23:59:59Z"}],
+                "fetched": "0001-01-01T00:00:00Z", "reason": "ok"}  # fmt: skip
+    assert usage_chip("grind", year_one, USAGE_NOW)["cls"] == "unknown"
 
 
 def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap():
