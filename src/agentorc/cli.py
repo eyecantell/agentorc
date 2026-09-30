@@ -1196,15 +1196,21 @@ def _promote_line(name: str, r: dict[str, Any]) -> str:
         f", {ahead} ahead" if isinstance(ahead, int) and ahead else (", live" if r.get("live") == r.get("main") else "")
     )
     checks = str(r.get("checks") or "unknown") + (f" ({r['checks_why']})" if r.get("checks_why") else "")
-    line = f"{name} · live {live} · main {main} · checks {checks} · auto {'on' if r.get('auto') else 'off'}"
+    if h := r.get("held"):  # §6 *The hold*: live is older than main because a person put it there
+        live += f", rolled back from {str(h.get('from') or '')[:7] or 'unknown'}"
+    auto = ("on" if r.get("auto") else "off") + (" · held" if r.get("held") else "")
+    line = f"{name} · live {live} · main {main} · checks {checks} · auto {auto}"
     if f := r.get("inflight"):
-        line += f"\n  promoting {str(f.get('sha'))[:7]} · started {f.get('at')} by {f.get('by')} · log {f.get('log')}"
+        what = "rolling back to" if f.get("kind") == "rollback" else "promoting"
+        line += f"\n  {what} {str(f.get('sha'))[:7]} · started {f.get('at')} by {f.get('by')} · log {f.get('log')}"
     elif f := r.get("failed"):
         line += f"\n  FAILED {str(f.get('sha'))[:7]} at {f.get('at')}: {f.get('why')} · log {f.get('log')}"
         line += "".join(f"\n    {t}" for t in f.get("tail") or [])
         line += "\n  nothing is promoted until it is cleared (the Inbox row's Dismiss)"
     elif u := r.get("unmet"):
         line += f"\n  not now: {u.get('text')}"
+    if r.get("held") and not r.get("inflight"):
+        line += "\n  held: nothing is promoted by itself until you promote main or clear it (ao promote clear)"
     return line
 
 
@@ -1212,7 +1218,21 @@ def cmd_promote(args: argparse.Namespace) -> int:
     """`ao promote [<repo>]` and `ao promote status` (design §4.7, §6 *Promote*, TD-132 slice 2): the
     press from a terminal, through the home's `promote` RPC — a person's own, refused to a session —
     or the readings it keeps (`promotes` on `host`). The press returns once the run is started: the
-    outcome is `check`'s on a later tick, and for this repo the host agent goes away under it."""
+    outcome is `check`'s on a later tick, and for this repo the host agent goes away under it.
+    `--sha <commit>` and `--back` are the rollback (§6 *A rollback*, TD-226); `ao promote clear
+    [<repo>]` is Dismiss from a terminal: a failure standing, else a rollback's hold."""
+    if args.repo == "clear":
+        repo = args.target or _main_checkout(os.getcwd())
+        if not repo:
+            raise AgentError("this directory is not in a git checkout; name the repo: ao promote clear <repo>")
+        got = call_sync("clear_promote", repo=repo)
+        said = {
+            "failed": "the failure is cleared: promoting goes on",
+            "held": "the hold is cleared: auto goes on as if nothing had been held",
+        }
+        return emit(args, got, lambda: print(f"{got['repo']}: {said.get(got.get('which') or '', 'nothing stood')}"))
+    if args.target:
+        raise AgentError(f"ao promote takes one repo; {args.target!r} is extra (ao promote clear <repo> clears)")
     if args.repo == "status":
         got = call_sync("host")
         if "promotes" not in got:
@@ -1229,10 +1249,17 @@ def cmd_promote(args: argparse.Namespace) -> int:
     repo = args.repo or _main_checkout(os.getcwd())
     if not repo:
         raise AgentError("this directory is not in a git checkout; name the repo: ao promote <repo>")
-    got = call_sync("promote", repo=repo, **({"sha": args.sha} if args.sha else {}))
+    if args.sha and args.back:
+        raise AgentError("ao promote takes --sha or --back, not both")
+    extra: dict[str, Any] = {"sha": args.sha} if args.sha else ({"back": True} if args.back else {})
+    got = call_sync("promote", repo=repo, **extra)
 
     def prose() -> None:
-        print(f"promoting {got['repo']} to {got['sha'][:7]} — log: {got['log']}")
+        if got.get("kind") == "rollback":
+            frm = str(got.get("from") or "")[:7] or "an unread live"
+            print(f"rolling back {got['repo']} to {got['sha'][:7]} from {frm} — log: {got['log']}")
+        else:
+            print(f"promoting {got['repo']} to {got['sha'][:7]} — log: {got['log']}")
         if got.get("checks") != "green":
             why = f" ({got['checks_why']})" if got.get("checks_why") else ""
             print(f"checks on {got['sha'][:7]} read {got.get('checks') or 'unknown'}{why}: pressed through, your word")
@@ -2440,9 +2467,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")
     p.add_argument(
-        "repo", nargs="?", help="the repo's name or its checkout's path, or `status`. None: this directory's"
+        "repo", nargs="?", help="the repo's name or its checkout's path, `status`, or `clear`. None: this directory's"
     )
-    p.add_argument("--sha", help="a commit other than main's head, for a rollback (not built yet)")
+    p.add_argument("target", nargs="?", help="after `clear`: the repo whose failure or hold to clear")
+    p.add_argument("--sha", help="roll back to this commit of main: its hex, seven or more (design §6 A rollback)")
+    p.add_argument("--back", action="store_true", help="roll back to what was live before the last promote")
     p.set_defaults(fn=cmd_promote)
 
     p = add("settings", help="the home's settings.yml, each key with what it makes today (design §5)")
