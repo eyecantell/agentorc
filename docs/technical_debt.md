@@ -90,7 +90,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Built — live look pending |
 | TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Built — live look pending after the next promote |
 | TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
-| TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
+| TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Designed 2026-09-29 — the build is TD-239 |
 | TD-180 | Add a TD from the UI: the person writes what they have and an agent asks what it needs and writes the entry, or the form opens an interactive designer or techlead session prefilled | Medium | Designed 2026-09-28 (the designer) — the build is TD-218 and TD-219; archives with them |
 | TD-185 | Export `AGENT_NAME` (the short name, `grinder-ao-1`) into every session at launch, so dev-cadence's co-author hook can name the agent in its commits | Medium | Built — the live commit check waits on the promote |
 | TD-187 | A member that declared out of work is never woken when its lane gains entries: the designer slept through TD-180–183 | High | Designed 2026-09-26 — the build is TD-195 |
@@ -122,6 +122,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Designed 2026-09-28 — the build is TD-233 |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Designed 2026-09-28 — the build is TD-233 |
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Open — pickable |
+| TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Open — pickable |
 
 
 ---
@@ -1739,13 +1740,14 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (Paul: *this may lead to automatic checks by the manager for us, like the PR count*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no — after TD-176 slice 1 or 2 lands, so the rule keys on numbers a person has watched first
+**Pickable:** no — designed; the build is TD-239
+**Blocked by:** TD-239
 
 **Why:** the repo's numbers (TD-176) make a growing PR count visible; nothing acts on it. A manager keeps handing out claims while the reader's queue grows, and the person finds out from the team card, once it is already large. Paul asked that the numbers come first and a rule after, so that the rule keys on numbers he has watched.
 
 **Fix:** design the rule, then build it as a policy of the manager's round. The question is §10 (2026-09-25): a per-team **balance** line — open PRs above `n`, the oldest past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out no new claim and asks the techlead to read, in its log line; never a kill, never a wind-down. To settle: setting or definition (the settings audit's rule, ADR 2026-09-25 §5); whether the manager reads `ao repo` each round or the tick pushes a breach as a `system` note (§4.10); what the manager's brief says (`src/agentorc/briefs/manager.md`, *A round*); and the numbers' defaults.
 
-**Status:** Open — nothing designed beyond the §10 question.
+**Status:** Designed 2026-09-29 (the designer, PR #PRNUM; the steer to Paul is `STEERID`, bound STEERBOUND): design §6 *Balance*, §4.5a (the Settings page's **balance**, the team card's **over its line** note), §4.7 `ao team balance`, §5 `teams.<team>.balance`, §10's question closed. It departs from this entry's Fix in one thing: the rule acts at the claim, refused by the host agent, and not in the manager's round, because a manager hands out no work and cannot read the reader's queue; the manager is told and logs it. Closes with TD-239.
 
 **Related:** TD-176, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
 
@@ -2386,3 +2388,28 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** through a busy evening the chip's reading is under fifteen minutes old with the endpoint asked at most a handful of times, a reading that does go old says its age on the chip and in `ao gate`, and the gate pauses the team on a projection rather than run the account past its line.
 
 **Related:** TD-230, TD-231 (the designs and the research), TD-122 (one poll per account), TD-087 (the reason on a refusal), TD-100 (the gate), TD-201 (the unattended layer's settings).
+
+## TD-239: Build the balance rule — a team over its line takes no new claim
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-29 (the designer, from TD-177's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/settings.py` (`TEAM_KEYS`, `parse_team`, `teams`), `src/sessionorc/agent_wake.py` (`rpc_set_settings`), `src/sessionorc/agent_tick.py` (`_refresh_repos`, the idle nudge, `_lane_news`), `src/sessionorc/agent.py` (`rpc_progress`, the `_ending` refusals), `src/sessionorc/agent_mail.py` (`_system_note`), `src/sessionorc/models.py` (`prs_waiting`, `review`), `src/agentorc/cli.py` (`ao team`, `cmd_repo`), `src/agentorc/ui/settings_page.py` (`team_cards`) and `ui/templates/settings.html`, `ui/templates/group_head.html`, `src/agentorc/ui/help.py`, `src/agentorc/briefs/grinder.md`, `hunter.md`, `auditor.md` and `manager.md`
+
+**Why:** TD-177's *Why*: the repo's numbers make a growing pull-request count visible and nothing acts on it, so the person finds out from the card once it is large.
+
+**Fix, in slices a PR each:**
+1. **The setting and the mark** (`sessionorc`): `balance` joins `TEAM_KEYS`; `parse_team` takes `{prs: <int ≥ 1>, oldest: <n>[mhd], review: <bool>}`, each optional, an empty mapping refused, an unknown key refused by name. After each repo reading and on each tick the home reads the lines of every team that has the key — open pull requests that are not drafts from `prs.open`, the oldest's `created`, and the seat's `prs_waiting.oldest` against the shortest `review.bound` of the team's live members (two hours where none) — and writes or removes `balance: {since, repo, crossed: [{line, value, limit}]}` on its `host` record under the team's name. A reading carrying `error` changes nothing. The team's repo is read from its live members' directories.
+2. **The refusal** (`sessionorc`): `rpc_progress` refuses a declared `claimed` by an unattended record whose team carries the mark, `force` or not, in the design's words with the mark's numbers; a renewal of a reference the record holds, a pull-request reference, `done`, `dropped`, `restart` and every interactive record pass. `none` is refused to such a record in the same words. The record keeps `balance_refused: {at, ref}` so the clearing can ring it; the idle nudge and rule 6's telling skip a record that carries it while the mark stands.
+3. **The notes**: on a crossing and on its clearing, one `system` note to the controller the team's members share and one to the person, FYI; on the clearing, one to each record carrying `balance_refused`, which is then removed. A mark that flaps inside ten minutes sends one pair, not several.
+4. **The page and the terminal**: the team card's **over its line** note from the mark; the Settings page's **balance** switch and fields with the numbers as they read now; `ao team balance`; the line in `ao team list` and `ao repo`. The help entries for the new controls are added to §4.5a's help list and `ui/help.py` together (bound by `tests/test_help.py`); their wording is this slice's.
+5. **The briefs**: the worker presets say what a refusal *over its line* means — take nothing new, finish, rebase or answer what is open of yours, end the turn, and never declare `none` on it; the manager preset says a team over its line is neither crashed nor finished, and that its part is one log line.
+6. **Tests**: nine open pull requests against `prs: 8` refuse a new claim and eight do not; a draft is not counted; a claim on `#712` passes; a renewal passes; `--force` is refused; an interactive member's claim passes; `none` is refused while the mark stands and taken once it goes; a failed reading leaves a standing mark standing and writes none; `review: true` with an `ask` carrying `pr` three hours old at the seat and a bound of `2h` crosses; a team with no key is never marked; the clearing rings a refused member once.
+
+**Done when:** on a scratch home with `ao team balance <team> --prs 1` and two open pull requests in the scratch repo, a member's `ao progress claim` is refused with the numbers, the card reads *over its line*, the manager's inbox holds one note, and closing one pull request clears the mark within a repo reading and rings the member.
+
+**Related:** TD-177 (the design), TD-176 (the numbers), TD-227 (rule 8, which gains the fifth bound when both are built; whichever lands second adds it), TD-093 (the reader and its bound), TD-100 (the usage gate, the precedent for a line a person sets).

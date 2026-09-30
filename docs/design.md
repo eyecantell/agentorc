@@ -2572,7 +2572,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
 | Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; built 2026-09-25 — TD-136): one mail entry whole, reached from the row's text and its *whole entry ›* link, and from `Enter` on the ringed row (a trail row's *re* is not a link yet). **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
 | Settings page | **Usage**: a reserve field per profile per window, **Save** per profile card | §4.5 screen 8 (TD-100 (4); built — TD-148). Each field takes what `ao gate` takes — `30`, `10/day`, empty to clear — and shows the line it makes today beside it before the press lands; **Save** calls `set_settings {profile, reserves}` for that card, the person's alone, and the card says *applies on the next tick*. A label the adapter has not reported is refused with the reported ones named, in place, as the CLI does. Cards are grouped under their account as the chip is (TD-122); a profile absent from the file shows empty fields, not zeros. A **metered** profile's card (§4.2a; TD-128, reconciled 2026-09-25; built — TD-151 slice 5) carries the same fields for `day`, `week` and `month` — the home's labels — each taking an **amount** as `ao gate` does (`$5`, `20M tok`, empty to clear) and refusing a percent by naming the billing, with the account's spend beside it as the chip draws it, *spent $3.20 · 64% · resets 00:00*; its badge reads *account <account> · <tool> · metered · $3 in / $15 out per M*, a priceless profile's *· metered · tokens*, and its foot names `profiles.yml`, by hand, with **Open file**, as a definition's card does. Cards on one metered account share the spend and keep their own amounts, as subscription cards share a reading and keep their own reserves. **The reading's age** (TD-230; the age built — TD-233 slice 1, the projection and the field not yet): beside each window's reading on a profile's card, under its line, its age and source as the chip's hover gives them — *58% · read 7m ago, asked of the endpoint*, *unknown since 22:21 (was 88%)* past three hours or the window's reset — and the line the gate would project when the reading is past `max_age`; and one field per account, **trust a reading for** (`usage.max_age`, default `1h`, or *never project*), written through `set_settings` |
-| Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **when work appears**, **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **when work appears** (TD-214; designed 2026-09-28, not built — TD-227) is a picker of three, *ask me · start the team · do nothing*, written to `teams.<team>.on_work` (§6 rule 8), *ask me* marked *default* while the key is absent. **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All three through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
+| Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **when work appears**, **balance**, **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **balance** (TD-177; designed 2026-09-29, not built — TD-239) is a switch and three fields — *open PRs above* `n`, *oldest open longer than* `d`, *the reader's queue past its bound* (a tick box) — written to `teams.<team>.balance` (§6 *Balance*); off, the key is absent; turned on, the fields start at 10, `2d` and ticked, and a field left empty is a line not drawn; under them, the repo's numbers as they read now, so the line is set against what it would have done today. **when work appears** (TD-214; designed 2026-09-28, not built — TD-227) is a picker of three, *ask me · start the team · do nothing*, written to `teams.<team>.on_work` (§6 rule 8), *ask me* marked *default* while the key is absent. **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All three through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
 | Settings page | **Repos**: the promote's **auto** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no switch and says why |
 | Settings page | **You**: `open_in` (preset, template or none), terminal **size** and **face**; **Reset this browser** | *yours everywhere*, written to `person:` through `set_settings`: `open_in` as §5 defines it (`vscode`, `none`, or `{label, url}`, the same refusals, a bad template named in place and the default kept); the terminal's **size** (a number of pixels, bounded 8–32 as `set_settings` bounds it) and **face** (a typed or picked `font-family` name; `monospace` is always appended and ligatures stay off — goal 12), applied to every open terminal without a reload. *this browser*: the theme, *mine* and the folds as they stand, display with their own controls where they already have one, and **Reset this browser**, which clears every `ao.*` key of this browser's `localStorage` after a confirm and reloads — a new control, browser-local, writing nothing anywhere else |
 | Settings page | **Open file** | the editor button with a file's path in place of a session directory (§5 `person.open_in`): `{path}` the file, `{remote}` the host as before; drawn on every file card (hosts, profiles, org, each repo's `.agentorc.yml`, and the home's `settings.yml` itself, read-only there) and absent under `open_in: none` |
@@ -2638,6 +2638,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller does not act on one — so it is drawn as wanting a person instead |
 | card / Focus header | **brief changed** chip | designed 2026-09-28 (TD-199; built — TD-217 slice 3; §6 *Keeping a team running* rule 7). When the record carries `brief_changed`: fixed words, and on hover, as text, the files that changed by name and when (*manager.md · changed 2026-09-26 14:02*) — paths the home read, nothing a session wrote. Drawn as the *restart wanted* chip is and where it is, and for the same reason a mark, never pressable, and not a state. It goes when the member is next started. `ao status -v` prints `brief: changed <when> (<files>)`, and `--json` carries `brief` and `brief_changed`. No Inbox row: nothing waits on the person — the tick restarts an idle member and a working one is told on its `ao` replies; a member it cannot restart reaches the Inbox as any restart past its ceiling does (*Inbox row: restart*) |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a, TD-053); on the team's card, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
+| Org | team card: **over its line** note | display only (TD-177; designed 2026-09-29, not built — TD-239; §6 *Balance*): on the header's second line of a team whose `balance` mark stands, amber, *over its line since <t>: 9 open PRs ≥ 8* — each crossed line in the mark's own numbers, *oldest PR 3d ≥ 2d*, *review waiting 5h ≥ 2h* — its tooltip *its members take no new claim until it clears · Settings*; gone when the mark goes. Never pressable: the line is moved on the Settings page |
 | Org | team card: **work waiting** note | display only (TD-214; designed 2026-09-28, not built — TD-227; §6 rule 8): beside *wound down <t>* on a team whose lanes gained work, *· n entries waiting since <t>* from `work_waiting`, its tooltip the ids by member; on a live team a start by the rule made reads *started <t> for TD-213 and 2 more* on the header's second line until the team next winds down, from the `restarts` entries' `why: work`. Never pressable: the press is the card's Start or the Inbox row's |
 | Org | team card: **starts** note | display only (TD-026, §6 *Schedule*; not built — TD-133): on a team card with nothing live whose name carries a rule in `settings.yml` (`teams.<team>.schedule`), beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant from the account's reading, in the reader's clock, by the formatter the *stops* note uses. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
@@ -3009,7 +3010,7 @@ the rollup's and the team card's numbers for one registered repo — the current
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
 entries (High first, each with its priority: §4.8 *Choosing in a free-pick lane*), the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
-balance rule exists (§10, TD-177), and what a person reads instead of the page.
+balance rule exists (§6 *Balance*, TD-177: the rule itself is read by the home's tick, and a manager told of a crossing reads the numbers here), and what a person reads instead of the page.
 
 **`ao pr held <n>`** (§4.9b *The reader*, TD-093): whether PR `n` waits for this session's reader —
 the record's `review` checked against the PR's changed files, read with `gh pr view <n> --json
@@ -3046,6 +3047,11 @@ with no restart; under `--json` the reply is the file's key as written and the c
 TD-227) writes `teams.<team>.on_work` through `set_settings`, refused to a session and for a team
 the org does not define, as the two below are; `ao team list` says *work waiting: n entries*
 beside *wound down* from the home's `work_waiting`.
+**`ao team balance <team> [--prs <n>] [--oldest <d>] [--review on|off] | --clear`** (TD-177, §6 *Balance*;
+designed 2026-09-29, not built — TD-239) writes `teams.<team>.balance` through `set_settings`, a line
+not named left as it was, refused to a session and for a team the org does not define; with no
+option it prints the lines and, against them, the numbers as they read now. `ao team list` says
+*over its line since <t>* and `ao repo` ends with the same line, from the home's `balance`.
 **`ao team until <team> <06:00|+8h|ISO> | --clear`** and **`ao team reserve <team> <n>`** (TD-100 (4);
 §6 *Team stop time*, *Usage gate*; built — TD-146 slice 3): the team's stop time,
 parsed in the caller's clock as `ao until` parses it, and its reserve priority, written to
@@ -5965,6 +5971,7 @@ teams:                                        # per team, by the name org.yml or
     until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
     reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
     on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
+    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; not built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
   agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
 person:                                       # the person's own — nothing here reaches a policy
@@ -6760,6 +6767,64 @@ teams:
   **Stranded-work flag** (Not built — phase 3): any session going `idle`/`exited` with a dirty tree
   or unpushed commits is flagged in the team — the stranded-work audit, continuous. **PAUSE** flag
   and `on`/`off`/`off --now` semantics (Not built — phase 3): kept as agent RPCs.
+- **Balance: a team over its line takes no new work** (TD-177; Paul, 2026-09-25: *if I want to
+  make sure the team is balanced, I can make sure the PR count is not growing too much — the
+  grinders outpacing the techlead*; designed 2026-09-29, not built — TD-239). The numbers came
+  first (§4.4 *Repo facts*, the team card and the Repo page, TD-176), and the rule keys on
+  exactly those, so what trips it is what a person has been watching. It is **off until a
+  person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team
+  balance`, §4.7), a setting and not a definition, since it is a number a person turns without
+  redefining the team (ADR 2026-09-25 §5). Three lines, each optional, any one of them enough:
+  - **`prs: n`** — the repo has more than `n` open pull requests that are not drafts, counted
+    from the reading's `prs.open` as the card counts them, whoever opened them;
+  - **`oldest: d`** (`12h`, `2d`) — the oldest of those has been open longer than `d`;
+  - **`review: true`** — the reader's queue is past its bound: the oldest pull request waiting
+    at the team's techlead seat (`prs_waiting.oldest` on the seat's record, §4.9b *The reader*)
+    has waited longer than the shortest `review.bound` a live member of the team carries, two
+    hours where none carries one.
+
+  **Who reads it** is the home's tick, never the manager's round: a session's `ao repo` cannot
+  see the reader's queue (§4.7), and nothing mechanical waits on a round (*Keeping a team
+  running*). After every repo reading and on every tick for the queue, the home reads the
+  lines for each team that has the key, the team's repo being the one its live members'
+  directories are checkouts of (a team over two repos is read against each, and either
+  crossing counts). A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
+  on the home's own `host` record under the team's name, where `work_waiting` is kept, and the
+  mark goes when no line is crossed. **A reading that failed crosses nothing and clears
+  nothing**: the mark stands as it was, as the chip's reading does.
+
+  **What it does** is one thing: while the mark stands, **a new claim by an unattended member
+  of that team is refused** — `ao progress claim TD-NNN` answers *ao-grind is over its line: 9
+  open PRs, the line is 8 (since 14:02). Take nothing new: finish, rebase or answer what is
+  open of yours, then end your turn — you are told when the line clears.* It is refused in the
+  step that would write it, as a lease is, and unlike a lease **`--force` does not pass it**:
+  the line is the person's, and a session cannot move it. Not refused: a claim on a reference
+  the claimer already holds (a renewal), a claim on a pull request (a PR number as the
+  reference: reading or finishing one is what brings the count down), `done`, `dropped` and
+  `restart`, and any claim by an interactive session, a person's own included (§9 invariant
+  5: policies leave those alone). **A refused member is not out of work**: `ao progress none`
+  is refused to it while the mark stands, in the same words, so a team over its line idles
+  and never winds down on it; the idle nudge and rule 6's lane news pass such a member by,
+  and rule 8 holds a start back with *its repo is over its line* as a fifth bound. Never a
+  pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
+
+  **Who is told**, once per crossing and once when it clears, by `system` note: the team's
+  **manager** (the controller its members share), which logs the line in its round — *14:02
+  over the line: 9 open PRs ≥ 8; no new claims until it clears* — and does nothing else, since
+  its members are neither crashed nor finished; and the **person**, FYI and uncounted. **The
+  techlead is asked by what already asks it**: every pull request in the reader's queue is an
+  `ask` on the seat, which the tick fills while one waits (rule 3), so a crossing of `review`
+  needs no second message, and a crossing of `prs` or `oldest` with nothing in the queue is
+  not the reader's to cure. When the mark goes, each member whose claim was refused is rung
+  with *the line is clear again: pick as your lane says*, within its wake budget.
+
+  **What a person sees**: the team card's **over its line** note (§4.5a) and the same words
+  in `ao team list` and `ao repo`; the Repo facet's numbers are the evidence, unchanged. **The
+  designer's pull requests count**: one waiting on a steer's bound is open, so a team whose
+  designer holds several for a night reaches `prs` sooner, and `n` is set with that in mind;
+  the default the page offers when the rule is first turned on is `prs: 10`, `oldest: 2d`,
+  `review: true`. Not on a node: the mark is the home's and a claim made at a node's agent is
+  not checked against it; it waits for the node's replica of the mark, as rule 4 waits.
 
 ## 7. Phases
 
@@ -7033,7 +7098,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       `container:` entry; a runtime host has `ao host forget`. Rejected: bind-mounting the home's
       whole `~/.agentorc` (its `agent.sock` makes an unqualified caller a person at the home).
       Build list: TD-057 step 3c. Brief: `docs/briefs/guardians-orchestrator.md`.
-- [ ] **What may a manager do with the repo's numbers?** (raised 2026-09-25, Paul: *if I want to
+- [x] **What may a manager do with the repo's numbers?** (raised 2026-09-25, Paul: *if I want to
       make sure the team is balanced, I can make sure the PR count is not growing too much — the
       grinders outpacing the techlead; this may lead to automatic checks by the manager*). The
       numbers come first, visible on the team card and the rollup and readable by `ao repo` (§4.5 screens 1 and 11, §4.7),
@@ -7044,6 +7109,10 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       wind-down. Open: whether the line is a setting (Settings page, Teams card) or a definition
       (`org.yml`), which the settings audit's rule decides (ADR 2026-09-25 §5); and whether the
       manager reads `ao repo` each round or the tick pushes the breach as a `system` note.
+      **Designed 2026-09-29** (§6 *Balance*; not built — TD-239): a setting, `teams.<team>.balance`,
+      off until set; read by the home's tick; and the rule acts where work is taken, at the
+      claim, because a manager hands out nothing — its members choose for themselves (§4.8
+      *Choosing in a free-pick lane*). The manager is told and logs it.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row is the current
       answer; revisit after phase 2 if it is too fiddly one-handed.
 - [x] **Rename the Herd page?** (2026-09-13): **yes, to Team** — "Herd" reads too close to

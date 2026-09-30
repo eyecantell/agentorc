@@ -112,6 +112,7 @@ not mix:
   Describes the job, not the run (TD-042). — *proposed*.
 - **lane** — the list of references a worker was handed, or `free-pick`. — *proposed*. A lane word matches a ledger entry by its header (design §6 rule 6); an `owner:<word>` in the lane narrows it to entries whose `Owner:` is that word or absent (TD-214).
 - **pickable** — of a ledger entry: not blocked, which is derived and never written (design §4.4 *Repo facts*, cadence §2.4, TD-223): no `Blocked by:`, or every entry it names archived and no decision named. Whether a given worker may take it is its lane's kind and owner words. *Not:* the `**Pickable:**` header line, retired. — *proposed* 2026-09-28.
+- **over its line** — of a team: one of its balance lines is crossed (design §6 *Balance*, TD-177) — more open pull requests than `n`, the oldest open longer than `d`, or the reader's queue past its bound — so its unattended members take no new claim until it clears. *Not:* the usage gate's line, which is a profile's and pauses. — *proposed* 2026-09-29.
 - **work waiting** — a wound-down team whose lanes gained entries since its members declared (design §6 rule 8, TD-214): the home's `work_waiting`, an Inbox row, and a start only under `teams.<team>.on_work: start`. — *proposed* 2026-09-28.
 - **profile** — `(adapter, account, model)` a session runs under (design §4.2a). — *proposed*.
 - **grant** — a capability on a session record (the field is `capabilities`; prose says
