@@ -122,7 +122,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Built — slices 1–4 (#768, #770, #776, #780, #781, #783, #786, #789, #791); live check pending |
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slices 1–3 and 6 built (the setting, the mark, the refusal, the notes, the tests); slices 4–5 open |
 | TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Open — design-first |
-| TD-243 | `test_derived_entries_go_to_the_record_that_holds_the_directory` flakes: the fixture's live tick can derive the new branch for the first record before it is killed | Low | Open — pickable |
 
 
 ---
@@ -2390,20 +2389,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Fix:** design the team's *finished* as a reading the home makes, not a judgement a session keeps. Options: (a) the tick, which already derives *concluded* for the page, winds a team down itself when every member is finished and its seats are idle (a policy beside TD-214's rule 8, which restarts it when work arrives); (b) the manager's round reads `ao team status --json` (the members' `unattended`, `state`, `out_of_work`) every round and is told never to rely on an earlier round's reading; (c) the page's *concluded* stops requiring the manager's own declaration when every member has declared, and offers **Start** (which closes the concluded sessions first) then. The round may take more than one. Also: the team card's controls should say why Start is absent (*live: manager-dc-1 has not declared*). Done when a team whose members have all declared out of work reads concluded, or winds down, within a tick or a round, and a test covers a manager that has not declared.
 
 **Related:** TD-199 (a running member keeps its start brief), TD-214 (rule 8, a wound-down team gaining work), TD-213 (archived: the wind-down's closes took the person's questions), TD-053 (wind-down), §4.9a, §4.5a **team groups**.
-
-## TD-243: `test_derived_entries_go_to_the_record_that_holds_the_directory` flakes on a live tick
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-09-30 (grinder-ao-1, CI on PR #803, 3.13 runner)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open.
-**Location:** `tests/test_agent.py` (`test_derived_entries_go_to_the_record_that_holds_the_directory`), `tests/conftest.py` (`park_ticks`, `derived`).
-
-**Why:** the test creates `run-1` in a repo already on `td077-cap`, claims TD-070 for it, kills it, starts `run-2`, and asserts the exited `run-1` holds only TD-070. The `agent` fixture's tick loop runs at `FAST_TICK`, so a derive can run while `run-1` is still live and credit it with the branch's TD-077 (`assert ['TD-070', 'TD-077'] == ['TD-070']`, run 2026-09-30 on #803, a PR that changed no code). The behaviour is right; the test raced its own clock.
-
-**Fix:** `await park_ticks(agent)` at the start, so every tick is the test's own (`derived` drives them by hand), as TD-078 and TD-088 did for their tests.
-
-**Related:** TD-063 (the CI flakes), TD-078, TD-088 (`park_ticks`), TD-034 (what the test holds).
