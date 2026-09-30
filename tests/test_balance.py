@@ -329,6 +329,8 @@ async def test_a_member_of_a_team_over_its_line_is_refused_a_new_claim(agent, tm
         assert json.loads((paths.sessions_dir() / f"{g}.json").read_text())["balance_refused"]["ref"] == "TD-900"
 
         await person.call("progress", id=g, ref="TD-800", status="claimed")  # a renewal
+        await person.call("progress", id=g, ref="TD-801", status="claimed", source="derived")  # its branch's
+        await person.call("progress", id=g, ref="TD-801", status="claimed")  # declaring work in hand passes
         await person.call("progress", id=g, ref="#712", status="claimed")  # reading a PR brings the count down
         await person.call("progress", id=g, ref="TD-800", status="done", pr=712)
         await person.call("progress", id=g, ref="TD-700", status="dropped", why="not mine")
@@ -369,7 +371,7 @@ async def test_none_is_refused_while_the_mark_stands_and_taken_once_it_goes(agen
             agent.sessions[g].restart_wanted = None
             agent._host_rec["teams"].pop("grind")
             got = await me.call("progress", id=g, status="none", why="nothing I may pick")
-            assert got["out_of_work"]["why"] == "nothing I may pick"
+            assert got["out_of_work"]["why"] == "nothing I may pick" and agent.sessions[g].balance_refused is None
 
 
 async def test_a_refused_member_is_neither_nudged_nor_told_of_its_lane_while_the_mark_stands(

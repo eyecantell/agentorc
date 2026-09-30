@@ -1747,7 +1747,8 @@ class HostAgent(
 
     def _balance_refusal(self, s: Session, ref: str | None) -> str | None:
         """The words refusing `s` a new claim on `ref` — or, with `ref` None, its `none` — while its
-        team is over its line; None when it passes. A renewal (a claim `s` already holds on `ref`) and
+        team is over its line; None when it passes. A renewal (a claim `s` already holds on `ref`, its
+        branch's derived one included: the work is in hand) and
         a pull request as the reference pass: finishing one is what brings the count down. A refusal
         is kept on the record (`balance_refused`) so the clearing can ring it."""
         mark = self._balance_of(s)
@@ -1756,7 +1757,7 @@ class HostAgent(
         if ref is not None:
             if ref.startswith("#"):
                 return None
-            if any(e.ref == ref and e.status == "claimed" and e.source == "declared" for e in s.progress):
+            if any(e.ref == ref and e.status == "claimed" for e in s.progress):  # declared or from its branch
                 return None
         s.balance_refused = {"at": now_iso(), "ref": ref}
         self._save(s)
@@ -1835,6 +1836,7 @@ class HostAgent(
             raise RpcError(words, balance=self._balance_of(s))
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
+            s.balance_refused = None  # taken, so the mark has gone: nothing left to ring
             s.lane_seen = None  # a second `none` is a declaration like the first: the tick looks afresh
         else:
             # The word stands whenever it is said — it is the session's — but one said inside

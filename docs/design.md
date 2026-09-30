@@ -6897,14 +6897,14 @@ teams:
   may name no repo. It is refused in the
   step that would write it, as a lease is, and unlike a lease **`--force` does not pass it**:
   the line is the person's, and a session cannot move it. Not refused: a claim on a reference
-  the claimer already holds (a renewal), a claim on a pull request (a PR number as the
+  the claimer already holds (a renewal, its branch's derived claim included), a claim on a pull request (a PR number as the
   reference: reading or finishing one is what brings the count down), `done`, `dropped` and
   `restart`, and any claim by an interactive session, a person's own included (§9 invariant
   5: policies leave those alone). **A refused member is not out of work**: `ao progress none`
   is refused to it while the mark stands, in the same words, so a team over its line idles
   and never winds down on it. A refusal, of a claim or of `none`, is kept on the record as
   **`balance_refused: {at, ref}`** (`ref` null for `none`), so the clearing can ring it; a claim
-  taken once the mark has gone removes it. While the mark stands the idle nudge and rule 6's lane
+  or a `none` taken once the mark has gone removes it. While the mark stands the idle nudge and rule 6's lane
   news pass a record carrying it by — an entry left untold is told once the line clears —
   and rule 8 holds a start back with *its repo is over its line* as a fifth bound. Never a
   pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
