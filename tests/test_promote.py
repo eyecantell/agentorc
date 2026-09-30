@@ -511,6 +511,8 @@ async def test_the_commit_is_refused_by_name(agent, checkout):
             await person.call("promote", repo="repo", sha="0" * 12)
         with pytest.raises(AgentError, match="is live already"):
             await person.call("promote", repo="repo", sha=first)
+        with pytest.raises(AgentError, match="is main's head: that is the plain press"):
+            await person.call("promote", repo="repo", sha=_git(checkout, "rev-parse", "HEAD"))
         with pytest.raises(AgentError, match="--sha or --back, not both"):
             await person.call("promote", repo="repo", sha=first, back=True)
         with pytest.raises(AgentError, match="no promote of repo has concluded"):

@@ -176,6 +176,10 @@ class PromoteMixin:
                 raise RpcError(f"promote {name} --sha refused — {why} (design §6 A rollback)")
             if r.get("live") == full and not r.get("live_why"):
                 raise RpcError(f"promote {name} --sha refused — {full[:7]} is live already")
+            if full == r.get("main"):  # a hold on main's head would stand until a Dismiss (review of #757)
+                raise RpcError(
+                    f"promote {name} --sha refused — {full[:7]} is main's head: that is the plain press, ao promote"
+                )
             if (u := promote_mod.unmet(r, press=True, kind="rollback")) is not None:
                 raise RpcError(f"promote {name} --sha refused — {u[1]} (design §6 A rollback, precondition: {u[0]})")
             checks, checks_why = await asyncio.to_thread(promote_mod.read_checks, root, full)
