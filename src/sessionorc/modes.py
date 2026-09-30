@@ -27,6 +27,8 @@ from sessionorc.mail import self_decide_refusal
 # is the home's — served at a node, all four would be written to the node's own store.
 # **`promote`** and **`clear_promote`** (§6 *Promote*, TD-132): the run starts in the home's checkout
 # and its intent file is the home's, so a press at a node goes to the home or nowhere.
+# **`entry_add`** (§4.10 *An entry handed to a seat*, TD-218): mail from the person with a debt, as
+# `identity_log`'s — the home's mailbox, the home's mark.
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
 # holds the replica the home last sent, which the next frame overwrites.
 HOME_EDITS = frozenset(
@@ -41,6 +43,7 @@ HOME_EDITS = frozenset(
         "promote",
         "clear_promote",
         "set_settings",
+        "entry_add",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the

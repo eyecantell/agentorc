@@ -10,13 +10,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import board as board_mod
 from sessionorc import (
+    adapters,
     hosts,
     mail,
 )
+from sessionorc import board as board_mod
 from sessionorc.agent_common import (
     BOARD_REPLY_NOTE,
+    ENTRY_TYPES,
     LEASE_TTL,
     RpcError,
     _older,
@@ -185,6 +187,74 @@ class InboxMixin:
         if root is None:
             raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
         return root, want
+
+    async def rpc_entry_add(
+        self,
+        repo: str = "",
+        type: str = "",
+        text: str = "",
+        teams: list[dict[str, str]] | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """**Hand to the techlead** and `ao td add` (design §4.10 *An entry handed to a seat*, §4.9
+        *Add an entry to the ledger*; TD-218 slice 2): the person's words as an `ask` from the
+        person to the techlead seat of the repo's first servicing team, carrying `entry: {repo,
+        type}` and marked `handed`, with **no bound**: it never lapses, and ends by its outcome or
+        the person's Dismiss alone. A person's own, refused to every session as `board_edit` is,
+        and served at the home. The host agent does not read `org.yml`, so the caller hands it the
+        teams that service the repo, in definition order, each `{team, seat}` — `seat` the id the
+        team's techlead takes, or empty where the team defines none — as `board_reply`'s `refs`
+        come from the reader. Refused in words: no such repo, no team services it, the team has no
+        techlead seat, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
+                "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"
+            )
+        want = str(repo or "").strip()
+        roots = hosts.local_host().repos()
+        found = [r for r in roots if want and (want in (Path(r).name, r) or Path(r).resolve() == Path(want).resolve())]
+        if not found:
+            raise RpcError(f"no registered repo is {want!r} (the home's repos registry lists {len(roots)})")
+        name = Path(found[0]).name
+        kind = str(type or "").strip().lower()
+        if kind not in ENTRY_TYPES:
+            raise RpcError(f"an entry is {' or '.join(ENTRY_TYPES)}, not {type!r} (cadence §2.11)")
+        words = str(text or "").strip()
+        if not words:
+            raise RpcError("the entry has no words: say what it is — a title is enough")
+        servicing = [t for t in teams or () if isinstance(t, dict) and str(t.get("team") or "").strip()]
+        if not servicing:
+            raise RpcError(f"no team services {name}: there is no techlead seat to hand it to (design §4.10)")
+        team = str(servicing[0]["team"]).strip()
+        seat = str(servicing[0].get("seat") or "").strip()
+        if not seat:
+            raise RpcError(f"{team} has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
+        sent = await self._msg(PERSON, words, [seat], "ask", None, None, None, None)
+        mid = (sent.get("entry") or {}).get("id")
+        if not mid:
+            raise RpcError(f"the entry was not delivered to {seat}")
+        # a seat closed and started again under its name is followed to the record that took it (review of #764)
+        seat = next(iter(sent.get("delivered") or ()), seat)
+        # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
+        self._mark(mid, handed=True, entry={"repo": name, "type": kind}, bound=None)
+        await self._push_changes()
+        log.info("entry_add: %s handed to %s (%s, %s)", mid, seat, name, kind)
+        return {
+            "id": mid,
+            "to": seat,
+            "team": team,
+            "repo": name,
+            "type": kind,
+            "read_when": self._entry_read_when(seat),
+        }
+
+    def _entry_read_when(self, seat: str) -> str:
+        """*When it is read* for a handed entry (§4.10): an `ask`'s sentence without a bound."""
+        s = self._graph().get(self._addr(seat))
+        down = s is not None and s.host != self.host and not (self.links.get(s.host) or {}).get("up")
+        rings = s is not None and getattr(adapters.get(s.adapter), "composer", None) is not None
+        return mail.read_when(s, "ask", datetime.now(UTC), seat=s is None, unreachable=down, rings=rings, lapses=False)
 
     async def rpc_board_reply(
         self,

@@ -59,6 +59,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     CREATE_GRACE,  # noqa: F401
     DERIVE_EVERY,  # noqa: F401
     DOORBELL_TRIES,  # noqa: F401
+    ENTRY_TYPES,  # noqa: F401
     FILE_CAP,  # noqa: F401
     FILES_MAX,  # noqa: F401
     FILL_CEILING,  # noqa: F401

@@ -5,13 +5,13 @@ reads *fills this seat* to a seat on call, and the tick fills it."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import park_ticks
 
-from sessionorc import mail
-from sessionorc.client import LocalClient
+from sessionorc import mail, modes
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import PERSON, MailEntry, Session
 
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
@@ -155,3 +155,87 @@ async def test_a_reply_on_the_thread_that_closes_no_question_of_the_seats_reads_
         got = await person.call("msg", to=sid, kind="reply", reply_to=fyi["id"], text="thanks")
         assert got["read_when"][sid].startswith("waits in the seat's mailbox")
         await person.call("kill", id=sid)
+
+
+# -- slice 2: `entry_add`, the person's one RPC for Hand to the techlead and `ao td add` --------------
+
+
+def _registry(tmp_path, *repos):
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text("".join(f"{r}\n" for r in repos))
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+
+
+async def _seat_session(person, tmp_path) -> str:
+    return (
+        await person.call(
+            "create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, supervised=True, prompt="the seat's brief", seat={"trigger": "asks"},
+        )  # fmt: skip
+    )["id"]
+
+
+@pytest.mark.unit
+def test_entry_add_is_the_homes_edit():
+    """Asked at a node it is forwarded to the home, and refused while the link is down: the mail and
+    its debt are the home's (design §4.4a), as `identity_log`'s are."""
+    assert "entry_add" in modes.HOME_EDITS
+    why = modes.offline_refusal("entry_add", None, {}, host="laptop", home="kmaster")
+    assert why and "kmaster (home) is unreachable" in why
+
+
+@pytest.mark.integration
+async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_path):
+    repo = tmp_path / "agentorc"
+    repo.mkdir()
+    _registry(tmp_path, repo)
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _seat_session(person, tmp_path)
+        teams = [{"team": "ao-grind", "seat": sid}, {"team": "other", "seat": "ao-x"}]
+        got = await person.call(
+            "entry_add", repo="agentorc", type="Debt", text="  the parser drops a trailing line  ", teams=teams
+        )
+        assert (got["to"], got["team"], got["repo"], got["type"]) == (sid, "ao-grind", "agentorc", "debt")
+        assert "default bound" not in got["read_when"], "a handed entry never lapses, so the sentence names none"
+        rec = agent.sessions[sid]
+        e = next(e for e in rec.inbox if e.id == got["id"])
+        assert e.kind == "ask" and e.from_ == PERSON and e.text == "the parser drops a trailing line"
+        assert e.handed and e.entry == {"repo": "agentorc", "type": "debt"} and e.bound is None
+        assert e.handed_entry and rec.asks_waiting() == 1
+        # three days on, past any `ask`'s default bound, the sweep leaves it standing
+        await agent._sweep_mail(datetime.now(UTC) + timedelta(days=3))
+        assert e.open and e.expired_at is None
+        # by path as well as by name — `ao td add` hands the checkout it runs in
+        again = await person.call("entry_add", repo=str(repo), type="feature", text="a second", teams=teams)
+        assert again["repo"] == "agentorc" and again["type"] == "feature"
+        # a seat on call — its record exited — reads *fills this seat*, with no bound after it
+        rec.state, rec.pane, rec.exit_code = "exited", True, 0
+        agent.store.save(rec)
+        third = await person.call("entry_add", repo="agentorc", type="debt", text="a third", teams=teams)
+        assert third["read_when"] == "fills this seat: a session starts on the next tick and reads it first"
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_entry_add_is_refused_in_words(agent, tmp_path):
+    repo = tmp_path / "agentorc"
+    repo.mkdir()
+    _registry(tmp_path, repo)
+    teams = [{"team": "ao-grind", "seat": "ao-agentorc-techlead-ao-1"}]
+    ok = {"repo": "agentorc", "type": "debt", "text": "x", "teams": teams}
+    async with LocalClient(caller="ao-some-worker") as worker:
+        with pytest.raises(AgentError, match="a person's own act"):
+            await worker.call("entry_add", **ok)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="no registered repo is 'samscrape'"):
+            await person.call("entry_add", **{**ok, "repo": "samscrape"})
+        with pytest.raises(AgentError, match="debt or feature, not 'chore'"):
+            await person.call("entry_add", **{**ok, "type": "chore"})
+        with pytest.raises(AgentError, match="has no words"):
+            await person.call("entry_add", **{**ok, "text": "   "})
+        with pytest.raises(AgentError, match="no team services agentorc"):
+            await person.call("entry_add", **{**ok, "teams": []})
+        with pytest.raises(AgentError, match="ao-grind has no techlead seat"):
+            await person.call("entry_add", **{**ok, "teams": [{"team": "ao-grind", "seat": ""}]})
