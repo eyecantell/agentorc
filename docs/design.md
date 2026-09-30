@@ -6514,7 +6514,7 @@ code and needs no grant; a session doing the same work does.
      member is a person's Start or **Members…**.
 
   8. **Work for a team that wound down** (TD-214; designed 2026-09-28; the reading, `work_waiting`,
-     `on_work` and `clear_work` built — TD-227 slice 2; the row, the words and the start not yet). A
+     `on_work` and `clear_work` built — TD-227 slice 2; the start built — slice 4; the row and the words not yet). A
      team that winds down closes its members, so rule 6 has nobody to tell: ao-grind wound down
      at 2026-09-28T06:56Z, its designer's lane gained ten entries over the day, and the team sat
      until a person saw the page. The tick keeps `lane_seen` for a member that is gone as it
@@ -6543,7 +6543,9 @@ code and needs no grant; a session doing the same work does.
      - **`start`**: a person's standing press, as a schedule is. The home replays the team: the
        launch record of every record carrying the badge that ended by the team's own ending, as
        §6 *Schedule* replays at the reset and under its rules (seats included, no launch record
-       no start, a suspended record or one at its ceiling left out), `why: work`. It starts
+       no start, a suspended record or one at its ceiling left out), `why: work`, each entry
+       carrying the `ids` it was started for, the records other ones name as a controller first so
+       the lead is up before its members, and a seat with its mail kept as a fill keeps it. It starts
        **the whole team**, a member whose lane gained nothing included: the manager decides
        who runs, and a member with nothing to pick declares `none` again at the cost of one
        short run. Four bounds, each read before the first replay and each leaving the row of
@@ -6553,6 +6555,11 @@ code and needs no grant; a session doing the same work does.
        instant however many records it replayed (the home keeps `work_started: [at]` beside
        `work_waiting`, since a replay writes a `restarts` entry on every member); and a start by this rule inside the last **`WORK_EARLY`** (thirty
        minutes), which is a team that found nothing and would be started into the same nothing.
+       A bound that holds writes **`held: {why}`** on `work_waiting` — `usage` with the `profile`,
+       `until` with the instant, `day` with the `count`, `early` with the last start — re-read on
+       every tick, so the start follows on the tick the bound lifts; a team with no record left
+       to replay is held as `nothing`. The row is drawn from `held`. A member on a node whose link
+       is down holds the whole start to a later tick, unmarked.
      - **`off`**: nothing is written and nothing drawn; the team waits for Start or its schedule.
 
      Dismiss — `clear_work {team}`, a person's own RPC and the home's alone (`modes.HOME_EDITS`:

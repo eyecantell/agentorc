@@ -1,0 +1,184 @@
+"""TD-227 slice 4, design §6 rule 8 under `on_work: start`: a wound-down team whose lanes gained work
+is started again by replaying its records' launch records, `why: work` with the ids, the lead first;
+four bounds read first hold the start back and leave the mark with `held`, which draws the row."""
+
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime, timedelta
+
+import pytest
+from conftest import park_ticks
+
+from sessionorc import paths
+from sessionorc import settings as settings_mod
+from sessionorc.agent_common import WORK_EARLY, WORK_SETTLE
+from sessionorc.client import LocalClient
+from sessionorc.models import Session
+
+DECLARED = {"at": "2026-09-28T06:56:00Z", "why": "nothing pickable"}
+
+
+def _iso(t: datetime) -> str:
+    return t.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _e(id: str) -> dict:
+    return {"id": id, "title": id, "priority": "medium", "owner": "grinder", "kind": "build", "pickable": "yes"}
+
+
+def _rec(name: str, **kw) -> Session:
+    base = dict(
+        id=f"ao-t-{name}", name=name, kind="interactive", adapter="shell", dir="/tmp/x", state="closed",
+        team="g", unattended=True, supervised=True, out_of_work=DECLARED, lane=["free-pick"],
+        lane_seen={"at": "x", "ids": ["TD-001"]}, profile="grind",
+    )  # fmt: skip
+    return Session(**{**base, **kw})
+
+
+def _launch(sid: str) -> None:
+    paths.launch_dir().mkdir(parents=True, exist_ok=True)
+    (paths.launch_dir() / f"{sid}.json").write_text(json.dumps({"name": sid}), encoding="utf-8")
+
+
+class _Replays:
+    """`_replay` stood in for: what the rule would start, in order, with its arguments."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, dict, dict]] = []
+
+    async def __call__(self, s, why, *, mark=None, **extra):
+        self.calls.append((s.name, why, mark or {}, extra))
+
+
+async def _settled(agent, tmp_path, *recs: Session, launch: bool = True):
+    """A wound-down team `g` whose grinder's lane gained TD-002, past the settle: returns the instant."""
+    repo = str(tmp_path)
+    agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001"), _e("TD-002")]}}
+    for r in recs:
+        r.repo, r.host = repo, agent.host
+        agent.sessions[r.id] = r
+        if launch:
+            _launch(r.id)
+    now = datetime.now(UTC)
+    await agent._work_marks(now)
+    return now + WORK_SETTLE
+
+
+def _team_rec(agent) -> dict:
+    return (agent._host_rec.get("teams") or {}).get("g") or {}
+
+
+async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    later = await _settled(
+        agent, tmp_path,
+        _rec("grinder-ao-1", controllers=["ao-t-manager-ao"]),
+        _rec("manager-ao", lane=["TD-900"]),
+        _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None, controllers=["ao-t-manager-ao"]),
+        _rec("paul-ao", unattended=False, out_of_work=None, state="working"),
+    )  # fmt: skip
+    assert replays.calls == [], "not before the settle"
+    await agent._work_marks(later)
+    assert [c[0] for c in replays.calls] == ["manager-ao", "grinder-ao-1", "techlead-ao"], "the lead first; no person"
+    assert {c[1] for c in replays.calls} == {"work"} and all(c[2] == {"ids": ["TD-002"]} for c in replays.calls)
+    assert replays.calls[2][3] == {"keep_mail": True} and replays.calls[0][3] == {}, "a seat keeps its mail"
+    rec = _team_rec(agent)
+    assert "work_waiting" not in rec and len(rec["work_started"]) == 1
+    assert agent.host_store.load()["teams"]["g"]["work_started"] == rec["work_started"], "saved"
+
+
+async def test_each_bound_holds_the_start_back_and_says_which(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    later = await _settled(agent, tmp_path, _rec("manager-ao", lane=["TD-900"]), _rec("grinder-ao-1"))
+    teams = agent._host_rec.setdefault("teams", {})
+
+    async def held(conf: dict, started: list[str] | None = None) -> dict | None:
+        settings_mod.save({"teams": {"g": {"on_work": "start", **conf}}})
+        teams.setdefault("g", {})["work_started"] = list(started or [])
+        await agent._work_marks(later)
+        return (_team_rec(agent).get("work_waiting") or {}).get("held")
+
+    past = _iso(later - timedelta(minutes=1))
+    assert await held({"until": past}) == {"why": "until", "until": past}
+    day = [_iso(later - timedelta(hours=h)) for h in (20, 10, 5)]
+    assert await held({}, day) == {"why": "day", "count": 3}
+    assert await held({}, [_iso(later - timedelta(hours=30)), *day]) == {"why": "day", "count": 3}
+    assert _team_rec(agent)["work_started"] == day, "a start older than the day is dropped"
+    early = _iso(later - WORK_EARLY + timedelta(minutes=1))
+    assert await held({}, [early]) == {"why": "early", "started": early}
+    monkeypatch.setattr(agent, "_profile_gated", lambda profile, now, team="": True)
+    assert await held({}) == {"why": "usage", "profile": "grind"}
+    assert replays.calls == [], "nothing started while a bound held"
+    assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}, "the row of ask, in its place"
+
+    # the person turns it back to `ask`: the row stands, with no start to hold back
+    settings_mod.save({"teams": {"g": {"on_work": "ask"}}})
+    await agent._work_marks(later)
+    assert "held" not in _team_rec(agent)["work_waiting"] and replays.calls == []
+
+    # the bound lifts: the next tick starts the team
+    monkeypatch.setattr(agent, "_profile_gated", lambda profile, now, team="": False)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    teams["g"]["work_started"] = [_iso(later - WORK_EARLY - timedelta(minutes=1))]
+    await agent._work_marks(later)
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1", "manager-ao"]
+    assert "work_waiting" not in _team_rec(agent) and len(_team_rec(agent)["work_started"]) == 2
+
+
+async def test_no_launch_record_no_start(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    later = await _settled(agent, tmp_path, _rec("grinder-ao-1"), launch=False)
+    await agent._work_marks(later)
+    assert replays.calls == [] and _team_rec(agent)["work_waiting"]["held"] == {"why": "nothing"}
+    assert "work_started" not in _team_rec(agent)
+
+
+@pytest.mark.integration
+async def test_a_start_by_the_rule_replays_the_records_under_their_names(agent, tmp_path):
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    async with LocalClient() as person:
+        made = {}
+        for name in ("manager-ao", "grinder-ao-1"):
+            made[name] = (
+                await person.call(
+                    "create",
+                    name=name,
+                    dir=str(tmp_path),
+                    adapter="shell",
+                    argv=["bash", "--norc", "--noprofile"],
+                    unattended=True,
+                    supervised=True,
+                    team="g",
+                    lane=["free-pick"],
+                    controllers=[made["manager-ao"]] if made else [],
+                )  # fmt: skip
+            )["id"]
+        repo = str(tmp_path)
+        agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001"), _e("TD-002")]}}
+        for sid in made.values():
+            rec = agent.sessions[sid]
+            rec.state, rec.pane, rec.out_of_work, rec.repo = "exited", True, DECLARED, repo
+            rec.lane_seen = {"at": "x", "ids": ["TD-001"]}
+            agent.store.save(rec)
+        old = {sid: agent.sessions[sid] for sid in made.values()}
+        now = datetime.now(UTC)
+        await agent._work_marks(now)
+        await agent._work_marks(now + WORK_SETTLE)
+        for sid in made.values():
+            new = agent.sessions[sid]
+            assert new is not old[sid] and new.state not in ("exited", "closed"), "superseded in place (§4.1)"
+            assert [(r["why"], r["ids"]) for r in new.restarts] == [("work", ["TD-002"])]
+            assert new.out_of_work is None and new.lane_seen is None, "the records it makes begin afresh"
+        assert "work_waiting" not in _team_rec(agent) and len(_team_rec(agent)["work_started"]) == 1
+        for sid in made.values():
+            await person.call("kill", id=sid)

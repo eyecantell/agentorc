@@ -938,7 +938,12 @@ class TickMixin:
                 old = rec.get("work_waiting")
                 on_work = (settings.get(team) or {}).get("on_work", "ask")
                 new = self._work_mark(team, old, by_team.get(team) or [], on_work, now, firsts)
-                if new == old:
+                starts = rec.get("work_started")
+                if new is not None and on_work == "start":
+                    new = await self._work_start(team, new, rec, by_team.get(team) or [], settings.get(team) or {}, now)
+                elif isinstance(new, dict) and "held" in new:
+                    new = {k: v for k, v in new.items() if k != "held"}  # `ask` again: no start to hold back
+                if new == old and rec.get("work_started") == starts:
                     continue
                 dirty = True
                 if new is None:
@@ -1004,6 +1009,85 @@ class TickMixin:
         at = old.get("at") if isinstance(old, dict) and old.get("at") else now_iso()
         return {"at": at, "repo": repo, "members": members}
 
+    async def _work_start(
+        self,
+        team: str,
+        mark: dict[str, Any],
+        rec: dict[str, Any],
+        records: list[Session],
+        conf: dict[str, Any],
+        now: datetime,
+    ) -> dict[str, Any] | None:
+        """Rule 8 under `on_work: start` (design §6, TD-227 slice 4): the person's standing press. The
+        four bounds are read before the first replay, and one that holds the start back leaves the
+        mark standing with `held: {why, …}`, which is what draws the row under `start`; otherwise the
+        team's records are replayed (`_work_replays`, the lead first), each `restarts` entry
+        `why: work` with the ids it was started for, the instant appended to `work_started` on the
+        home's record once however many records it replayed, and None is returned: the mark goes.
+        A member on a node whose link is down holds the whole start to the next tick, unmarked."""
+        started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
+        if started != (rec.get("work_started") or []):
+            rec["work_started"] = started  # a start older than the day counts for nothing
+        if not started:
+            rec.pop("work_started", None)
+        replays = self._work_replays(records, now)
+        held = self._work_held(replays, started, conf, now, team)
+        bare = {k: v for k, v in mark.items() if k != "held"}
+        if held is not None:
+            return {**bare, "held": held}
+        if any(r.host != self.host and r.host not in self._link_muxes for r in replays):
+            return bare  # its link is down: the whole team waits for it, looked at again next tick (§4.4a)
+        ids = list(dict.fromkeys(i for got in (mark.get("members") or {}).values() for i in got))
+        rec["work_started"] = [*started, now_iso()]
+        log.info("rule 8: starting %s again for %s (%d records)", team, ids, len(replays))
+        for r in replays:
+            try:
+                await self._replay(r, "work", mark={"ids": ids}, **({"keep_mail": True} if r.seat is not None else {}))
+            except Exception:  # noqa: BLE001 — one record's failure is never the team's start
+                log.exception("%s: rule 8's replay failed", self._address(r))
+        return None
+
+    def _work_replays(self, records: list[Session], now: datetime) -> list[Session]:
+        """What a start by rule 8 replays: the team's crew records that ended — the wound-down reading
+        has every one that is not a seat declared — seats included, none superseded, suspended, at
+        its ceiling or without a launch record (no launch record, no start: the rule never invents a
+        team). The records other ones name as a controller come first, so the lead is up before its
+        members, as a person's start makes it."""
+        out = []
+        for r in work_mod.crew(records):
+            if r.state not in work_mod.DEAD or r.superseded_by or r.suspended or r.restart_ceiling:
+                continue
+            recent = [e for e in r.restarts if isinstance(e, dict) and _recent(e.get("at"), now, RESTART_WINDOW)]
+            if len(recent) >= RESTART_CEILING:
+                continue
+            if not (paths.launch_dir() / f"{self._address(r)}.json").is_file():
+                continue
+            out.append(r)
+        leads = {c for r in out for c in self._ctl(r)}
+        return sorted(out, key=lambda r: (self._address(r) not in leads, r.name, r.id))
+
+    def _work_held(
+        self, replays: list[Session], started: list[str], conf: dict[str, Any], now: datetime, team: str
+    ) -> dict[str, Any] | None:
+        """The bound that holds rule 8's start back, in the design's order, or None (§6 rule 8): a
+        member's profile over its usage line; the team's stop time passed and not cleared;
+        `WORK_STARTS_DAY` starts in the day; a start inside `WORK_EARLY`. Nothing to replay holds it
+        too: the row of `ask` is the person's way to start a team the rule cannot."""
+        if not replays:
+            return {"why": "nothing"}
+        for profile in dict.fromkeys(r.profile for r in replays):
+            if self._profile_gated(profile, now, team):
+                return {"why": "usage", "profile": profile}
+        until = conf.get("until")
+        with contextlib.suppress(TypeError, ValueError):
+            if until and _parse(str(until)) <= now:
+                return {"why": "until", "until": str(until)}
+        if len(started) >= agent_common.WORK_STARTS_DAY:
+            return {"why": "day", "count": len(started)}
+        if started and _recent(started[-1], now, agent_common.WORK_EARLY):
+            return {"why": "early", "started": started[-1]}
+        return None
+
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
             n = s.asks_waiting(home=self.host) if s.seat_due else 0
@@ -1054,12 +1138,12 @@ class TickMixin:
                 return False
         return True
 
-    async def _replay(self, s: Session, why: str, **extra: Any) -> None:
+    async def _replay(self, s: Session, why: str, *, mark: dict[str, Any] | None = None, **extra: Any) -> None:
         """One restart by the tick (§6): the record's launch record handed to `create` again — here,
         or at its node — the attempt appended to `restarts` and the list carried onto the new record,
         so the count survives the restart it counts. A replay that fails keeps its entry with `error`
-        and counts all the same."""
-        entry: dict[str, Any] = {"at": now_iso(), "why": why}
+        and counts all the same. `mark` adds to the entry (rule 8's `ids`, what a start was for)."""
+        entry: dict[str, Any] = {"at": now_iso(), "why": why, **(mark or {})}
         history = [*s.restarts, entry]
         address = self._address(s)
         read: dict[str, Any] | None = None
