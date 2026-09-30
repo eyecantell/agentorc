@@ -255,7 +255,10 @@ class RemoteMixin:
         except (link.LinkClosed, TimeoutError) as e:
             raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
         repos = got.get("repos") if isinstance(got, dict) else None
-        return {"host": host, "repos": [str(r) for r in repos] if isinstance(repos, list) else []}
+        if not isinstance(repos, list):
+            # never read as *holds no repo*: the landing rule would send the team elsewhere on it
+            raise RpcError(f"{host} answered its registry with no list of checkouts")
+        return {"host": host, "repos": [str(r) for r in repos]}
 
     async def rpc_host_files(
         self, host: str, dir: str, paths: list[str] | None = None, caller: Any = None

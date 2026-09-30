@@ -1526,6 +1526,14 @@ async def test_host_repos_reads_a_hosts_registry_here_or_through_its_node(agent,
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
         assert await person.call("host_repos", host="laptop") == {"host": "laptop", "repos": ["/srv/samscrape"]}
         assert mux.sent == [("repos", {})]
+
+        class Odd(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                return {"taken": 0}
+
+        agent._link_muxes["laptop"] = Odd()
+        with pytest.raises(AgentError, match="no list of checkouts"):
+            await person.call("host_repos", host="laptop")
     assert await agent._from_home("repos", {}) == {"repos": ["/w/a", "/w/b"]}, "the node's half"
 
 
