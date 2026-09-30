@@ -76,6 +76,10 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     NO_CONTROLLERS,  # noqa: F401
     NO_GRANTS,  # noqa: F401
     UNDESCRIBED_GRANT,  # noqa: F401
+    USAGE_AGED,  # noqa: F401
+    USAGE_FRESH,  # noqa: F401
+    USAGE_SOURCE,  # noqa: F401
+    USAGE_UNKNOWN,  # noqa: F401
     USAGE_WHY,  # noqa: F401
     WRAPUP_PROMPT,  # noqa: F401
     _age,  # noqa: F401
@@ -119,7 +123,10 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     teams_view,  # noqa: F401
     templates,  # noqa: F401
     usage_accounts,  # noqa: F401
+    usage_age,  # noqa: F401
     usage_chip,  # noqa: F401
+    usage_clock,  # noqa: F401
+    usage_read,  # noqa: F401
     vscode_url,  # noqa: F401
     with_lines,  # noqa: F401
 )
