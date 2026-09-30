@@ -601,7 +601,10 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
         "team": team.name,
         "source": str(team.source) if team.source else None,
         "editable": editable,
-        "note": "" if editable else "defined in the repo — edit it by PR; this card only reads it",
+        # the reason the card's disabled Members… gives (§4.5a *Members… on a repo-defined team*, TD-229)
+        "note": ""
+        if editable
+        else f"defined in {Path(team.source).parent.name if team.source else 'the repo'}'s .agentorc.yml — changed by PR",
         "live": bool(live(crew(name, sessions))),
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,

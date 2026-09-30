@@ -37,10 +37,12 @@
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}"{% if g.stays %} data-confirm="Stop {{ g.team }} now? {{ g.stays | join('; ') }}."{% endif %}>Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
 {# design §4.5a *team card: **Members…*** (§4.9, TD-163, built by TD-172): beside Start on a stopped
-   team and beside Wind down on a live one; on a team a repo defines, a note instead — its file is
-   edited by PR #}
+   team and beside Wind down on a live one; on a team a repo defines (§4.5a *Members… on a
+   repo-defined team*, TD-229) drawn disabled with its reason and **Open file** through the person's
+   `open_in` — a press that committed to a repo's default branch would go round the repo's review #}
 {% if g.team and g.defined %}{% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member or remove one — org.yml is edited in place, and on a live team the member is started or wound down">Members…</button>
-{% else %}<span class="meta" title="this team is defined in {{ g.source or 'a repo' }}">defined in the repo — edit it by PR</span>{% endif %}{% endif %}
+{% else %}{% set why = "defined in " ~ (g.source_repo or "the repo") ~ "'s .agentorc.yml — changed by PR" %}<button class="btn sm ghost" disabled title="{{ why }}">Members…</button> <span class="meta" title="{{ g.source or 'a repo' }}">{{ why }}</span>
+{%- set ed = editor_link(g.source) if g.source else None %}{% if ed %} <a class="btn sm ghost" href="{{ ed.url }}" title="open {{ g.source }} in {{ ed.label }}">Open file</a>{% endif %}{% endif %}{% endif %}
 {# the fold (design §4.5a *team card: fold*, TD-156 (f), TD-194): any team with sessions folds, and
    the control sits beside Start or Wind down, a chevron and the count — the keyboard's and the
    screen reader's press, which a click on the header's row grows to the mouse; the client keeps

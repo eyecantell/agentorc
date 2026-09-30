@@ -1484,7 +1484,13 @@ def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
         {"repo-team": {"manager": {"role": "manager"}, "members": [{"role": "grinder"}]}},
     )
     v = teamrun.members_view(org, "repo-team", [])
-    assert not v["editable"] and "edit it by PR" in v["note"]
+    assert not v["editable"] and v["note"] == "defined in agentorc's .agentorc.yml — changed by PR"
+    # the edit itself refuses a repo's file, whatever path reaches it (TD-229 slice 4)
+    repo_file = tmp_path / "agentorc" / ".agentorc.yml"
+    repo_file.write_text("teams: {repo-team: {members: [{role: grinder}]}}\n")
+    with pytest.raises(ValueError, match="changed by PR"):
+        orgmod.edit_members(repo_file, "repo-team", add={"role": "grinder"})
+    assert repo_file.read_text() == "teams: {repo-team: {members: [{role: grinder}]}}\n"
 
 
 # ── a person in the team (design §4.9 *A person in the team*, TD-160 / TD-173) ─────────────────

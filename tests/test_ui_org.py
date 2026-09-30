@@ -1098,15 +1098,19 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
 
 def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     """§4.5a *team card: Members…* (TD-172): beside Start or Wind down on a team `org.yml` defines;
-    on a team a repo defines, the note *defined in the repo — edit it by PR* instead; never on *No
+    on a team a repo defines, drawn disabled with its reason and **Open file** (TD-229); never on *No
     team*. The exited banner's *one member back* line and the team skill's say the same thing."""
     from agentorc.ui.app import templates
 
     head = templates.get_template("group_head.html")
     base = {"team": "ao-grind", "label": "ao-grind", "defined": True, "stopped": True, "members": [], "live": 0}
     assert 'data-members="ao-grind"' in head.render(g={**base, "in_org": True})
-    repo = head.render(g={**base, "in_org": False, "source": "/r/.agentorc.yml"})
-    assert "data-members" not in repo and "defined in the repo — edit it by PR" in repo
+    repo = head.render(g={**base, "in_org": False, "source": "/r/.agentorc.yml", "source_repo": "r"})
+    # a repo's team (§4.5a *Members… on a repo-defined team*, TD-229 slice 4): disabled, its reason
+    # beside it, and **Open file** on its `.agentorc.yml` through the person's `open_in`
+    assert "data-members" not in repo and "defined in r&#39;s .agentorc.yml — changed by PR</span>" in repo
+    assert '<button class="btn sm ghost" disabled title="defined in r&#39;s .agentorc.yml' in repo
+    assert ">Open file</a>" in repo and "/r/.agentorc.yml" in repo
     assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
     ui_dir = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
     js = (ui_dir / "static" / "app.js").read_text()
