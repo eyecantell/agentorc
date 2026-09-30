@@ -28,7 +28,7 @@ from agentorc import profiles as profiles_mod
 from agentorc import repoconfig, teamrun, teams
 from agentorc import review as reviewmod
 from agentorc.cli import stop_time as clistop
-from sessionorc import hosts, mail, naming, paths
+from sessionorc import gitinfo, hosts, mail, naming, paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import (
@@ -199,11 +199,16 @@ from .org import (  # re-exported: routes, templates and tests read these from t
 )
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
+    ENTRY_PREFIX,
+    ENTRY_TRIES,
     LEDGER_FOLD,  # noqa: F401
     LEDGER_LISTS,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401
     compact_in,  # noqa: F401
     doing_chips,  # noqa: F401
+    entry_composer,
+    entry_line,
+    entry_role,
     ledger_lists,  # noqa: F401
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
@@ -1187,6 +1192,102 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if not (dir.strip() and name.strip()):
             return {"id": "", "name": name, "verdict": "free", "holder": None, "message": ""}
         return await call("name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None)
+
+    # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) ---
+
+    async def entry_plan(repo: str, type_: str) -> dict[str, Any]:
+        """What **Open a session** would start for `repo` (a registered checkout's name) and `type_`:
+        the team whose projects hold the checkout, the role its `entries:` names (§4.9), the first
+        `entry-<n>` free in the repo, the team's live manager, and the line under the button."""
+        if type_ not in orgmod.ENTRY_TYPES:
+            raise HTTPException(400, f"type is {' or '.join(orgmod.ENTRY_TYPES)}, not {type_!r}")
+        root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
+        if root is None:
+            raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
+        root = str(Path(root).expanduser().resolve())
+        org, _notes = await asyncio.to_thread(org_here)
+        team = repo_teams(org, host_name()).get(root, "")
+        role = entry_role(org, team, type_)
+        try:
+            cfg = await asyncio.to_thread(repoconfig.discover, root)
+        except ValueError as e:
+            raise HTTPException(400, str(e).strip('"')) from None
+        name = ""
+        for n in range(1, ENTRY_TRIES + 1):
+            cand = f"{ENTRY_PREFIX}-{n}"
+            with contextlib.suppress(gitinfo.WorktreeError):
+                if (await asyncio.to_thread(gitinfo.worktree_path, Path(root), cand)).exists():
+                    continue
+            if (await call("name_check", dir=root, name=cand, repo=root)).get("verdict") == "free":
+                name = cand
+                break
+        if not name:
+            raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
+        manager = ""
+        if team:
+            t, here = org.teams[team], host_name()
+            mid = teams.manager_id(org, t, t.host or here, here)
+            manager = mid if mid in {s["id"] for s in teamrun.live(await call("list"))} else ""
+        return {
+            "repo": repo,
+            "root": root,
+            "ledger": cfg.ledger,
+            "type": type_,
+            "team": team,
+            "role": role,
+            "name": name,
+            "manager": manager,
+            "line": entry_line(role, name, team),
+        }
+
+    @app.get("/api/entry/plan")
+    async def api_entry_plan(repo: str = "", type: str = "debt"):
+        """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes."""
+        return await entry_plan(repo, type)
+
+    @app.post("/api/entry/session")
+    async def api_entry_session(request: Request):
+        """§4.5a Add entry form → **Open a session** (TD-219 slice 3): `{repo, type, words}` starts an
+        **interactive** session in a new worktree `entry-<n>` of the repo, in its team as a person's own
+        session is (§4.9 *A person in the team*) with the role `entries:` names for the Type — `plain`
+        with no badge where no team services the repo — at the prompt: no opening prompt and no brief.
+        Answers `{id, text}`: the composer's text, which the page keeps in the browser as that session's
+        draft; nothing is typed into the pane and nothing is stored on the record."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if not isinstance(body, dict):
+            raise HTTPException(400, "send {repo, type, words}")
+        plan = await entry_plan(str(body.get("repo") or ""), str(body.get("type") or "debt"))
+        root, team = plan["root"], plan["team"]
+        try:
+            cfg = await asyncio.to_thread(repoconfig.discover, root)
+            preset = repoconfig.resolve_role(cfg, plan["role"], (await asyncio.to_thread(org_here))[0].roles)
+        except (KeyError, ValueError) as e:
+            raise HTTPException(400, str(e).strip('"')) from None
+        review = preset.review
+        if team and review is None:  # a role's own `review:` wins, else the team's reader (§4.9)
+            review = (await asyncio.to_thread(team_reader, team, root))["review"]
+        s = await call(
+            "create",
+            name=plan["name"],
+            dir=root,
+            adapter="claude-code",
+            profile=preset.profile or "",
+            prompt="",  # started at the prompt: a role's brief is written for an unattended run (§4.9)
+            unattended=False,
+            **teams.gate_prompts(False),
+            worktree=plan["name"],
+            repo=root,
+            capabilities=list(preset.grants),
+            lane=[],
+            role=preset.name,
+            review=review,
+            context_bound=preset.context_bound,
+            ledger=cfg.ledger,
+            controllers=[plan["manager"]] if plan["manager"] else [],
+            team=team,  # the badge, as the New session form's Team pick sets it; none without a team
+        )
+        text = entry_composer(plan["repo"], plan["type"], plan["ledger"], str(body.get("words") or ""))
+        return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
 
 
 def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:

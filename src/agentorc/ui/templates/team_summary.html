@@ -14,7 +14,8 @@
     {% else %}{% set r = m.repo %}
     <div class="fhead"><span class="kind">Repo</span> <a class="strong" href="{{ r.url }}">{{ r.name }}</a><span class="grow"></span><a class="meta" href="{{ r.url }}">open →</a></div>
     {% set led = r.ledger %}
-    <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span><span class="grow"></span>
+    <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span>
+      <button class="btn sm ghost" type="button" data-addentry="{{ r.name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button><span class="grow"></span>
       <span class="seg" data-pick="led">{% for w in ('open', 'day', 'week', 'month') %}<button type="button" data-v="{{ w }}"{% if w != 'open' and not led.windows %} disabled title="the ledger's history could not be read{% if led.history_error %}: {{ led.history_error }}{% endif %}"{% endif %}>{{ w }}</button>{% endfor %}</span></div>
     {% if led.n is none %}
     <div class="meta dim" title="{{ led.error or 'not read yet' }}">could not look</div>
