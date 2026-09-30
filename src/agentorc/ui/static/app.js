@@ -80,12 +80,14 @@
   if (AO.termChan && AO.termChan.unref) AO.termChan.unref();  // node's probes (tests) only: a browser has no unref
 
   // ---- toasts: the one error surface (design §4.5) ----
-  AO.toast = function (text, ok) {
+  AO.toast = function (text, ok, href) {
     const el = document.createElement("div");
     el.className = "toast" + (ok ? " ok" : "");
     el.textContent = text;
+    // a toast that names a thing links to its page (*handed to techlead-ao-1 · m-…*, TD-219 slice 4)
+    if (href) { const a = document.createElement("a"); a.href = href; a.textContent = " open"; el.appendChild(a); }
     $("#toasts").appendChild(el);
-    setTimeout(() => el.remove(), ok ? 3000 : 7000);
+    setTimeout(() => el.remove(), href ? 10000 : ok ? 3000 : 7000);  // a link needs the time to be pressed
   };
 
   // The Focus pane's **copy on select** (§4.5a, TD-174): written to the person's settings, which
@@ -1896,7 +1898,8 @@
 
   // design §4.5a **Add entry…** and the *Add entry form* (§4.9 *Add an entry to the ledger*, TD-219
   // slice 3): one form from the Repo page and the team card's Repo facet, the repo fixed by the press.
-  // **Open a session** starts an interactive session in a new worktree and goes to its Focus with the
+  // **Hand to the techlead** (slice 4) sends the words to `entry_add` and toasts the message's id, a
+  // link to its page. **Open a session** starts an interactive session in a new worktree and goes to its Focus with the
   // composer holding `entry.md`'s lines and the words — kept here as that session's draft until sent
   // (`AO.draftKey`); nothing is typed into the pane. The page writes no file.
   AO.draftKey = (sid) => `ao.draft.${sid}`;
@@ -1906,9 +1909,19 @@
     const say = (m) => { err.textContent = m || ""; err.hidden = !m; };
     const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
     let asked = 0;  // a later Type press wins over an earlier answer that arrives after it
+    let handWhy = "…";  // **Hand to the techlead**'s reason to be disabled, from the plan (TD-219 slice 4)
+    const hand = $("#entryhand");
+    // disabled with its reason where no team or seat takes it, and while **What** is empty (§4.5a)
+    const handState = () => {
+      const empty = !$("#entrywhat").value.trim();
+      hand.disabled = !!handWhy || empty;
+      hand.title = handWhy || (empty ? "write what the entry is first" : "");
+    };
+    $("#entrywhat").oninput = handState;
     async function plan() {
       const mine = ++asked;
       $("#entryline").textContent = "";
+      handWhy = "…"; handState();
       let r, v;
       try {
         r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}`);
@@ -1919,9 +1932,27 @@
       say(""); $("#entrygo").disabled = false;
       $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
       $("#entryline").textContent = `Starts ${v.line}, and opens its Focus with these words in the composer, not sent.`;
+      const h = v.hand || { why: "the host agent did not say who takes it" };
+      handWhy = h.why || "";
+      $("#entryseat").textContent = h.name || h.to || "";
+      $("#entryhandwhat").hidden = !!handWhy;
+      $("#entrywhen").textContent = handWhy ? `Hand to the techlead: ${handWhy}` : `When it is read: ${h.line}`;
+      handState();
     }
+    hand.onclick = async () => {
+      hand.disabled = true;
+      let r, got;
+      try {
+        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
+        got = await r.json();
+      } catch (e) { handState(); return say(`the page could not ask: ${e.message}`); }
+      if (!r.ok) { handState(); return say(got.detail || "refused"); }
+      dlg.close();
+      AO.toast(got.text, true, got.href);
+    };
     $("#entrywhere").textContent = repo;
-    $("#entrywhat").value = ""; dlg.querySelector("input[name=entrytype][value=debt]").checked = true;
+    $("#entrywhat").value = ""; $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";
+    dlg.querySelector("input[name=entrytype][value=debt]").checked = true;
     dlg.querySelectorAll("input[name=entrytype]").forEach((x) => { x.onchange = plan; });
     $("#entrygo").onclick = async () => {
       $("#entrygo").disabled = true;

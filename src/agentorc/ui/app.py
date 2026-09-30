@@ -214,8 +214,10 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     compact_in,  # noqa: F401
     doing_chips,  # noqa: F401
     entry_composer,
+    entry_hand,
     entry_line,
     entry_role,
+    entry_teams,
     ledger_lists,  # noqa: F401
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
@@ -1230,11 +1232,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 break
         if not name:
             raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
-        manager = ""
+        manager, records = "", {r["id"]: r for r in await call("list")}
         if team:
             t, here = org.teams[team], host_name()
             mid = teams.manager_id(org, t, t.host or here, here)
-            manager = mid if mid in {s["id"] for s in teamrun.live(await call("list"))} else ""
+            manager = mid if mid in {s["id"] for s in teamrun.live(list(records.values()))} else ""
+        servicing = entry_teams(org, root, host_name())
         return {
             "repo": repo,
             "root": root,
@@ -1245,12 +1248,43 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "name": name,
             "manager": manager,
             "line": entry_line(role, name, team),
+            "teams": servicing,  # what `entry_add` is handed (TD-218), in definition order
+            "hand": entry_hand(servicing, records, datetime.now(UTC)),  # **Hand to the techlead** (TD-219 slice 4)
         }
 
     @app.get("/api/entry/plan")
     async def api_entry_plan(repo: str = "", type: str = "debt"):
         """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes."""
         return await entry_plan(repo, type)
+
+    @app.post("/api/entry/hand")
+    async def api_entry_hand(request: Request):
+        """§4.5a Add entry form → **Hand to the techlead** (TD-219 slice 4): `{repo, type, words}` goes
+        to `entry_add` (TD-218) as the person's `ask` to the techlead seat of the repo's first
+        servicing team, marked `handed`, with no bound; the host agent refuses in words what the page
+        disables (no team, no seat, no words). Answers `{id, to, name, text, href}`: the toast's words,
+        *handed to techlead-ao-1 · m-…*, and the message's page in the Inbox."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if not isinstance(body, dict):
+            raise HTTPException(400, "send {repo, type, words}")
+        plan = await entry_plan(str(body.get("repo") or ""), str(body.get("type") or "debt"))
+        got = await call(
+            "entry_add",
+            repo=plan["root"],
+            type=plan["type"],
+            text=str(body.get("words") or ""),
+            teams=[{"team": t["team"], "seat": t["seat"]} for t in plan["teams"]],
+        )
+        name = plan["hand"]["name"] if got.get("to") == plan["hand"]["to"] else got.get("to")
+        return {
+            "ok": True,
+            "id": got["id"],
+            "to": got.get("to"),
+            "name": name or got.get("to"),
+            "read_when": got.get("read_when") or "",
+            "text": f"handed to {name or got.get('to')} · {got['id']}",
+            "href": f"/inbox/{got['id']}",
+        }
 
     @app.post("/api/entry/session")
     async def api_entry_session(request: Request):
