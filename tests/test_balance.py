@@ -13,6 +13,7 @@ from conftest import park_ticks
 from sessionorc import balance, paths
 from sessionorc import settings as settings_mod
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import Session
 
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
 
@@ -322,9 +323,13 @@ async def test_a_member_of_a_team_over_its_line_is_refused_a_new_claim(agent, tm
         g = await _member(person, tmp_path, "g1", unattended=True)
         await person.call("progress", id=g, ref="TD-800", status="claimed")  # held before the crossing
         _mark(agent)
+        with pytest.raises(AgentError, match="over its line"):
+            await person.call("progress", id=g, ref="TD-900", status="claimed")
+        assert agent.sessions[g].balance_refused is None, "a person's write is refused, and nobody tried to be rung"
         for force in (False, True):
             with pytest.raises(AgentError, match="grind is over its line: 9 open PRs, the line is 8") as no:
-                await person.call("progress", id=g, ref="TD-900", status="claimed", force=force)
+                async with LocalClient(caller=g) as me:
+                    await me.call("progress", id=g, ref="TD-900", status="claimed", force=force)
             assert no.value.data["balance"]["crossed"][0]["value"] == 9
         rec = agent.sessions[g]
         assert rec.balance_refused["ref"] == "TD-900" and not any(e.ref == "TD-900" for e in rec.progress)
@@ -450,7 +455,8 @@ async def test_a_crossing_and_its_clearing_tell_the_manager_and_the_person_once_
         assert len(_system(agent.sessions[mgr].inbox)) == len(_system(agent.person_inbox)) == 1
 
         with pytest.raises(AgentError, match="over its line"):
-            await person.call("progress", id=g1, ref="TD-900", status="claimed")
+            async with LocalClient(caller=g1) as me:
+                await me.call("progress", id=g1, ref="TD-900", status="claimed")
         assert agent.sessions[g1].balance_refused
 
         agent._repos[root] = {"name": "repo", **_prs(8)}
@@ -512,3 +518,18 @@ async def test_a_told_crossing_survives_a_restart_and_a_wound_down_team_tells_no
         agent.sessions[g].state = "exited"
         await agent._balance_marks(now + timedelta(minutes=1))
         assert agent._host_rec["teams"] == {} and len(_system(agent.person_inbox)) == 1
+
+
+async def test_the_clearing_rings_a_nodes_refused_member_through_its_record_at_the_home(agent):
+    """A node forwards `progress` to the home (a report), so the home refuses a node's member and keeps
+    `balance_refused` on its replica; the clearing rings it there, under its address, as any mail."""
+    r = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="/tmp/x", host="laptop", team="grind")
+    r.state, r.unattended = "idle", True
+    r.balance_refused = {"at": datetime.now(UTC).isoformat(), "ref": "TD-900"}
+    agent.remote["laptop"] = {r.id: r}
+    try:
+        agent._balance_ring("grind")
+        assert _system(r.inbox) == [balance.CLEAR] and r.balance_refused is None
+        assert json.loads((paths.remote_dir("laptop") / "ao-x-w.json").read_text()).get("balance_refused") is None
+    finally:
+        agent.remote.pop("laptop", None)

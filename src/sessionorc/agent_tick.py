@@ -1465,8 +1465,10 @@ class TickMixin:
 
     def _balance_ring(self, team: str) -> None:
         """The mark went: each live member refused while it stood is rung, once, within its wake budget
-        (§6 *Balance*), and the field that held it back from the nudge and the lane news goes."""
-        for s in self.sessions.values():
+        (§6 *Balance*), and the field that held it back from the nudge and the lane news goes. A node's
+        member is refused at the home, so its record here carries the field and the note reaches it
+        as any mail to a node's session does."""
+        for s in self._graph().values():
             if s.team != team or not s.balance_refused:
                 continue
             s.balance_refused = None

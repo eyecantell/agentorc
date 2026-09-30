@@ -6907,7 +6907,8 @@ teams:
   5: policies leave those alone). **A refused member is not out of work**: `ao progress none`
   is refused to it while the mark stands, in the same words, so a team over its line idles
   and never winds down on it. A refusal, of a claim or of `none`, is kept on the record as
-  **`balance_refused: {at, ref}`** (`ref` null for `none`), so the clearing can ring it; a claim
+  **`balance_refused: {at, ref}`** (`ref` null for `none`) — only when the member itself asked;
+  a person's `--id` claim on its record is refused alike and leaves nothing to ring — so the clearing can ring it; a claim
   or a `none` taken once the mark has gone removes it. While the mark stands the idle nudge and rule 6's lane
   news pass a record carrying it by — an entry left untold is told once the line clears —
   and rule 8 holds a start back with *its repo is over its line* as a fifth bound. Never a
@@ -6938,8 +6939,10 @@ teams:
   designer's pull requests count**: one waiting on a steer's bound is open, so a team whose
   designer holds several for a night reaches `prs` sooner, and `n` is set with that in mind;
   the default the page offers when the rule is first turned on is `prs: 10`, `oldest: 2d`,
-  `review: true`. Not on a node: the mark is the home's and a claim made at a node's agent is
-  not checked against it; it waits for the node's replica of the mark, as rule 4 waits.
+  `review: true`. **A node's member is checked too**: a claim is a report, which its node
+  forwards to the home (§4.4a), so the home refuses it against its own mark and rings it on the
+  clearing through the link like any mail; a node cut off from the home refuses every report,
+  so nothing is claimed unchecked.
 
 ## 7. Phases
 

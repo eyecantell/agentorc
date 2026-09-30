@@ -1704,7 +1704,7 @@ class HostAgent(
             )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
         new_claim = status == "claimed" and entry.source == "declared"
-        if new_claim and (words := self._balance_refusal(s, entry.ref)):
+        if new_claim and (words := self._balance_refusal(s, entry.ref, caller)):
             raise RpcError(words, balance=self._balance_of(s))
         holder = self._lease_holder(s, entry) if new_claim else None
         if holder is not None and not force:
@@ -1738,19 +1738,22 @@ class HostAgent(
     def _balance_of(self, s: Session) -> dict[str, Any] | None:
         """The balance mark of `s`'s team if `s` is one it refuses (design §6 *Balance*, TD-239): an
         unattended record that is no seat, on a team the home's `host` record marks — read there by
-        team, never from a repo's reading, since a `review` crossing may name no repo. None at a node,
-        whose `host` record carries no mark: a claim made there is not checked (§6)."""
+        team, never from a repo's reading, since a `review` crossing may name no repo. A node's member is
+        checked here too: `progress` is a report, which its node forwards to the home (`modes.REPORTS`);
+        only a node cut off from the home, which refuses reports outright, checks nothing (§6)."""
         if not s.team or not s.unattended or s.seat is not None:
             return None
         mark = ((self._host_rec.get("teams") or {}).get(s.team) or {}).get("balance")
         return mark if isinstance(mark, dict) and mark.get("crossed") else None
 
-    def _balance_refusal(self, s: Session, ref: str | None) -> str | None:
+    def _balance_refusal(self, s: Session, ref: str | None, caller: Any = None) -> str | None:
         """The words refusing `s` a new claim on `ref` — or, with `ref` None, its `none` — while its
         team is over its line; None when it passes. A renewal (a claim `s` already holds on `ref`, its
         branch's derived one included: the work is in hand) and
         a pull request as the reference pass: finishing one is what brings the count down. A refusal
-        is kept on the record (`balance_refused`) so the clearing can ring it."""
+        of the session's own word is kept on the record (`balance_refused`) so the clearing can ring
+        it; one of another's write on its record (a person's `--id`) is not, since the member never
+        tried and has nothing to be rung about."""
         mark = self._balance_of(s)
         if mark is None:
             return None
@@ -1759,8 +1762,9 @@ class HostAgent(
                 return None
             if any(e.ref == ref and e.status == "claimed" for e in s.progress):  # declared or from its branch
                 return None
-        s.balance_refused = {"at": now_iso(), "ref": ref}
-        self._save(s)
+        if not mail.is_person(caller) and str(caller) == s.id:
+            s.balance_refused = {"at": now_iso(), "ref": ref}
+            self._save(s)
         return balance_mod.refusal(s.team, mark)
 
     def _lease_holder(self, s: Session, entry: ProgressEntry) -> dict[str, str] | None:
@@ -1831,7 +1835,7 @@ class HostAgent(
                 f"{s.id} already {said} (since {getattr(s, other)['at']}): a session is out of work or it wants "
                 "another run at it, never both — claim something to take that back (design §4.9a)"
             )
-        if status == "none" and (words := self._balance_refusal(s, None)):
+        if status == "none" and (words := self._balance_refusal(s, None, caller)):
             # a member refused a claim is not out of work (§6 *Balance*): its team idles, never winds down
             raise RpcError(words, balance=self._balance_of(s))
         if status == "none":
