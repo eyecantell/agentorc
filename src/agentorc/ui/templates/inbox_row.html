@@ -645,7 +645,7 @@
     </div>
   </details>
   {%- endif %}
-  {%- if e.failed or e.held %}<button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ e.repo }}" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}
+  {%- if e.failed or e.held %}<button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ e.repo }}" data-held="{{ '1' if e.held else '' }}" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}
   {%- endif %}
 </div>
 {%- endmacro %}

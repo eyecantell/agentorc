@@ -65,7 +65,8 @@ it is; the policy then promotes nothing for the repo until a Promote concludes o
 (`ao promote clear`) ends the hold. A rollback to a commit older than `8841800` (#757) is concluded by
 code that knows no hold, so turn `auto` off first on the Settings page. **When the live copy does not
 start**, so neither `ao` nor the host agent answers, go back by hand — the same tree, then the pair
-with its path:
+with its path. It writes no hold, and the pair restarts the host agent, so turn `auto` off first
+(`settings.yml`, or the Settings page once it answers) and on again once main holds the cure:
 
 ```bash
 R=/home/kmaster/agentorc T=~/.agentorc/promotes/agentorc/tree V=~/.local/share/agentorc-venv/bin

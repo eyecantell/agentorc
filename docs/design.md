@@ -2746,8 +2746,8 @@ whose consequence is least visible:
   hold still stops the policy.
 - **Dismiss** (Inbox row: promote) — Clears the home's own mark on this repo: a failed promote
   first, and a rollback's hold when no failure stands. Press it once you have read the failure, or
-  when what a rollback went back from may go live again. It moves nothing live: after it, promoting
-  goes on — under `auto`, to main's head at the next pass.
+  when what a rollback went back from may go live again. It moves nothing live: once neither stands,
+  promoting goes on — under `auto`, to main's head at the next pass.
 
 Which session to message, by role, is TD-162's line; the marks on the Message composer are its.
 Not in the first set, and written when a person asks at them: Take over / Hand back, Transcript,

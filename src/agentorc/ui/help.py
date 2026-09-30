@@ -182,8 +182,8 @@ HELP: tuple[Help, ...] = (
         (
             "Clears the home's own mark on this repo: a failed promote first, and a rollback's hold when no "
             "failure stands. Press it once you have read the failure, or when what a rollback went back from "
-            "may go live again. It moves nothing live: after it, promoting goes on — under `auto`, to main's "
-            "head at the next pass."
+            "may go live again. It moves nothing live: once neither stands, promoting goes on — under `auto`, "
+            "to main's head at the next pass."
         ),
     ),
 )
