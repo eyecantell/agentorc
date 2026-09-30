@@ -1028,6 +1028,8 @@ class TickMixin:
         started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
         if started != (rec.get("work_started") or []):
             rec["work_started"] = started  # a start older than the day counts for nothing
+        if not started:
+            rec.pop("work_started", None)
         replays = self._work_replays(records, now)
         held = self._work_held(replays, started, conf, now, team)
         bare = {k: v for k, v in mark.items() if k != "held"}
