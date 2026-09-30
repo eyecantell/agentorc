@@ -78,9 +78,9 @@ TRAIL_KEEP = 100  # attention-trail entries kept, newest first (design §4.10, T
 TRAIL_FLOOR = timedelta(seconds=5)  # a row this short leaves no trail unless a person ended it
 # What **Reply** on a board row says it did until dev-cadence's reader carries each item's `session` and
 # `refs` (TD-142 slice 2): the file half alone, and nobody mailed.
+BOARD_REPLY_NOTE = "written on the board — no session standing is known: the board reader carries no session fields yet"
 # An entry handed to a seat is debt or a feature (cadence §2.11; design §4.10, TD-218)
 ENTRY_TYPES = ("debt", "feature")
-BOARD_REPLY_NOTE = "written on the board — no session standing is known: the board reader carries no session fields yet"
 # A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
 # long it is given to finish after the ask. It is a grace, not a deadline the session can see — a
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
