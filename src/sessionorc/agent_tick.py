@@ -1460,7 +1460,7 @@ class TickMixin:
 
     def _balance_leads(self, members: list[Session]) -> list[str]:
         """The controllers the team's members share — its manager (§6 *Balance*) — read from the members
-        the rule refuses (unattended, no seat) and a teammate does not control; none when a person leads."""
+        the rule refuses (unattended, no seat) that control no teammate; none when a person leads."""
         leads = {c for m in members for c in self._ctl(m)}  # in the home's form: a node's member is `id@host`
         sets = [set(self._ctl(m)) for m in members if self._address(m) not in leads and m.unattended and m.seat is None]
         return sorted(set.intersection(*sets)) if sets else []
@@ -1468,8 +1468,9 @@ class TickMixin:
     def _balance_ring(self, team: str) -> None:
         """The mark went: each live member refused while it stood is rung, once, within its wake budget
         (§6 *Balance*), and the field that held it back from the nudge and the lane news goes. A node's
-        member is refused at the home, so its record here carries the field and the note reaches it
-        as any mail to a node's session does."""
+        member is refused at the home, so its record here carries the field and the note lands in the
+        home's copy of it, read at its next forwarded `inbox` or `wait`: nothing rings a node's idle
+        member yet (§4.4a, TD-057)."""
         for s in self._graph().values():
             if s.team != team or not s.balance_refused:
                 continue

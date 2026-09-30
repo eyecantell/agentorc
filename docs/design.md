@@ -6929,7 +6929,7 @@ teams:
   minutes after a clearing, and at once when the team has no live member — a team that wound
   down loses its mark with nobody to tell, and neither the manager nor the person is sent a
   clearing. The manager is the controller the team's unattended, non-seat members share, read
-  from those no teammate controls, each address in the home's form (a node's member's is `id@host`); a team a person leads has none, and only the person is told.
+  from those that control no teammate, each address in the home's form (a node's member's is `id@host`); a team a person leads has none, and only the person is told.
   When the mark goes, each member whose claim was refused is rung
   with *the line is clear again: pick as your lane says*, within its wake budget, and its
   `balance_refused` removed — an exited one's is removed with nothing sent.
@@ -6940,8 +6940,11 @@ teams:
   designer holds several for a night reaches `prs` sooner, and `n` is set with that in mind;
   the default the page offers when the rule is first turned on is `prs: 10`, `oldest: 2d`,
   `review: true`. **A node's member is checked too**: a claim is a report, which its node
-  forwards to the home (§4.4a), so the home refuses it against its own mark and rings it on the
-  clearing through the link like any mail; a node cut off from the home refuses every report,
+  forwards to the home (§4.4a), so the home refuses it against its own mark, and on the clearing its note
+  lands in the home's copy of its record, read at its next forwarded `inbox` or `wait`: an idle
+  member on a node has no doorbell yet (§4.4a *The doorbell is the forwarded `wait`*), so it
+  learns of the clearing when something else has it read its inbox — its manager, told of the
+  clearing, is the one to look (TD-057). A node cut off from the home refuses every report,
   so nothing is claimed unchecked.
 
 ## 7. Phases
