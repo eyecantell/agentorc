@@ -909,13 +909,21 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(t
 @pytest.mark.unit
 def test_a_press_on_a_board_read_from_origin_is_refused_before_the_write_back(tmp_path, monkeypatch):
     """The page draws the controls disabled; a press that comes anyway is refused in the same words
-    and never reaches `board_edit` or `board_reply`. Put on the board is not a row's press."""
+    and never reaches `board_edit` or `board_reply` while the checkout's own board lacks the line.
+    Put on the board is not a row's press. Once pulled, the press goes through at once."""
     host(tmp_path, monkeypatch)
     from agentorc.ui import app as uiapp
 
     board = str(tmp_path / "r/docs/user_attention.md")
     row = {"row": "board", "id": f"board:{board}:3", "board": board, "text": "x", "due_now": True, "at": "2026-09-01"}
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([dict(row, source="origin/main")], ""))
+    pulled = []
+
+    def fake(run=None, *, fetch=False, board=""):
+        if board and pulled:  # the checkout pulled since the reading: its own board holds the line
+            return [dict(row, line=3, source="")], ""
+        return [dict(row, line=3 if not board else 9, source="" if board else "origin/main")], ""
+
+    monkeypatch.setattr(uiapp, "read_boards", fake)
     calls = []
 
     class Fake:
@@ -950,6 +958,11 @@ def test_a_press_on_a_board_read_from_origin_is_refused_before_the_write_back(tm
             json={"action": "add", "msg": "m-1", "board": board, "text": "new", "due": "2026-10-01"},
         )
         assert r.status_code == 200 and calls == [("board_edit", "add")]
+        # pulled since the last reading: the plain read of the one board finds the line, and the
+        # press goes through without waiting on the next fetching read
+        pulled.append(1)
+        r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 3, "text": "x"})
+        assert r.status_code == 200 and calls[-1] == ("board_edit", "done")
 
 
 def _behind_clone(tmp_path):

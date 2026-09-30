@@ -637,11 +637,16 @@ def create_app() -> FastAPI:
             board_cache["task"] = asyncio.create_task(board_fetch())
         return board_cache["rows"], board_cache["note"]
 
-    def board_on_origin(board: str) -> bool:
-        """Whether the last reading drew this board from origin (§4.5 screen 6, TD-221 slice 3): its
-        rows are read-only until the checkout is pulled, since the write-back edits the checkout's
-        file and that file does not hold origin's lines yet."""
-        return any(r.get("board") == board and r.get("source") for r in board_cache["all"])
+    async def board_on_origin(board: str, line: Any, text: str) -> bool:
+        """Whether this board's row is still read-only (§4.5 screen 6, TD-221 slice 3): the last
+        reading drew the board from origin, and the checkout's own board does not hold the line yet —
+        the write-back edits the checkout's file. A checkout pulled since that reading is seen by a
+        plain read of the one board, kept out of the cache so origin's rows are not dropped from the
+        page, and the press goes through rather than waiting on the next fetching read."""
+        if not any(r.get("board") == board and r.get("source") for r in board_cache["all"]):
+            return False
+        rows, _ = await asyncio.to_thread(read_boards, board=board)
+        return not any(str(r.get("line")) == str(line) and r.get("text") == text for r in rows)
 
     async def board_view(fresh: bool = False) -> tuple[dict[str, Any], str]:
         """The board's horizon (§4.5 screen 6, TD-220) over every open row the cache holds, sorted by
@@ -2226,7 +2231,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # it in the repo's main checkout. The row hands back what the reader gave it — the board,
             # the line and its text — and the agent refuses the edit when that line has moved on.
             what = str(body.get("action") or "")
-            if what != "add" and h.board_on_origin(str(body.get("board") or "")):
+            if what != "add" and await h.board_on_origin(
+                str(body.get("board") or ""), body.get("line"), str(body.get("text") or "")
+            ):
                 # §4.5a **origin note** (TD-221 slice 3): the page draws these disabled; a press that
                 # comes anyway is refused in the same words, never sent to the write-back
                 raise HTTPException(409, ORIGIN_READONLY)

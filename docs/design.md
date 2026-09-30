@@ -2128,7 +2128,8 @@ Screens:
    origin's line yet; so on a board whose `source` is origin, Snooze, Done and Reply are drawn
    disabled, their reason beside them — *on origin, not in this checkout yet: pull to act on
    it* — and **Open board** stays; a press that reaches the UI anyway is refused in the same
-   words and never sent to the write-back. **The host agent does not pull**: the main checkout is the
+   words and never sent to the write-back, unless a plain read of that one board finds the
+   checkout now holds the line (pulled since the reading), when it goes through. **The host agent does not pull**: the main checkout is the
    person's (§4.9 *Home and reach*; §6 *Promote*: *the tree is a person's*), a fast-forward moves
    tracked files under a live anchor session, and the reader's *behind* is about the board file
    and not the branch, so a fast-forward would be refused on any checkout with a commit of its
