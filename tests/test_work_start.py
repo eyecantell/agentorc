@@ -241,7 +241,8 @@ async def test_a_repo_over_the_teams_balance_line_holds_the_start_as_the_fifth_b
     got = await held({"prs": 2})
     assert got == {"why": "balance", "repo": repo, "crossed": [{"line": "prs", "value": 3, "limit": 2}]}
     agent._repos[repo]["prs"] = {"error": "gh: offline"}
-    assert (await held({"prs": 2}) or {}).get("why") != "balance", "a reading that cannot be told holds nothing"
+    assert await held({"prs": 2}) is None, "a reading that cannot be told holds nothing"
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1", "manager-ao", "techlead-ao"], "the team started"
     replays.calls.clear()
 
     # the review line: the ended seat's queue, three hours old against the two-hour bound

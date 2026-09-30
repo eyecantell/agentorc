@@ -1122,6 +1122,7 @@ class TickMixin:
         if not bal:
             return None
         roots = [repo] if repo and repo in self._repos else []
+        records = [r for r in records if not r.superseded_by]  # a resumed record's successor holds its inbox
         waiting = [str(w["oldest"]) for r in records if r.seat is not None and (w := r.prs_waiting(home=self.host))]
         bounds = [d for r in records if (d := balance_mod.span((r.review or {}).get("bound")))]
         got = balance_mod.crossed(
