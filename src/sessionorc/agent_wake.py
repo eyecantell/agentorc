@@ -384,9 +384,10 @@ class WakeMixin:
 
     async def rpc_repos(self) -> dict[str, dict[str, Any]]:
         """The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), keyed by the
-        checkout's path: what the team card's Repo facet, the rollup and the Repo page draw. The
-        home's; a node forwards it (§4.4a)."""
-        return dict(self._repos)
+        checkout's path: what the team card's Repo facet, the rollup and the Repo page draw, with
+        `balance` beside a reading whose repo a team is over its line in (§6 *Balance*). The home's;
+        a node forwards it (§4.4a)."""
+        return {root: v for root in self._repos if (v := self._repo_view(root)) is not None}
 
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty
@@ -478,7 +479,7 @@ class WakeMixin:
           which clears that window's reserve. A label the profile's adapter does not report is
           refused, with the reported ones named — except before the profile has any reading, when
           nothing can be checked and the reply says `unchecked`.
-        - `teams`: `{team: {schedule?, until?, reserve?} | None}` — a field set to None is cleared, a
+        - `teams`: `{team: {schedule?, until?, reserve?, balance?} | None}` — a field set to None is cleared, a
           team set to None removed. The team's name is the client's to check against the org's
           definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
         - `repos`: `{repo: {promote: {auto: bool}} | None}`.

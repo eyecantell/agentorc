@@ -174,8 +174,9 @@ class ServeMixin:
                     await writer.drain()
                     for prof, u in self._usage.items():  # the top bar's figure, before the cards
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
-                    for root, r in self._repos.items():  # the repo facts, as a change would push them
-                        await self._send(writer, json.dumps({"event": "repos", "root": root, "repo": r}))
+                    for root in list(self._repos):  # the repo facts, as a change would push them, marks and all
+                        view = self._repo_view(root)
+                        await self._send(writer, json.dumps({"event": "repos", "root": root, "repo": view}))
                     await self._push_changes()
                     continue
                 writer.write(_reply_line(req, await self._dispatch(req, peer=_peer_pid(writer), conn=writer)))

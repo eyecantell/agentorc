@@ -150,6 +150,29 @@ class RepoStore:
         _atomic_write(self.path, json.dumps(readings, indent=1))
 
 
+class HostStore:
+    """The home's own `host` record (design §6 *Balance*, TD-239), `{teams: {<team>: {...}}}`, written
+    whole each time it changes. A missing or unreadable file is an empty record, never a crash: the
+    next tick writes what stands."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path or paths.host_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> dict[str, Any]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {"teams": {}}
+        teams = raw.get("teams") if isinstance(raw, dict) else None
+        if not isinstance(teams, dict):
+            return {"teams": {}}
+        return {"teams": {str(k): v for k, v in teams.items() if isinstance(v, dict)}}
+
+    def save(self, record: dict[str, Any]) -> None:
+        _atomic_write(self.path, json.dumps(record, indent=1))
+
+
 class DoingLogStore:
     """The doing log (design §4.8 *the doing log*, TD-176 slice 2): the last `keep` `ao doing` calls
     per team, in memory and in `doing.jsonl` — one line appended per call, the file rewritten from

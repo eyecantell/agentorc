@@ -245,7 +245,8 @@ def crossed(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 # -- teams, repos, person (§5, TD-146) -------------------------------------------------------------
 
-TEAM_KEYS = ("schedule", "until", "reserve")
+TEAM_KEYS = ("schedule", "until", "reserve", "balance")
+BALANCE_KEYS = ("prs", "oldest", "review")
 TERMINAL_KEYS = ("size", "face", "copy_on_select")
 TERMINAL_SIZE = (8, 32)  # a readable monospace size in px, either way of the Focus pane's default 13
 INBOX_KEYS = ("board_show",)
@@ -272,7 +273,7 @@ def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
 
 
 def teams(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """`teams:` as `{team: {schedule?, until?, reserve?}}` — each field that is not valid dropped."""
+    """`teams:` as `{team: {schedule?, until?, reserve?, balance?}}` — each field that is not valid dropped."""
     return _keyed(doc, "teams", parse_team)
 
 
@@ -336,7 +337,7 @@ def instant(value: Any) -> str:
 def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
     """One team's settings: `schedule` (TD-133's rule, a mapping kept as written until that build
     reads it), `until` (an instant, §6 *Team stop time*) and `reserve` (a flat percent added to the
-    profile's reserve for the team's sessions, §6 *Usage gate*)."""
+    profile's reserve for the team's sessions, §6 *Usage gate*) and `balance` (§6 *Balance*)."""
 
     def schedule(v: Any) -> dict[str, Any]:
         if not isinstance(v, dict) or not v:
@@ -344,7 +345,37 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
         return dict(v)
 
     value = _fields(value, TEAM_KEYS, "a team's settings", drop)
-    return _each(value, {"schedule": schedule, "until": instant, "reserve": _pct}, drop)
+    checks = {"schedule": schedule, "until": instant, "reserve": _pct, "balance": lambda v: parse_balance(v, drop)}
+    return _each(value, checks, drop)
+
+
+def parse_balance(value: Any, drop: bool = False) -> dict[str, Any]:
+    """A team's balance lines (§6 *Balance*, TD-239): `{prs: <int ≥ 1>, oldest: <n>[mhd], review: <bool>}`,
+    each optional and any one enough. An empty mapping is refused — it draws no line, and *off* is
+    the key's absence — as is one whose every line failed on the reader's side."""
+    if isinstance(value, dict) and not value:
+        raise ValueError("balance draws at least one line: prs, oldest or review (off is no balance key)")
+
+    def prs(n: Any) -> int:
+        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+            raise ValueError(f"balance.prs is a whole number of open pull requests, 1 or more, not {n!r}")
+        return n
+
+    def oldest(d: Any) -> str:
+        word = d.strip() if isinstance(d, str) else ""
+        if not re.fullmatch(r"[1-9][0-9]*[mhd]", word):
+            raise ValueError(f"balance.oldest is a duration such as 12h or 2d, not {d!r}")
+        return word
+
+    def review(b: Any) -> bool:
+        if not isinstance(b, bool):
+            raise ValueError(f"balance.review is true or false, not {b!r}")
+        return b
+
+    got = _each(_fields(value, BALANCE_KEYS, "balance", drop), {"prs": prs, "oldest": oldest, "review": review}, drop)
+    if not got:
+        raise ValueError("balance draws at least one line: prs, oldest or review")
+    return got
 
 
 def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
