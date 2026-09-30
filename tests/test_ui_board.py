@@ -175,7 +175,7 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
     from agentorc.ui import app as uiapp
 
     reads, calls, replies = [], [], []
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (reads.append(1), ([], ""))[1])
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
 
     class Fake:
         def __init__(self, *a, **k):
@@ -359,7 +359,7 @@ def test_with_the_host_agent_down_no_surface_counts_the_board(tmp_path, monkeypa
 
     root = tmp_path / "proj"
     rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue")))
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (rows, ""))
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (rows, ""))
 
     class Down:
         def __init__(self, *a, **k):
@@ -551,7 +551,7 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
     items = [item(3, "decide the thing", "2026-09-20", "2d overdue")]
     items += [ahead(10 + i, f"later item {i}", f"2026-10-{i + 1:02d}") for i in range(12)]
     rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (rows, ""))
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (rows, ""))
 
     class Fake:
         def __init__(self, *a, **k):
@@ -573,7 +573,7 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
             assert needs_line(page) == "1"
             assert 'Board, coming up</span><span class="meta">(9)</span>' in page  # ten places, one due
             assert "due in 3 d · Oct 1" in page and 'data-section="coming"' in page
-            assert '<summary>not shown (3)</summary>' in page and "later item 11" in page
+            assert "<summary>not shown (3)</summary>" in page and "later item 11" in page
             assert "showing the next 10 board items per team · 3 not shown, the next due Oct 10" in page
             assert 'class="boardshow"' in page and 'href="/settings#sec-you"' in page
             # the rail's *board items* counts every board row on the page; its *Needs you* the due one
@@ -626,7 +626,7 @@ def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out
 
     items = [ahead(10, "next week's item", "2026-10-04"), ahead(11, "forty days out", "2026-11-07")]
     rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (rows, ""))
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (rows, ""))
     calls = []
 
     class Fake:
@@ -668,3 +668,151 @@ def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out
     show = js[js.index('closest("a.boardshow")') :]
     show = show[: show.index("});")]
     assert "fetch" not in show and "settings" not in show  # show writes nothing
+
+
+# -- the board read against origin (§4.5 screen 6 *Boards are read against origin*, TD-221) ------
+
+
+def _git(*args, cwd):
+    import subprocess
+
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+
+
+@pytest.mark.unit
+def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_path, monkeypatch):
+    """A clone one commit behind its origin: the fetching read shows the line merged on origin, the
+    row says it was read from origin (`source`) and keeps the reader's `fetch_note`; the plain read
+    does not see it. Real git, the real reader."""
+    due = date.today().isoformat()
+    origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "proj"
+    _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    _git("clone", "-q", str(origin), str(seed), cwd=tmp_path)
+    for k, v in (("user.email", "t@t"), ("user.name", "t")):
+        _git("config", k, v, cwd=seed)
+    (seed / "docs").mkdir()
+    (seed / "docs" / "user_attention.md").write_text(f"# Board\n\n- [ ] the old line. Due: {due}.\n")
+    (seed / "scripts").mkdir()
+    shutil.copy(READER, seed / "scripts" / "nudge_user_attention.py")
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-q", "-m", "board", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
+    with (seed / "docs" / "user_attention.md").open("a") as f:
+        f.write(f"- [ ] the line only on origin. Due: {due}.\n")
+    _git("commit", "-q", "-am", "a line", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    host(tmp_path, monkeypatch, [clone])
+    from agentorc.ui import app as uiapp
+
+    rows, note = uiapp.read_boards()
+    assert note == "" and [r["text"].split(".")[0] for r in rows] == ["the old line"]
+    assert rows[0]["source"] == "" and rows[0]["fetch_note"] == ""
+    rows, note = uiapp.read_boards(fetch=True)
+    assert note == "" and [r["text"].split(".")[0] for r in rows] == ["the old line", "the line only on origin"]
+    assert all(r["source"] for r in rows) and rows[0]["fetch_note"].startswith("fetched; local clone is behind")
+
+
+@pytest.mark.unit
+def test_a_fetch_that_is_stopped_or_fails_is_followed_by_a_plain_read(tmp_path, monkeypatch):
+    """A dead remote costs the origin view and never the board: the fetching read stopped at its
+    bound (or failed) is followed at once by a plain read, and each board says *fetch skipped*."""
+    import subprocess
+
+    root = repo(tmp_path, "proj", "# Board\n")
+    host(tmp_path, monkeypatch, [root])
+    from agentorc.ui import app as uiapp
+
+    seen = []
+
+    class Done:
+        returncode, stderr = 0, ""
+        stdout = __import__("json").dumps(report(root, item(3, "a thing. Due: 2026-09-20.", "2026-09-20", "overdue")))
+
+    def run(argv, **kw):
+        seen.append(("--fetch" in argv, kw["timeout"]))
+        if "--fetch" in argv:
+            raise subprocess.TimeoutExpired(argv, kw["timeout"])
+        return Done()
+
+    rows, note = uiapp.read_boards(run=run, fetch=True)
+    assert seen == [(True, uiapp.BOARD_FETCH_TIMEOUT), (False, uiapp.BOARD_TIMEOUT)]
+    assert note == "" and len(rows) == 1
+    assert rows[0]["source"] == "" and rows[0]["fetch_note"] == "fetch skipped (timeout)"
+
+    class Failed:
+        returncode, stdout, stderr = 1, "", "boom\n"
+
+    rows, _ = uiapp.read_boards(run=lambda argv, **kw: Failed() if "--fetch" in argv else Done(), fetch=True)
+    assert rows[0]["fetch_note"] == "fetch skipped (the reader exited 1 — boom)"
+
+
+@pytest.mark.unit
+def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, monkeypatch):
+    """The first request reads plainly; from then a stale reading starts one fetching read, however
+    many requests find it stale, and each is answered from the last reading meanwhile; a press
+    reads its own board plainly, laid over the last reading, and does not wait on the fetch. A
+    fetch that began before the press does not put the answered row back."""
+    import threading
+
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+
+    board = str(tmp_path / "r/docs/user_attention.md")
+    other = str(tmp_path / "s/docs/user_attention.md")
+
+    def row(b, text):
+        return {
+            "row": "board",
+            "id": f"board:{b}:{text}",
+            "board": b,
+            "text": text,
+            "due_now": True,
+            "at": "2026-09-01",
+        }
+
+    gate, reads, board_ = threading.Event(), [], board
+
+    def fake(run=None, *, fetch=False, board=""):
+        reads.append("fetch" if fetch else board or "plain")
+        if fetch:
+            assert gate.wait(10)
+            return [row(board_, "answered"), row(other, "from origin")], ""
+        if board:
+            return [], ""  # the answered row is gone from its board
+        return [row(board_, "answered"), row(other, "old")], ""
+
+    monkeypatch.setattr(uiapp, "read_boards", fake)
+    monkeypatch.setattr(uiapp, "BOARD_TTL", -1.0)
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "board_edit":
+                return {"commit": "abc"}
+            return {"list": [], "inbox": {"entries": [], "trail": []}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    with TestClient(uiapp.create_app()) as c:
+        assert c.get("/api/person/inbox").json()["needs"] == 2 and reads == ["plain"]
+        c.get("/api/person/inbox")
+        c.get("/api/person/inbox")
+        assert reads == ["plain", "fetch"]  # one fetching read, the requests answered meanwhile
+        r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 3, "text": "answered"})
+        assert r.status_code == 200 and reads == ["plain", "fetch", board]
+        assert c.get("/api/person/inbox").json()["needs"] == 1  # the press's read, laid over
+        gate.set()
+        for _ in range(50):
+            got = c.get("/api/person/inbox").json()
+            if "from origin" in got["html"]["needs"]:
+                break
+            threading.Event().wait(0.05)
+        assert "from origin" in got["html"]["needs"] and "answered" not in got["html"]["needs"]

@@ -2074,7 +2074,7 @@ Screens:
    naming a board line says *on the board, due <date>*, and that a line the person should see
    today is dated today — so *left for you* never sends the person to a page that does not draw it.
 
-   **Boards are read against origin (TD-208; designed 2026-09-28, not built — TD-221).** Every
+   **Boards are read against origin (TD-208; designed 2026-09-28; the read, its bound and one read at a time built 2026-09-29 — TD-221 slices 1–2; the note and the read-only rows not built — TD-221 slice 3).** Every
    board line a session writes reaches origin by a merged PR, and the registry's roots are main
    checkouts that move only when someone pulls: on 2026-09-27 three of six boards differed from
    origin, and the two items Paul looked for were on a board ten commits behind. So the read
@@ -2087,10 +2087,11 @@ Screens:
    and after *fetched; board DIFFERS from* the parenthesis that says which way (the
    reader gives the cases no other field, and a field for them is asked of dev-cadence with
    TD-221), and the reader's sentence itself is never drawn but for a skipped fetch's reason.
-   **The read is in the UI's process and off the page's loop, as built; three things are new.**
+   **The read is in the UI's process and off the page's loop; three things are its own.**
    (1) *One read at a time, and the last reading drawn while it runs*: a request that finds
-   the reading older than a minute starts a read if none is running and is answered from the
-   last reading, where today it waits for the read. (2) *A bound of its own*: a fetching read
+   the reading older than a minute starts a fetching read if none is running and is answered from the
+   last reading; only the first read, with nothing yet to draw, is waited for, and it is a plain
+   one, so no page waits on the network. (2) *A bound of its own*: a fetching read
    is stopped at `BOARD_FETCH_TIMEOUT` (45 s: the reader's fetch is 30 s a repo with no
    aggregate bound once `--due-only` is dropped, TD-220, and without it the reader may also make
    an `ls-remote` and, within its own allowance, a `gh` call a repo), and a read that is stopped or fails

@@ -250,21 +250,32 @@ BOARD_SCRIPT = Path("scripts") / "nudge_user_attention.py"
 BOARD_TTL = 60.0
 BOARD_ACTS = ("snooze", "done")  # §4.5a's two answers to a board row, the `board_edit` RPC's actions
 BOARD_TIMEOUT = 20.0
+# §4.5 screen 6 *Boards are read against origin* (TD-221): the read passes the reader's own `--fetch`,
+# which fetches each repo's origin serially (30 s a repo, no aggregate bound once `--due-only` went,
+# TD-220), so a fetching read has a bound of its own; stopped or failed, a plain read follows at once
+BOARD_FETCH_TIMEOUT = 45.0
 
 
-def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
+def board_argv(roots: Collection[str | Path], *, fetch: bool = False, only: str = "") -> tuple[list[str] | None, str]:
     """The command that reads every open item of these repos' boards — not `--due-only` since TD-220
     (§4.5 screen 6 *The board's horizon*): the page sorts what is due from what comes up — or None
     and a note saying why nothing is read. No board anywhere is not a fault and has no note; boards with no reader do,
-    since the Inbox would otherwise look clear when it is not (§4.5 *no silent failure path*)."""
+    since the Inbox would otherwise look clear when it is not (§4.5 *no silent failure path*).
+
+    `fetch` passes the reader's own `--fetch` (§4.5 screen 6 *Boards are read against origin*,
+    TD-221): it fetches each repo's origin and reads a board that is merely behind from
+    `origin/<default>` — the fetch is the reader's, never a second one of ours. `only` reads that one
+    board alone, as the read after a press does."""
     rs = [Path(r).expanduser() for r in roots]
     boards = [str(r / BOARD_FILE) for r in rs if (r / BOARD_FILE).is_file()]
+    if only:
+        boards = [b for b in boards if b == only] or ([only] if Path(only).is_file() else [])
     if not boards:
         return None, ""
     script = next((r / BOARD_SCRIPT for r in rs if (r / BOARD_SCRIPT).is_file()), None)
     if script is None:
         return None, f"board items are not shown: no repo here carries {BOARD_SCRIPT}, dev-cadence's reader"
-    argv = [sys.executable, str(script), "--report", "--json"]
+    argv = [sys.executable, str(script), "--report", "--json"] + (["--fetch"] if fetch else [])
     for b in boards:
         argv += ["--board", b]
     return argv, ""
@@ -436,6 +447,11 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "due_error": bool(it.get("due_error")),
                     "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today, tag),
                     "editor": url,
+                    # §4.5 screen 6 *Boards are read against origin* (TD-221): whether the board was
+                    # read from origin (the reader's `source`, non-null only then) and the reader's
+                    # sentence for what its fetch found, kept for the note above the repo's rows
+                    "source": str(b.get("source") or ""),
+                    "fetch_note": str(b.get("fetch_note") or ""),
                     "find": _find_text(label, text, tag, "board"),
                 }
             )
