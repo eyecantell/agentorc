@@ -24,8 +24,10 @@ roles:
   grinder: {profile: grind}
 ```
 
-A repo's `.agentorc.yml` may carry `teams:` of its own (teams whose only project is that repo);
-`merge_repo_teams` folds them in, the org file winning a name collision. The file is read by the
+A repo's `.agentorc.yml` may carry `teams:` of its own (teams whose only project is that repo), and
+the org a client sees is the aggregate (§4.9 *The org is an aggregate*, TD-229): `with_repos` folds
+in the teams of every checkout in the host's registry, the org file winning a name collision (the
+repo's reads *shadowed*) and a name two repos define refused in both. The file is read by the
 clients (`ao team`, `ao new`, the UI) on every use and cached nowhere; the host agent never reads
 it — it stores `team` and `project` as two plain strings on the record and nothing keys on them
 (§9 invariant 9). With no file the org is empty.
@@ -156,6 +158,10 @@ class Org:
     teams: dict[str, TeamDef] = field(default_factory=dict)
     roles: dict[str, dict[str, Any]] = field(default_factory=dict)  # the org-wide overlay (§4.9 precedence)
     path: Path | None = None
+    # a repo's definition the org file's of the same name wins over: team → the repo files (§4.9)
+    shadowed: dict[str, list[Path]] = field(default_factory=dict)
+    # a name two repos define, refused in both (§4.9 *Names are the org's*): team → why, naming each
+    refused: dict[str, str] = field(default_factory=dict)
 
     def checkout(self, project: str, repo: str, host: str) -> Path | None:
         """Where `repo` of `project` is checked out on `host`; None when any of the three is unknown."""
@@ -207,32 +213,112 @@ def merge_repo_teams(
 ) -> Org:
     """Fold a repo's `.agentorc.yml` `teams:` into the org (design §4.9): each is a team whose only
     project is that repo, so a repo can ship its own grind team beside its code. The org file wins
-    a name collision; each definition keeps its `source`. Returns a new Org; `org` is untouched.
-    `repo_roles` names the roles the repo's own file defines, which its teams' `entries:` may name.
+    a name collision, and the repo's is recorded in `shadowed`; each definition keeps its `source`.
+    Returns a new Org; `org` is untouched. `repo_roles` names the roles the repo's own file defines,
+    which its teams' `entries:` may name.
 
-    The repo's project is the checkout's directory name, on this host at `repo_root`; an org
-    project of that name is used as it stands."""
+    The repo is the team's project, unsaid: the checkout's directory name, on this host at
+    `repo_root`; an org project of that name is used as it stands. Spanning, placing and nesting
+    are the org file's, so a `projects:` key, a `host:` and a nested `{team: …}` member are each
+    refused naming the key (§4.9 *The org is an aggregate*)."""
     repo_root = Path(repo_root).expanduser().resolve()
     rname = repo_root.name
-    merged = Org(projects=dict(org.projects), teams=dict(org.teams), roles=dict(org.roles), path=org.path)
+    merged = Org(
+        projects=dict(org.projects),
+        teams=dict(org.teams),
+        roles=dict(org.roles),
+        path=org.path,
+        shadowed={k: list(v) for k, v in org.shadowed.items()},
+        refused=dict(org.refused),
+    )
     source = repo_root / ".agentorc.yml"
     label = f"{source}"
     teams = _mapping(repo_teams, f"{label}: teams")
+    for tname, raw in teams.items():
+        key = f"{label}: teams.{tname}"
+        raw = _mapping(raw, key)
+        for k in ("projects", "host"):
+            if k in raw:
+                raise ValueError(
+                    f"{key}.{k}: a repo's team is on its own repo and lands where the org places it — "
+                    f"`{k}:` is the org file's (design §4.9 *The org is an aggregate*)"
+                )
+        for i, m in enumerate(raw.get("members") or []):
+            if isinstance(m, dict) and "team" in m:
+                raise ValueError(
+                    f"{key}.members[{i}].team: a nested team is the org file's, not a repo's "
+                    "(design §4.9 *The org is an aggregate*)"
+                )
     if teams and rname not in merged.projects:
         merged.projects[rname] = Project(rname, {rname: {hosts.local_host().name: repo_root}})
     for tname, raw in teams.items():
         tname = str(tname)
         if tname in org.teams:
-            continue  # the org file wins
+            merged.shadowed.setdefault(tname, []).append(source)  # the org file wins
+            continue
         raw = dict(_mapping(raw, f"{label}: teams.{tname}"))
-        raw.setdefault("projects", [rname])
+        raw["projects"] = [rname]
         merged.teams[tname] = _team(tname, raw, f"{label}: teams.{tname}", source=source)
     _validate(merged, label)
     for tname in teams:  # only the teams this repo adds: each is checked once, against its own repo's roles
-        team = merged.teams[str(tname)]
-        if team.source == source:
+        team = merged.teams.get(str(tname))
+        if team is not None and team.source == source:
             _entries_resolve(merged, team, f"{label}: teams.{tname}.entries", repo_roles)
     return merged
+
+
+def with_repos(org: Org, roots: Collection[Path | str]) -> tuple[Org, list[str]]:
+    """The org a client sees (design §4.9 *The org is an aggregate*, TD-229): `org` — the org file —
+    plus the `teams:` of every checkout in `roots` (the host's repos registry), as each is checked
+    out. `ao team` and the pages both read this one function, so they cannot disagree.
+
+    A name two repos define is refused in both, each naming the other, and kept in `refused`: a
+    team's name keys its settings and its badge, and the later repo winning silently is how a start
+    would run the wrong team. The org file still wins a name over any repo (`shadowed`). A repo
+    whose `.agentorc.yml` cannot be read, or whose teams are refused, is skipped and named in the
+    returned notes — one broken file must not empty the page or `ao team list`."""
+    notes: list[str] = []
+    found: list[tuple[repoconfig.RepoConfig, dict[str, Any]]] = []
+    seen: set[Path] = set()
+    for root in roots:
+        where = Path(root).expanduser().resolve()
+        if where in seen:  # one checkout written twice (a trailing slash, a symlink) is one repo, not two
+            continue
+        seen.add(where)
+        try:
+            cfg = repoconfig.load(Path(root).expanduser())
+        except (OSError, ValueError) as e:
+            notes.append(f"{root}: {str(e).strip(chr(34))}")
+            continue
+        if cfg.teams and cfg.root:
+            found.append((cfg, dict(cfg.teams)))
+    by_name: dict[str, list[Path]] = {}
+    for cfg, teams in found:
+        for tname in teams:
+            by_name.setdefault(str(tname), []).append(Path(cfg.root) / repoconfig.FILE)
+    twice = {n: files for n, files in by_name.items() if len(files) > 1 and n not in org.teams}
+    for cfg, teams in found:
+        mine = {k: v for k, v in teams.items() if str(k) not in twice}
+        try:
+            org = merge_repo_teams(org, Path(cfg.root), mine, cfg.roles) if mine else org
+        except (OSError, ValueError) as e:
+            notes.append(f"{cfg.root}: {str(e).strip(chr(34))}")
+    if twice:
+        org = Org(
+            projects=org.projects,
+            teams=dict(org.teams),
+            roles=org.roles,
+            path=org.path,
+            shadowed=org.shadowed,
+            refused=dict(org.refused),
+        )
+        for n, files in twice.items():
+            org.refused[n] = (
+                f"team {n!r} is defined twice — in {' and in '.join(map(str, files))} — so neither starts: "
+                "a team's name is the org's; rename one (design §4.9 *Names are the org's*)"
+            )
+            notes.append(org.refused[n])
+    return org, notes
 
 
 # ── parsing ───────────────────────────────────────────────────────────────────────────────────

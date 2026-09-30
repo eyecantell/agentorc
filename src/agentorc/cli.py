@@ -553,7 +553,7 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
         return ""
     directory = pathlib.Path(args.dir or os.getcwd())
     try:
-        org = _org_here(directory)
+        org = _org_here()
     except ValueError as e:
         print(f"--team {name}: {e} — the badge alone", file=sys.stderr)
         return ""
@@ -674,9 +674,12 @@ def cmd_roles(args: argparse.Namespace) -> int:
 # ── ao team (design §4.9) ─────────────────────────────────────────────────────────────────────
 
 
-def _org_here(directory: pathlib.Path) -> orgmod.Org:
-    """`~/.agentorc/org.yml`, plus a repo's own `teams:` when the command is run inside one — the
-    org file wins a name collision (design §4.9). Read on every use and cached nowhere.
+def _org_here() -> orgmod.Org:
+    """The org as the clients aggregate it (design §4.9 *The org is an aggregate*, TD-229):
+    `~/.agentorc/org.yml` plus the `teams:` of every checkout in this host's repos registry — the
+    one function the pages read too (`orgmod.with_repos`), so `ao team` gives the same org from any
+    directory. A repo file that cannot be read, or a name two repos define, is a line on stderr.
+    Read on every use and cached nowhere.
 
     On a node the org is not here (design §4.4a: `org.yml` lives on the home), and a local file
     that disagreed with the home's would start a team the home knows nothing about."""
@@ -686,10 +689,9 @@ def _org_here(directory: pathlib.Path) -> orgmod.Org:
             f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
             "(design §4.4a: decided, not built)"
         )
-    o = orgmod.load()
-    cfg = repoconfig.discover(directory)
-    if cfg.teams and cfg.root:
-        o = orgmod.merge_repo_teams(o, cfg.root, cfg.teams, cfg.roles)
+    o, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos())
+    for note in notes:
+        print(note, file=sys.stderr)
     return o
 
 
@@ -700,9 +702,8 @@ def cmd_team_start(args: argparse.Namespace) -> int:
     refuses the whole start, so there is never half a team; an exited or closed holder is
     superseded, which makes this the restart too. What is left here is the terminal's half: the
     messages and the exit code."""
-    directory = pathlib.Path(args.dir or os.getcwd())
     try:
-        org = _org_here(directory)
+        org = _org_here()
     except ValueError as e:
         return fail(args, str(e), 1)
     try:
@@ -760,9 +761,8 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
     sends, `agentorc.teams.WRAPUP_PROMPT` — to each member, wait for each to go idle or the window
     to pass, then the lead. `--now` kills instead of asking. Both halves are `agentorc.teamrun`'s,
     shared with the Org page's strip; here they run in a row, because a terminal may wait."""
-    directory = pathlib.Path(args.dir or os.getcwd())
     try:
-        org = _org_here(directory)
+        org = _org_here()
         # A lead stopping its own team is the wind-down of §4.9a: same sequence, never typed at.
         st = teamrun.stop_members(call_sync, org, args.name, now=args.now, caller=os.environ.get("AGENTORC_SESSION"))
     except (teams.TeamError, ValueError) as e:
@@ -795,10 +795,9 @@ def cmd_team_status(args: argparse.Namespace) -> int:
     """`ao team status <name>` (design §4.9): the lead's Members view for a terminal — each session
     carrying the badge with its state, lane and report line, the lead first, and every name the
     definition expects that is not running said to be so."""
-    directory = pathlib.Path(args.dir or os.getcwd())
     org, expected = orgmod.Org(), []
     try:
-        org = _org_here(directory)
+        org = _org_here()
         # the names the definition would start; a definition that cannot start (a checkout gone,
         # say) is not an error here — status reads what is running, and says what is not
         plan = teams.plan(org, args.name, hosts.local_host().name, files=teamrun.files_via(call_sync))
@@ -834,18 +833,16 @@ def cmd_team_list(args: argparse.Namespace) -> int:
     """`ao team list` (design §4.9): every definition, its source file, and whether it is live — a
     team is live when any session carrying its badge is live. There is no team record: a team that
     is stopped is only its definition."""
-    directory = pathlib.Path(args.dir or os.getcwd())
     try:
-        org = _org_here(directory)
+        org = _org_here()
     except ValueError as e:
         return fail(args, str(e), 1)
     rows = teamrun.rows(org, call_sync("list"))
 
     def prose() -> None:
         if not rows:
-            print(f"no team defined in {org.path}" + (f" or {directory}/{repoconfig.FILE}" if directory else ""))
-            return
-        w = max(len(r["name"]) for r in rows)
+            print(f"no team defined in {org.path} or any registered checkout's {repoconfig.FILE}")
+        w = max((len(n) for n in [*(r["name"] for r in rows), *org.shadowed, *org.refused]), default=0)
         for r in rows:
             # *stopped* and *wound down* are different facts about a team (§4.9a, TD-053 step 6),
             # and the strip says which — so this does too, from the same rows, or the page and the
@@ -861,8 +858,15 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                 + f"members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
             )
+        # a repo's definition the org file's wins over, and a name two repos define (§4.9)
+        for name, files in org.shadowed.items():
+            for f in files:
+                print(f"{name:<{w}}  shadowed by {org.path.name if org.path else 'org.yml'}  [{f}]")
+        for name, why in org.refused.items():
+            print(f"{name:<{w}}  refused: {why}")
 
-    return emit(args, {"teams": rows}, prose)
+    shadowed = {n: [str(f) for f in fs] for n, fs in org.shadowed.items()}
+    return emit(args, {"teams": rows, "shadowed": shadowed, "refused": dict(org.refused)}, prose)
 
 
 def cmd_kill(args: argparse.Namespace) -> int:
@@ -1419,7 +1423,9 @@ def cmd_gate(args: argparse.Namespace) -> int:
 def _defined_team(args: argparse.Namespace) -> str:
     """The team `args.name` names, checked against the org's definitions here — the agent takes the
     key as given (design §4.7): a team the org does not define is refused, naming the defined ones."""
-    org = _org_here(pathlib.Path(args.dir or os.getcwd()))
+    org = _org_here()
+    if args.name in org.refused:  # two repos define it (§4.9 *Names are the org's*): say why, not "no team"
+        raise AgentError(org.refused[args.name])
     if args.name not in org.teams:
         raise AgentError(
             f"no team {args.name!r}: the org defines {', '.join(sorted(org.teams)) or 'none'} (design §4.9)"
@@ -2373,7 +2379,8 @@ def build_parser() -> argparse.ArgumentParser:
     def add_team(name: str, **kw: Any) -> argparse.ArgumentParser:
         q = tsub.add_parser(name, **kw)
         q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
-        q.add_argument("-d", "--dir", help="where a repo's own `teams:` is read from (default: cwd)")
+        # read by nothing since TD-229: the org is every registered checkout's (§4.9 *The org is an aggregate*)
+        q.add_argument("-d", "--dir", help=argparse.SUPPRESS)
         return q
 
     q = add_team("start", help="launch a team: every check first, then the lead, then its members")
