@@ -1999,8 +1999,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 except HTTPException as err:
                     ctx["gone"] = str(err.detail)
             return templates.TemplateResponse(request, "inbox_entry.html", ctx)
+        if ctx["entry"].get("handed_row"):
+            # a handed entry's one copy is its holder's, and `thread` reads the person inbox alone:
+            # its thread here is the person inbox's entries on its root — the seat's questions and
+            # the person's answers to them (§4.10 *An entry handed to a seat*)
+            th = {"entries": [e for e in got["entries"] if e.get("root") == mid], "pruned": False}
+        else:
+            th = None
         try:
-            th = await call("thread", msg=mid)
+            th = th or await call("thread", msg=mid)
         except HTTPException as err:
             # an older host agent has no `thread`: the entry still reads whole, the thread says why
             ctx["thread_error"] = str(err.detail)

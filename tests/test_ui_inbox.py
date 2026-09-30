@@ -1553,8 +1553,10 @@ def test_the_handed_row_reaches_the_page_its_own_page_and_the_org_count(tmp_path
         "usage": {},
         "gate": {},
         "host": {"host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {}},
-        "thread": {"entries": [], "pruned": False},
     }
+    # the seat's question on the entry's thread, in the person inbox; `thread` reads the person
+    # inbox alone and refuses the holder's copy's id, so the page must not ask it
+    inbox["entries"].append(entry("m-q1", "ask", from_="ao-agentorc-techlead-ao-1", root="m-h1", text="which board?"))
 
     class FakeClient:
         async def __aenter__(self):
@@ -1564,20 +1566,23 @@ def test_the_handed_row_reaches_the_page_its_own_page_and_the_org_count(tmp_path
             return False
 
         async def call(self, method, **params):
+            if method == "thread":
+                raise RuntimeError("the person inbox holds no entry")
             return answers[method]
 
     monkeypatch.setattr(uiapp, "LocalClient", FakeClient)
     with TestClient(uiapp.create_app()) as c:
         got = c.get("/api/person/inbox").json()
-        assert got["sections"]["waiting"] == ["m-h1"] and got["sections"]["needs"] == ["m-h2"]
-        assert got["needs"] == 1 and "waiting on techlead-ao-1" in got["html"]["waiting"]
+        assert got["sections"]["waiting"] == ["m-h1"] and sorted(got["sections"]["needs"]) == ["m-h2", "m-q1"]
+        assert got["needs"] == 2 and "waiting on techlead-ao-1" in got["html"]["waiting"]
         page = c.get("/inbox").text
         assert 'data-msg="m-h1"' in page and "entry · debt" in page
         one = c.get("/inbox/m-h1")
         assert one.status_code == 200 and "no longer in the person inbox" not in one.text
         assert "the Inbox hides a board item" in one.text
+        assert "the thread could not be read" not in one.text and 'data-msg="m-q1"' in one.text
         org = c.get("/")
-        assert org.status_code == 200 and 'id="personneeds">1<' in org.text
+        assert org.status_code == 200 and 'id="personneeds">2<' in org.text
 
 
 @pytest.mark.unit
