@@ -218,3 +218,57 @@ def test_a_host_record_that_cannot_be_read_is_empty(tmp_path):
     assert HostStore(p).load() == {"teams": {}}
     p.write_text(json.dumps({"teams": {"a": {"balance": {"since": "x"}}, "b": 3}}))
     assert HostStore(p).load() == {"teams": {"a": {"balance": {"since": "x"}}}}
+
+
+async def test_a_mark_is_saved_with_no_repo_and_a_repo_the_home_does_not_read_is_not_the_teams(
+    agent, tmp_path, monkeypatch
+):
+    """The review's findings on #772: a `review` crossing by members naming no registered repo is
+    still saved, a member's unregistered path neither crosses nor makes the reading unknown, and one
+    team's surprise costs the others nothing."""
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    async with LocalClient() as person:
+        await person.call(
+            "set_settings",
+            teams={
+                "grind": {"balance": {"review": True}},
+                "other": {"balance": {"prs": 1}},
+                "bad": {"balance": {"prs": 1}},
+            },
+        )
+        seat = await _member(person, tmp_path, "tl")
+        agent.sessions[seat].seat = {"trigger": "asks"}
+        waited = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+        monkeypatch.setattr(agent.sessions[seat], "prs_waiting", lambda home=None: {"n": 1, "oldest": waited})
+
+        o1 = await _member(person, tmp_path, "o1", team="other")
+        o2 = await _member(person, tmp_path, "o2", team="other")
+        agent.sessions[o1].repo = root
+        agent.sessions[o2].repo = "/elsewhere/not/registered"
+        agent._repos[root] = {"name": "repo", **_prs(3)}
+
+        b1 = await _member(person, tmp_path, "b1", team="bad")
+        agent.sessions[b1].review = "not a mapping"  # a record a hand could have broken
+
+        await agent._balance_marks(datetime.now(UTC))
+        saved = json.loads(paths.host_file().read_text())["teams"]
+        assert saved["grind"]["balance"]["repo"] == "" and saved["grind"]["balance"]["crossed"][0]["line"] == "review"
+        assert saved["other"]["balance"]["repo"] == root  # the unregistered path is not the team's repo
+        assert "bad" not in saved
+
+        # a new subscriber's snapshot carries the marks, as `repos` does
+        async with LocalClient() as sub:
+            import asyncio
+
+            got = []
+
+            async def listen():
+                async for ev in sub.subscribe():
+                    if ev.get("event") == "repos":
+                        got.append(ev)
+
+            listener = asyncio.create_task(listen())
+            await asyncio.sleep(0.3)
+            listener.cancel()
+        assert got and got[0]["repo"]["balance"] == {"other": saved["other"]["balance"]}

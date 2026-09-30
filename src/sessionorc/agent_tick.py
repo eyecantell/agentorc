@@ -1045,41 +1045,36 @@ class TickMixin:
 
     async def _balance_marks(self, now: datetime) -> None:
         """Design §6 *Balance* (TD-239): on every tick at the home, each team whose `teams.<team>.balance`
-        is set is read against the repo facts of the repos its live members name (`repo`) and the
-        reader's queue on its seats, and its mark — `balance: {since, repo, crossed}` on the home's
-        `host` record under the team's name — is written, kept (its `since` with it) or removed. A
-        reading that cannot be told leaves the mark as it stands; a team with no key, or with no live
-        member, has none. A change is saved and pushed as a `repos` event for each repo it touches."""
+        is set is read against the repo facts of the registered repos its live members name (`repo`)
+        and the reader's queue on its seats, and its mark — `balance: {since, repo, crossed}` on the
+        home's `host` record under the team's name — is written, kept (its `since` with it) or removed.
+        A reading that cannot be told leaves the mark as it stands; a team with no key, or with no live
+        member, has none. A change is saved, and pushed as a `repos` event for each repo it touches;
+        one team's surprise costs that team's reading this tick, never another's or the save."""
+        teams = self._host_rec.setdefault("teams", {})
         try:
             settings = settings_mod.teams(settings_mod.load())
-            live: dict[str, list[Session]] = {}
-            for r in self._graph().values():
-                if r.team and r.state not in ("exited", "closed") and not r.superseded_by:
-                    live.setdefault(r.team, []).append(r)
-            teams = self._host_rec.setdefault("teams", {})
-            touched: set[str] = set()
-            for team in sorted(set(teams) | set(settings)):
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
+            log.exception("reading the teams' settings for the balance failed")
+            return
+        if not teams and not any(v.get("balance") for v in settings.values()):
+            return
+        live: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team and r.state not in ("exited", "closed") and not r.superseded_by:
+                live.setdefault(r.team, []).append(r)
+        touched: set[str] = set()
+        dirty = False
+        for team in sorted(set(teams) | set(settings)):
+            try:
                 rec = teams.get(team) or {}
                 old = rec.get("balance")
-                bal = (settings.get(team) or {}).get("balance")
-                members = live.get(team) or []
-                if not bal or not members:
-                    new = None
-                else:
-                    roots = sorted({m.repo for m in members if m.repo})
-                    waiting = [w["oldest"] for m in members if m.seat and (w := m.prs_waiting(home=self.host))]
-                    bounds = [d for m in members if (d := balance_mod.span((m.review or {}).get("bound")))]
-                    got = balance_mod.crossed(
-                        bal, roots, self._repos, min(waiting) if waiting else None,
-                        min(bounds) if bounds else balance_mod.REVIEW_BOUND, now,
-                    )  # fmt: skip
-                    if got is None:
-                        continue  # could not look: the mark stands as it was, or stays absent
-                    crossed, repo = got
-                    since = old["since"] if isinstance(old, dict) and old.get("since") else now_iso()
-                    new = {"since": since, "repo": repo, "crossed": crossed} if crossed else None
+                new = self._balance_mark(old, (settings.get(team) or {}).get("balance"), live.get(team) or [], now)
+                if new is ...:
+                    continue  # could not look: the mark stands as it was, or stays absent
                 if new == old:
                     continue
+                dirty = True
                 touched |= {m["repo"] for m in (old, new) if isinstance(m, dict) and m.get("repo")}
                 if new is None:
                     rec.pop("balance", None)
@@ -1089,12 +1084,39 @@ class TickMixin:
                     teams[team] = rec
                 else:
                     teams.pop(team, None)
-            if touched:
-                self.host_store.save(self._host_rec)
-                for root in sorted(touched):
-                    await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
-        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
-            log.exception("reading the teams' balance failed")
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never the others'
+                log.exception("reading %s's balance failed", team)
+        if not dirty:
+            return
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+        for root in sorted(touched):
+            await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+
+    def _balance_mark(
+        self, old: Any, bal: dict[str, Any] | None, members: list[Session], now: datetime
+    ) -> dict[str, Any] | None | Any:
+        """One team's mark as it reads now (`_balance_marks`): None when it has none, `...` when it
+        cannot be told. The team's repos are the ones its live members name **that the home reads**
+        — a registry root (§6 *Balance*); a path the registry does not list is not the team's repo."""
+        if not bal or not members:
+            return None
+        roots = sorted({m.repo for m in members if m.repo and m.repo in self._repos})
+        waiting = [str(w["oldest"]) for m in members if m.seat and (w := m.prs_waiting(home=self.host))]
+        bounds = [d for m in members if (d := balance_mod.span((m.review or {}).get("bound")))]
+        got = balance_mod.crossed(
+            bal, roots, self._repos, min(waiting) if waiting else None,
+            min(bounds) if bounds else balance_mod.REVIEW_BOUND, now,
+        )  # fmt: skip
+        if got is None:
+            return ...
+        crossed, repo = got
+        if not crossed:
+            return None
+        since = old["since"] if isinstance(old, dict) and old.get("since") else now_iso()
+        return {"since": since, "repo": repo, "crossed": crossed}
 
     @staticmethod
     def _ledger_mtimes(roots: list[str]) -> dict[str, float | None]:
