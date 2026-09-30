@@ -36,6 +36,14 @@
   <section class="isec" id="sec-usage">
     <div class="row gap sechead"><span class="h2">Usage</span>{{ imark("usage", "Usage", info_usage) }}</div>
     {{ panel("usage", info_usage) }}
+    {#- **trust a reading for** (§4.5a *Settings page: Usage*, §6 *A reading the gate can no longer
+        trust*; TD-233): `usage.max_age`, one setting for every account -#}
+    <form class="card pad setcard" data-section="max_age" id="setmaxage">
+      <label class="setrow"><span class="setlabel">trust a reading for</span>
+        <input class="input setin" name="max_age" value="{{ max_age }}" placeholder="1h" autocomplete="off" spellcheck="false">
+        <span class="note">{% if max_age == "off" %}never project: an old reading is read as it is{% else %}past it, the gate projects each account's reading while unattended sessions work{% endif %}</span></label>
+      <div class="row gap wrap"><span class="note setsaid">an age, 90m or 2h · off never projects · empty for the hour · applies on the next tick</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+    </form>
     {% for g in usage_groups %}
       <div class="note setgroup">{{ g.account }}</div>
       {% for c in g.cards %}

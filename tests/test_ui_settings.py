@@ -120,6 +120,30 @@ def test_the_line_text_is_ao_gates():
     assert setmod.line_text({"line": None}, NOW) == "no line — the window reports no reset"
     assert setmod.line_text(None, NOW) == "no line"
     assert setmod.line_text({"line": 95, "pct": 99, "unknown": "reset"}, NOW).startswith("unknown since its reset")
+    # past `usage.max_age` (TD-233): the projection the gate reads, or why there is none
+    pr = {"line": 95, "pct": 96.0, "reserve": 5, "projected": {"from": 88, "rate": 1.3, "age": 21600}}
+    assert setmod.line_text(pr, NOW) == "→ line 95% · projected 96%"
+    assert setmod.line_text({"line": 95, "pct": 88, "reserve": 5, "unknown": "rate"}, NOW).endswith(
+        "no rate to project by"
+    )
+
+
+def test_trust_a_reading_for_writes_usage_max_age(client, subprocess_agent):
+    """§4.5a *Settings page: Usage* **trust a reading for** (TD-233): drawn at the hour until set,
+    written through `set_settings {usage}`, refused in place out of its bounds, empty clearing it."""
+    from sessionorc.client import call_sync
+
+    try:
+        assert 'id="setmaxage"' in (page := client.get("/settings").text) and 'name="max_age" value="1h"' in page
+        assert client.post("/api/settings/max_age", json={"max_age": "off"}).json()["ok"]
+        assert call_sync("settings")["usage"] == {"max_age": "off"}
+        page = client.get("/settings").text
+        assert 'name="max_age" value="off"' in page and "never project" in page
+        bad = client.post("/api/settings/max_age", json={"max_age": "2m"})
+        assert bad.status_code == 400 and "from 5m to 7d" in bad.json()["detail"]
+    finally:
+        assert client.post("/api/settings/max_age", json={"max_age": ""}).json()["ok"]
+    assert call_sync("settings")["usage"] == {"max_age": "1h"}
 
 
 @pytest.mark.unit

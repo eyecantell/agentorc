@@ -116,7 +116,8 @@ def spend_text(w: Mapping[str, Any] | None, unit: str = "") -> str:
 
 def line_text(row: Mapping[str, Any] | None, now: datetime | None = None) -> str:
     """The line a reserve makes today, as `ao gate` prints it and the chip will draw it: *→ line
-    70%*, *→ line 60% · 4 days left · moves Thu 07:00*, or why there is none."""
+    70%*, *→ line 60% · 4 days left · moves Thu 07:00*, or why there is none; past `usage.max_age`,
+    the projection the gate reads, *· projected 96%*, or *· no rate to project by*."""
     if not row:
         return "no line"
     if row.get("unknown") == "reset":
@@ -124,6 +125,11 @@ def line_text(row: Mapping[str, Any] | None, now: datetime | None = None) -> str
     if row.get("line") is None:
         return "no line — the window reports no reset"
     out = f"→ line {row['line']:g}%"
+    if isinstance(row.get("projected"), dict) and _is_num(row.get("pct")):
+        # past `usage.max_age` (§6 *A reading the gate can no longer trust*, TD-233): what the gate reads
+        out += f" · projected {row['pct']:g}%"
+    elif row.get("unknown") == "rate":
+        out += " · no rate to project by"
     r = row.get("reserve")
     resets = _when(row.get("resets"))
     if isinstance(r, dict) and resets:
