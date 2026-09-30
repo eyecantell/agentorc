@@ -272,11 +272,17 @@ def parse_max_age(value: Any) -> str:
     return f"{m.group(1)}{m.group(2) or 's'}"
 
 
+def _off(value: Any) -> Any:
+    """A hand-written `max_age: off` as YAML reads it, `False`, is the word `off` (the RPC keeps
+    refusing a boolean: only the file's own spelling is read this way)."""
+    return "off" if value is False else value
+
+
 def max_age(doc: dict[str, Any]) -> float | None:
     """The age in seconds past which the gate projects a reading, None under `off`. An unset or
     malformed value is the default hour: a hand edit's typo must not switch the projection off."""
     raw = doc.get("usage")
-    raw = raw.get("max_age") if isinstance(raw, dict) else None
+    raw = _off(raw.get("max_age")) if isinstance(raw, dict) else None
     try:
         kept = parse_max_age(MAX_AGE_DEFAULT if raw is None else raw)
     except ValueError:
@@ -290,7 +296,7 @@ def usage(doc: dict[str, Any]) -> dict[str, Any]:
     """The `usage:` key as kept: `{max_age}`, the default when unset or malformed."""
     raw = doc.get("usage")
     try:
-        return {"max_age": parse_max_age(raw["max_age"])} if isinstance(raw, dict) and "max_age" in raw else {}
+        return {"max_age": parse_max_age(_off(raw["max_age"]))} if isinstance(raw, dict) and "max_age" in raw else {}
     except ValueError:
         return {}
 

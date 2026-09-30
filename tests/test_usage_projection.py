@@ -67,6 +67,8 @@ def test_max_age_takes_an_age_or_off_and_the_reader_defaults_to_an_hour():
     assert settings.max_age({"usage": {"max_age": "90m"}}) == 5400.0
     assert settings.max_age({"usage": {"max_age": "off"}}) is None
     assert settings.max_age({"usage": {"max_age": "soon"}}) == 3600.0  # a typo never switches it off
+    assert settings.max_age({"usage": {"max_age": False}}) is None  # `max_age: off` as YAML reads it
+    assert settings.usage({"usage": {"max_age": False}}) == {"max_age": "off"}
     assert settings.parse_max_age("2h") == "2h" and settings.parse_max_age(600) == "600s"
     for bad in ("1m", "30d", "1.5h", True, None):
         with pytest.raises(ValueError):
@@ -96,7 +98,12 @@ async def test_a_projection_pauses_says_so_once_and_a_fresh_reading_under_the_li
         assert agent._profile_gated("", now)  # the same reader: no restart into the pause
         gate = (await person.call("gate"))["profiles"][""]
         assert gate["windows"][0]["projected"] and (await person.call("gate"))["max_age"] == "1h"
+        saves = []
+        real_save = agent.store.save
+        agent.store.save = lambda rec_: (saves.append(rec_.id), real_save(rec_))
         await agent._enforce_usage_gate(now + timedelta(minutes=1))
+        agent.store.save = real_save
+        assert saves == [] and rec.gated == g  # a minute on, the projection moved under a point: no rewrite
         assert len(_notes(agent, "pausing on a projection: no reading of Claude · paul for 6h")) == 1
         # a fresh reading under the line resumes, past RESUME_MIN
         later = now + RESUME_MIN + timedelta(seconds=5)

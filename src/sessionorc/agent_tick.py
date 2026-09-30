@@ -311,6 +311,14 @@ class TickMixin:
                     **({"team_extra": {"team": s.team, "n": extra}} if extra else {}),
                     **({"projected": over["projected"]} if over.get("projected") else {}),
                 }
+                was = s.gated or {}
+                if (
+                    was.get("projected")
+                    and mark.get("projected")
+                    and (was.get("label"), was.get("line")) == (mark["label"], mark["line"])
+                    and abs(float(was.get("pct") or 0) - float(mark["pct"] or 0)) < 1
+                ):
+                    mark = was  # a projection grows by the second: rewrite the mark only as it moves a point
                 if mark != s.gated:
                     if not s.gated:
                         log.info("%s paused by the usage gate: %s %s %s%% >= %s%%", s.id, s.profile,
