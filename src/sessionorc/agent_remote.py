@@ -476,10 +476,11 @@ class RemoteMixin:
         if s is None or not key.startswith(f"{s.adapter}:") or len(key) <= len(s.adapter) + 1:
             log.warning("a usage report from %s names no record of that host, or no account of it: dropped", host)
             return
+        windows = usage_mod.clean_windows(params.get("windows"))
+        if not windows or not any(r is s for r in self._usage_remote_live()):
+            return  # a report for a record that is no live tool session names no key
         self._usage_remote_keys[(host, s.profile)] = key  # before the merge, whose spread reads it
-        await self._usage_merge_report(
-            s, usage_mod.clean_windows(params.get("windows")), bool(params.get("fresh")), key
-        )
+        await self._usage_merge_report(s, windows, bool(params.get("fresh")), key)
 
     async def _take_derived(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
         """A node's tick derived reports for one of its records (§4.4a, step 4b.2): applied as this

@@ -315,7 +315,8 @@ class WakeMixin:
             return None
         key = key or _usage_key(ad, s.adapter, s.profile)[0]
         was = self._usage_acct.get(key)
-        if was is None and isinstance(self._usage.get(s.profile), dict):
+        # a node's profile may share its name with another login's here: its account starts clean
+        if was is None and self.sessions.get(s.id) is s and isinstance(self._usage.get(s.profile), dict):
             was = {k: v for k, v in self._usage[s.profile].items() if k not in ("account", "tool")}
         merged = usage_mod.merge(was, cleaned, at=now_iso(), source="reported", fresh=fresh, by=s.name)
         if merged != was:

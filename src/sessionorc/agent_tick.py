@@ -1574,6 +1574,21 @@ class TickMixin:
             if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
         ]
 
+    def _usage_theirs(self, here: set[str]) -> list[tuple[Session, str]]:
+        """The nodes' live sessions this home shows, each with the account key its node reported it
+        under, for the poll and the spread alike. A reading is per profile and the chip per account,
+        so one profile carries one account's: a profile a session here runs under (`here`) is this
+        host's own, and one two nodes key to two accounts goes to the first by host, never to both,
+        or the reading would flip between them on every pass."""
+        claimed: dict[str, str] = {}
+        out: list[tuple[Session, str]] = []
+        for s in sorted(self._usage_remote_live(), key=lambda r: (r.host, r.id)):
+            key = self._usage_remote_keys.get((s.host, s.profile))
+            if s.profile in here or key is None or claimed.setdefault(s.profile, key) != key:
+                continue
+            out.append((s, key))
+        return out
+
     async def _refresh_usage_inner(self) -> None:
         live = self._usage_live()
         # A metered profile is never polled (§4.2a): its reading is the spend pass's sum, and the cap
@@ -1597,13 +1612,12 @@ class TickMixin:
             meta.setdefault(key, {"account": account, "tool": str(getattr(ad, "label", "") or s.adapter)})
             ask.setdefault(key, (fn, s.profile))
         # a node's session is kept and shown while its node reports it, and never asked for here;
-        # a profile a live session here runs under is this host's own reading, so one profile
-        # never carries two accounts' (the chip is per account, the reading per profile)
-        here = {s.profile for s in live}
-        for s in self._usage_remote_live():
+        # the key of a node's profile no live session of that node runs under any more is forgotten
+        remote_live = {(s.host, s.profile) for s in self._usage_remote_live()}
+        for pair in [p for p in self._usage_remote_keys if p not in remote_live]:
+            del self._usage_remote_keys[pair]
+        for s, key in self._usage_theirs({s.profile for s in live}):
             ad = adapters.get(s.adapter)
-            if s.profile in here or (key := self._usage_remote_keys.get((s.host, s.profile))) is None:
-                continue
             account = key.split(":", 1)[1]
             profs = groups.setdefault(key, [])
             if s.profile not in profs:
@@ -1702,12 +1716,7 @@ class TickMixin:
             for s in self._usage_live()
             if getattr(ad := adapters.get(s.adapter), "usage_for", None)
         ]
-        here = {s.profile for s, _ in mine}
-        theirs = [  # a node's, where no session here runs under the profile (`_refresh_usage_inner`)
-            (s, (k, k.split(":", 1)[1]))
-            for s in self._usage_remote_live()
-            if s.profile not in here and (k := self._usage_remote_keys.get((s.host, s.profile)))
-        ]
+        theirs = [(s, (k, k.split(":", 1)[1])) for s, k in self._usage_theirs({s.profile for s in self._usage_live()})]
         for s, (k, account) in [*mine, *theirs]:
             if k != key:
                 continue
@@ -1737,7 +1746,13 @@ class TickMixin:
         poll's allowance, from the newest reading its profiles hold (TD-087, TD-122): a restart
         keeps the chip and does not ask sooner than `fetched + USAGE_FRESH`. A reading with no
         readable time is polled at once."""
-        held = [self._usage[p] for p in profs if isinstance(self._usage.get(p), dict)]
+        # only a reading of this account: a node's profile can change hands between two accounts
+        account = key.split(":", 1)[-1]
+        held = [
+            r
+            for p in profs
+            if isinstance(r := self._usage.get(p), dict) and str(r.get("account") or account) == account
+        ]
         if key not in self._usage_acct and held:
             newest = max(held, key=lambda r: str(r.get("fetched") or ""))
             self._usage_acct[key] = {k: v for k, v in newest.items() if k not in ("account", "tool")}

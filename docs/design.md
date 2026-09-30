@@ -788,7 +788,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
     account of that record's adapter, and remembers it per node and profile. The home merges
     the report as its own sessions' and shows the account while that session lives, never
     asking the endpoint for it; a profile a session at the home runs under keeps the home's own
-    account's reading, since a reading is per profile. The home holds the account's reading and
+    account's reading, and one two nodes key to two accounts shows the first node's by name,
+    since a reading is per profile; a node's key is forgotten once no live session of that node
+    runs under the profile, and a report for a record that is no live tool session sets none. The home holds the account's reading and
     sends it to the nodes as it sends the metered sums (not built: a node reads its own).
   - **The endpoint is the fallback, on demand**: asked only when an account a live session's
     profile names has no reading younger than `USAGE_FRESH` (fifteen minutes), at most once

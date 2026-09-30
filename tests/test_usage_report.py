@@ -265,3 +265,28 @@ async def test_the_home_shows_a_nodes_report_under_the_nodes_account_and_never_a
     agent._take_records("laptop", [node_record(state="exited")], whole=False)
     await agent._refresh_usage_inner()
     assert "pn" not in agent._usage and "hookstub:laptop-paul" not in agent._usage_acct
+
+
+async def test_two_nodes_keying_one_profile_to_two_accounts_show_one_and_never_flip(agent, hookstub, monkeypatch):
+    """The review of the node's report: a profile two nodes key to two accounts goes to the first by
+    host, and stays there pass after pass; a report for a record that is no live tool session sets no
+    key; a node's key is forgotten once no live session of that node runs under the profile."""
+    monkeypatch.setattr(hookstub, "usage_asked", [])
+    hookstub.usage_value = None
+    agent._take_records("desk", [node_record("ao-d-w", host="desk")], whole=True)
+    agent._take_records("laptop", [node_record(), node_record("ao-x-z", name="nz", state="exited")], whole=True)
+    await agent._take_usage_report("laptop", {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 20.0)]})
+    await agent._take_usage_report("desk", {"id": "ao-d-w", "account": "hookstub:alice", "windows": [w("5h", 50.0)]})
+    # an exited record's report names no key, whatever it says
+    await agent._take_usage_report("laptop", {"id": "ao-x-z", "account": "hookstub:carol", "windows": [w("5h", 9.0)]})
+    assert ("laptop", "pn") in agent._usage_remote_keys and agent._usage_remote_keys[("laptop", "pn")] == "hookstub:bob"
+    for _ in range(3):
+        await agent._refresh_usage_inner()
+        assert agent._usage["pn"]["account"] == "alice" and pcts(agent._usage["pn"]) == {"5h": 50.0}
+    assert hookstub.usage_asked == []
+
+    agent._take_records("desk", [node_record("ao-d-w", host="desk", state="exited")], whole=False)
+    await agent._refresh_usage_inner()
+    assert ("desk", "pn") not in agent._usage_remote_keys
+    await agent._take_usage_report("laptop", {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 21.0)]})
+    assert agent._usage["pn"]["account"] == "bob" and pcts(agent._usage["pn"]) == {"5h": 21.0}
