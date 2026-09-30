@@ -11,6 +11,7 @@ teams:
     manager: {role: manager, name: manager-ao-1}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # optional: the go-between (§4.9b)
     seats: [{name: docs-audit-ao-1, role: auditor, trigger: {prs: 10}}]   # optional: seats with a trigger (§4.9b)
+    entries: {feature: designer}      # optional: the role Add entry's session takes, per Type (§4.9)
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
@@ -33,6 +34,7 @@ it — it stores `team` and `project` as two plain strings on the record and not
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -139,6 +141,13 @@ class TeamDef:
     seats: list[SeatDef] = field(default_factory=list)  # seats with a trigger (§4.9b, TD-098)
     source: Path | None = None  # the file it was read from (`ao team list` names it)
     host: str = ""  # where every session lands (design §4.4a "Teams across hosts"); "" is the host the start runs on
+    # the role a person's entry session takes, per Type (design §4.9 *Add an entry to the ledger*, TD-219):
+    # only the keys the definition says; `entry_role` reads a missing one as the techlead
+    entries: dict[str, str] = field(default_factory=dict)
+
+    def entry_role(self, type_: str) -> str:
+        """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
+        return self.entries.get(type_, TECHLEAD_ROLE)
 
 
 @dataclass
@@ -188,13 +197,18 @@ def load(path: Path | None = None) -> Org:
         # the file is read, never a preset that silently gains a key nothing reads
         org.roles[str(rname)] = repoconfig._role_block(str(rname), raw, f"{label}: roles")
     _validate(org, label)
+    for team in org.teams.values():
+        _entries_resolve(org, team, f"{label}: teams.{team.name}.entries", ())
     return org
 
 
-def merge_repo_teams(org: Org, repo_root: Path, repo_teams: dict[str, Any] | None) -> Org:
+def merge_repo_teams(
+    org: Org, repo_root: Path, repo_teams: dict[str, Any] | None, repo_roles: Collection[str] = ()
+) -> Org:
     """Fold a repo's `.agentorc.yml` `teams:` into the org (design §4.9): each is a team whose only
     project is that repo, so a repo can ship its own grind team beside its code. The org file wins
     a name collision; each definition keeps its `source`. Returns a new Org; `org` is untouched.
+    `repo_roles` names the roles the repo's own file defines, which its teams' `entries:` may name.
 
     The repo's project is the checkout's directory name, on this host at `repo_root`; an org
     project of that name is used as it stands."""
@@ -214,6 +228,10 @@ def merge_repo_teams(org: Org, repo_root: Path, repo_teams: dict[str, Any] | Non
         raw.setdefault("projects", [rname])
         merged.teams[tname] = _team(tname, raw, f"{label}: teams.{tname}", source=source)
     _validate(merged, label)
+    for tname in teams:  # only the teams this repo adds: each is checked once, against its own repo's roles
+        team = merged.teams[str(tname)]
+        if team.source == source:
+            _entries_resolve(merged, team, f"{label}: teams.{tname}.entries", repo_roles)
     return merged
 
 
@@ -290,7 +308,9 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
 MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
-TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host")
+TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host", "entries")
+# the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
+ENTRY_TYPES = ("debt", "feature")
 TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
 SEAT_KEYS = ("name", "role", "trigger", "brief", "profile", "home")
@@ -368,7 +388,28 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         seats=_seats(name, raw.get("seats"), f"{key}.seats"),
         source=source,
         host=_str(raw.get("host"), f"{key}.host"),
+        entries=_entries(raw.get("entries"), f"{key}.entries"),
     )
+
+
+def _entries(raw: Any, key: str) -> dict[str, str]:
+    """`entries: {feature: <role>, debt: <role>}` (design §4.9, TD-219): either key optional; an
+    unknown key is refused naming it, and so is a value that is not a role name. Whether the role
+    resolves is `_validate`'s, which knows the org's roles."""
+    raw = _mapping(raw, key)
+    stray = sorted(str(k) for k in raw if k not in ENTRY_TYPES)
+    if stray:
+        raise ValueError(f"{key}: unknown key(s) {stray}; known: {list(ENTRY_TYPES)} (the ledger's Type)")
+    out: dict[str, str] = {}
+    for t in ENTRY_TYPES:
+        if t in raw:
+            role = _str(raw[t], f"{key}.{t}")
+            if not role:
+                raise ValueError(f"{key}.{t}: a role name, e.g. `techlead`")
+            if role == PERSON:
+                raise ValueError(f"{key}.{t}: {PERSON!r} is not a role a session takes")
+            out[t] = role
+    return out
 
 
 def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
@@ -470,6 +511,16 @@ def _validate(org: Org, label: str) -> None:
                 continue
             m.home = _home(m.home, repos, f"{mkey}.home")
     _no_cycles(org, label)
+
+
+def _entries_resolve(org: Org, team: TeamDef, key: str, repo_roles: Collection[str]) -> None:
+    """Each role `entries:` names resolves (design §4.9, TD-219): a built-in preset, the org's
+    `roles:`, a role the repo's own file defines, or one the team's own definition starts."""
+    known = [*repoconfig.PRESETS, *org.roles, *repo_roles]
+    known += [m.role for m in team.members if m.team is None and m.role] + [s.role for s in team.seats]
+    for t, role in team.entries.items():
+        if role not in known:
+            raise ValueError(f"{key}.{t}: unknown role {role!r}; known: {', '.join(dict.fromkeys(known))}")
 
 
 def _home(home: str, repos: list[str], key: str) -> str:
