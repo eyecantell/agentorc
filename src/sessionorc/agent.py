@@ -39,6 +39,7 @@ from sessionorc import (
     naming,
     paths,
 )
+from sessionorc import balance as balance_mod
 from sessionorc import spend as spend_mod
 from sessionorc.agent_attention import AttentionMixin
 from sessionorc.agent_common import (  # re-exported: callers and tests read these from the agent
@@ -1702,7 +1703,10 @@ class HostAgent(
                 f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none, restart"
             )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
-        holder = self._lease_holder(s, entry) if status == "claimed" and entry.source == "declared" else None
+        new_claim = status == "claimed" and entry.source == "declared"
+        if new_claim and (words := self._balance_refusal(s, entry.ref)):
+            raise RpcError(words, balance=self._balance_of(s))
+        holder = self._lease_holder(s, entry) if new_claim else None
         if holder is not None and not force:
             raise RpcError(
                 f"{entry.ref} is claimed by {holder['session']} since {holder['at']} (a lease, design §4.8): pick "
@@ -1715,6 +1719,8 @@ class HostAgent(
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
             s.out_of_work = s.restart_wanted = None
             s.lane_seen = None  # rule 6's memory goes with the declaration it was about (TD-195)
+            if s.balance_refused and not self._balance_of(s):
+                s.balance_refused = None  # the line cleared and the member claimed: nothing left to ring
         if applied and status == "dropped" and entry.source == "declared" and mail.is_person(caller):
             # §4.5a *Reports* → Drop, §4.10 (TD-150 slice 3): the session is told its lease went, by a
             # `system` note that wakes it as a person's act does — else it works on, holding nothing
@@ -1728,6 +1734,34 @@ class HostAgent(
         if holder is not None and applied:
             out["lease_overridden"] = holder
         return out
+
+    def _balance_of(self, s: Session) -> dict[str, Any] | None:
+        """The balance mark of `s`'s team if `s` is one it refuses (design §6 *Balance*, TD-239): an
+        unattended record that is no seat, on a team the home's `host` record marks — read there by
+        team, never from a repo's reading, since a `review` crossing may name no repo. None at a node,
+        whose `host` record carries no mark: a claim made there is not checked (§6)."""
+        if not s.team or not s.unattended or s.seat is not None:
+            return None
+        mark = ((self._host_rec.get("teams") or {}).get(s.team) or {}).get("balance")
+        return mark if isinstance(mark, dict) and mark.get("crossed") else None
+
+    def _balance_refusal(self, s: Session, ref: str | None) -> str | None:
+        """The words refusing `s` a new claim on `ref` — or, with `ref` None, its `none` — while its
+        team is over its line; None when it passes. A renewal (a claim `s` already holds on `ref`, its
+        branch's derived one included: the work is in hand) and
+        a pull request as the reference pass: finishing one is what brings the count down. A refusal
+        is kept on the record (`balance_refused`) so the clearing can ring it."""
+        mark = self._balance_of(s)
+        if mark is None:
+            return None
+        if ref is not None:
+            if ref.startswith("#"):
+                return None
+            if any(e.ref == ref and e.status == "claimed" for e in s.progress):  # declared or from its branch
+                return None
+        s.balance_refused = {"at": now_iso(), "ref": ref}
+        self._save(s)
+        return balance_mod.refusal(s.team, mark)
 
     def _lease_holder(self, s: Session, entry: ProgressEntry) -> dict[str, str] | None:
         """The other live record holding an unexpired declared claim on `entry.ref`, if any. Read and
@@ -1797,8 +1831,12 @@ class HostAgent(
                 f"{s.id} already {said} (since {getattr(s, other)['at']}): a session is out of work or it wants "
                 "another run at it, never both — claim something to take that back (design §4.9a)"
             )
+        if status == "none" and (words := self._balance_refusal(s, None)):
+            # a member refused a claim is not out of work (§6 *Balance*): its team idles, never winds down
+            raise RpcError(words, balance=self._balance_of(s))
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
+            s.balance_refused = None  # taken, so the mark has gone: nothing left to ring
             s.lane_seen = None  # a second `none` is a declaration like the first: the tick looks afresh
         else:
             # The word stands whenever it is said — it is the session's — but one said inside

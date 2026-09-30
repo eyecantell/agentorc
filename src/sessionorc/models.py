@@ -116,6 +116,7 @@ HOME_OWNED = frozenset(
         "findings",
         "out_of_work",
         "lane_seen",
+        "balance_refused",
         "restart_wanted",
         "suspended",
         "doing",
@@ -842,6 +843,11 @@ class Session:
     # declaration, then each new one as a `system` note names it (design §6 rule 6, TD-195), so an
     # entry is told once. The home's; cleared wherever `out_of_work` is set or cleared.
     lane_seen: dict[str, Any] | None = None
+    # `{at, ref}` once a claim of this record's was refused because its team is over its line
+    # (design §6 *Balance*, TD-239) — `ref` None for a refused `ao progress none` — so the mark's
+    # clearing can ring it; while the mark stands, the idle nudge and rule 6's telling pass it by.
+    # The home's; a later claim that is taken removes it.
+    balance_refused: dict[str, Any] | None = None
     # `{at, why, early?}` once the session has declared that **its run is over and its lane is
     # not** (`ao progress restart --why`, design §4.9a *A run that ends with work left*, TD-083):
     # start me again, under this name and this brief, with nothing of this conversation. A fact,
