@@ -511,9 +511,9 @@ class WakeMixin:
           which clears that window's reserve. A label the profile's adapter does not report is
           refused, with the reported ones named — except before the profile has any reading, when
           nothing can be checked and the reply says `unchecked`.
-        - `teams`: `{team: {schedule?, until?, reserve?, balance?} | None}` — a field set to None is cleared, a
-          team set to None removed. The team's name is the client's to check against the org's
-          definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
+        - `teams`: `{team: {schedule?, until?, reserve?, balance?, on_work?} | None}` — a field set to
+          None is cleared, a team set to None removed. The team's name is the client's to check
+          against the org's definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
         - `repos`: `{repo: {promote: {auto: bool}} | None}`.
         - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?}}`, a None
           clearing that key (or that field of terminal or inbox).
@@ -593,6 +593,45 @@ class WakeMixin:
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
         return out
+
+    async def rpc_clear_work(self, team: str = "", caller: Any = None) -> dict[str, Any]:
+        """Dismiss's half of the **Inbox row: team start** (design §6 rule 8, §4.5a, TD-227): the ids
+        of the team's `work_waiting` are added to each named member's `lane_seen`, so those entries
+        do not ask again and a later one does, and the mark is removed. A person's own, refused to a
+        session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`). `{team, cleared,
+        ids}`: `cleared` false when no work was waiting."""
+        if not mail.is_person(caller):
+            raise RpcError("clear_work is a person's own: refused to a session (design §6 rule 8)")
+        if self.mode != "home":
+            raise RpcError("clear_work runs at the home (design §6 rule 8): this host is a node")
+        team = str(team or "").strip()
+        if not team:
+            raise RpcError("clear_work needs the team whose work to dismiss")
+        teams = self._host_rec.get("teams") or {}
+        rec = teams.get(team) or {}
+        mark = rec.get("work_waiting")
+        if not isinstance(mark, dict):
+            return {"team": team, "cleared": False, "ids": []}
+        named = mark.get("members") if isinstance(mark.get("members"), dict) else {}
+        for r in self._graph().values():
+            ids = named.get(r.name)
+            if r.team != team or r.superseded_by or r.lane_seen is None or not isinstance(ids, list):
+                continue
+            held = list(r.lane_seen.get("ids") or [])
+            if add := [str(i) for i in ids if str(i) not in held]:
+                r.lane_seen = {"at": now_iso(), "ids": [*held, *add]}
+                self._save(r)
+        rec.pop("work_waiting", None)
+        if not rec:
+            teams.pop(team, None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+        await self._push_changes()
+        ids = sorted({str(i) for v in named.values() if isinstance(v, list) for i in v})
+        log.info("rule 8: %s's work waiting dismissed by the person: %s", team, ", ".join(ids))
+        return {"team": team, "cleared": True, "ids": ids}
 
     def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any) -> dict[str, Any]:
         """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file)."""

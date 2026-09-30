@@ -44,6 +44,7 @@ HOME_EDITS = frozenset(
         "clear_promote",
         "set_settings",
         "entry_add",
+        "clear_work",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the

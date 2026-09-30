@@ -303,7 +303,8 @@ def usage(doc: dict[str, Any]) -> dict[str, Any]:
 
 # -- teams, repos, person (§5, TD-146) -------------------------------------------------------------
 
-TEAM_KEYS = ("schedule", "until", "reserve", "balance")
+TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work")
+ON_WORK = ("ask", "start", "off")  # §6 rule 8: what a wound-down team whose lanes gained work does; `ask` when absent
 BALANCE_KEYS = ("prs", "oldest", "review")
 TERMINAL_KEYS = ("size", "face", "copy_on_select")
 TERMINAL_SIZE = (8, 32)  # a readable monospace size in px, either way of the Focus pane's default 13
@@ -331,7 +332,8 @@ def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
 
 
 def teams(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """`teams:` as `{team: {schedule?, until?, reserve?, balance?}}` — each field that is not valid dropped."""
+    """`teams:` as `{team: {schedule?, until?, reserve?, balance?, on_work?}}` — each field that is not
+    valid dropped."""
     return _keyed(doc, "teams", parse_team)
 
 
@@ -395,15 +397,27 @@ def instant(value: Any) -> str:
 def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
     """One team's settings: `schedule` (TD-133's rule, a mapping kept as written until that build
     reads it), `until` (an instant, §6 *Team stop time*) and `reserve` (a flat percent added to the
-    profile's reserve for the team's sessions, §6 *Usage gate*) and `balance` (§6 *Balance*)."""
+    profile's reserve for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*) and
+    `on_work` (§6 rule 8: `ask`, `start` or `off`)."""
 
     def schedule(v: Any) -> dict[str, Any]:
         if not isinstance(v, dict) or not v:
             raise ValueError(f"schedule is a mapping (§6 *Schedule*), not {v!r}")
         return dict(v)
 
+    def on_work(v: Any) -> str:
+        if v not in ON_WORK:
+            raise ValueError(f"on_work is ask, start or off (§6 rule 8), not {v!r}")
+        return str(v)
+
     value = _fields(value, TEAM_KEYS, "a team's settings", drop)
-    checks = {"schedule": schedule, "until": instant, "reserve": _pct, "balance": lambda v: parse_balance(v, drop)}
+    checks = {
+        "schedule": schedule,
+        "until": instant,
+        "reserve": _pct,
+        "balance": lambda v: parse_balance(v, drop),
+        "on_work": on_work,
+    }
     return _each(value, checks, drop)
 
 
