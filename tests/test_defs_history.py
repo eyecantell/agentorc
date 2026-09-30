@@ -43,6 +43,18 @@ def test_init_tracks_the_three_files_and_ignores_the_rest(tmp_path):
     assert defs.commit("edited by hand", home=home) is False, "nothing changed: no commit"
 
 
+def test_a_gitignore_of_the_persons_own_is_kept_and_the_three_let_in(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".gitignore").write_text("*.bak\n")
+    (home / "org.yml").write_text("teams: {}\n")
+    (home / "org.yml.bak-1").write_text("x\n")
+    (home / "hosts.yml").write_text("a: 1\n")
+    defs.init(home)
+    assert (home / ".gitignore").read_text().startswith("*.bak\n")
+    assert _tracked(home) == {".gitignore", "org.yml"}
+
+
 def test_a_half_written_file_waits_until_it_parses(tmp_path):
     home = tmp_path / "home"
     home.mkdir()

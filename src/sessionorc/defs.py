@@ -50,8 +50,12 @@ def init(home: Path | None = None) -> bool:
     if cp.returncode != 0:
         raise RuntimeError(cp.stderr.strip() or "git init failed")
     ignore = home / ".gitignore"
-    if not ignore.exists():
+    have = ignore.read_text(encoding="utf-8") if ignore.exists() else ""
+    if not have:
         ignore.write_text(IGNORE, encoding="utf-8")
+    elif missing := [line for line in IGNORE.splitlines()[1:] if line not in have.splitlines()]:
+        # a file of the person's own keeps its lines; the three are let back in after them
+        ignore.write_text(have.rstrip("\n") + "\n" + "\n".join(missing) + "\n", encoding="utf-8")
     commit("the home's definitions, first tracked", home=home, files=(".gitignore", *TRACKED))
     return True
 

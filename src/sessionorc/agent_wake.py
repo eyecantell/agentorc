@@ -594,8 +594,8 @@ class WakeMixin:
                 )
         held = [k for k in ("usage_gate", "usage", "teams", "repos", "person") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
-        await self._commit_defs(defs.settings_message(before, doc), ("settings.yml",))
         await self._push_settings()
+        await self._commit_defs(defs.settings_message(before, doc), ("settings.yml",))  # a slow git delays no node
         return out
 
     async def rpc_commit_defs(self, message: str = "", caller: Any = None) -> dict[str, Any]:
