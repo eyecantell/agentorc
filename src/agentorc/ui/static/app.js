@@ -826,9 +826,12 @@
     const row = (Array.isArray(lines) ? lines : []).find((r) => r && typeof r === "object" && r.label === w.label);
     return row && typeof row.line === "number" ? row : null;
   }
+  // The projection the gate reads for a window (§6, TD-233): the row's `pct` when it is `projected`.
+  const projectedOf = (row) => (row && row.projected && typeof row.projected === "object" && !Array.isArray(row.projected) && typeof row.pct === "number" ? row.pct : null);
   function usageHover(w, row) {
     if (!row) return `${w.label} ${w.pct}% (resets ${w.resets || "?"})`;
-    return `${w.label} ${w.pct}% / line ${row.line}% (${reserveWhy(row)}; resets ${w.resets || "?"})`;
+    const pr = projectedOf(row);
+    return `${w.label} ${w.pct}%${pr !== null ? `, projected ${pr}%` : ""} / line ${row.line}% (${reserveWhy(row)}; resets ${w.resets || "?"})`;
   }
   // A line's reserve, the days left a per-day reserve counts, and when the line next moves — the
   // account's lowest line and each profile's own alike (TD-100, TD-122).
@@ -934,24 +937,29 @@
     // a window past its reset is unknown until read again — never zero, never a cap (§4.4)
     const gone = new Set(windows.filter((w) => { const r = instant(w.resets); return r !== null && r <= now; }));
     // worst = the smallest gap to its line, the tool's 100% where the profile has no reserve (§4.5a, TD-100)
-    const gap = ([w, r]) => (r ? r.line : 100) - w.pct;
-    const ws = windows.map((w) => [w, usageLine(w, u.lines)]).sort((a, b) => (gone.has(a[0]) - gone.has(b[0])) || gap(a) - gap(b) || b[0].pct - a[0].pct);
+    // the number the gate reads: the projection while it projects (§6, TD-233), else the reading
+    const shown = ([w, r]) => { const pr = projectedOf(r); return pr === null ? w.pct : pr; };
+    const gap = (x) => (x[1] ? x[1].line : 100) - shown(x);
+    const ws = windows.map((w) => [w, usageLine(w, u.lines)]).sort((a, b) => (gone.has(a[0]) - gone.has(b[0])) || gap(a) - gap(b) || shown(b) - shown(a));
     const [worst, row] = ws[0];
+    const projected = gone.has(worst) ? null : projectedOf(row);
     const parts = ws.map(([w, r]) => gone.has(w) ? `${w.label} unknown since its reset at ${usageClock(instant(w.resets), now)} (was ${w.pct}%)` : usageHover(w, r));
     let title = [...(read ? [`read at ${read.clock}, ${read.age} ago, ${read.source}`] : []), ...(why ? [why] : []), parts.join(" · ")].join(". ");
     if (sharing) title += `. ${sharing}`;
-    if (gone.has(worst) || (read && read.secs > USAGE_UNKNOWN)) {
+    if (gone.has(worst) || (projected === null && read && read.secs > USAGE_UNKNOWN)) {
       // the number is no longer offered as the account's (§4.5a *The age*); it stays on the hover
       const since = gone.has(worst) ? instant(worst.resets) : at;
       return { text: `${profile} · ${worst.label} unknown since ${usageClock(since, now)} (was ${worst.pct}%)`, title, pct: 0, cls: "unknown", near: false };
     }
-    const near = worst.pct >= 100 || (row ? worst.pct >= row.line - 10 : worst.pct >= NEAR_CAP);
-    let cls = worst.pct >= 100 ? "cap" : near ? "near" : "";
+    const n = shown([worst, row]);
+    const near = n >= 100 || (row ? n >= row.line - 10 : n >= NEAR_CAP);
+    let cls = n >= 100 ? "cap" : near ? "near" : "";
     let text = `${profile} · ${worst.label} ${worst.pct}%`;  // *Claude · paul · week 24%* (TD-122)
-    if (row) text += ` / ${row.line}%`;  // *grind · week 61% / 70%* (TD-100)
+    if (row && projected === null) text += ` / ${row.line}%`;  // *grind · week 61% / 70%* (TD-100)
     if (read && read.secs > USAGE_AGED) text += ` · ${read.age}`;  // *Claude · paul · week 88% · 6h* (TD-230)
+    if (row && projected !== null) text += ` · projected ${projected}% / ${row.line}%`;  // *week 88% · 2h · projected 96% / 95%* (TD-233)
     if (read && read.secs > USAGE_FRESH) cls = (cls + " old").trim();  // still red at a cap
-    return { text, title, pct: worst.pct, cls, near };
+    return { text, title, pct: n, cls, near };
   };
   function onUsage(ev) {
     const chip = $("#usagechip"); if (!chip) return;

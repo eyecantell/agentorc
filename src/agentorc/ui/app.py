@@ -93,6 +93,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _look_for,  # noqa: F401
     _metered_chip,  # noqa: F401
     _money,  # noqa: F401
+    _projected,  # noqa: F401
     _reserve_why,  # noqa: F401
     _short_age,  # noqa: F401
     _str_list,  # noqa: F401

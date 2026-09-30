@@ -451,6 +451,19 @@ USAGE_CASES = {
                    "fetched": "2026-09-20T18:00:00Z", "reason": "ok"},
     "all_reset": {"windows": [{"label": "5h", "pct": 97, "resets": "2026-09-20T19:00:00Z"}],
                   "fetched": "2026-09-20T18:00:00Z", "reason": "ok"},
+    # the gate projecting (§6 *A reading the gate can no longer trust*, TD-233): the projection is shown
+    "projected": {"windows": [{"label": "week", "pct": 88, "resets": "2026-09-25T00:00:00Z"},
+                              {"label": "5h", "pct": 50, "resets": "2026-09-20T21:00:00Z"}],
+                  "fetched": "2026-09-20T14:00:00Z", "reason": "ok",
+                  "lines": [{"label": "week", "pct": 96.0, "line": 95, "next": None, "reserve": 5,
+                             "projected": {"from": 88, "rate": 1.33, "age": 21780}}]},
+    "projected_under": {"windows": [{"label": "week", "pct": 60, "resets": "2026-09-25T00:00:00Z"}],
+                        "fetched": "2026-09-20T18:00:00Z", "reason": "ok",
+                        "lines": [{"label": "week", "pct": 62.5, "line": 95, "next": None, "reserve": 5,
+                                   "projected": {"from": 60, "rate": 1.2, "age": 7380}}]},
+    "no_rate": {"windows": [{"label": "week", "pct": 60, "resets": "2026-09-25T00:00:00Z"}],
+                "fetched": "2026-09-20T18:00:00Z", "reason": "ok",
+                "lines": [{"label": "week", "pct": 60, "line": 95, "next": None, "reserve": 5, "unknown": "rate"}]},
 }  # fmt: skip
 USAGE_NOW = datetime(2026, 9, 20, 20, 3, tzinfo=UTC)  # three minutes after `fresh` was read
 
@@ -545,6 +558,22 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
         "gone": None,
     }
     assert with_lines(usage, None) == usage and with_lines(None, gate) == {}
+
+
+def test_the_usage_chip_shows_the_gates_projection():
+    """design §4.5a **usage** chip, §6 *A reading the gate can no longer trust* (TD-233): while the
+    gate projects a window, the chip says so — *week 88% · 6h · projected 96% / 95%* — ranks and
+    colours by the projection, and a reading past `USAGE_UNKNOWN` it projects is not *unknown*;
+    a window with no rate to project by is the reading as ever."""
+    from agentorc.ui.app import usage_chip
+
+    got = {k: usage_chip("grind", USAGE_CASES[k], USAGE_NOW) for k in ("projected", "projected_under", "no_rate")}
+    assert got["projected"]["text"] == "grind · week 88% · 6h · projected 96% / 95%"
+    assert got["projected"]["pct"] == 96.0 and got["projected"]["cls"] == "near old" and got["projected"]["near"]
+    assert "week 88%, projected 96% / line 95% (reserve 5%" in got["projected"]["title"]
+    assert got["projected_under"]["text"] == "grind · week 60% · 2h · projected 62.5% / 95%"
+    assert got["projected_under"]["cls"] == "old" and not got["projected_under"]["near"]
+    assert got["no_rate"]["text"] == "grind · week 60% / 95% · 2h"
 
 
 def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
