@@ -2382,7 +2382,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** designer
 **Kind:** design-first
 **Pickable:** no — designed; the build is TD-241
-**Status:** Designed 2026-09-29 (the designer, PR #PRNUM; the steer to Paul is `STEERID`, bound STEERBOUND): design §6 rule 9 *Finished is the home's reading*, §4.9a, §4.5a *team groups* (*concluded* from the same reading, the *not concluded* line), §4.9 `ao team status --json`. Of the Fix's three: (a) and (c) together, since the page and the tick must agree, and (b) as the brief's word. Closes with TD-241.
+**Status:** Designed 2026-09-29 (the designer, PR #775; the steer to Paul is `m-131e40cf9385`, bound 2026-09-30 09:02 MDT): design §6 rule 9 *Finished is the home's reading*, §4.9a, §4.5a *team groups* (*concluded* from the same reading, the *not concluded* line), §4.9 `ao team status --json`. Of the Fix's three: (a) and (c) together, since the page and the tick must agree, and (b) as the brief's word. Closes with TD-241.
 **Blocked by:** TD-241
 **Location:** `src/agentorc/briefs/manager.md` (*Out of work*: the manager decides every member is finished and winds the team down), design §4.9a (the wind-down, *finished means declared*), §4.5a **team groups** (*concluded*: every live session idle and declared, the manager included), the tick (`agent_tick.py`)
 
