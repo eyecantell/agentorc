@@ -2414,3 +2414,14 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-09-29 (PR #771, slices 1–2; PR #774, slices 3–4; grinder-ao-2). The Inbox's board read passes the reader's `--fetch`, bounded at `BOARD_FETCH_TIMEOUT` with a plain read behind it, one read at a time; the origin note (`ORIGIN_PHRASES`, `origin_note`, `origin_firsts` in `src/agentorc/ui/inbox.py`) above a repo's first board row in each list, and a board read from origin read-only on the page and at the route. Design §4.5 screen 6 *Boards are read against origin* and §4.5a **origin note** carry the lasting content; the field for the case is asked of dev-cadence on the board.
 
 **Related:** TD-208 (the design), TD-220 (the horizon: the same read, without `--due-only` and so without the reader's 8 s budget), TD-222 (the push and the pull), TD-069 (the write-back), dev-cadence's TD-030 (`--fetch`).
+
+## TD-242: `test_a_metered_accounts_spend_is_summed_noted_and_gated` fails near local midnight
+
+**Priority:** Low
+**Added:** 2026-09-29 (grinder-ao-1, seen in its own suite runs late in the evening; filed at the techlead's read of #784)
+**Status:** Resolved
+**Location:** `tests/test_spend.py` (`test_a_metered_accounts_spend_is_summed_noted_and_gated`)
+
+**Why:** the test failed on `main` when the suite ran within an hour of local midnight, and passed otherwise; a flaky test in the gate costs every PR a rerun. Reproduced at 23:30 MDT on 2026-09-29, at `test_spend.py:199`: after the pause at the day's amount the test ran the gate again at `now + timedelta(hours=1)` (*a restart of the home*), and a day window is the home's local day (§4.2a), so that instant was past the window's reset and the pause was lifted.
+
+**Resolved:** 2026-09-29 (PR #NNN, grinder-ao-1) — the second gate runs a second later, not an hour: the restart needs a later instant, not a later day. The test passes at 23:31 local, where it had failed a minute before.

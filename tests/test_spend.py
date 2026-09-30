@@ -187,7 +187,9 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
         assert agent.sessions[i["id"]].state != "limited" and hookstub.usage_asked == []
         assert agent._usage["api2"]["windows"][0]["pct"] == 50, "the poll leaves a summed reading alone"
         # a restart of the home: the gate runs before the detached spend pass, and a pause made at an
-        # amount stands, with nothing typed (the techlead's read of #681)
+        # amount stands, with nothing typed (the techlead's read of #681). A moment later, never an
+        # hour: the day is the home's local one, and within an hour of midnight an hour on is the
+        # next day, whose reset lifts the pause (TD-242)
         agent._metered, agent._billing_seen = set(), {}
         typed: list[str] = []
 
@@ -195,7 +197,7 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
             typed.append(text)
 
         monkeypatch.setattr(agent, "_submit", counting)
-        await agent._enforce_usage_gate(now + timedelta(hours=1))
+        await agent._enforce_usage_gate(now + timedelta(seconds=1))
         assert agent.sessions[w["id"]].gated and typed == []
         # one definition of live: a record the quota poll does not count is not read for spend either
         agent.sessions[i["id"]].kind = "command"
