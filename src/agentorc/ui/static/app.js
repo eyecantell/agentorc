@@ -1847,6 +1847,55 @@
     e.preventDefault(); openMembers(b.dataset.members);
   });
 
+  // design §4.5a **Add entry…** and the *Add entry form* (§4.9 *Add an entry to the ledger*, TD-219
+  // slice 3): one form from the Repo page and the team card's Repo facet, the repo fixed by the press.
+  // **Open a session** starts an interactive session in a new worktree and goes to its Focus with the
+  // composer holding `entry.md`'s lines and the words — kept here as that session's draft until sent
+  // (`AO.draftKey`); nothing is typed into the pane. The page writes no file.
+  AO.draftKey = (sid) => `ao.draft.${sid}`;
+  function openEntry(repo) {
+    const dlg = $("#entrydlg"); if (!dlg) return;
+    const err = $("#entryerr");
+    const say = (m) => { err.textContent = m || ""; err.hidden = !m; };
+    const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
+    let asked = 0;  // a later Type press wins over an earlier answer that arrives after it
+    async function plan() {
+      const mine = ++asked;
+      $("#entryline").textContent = "";
+      let r, v;
+      try {
+        r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}`);
+        v = await r.json();
+      } catch (e) { if (mine === asked) { say(`the page could not ask: ${e.message}`); $("#entrygo").disabled = true; } return; }
+      if (mine !== asked) return;
+      if (!r.ok) { say(v.detail || "the repo could not be read"); $("#entrygo").disabled = true; return; }
+      say(""); $("#entrygo").disabled = false;
+      $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
+      $("#entryline").textContent = `Starts ${v.line}, and opens its Focus with these words in the composer, not sent.`;
+    }
+    $("#entrywhere").textContent = repo;
+    $("#entrywhat").value = ""; dlg.querySelector("input[name=entrytype][value=debt]").checked = true;
+    dlg.querySelectorAll("input[name=entrytype]").forEach((x) => { x.onchange = plan; });
+    $("#entrygo").onclick = async () => {
+      $("#entrygo").disabled = true;
+      let r, got;
+      try {
+        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
+        got = await r.json();
+      } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
+      if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }
+      try { localStorage.setItem(AO.draftKey(got.id), got.text); } catch (_) { /* no storage: Focus opens with an empty composer */ }
+      location.href = `/focus/${encodeURIComponent(got.id)}`;
+    };
+    say(""); plan();
+    if (!dlg.open) dlg.showModal();
+    $("#entrywhat").focus();
+  }
+  document.addEventListener?.("click", (e) => {
+    const b = e.target.closest && e.target.closest("[data-addentry]"); if (!b) return;
+    e.preventDefault(); openEntry(b.dataset.addentry);
+  });
+
   AO.org = function () {
     // the Repo page's team link lands here filtered to that team (§4.5a *Repo page: links*)
     const wantTeam = new URLSearchParams(location.search).get("team");
@@ -2372,9 +2421,14 @@
 
     const compose = $("#compose");
     compose.addEventListener("keydown", (e) => { if (e.key === "Escape") { term.focus(); } if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#send").click(); });
+    // a draft the Add entry form left for this session (§4.5a **Open a session**, TD-219): filled,
+    // focused and not sent, kept as the person edits it and dropped once it is sent
+    const draft = (() => { try { return localStorage.getItem(AO.draftKey(id)); } catch (_) { return null; } })();
+    if (draft !== null && !compose.value) { compose.value = draft; compose.focus(); }
+    compose.addEventListener("input", () => { try { if (localStorage.getItem(AO.draftKey(id)) !== null) localStorage.setItem(AO.draftKey(id), compose.value); } catch (_) { /* no storage */ } });
     $("#send").addEventListener("click", async () => {
       const text = compose.value; if (!text.trim()) return;
-      try { await act(id, "send", { text }); compose.value = ""; term.focus(); } catch (e) { banner(`Send failed: ${e.message}`); }
+      try { await act(id, "send", { text }); compose.value = ""; try { localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } term.focus(); } catch (e) { banner(`Send failed: ${e.message}`); }
     });
     // design §4.5a *Focus composer* **prompt chips** (§4.8 *A role has saved prompts*, TD-170): a
     // press is **Send** with the chip's text — the same `send`, its confirmation and its refusals —

@@ -10,6 +10,7 @@ from collections.abc import Collection, Mapping
 from datetime import datetime
 from typing import Any
 
+from agentorc import org as orgmod
 from agentorc import repoconfig, teamrun
 from sessionorc.models import (
     has_control,
@@ -18,6 +19,32 @@ from sessionorc.models import (
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
 from .common import _age
 from .org import compact_line, team_summary
+
+# -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
+
+ENTRY_PREFIX = "entry"  # the session and its worktree: `entry-<n>`, the first number free in the repo
+ENTRY_TRIES = 200  # how far the first free number is looked for before the press is refused
+
+
+def entry_role(org: orgmod.Org, team: str, type_: str) -> str:
+    """The role **Open a session** starts for `type_`: the team's `entries:` word for it, else the
+    techlead; `plain` where no team services the repo (§4.9 *Where there is no seat*)."""
+    t = org.teams.get(team) if team else None
+    return t.entry_role(type_) if t is not None else "plain"
+
+
+def entry_line(role: str, name: str, team: str) -> str:
+    """The one line under **Open a session** (§4.5a): what the press will start."""
+    tail = "" if team else " — no team services this repo"
+    return f"an interactive {role} session, {name}, in a new worktree{tail}"
+
+
+def entry_composer(repo: str, type_: str, ledger: str, words: str) -> str:
+    """What the entry session's composer holds (§4.5a **Open a session**): `entry.md`'s lines with the
+    repo, the type and the ledger filled, then the person's words — or the lines alone."""
+    head = repoconfig.entry_text(repo, type_, ledger)
+    return f"{head}\n\n{words.strip()}" if words.strip() else head
+
 
 # -- the Repo page (design §4.5 screen 11, TD-176 slice 5) -------------------------------------------
 
