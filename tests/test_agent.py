@@ -7,7 +7,7 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import FAST_TICK, derived, wait_for, wait_state
+from conftest import FAST_TICK, derived, park_ticks, wait_for, wait_state
 
 from sessionorc import adapters, naming, paths, reports
 from sessionorc.agent import WRAPUP_GRACE
@@ -1566,6 +1566,10 @@ async def test_derived_entries_go_to_the_record_that_holds_the_directory(agent, 
     for the record that holds it now — an exited predecessor is not credited with its successor's
     work. What the predecessor already claimed is still re-checked by PR number, so a merge that
     happens after it exits still lands on it (TD-032)."""
+    # every derive is the test's own: a live tick's derive credited run-1 with td077-cap (TD-243)
+    await park_ticks(agent)
+    if agent._derive_task is not None:
+        await agent._derive_task  # one the parked loop started, finished before run-1 exists
     repo = tmp_path / "repo"
     repo.mkdir()
     for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@e.com"], ["config", "user.name", "t"]):
