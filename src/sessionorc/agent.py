@@ -1762,7 +1762,7 @@ class HostAgent(
                 return None
             if any(e.ref == ref and e.status == "claimed" for e in s.progress):  # declared or from its branch
                 return None
-        if not mail.is_person(caller) and str(caller) == s.id:
+        if not mail.is_person(caller) and self._addr(caller) == self._address(s):  # a node's caller is `id@host`
             s.balance_refused = {"at": now_iso(), "ref": ref}
             self._save(s)
         return balance_mod.refusal(s.team, mark)

@@ -1429,22 +1429,24 @@ class TickMixin:
     ) -> bool:
         """Design §6 *Balance*, *Who is told*: one `system` note to the team's manager and one to the
         person on a crossing, and the same pair when it clears. What was last told is kept on the team's
-        `host` record (`balance_told: {state, at, since}`), so a restart tells nothing twice; a crossing
-        inside `FLAP` of the last one told waits until it has stood that long, so a mark that comes and
-        goes tells one pair. A team that wound down loses its mark with nobody to tell, and its memory
-        with it. True when `rec` changed."""
+        `host` record (`balance_told: {state, at, since}`, `at` the last note of either kind), so a restart
+        tells nothing twice; a crossing inside `FLAP` of the last note waits until it is that far from
+        it, so a mark that comes and goes tells one pair. A team that wound down loses its mark with
+        nobody to tell, and its memory with it. True when `rec` changed."""
         told = rec.get("balance_told") if isinstance(rec.get("balance_told"), dict) else {}
         if not members:
             return rec.pop("balance_told", None) is not None
-        at = _parse(told["at"]) if told.get("at") else None
+        at = _parse(told["at"]) if told.get("at") else None  # when the last note was sent, either kind
+        sent = now.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")  # the tick's clock
         if mark is not None:
             if told.get("state") == "over" or (at is not None and now - at < balance_mod.FLAP):
                 return False
-            text = balance_mod.crossing(team, mark)
-            rec["balance_told"] = {"state": "over", "at": now_iso(), "since": mark.get("since")}
+            text, told = (
+                balance_mod.crossing(team, mark),
+                {"state": "over", "at": sent, "since": mark.get("since")},
+            )
         elif told.get("state") == "over":
-            text = balance_mod.clearing(team, told)
-            rec["balance_told"] = {**told, "state": "clear"}
+            text, told = balance_mod.clearing(team, told), {**told, "state": "clear", "at": sent}
         elif told and (at is None or now - at >= balance_mod.FLAP):
             return rec.pop("balance_told", None) is not None  # the flap window is over: nothing left to hold
         else:
@@ -1452,15 +1454,15 @@ class TickMixin:
         for lead in self._balance_leads(members):
             self._system_note(lead, text)
         self._system_note(PERSON, text)
+        rec["balance_told"] = told  # after the notes: one that raised is sent again next tick
         log.info("balance: %s", text)
         return True
 
-    @staticmethod
-    def _balance_leads(members: list[Session]) -> list[str]:
+    def _balance_leads(self, members: list[Session]) -> list[str]:
         """The controllers the team's members share — its manager (§6 *Balance*) — read from the members
         the rule refuses (unattended, no seat) and a teammate does not control; none when a person leads."""
-        leads = {c for m in members for c in m.controllers}
-        sets = [set(m.controllers) for m in members if m.id not in leads and m.unattended and m.seat is None]
+        leads = {c for m in members for c in self._ctl(m)}  # in the home's form: a node's member is `id@host`
+        sets = [set(self._ctl(m)) for m in members if self._address(m) not in leads and m.unattended and m.seat is None]
         return sorted(set.intersection(*sets)) if sets else []
 
     def _balance_ring(self, team: str) -> None:

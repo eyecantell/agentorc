@@ -6915,8 +6915,8 @@ teams:
   pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
 
   **Who is told**, once per crossing and once when it clears — a mark that comes and goes
-  inside ten minutes tells once, not each time: a crossing within ten minutes of the last one
-  told is told only once it has stood until those ten minutes are up — by `system` note: the team's
+  inside ten minutes tells once, not each time: a crossing within ten minutes of the last note
+  of either kind is told only once it has stood until those ten minutes are up — by `system` note: the team's
   **manager** (the controller its members share), which logs the line in its round — *14:02
   over the line: 9 open PRs, line 8; no new claims until it clears* — and does nothing else, since
   its members are neither crashed nor finished; and the **person**, FYI and uncounted. **The
@@ -6924,12 +6924,12 @@ teams:
   `ask` on the seat, which the tick fills for a seat whose trigger is `asks` (rule 3), so a crossing of `review`
   needs no second message, and a crossing of `prs` or `oldest` with nothing in the queue is
   not the reader's to cure. What was last told is kept beside the mark, **`balance_told: {state,
-  at, since}`** on the same team entry of the `host` record (`over` or `clear`, when the crossing
-  was told, the mark's `since`), so a restart of the home tells nothing twice; it goes ten
+  at, since}`** on the same team entry of the `host` record (`over` or `clear`, when the last note
+  was sent, the mark's `since`), so a restart of the home tells nothing twice; it goes ten
   minutes after a clearing, and at once when the team has no live member — a team that wound
   down loses its mark with nobody to tell, and neither the manager nor the person is sent a
   clearing. The manager is the controller the team's unattended, non-seat members share, read
-  from those no teammate controls; a team a person leads has none, and only the person is told.
+  from those no teammate controls, each address in the home's form (a node's member's is `id@host`); a team a person leads has none, and only the person is told.
   When the mark goes, each member whose claim was refused is rung
   with *the line is clear again: pick as your lane says*, within its wake budget, and its
   `balance_refused` removed — an exited one's is removed with nothing sent.

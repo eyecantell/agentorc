@@ -497,8 +497,17 @@ async def test_a_mark_that_flaps_inside_ten_minutes_tells_one_pair(agent, tmp_pa
         ]
         assert "balance" in agent._host_rec["teams"]["grind"], "the mark itself is not held back"
 
-        await agent._balance_marks(now + timedelta(minutes=10))  # stood past the window: told now
+        await agent._balance_marks(now + timedelta(minutes=10))  # eight minutes from the clearing's note: held
+        assert len(told()) == 2
+        await agent._balance_marks(now + timedelta(minutes=12))  # ten from the last note: told now
         assert len(told()) == 3 and told()[2].startswith("grind is over its line")
+
+        # a mark that stood for hours and clears: a crossing a minute later is held from the clearing's note
+        agent._repos[root] = {"name": "repo", **_prs(8)}
+        await agent._balance_marks(now + timedelta(hours=3))
+        agent._repos[root] = {"name": "repo", **_prs(9)}
+        await agent._balance_marks(now + timedelta(hours=3, minutes=1))
+        assert len(told()) == 4 and told()[3].startswith("grind is under its line again")
 
 
 async def test_a_told_crossing_survives_a_restart_and_a_wound_down_team_tells_nothing(agent, tmp_path):
@@ -526,8 +535,15 @@ async def test_the_clearing_rings_a_nodes_refused_member_through_its_record_at_t
     r = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="/tmp/x", host="laptop", team="grind")
     r.state, r.unattended = "idle", True
     r.balance_refused = {"at": datetime.now(UTC).isoformat(), "ref": "TD-900"}
+    r.controllers = ["mgr"]  # the node's own form: the home reads `mgr@laptop`
     agent.remote["laptop"] = {r.id: r}
     try:
+        assert agent._balance_leads([r]) == ["mgr@laptop"]
+        _mark(agent)
+        r.balance_refused = None
+        assert agent._balance_refusal(r, "TD-901", caller="ao-x-w@laptop")  # as `_forwarded` names the caller
+        assert r.balance_refused["ref"] == "TD-901", "the member's own word, from its node, is kept"
+        agent._host_rec["teams"].pop("grind")
         agent._balance_ring("grind")
         assert _system(r.inbox) == [balance.CLEAR] and r.balance_refused is None
         assert json.loads((paths.remote_dir("laptop") / "ao-x-w.json").read_text()).get("balance_refused") is None
