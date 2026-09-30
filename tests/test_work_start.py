@@ -151,8 +151,15 @@ async def test_a_start_by_the_rule_replays_the_records_under_their_names(agent, 
         for name in ("manager-ao", "grinder-ao-1"):
             made[name] = (
                 await person.call(
-                    "create", name=name, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
-                    unattended=True, supervised=True, team="g", lane=["free-pick"],
+                    "create",
+                    name=name,
+                    dir=str(tmp_path),
+                    adapter="shell",
+                    argv=["bash", "--norc", "--noprofile"],
+                    unattended=True,
+                    supervised=True,
+                    team="g",
+                    lane=["free-pick"],
                     controllers=[made["manager-ao"]] if made else [],
                 )  # fmt: skip
             )["id"]
