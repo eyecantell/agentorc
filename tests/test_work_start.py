@@ -1,6 +1,7 @@
 """TD-227 slice 4, design §6 rule 8 under `on_work: start`: a wound-down team whose lanes gained work
 is started again by replaying its records' launch records, `why: work` with the ids, the lead first;
-four bounds read first hold the start back and leave the mark with `held`, which draws the row."""
+five bounds read first (the fifth the team's balance line, TD-239) hold the start back and leave the
+mark with `held`, which draws the row."""
 
 from __future__ import annotations
 
@@ -247,7 +248,8 @@ async def test_a_start_by_the_rule_replays_the_records_under_their_names(agent, 
 
 async def test_a_repo_over_the_teams_balance_line_holds_the_start_as_the_fifth_bound(agent, tmp_path, monkeypatch):
     """§6 *Balance*: the mark goes with the team's last live member, so rule 8 reads the lines itself —
-    against `work_waiting`'s repo, and the `review` line against the queue its ended seats keep."""
+    against every registry root the team's records name, and the `review` line against the queue its
+    ended seats keep."""
     await park_ticks(agent)
     replays = _Replays()
     monkeypatch.setattr(agent, "_replay", replays)
