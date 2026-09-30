@@ -2425,3 +2425,18 @@ Both go away only when the record says who closed it.
 **Why:** the test failed on `main` when the suite ran within an hour of local midnight, and passed otherwise; a flaky test in the gate costs every PR a rerun. Reproduced at 23:30 MDT on 2026-09-29, at `test_spend.py:199`: after the pause at the day's amount the test ran the gate again at `now + timedelta(hours=1)` (*a restart of the home*), and a day window is the home's local day (§4.2a), so that instant was past the window's reset and the pause was lifted.
 
 **Resolved:** 2026-09-29 (PR #787, grinder-ao-1) — the second gate runs a second later, not an hour: the restart needs a later instant, not a later day. The test passes at 23:31 local, where it had failed a minute before.
+
+## TD-243: `test_derived_entries_go_to_the_record_that_holds_the_directory` flakes on a live tick
+
+**Priority:** Low
+**Added:** 2026-09-30 (grinder-ao-1, CI on PR #803, 3.13 runner)
+**Status:** Resolved
+**Location:** `tests/test_agent.py` (`test_derived_entries_go_to_the_record_that_holds_the_directory`), `tests/conftest.py` (`park_ticks`, `derived`).
+
+**Why:** the test creates `run-1` in a repo already on `td077-cap`, claims TD-070 for it, kills it, starts `run-2`, and asserts the exited `run-1` holds only TD-070. The `agent` fixture's tick loop runs at `FAST_TICK`, so a derive can run while `run-1` is still live and credit it with the branch's TD-077 (`assert ['TD-070', 'TD-077'] == ['TD-070']`, run 2026-09-30 on #803, a PR that changed no code). The behaviour is right; the test raced its own clock.
+
+**Fix:** `await park_ticks(agent)` at the start, so every tick is the test's own (`derived` drives them by hand), as TD-078 and TD-088 did for their tests.
+
+**Related:** TD-063 (the CI flakes), TD-078, TD-088 (`park_ticks`), TD-034 (what the test holds).
+
+**Resolved:** 2026-09-30 (PR #805, grinder-ao-1) — the test parks the fixture's tick loop and awaits a derive the loop had already started, so every derive it asserts on is one `derived` drove; five runs in a row pass.
