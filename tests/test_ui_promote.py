@@ -64,6 +64,35 @@ def test_under_auto_nothing_but_a_failure_and_a_failure_whatever_auto_says():
         assert inbox_sections([], states=[r])["count"] == 1
 
 
+def test_a_held_row_is_counted_whatever_auto_says_and_reads_rolled_back():
+    """§4.5a *After a rollback* (§6 *The hold*, TD-226 slice 3): drawn while the home's `held` stands,
+    under auto too and with live behind main, under *Needs you*, reading *rolled back from*, never
+    *behind*; Dismiss is drawn on it, each control titled by its help paragraph."""
+    from agentorc.ui.app import templates
+    from agentorc.ui.help import first_sentence
+
+    now = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
+    held = {"sha": LIVE, "from": "7" * 40, "main": MAIN, "at": "2026-09-29T09:00:00+00:00"}
+    for auto in (True, False):
+        (r,) = promote_rows({"agentorc": reading(auto=auto, held=held)}, now)
+        assert r["text"] == (
+            "agentorc · live 4444444, rolled back from 7777777 3h 0m ago · main 9999999, 3 commits ahead"
+            f" · checks green · auto {'on' if auto else 'off'} · held"
+        )
+        assert not r["fyi"] and r["held"] == held and inbox_sections([], states=[r])["count"] == 1
+    # held with live at main's head (main has not moved since): still drawn, the hold is the person's
+    (r,) = promote_rows({"agentorc": reading(auto=True, live=MAIN, ahead=0, held=held)}, now)
+    assert "rolled back from 7777777" in r["text"]
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
+    assert 'data-act="clear_promote"' in html and 'data-act="promote"' in html
+    for key in ("promote", "promote-snooze", "promote-dismiss"):
+        assert f'title="{first_sentence(key)}"'.replace("'", "&#39;") in html, key
+    # neither failed nor held: no Dismiss
+    (r,) = promote_rows({"agentorc": reading()}, now)
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
+    assert 'data-act="clear_promote"' not in html
+
+
 def test_a_snoozed_row_is_in_no_count_and_merges_do_not_wake_it():
     until = (datetime.now(UTC) + timedelta(days=1)).isoformat()
     snoozed = {"promote:agentorc|promote": until}

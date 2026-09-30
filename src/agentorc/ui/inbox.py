@@ -401,7 +401,12 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
     run **in flight** is FYI (`fyi`), uncounted, its Promote disabled; a **failure** is *Needs you*
     whatever `auto` says. Under `auto: true` nothing but a failure: the normal flow is the note.
     Aged from when main moved (`moved`, its head's committer time). Keyed `promote:<repo>` in the
-    attention store, so Snooze is by time alone and more merges do not wake a snoozed row."""
+    attention store, so Snooze is by time alone and more merges do not wake a snoozed row.
+
+    **After a rollback** (§6 *A rollback*, TD-226 slice 3) the row is drawn while the home's `held`
+    stands, whatever `auto` says, under *Needs you*: *live `<sha7>`, rolled back from `<sha7>` <t>
+    ago · main … · auto on · held* — *rolled back*, never *behind*, since a person put live there;
+    its Dismiss ends the hold when no failure stands."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for repo, r in sorted((promotes or {}).items()):
@@ -409,18 +414,27 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
             continue
         failed = r.get("failed") if isinstance(r.get("failed"), dict) else None
         flight = r.get("inflight") if isinstance(r.get("inflight"), dict) else None
+        held = r.get("held") if isinstance(r.get("held"), dict) else None
         behind = bool(r.get("main")) and r.get("live") != r.get("main")
-        if not failed and (r.get("auto") or not (flight or behind)):
+        if not failed and not held and (r.get("auto") or not (flight or behind)):
             continue
         live = str(r.get("live") or "")[:7]
         main = str(r.get("main") or "")[:7]
         ahead = r.get("ahead")
         checks = str(r.get("checks") or "unknown")
-        text = f"{repo} · live {live or 'unknown'} · main {main or 'unknown'}"
+        text = f"{repo} · live {live or 'unknown'}"
+        if held:
+            frm, since = str(held.get("from") or "")[:7], _age(held.get("at"), at)
+            text += f", rolled back from {frm or 'unknown'}" + (f" {since} ago" if since else "")
+        text += f" · main {main or 'unknown'}"
         if isinstance(ahead, int) and ahead:
             text += f", {ahead} commit{'' if ahead == 1 else 's'} ahead"
         text += f" · checks {checks}"
-        when = str((failed or {}).get("at") or (flight or {}).get("at") or r.get("moved") or "")
+        if held:
+            text += f" · auto {'on' if r.get('auto') else 'off'} · held"
+        when = str(
+            (failed or {}).get("at") or (flight or {}).get("at") or (held or {}).get("at") or r.get("moved") or ""
+        )
         out.append(
             {
                 "row": "promote",
@@ -436,6 +450,7 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "checks_why": r.get("checks_why"),
                 "unmet": r.get("unmet"),
                 "failed": failed,
+                "held": held,
                 "inflight": flight,
                 "fyi": bool(flight) and not failed,
                 "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),

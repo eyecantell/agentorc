@@ -415,8 +415,8 @@
       // §4.8a *An alarm's answers* (TD-077 b): **Log TD** — an answer, so the row goes. The agent
       // picks the controller and writes the words; the page sends only whose alarms they are.
       if (action === "identity_log") body = { id: b.dataset.who || "" };
-      // design §4.5a **Inbox row: promote** (TD-132 slice 3): **Promote** and a failure row's
-      // **Dismiss**, the person's own, to `/api/person/<action>` with the repo alone
+      // design §4.5a **Inbox row: promote** (TD-132 slice 3, TD-226 slice 3): **Promote** and a failure
+      // or held row's **Dismiss**, the person's own, to `/api/person/<action>` with the repo alone
       if (action === "promote" || action === "clear_promote") body = { repo: b.dataset.repo };
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
@@ -523,7 +523,7 @@
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "promote") AO.toast(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
-      if (action === "clear_promote") AO.toast(res.cleared ? "the failure is cleared: promoting goes on" : "no failure stood", true);
+      if (action === "clear_promote") AO.toast(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
