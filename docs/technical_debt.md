@@ -120,7 +120,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-230 | The usage chip shows a six-hour-old reading as *stale* with no age, and the gate acts on it as if fresh: 88% shown and gated on while the account was at 93% | High | Designed 2026-09-28 — the build is TD-233 |
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Designed 2026-09-28 — the build is TD-233 |
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Open — pickable |
-| TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Open — pickable |
+| TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slice 1 built (the setting and the mark); slices 2–6 open |
 | TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Open — design-first |
 
 
@@ -2357,7 +2357,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open
+**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1):** `parse_balance` and `balance` in `TEAM_KEYS`; `sessionorc/balance.py` (`crossed`, `span`); the tick's `_balance_marks` writing `balance: {since, repo, crossed}` on the home's `host` record, which is `host.json` (`HostStore`, `paths.host_file`); `rpc_repos` and the `repos` event carrying `balance: {<team>: mark}` on each checkout's reading (`_repo_view`). Slices 2–6 open
 **Location:** `src/sessionorc/settings.py` (`TEAM_KEYS`, `parse_team`, `teams`), `src/sessionorc/agent_wake.py` (`rpc_set_settings`), `src/sessionorc/agent_tick.py` (`_refresh_repos`, the idle nudge, `_lane_news`), `src/sessionorc/agent.py` (`rpc_progress`, the `_ending` refusals), `src/sessionorc/agent_mail.py` (`_system_note`), `src/sessionorc/models.py` (`prs_waiting`, `review`), `src/agentorc/cli.py` (`ao team`, `cmd_repo`), `src/agentorc/ui/settings_page.py` (`team_cards`) and `ui/templates/settings.html`, `ui/templates/group_head.html`, `src/agentorc/ui/help.py`, `src/agentorc/briefs/grinder.md`, `hunter.md`, `auditor.md` and `manager.md`
 
 **Why:** TD-177's *Why*: the repo's numbers make a growing pull-request count visible and nothing acts on it, so the person finds out from the card once it is large.

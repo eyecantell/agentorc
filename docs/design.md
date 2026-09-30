@@ -5986,7 +5986,7 @@ teams:                                        # per team, by the name org.yml or
     until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
     reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
     on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
-    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; not built — TD-239): over any of these the team's members take no new claim; absent, no rule
+    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; the setting and the mark built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
   agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
 person:                                       # the person's own — nothing here reaches a policy
@@ -6787,7 +6787,8 @@ teams:
   and `on`/`off`/`off --now` semantics (Not built — phase 3): kept as agent RPCs.
 - **Balance: a team over its line takes no new work** (TD-177; Paul, 2026-09-25: *if I want to
   make sure the team is balanced, I can make sure the PR count is not growing too much — the
-  grinders outpacing the techlead*; designed 2026-09-29, not built — TD-239). The numbers came
+  grinders outpacing the techlead*; designed 2026-09-29; the setting and the mark built — TD-239
+  slice 1 — and the refusal, the notes and what a person sees not yet). The numbers came
   first (§4.4 *Repo facts*, the team card and the Repo page, TD-176), and the rule keys on
   exactly those, so what trips it is what a person has been watching. It is **off until a
   person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team
@@ -6809,9 +6810,13 @@ teams:
   counts, and every member is refused whichever repo it sits in). A team with no live member
   is not read, and a mark it carried goes: there is nobody to refuse. A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
   on the home's own `host` record under the team's name — the record rule 8 designs for
-  `work_waiting` (TD-227, not built; whichever of the two builds lands first makes it) — served
-  with the `repos` reading, so a client and a session's `ao repo` read it there, and the
-  mark goes when no line is crossed. **A reading that failed crosses nothing and clears
+  `work_waiting` (TD-227, not built), which is `host.json` in the home, `{teams: {<team>: {balance}}}`,
+  kept across a restart so a mark keeps its `since` — served with the `repos` reading, each
+  checkout's reading carrying `balance: {<team>: mark}` for the marks whose `repo` it is, so a
+  client and a session's `ao repo` read it there, and the mark goes when no line is crossed.
+  A crossed line's `value` and `limit` are open pull requests for `prs` and seconds for `oldest`
+  and `review`, so a reader writes both sides alike (*oldest PR 3d, line 2d*); a mark still
+  crossed keeps its `since` whatever its numbers do. **A reading that failed crosses nothing and clears
   nothing**: the mark stands as it was, as the chip's reading does.
 
   **What it does** is one thing: while the mark stands, **a new claim by an unattended member

@@ -172,6 +172,7 @@ from sessionorc.store import (
     AttentionStore,
     DoingLogStore,
     EventQueue,
+    HostStore,
     IdentityAlarmStore,
     PersonInboxStore,
     RepoStore,
@@ -429,6 +430,9 @@ class HostAgent(
         self._repos_read_at = float("-inf")  # monotonic: the first tick reads
         self._ledger_mtime: dict[str, float | None] = {}
         self._repos_task: asyncio.Task[None] | None = None
+        # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
+        self.host_store = HostStore()
+        self._host_rec: dict[str, Any] = self.host_store.load()
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}

@@ -71,6 +71,13 @@ def usage_file() -> Path:
     return home() / "usage.json"
 
 
+def host_file() -> Path:
+    """The home's own `host` record (design §6 *Balance*, TD-239): what the home's tick writes about a
+    team rather than a session — `{teams: {<team>: {balance?}}}` — kept across a restart, so a mark
+    and its `since` outlive a promote."""
+    return home() / "host.json"
+
+
 def repos_file() -> Path:
     """The home's repo facts (design §4.4 *Repo facts*, TD-176): the last reading of each registered
     checkout's PRs and ledger, kept across a restart so the page has numbers before the first read,

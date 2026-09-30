@@ -22,6 +22,7 @@ from sessionorc import (
     paths,
     reports,
 )
+from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
@@ -116,6 +117,8 @@ class TickMixin:
         if self.mode == "home" and (self._repos_task is None or self._repos_task.done()):
             # detached as the usage refresh is: `gh` talks to the network (§4.4 *Repo facts*)
             self._repos_task = asyncio.create_task(self._refresh_repos())
+        if self.mode == "home":
+            await self._balance_marks(snapshot_at)
         if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
             # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
             self._promote_task = asyncio.create_task(self._refresh_promotes())
@@ -1020,12 +1023,78 @@ class TickMixin:
             self._repos.update(changed)
             if changed or gone:
                 self.repos_store.save(self._repos)
-            for r, v in changed.items():
-                await self._broadcast({"event": "repos", "root": r, "repo": v})
+            for r in changed:
+                await self._broadcast({"event": "repos", "root": r, "repo": self._repo_view(r)})
             for r in gone:
                 await self._broadcast({"event": "repos", "root": r, "repo": None})
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("reading the repo facts failed")
+
+    def _repo_view(self, root: str) -> dict[str, Any] | None:
+        """A checkout's reading as the `repos` RPC and event serve it: the reading, and under
+        `balance` the marks of the teams over their line in this repo (§6 *Balance*), by team."""
+        v = self._repos.get(root)
+        if v is None:
+            return None
+        marks = {
+            team: rec["balance"]
+            for team, rec in (self._host_rec.get("teams") or {}).items()
+            if isinstance(rec.get("balance"), dict) and rec["balance"].get("repo") == root
+        }
+        return {**v, "balance": marks} if marks else dict(v)
+
+    async def _balance_marks(self, now: datetime) -> None:
+        """Design §6 *Balance* (TD-239): on every tick at the home, each team whose `teams.<team>.balance`
+        is set is read against the repo facts of the repos its live members name (`repo`) and the
+        reader's queue on its seats, and its mark — `balance: {since, repo, crossed}` on the home's
+        `host` record under the team's name — is written, kept (its `since` with it) or removed. A
+        reading that cannot be told leaves the mark as it stands; a team with no key, or with no live
+        member, has none. A change is saved and pushed as a `repos` event for each repo it touches."""
+        try:
+            settings = settings_mod.teams(settings_mod.load())
+            live: dict[str, list[Session]] = {}
+            for r in self._graph().values():
+                if r.team and r.state not in ("exited", "closed") and not r.superseded_by:
+                    live.setdefault(r.team, []).append(r)
+            teams = self._host_rec.setdefault("teams", {})
+            touched: set[str] = set()
+            for team in sorted(set(teams) | set(settings)):
+                rec = teams.get(team) or {}
+                old = rec.get("balance")
+                bal = (settings.get(team) or {}).get("balance")
+                members = live.get(team) or []
+                if not bal or not members:
+                    new = None
+                else:
+                    roots = sorted({m.repo for m in members if m.repo})
+                    waiting = [w["oldest"] for m in members if m.seat and (w := m.prs_waiting(home=self.host))]
+                    bounds = [d for m in members if (d := balance_mod.span((m.review or {}).get("bound")))]
+                    got = balance_mod.crossed(
+                        bal, roots, self._repos, min(waiting) if waiting else None,
+                        min(bounds) if bounds else balance_mod.REVIEW_BOUND, now,
+                    )  # fmt: skip
+                    if got is None:
+                        continue  # could not look: the mark stands as it was, or stays absent
+                    crossed, repo = got
+                    since = old["since"] if isinstance(old, dict) and old.get("since") else now_iso()
+                    new = {"since": since, "repo": repo, "crossed": crossed} if crossed else None
+                if new == old:
+                    continue
+                touched |= {m["repo"] for m in (old, new) if isinstance(m, dict) and m.get("repo")}
+                if new is None:
+                    rec.pop("balance", None)
+                else:
+                    rec["balance"] = new
+                if rec:
+                    teams[team] = rec
+                else:
+                    teams.pop(team, None)
+            if touched:
+                self.host_store.save(self._host_rec)
+                for root in sorted(touched):
+                    await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
+            log.exception("reading the teams' balance failed")
 
     @staticmethod
     def _ledger_mtimes(roots: list[str]) -> dict[str, float | None]:
