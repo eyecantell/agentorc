@@ -396,6 +396,9 @@ class HostAgent(
         self.usage_store = UsageStore()
         self._usage: dict[str, dict[str, Any]] = self.usage_store.load()
         self._usage_acct: dict[str, dict[str, Any]] = {}
+        # (node, profile) → the account key that node keys the profile by (§4.4 *A node's sessions
+        # report to their node*, TD-233 slice 2): its credentials decide, not a profile of that name here
+        self._usage_remote_keys: dict[tuple[str, str], str] = {}
         # …and the **allowance** survives with it (anchor's read of PR #307): a held reading is as
         # good as a poll made at its `fetched`, so the first poll after a promote waits until
         # `fetched + USAGE_FRESH`, never sooner. A reading with no readable time is polled at once.

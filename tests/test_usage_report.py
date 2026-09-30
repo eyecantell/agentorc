@@ -4,6 +4,7 @@ own and a short history; the endpoint then asked only for what reports cannot gi
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -159,3 +160,133 @@ async def test_a_report_reaches_the_accounts_reading_and_holds_the_endpoint_off(
         hookstub.usage_value = None
         for s in (sa, sb):
             await c.call("kill", id=s["id"])
+
+
+# -- a node's sessions report to their node, which sends each on to the home (TD-233 slice 2) ---------
+
+
+def node_record(rid="ao-x-w", host="laptop", **kw):
+    from sessionorc.models import Session
+
+    base = dict(id=rid, name="nw", kind="interactive", adapter="hookstub", dir="/tmp/x", host=host, state="working")
+    return Session(**{**base, "profile": "pn", **kw}).to_dict()
+
+
+async def test_a_node_sends_each_report_on_to_the_home_and_drops_it_with_no_link(
+    agent, hookstub, tmp_path, monkeypatch
+):
+    """A node's session's report is merged on the node, for its own gate, and sent on to the home
+    as `usage_report {id, account, windows, fresh}`, the account the node keys the profile by;
+    with no link, or before its snapshot, it is dropped rather than queued."""
+    monkeypatch.setattr(hookstub, "accounts", {"pn": "paul"})
+    sent: list[dict] = []
+
+    class Mux:
+        async def notify(self, method, **params):
+            if method == "usage_report":  # the records' own reports go the same road
+                sent.append({"method": method, **params})
+
+        async def request(self, method, timeout=None, **params):
+            return None
+
+    monkeypatch.setattr(agent, "mode", "node")
+    monkeypatch.setattr(agent, "_home_mux", Mux())
+    monkeypatch.setattr(agent, "_snapshot_sent", True)
+    async with LocalClient() as c:
+        (tmp_path / "n").mkdir()
+        s = await c.call("create", name="nw", dir=str(tmp_path / "n"), adapter="hookstub", profile="pn")
+        async with LocalClient(caller=s["id"]) as me:
+            assert await me.call("usage_report", windows=[w("5h", 42.5)], fresh=True) == {"taken": True}
+        assert await wait_for(lambda: bool(sent), timeout=5.0)
+        assert sent == [
+            {
+                "method": "usage_report",
+                "id": s["id"],
+                "account": "hookstub:paul",
+                "windows": [w("5h", 42.5)],
+                "fresh": True,
+            }
+        ]
+        assert pcts(agent._usage["pn"]) == {"5h": 42.5}  # the node's own reading, for its own gate
+
+        sent.clear()
+        monkeypatch.setattr(agent, "_snapshot_sent", False)  # a link not yet past its snapshot
+        async with LocalClient(caller=s["id"]) as me:
+            assert await me.call("usage_report", windows=[w("5h", 43.0)], fresh=True) == {"taken": True}
+        monkeypatch.setattr(agent, "_home_mux", None)  # and a link that is down
+        async with LocalClient(caller=s["id"]) as me:
+            assert await me.call("usage_report", windows=[w("5h", 44.0)], fresh=True) == {"taken": True}
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert sent == [] and pcts(agent._usage["pn"]) == {"5h": 44.0}
+        await c.call("kill", id=s["id"])
+
+
+async def test_the_home_shows_a_nodes_report_under_the_nodes_account_and_never_asks_for_it(
+    agent, hookstub, tmp_path, monkeypatch
+):
+    """At the home, a node's report lands on the chip under the account the node named, for a record
+    of that link's host only and an account in its adapter's namespace; the poll keeps it while the
+    session lives and never asks the endpoint for it; a profile a session here runs under keeps its
+    own account's reading; the chip goes when the node's session does."""
+    monkeypatch.setattr(hookstub, "accounts", {"pn": "paul", "ph": "heather"})
+    monkeypatch.setattr(hookstub, "usage_asked", [])
+    hookstub.usage_value = None
+    agent._take_records("laptop", [node_record(), node_record("ao-x-v", name="nv", profile="ph")], whole=True)
+    report = {"id": "ao-x-w", "account": "hookstub:laptop-paul", "windows": [w("5h", 71.0)], "fresh": True}
+    await agent._take_usage_report("laptop", report)
+    got = agent._usage["pn"]
+    assert got["account"] == "laptop-paul" and got["by"] == "nw" and pcts(got) == {"5h": 71.0}
+
+    # another host's name for the record, an unknown record, an account of another adapter: dropped
+    await agent._take_usage_report("desk", report | {"windows": [w("5h", 99.0)]})
+    await agent._take_usage_report("laptop", report | {"id": "ao-x-nope", "windows": [w("5h", 99.0)]})
+    await agent._take_usage_report("laptop", report | {"account": "claude-code:paul", "windows": [w("5h", 99.0)]})
+    await agent._take_usage_report("laptop", report | {"account": "hookstub:", "windows": [w("5h", 99.0)]})
+    assert pcts(agent._usage["pn"]) == {"5h": 71.0}
+
+    async with LocalClient() as c:
+        (tmp_path / "h").mkdir()
+        mine = await c.call("create", name="hh", dir=str(tmp_path / "h"), adapter="hookstub", profile="ph")
+        async with LocalClient(caller=mine["id"]) as me:
+            await me.call("usage_report", windows=[w("5h", 12.0)], fresh=True)
+        await agent._take_usage_report(
+            "laptop", {"id": "ao-x-v", "account": "hookstub:laptop-h", "windows": [w("5h", 88.0)], "fresh": True}
+        )
+        agent._usage_checked["hookstub:laptop-paul"] = time.monotonic() - 3600
+        hookstub.usage_asked.clear()
+        await agent._refresh_usage_inner()
+        assert hookstub.usage_asked == []  # the node's account is the node's to ask; this one is young
+        assert agent._usage["pn"]["account"] == "laptop-paul" and pcts(agent._usage["pn"]) == {"5h": 71.0}
+        # the profile a session here runs under keeps this host's account, whatever the node reported
+        assert agent._usage["ph"]["account"] == "heather" and pcts(agent._usage["ph"]) == {"5h": 12.0}
+        await c.call("kill", id=mine["id"])
+
+    agent._take_records("laptop", [node_record(state="exited")], whole=False)
+    await agent._refresh_usage_inner()
+    assert "pn" not in agent._usage and "hookstub:laptop-paul" not in agent._usage_acct
+
+
+async def test_two_nodes_keying_one_profile_to_two_accounts_show_one_and_never_flip(agent, hookstub, monkeypatch):
+    """The review of the node's report: a profile two nodes key to two accounts goes to the first by
+    host, and stays there pass after pass; a report for a record that is no live tool session sets no
+    key; a node's key is forgotten once no live session of that node runs under the profile."""
+    monkeypatch.setattr(hookstub, "usage_asked", [])
+    hookstub.usage_value = None
+    agent._take_records("desk", [node_record("ao-d-w", host="desk")], whole=True)
+    agent._take_records("laptop", [node_record(), node_record("ao-x-z", name="nz", state="exited")], whole=True)
+    await agent._take_usage_report("laptop", {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 20.0)]})
+    await agent._take_usage_report("desk", {"id": "ao-d-w", "account": "hookstub:alice", "windows": [w("5h", 50.0)]})
+    # an exited record's report names no key, whatever it says
+    await agent._take_usage_report("laptop", {"id": "ao-x-z", "account": "hookstub:carol", "windows": [w("5h", 9.0)]})
+    assert ("laptop", "pn") in agent._usage_remote_keys and agent._usage_remote_keys[("laptop", "pn")] == "hookstub:bob"
+    for _ in range(3):
+        await agent._refresh_usage_inner()
+        assert agent._usage["pn"]["account"] == "alice" and pcts(agent._usage["pn"]) == {"5h": 50.0}
+    assert hookstub.usage_asked == []
+
+    agent._take_records("desk", [node_record("ao-d-w", host="desk", state="exited")], whole=False)
+    await agent._refresh_usage_inner()
+    assert ("desk", "pn") not in agent._usage_remote_keys
+    await agent._take_usage_report("laptop", {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 21.0)]})
+    assert agent._usage["pn"]["account"] == "bob" and pcts(agent._usage["pn"]) == {"5h": 21.0}

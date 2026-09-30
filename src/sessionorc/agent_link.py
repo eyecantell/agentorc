@@ -370,6 +370,31 @@ class LinkMixin:
         if changed:
             await self._push_changes()
 
+    def _forward_usage_report(self, s: Session, key: str, windows: list[dict[str, Any]], fresh: bool) -> None:
+        """A node sends each report its sessions made on to the home (§4.4 *A node's sessions report
+        to their node*, TD-233 slice 2): `usage_report {id, account, windows, fresh}`, the session
+        and the account key this node, which holds the profile's credentials, keyed it by — a
+        profile of the same name at the home may be another login. Off the RPC's path, since the
+        status line that sent it waits a second at most; not queued, since a report delivered late would be read
+        as new —
+        a link that is down, or not yet past its snapshot, drops it."""
+        mux = self._home_mux
+        if self.mode != "node" or mux is None or not self._snapshot_sent:
+            return
+
+        async def send() -> None:
+            try:
+                await asyncio.wait_for(
+                    mux.notify("usage_report", id=s.id, account=key, windows=windows, fresh=fresh),
+                    agent_common.REPORT_WRITE,
+                )
+            except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
+                log.warning("a usage report from %s did not reach %s: %s", s.id, self.home, e)
+
+        task = asyncio.ensure_future(send())
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+
     async def _send_derived(self, s: Session, progress: list[Any], findings: list[Any], retire: list[str]) -> None:
         """A node's tick derived these for `s` (§4.4a, step 4b.2): sent to the home — whose fields
         they are — as `derived`, and applied there exactly as a home's own tick applies them. Not
