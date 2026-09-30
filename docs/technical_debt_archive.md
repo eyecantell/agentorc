@@ -2372,3 +2372,45 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-09-29 (PR #753; grinder-ao-1). The mark is `{why, closed_at}`, naming the `closed_at` the tick's own close wrote. For a node's member that is the node's stamp, taken from the close's reply, which `_route_act` applies before it returns. A Close at the node writes a new `closed_at`, and `_closed_by_tick` requires the two to be equal: a comparison for equality, not an order between two hosts' clocks. The unknown-verdict routed close is left as it was, since it fails safe, and design §6 rule 2 now says so. Residual: a person's re-Close at the node within the same whole second as the tick's close writes an equal stamp. Test: `test_a_persons_close_at_the_node_no_longer_matches_the_ticks_mark` in `tests/test_link.py`.
 
 **Related:** TD-237 (#752), TD-236 (#750), TD-235 (#749), design §6 rule 2.
+
+## TD-208: The Inbox reads each board from the local working tree, so a checkout behind origin hides items
+
+**Priority:** Medium
+**Added:** 2026-09-27 (Paul: *yes look into the second part*, after TD-207's two items could not be found)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** `src/agentorc/ui/inbox.py` (`board_argv`: the boards are `<root>/docs/user_attention.md` of each registry root, read with `--report --json` — `--due-only` went with TD-220 — and no `--fetch`), design §4.5 screen 6 (*Board items*), §4.4 (the board write-back), dev-cadence's `nudge_user_attention.py` (`--fetch`, TD-030 there)
+
+**Why:** every board line a session writes lands on origin by a merged PR. The registry's roots are the main checkouts, which move only when someone pulls. The Inbox reads the file in each checkout's working tree, so an item merged on origin is invisible until that checkout is pulled. Measured 2026-09-27 after a `git fetch` of each: dev-cadence 10 commits behind (its board lacked grinder-dc-1's two `act` items), agentorc 4 behind, samscrape 1. Three of the six boards differed from origin. The SessionStart hook already solves this for itself: dev-cadence's reader takes `--fetch` and reads a merely-behind clone's board from `origin/<default>`, bounded by `ATTENTION_DUE_FETCH_BUDGET` (8 s) with `--due-only`. The Inbox doesn't pass it.
+
+**Fix:** design where the fetch happens and what the write-back does then: (a) pass `--fetch` on the Inbox's read (at most once a minute already; the 8 s budget bounds it), or (b) the host agent's repo tick (TD-176, which already reads the remote every five minutes) fetches, and the Inbox reads with `--fetch`'s origin fallback; (c) what Snooze / Done / Reply do on an item that exists only on origin, since the write-back commits to the local default branch (§4.4), so it must pull first or refuse and say so; (d) a checkout that is ahead or diverged is read from the working tree, as the reader already does, with a note. Then the build, with a test on a clone that is one commit behind. Done when a board line merged on origin shows in the Inbox within the read interval without a pull.
+
+
+**Resolved:** 2026-09-29 (designed PR #715; built as TD-221, PRs #771 and #774). Design §4.5 screen 6 *Boards are read against origin*; whether a write-back pushes and whether the host agent may pull stays TD-222.
+
+**Related:** TD-207 (the horizon), TD-069 (board rows, the write-back), TD-176 (the repo tick), dev-cadence's TD-030 (`--fetch`).
+
+## TD-221: Build the board read against origin
+
+**Priority:** Medium
+**Added:** 2026-09-28 (the designer, from TD-208's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/inbox.py` (`board_argv`, `BOARD_TTL`, `BOARD_TIMEOUT`), `src/agentorc/ui/app.py` (`read_boards`, `board_items`, `board_fetch`, and the read of one board after Snooze, Done, Reply and Put on the board), the Inbox's and the Repo page's templates; design §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note**. No held path: the host agent's write-back (`src/sessionorc/board.py`) is not changed.
+
+**Why:** TD-208's *Why*: a board line merged on origin is invisible in the Inbox until the main checkout is pulled.
+
+**Fix, in slices a PR each:**
+1. **The read**: `board_argv` adds `--fetch`; the fetching read is bounded by `BOARD_FETCH_TIMEOUT` (45 s) and, stopped or failed, followed at once by a plain read, the reading marked *origin could not be reached* with the reason; the reading keeps each board's `source` and `fetch_note`.
+2. **One read at a time**: a request that finds the reading stale starts a read only if none runs and is answered from the last reading; the read after a press is a plain read of that one board laid over the last reading.
+3. **The note and the rows**: the case is read from `source` (non-null only when the board was read from origin) and the fixed phrases of `fetch_note` — its opening, *fetch skipped*, *fetched; no board at*, *fetched; board matches*, *fetched; local clone is behind*, and after *fetched; board DIFFERS from* the parenthesis, *(no common history*, *(local edits not pushed)*, *(both sides changed)* — in one table with a test that fails on a phrase it does not know, and a field for the case is asked of dev-cadence; one line above a repo's first board row on the Inbox and the Repo page, in the design's words — behind, local edits, two-sided (the warning colour), origin not reached — and none when the board matches or origin has none; on a board whose `source` is origin, Snooze, Done and Reply disabled with the design's reason, Open board kept.
+4. **Tests**: on a clone one commit behind, a board line that is only on origin shows within one read, its note says it was read from origin and its Snooze is disabled; after a pull the same row is pressable; a two-sided clone shows the local rows and the warning note; a remote that does not answer leaves the local rows and the *not reached* note, inside the bound; two requests on a stale reading start one read; a press does not wait on a fetch.
+
+**Done when** a board line merged on origin shows in the Inbox within the read interval without a pull, and a remote that is down never empties the board rows; design §4.5, §4.4 and §4.5a lose their *not built* for this entry, and TD-208 archives with this one.
+
+
+**Resolved:** 2026-09-29 (PR #771, slices 1–2; PR #774, slices 3–4; grinder-ao-2). The Inbox's board read passes the reader's `--fetch`, bounded at `BOARD_FETCH_TIMEOUT` with a plain read behind it, one read at a time; the origin note (`ORIGIN_PHRASES`, `origin_note`, `origin_firsts` in `src/agentorc/ui/inbox.py`) above a repo's first board row in each list, and a board read from origin read-only on the page and at the route. Design §4.5 screen 6 *Boards are read against origin* and §4.5a **origin note** carry the lasting content; the field for the case is asked of dev-cadence on the board.
+
+**Related:** TD-208 (the design), TD-220 (the horizon: the same read, without `--due-only` and so without the reader's 8 s budget), TD-222 (the push and the pull), TD-069 (the write-back), dev-cadence's TD-030 (`--fetch`).

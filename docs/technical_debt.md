@@ -102,7 +102,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Designed 2026-09-28 with TD-223 — the build is TD-228 |
 | TD-199 | A running member keeps the brief it started with: manager-ao-1, started 2026-09-25, still runs the brief from before #600, and its card line has read *round 1: … all working* for a day and a half | Medium | Designed 2026-09-28 — the build is TD-217 |
 | TD-201 | An idle session flipped to `working` by a hook 4 s after its Stop, read `stalled?` for 13 h, and its mail was never rung: grinder-ao-1 sat on TD-108 step 1e from 05:56Z | High | Partly done — capture, subagent events and suggestions-off built; naming the event waits on the live log |
-| TD-208 | The Inbox reads each board from the local working tree, so a checkout behind origin hides items merged there: on 2026-09-27 three of six boards (dev-cadence 10 behind, agentorc 4, samscrape 1) differed from origin | Medium | Designed 2026-09-28 (the designer) — the build is TD-221; archives with it |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open — answered by TD-210's design; closes with TD-229 |
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Designed 2026-09-28 — the build is TD-229 |
 | TD-211 | The briefs read a hand-written `**Pickable:**` line while dev-cadence's `ledger.py --pickable` derives the same answer from `**Blocked by:**`: two answers that can disagree | Medium | Open — answered by TD-223's design; closes with TD-228 |
@@ -111,7 +110,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-217 | Build rule 7, brief changed: `prompt_from` on the create and the launch record, a replay that fills the prompt from its files as merged, `brief` and `brief_changed` on the record, the reply clause, the tick's restart of an idle member, the chip | Medium | Built — slices 1–4 (#714, #745, #747, #748); live check pending |
 | TD-218 | Build Add entry, the home's half: `entry_add`, the `entry` field and the handed `ask` that closes by its outcome, `--thread` on it, a handed entry counted in `asks_waiting` but for while the seat waits on the person, the *When it is read* row, `ao td add` | Medium | Partly done — slices 1–3 built (PR #760, PR #764, PR #765), the Waiting-on-them row built (TD-219); left: slice 4 (`ao td add`) |
 | TD-219 | Build Add entry, the form: **Add entry…** on the Repo page and the team card, `entry.md` and the techlead preset's section, the team's `entries:` key, **Open a session** with the composer filled and not sent | Medium | Built — slices 1–4 and the Waiting-on-them row; left: a live look after a promote |
-| TD-221 | Build the board read against origin: `--fetch` on the Inbox's read with a bound and a plain read behind it, one read at a time, the origin note, rows read from origin drawn read-only | Medium | Partly done — slices 1–2 (the fetching read, its bound, one read at a time) built; left: the note and the read-only rows (slice 3) |
 | TD-222 | A board write-back is never pushed and the host agent never pulls: one Snooze and one merged board line leave the checkout two-sided, and a row read from origin cannot be acted on — decide how a write-back reaches origin and whether the host agent may fast-forward | Medium | Open — Paul's decision |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Designed 2026-09-28 — the build is TD-228 |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — (a) and the log; live check pending |
@@ -1985,23 +1983,6 @@ Tests: a `PreToolUse` (or the named event) within seconds of a `Stop`, with no `
 
 **Related:** TD-090, TD-155 (the same family, archived), TD-103 (§6 rules; stall handling not built), TD-187 / TD-195 (waking a finished member, which also needs the idle to be true), design §4.2 (hook versus screen), §4.10 (the doorbell), §6 *Stall*.
 
-## TD-208: The Inbox reads each board from the local working tree, so a checkout behind origin hides items
-
-**Priority:** Medium
-**Added:** 2026-09-27 (Paul: *yes look into the second part*, after TD-207's two items could not be found)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-221
-**Blocked by:** TD-221
-**Status:** Designed 2026-09-28 (the designer, PR #715, stacked on #713; the first steer to Paul, `m-050fcd5e1427`, offered a fast-forward the fact-check then turned down, and the note that withdraws it is named in the PR): design §4.5 screen 6 *Boards are read against origin*, §4.4 *Board write-back* (one sentence), §4.5a the **origin note** row. Settled, by the Fix's letters: (a) the Inbox's read passes `--fetch`, the reader's own, bounded at 45 s with a plain read behind it, one read at a time, the read after a press a plain one of that board — the Fix's *8 s budget* holds only under `--due-only`, which TD-220 drops; (b) is rejected — a fetch of ours beside the reader's would make a second reader of the comparison; (c) Snooze, Done and Reply on a row read from origin are drawn disabled, saying *pull*: the host agent does not move the person's checkout; (d) a checkout ahead or two-sided is read from the working tree with a note, the two-sided one in the warning colour because origin's additions are hidden. Found: TD-222.
-**Location:** `src/agentorc/ui/inbox.py` (`board_argv`: the boards are `<root>/docs/user_attention.md` of each registry root, read with `--report --json` — `--due-only` went with TD-220 — and no `--fetch`), design §4.5 screen 6 (*Board items*), §4.4 (the board write-back), dev-cadence's `nudge_user_attention.py` (`--fetch`, TD-030 there)
-
-**Why:** every board line a session writes lands on origin by a merged PR. The registry's roots are the main checkouts, which move only when someone pulls. The Inbox reads the file in each checkout's working tree, so an item merged on origin is invisible until that checkout is pulled. Measured 2026-09-27 after a `git fetch` of each: dev-cadence 10 commits behind (its board lacked grinder-dc-1's two `act` items), agentorc 4 behind, samscrape 1. Three of the six boards differed from origin. The SessionStart hook already solves this for itself: dev-cadence's reader takes `--fetch` and reads a merely-behind clone's board from `origin/<default>`, bounded by `ATTENTION_DUE_FETCH_BUDGET` (8 s) with `--due-only`. The Inbox doesn't pass it.
-
-**Fix:** design where the fetch happens and what the write-back does then: (a) pass `--fetch` on the Inbox's read (at most once a minute already; the 8 s budget bounds it), or (b) the host agent's repo tick (TD-176, which already reads the remote every five minutes) fetches, and the Inbox reads with `--fetch`'s origin fallback; (c) what Snooze / Done / Reply do on an item that exists only on origin, since the write-back commits to the local default branch (§4.4), so it must pull first or refuse and say so; (d) a checkout that is ahead or diverged is read from the working tree, as the reader already does, with a note. Then the build, with a test on a clone that is one commit behind. Done when a board line merged on origin shows in the Inbox within the read interval without a pull.
-
-**Related:** TD-207 (the horizon), TD-069 (board rows, the write-back), TD-176 (the repo tick), dev-cadence's TD-030 (`--fetch`).
-
 ## TD-209: The org-wide `grinder` role carries agentorc's review paths into every repo
 
 **Priority:** Low
@@ -2163,28 +2144,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Left for Paul:** `entries: {feature: designer}` under `teams.ao-grind` in `~/.agentorc/org.yml`, which gives his split — an interactive designer for a feature, a techlead for the rest. Without it both types start a techlead session. On the board.
 
 **Related:** TD-180 (the design), TD-218 (the home's half), TD-173 (a person in the team: the start this one reuses), TD-170 (the composer's fill), TD-176 (the Repo page and the facet).
-
-## TD-221: Build the board read against origin
-
-**Priority:** Medium
-**Added:** 2026-09-28 (the designer, from TD-208's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Partly done — **slices 1–2 built 2026-09-29 (grinder-ao-2):** `board_argv(fetch=, only=)`, `BOARD_FETCH_TIMEOUT`, `read_boards(fetch=, board=)` with the plain-read fallback marking *fetch skipped (<why>)*, each row's `source` and `fetch_note`; `board_items`' one fetching read at a time in the background, the first read plain, the read after a press of that one board laid over the last reading; tests in `tests/test_ui_board.py`. Left: slice 3 (the note, the read-only rows, the phrase table and the field asked of dev-cadence) and the rest of slice 4's tests (after a pull the row is pressable, the two-sided note)
-**Location:** `src/agentorc/ui/inbox.py` (`board_argv`, `BOARD_TTL`, `BOARD_TIMEOUT`), `src/agentorc/ui/app.py` (`read_boards`, `board_items`, `board_fetch`, and the read of one board after Snooze, Done, Reply and Put on the board), the Inbox's and the Repo page's templates; design §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note**. No held path: the host agent's write-back (`src/sessionorc/board.py`) is not changed.
-
-**Why:** TD-208's *Why*: a board line merged on origin is invisible in the Inbox until the main checkout is pulled.
-
-**Fix, in slices a PR each:**
-1. **The read**: `board_argv` adds `--fetch`; the fetching read is bounded by `BOARD_FETCH_TIMEOUT` (45 s) and, stopped or failed, followed at once by a plain read, the reading marked *origin could not be reached* with the reason; the reading keeps each board's `source` and `fetch_note`.
-2. **One read at a time**: a request that finds the reading stale starts a read only if none runs and is answered from the last reading; the read after a press is a plain read of that one board laid over the last reading.
-3. **The note and the rows**: the case is read from `source` (non-null only when the board was read from origin) and the fixed phrases of `fetch_note` — its opening, *fetch skipped*, *fetched; no board at*, *fetched; board matches*, *fetched; local clone is behind*, and after *fetched; board DIFFERS from* the parenthesis, *(no common history*, *(local edits not pushed)*, *(both sides changed)* — in one table with a test that fails on a phrase it does not know, and a field for the case is asked of dev-cadence; one line above a repo's first board row on the Inbox and the Repo page, in the design's words — behind, local edits, two-sided (the warning colour), origin not reached — and none when the board matches or origin has none; on a board whose `source` is origin, Snooze, Done and Reply disabled with the design's reason, Open board kept.
-4. **Tests**: on a clone one commit behind, a board line that is only on origin shows within one read, its note says it was read from origin and its Snooze is disabled; after a pull the same row is pressable; a two-sided clone shows the local rows and the warning note; a remote that does not answer leaves the local rows and the *not reached* note, inside the bound; two requests on a stale reading start one read; a press does not wait on a fetch.
-
-**Done when** a board line merged on origin shows in the Inbox within the read interval without a pull, and a remote that is down never empties the board rows; design §4.5, §4.4 and §4.5a lose their *not built* for this entry, and TD-208 archives with this one.
-
-**Related:** TD-208 (the design), TD-220 (the horizon: the same read, without `--due-only` and so without the reader's 8 s budget), TD-222 (the push and the pull), TD-069 (the write-back), dev-cadence's TD-030 (`--fetch`).
 
 ## TD-222: A board write-back is never pushed and the host agent never pulls
 

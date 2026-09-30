@@ -255,6 +255,77 @@ BOARD_TIMEOUT = 20.0
 # TD-220), so a fetching read has a bound of its own; stopped or failed, a plain read follows at once
 BOARD_FETCH_TIMEOUT = 45.0
 
+# §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note** (TD-221 slice 3): which case the
+# reader's fetch found, read from the fixed phrases of its `fetch_note` — the reader gives the cases no
+# field of their own (one is asked of dev-cadence) — in order, the first that opens the note winning,
+# so the parenthesis after *board DIFFERS from* is read before the opening alone. A case of None draws
+# no note. `tests/test_ui_board.py` fails on a phrase in the reader that this table does not know.
+ORIGIN_PHRASES: tuple[tuple[str, str, str | None], ...] = (
+    ("fetch skipped", "", "unreached"),
+    ("fetched; no board at", "", None),
+    ("fetched; board matches", "", None),
+    ("fetched; local clone is behind", "", "behind"),
+    ("fetched; board DIFFERS from", "(no common history", "both"),
+    ("fetched; board DIFFERS from", "(local edits not pushed)", "local"),
+    ("fetched; board DIFFERS from", "(both sides changed)", "both"),
+)
+ORIGIN_READONLY = "on origin, not in this checkout yet: pull to act on it"
+
+
+def origin_case(source: str, fetch_note: str) -> str | None:
+    """The case of one board's read against origin (§4.5 screen 6): `behind`, `local`, `both`,
+    `unreached`, or None — matches origin, no board there, a plain read, or a phrase this table does
+    not know. `source` is non-empty only when the board was read from origin, which is *behind*."""
+    if source:
+        return "behind"
+    for opening, paren, case in ORIGIN_PHRASES:
+        if fetch_note.startswith(opening) and (not paren or paren in fetch_note):
+            return case
+    return None
+
+
+def origin_note(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    """§4.5a **origin note**: the line above a repo's first board row, in the design's words, as
+    `{text, warn}` — `warn` the warning colour, for the one case where rows are hidden — or None.
+    The reader's sentence is never drawn but for a skipped fetch's reason, which carries no count."""
+    source, fetch_note = str(row.get("source") or ""), str(row.get("fetch_note") or "")
+    case = origin_case(source, fetch_note)
+    if case == "behind":
+        return {"text": f"read from {source or 'origin'}: this checkout has not pulled it yet", "warn": False}
+    if case == "local":
+        return {"text": "board edits made here are not on origin", "warn": False}
+    if case == "both":
+        return {
+            "text": "this checkout's board and origin's have both changed: showing the checkout's, "
+            "and what origin added is not shown — pull",
+            "warn": True,
+        }
+    if case == "unreached":
+        why = fetch_note.removeprefix("fetch skipped").strip().removeprefix("(").removesuffix(")")
+        return {
+            "text": f"origin could not be reached ({why.strip() or 'no reason given'}): "
+            "showing the checkout's board as of its last pull",
+            "warn": False,
+        }
+    return None
+
+
+def origin_firsts(rows: Collection[Mapping[str, Any]]) -> set[str]:
+    """The ids of the rows that carry their repo's **origin note** in one list as drawn: the first
+    board row of each board whose read has a note (§4.5a: *one line above a repo's first board row*)."""
+    seen: set[str] = set()
+    out: set[str] = set()
+    for r in rows:
+        if r.get("row") != "board" or not r.get("board") or r["board"] in seen:
+            continue
+        seen.add(r["board"])
+        if origin_note(r):
+            out.add(str(r.get("id")))
+    return out
+
+
+templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts, ORIGIN_READONLY=ORIGIN_READONLY)
+
 
 def board_argv(roots: Collection[str | Path], *, fetch: bool = False, only: str = "") -> tuple[list[str] | None, str]:
     """The command that reads every open item of these repos' boards — not `--due-only` since TD-220

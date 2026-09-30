@@ -140,6 +140,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     BOARD_TTL,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
     NEEDS_YOU_ROWS,  # noqa: F401
+    ORIGIN_PHRASES,  # noqa: F401
+    ORIGIN_READONLY,
     OWING_CLOSES,  # noqa: F401
     OWING_KINDS,  # noqa: F401
     PERSON_ASK_KINDS,  # noqa: F401
@@ -172,6 +174,9 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     handed_rows,  # noqa: F401
     horizon_of,  # noqa: F401
     inbox_sections,  # noqa: F401
+    origin_case,  # noqa: F401
+    origin_firsts,  # noqa: F401
+    origin_note,  # noqa: F401
     promote_rows,  # noqa: F401
     rail_counts,  # noqa: F401
     rail_kind,  # noqa: F401
@@ -632,6 +637,17 @@ def create_app() -> FastAPI:
             board_cache["task"] = asyncio.create_task(board_fetch())
         return board_cache["rows"], board_cache["note"]
 
+    async def board_on_origin(board: str, line: Any, text: str) -> bool:
+        """Whether this board's row is still read-only (§4.5 screen 6, TD-221 slice 3): the last
+        reading drew the board from origin, and the checkout's own board does not hold the line yet —
+        the write-back edits the checkout's file. A checkout pulled since that reading is seen by a
+        plain read of the one board, kept out of the cache so origin's rows are not dropped from the
+        page, and the press goes through rather than waiting on the next fetching read."""
+        if not any(r.get("board") == board and r.get("source") for r in board_cache["all"]):
+            return False
+        rows, _ = await asyncio.to_thread(read_boards, board=board)
+        return not any(str(r.get("line")) == str(line) and r.get("text") == text for r in rows)
+
     async def board_view(fresh: bool = False) -> tuple[dict[str, Any], str]:
         """The board's horizon (§4.5 screen 6, TD-220) over every open row the cache holds, sorted by
         the person's `inbox.board_show`, and the reader's note: `due` is `board_items`' rows, `ahead`
@@ -760,6 +776,7 @@ def create_app() -> FastAPI:
         person_view=person_view,
         person_inbox=person_inbox,
         board_items=board_items,
+        board_on_origin=board_on_origin,
         board_view=board_view,
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
@@ -2214,6 +2231,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # it in the repo's main checkout. The row hands back what the reader gave it — the board,
             # the line and its text — and the agent refuses the edit when that line has moved on.
             what = str(body.get("action") or "")
+            if what != "add" and await h.board_on_origin(
+                str(body.get("board") or ""), body.get("line"), str(body.get("text") or "")
+            ):
+                # §4.5a **origin note** (TD-221 slice 3): the page draws these disabled; a press that
+                # comes anyway is refused in the same words, never sent to the write-back
+                raise HTTPException(409, ORIGIN_READONLY)
             if what == "reply":
                 # §4.5a *Due strip / Inbox board row* → **Reply** (§4.4, TD-142): the person's words
                 # appended to the item's own line by `board_reply`, which re-checks the line as an
