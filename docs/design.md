@@ -3994,8 +3994,10 @@ imports `agentorc`), and the host agent needs no restart when a definition chang
 **The org is an aggregate of what the repos define** (TD-210, TD-209; Paul, 2026-09-28: *should
 org.yml actually be an aggregate of each of the repos that support a team?*; designed that day;
 the aggregate below is built — TD-229 slice 1, one function, `org.with_repos`, that `ao team` and
-the pages both read — and `place:`, a node's registry, **Members…**'s disabled state, the home's
-history and `ao org` are not — TD-229's later slices). A team that works one repo is **defined in that repo**, in
+the pages both read — as are **Members…**'s disabled state, the home's history and agentorc's own
+`.agentorc.yml`, which defines `ao-grind` and its roles' `review:` (slice 2; the org file's `ao-grind`
+shadows it until the person removes that one); `place:`, the landing rule (a node's registry is asked over the link, below) and `ao org` are not —
+TD-229's later slices). A team that works one repo is **defined in that repo**, in
 its `.agentorc.yml` — `teams:`, the `roles:` it uses with their `review:` paths, the briefs
 beside them — so it has the repo's history, is changed by PR and is read by whoever clones the
 repo. The org a client sees is the union:

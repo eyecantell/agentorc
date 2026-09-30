@@ -418,11 +418,12 @@ async def test_a_press_that_finds_its_run_done_files_the_note(agent, checkout):
 
 
 def test_this_repos_block_is_the_promote_pair_read_from_the_checkout():
-    """TD-132 slice 4: agentorc's own `.agentorc.yml` carries `promote:` alone — `run` is CLAUDE.md's
-    pair with the checkout's path taken from where it runs, `check` the live venv's build record."""
+    """TD-132 slice 4: agentorc's own `.agentorc.yml` carries `promote:` with `run` and `check` alone —
+    `run` is CLAUDE.md's pair with the checkout's path taken from where it runs, `check` the live venv's
+    build record. Its `teams:` and `roles:` are TD-229 slice 2's (`tests/test_org.py`)."""
     root = Path(__file__).resolve().parent.parent
     doc = yaml.safe_load((root / ".agentorc.yml").read_text())
-    assert list(doc) == ["promote"] and set(doc["promote"]) == {"run", "check"}  # `auto` is settings.yml's
+    assert "promote" in doc and set(doc["promote"]) == {"run", "check"}  # `auto` is settings.yml's
     b = promote.block(root)
     assert "/agentorc-venv/bin" in b["run"] and '"$(pwd -P)[ui]"' in b["run"] and b["run"].endswith("service install")
     assert "/home/kmaster" not in b["run"] + b["check"]  # never a hard-coded checkout or home
