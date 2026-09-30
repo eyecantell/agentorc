@@ -726,8 +726,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   reads none of this — its checkouts are at the same absolute paths at the home (§4.4a), where
   the reads run.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
-- Usage, **reported first and asked for last** (TD-231, TD-230; designed 2026-09-28, not built —
-  TD-233; until then the poll described after this paragraph is the one source). The usage
+- Usage, **reported first and asked for last** (TD-231, TD-230; designed 2026-09-28, partly
+  built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the report is
+  not built, so until then the poll described after this paragraph is the one source). The usage
   endpoint is no documented interface, and on 2026-09-28 it refused every poll for six hours
   though agentorc asked once per account: the tool's own clients read it too, and its refusals
   carry no usable `Retry-After`. What a session of the tool is *told* about its limits is
@@ -789,12 +790,15 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   Not used: the rate-limit headers on a model's responses, which are named in the client and
   documented nowhere.
   **The poll, as built**: each **account** a live agent session's profile names is asked its adapter's `usage_for`
-  **every five minutes** in a thread, never per tick — once per `(adapter, account)`, through one
+  in a thread, never per tick, and only on the fallback's terms above (TD-233 slice 3): when its
+  reading is older than `USAGE_FRESH` and at most once per `USAGE_FRESH` — so, while nothing
+  reports, about every fifteen minutes — once per `(adapter, account)`, through one
   profile of that account (§4.2a, TD-122), never once per profile: a shorter cadence buys nothing
   against a five-hour window while spending an allowance the tool itself shares (TD-087), and
   four profiles on one account asking four times is how the endpoint came to answer
-  `rate_limited` to all of them. `limited` is read from the
-  same poll, so a session at its cap may show it up to five minutes late; the pane's own limit
+  `rate_limited` to all of them. The ask for a window only the endpoint gives, once an hour under
+  a fresh report, waits for the report (slice 2). `limited` is read from the
+  same poll, so a session at its cap may show it up to fifteen minutes late; the pane's own limit
   message marks it within a tick regardless (§4.2). The last answer is cached **per account** and
   served by `usage` under every profile that shares it — the same windows, `fetched`, `reason`
   and back-off on each — streamed as a `usage` event for the top bar's per-account chip, and drives the `limited` rule
@@ -806,17 +810,17 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   one account in use is one chip.
   **A failure says why** (TD-087): the adapter answers `ok` with the windows, or `rate_limited`
   (with the endpoint's `Retry-After` when it is a number; the HTTP date form is legal and not
-  parsed, and an unreadable one doubles instead of guessing), `no_credentials`, `no_profile` or
+  parsed, and an unreadable one is the fixed cool-off), `no_credentials`, `no_profile` or
   `error` — a word the core keys on, never prose. The core does three things with it and no more.
-  It **logs a change of reason once**, not per poll. It **backs off on `rate_limited` alone**, and
-  backs the account off, not the one profile it happened to ask through:
-  the `Retry-After`, floored at the ordinary cadence and **not** capped; else its own doubling,
-  which stops at an hour; any other answer returns to the cadence, since only a 429 is the
-  endpoint asking to be asked less often. It **keeps the last good reading** with the reason
+  It **logs a change of reason once**, not per poll. It **cools off on `rate_limited` alone**, and
+  cools the account off, not the one profile it happened to ask through: `USAGE_COOL`, a fixed
+  hour, or the `Retry-After` where that is longer, **not** capped — never a doubling, which could
+  not learn a window the endpoint never names (TD-231); any other answer returns to the cadence,
+  since only a 429 is the endpoint asking to be asked less often. It **keeps the last good reading** with the reason
   beside it, so the chip goes stale rather than going out (*the chip went out* and *the allowance
   is spent* are different things to a person). The reading is **held across a restart**
   (`usage.json`) and so is the allowance: the first poll after a restart waits until the held
-  reading's `fetched` plus the cadence, never sooner. The reason is not held.
+  reading's `fetched` plus the cadence, never sooner, and a cool-off's end is held on the reading (`cool_until`), so a restart inside the hour does not ask. The reason is not held.
   **A metered account's reading is a sum, not a poll** (§4.2a; TD-128, reconciled 2026-09-25;
   built at the home 2026-09-27 — TD-151 slice 3; a node's turns the same day — slice 4). On every tick each host asks the adapter `spend(profile, cursors)` (§4.3) for
   the metered profiles its live sessions run under and adds the turns to a **daily ledger per

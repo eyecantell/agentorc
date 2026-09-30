@@ -3,6 +3,7 @@
 import asyncio
 import json
 import subprocess
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -292,7 +293,7 @@ async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
     adapter labels, and **any** of them at 100% is the cap — the core names none of them."""
     from datetime import UTC, datetime, timedelta
 
-    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_FRESH", 0.0)
     soon = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     async with LocalClient() as c, LocalClient() as sub:
         s = await c.call("create", name="cap", dir=str(tmp_path), adapter="hookstub", profile="p1")
@@ -352,7 +353,7 @@ async def test_limited_from_one_daily_window(agent, hookstub, tmp_path, monkeypa
     once no live session runs under it."""
     from datetime import UTC, datetime, timedelta
 
-    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_FRESH", 0.0)
     soon = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     async with LocalClient() as c:
         s = await c.call("create", name="daily", dir=str(tmp_path), adapter="hookstub", profile="pd")
@@ -1845,12 +1846,13 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
     Now the adapter answers with a **reason**; a reading is replaced only by a newer reading, so
     a refusal leaves the last one standing with the reason beside it — *the chip went out* and
     *the allowance is spent* are different things to a person, and a five-hour window does not
-    change while we are refused. A 429 waits the endpoint's own `Retry-After`, or doubles; any
-    other answer goes back to the ordinary cadence, since only a 429 says *ask less often*."""
-    from sessionorc.agent import USAGE_BACKOFF_MAX, USAGE_EVERY
+    change while we are refused. A 429 cools the account off for `USAGE_COOL`, or the endpoint's
+    own `Retry-After` where that is longer (TD-233 slice 3); any other answer goes back to the
+    ordinary cadence, since only a 429 says *ask less often*."""
+    from sessionorc.agent import USAGE_COOL
     from sessionorc.store import UsageStore
 
-    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_FRESH", 0.0)
     K = "hookstub:p9"  # the account key (TD-122): the stub names no account, so the profile's
     async with LocalClient() as c:
         s = await c.call("create", name="u", dir=str(tmp_path), adapter="hookstub", profile="p9")
@@ -1863,24 +1865,26 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         }
         assert UsageStore().load()["p9"]["fetched"] == "t1"  # and it is on disk, for the next promote
 
-        # a 429 keeps the reading, says why, and waits the endpoint's own word on when
+        # a 429 keeps the reading, says why, and cools off an hour: a shorter word is not believed
         hookstub.usage_value = {"reason": "rate_limited", "retry_after": 900.0}
         assert await wait_for(lambda: agent._usage["p9"].get("reason") == "rate_limited", timeout=5.0, step=0.1)
         assert agent._usage["p9"]["windows"] == [{"label": "5h", "pct": 40, "resets": None}]  # not lost
         assert agent._usage["p9"]["fetched"] == "t1" and agent._usage["p9"]["retry_after"] == 900.0
-        assert agent._usage_wait[K] == 900.0
+        assert agent._usage_wait[K] == USAGE_COOL == 3600.0
 
-        # with no Retry-After it doubles instead, to a ceiling — and the old `retry_after` goes
-        # with the poll that gave it, rather than standing as this refusal's word on when
-        agent._usage_wait[K] = USAGE_BACKOFF_MAX
+        # a longer Retry-After is kept, never capped
+        agent._usage_reading(K, {"reason": "rate_limited", "retry_after": 5400})
+        assert agent._usage_wait[K] == 5400.0
+
+        # with no Retry-After it is the fixed hour, never a doubling — and the old `retry_after`
+        # goes with the poll that gave it, rather than standing as this refusal's word on when
         again = agent._usage_reading(K, {"reason": "rate_limited"})
         assert again is not None and "retry_after" not in again and again["reason"] == "rate_limited"
-        assert agent._usage_wait[K] == USAGE_BACKOFF_MAX  # already at the ceiling
+        assert agent._usage_wait[K] == USAGE_COOL
+        assert again["cool_until"].endswith("Z")  # when it ends, held for a restart
         agent._usage_acct[K] = again
-        assert agent._usage_reading(K, {"reason": "rate_limited"}) is None  # now nothing changed to say
-        agent._usage_wait[K] = 100.0
         agent._usage_reading(K, {"reason": "rate_limited"})
-        assert agent._usage_wait[K] == 200.0
+        assert agent._usage_wait[K] == USAGE_COOL  # a second refusal does not lengthen it
 
         # any other answer is the ordinary cadence again — only a 429 says *ask less often*
         agent._usage_acct[K] = agent._usage_reading(K, {"reason": "error"})
@@ -1895,7 +1899,64 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
             "fetched": "t2",
             "reason": "ok",
         }
-        assert USAGE_EVERY == 300.0  # five minutes: the shortest window the endpoint reports is five hours
+        await c.call("kill", id=s["id"])
+
+
+async def test_the_endpoint_is_asked_only_for_a_reading_past_fresh(agent, hookstub, tmp_path, monkeypatch):
+    """TD-233 slice 3 (design §4.4 *Usage*): the endpoint is the fallback. An account whose
+    reading is younger than `USAGE_FRESH` is not asked, whatever the poll's own clock says, and one
+    whose reading has aged past it is asked once, then not again inside `USAGE_FRESH`."""
+    from sessionorc.agent import USAGE_FRESH
+
+    def iso(dt):
+        return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    assert USAGE_FRESH == 900.0  # fifteen minutes, the chip's own `USAGE_FRESH`
+    monkeypatch.setattr(hookstub, "usage_asked", [])
+    K = "hookstub:pf"
+    async with LocalClient() as c:
+        now = datetime.now(UTC)
+        hookstub.usage_value = {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": iso(now)}
+        s = await c.call("create", name="uf", dir=str(tmp_path), adapter="hookstub", profile="pf")
+        assert await wait_for(lambda: K in agent._usage_acct, timeout=5.0, step=0.1)  # the first ask, no reading yet
+        agent._usage_acct[K] = {"windows": [], "fetched": iso(now - timedelta(seconds=60)), "reason": "ok"}
+        agent._usage_checked[K] = time.monotonic() - 2 * USAGE_FRESH  # the poll's clock alone says due
+        hookstub.usage_asked.clear()
+        await agent._refresh_usage_inner()
+        assert "pf" not in hookstub.usage_asked  # a minute-old reading: not asked
+        agent._usage_acct[K]["fetched"] = iso(now + timedelta(hours=1))  # stamped ahead: not young
+        assert not agent._usage_young(K)
+
+        # (the ticker's own pass may ask beside this one, so the counts are read as *some*, then
+        # *no more*)
+        agent._usage_acct[K]["fetched"] = iso(now - timedelta(seconds=USAGE_FRESH + 60))
+        await agent._refresh_usage_inner()
+        asked = hookstub.usage_asked.count("pf")
+        assert asked >= 1
+        assert agent._usage_acct[K]["windows"] == [{"label": "5h", "pct": 40, "resets": None}]
+
+        agent._usage_acct[K]["fetched"] = iso(now - timedelta(seconds=USAGE_FRESH + 60))  # aged again at once
+        await agent._refresh_usage_inner()
+        assert hookstub.usage_asked.count("pf") == asked  # but asked once per `USAGE_FRESH` at most
+
+        # a 429 cools the account off: an old reading and a due clock ask nothing for the hour
+        hookstub.usage_value = {"reason": "rate_limited"}
+        agent._usage_checked[K] = time.monotonic() - 2 * USAGE_FRESH
+        await agent._refresh_usage_inner()
+        assert agent._usage_wait[K] == 3600.0 and agent._usage_acct[K]["reason"] == "rate_limited"
+        asked = hookstub.usage_asked.count("pf")
+        agent._usage_checked[K] = time.monotonic() - 2 * USAGE_FRESH  # past fresh, well inside the hour
+        await agent._refresh_usage_inner()
+        assert hookstub.usage_asked.count("pf") == asked
+
+        # and a restart keeps it: the held reading's `cool_until` seeds the wait, not its old `fetched`
+        held = dict(agent._usage["pf"])
+        agent._usage_checked.pop(K)
+        agent._usage_wait.pop(K)
+        agent._usage_acct.pop(K)
+        agent._usage_seed(K, ["pf"])
+        assert 3500 < agent._usage_wait[K] <= 3600 and held["cool_until"]
+        assert time.monotonic() - agent._usage_checked[K] < agent._usage_wait[K]  # not due
         await c.call("kill", id=s["id"])
 
 
@@ -1905,7 +1966,7 @@ async def test_usage_is_polled_once_per_account_and_backed_off_as_one(agent, hoo
     profiles on one account are asked through one of them, both carry the same reading and
     `fetched`, and a 429 backs the account off rather than the profile it happened to ask
     through. A profile on another account is its own poll."""
-    monkeypatch.setattr("sessionorc.agent_common.USAGE_EVERY", 0.0)
+    monkeypatch.setattr("sessionorc.agent_common.USAGE_FRESH", 0.0)
     monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pb": "paul", "pc": "other"})
     monkeypatch.setattr(hookstub, "usage_asked", [])
     async with LocalClient() as c:
@@ -1929,7 +1990,7 @@ async def test_usage_is_polled_once_per_account_and_backed_off_as_one(agent, hoo
         # a 429 through one profile backs the whole account off: nothing asks through the other
         hookstub.usage_value = {"reason": "rate_limited", "retry_after": 900.0}
         await agent._refresh_usage_inner()
-        assert agent._usage_wait["hookstub:paul"] == 900.0 and "hookstub:pa" not in agent._usage_wait
+        assert agent._usage_wait["hookstub:paul"] == 3600.0 and "hookstub:pa" not in agent._usage_wait
         assert agent._usage["pa"]["reason"] == agent._usage["pb"]["reason"] == "rate_limited"
         assert agent._usage["pb"]["windows"] == [{"label": "week", "pct": 24, "resets": None}]  # kept
         hookstub.usage_value = {"windows": [{"label": "week", "pct": 25, "resets": None}], "fetched": "t2"}

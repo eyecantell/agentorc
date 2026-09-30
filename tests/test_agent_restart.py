@@ -322,9 +322,9 @@ async def test_the_last_usage_reading_survives_a_restart(tmp_path, monkeypatch):
 async def test_a_restart_keeps_the_polls_allowance_too(tmp_path, monkeypatch):
     """Anchor's read of PR #307: keeping the reading kept the chip but not the allowance —
     `_usage_checked` started empty, so a promote still polled at once. The first poll after a
-    restart is now seeded from the held reading's `fetched`: due when `fetched + USAGE_EVERY` has
+    restart is now seeded from the held reading's `fetched`: due when `fetched + USAGE_FRESH` has
     passed, never sooner; a reading with no readable time is polled at once, as before."""
-    from sessionorc.agent import USAGE_EVERY
+    from sessionorc.agent import USAGE_FRESH
 
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     tmux = Tmux(socket_name=private_socket_name())
@@ -335,8 +335,8 @@ async def test_a_restart_keeps_the_polls_allowance_too(tmp_path, monkeypatch):
     now = datetime.now(UTC)
     a = HostAgent(tmux=tmux)
     for prof, fetched in {
-        "fresh": iso(now - timedelta(seconds=60)),  # fetched a minute ago: not due for four more
-        "old": iso(now - timedelta(seconds=USAGE_EVERY + 60)),  # a period and more: due now
+        "fresh": iso(now - timedelta(seconds=60)),  # fetched a minute ago: not due for fourteen more
+        "old": iso(now - timedelta(seconds=USAGE_FRESH + 60)),  # a period and more: due now
         "ahead": iso(now + timedelta(hours=1)),  # a clock that stepped back: a full period, not sooner
         "odd": "t1",  # not a time: polled at once
     }.items():
@@ -348,9 +348,9 @@ async def test_a_restart_keeps_the_polls_allowance_too(tmp_path, monkeypatch):
     mono = time.monotonic()
 
     def due(prof):
-        return mono - a2._usage_checked.get(prof, -USAGE_EVERY) >= USAGE_EVERY  # the tick's own test
+        return mono - a2._usage_checked.get(prof, -USAGE_FRESH) >= USAGE_FRESH  # the tick's own test
 
-    assert not due("fresh") and USAGE_EVERY - 70 < a2._usage_checked["fresh"] + USAGE_EVERY - mono <= USAGE_EVERY - 59
+    assert not due("fresh") and USAGE_FRESH - 70 < a2._usage_checked["fresh"] + USAGE_FRESH - mono <= USAGE_FRESH - 59
     assert due("old")
     assert not due("ahead") and a2._usage_checked["ahead"] == pytest.approx(mono, abs=5)
     assert "odd" not in a2._usage_checked and due("odd")

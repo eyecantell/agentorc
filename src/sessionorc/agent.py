@@ -99,8 +99,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     TRAIL_FLOOR,  # noqa: F401
     TRAIL_KEEP,  # noqa: F401
     TRANSCRIPT_TURNS_MAX,
-    USAGE_BACKOFF_MAX,  # noqa: F401
-    USAGE_EVERY,  # noqa: F401
+    USAGE_COOL,  # noqa: F401
+    USAGE_FRESH,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
     RpcError,  # noqa: F401
     _alarm_report,  # noqa: F401
@@ -111,6 +111,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _clean_answer,  # noqa: F401
     _context_bound,  # noqa: F401
     _controllers,  # noqa: F401
+    _cool_left,  # noqa: F401
     _drop_unknown,  # noqa: F401
     _duration,  # noqa: F401
     _ended_by,  # noqa: F401
@@ -380,7 +381,7 @@ class HostAgent(
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         # The last good reading per profile, kept across a restart (TD-087) — with, beside the
         # windows, why the *last poll* failed, which the page draws as a stale chip rather than
-        # as nothing at all. `_usage_wait` is the backoff a 429 sets and a success clears.
+        # as nothing at all. `_usage_wait` is the cool-off a 429 sets and a success clears.
         # **The reading is the account's** (§4.2a, TD-122): `_usage_acct` holds one reading per
         # `(adapter, account)` key and the poll, its clock and its backoff are keyed on that;
         # `_usage` is the same reading copied under every live profile sharing the account, with
@@ -391,7 +392,7 @@ class HostAgent(
         self._usage_acct: dict[str, dict[str, Any]] = {}
         # …and the **allowance** survives with it (anchor's read of PR #307): a held reading is as
         # good as a poll made at its `fetched`, so the first poll after a promote waits until
-        # `fetched + USAGE_EVERY`, never sooner. A reading with no readable time is polled at once.
+        # `fetched + USAGE_FRESH`, never sooner. A reading with no readable time is polled at once.
         # Seeded per account on the first refresh, from its profiles' held readings.
         self._usage_checked: dict[str, float] = {}
         self._usage_wait: dict[str, float] = {}
