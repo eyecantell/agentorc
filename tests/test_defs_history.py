@@ -27,11 +27,11 @@ def _tracked(home: Path) -> set[str]:
     return set(subprocess.run(["git", "-C", str(home), "ls-files"], capture_output=True, text=True).stdout.split())
 
 
-
 async def _committed(agent) -> None:
     """The commit after `set_settings` runs detached (`_bg`): wait for it."""
     while agent._bg:
         await asyncio.gather(*list(agent._bg), return_exceptions=True)
+
 
 def test_init_tracks_the_three_files_and_ignores_the_rest(tmp_path):
     home = tmp_path / "home"
@@ -115,7 +115,6 @@ async def test_set_settings_leaves_one_commit_and_a_failed_commit_leaves_the_wri
     assert len(_log(home, "settings.yml")) == 1, "the failed commit made none"
 
 
-
 async def test_a_wedged_commit_holds_no_save(agent, monkeypatch):
     """The commit after `set_settings` is detached, as the tick's is: a git that hangs holds the
     history back, never the reply (the techlead's read of #800)."""
@@ -130,6 +129,7 @@ async def test_a_wedged_commit_holds_no_save(agent, monkeypatch):
     finally:
         release.set()
     await _committed(agent)
+
 
 async def test_commit_defs_is_a_persons_own_and_the_homes(agent):
     await park_ticks(agent)

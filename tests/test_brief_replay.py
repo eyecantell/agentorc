@@ -87,7 +87,6 @@ def test_what_cannot_be_read_is_said_and_never_guessed(tmp_path):
     assert brief.record({**made, "base": str(tmp_path / "gone.md")}) is None
 
 
-
 @pytest.mark.unit
 def test_a_brief_under_the_homes_work_tree_is_read_from_disk_whatever_its_remote(tmp_path, monkeypatch):
     """§4.9: the home is a work tree of its three definition files, not a checkout a brief is merged
@@ -112,6 +111,7 @@ def test_a_brief_under_the_homes_work_tree_is_read_from_disk_whatever_its_remote
     (repo / "docs" / "new.md").write_text("only here\n")
     with pytest.raises(brief.Unreadable, match="not on origin/"):
         brief.read(str(repo / "docs" / "new.md"))
+
 
 def _crash(agent, sid: str) -> None:
     rec = agent.sessions[sid]
