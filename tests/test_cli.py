@@ -1789,6 +1789,9 @@ def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
     assert "x 5/day → no line" in line
     assert _gate_line("grind", [{"label": "5h", "reserve": 30, "unread": True}]) == "grind · 5h 30 → no reading yet"
     assert _gate_line("", []) == "(default)"
+    # a window past its reset (TD-233): no number, so no line to be over
+    past = {"label": "week", "reserve": 5, "line": 95, "pct": 99, "unknown": "reset", "next": None}
+    assert _gate_line("grind", [past]) == "grind · week 5 → unknown since its reset (was 99%)"
 
 
 def test_ao_gate_says_how_old_each_reading_is():

@@ -6697,8 +6697,9 @@ teams:
   that the projection no longer reaches the line; `RESUME_MIN` holds as for any resume. **A
   window that is unknown pauses nothing**: past its reset, or with no rate to project by,
   the gate has no number (past its reset built — TD-233: the gate's rows carry `unknown:
-  "reset"` beside the number last read, and a pause on that window lifts once the reset
-  passes), and one note says *usage unknown for 1h, n unattended sessions
+  "reset"` beside the number last read, which `ao gate` prints as *week 5 → unknown since its
+  reset (was 99%)* and the Settings card as *unknown since its reset*, and a pause on that window
+  lifts once the reset passes), and one note says *usage unknown for 1h, n unattended sessions
   working*, once per account per day and not at all with `max_age: off`. A profile with
   nothing unattended live is never projected: an idle account's old reading harms nobody. The
   windows and their labels are the adapter's (§4.3, TD-073); the gate knows none of them by name.

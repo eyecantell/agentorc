@@ -119,6 +119,8 @@ def line_text(row: Mapping[str, Any] | None, now: datetime | None = None) -> str
     70%*, *→ line 60% · 4 days left · moves Thu 07:00*, or why there is none."""
     if not row:
         return "no line"
+    if row.get("unknown") == "reset":
+        return "unknown since its reset — pauses nothing until a new reading"
     if row.get("line") is None:
         return "no line — the window reports no reset"
     out = f"→ line {row['line']:g}%"
