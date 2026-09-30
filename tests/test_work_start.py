@@ -161,6 +161,30 @@ async def test_a_seats_fills_do_not_count_toward_the_ceiling(agent, tmp_path, mo
     assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "techlead-ao"]
 
 
+async def test_the_fifth_bound_reads_every_repo_the_team_names(agent, tmp_path, monkeypatch):
+    """The techlead's read of #799: as for a live team, either repo's crossing counts — a start into a
+    team whose manager's repo is over the line would meet the mark it then raises."""
+    await park_ticks(agent)
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    lead = _rec("manager-ao", lane=["TD-900"])
+    later = await _settled(agent, tmp_path, lead, _rec("grinder-ao-1"))
+    other = str(tmp_path / "b")
+    born = _iso(later - timedelta(hours=1))
+    agent._repos[str(tmp_path)]["prs"] = {"open": [], "at": born}
+    agent._repos[other] = {
+        "name": "b",
+        "root": other,
+        "prs": {"open": [{"number": i, "created": born} for i in range(3)]},
+    }
+    lead.repo = other
+    settings_mod.save({"teams": {"g": {"on_work": "start", "balance": {"prs": 2}}}})
+    await agent._work_marks(later)
+    held = _team_rec(agent)["work_waiting"]["held"]
+    assert held == {"why": "balance", "repo": other, "crossed": [{"line": "prs", "value": 3, "limit": 2}]}
+    assert replays.calls == []
+
+
 async def test_a_member_behind_a_down_link_holds_the_start_as_link(agent, tmp_path, monkeypatch):
     """The techlead's read of #792: the start waits for the link, and says so, so the row is drawn."""
     await park_ticks(agent)
@@ -240,8 +264,18 @@ async def test_a_repo_over_the_teams_balance_line_holds_the_start_as_the_fifth_b
 
     got = await held({"prs": 2})
     assert got == {"why": "balance", "repo": repo, "crossed": [{"line": "prs", "value": 3, "limit": 2}]}
+    prs = agent._repos[repo]["prs"]
     agent._repos[repo]["prs"] = {"error": "gh: offline"}
-    assert await held({"prs": 2}) is None, "a reading that cannot be told holds nothing"
+    assert await held({"prs": 2}) == got and replays.calls == [], "a reading that cannot be told lifts no hold"
+    agent._repos[repo]["prs"] = {**prs, "open": [*prs["open"], {"number": 799, "created": born}]}
+    saved = agent._host_rec["teams"]["g"]["work_waiting"]
+    assert await held({"prs": 2}) == got, "the same line crossed: the hold stands with the crossing's numbers"
+    assert agent._host_rec["teams"]["g"]["work_waiting"] is saved, "and the tick writes nothing"
+    agent._repos[repo]["prs"] = {"error": "gh: offline"}
+    for k in list(_team_rec(agent)):
+        _team_rec(agent).pop(k)
+    await agent._work_marks(later - WORK_SETTLE)
+    assert await held({"prs": 2}) is None, "a reading that cannot be told writes no new hold"
     assert [c[0] for c in replays.calls] == ["grinder-ao-1", "manager-ao", "techlead-ao"], "the team started"
     replays.calls.clear()
 

@@ -1039,7 +1039,8 @@ class TickMixin:
         if not started:
             rec.pop("work_started", None)
         replays = self._work_replays(records, now)
-        held = self._work_held(replays, started, conf, now, team, mark.get("repo"), records)
+        standing = (rec.get("work_waiting") or {}).get("held")
+        held = self._work_held(replays, started, conf, now, team, records, standing)
         bare = {k: v for k, v in mark.items() if k != "held"}
         if held is None:
             down = next((r.host for r in replays if r.host != self.host and r.host not in self._link_muxes), None)
@@ -1088,8 +1089,8 @@ class TickMixin:
         conf: dict[str, Any],
         now: datetime,
         team: str,
-        repo: str | None = None,
         records: list[Session] | None = None,
+        standing: Any = None,
     ) -> dict[str, Any] | None:
         """The bound that holds rule 8's start back, in the design's order, or None (§6 rule 8): a
         member's profile over its usage line; the team's stop time passed and not cleared;
@@ -1109,28 +1110,36 @@ class TickMixin:
             return {"why": "day", "count": len(started)}
         if started and _recent(started[-1], now, agent_common.WORK_EARLY):
             return {"why": "early", "started": started[-1]}
-        return self._work_balance(conf.get("balance"), repo, records or replays, now)
+        return self._work_balance(conf.get("balance"), records or replays, now, standing)
 
     def _work_balance(
-        self, bal: dict[str, Any] | None, repo: str | None, records: list[Session], now: datetime
+        self, bal: dict[str, Any] | None, records: list[Session], now: datetime, standing: Any = None
     ) -> dict[str, Any] | None:
         """Rule 8's fifth bound (§6 *Balance*): the team's lines read by the rule itself, since the mark
-        went with the team's last live member — against `work_waiting`'s `repo`, and for `review`
-        the queue at its seats, which keep their inbox when they end, against the shortest bound its
-        records carry. `{why: balance, repo, crossed}` when a line is crossed; a reading that cannot
-        be told holds nothing, as a failed reading writes no mark."""
+        went with the team's last live member — against every registry root its records name, either
+        crossing counts, as `_balance_mark` reads a live team, and for `review` the queue at its seats,
+        which keep their inbox when they end, against the shortest bound its records carry.
+        `{why: balance, repo, crossed}` when a line is crossed. A reading that cannot be told writes no
+        new hold and lifts none (a failed reading crosses nothing and clears nothing); a standing hold
+        whose repo, lines and limits are unchanged is kept as it stands, so an age's `value` is the
+        crossing's and the tick writes nothing while it holds (the techlead's read of #799)."""
         if not bal:
             return None
-        roots = [repo] if repo and repo in self._repos else []
         records = [r for r in records if not r.superseded_by]  # a resumed record's successor holds its inbox
+        roots = sorted({r.repo for r in records if r.repo and r.repo in self._repos})
         waiting = [str(w["oldest"]) for r in records if r.seat is not None and (w := r.prs_waiting(home=self.host))]
         bounds = [d for r in records if (d := balance_mod.span((r.review or {}).get("bound")))]
         got = balance_mod.crossed(
             bal, roots, self._repos, min(waiting) if waiting else None,
             min(bounds) if bounds else balance_mod.REVIEW_BOUND, now,
         )  # fmt: skip
-        if not got or not got[0]:
+        kept = standing if isinstance(standing, dict) and standing.get("why") == "balance" else None
+        if got is None:
+            return kept
+        if not got[0]:
             return None
+        if kept is not None and kept.get("repo") == got[1] and _lines(kept.get("crossed")) == _lines(got[0]):
+            return kept
         return {"why": "balance", "repo": got[1], "crossed": got[0]}
 
     def _nudge_line(self, s: Session) -> str | None:
@@ -2394,3 +2403,8 @@ def _span(seconds: float) -> str:
     if m < 120:
         return f"{m}m"
     return f"{m // 60}h" if m < 48 * 60 else f"{m // 1440}d"
+
+
+def _lines(crossed: Any) -> list[tuple[Any, Any]]:
+    """A balance crossing's lines and limits, without the numbers that move with the clock."""
+    return [(c.get("line"), c.get("limit")) for c in crossed or [] if isinstance(c, dict)]

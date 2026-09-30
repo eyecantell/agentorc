@@ -6558,9 +6558,11 @@ code and needs no grant; a session doing the same work does.
        `work_waiting`, since a replay writes a `restarts` entry on every member); and a start by this rule inside the last **`WORK_EARLY`** (thirty
        minutes), which is a team that found nothing and would be started into the same nothing; and
        its repo **over the team's balance line** (§6 *Balance*), read here by the rule itself,
-       since the mark goes with the team's last live member: the team's `balance` against
-       `work_waiting`'s `repo`, and `review` against the queue its ended seats keep, a reading
-       that cannot be told holding nothing.
+       since the mark goes with the team's last live member: the team's `balance` against every
+       registry root its records name, either crossing counting as for a live team, and `review`
+       against the queue its ended seats keep. A reading that cannot be told writes no new hold
+       and lifts none, and a standing hold whose repo, lines and limits are unchanged is kept as
+       it stands, so its numbers are the crossing's.
        A bound that holds writes **`held: {why}`** on `work_waiting` — `usage` with the `profile`,
        `until` with the instant, `day` with the `count`, `early` with the last start, `balance`
        with the `repo` and the `crossed` lines in the mark's shape — re-read on
@@ -6917,8 +6919,8 @@ teams:
   or a `none` taken once the mark has gone removes it. While the mark stands the idle nudge and rule 6's lane
   news pass a record carrying it by — an entry left untold is told once the line clears —
   and rule 8 holds a start back with *its repo is over its line* as a fifth bound — reading the
-  lines itself against `work_waiting`'s `repo`, since the mark went with the team's last live
-  member (rule 8, built). Never a
+  lines itself against the repos the team's records name, since the mark went with the team's
+  last live member (rule 8, built). Never a
   pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
 
   **Who is told**, once per crossing and once when it clears — a mark that comes and goes
