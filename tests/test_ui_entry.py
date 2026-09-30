@@ -193,3 +193,18 @@ def test_hand_is_disabled_with_its_reason(tmp_path, monkeypatch, team, seat, why
     c = client(monkeypatch, tmp_path, fake([]))
     hand = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["hand"]
     assert hand["why"] == why and hand["to"] == ""
+
+
+def test_a_seat_with_no_checkout_is_not_read_as_no_seat():
+    """From the review of slice 4: `teams.seat_id` answers "" both for a team with no techlead and
+    for a seat whose home has no checkout on its host, and `entry_add` refuses both — but the reason
+    under the button says which, so the person knows whether to add a seat or a checkout."""
+    from datetime import UTC, datetime
+
+    from agentorc.ui.repo import entry_hand
+
+    now = datetime(2026, 9, 29, tzinfo=UTC)
+    none = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": ""}], {}, now)
+    assert none["why"] == "this team has no techlead seat" and none["to"] == ""
+    bare = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": "techlead-sam"}], {}, now)
+    assert bare["why"] == "techlead-sam: the techlead seat has no checkout on its host" and bare["to"] == ""

@@ -64,21 +64,33 @@ def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
         }
         if root in paths:
             seat = teams.seat_id(org, t, t.host or host, host)
-            out.append({"team": tname, "seat": seat, "name": t.techlead.name if seat and t.techlead else ""})
+            out.append(
+                {
+                    "team": tname,
+                    "seat": seat,
+                    "name": t.techlead.name if seat and t.techlead else "",
+                    # a seat the team defines whose home has no checkout on its host: `seat_id` is ""
+                    # for it as for no seat at all, and the reason under the button tells them apart
+                    "techlead": t.techlead.name if t.techlead else "",
+                }
+            )
     return out
 
 
 def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, Any]], now: datetime) -> dict[str, str]:
     """**Hand to the techlead**'s state on the Add entry form (§4.5a): `{team, to, name, why, line}`.
     `why` is the reason the button is disabled — *no team services this repo*, *this team has no
-    techlead seat* — else empty; `line` is §4.10's *When it is read* for an `ask` with no bound, the
+    techlead seat*, *<seat>: the techlead seat has no checkout on its host* — else empty; `line` is
+    §4.10's *When it is read* for an `ask` with no bound, the
     sentence the Message composer draws: the seat's record's own (`refill`, the agent's sentence for
     what fills a seat as an `ask` does), or a seat nobody fills where there is no record."""
     if not servicing:
         return {"team": "", "to": "", "name": "", "why": "no team services this repo", "line": ""}
     first = servicing[0]
     if not first.get("seat"):
-        return {"team": first["team"], "to": "", "name": "", "why": "this team has no techlead seat", "line": ""}
+        lead = first.get("techlead") or ""
+        why = f"{lead}: the techlead seat has no checkout on its host" if lead else "this team has no techlead seat"
+        return {"team": first["team"], "to": "", "name": "", "why": why, "line": ""}
     rw = (records.get(first["seat"]) or {}).get("read_when")
     line = rw.get("refill") if isinstance(rw, dict) and rw.get("refill") else ""
     line = line or mail.read_when(None, "ask", now, seat=True, lapses=False)

@@ -1477,6 +1477,109 @@ def test_a_done_outcome_is_fyi_under_the_question_and_its_note_is_not_a_row_of_i
     assert "you answered &ldquo;merge it&rdquo;" in html and "outcome · done" in html and "merged as #261" in html
 
 
+def handed_entry(mid, **kw):
+    """An entry the person handed a seat, as the `inbox` read lists it under `handed` (TD-218 slice 3):
+    the holder's own copy, from the person, `handed`, with its holder named."""
+    return {
+        "id": mid, "from": "person", "to": [kw.pop("holder", "ao-agentorc-techlead-ao-1")], "kind": "ask",
+        "text": kw.pop("text", "the Inbox hides a board item\n\nseen on the ao-grind board"),
+        "at": "2026-09-19T10:00:00Z", "handed": True, "entry": {"repo": "agentorc", "type": "debt"},
+        "holder": "ao-agentorc-techlead-ao-1", "holder_name": "techlead-ao-1",
+        "holder_state": kw.pop("holder_state", "working"), **kw,
+    }  # fmt: skip
+
+
+@pytest.mark.unit
+def test_an_entry_handed_to_a_seat_waits_on_them_until_its_outcome_and_blocked_is_counted():
+    """§4.10 *An entry handed to a seat* (TD-219): the row waits under **Waiting on them** from the
+    press until the seat reports, uncounted, whatever its holder's state — a seat that exited is
+    filled again — and is under **Needs you**, counted, once it came back `blocked`. The row names
+    the holder and opens it, and **Dismiss** names the entry's id (the holder's copy)."""
+    from agentorc.ui.app import handed_rows, inbox_sections
+
+    at = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    fleet = {
+        "ao-agentorc-techlead-ao-1": {
+            "id": "ao-agentorc-techlead-ao-1", "team": "ao-grind", "state": "working",
+            "doing": {"text": "drafting TD-240", "at": "2026-09-19T11:50:00Z"},
+        }
+    }  # fmt: skip
+    got = inbox_sections([], now=at, handed=handed_rows([handed_entry("m-h1"), "junk", {}], fleet, at))
+    assert [x["id"] for x in got["waiting"]] == ["m-h1"] and got["count"] == 0 and not got["needs"]
+    html = rows("waiting", got["waiting"])
+    assert "entry · debt" in html and "for agentorc" in html and "the Inbox hides a board item" in html
+    assert 'href="/focus/ao-agentorc-techlead-ao-1"' in html and "ao-grind" in html
+    assert "waiting on techlead-ao-1 to report the entry and its PR" in html
+    assert "doing: drafting TD-240 · says 10m ago" in html
+    assert 'data-act="dismiss" data-id="person" data-msg="m-h1"' in html
+    assert 'data-act="reply"' not in html and 'data-act="snooze"' not in html
+    # its holder exited half way: still waiting, uncounted, and the row says so
+    gone = handed_rows([handed_entry("m-h2", holder_state="exited")], {}, at)
+    got = inbox_sections([], now=at, handed=gone)
+    assert [x["id"] for x in got["waiting"]] == ["m-h2"] and got["count"] == 0
+    html = rows("waiting", got["waiting"])
+    assert "techlead-ao-1 exited before reporting" in html and "/focus/" not in html
+    # blocked: counted under Needs you, its outcome drawn
+    blocked = {"state": "blocked", "text": "which board?", "at": "2026-09-19T11:30:00Z"}
+    got = inbox_sections([], now=at, handed=handed_rows([handed_entry("m-h3", outcome=blocked)], fleet, at))
+    assert [x["id"] for x in got["needs"]] == ["m-h3"] and got["count"] == 1 and not got["waiting"]
+    html = rows("needs", got["needs"])
+    assert "outcome · blocked" in html and "which board?" in html and "blocked on something only a person" in html
+
+
+@pytest.mark.unit
+def test_the_handed_row_reaches_the_page_its_own_page_and_the_org_count(tmp_path, monkeypatch):
+    """The `inbox` read's `handed` list is drawn on the Inbox page and its poll, found by its id on
+    `/inbox/<id>` (the Hand to the techlead toast links there, §4.5a), and a `blocked` one counts
+    in the Org's top bar as it does on the Inbox — one `inbox_sections` for both."""
+    from fastapi.testclient import TestClient
+
+    from agentorc.ui import app as uiapp
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    blocked = {"state": "blocked", "text": "which board?", "at": "2026-09-19T11:30:00Z"}
+    inbox = {
+        "id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0,
+        "handed": [handed_entry("m-h1"), handed_entry("m-h2", outcome=blocked)],
+    }  # fmt: skip
+    idreport = {"host": "kmaster", "mode": "off", "detached_check": False, "tally": {}}
+    answers = {
+        "list": [rec("ao-agentorc-techlead-ao-1", "working", name="techlead-ao-1")],
+        "inbox": inbox,
+        "identity": {**idreport, "alarms": [], "sessions": {}},
+        "usage": {},
+        "gate": {},
+        "host": {"host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {}},
+        "thread": {"entries": [], "pruned": False},
+    }
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call(self, method, **params):
+            return answers[method]
+
+    monkeypatch.setattr(uiapp, "LocalClient", FakeClient)
+    with TestClient(uiapp.create_app()) as c:
+        got = c.get("/api/person/inbox").json()
+        assert got["sections"]["waiting"] == ["m-h1"] and got["sections"]["needs"] == ["m-h2"]
+        assert got["needs"] == 1 and "waiting on techlead-ao-1" in got["html"]["waiting"]
+        page = c.get("/inbox").text
+        assert 'data-msg="m-h1"' in page and "entry · debt" in page
+        one = c.get("/inbox/m-h1")
+        assert one.status_code == 200 and "no longer in the person inbox" not in one.text
+        assert "the Inbox hides a board item" in one.text
+        org = c.get("/")
+        assert org.status_code == 200 and 'id="personneeds">1<' in org.text
+
+
 @pytest.mark.unit
 def test_the_trail_puts_a_row_that_resolved_without_you_into_fyi():
     """§4.10 *The Inbox is a queue*: a state row that went away by some other road — the session

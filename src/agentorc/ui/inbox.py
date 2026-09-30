@@ -612,6 +612,46 @@ def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> N
         e["outcome_age"] = _age(outcome.get("at"), now)
 
 
+def handed_rows(
+    handed: Collection[dict[str, Any]], records: Mapping[str, dict[str, Any]], now: datetime
+) -> list[dict[str, Any]]:
+    """The entries the person handed a seat (§4.10 *An entry handed to a seat*, TD-219): the
+    `inbox` read lists them as `handed` beside the person inbox, each the holder's own copy with
+    `holder`, `holder_name` and `holder_state`, while it owes its outcome or came back `blocked`.
+    Each becomes a row keyed `handed_row`, never `row` — it is mail, so its page (`/inbox/<id>`) and
+    **Dismiss** reach it by its id as any entry's do. It waits on the seat, not on the holder: a seat
+    that exited half way is filled again, so an exited holder is not the counted *asker gone quiet*
+    of an answered question; only `blocked` is counted (`inbox_sections`)."""
+    out = []
+    for e in handed:
+        if not isinstance(e, dict) or not e.get("id"):
+            continue
+        holder = str(e.get("holder") or "")
+        rec = records.get(holder) or {}
+        doing = rec.get("doing") if isinstance(rec.get("doing"), dict) else {}
+        entry = e.get("entry") if isinstance(e.get("entry"), dict) else {}
+        out.append(
+            {
+                **e,
+                "handed_row": True,
+                "entry": entry,
+                "team": e.get("team") or rec.get("team") or "",
+                "from_name": "you",
+                "holder_name": str(e.get("holder_name") or rec.get("name") or holder),
+                "holder_state": str(e.get("holder_state") or rec.get("state") or ""),
+                "holder_open": holder if holder in records else "",
+                "holder_doing": (
+                    {"text": str(doing.get("text") or ""), "age": _age(doing.get("at"), now)}
+                    if doing.get("text")
+                    else None
+                ),
+                "age": _age(e.get("at"), now),
+                "outcome_age": _age(_outcome_of(e).get("at"), now) if _outcome_of(e) else "",
+            }
+        )
+    return out
+
+
 def _outcome_of(e: dict[str, Any]) -> dict[str, Any]:
     """An entry's `outcome` (§4.10 *Outcomes*) as a dict, or `{}` — read as a shape, never trusted:
     an entry from another build may carry anything there and it must cost a row a line, not the
@@ -661,6 +701,7 @@ def inbox_sections(
     trail: Collection[dict[str, Any]] = (),
     attention_snoozed: dict[str, Any] | None = None,
     boards: Collection[dict[str, Any]] = (),
+    handed: Collection[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -691,6 +732,10 @@ def inbox_sections(
       counted — only a person, or the asker's manager, can find out what happened — and so is a
       **`blocked`** outcome, which is not a dead end but work stopped on something only a person
       can move. A `done` or `dropped` outcome is FYI, shown under the question it closes.
+      **An entry the person handed a seat** (`handed`, from `handed_rows`; §4.10 *An entry handed
+      to a seat*, TD-219) waits here from the press until its outcome, whatever its holder's state
+      — a seat that exited is filled again — and is in *Needs you*, counted, once it came back
+      `blocked`. A `done` or `dropped` one is no longer listed by the read, so it is in neither.
 
     **A state row's snooze** (§4.10 *The Inbox is a queue*, TD-079 step 1b) lives in the home's own
     attention store, per record and row kind, because a state has no mail entry to carry one:
@@ -749,6 +794,8 @@ def inbox_sections(
             continue  # the reporting note: drawn under the question it closes, not beside it
         else:
             out["fyi"].append(e)
+    for e in handed:
+        out["needs" if _outcome_of(e).get("state") == "blocked" else "waiting"].append(e)
     out["fyi"].extend(_trail_rows(trail or (), at))
     out["needs"].extend(boards)
     out["needs"].sort(key=_needs_key)
