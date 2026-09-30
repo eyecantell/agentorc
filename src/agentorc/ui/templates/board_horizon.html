@@ -9,12 +9,12 @@
 {%- if hz and hz.line %}
 {%- if hz.ahead %}
 <div class="row gap wrap boardsub"><span class="boardsubh">Board, coming up</span><span class="meta">({{ hz.ahead | length }})</span><span class="meta">not counted</span></div>
-<div class="inboxrows" id="rows-coming">{% for e in hz.ahead %}{{ hr.row(e, 'coming') }}{% endfor %}</div>
+<div class="inboxrows" id="rows-coming">{% set firsts = origin_firsts(hz.ahead) %}{% for e in hz.ahead %}{{ hr.row(e, 'coming', e.id in firsts) }}{% endfor %}</div>
 {%- endif %}
 {%- if hz.hidden %}
 <details class="fold boardfold" data-fold="boardfold">
   <summary>not shown ({{ hz.hidden | length }})</summary>
-  <div class="inboxrows" id="rows-unshown">{% for e in hz.hidden %}{{ hr.row(e, 'unshown') }}{% endfor %}</div>
+  <div class="inboxrows" id="rows-unshown">{% set firsts = origin_firsts(hz.hidden) %}{% for e in hz.hidden %}{{ hr.row(e, 'unshown', e.id in firsts) }}{% endfor %}</div>
 </details>
 {%- endif %}
 <div class="meta boardline">{{ hz.line.says }} · {{ hz.line.rest }}{% if hz.line.n %} — <a href="#" class="boardshow" title="open the fold for this page view — no setting changes">show</a>{% endif %} · <a href="/settings#sec-you" title="board items shown: the Settings page's You">Settings</a></div>

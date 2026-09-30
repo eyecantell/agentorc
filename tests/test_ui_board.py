@@ -816,3 +816,200 @@ def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, mon
                 break
             threading.Event().wait(0.05)
         assert "from origin" in got["html"]["needs"] and "answered" not in got["html"]["needs"]
+
+
+def _reader_phrases():
+    """Every `FetchResult` sentence the reader can write, its f-string holes filled."""
+    import re
+
+    src = READER.read_text()
+    out = []
+    for m in re.finditer(r'FetchResult\(\s*f?"([^"]*)"', src):
+        out.append(re.sub(r"\{[^}]*\}", "origin/main", m.group(1)))
+    return out
+
+
+@pytest.mark.unit
+def test_the_phrase_table_knows_every_sentence_the_reader_writes():
+    """§4.5 screen 6: the note is chosen by the fixed phrases of the reader's `fetch_note` — the
+    reader gives the cases no field — so a phrase the reader gains that the table does not know
+    fails here rather than drawing no note on the page."""
+    from agentorc.ui.inbox import ORIGIN_PHRASES
+
+    phrases = _reader_phrases()
+    assert len(phrases) >= 9
+    for ph in phrases:
+        known = [c for o, p, c in ORIGIN_PHRASES if ph.startswith(o) and (not p or p in ph)]
+        assert known, f"the origin note's table does not know the reader's phrase {ph!r}"
+
+
+@pytest.mark.unit
+def test_the_origin_note_says_each_case_in_the_designs_words():
+    """§4.5a **origin note**: behind, local edits, two-sided (the warning colour), origin not
+    reached with its reason; none when the board matches, origin has none, or the read was plain."""
+    from agentorc.ui.inbox import origin_note
+
+    def note(fetch_note, source=""):
+        return origin_note({"source": source, "fetch_note": fetch_note})
+
+    behind = note("fetched; local clone is behind — showing origin/main's board (pull to catch up)", "origin/main")
+    assert behind == {"text": "read from origin/main: this checkout has not pulled it yet", "warn": False}
+    local = note("fetched; board DIFFERS from origin/main (local edits not pushed) — push for the cross-machine view")
+    assert local == {"text": "board edits made here are not on origin", "warn": False}
+    for paren in ("(both sides changed)", "(no common history to compare)"):
+        both = note(f"fetched; board DIFFERS from origin/main {paren} — pull/push; showing local")
+        assert both["warn"] and both["text"].startswith("this checkout's board and origin's have both changed")
+        assert both["text"].endswith("what origin added is not shown — pull")
+    assert note("fetch skipped (timeout)") == {
+        "text": "origin could not be reached (timeout): showing the checkout's board as of its last pull",
+        "warn": False,
+    }
+    assert "(fatal: could not read (x))" in note("fetch skipped (fatal: could not read (x))")["text"]
+    for none in ("fetched; board matches origin/main", "fetched; no board at origin/main", "", "something new"):
+        assert note(none) is None
+
+
+@pytest.mark.unit
+def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(tmp_path, monkeypatch):
+    """One note above the repo's first board row in the list, none for a board that matches; on a
+    board whose `source` is origin, Snooze, Done and Reply are disabled with the design's reason and
+    Open board stays; a two-sided board's note is in the warning colour."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows, templates
+
+    a, b, c = tmp_path / "behind", tmp_path / "same", tmp_path / "both"
+    rep = report(a, item(3, "one. Due: 2026-09-20.", "2026-09-20", "2d overdue"), item(4, "two.", "2026-09-20", "x"))
+    rep["boards"][0].update(source="origin/main", fetch_note="fetched; local clone is behind — showing …")
+    for root, fn in (
+        (b, "fetched; board matches origin/main"),
+        (c, "fetched; board DIFFERS from origin/main (both sides changed) — pull/push; showing local"),
+    ):
+        more = report(root, item(7, f"{root.name} line.", "2026-09-20", "2d overdue"))["boards"][0]
+        more["fetch_note"] = fn
+        rep["boards"].append(more)
+    rows = board_rows(rep)
+    assert [r["source"] for r in rows] == ["origin/main", "origin/main", "", ""]
+    html = templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
+    assert html.count("read from origin/main: this checkout has not pulled it yet") == 1
+    assert html.index("this checkout has not pulled it yet") < html.index("one. Due")
+    assert html.count('class="originnote meta warnish"') == 1 and html.count("originnote") == 2
+    ro = "on origin, not in this checkout yet: pull to act on it"
+    behind_html = html[: html.index("same line.")]
+    assert 'data-act="' not in behind_html and behind_html.count(f'disabled title="{ro}"') == 6
+    assert behind_html.count("Open board") == 2
+    rest = html[html.index("same line.") :]
+    assert rest.count('data-board-act="done"') == 2 and ro not in rest
+    # the Repo page and the horizon draw it by the same rule
+    part = templates.get_template("board_horizon.html").render(
+        hz={"ahead": rows, "hidden": [], "line": {"says": "x", "rest": "y", "n": 0}}, origin=""
+    )
+    assert part.count("this checkout has not pulled it yet") == 1
+
+
+@pytest.mark.unit
+def test_a_press_on_a_board_read_from_origin_is_refused_before_the_write_back(tmp_path, monkeypatch):
+    """The page draws the controls disabled; a press that comes anyway is refused in the same words
+    and never reaches `board_edit` or `board_reply`. Put on the board is not a row's press."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+
+    board = str(tmp_path / "r/docs/user_attention.md")
+    row = {"row": "board", "id": f"board:{board}:3", "board": board, "text": "x", "due_now": True, "at": "2026-09-01"}
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([dict(row, source="origin/main")], ""))
+    calls = []
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method in ("board_edit", "board_reply"):
+                calls.append((method, kw.get("action")))
+                return {"commit": "abc"}
+            return {"list": [], "inbox": {"entries": [], "trail": []}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    with TestClient(uiapp.create_app()) as c:
+        c.get("/api/person/inbox")
+        for body in (
+            {"action": "done", "board": board, "line": 3, "text": "x"},
+            {"action": "snooze", "board": board, "line": 3, "text": "x", "due": "2026-10-01"},
+            {"action": "reply", "board": board, "line": 3, "text": "x", "reply": "y"},
+        ):
+            r = c.post("/api/person/board", json=body)
+            assert r.status_code == 409 and "pull to act on it" in r.text
+        assert calls == []
+        r = c.post(
+            "/api/person/board",
+            json={"action": "add", "msg": "m-1", "board": board, "text": "new", "due": "2026-10-01"},
+        )
+        assert r.status_code == 200 and calls == [("board_edit", "add")]
+
+
+def _behind_clone(tmp_path):
+    """An origin, a seed that pushes to it and a clone one board commit behind."""
+    due = date.today().isoformat()
+    origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "proj"
+    _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    _git("clone", "-q", str(origin), str(seed), cwd=tmp_path)
+    (seed / "docs").mkdir()
+    (seed / "docs" / "user_attention.md").write_text(f"# Board\n\n- [ ] the old line. Due: {due}.\n")
+    (seed / "scripts").mkdir()
+    shutil.copy(READER, seed / "scripts" / "nudge_user_attention.py")
+    for d in (seed,):
+        for k, v in (("user.email", "t@t"), ("user.name", "t")):
+            _git("config", k, v, cwd=d)
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-q", "-m", "board", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
+    for k, v in (("user.email", "t@t"), ("user.name", "t")):
+        _git("config", k, v, cwd=clone)
+    with (seed / "docs" / "user_attention.md").open("a") as f:
+        f.write(f"- [ ] the line only on origin. Due: {due}.\n")
+    _git("commit", "-q", "-am", "a line", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    return clone, due
+
+
+@pytest.mark.unit
+def test_after_a_pull_the_row_is_pressable_and_a_two_sided_board_warns(tmp_path, monkeypatch):
+    """Real git, the real reader (TD-221 slice 4): behind, the row only on origin is read-only under
+    the *behind* note; after a pull the same row is pressable and no note is drawn; a local board
+    edit against a new line on origin shows the checkout's rows under the warning note."""
+    clone, due = _behind_clone(tmp_path)
+    host(tmp_path, monkeypatch, [clone])
+    from agentorc.ui import app as uiapp
+    from agentorc.ui.app import templates
+
+    def page():
+        rows, note = uiapp.read_boards(fetch=True)
+        assert note == ""
+        return rows, templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
+
+    rows, html = page()
+    assert [r["text"].split(".")[0] for r in rows] == ["the old line", "the line only on origin"]
+    assert "this checkout has not pulled it yet" in html and 'data-board-act="done"' not in html
+    _git("pull", "-q", "--ff-only", cwd=clone)
+    rows, html = page()
+    assert [r["source"] for r in rows] == ["", ""] and rows[0]["fetch_note"].startswith("fetched; board matches")
+    assert "originnote" not in html and html.count('data-board-act="done"') == 2
+    # two-sided: an edit here, committed, and another line merged on origin
+    board = clone / "docs" / "user_attention.md"
+    board.write_text(board.read_text() + f"- [ ] a line made here. Due: {due}.\n")
+    _git("commit", "-q", "-am", "here", cwd=clone)
+    seed = tmp_path / "seed"
+    with (seed / "docs" / "user_attention.md").open("a") as f:
+        f.write(f"- [ ] a second line on origin. Due: {due}.\n")
+    _git("commit", "-q", "-am", "there", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    rows, html = page()
+    assert "a line made here" in html and "a second line on origin" not in html
+    assert 'class="originnote meta warnish"' in html and "what origin added is not shown — pull" in html
+    assert html.count('data-board-act="done"') == 3  # the checkout's rows are its own: pressable
