@@ -111,7 +111,6 @@ async def test_the_launch_record_keeps_prompt_from_and_a_replay_hands_it_back(ag
         await person.call("kill", id=s["id"])
 
 
-
 @pytest.mark.unit
 def test_the_lane_slot_leaves_an_owner_word_out():
     """TD-227 slice 1: `owner:<word>` narrows what the home tells a member of; the brief names the lane."""

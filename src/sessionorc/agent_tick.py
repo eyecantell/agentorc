@@ -872,9 +872,13 @@ class TickMixin:
                 if s.out_of_work != decl or s.lane_seen is not None:
                     return  # the declaration moved while git was read: the next tick looks afresh
                 if then is not None and tip is not None:
-                    # both sides from origin: an entry only a branch checked out here holds is not new
-                    seen, ids = matching(then), matching(tip)
-                    read = f"the ledger at the declaration ({why}) against origin's tip"
+                    # an entry the checkout holds and origin's tip does not (a branch checked out here)
+                    # is seen, untold, or every tick after this one, which reads the checkout, would
+                    # tell it as new — and again after each `none`
+                    seen = matching(then)
+                    on_tip = set(matching(tip))
+                    seen += [i for i in ids if i not in on_tip and i not in seen]
+                    read = f"the ledger at the declaration ({why}), the checkout's own entries seen"
                 else:
                     read = f"the reading at this tick ({why})"
             s.lane_seen = {"at": now_iso(), "ids": seen}

@@ -102,7 +102,14 @@ async def test_the_first_write_is_the_ledger_at_the_declaration(agent, tmp_path)
         agent._repos[str(repo)]["ledger"]["path"] = "docs/technical_debt.md"
         rec = agent.sessions[sid]
         await agent._lane_news(rec, now)
-        assert rec.lane_seen["ids"] == ["TD-001", "TD-002"] and "TD-009" not in _notes(agent, sid)[0]
+        assert rec.lane_seen["ids"] == ["TD-001", "TD-009", "TD-002"] and "TD-009" not in _notes(agent, sid)[0]
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        assert len(_notes(agent, sid)) == 1, "the checkout's own entry is not told on a later tick either"
+        # a second `none` looks afresh: the first write again sees the checkout's own entry, untold
+        rec.out_of_work, rec.lane_seen = {"at": "2026-09-28T00:00:00Z", "why": "nothing pickable"}, None
+        await agent._lane_news(rec, now + timedelta(minutes=2))
+        await agent._lane_news(rec, now + timedelta(minutes=3))
+        assert rec.lane_seen["ids"] == ["TD-001", "TD-002", "TD-009"] and len(_notes(agent, sid)) == 1
         assert (
             len(_notes(agent, sid)) == 1
             and "gained 1 entry since you declared out of work: TD-002" in _notes(agent, sid)[0]

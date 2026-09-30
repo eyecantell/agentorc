@@ -6410,8 +6410,9 @@ code and needs no grant; a session doing the same work does.
      the ledger file as the last commit of `origin/<default>` before `out_of_work.at` held it, read
      from the checkout's history, so an entry merged between the declaration and the first tick
      that looks — a day later, when the rule went live on 2026-09-28 with ten entries in the
-     designer's lane — is new and is told; that first tick compares it with the same ref's tip, not the
-     checkout's file, so an entry only a branch checked out at the home holds is not told as new;
+     designer's lane — is new and is told; an entry the checkout's reading holds and that ref's tip does not
+     (a branch checked out at the home) is written into it untold, so no tick, this one or a later
+     one reading the checkout, tells as new an entry `origin/<default>` does not hold;
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      `design-first` matches an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
      matches one with `Pickable: yes` that is not design-first (**with pickable derived**, TD-223,
