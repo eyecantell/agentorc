@@ -827,7 +827,7 @@
     return row && typeof row.line === "number" ? row : null;
   }
   // The projection the gate reads for a window (§6, TD-233): the row's `pct` when it is `projected`.
-  const projectedOf = (row) => (row && row.projected && typeof row.projected === "object" && typeof row.pct === "number" ? row.pct : null);
+  const projectedOf = (row) => (row && row.projected && typeof row.projected === "object" && !Array.isArray(row.projected) && typeof row.pct === "number" ? row.pct : null);
   function usageHover(w, row) {
     if (!row) return `${w.label} ${w.pct}% (resets ${w.resets || "?"})`;
     const pr = projectedOf(row);
