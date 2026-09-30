@@ -4047,10 +4047,12 @@ anywhere in a definition names a file that has to be repeatable (§4.8): this co
 restart, so a brief written for one run strands the next one. The start warns and proceeds when
 it finds a clock time or a run number in the text it is about to hand over.
 
-`entries` (on the team, TD-180; not built — TD-219): `{feature: <role>, debt: <role>}`, the role an
+`entries` (on the team, TD-180; the key built by TD-219, the form not yet): `{feature: <role>, debt: <role>}`, the role an
 interactive session takes when the person opens one from **Add entry…** (*Add an entry to the
-ledger*, below); either key may be left out and reads `techlead`; a role nothing resolves is an
-error naming it, as an unknown key is.
+ledger*, below); either key may be left out and reads `techlead`; a role nothing resolves — not a
+preset, not the org's `roles:`, not a role the repo's own file defines for its own teams, not one
+the team's definition starts — is an error naming it when the definition is read, as an unknown key
+is. `ao team list --json` carries each team's `entries` with both types said.
 
 Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
 `name` (the prefix; default the role), `home`, `lane`, `brief` (the repo's supplement to the role's template, §4.8),

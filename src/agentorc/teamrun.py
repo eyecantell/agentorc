@@ -116,7 +116,7 @@ def org_with_repo_teams(org: orgmod.Org, roots: list[Path | str]) -> tuple[orgmo
         try:
             cfg = repoconfig.load(Path(root).expanduser())
             if cfg.teams and cfg.root:
-                org = orgmod.merge_repo_teams(org, cfg.root, cfg.teams)
+                org = orgmod.merge_repo_teams(org, cfg.root, cfg.teams, cfg.roles)
         except (OSError, ValueError) as e:
             notes.append(f"{root}: {str(e).strip(chr(34))}")
     return org, notes
@@ -285,6 +285,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "projects": list(t.projects),
                 "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
+                # the role Add entry's **Open a session** starts, per Type (§4.9, TD-219), each said
+                "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
                 "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
                 "members": sum(len(m.names()) for m in t.members if m.team is None),

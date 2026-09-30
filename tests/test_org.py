@@ -513,3 +513,48 @@ def test_a_count_is_edited_as_the_field_never_as_text_that_looks_like_it(tmp_pat
     assert p.read_text() == before.replace('"prod count: 9 today", count: 2,', '"prod count: 9 today", count: 3,')
     org.edit_members(p, "ao-grind", remove=0, role="grinder")
     assert p.read_text() == before
+
+
+def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path, monkeypatch):
+    """TD-219 slice 2, design §4.9 *Add an entry to the ledger*: `entries: {feature: <role>, debt:
+    <role>}` on a team, either key optional and read as `techlead` where unsaid; an unknown key, or a
+    role nothing resolves, is an error naming it when the definition is read. A role resolves from the
+    presets, the org's `roles:`, the team's own members and seats, or the repo's roles for its own teams."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    f = tmp_path / "org.yml"
+    base = (
+        "projects: {p: {repos: {r: {kmaster: /tmp/r}}}}\nroles: {designer: {profile: x}}\n"
+        "teams:\n  t:\n    projects: [p]\n"
+    )
+    f.write_text(base)
+    t = org.load(f).teams["t"]
+    assert t.entries == {} and (t.entry_role("debt"), t.entry_role("feature")) == ("techlead", "techlead")
+    f.write_text(base + "    entries: {feature: designer}\n")
+    t = org.load(f).teams["t"]
+    assert (t.entry_role("feature"), t.entry_role("debt")) == ("designer", "techlead")
+    f.write_text(base + "    members: [{role: sage}]\n    entries: {debt: sage}\n")  # the team's own role
+    assert org.load(f).teams["t"].entry_role("debt") == "sage"
+    for bad, why in (
+        ("{bug: grinder}", r"unknown key\(s\) \['bug'\]"),
+        ("{feature: wizard}", "unknown role 'wizard'"),
+        ("{debt: person}", "not a role"),
+        ("{debt: ''}", "a role name"),
+        ("[designer]", "must be a mapping"),
+    ):
+        f.write_text(base + f"    entries: {bad}\n")
+        with pytest.raises(ValueError, match=why):
+            org.load(f)
+    # a repo's own team may name a role its own file defines
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    f.write_text(base)
+    teams = {"g": {"entries": {"feature": "scribe"}}}
+    with pytest.raises(ValueError, match="unknown role 'scribe'"):
+        org.merge_repo_teams(org.load(f), repo, teams)
+    assert org.merge_repo_teams(org.load(f), repo, teams, ["scribe"]).teams["g"].entry_role("feature") == "scribe"
+    # `ao team list --json` (the rows) carries both types, said
+    from agentorc import teamrun
+
+    f.write_text(base + "    entries: {feature: designer}\n")
+    (row,) = teamrun.rows(org.load(f), [])
+    assert row["entries"] == {"debt": "techlead", "feature": "designer"}

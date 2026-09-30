@@ -689,7 +689,7 @@ def _org_here(directory: pathlib.Path) -> orgmod.Org:
     o = orgmod.load()
     cfg = repoconfig.discover(directory)
     if cfg.teams and cfg.root:
-        o = orgmod.merge_repo_teams(o, cfg.root, cfg.teams)
+        o = orgmod.merge_repo_teams(o, cfg.root, cfg.teams, cfg.roles)
     return o
 
 
