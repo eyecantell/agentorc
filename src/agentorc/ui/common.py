@@ -123,6 +123,43 @@ USAGE_WHY = {
 }
 NEAR_CAP = 80  # "at or near a cap" (§4.5a): never collapsed into +n; `app.js` keeps the same number
 
+# How old a reading may be before the chip says so (design §4.5a **usage** chip, *The age*; TD-230,
+# TD-233 slice 1), in seconds; `app.js` keeps the same three numbers. Past `USAGE_AGED` the age is
+# printed after the number, past `USAGE_FRESH` the chip is dimmed, and past `USAGE_UNKNOWN` the
+# number is no longer offered as the account's: *week unknown since 22:21 (was 88%)*.
+USAGE_AGED = 5 * 60
+USAGE_FRESH = 15 * 60
+USAGE_UNKNOWN = 3 * 3600
+# Where a reading came from (§4.4 *Usage*), for the hover: a reading with no `source` was asked.
+USAGE_SOURCE = {"asked": "asked of the endpoint", "reported": "reported by a session"}
+
+
+def usage_age(secs: float) -> str:
+    """A reading's age in the chip's short shape — *7m*, *6h*, *2d* — as `ao gate` prints it."""
+    secs = max(0, int(secs))
+    if secs < 3600:
+        return f"{secs // 60}m"
+    return f"{secs // 3600}h" if secs < 86400 else f"{secs // 86400}d"
+
+
+def usage_clock(dt: datetime, now: datetime) -> str:
+    """When a reading was taken, in local time: *22:21*, with the day in front once it is a day old."""
+    local = dt.astimezone()
+    return local.strftime("%a %H:%M") if (now - dt).total_seconds() >= 86400 else local.strftime("%H:%M")
+
+
+def usage_read(u: Any, now: datetime) -> dict[str, Any] | None:
+    """A reading's age as the chip, its hover and the Settings card say it (§4.5a *The age*, TD-233
+    slice 1): `{secs, age, clock, source}`, or None when `fetched` is not a time — an agent before
+    TD-087, or a test's placeholder — which is drawn as before, with no age."""
+    at = _instant(u.get("fetched")) if isinstance(u, dict) else None
+    if at is None:
+        return None
+    secs = max(0.0, (now - at).total_seconds())
+    source = str(u.get("source") or "asked")
+    return {"secs": secs, "age": usage_age(secs), "clock": usage_clock(at, now),
+            "source": USAGE_SOURCE.get(source, source)}  # fmt: skip
+
 
 def _usage_line(w: dict[str, Any], lines: Any) -> dict[str, Any] | None:
     """This window's row of the gate's reading (§6 *Usage gate*, TD-100): `{line, reserve, next}`
@@ -283,7 +320,7 @@ def _metered_chip(prof: str, u: dict[str, Any], windows: list[dict[str, Any]]) -
 METERED_KINDS = (("input", "in"), ("output", "out"), ("cache_read", "cache read"), ("cache_write", "cache write"))
 
 
-def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
+def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any] | None:
     """One account's top-bar chip (design §4.5a **usage**, TD-073, TD-087, TD-122), or None for no
     chip. `prof` is the chip's name — `<tool> · <account>` from `usage_accounts`, a bare profile
     for an agent that names no account.
@@ -292,13 +329,17 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
     the smallest gap to its line — the line the profile's reserve makes (§6, TD-100: `u["lines"]`,
     the `gate` reading the page attaches), the tool's 100% where it has none — and a window with a
     line prints it after the number, *grind · week 61% / 70%*. *Near* (never collapsed into +n) is
-    within ten points of a line, 80% without one. **A held reading goes stale,
-    not out** (TD-087): when the last poll was refused, the host agent keeps the last good windows
-    with the `reason` beside them, and the chip draws them dimmed with *· stale* and says on hover
-    when they were read and why the poll since failed — *the chip went out* and *the allowance is
-    spent* are different things to a person. A refusal with no reading ever held is `<profile>: no
-    reading yet`, the same way: a chip that silently went out is what this entry was. An `ok` answer
-    with no windows is an adapter that reports no quota, which has no chip.
+    within ten points of a line, 80% without one.
+
+    **The age** (§4.5a, TD-230, TD-233 slice 1): past five minutes the reading's age follows the
+    number, *Claude · paul · week 88% · 6h*, and past `USAGE_FRESH` the chip is dimmed (`old`; still
+    red at a cap); past `USAGE_UNKNOWN`, or once the worst window's reset has passed, the number is
+    no longer offered as the account's — *week unknown since 22:21 (was 88%)* — and a window past
+    its reset is never the worst while one is not. The age replaced the word *stale* (TD-087), which
+    said a reading was old and not how old; the hover still says when it was taken, from where, and
+    why the poll since failed. A refusal with no reading ever held is `<profile>: no reading yet`: a
+    chip that silently went out is what TD-087 was. An `ok` answer with no windows is an adapter that
+    reports no quota, which has no chip. `now` is for the tests.
 
     `app.js`'s `AO.usageChip` is the same rule for a pushed `usage` event; the tests hold the two
     to the same cases."""
@@ -313,11 +354,11 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
         if isinstance(w, dict) and isinstance(w.get("pct"), int | float) and not isinstance(w.get("pct"), bool)
     ]
     reason = str(u.get("reason") or "ok")
-    stale = reason != "ok"
-    if not windows and not stale:
+    refused = reason != "ok"
+    if not windows and not refused:
         return None
     why = ""
-    if stale:
+    if refused:
         why = "the last poll was refused: " + USAGE_WHY.get(reason, reason)
         if isinstance(u.get("retry_after"), int | float):
             why += f", which asked to be left {max(1, math.ceil(u['retry_after'] / 60))} min"
@@ -326,22 +367,40 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
         title = f"no usage reading for {prof} yet — {why}"
         if sharing:
             title += f". {sharing}"
-        return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "stale", "near": False}
+        return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "unknown", "near": False}
+    now = now or datetime.now(UTC)
+    read = usage_read(u, now)
+    # A window past its reset is unknown until it is read again — never zero, never a cap (§4.4)
+    gone = {id(w) for w in windows if (r := _instant(w.get("resets"))) is not None and r <= now}
     rows = [(w, _usage_line(w, u.get("lines"))) for w in windows]
-    ws = sorted(rows, key=lambda x: ((x[1]["line"] if x[1] else 100) - x[0]["pct"], -x[0]["pct"]))
+    ws = sorted(rows, key=lambda x: (id(x[0]) in gone, (x[1]["line"] if x[1] else 100) - x[0]["pct"], -x[0]["pct"]))
     worst, row = ws[0]
-    title = " · ".join(_usage_hover(w, r) for w, r in ws)
+    parts = []
+    for w, r in ws:
+        if id(w) in gone:
+            parts.append(f"{w.get('label')} unknown since its reset at {usage_clock(_instant(w['resets']), now)} "
+                         f"(was {w['pct']}%)")  # fmt: skip
+        else:
+            parts.append(_usage_hover(w, r))
+    head = [f"read at {read['clock']}, {read['age']} ago, {read['source']}"] if read else []
+    title = ". ".join([*head, *([why] if why else []), " · ".join(parts)])
+    if sharing:
+        title += f". {sharing}"
+    unknown = id(worst) in gone or (read is not None and read["secs"] > USAGE_UNKNOWN)
+    if unknown:
+        # the number is no longer offered as the account's (§4.5a *The age*); it stays on the hover
+        since = _instant(worst["resets"]) if id(worst) in gone else _instant(u.get("fetched"))
+        text = f"{prof} · {worst.get('label')} unknown since {usage_clock(since, now)} (was {worst['pct']}%)"
+        return {"text": text, "title": title, "pct": 0, "cls": "unknown", "near": False}
     near = worst["pct"] >= 100 or (worst["pct"] >= row["line"] - 10 if row else worst["pct"] >= NEAR_CAP)
     cls = "cap" if worst["pct"] >= 100 else "near" if near else ""
     text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *Claude · paul · week 24%* (TD-122)
     if row:
         text += f" / {row['line']:g}%"  # *grind · week 61% / 70%* (§4.5a, TD-100)
-    if stale:
-        title = f"held reading from {u.get('fetched') or 'an unknown time'} — {why}. {title}"
-        text += " · stale"
-        cls = f"{cls} stale".strip()
-    if sharing:
-        title += f". {sharing}"
+    if read and read["secs"] > USAGE_AGED:
+        text += f" · {read['age']}"  # *Claude · paul · week 88% · 6h* (TD-230)
+    if read and read["secs"] > USAGE_FRESH:
+        cls = f"{cls} old".strip()  # still red at a cap: it is the best evidence there is
     return {"text": text, "title": title, "pct": worst["pct"], "cls": cls, "near": near}
 
 

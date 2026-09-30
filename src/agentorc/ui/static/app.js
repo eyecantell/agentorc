@@ -814,10 +814,11 @@
     no_profile: "no such profile", error: "the usage endpoint could not be read",
   };
   // One account's chip, or null for none — `usage_chip` in app.py is the same rule for the server's
-  // render, and the tests hold the two to the same cases. **A held reading goes stale, not out**
-  // (TD-087): a refused poll keeps the last good windows, drawn dimmed with *· stale* and, on hover,
-  // when they were read and why the poll since failed; a refusal with nothing ever held is
-  // `<profile>: no reading yet`. An `ok` with no windows is a tool that reports no quota: no chip.
+  // render, and the tests hold the two to the same cases. **The age** (§4.5a, TD-233 slice 1): past
+  // five minutes the reading's age follows the number, past `USAGE_FRESH` the chip is dimmed, past
+  // `USAGE_UNKNOWN` or the worst window's reset it reads *unknown since 22:21 (was 88%)*; the hover
+  // says when it was read, from where, and why the poll since failed. A refusal with nothing ever
+  // held is `<profile>: no reading yet`. An `ok` with no windows is a tool that reports no quota: no chip.
   // This window's row of the gate's reading (§6, TD-100), where the profile's reserve makes a line.
   function usageLine(w, lines) {
     const row = (Array.isArray(lines) ? lines : []).find((r) => r && typeof r === "object" && r.label === w.label);
@@ -893,31 +894,61 @@
     const near = n >= NEAR_CAP;
     return { text, title, pct: n, cls: n >= 100 ? "cap" : near ? "near" : "", near };
   }
-  AO.usageChip = function (profile, u) {
+  // How old a reading may be before the chip says so (§4.5a *The age*, TD-233 slice 1), in seconds:
+  // `USAGE_AGED` and the rest in app.py are the same three numbers.
+  const USAGE_AGED = 5 * 60, USAGE_FRESH = 15 * 60, USAGE_UNKNOWN = 3 * 3600;
+  const USAGE_SOURCE = { asked: "asked of the endpoint", reported: "reported by a session" };
+  // An instant off a record, or null for what `_instant` would not read: an ISO date, a naive one UTC.
+  function instant(iso) {
+    if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
+    let s = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00" : iso;
+    if (!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) s += "Z";
+    const t = Date.parse(s);
+    return Number.isNaN(t) ? null : t;
+  }
+  const usageAge = (secs) => { secs = Math.max(0, Math.floor(secs)); return secs < 3600 ? `${Math.floor(secs / 60)}m` : secs < 86400 ? `${Math.floor(secs / 3600)}h` : `${Math.floor(secs / 86400)}d`; };
+  function usageClock(t, now) {
+    const d = new Date(t), pad = (n) => String(n).padStart(2, "0");
+    const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return now - t >= 86400e3 ? `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]} ${hm}` : hm;
+  }
+  AO.usageChip = function (profile, u, now) {
     if (!u || typeof u !== "object") return null;
     const spent = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w === "object" && w.spent && typeof w.spent === "object" && !Array.isArray(w.spent));
     if (spent.length) return meteredChip(profile, u, spent);
     const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
-    const reason = String(u.reason || "ok"), stale = reason !== "ok";
-    if (!windows.length && !stale) return null;
+    const reason = String(u.reason || "ok"), refused = reason !== "ok";
+    if (!windows.length && !refused) return null;
     let why = "";
-    if (stale) {
+    if (refused) {
       why = "the last poll was refused: " + (USAGE_WHY[reason] || reason);
       if (typeof u.retry_after === "number") why += `, which asked to be left ${Math.max(1, Math.ceil(u.retry_after / 60))} min`;
     }
     const sharing = usageProfiles(u);
-    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}` + (sharing ? `. ${sharing}` : ""), pct: 0, cls: "stale", near: false };
+    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}` + (sharing ? `. ${sharing}` : ""), pct: 0, cls: "unknown", near: false };
+    now = typeof now === "number" ? now : Date.now();
+    const at = instant(u.fetched), secs = at === null ? null : Math.max(0, (now - at) / 1000);
+    const read = at === null ? null : { secs, age: usageAge(secs), clock: usageClock(at, now), source: USAGE_SOURCE[String(u.source || "asked")] || String(u.source) };
+    // a window past its reset is unknown until read again — never zero, never a cap (§4.4)
+    const gone = new Set(windows.filter((w) => { const r = instant(w.resets); return r !== null && r <= now; }));
     // worst = the smallest gap to its line, the tool's 100% where the profile has no reserve (§4.5a, TD-100)
     const gap = ([w, r]) => (r ? r.line : 100) - w.pct;
-    const ws = windows.map((w) => [w, usageLine(w, u.lines)]).sort((a, b) => gap(a) - gap(b) || b[0].pct - a[0].pct);
+    const ws = windows.map((w) => [w, usageLine(w, u.lines)]).sort((a, b) => (gone.has(a[0]) - gone.has(b[0])) || gap(a) - gap(b) || b[0].pct - a[0].pct);
     const [worst, row] = ws[0];
-    let title = ws.map(([w, r]) => usageHover(w, r)).join(" · ");
+    const parts = ws.map(([w, r]) => gone.has(w) ? `${w.label} unknown since its reset at ${usageClock(instant(w.resets), now)} (was ${w.pct}%)` : usageHover(w, r));
+    let title = [...(read ? [`read at ${read.clock}, ${read.age} ago, ${read.source}`] : []), ...(why ? [why] : []), parts.join(" · ")].join(". ");
+    if (sharing) title += `. ${sharing}`;
+    if (gone.has(worst) || (read && read.secs > USAGE_UNKNOWN)) {
+      // the number is no longer offered as the account's (§4.5a *The age*); it stays on the hover
+      const since = gone.has(worst) ? instant(worst.resets) : at;
+      return { text: `${profile} · ${worst.label} unknown since ${usageClock(since, now)} (was ${worst.pct}%)`, title, pct: 0, cls: "unknown", near: false };
+    }
     const near = worst.pct >= 100 || (row ? worst.pct >= row.line - 10 : worst.pct >= NEAR_CAP);
     let cls = worst.pct >= 100 ? "cap" : near ? "near" : "";
     let text = `${profile} · ${worst.label} ${worst.pct}%`;  // *Claude · paul · week 24%* (TD-122)
     if (row) text += ` / ${row.line}%`;  // *grind · week 61% / 70%* (TD-100)
-    if (stale) { title = `held reading from ${u.fetched || "an unknown time"} — ${why}. ${title}`; text += " · stale"; cls = (cls + " stale").trim(); }
-    if (sharing) title += `. ${sharing}`;
+    if (read && read.secs > USAGE_AGED) text += ` · ${read.age}`;  // *Claude · paul · week 88% · 6h* (TD-230)
+    if (read && read.secs > USAGE_FRESH) cls = (cls + " old").trim();  // still red at a cap
     return { text, title, pct: worst.pct, cls, near };
   };
   function onUsage(ev) {
@@ -929,13 +960,29 @@
     // are what `fitUsage` measures against (review of PR #279).
     if (!c) { if (el) { const sep = el.nextSibling; if (sep && sep.nodeType === 3) sep.remove(); el.remove(); } fitUsage(); return; }
     if (!el) { el = document.createElement("span"); el.dataset.account = ev.account; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
+    el.dataset.usage = JSON.stringify(ev.usage);
+    drawUsage(el, c);
+    fitUsage();
+  }
+  function drawUsage(el, c) {
     el.dataset.pct = c.pct;
     el.dataset.near = c.near ? "1" : "";
     el.textContent = c.text;
     el.className = c.cls;
     el.title = c.title;
+  }
+  // A reading ages with no event to say so — the endpoint refusing is exactly when none comes — so
+  // each chip is drawn again once a minute from the reading it holds (`data-usage`, TD-233 slice 1).
+  function ageUsage() {
+    const chip = $("#usagechip"); if (!chip) return;
+    for (const el of chip.querySelectorAll("[data-usage]")) {
+      let u; try { u = JSON.parse(el.dataset.usage); } catch (e) { continue; }
+      const c = AO.usageChip(el.dataset.account, u);
+      if (c) drawUsage(el, c);
+    }
     fitUsage();
   }
+  setInterval(ageUsage, 60e3);
   // Chips side by side while they fit; past that the worst accounts and `+n`, which shows the rest
   // on hover. No rotation: a display that rotates hides the number at the moment it is looked at,
   // and the one that matters may be the one off screen (TD-073, decided by Paul 2026-09-19).

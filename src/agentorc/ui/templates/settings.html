@@ -53,7 +53,7 @@
           {% for w in c.rows %}
           <label class="setrow"><span class="setlabel">{{ w.label }} reserve</span>
             <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no line" data-resets="{{ w.resets }}" data-pct="{{ w.pct if w.pct is not none else '' }}" autocomplete="off" spellcheck="false">
-            <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span></label>
+            <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span>{% if w.age %}<span class="note dim setage">{{ w.age }}</span>{% endif %}</label>
           {% else %}
           <div class="note">No window reported yet: the adapter has not read this profile's usage. A reserve can be set with <span class="mono">ao gate</span>, which says the labels were not checked.</div>
           {% endfor %}

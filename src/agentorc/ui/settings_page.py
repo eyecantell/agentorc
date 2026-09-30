@@ -32,6 +32,8 @@ from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.models import tokens_short
 
+from .common import USAGE_UNKNOWN, usage_clock, usage_read
+
 # The *i* mark of each file card (§4.5a *Settings page: read-only values and the i mark*): when the
 # file is re-read and who edits it. A host's name, its `home:` and its identity mode are read once,
 # at the agent's start, so the hosts card says *restart the host agent to apply* for those three.
@@ -140,6 +142,21 @@ def _account(p: profiles_mod.Profile, reading: Mapping[str, Any] | None) -> tupl
     return f"{tool} · {acct}", acct
 
 
+def reading_age(w: Mapping[str, Any], read: Mapping[str, Any] | None, reading: Any, now: datetime) -> str:
+    """A window's reading as the chip's hover gives it (§4.5a *Settings page: Usage*, *The reading's
+    age*; TD-233 slice 1): *week 88% · read 6h ago, asked of the endpoint*; past its reset or past
+    `USAGE_UNKNOWN`, *unknown since 22:21 (was 88%)*. Empty for a reading with no time on it."""
+    pct = f"{w['pct']}%" if _is_num(w.get("pct")) else "?"
+    resets = _when(w.get("resets"))
+    if resets is not None and resets <= now:
+        return f"unknown since its reset at {usage_clock(resets, now)} (was {pct})"
+    if read is None:
+        return ""
+    if read["secs"] > USAGE_UNKNOWN:
+        return f"unknown since {read['clock']} (was {pct}), {read['source']}"
+    return f"{pct} · read {read['age']} ago, {read['source']}"
+
+
 def usage_cards(
     profiles: Mapping[str, profiles_mod.Profile],
     gate: Mapping[str, Any] | None,
@@ -162,6 +179,7 @@ def usage_cards(
         windows = [w for w in (reading or {}).get("windows") or [] if isinstance(w, dict) and w.get("label")]
         reserves = g.get("reserves") or {}
         rows_by = {str(r.get("label")): r for r in g.get("windows") or [] if isinstance(r, dict)}
+        read = usage_read(reading, now)
         rows = []
         for w in windows:
             label = str(w["label"])
@@ -172,6 +190,7 @@ def usage_cards(
                     "line": line_text(rows_by.get(label), now) if label in reserves else "no line",
                     "resets": str(w.get("resets") or ""),
                     "pct": w.get("pct") if _is_num(w.get("pct")) else None,
+                    "age": reading_age(w, read, reading, now),
                 }
             )
         for label, r in reserves.items():  # a reserve on a label no reading has shown yet

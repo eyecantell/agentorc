@@ -91,6 +91,29 @@ def test_usage_cards_group_by_account_and_draw_each_reported_window():
 
 
 @pytest.mark.unit
+def test_a_usage_cards_rows_say_how_old_the_reading_is():
+    """design §4.5a *Settings page: Usage*, *The reading's age* (TD-230, TD-233 slice 1): beside each
+    window's reading, its age and source as the chip's hover gives them; past three hours, or past
+    the window's reset, *unknown since …* with the number it was."""
+    profiles = {"grind": profiles_mod.Profile(name="grind", account="paul")}
+    later = (NOW + timedelta(days=2)).isoformat()
+
+    def rows(fetched: str, resets: str = later) -> list[dict]:
+        usage = {"grind": {"fetched": fetched, "windows": [{"label": "week", "pct": 58, "resets": resets}]}}
+        return setmod.usage_cards(profiles, {}, usage, NOW)[0]["cards"][0]["rows"]
+
+    assert rows((NOW - timedelta(minutes=7)).isoformat())[0]["age"] == "58% · read 7m ago, asked of the endpoint"
+    was = NOW - timedelta(hours=4)
+    assert rows(was.isoformat())[0]["age"] == (
+        f"unknown since {was.astimezone():%H:%M} (was 58%), asked of the endpoint"
+    )
+    gone = NOW - timedelta(minutes=30)
+    got = rows(NOW.isoformat(), gone.isoformat())[0]["age"]
+    assert got == f"unknown since its reset at {gone.astimezone():%H:%M} (was 58%)"
+    assert rows("x")[0]["age"] == ""  # no time on the reading: nothing said
+
+
+@pytest.mark.unit
 def test_the_line_text_is_ao_gates():
     row = {"line": 60, "reserve": {"per_day": 10}, "resets": (NOW + timedelta(days=1)).isoformat(), "next": None}
     assert setmod.line_text(row, NOW) == "→ line 60% · 1 day left"

@@ -22,8 +22,9 @@
      account's **worst** window — the label and the number the adapter gave, never a field name of
      any one tool — with the rest, and the profiles sharing it, on hover. `app.js` re-sorts and
      collapses them to `+n` when they stop fitting; an account at or near a cap is never the one
-     collapsed. A held reading whose last poll was refused is drawn stale, not dropped (TD-087): `usage_chip`. #}
-  <span class="mono dim" id="usagechip" title="subscription usage per account a live session is running under: the worst quota window the tool reports, the rest on hover">{% for name, u in (usage or {}).items() %}{% set c = usage_chip(name, u) %}{% if c %}<span data-account="{{ name }}" data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></span>
+     collapsed. A reading prints its age once it is old, and reads *unknown since* past three hours
+     (TD-233): `usage_chip`; `data-usage` is what `app.js` draws it again from as it ages. #}
+  <span class="mono dim" id="usagechip" title="subscription usage per account a live session is running under: the worst quota window the tool reports, the rest on hover">{% for name, u in (usage or {}).items() %}{% set c = usage_chip(name, u) %}{% if c %}<span data-account="{{ name }}" data-usage='{{ u|tojson }}' data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></span>
   {# design §4.5a Org top bar **build** chip (TD-132 slice 5, TD-062): display only, drawn only when
      the running host agent is not main's head or cannot say — nothing in the common case, as the
      unread chip. `build_chip`: `build.line` on hover, main's distance from the home's promote

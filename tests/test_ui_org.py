@@ -4,6 +4,7 @@ grouping function, and one render of the page template over its output."""
 from __future__ import annotations
 
 import pathlib
+from datetime import UTC, datetime
 
 import pytest
 
@@ -356,15 +357,18 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     tool appears in the template, so a profile with one daily window renders the same way."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from datetime import timedelta
+
     from agentorc.ui.app import templates
 
+    now = datetime.now(UTC)  # the page draws against the clock, so the reading is a minute old
     usage = {
         "grind": {
             "windows": [
-                {"label": "5h", "pct": 19, "resets": "2026-09-20T22:00:00Z"},
-                {"label": "week", "pct": 88, "resets": "2026-09-24T00:00:00Z"},
+                {"label": "5h", "pct": 19, "resets": (now + timedelta(hours=2)).isoformat()},
+                {"label": "week", "pct": 88, "resets": (now + timedelta(days=4)).isoformat()},
             ],
-            "fetched": "2026-09-20T20:00:00Z",
+            "fetched": (now - timedelta(minutes=1)).isoformat(),
         },
         "openai": {"windows": [{"label": "day", "pct": 100, "resets": None}], "fetched": "x"},
         "quietly": {"windows": [], "fetched": "x"},  # an adapter that reports no quota: no chip
@@ -375,9 +379,12 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
         person_needs=0, node_banner="", identity_note="",
     )  # fmt: skip
     assert "grind · week 88%" in html and "5h 19%" not in html.split("grind · week 88%")[1].split("</span>")[0]
-    assert 'data-account="grind" data-pct="88" data-near="1" class="near"' in html
-    assert "week 88% (resets 2026-09-24T00:00:00Z) · 5h 19% (resets 2026-09-20T22:00:00Z)" in html
-    assert 'data-account="openai" data-pct="100" data-near="1" class="cap"' in html and "openai · day 100%" in html
+    assert 'data-pct="88" data-near="1" class="near"' in html
+    # the reading the chip was drawn from rides on it, so `app.js` can draw it again as it ages (TD-233)
+    assert 'data-account="grind" data-usage=\'{' in html
+    wk, fh = usage["grind"]["windows"][1]["resets"], usage["grind"]["windows"][0]["resets"]
+    assert f"week 88% (resets {wk}) · 5h 19% (resets {fh})" in html
+    assert 'data-pct="100" data-near="1" class="cap"' in html and "openai · day 100%" in html
     assert 'data-account="quietly"' not in html  # no windows, no chip
     assert "five_hour" not in html and "weekly" not in html
 
@@ -430,36 +437,78 @@ USAGE_CASES = {
     "metered_unpriced": {"reason": "error: OSError", "windows": [
         {"label": "day", "pct": None, "resets": None,
          "spent": {"tokens": {"input": 900}, "total": 900, "cost": None}}]},
+    # the age (§4.5a *The age*, TD-233 slice 1), against USAGE_NOW
+    "aged_7m": {"windows": [{"label": "week", "pct": 40, "resets": "2026-09-25T00:00:00Z"}],
+                "fetched": "2026-09-20T19:56:00Z", "reason": "ok"},
+    "aged_1h": {"windows": [{"label": "week", "pct": 100, "resets": "2026-09-25T00:00:00Z"}],
+                "fetched": "2026-09-20T18:59:00Z", "reason": "rate_limited", "source": "reported"},
+    "aged_4h": {"windows": [{"label": "week", "pct": 88, "resets": "2026-09-25T00:00:00Z"}],
+                "fetched": "2026-09-20T16:00:00Z", "reason": "rate_limited"},
+    "aged_2d": {"windows": [{"label": "week", "pct": 88, "resets": "2026-09-25T00:00:00Z"}],
+                "fetched": "2026-09-18T16:00:00Z", "reason": "ok"},
+    "past_reset": {"windows": [{"label": "5h", "pct": 97, "resets": "2026-09-20T19:00:00Z"},
+                               {"label": "week", "pct": 40, "resets": "2026-09-25T00:00:00Z"}],
+                   "fetched": "2026-09-20T18:00:00Z", "reason": "ok"},
+    "all_reset": {"windows": [{"label": "5h", "pct": 97, "resets": "2026-09-20T19:00:00Z"}],
+                  "fetched": "2026-09-20T18:00:00Z", "reason": "ok"},
 }  # fmt: skip
+USAGE_NOW = datetime(2026, 9, 20, 20, 3, tzinfo=UTC)  # three minutes after `fresh` was read
 
 
-def test_a_refused_usage_poll_draws_the_held_reading_stale_rather_than_nothing():
-    """design §4.5a **usage** chip, TD-087. The chip was empty through three promotes because the
-    endpoint answered 429 and every failure was one silence. The host agent now keeps the last good
-    reading with the adapter's `reason` beside it (PR #307); this is the page's half — **stale, not
-    out**. The windows still print (a five-hour window does not change while we are refused), dimmed
-    with *· stale*, and the hover says when the reading was taken and why the poll since failed. A
-    refusal with nothing ever held is *no reading*, drawn the same way: a chip that silently went
-    out is the thing this entry was. A tool that reports no quota still has no chip."""
+def _clock(iso: str) -> str:
+    return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%H:%M")
+
+
+def test_a_refused_usage_poll_keeps_the_held_reading_and_its_age_says_how_old_it_is():
+    """design §4.5a **usage** chip, TD-087, TD-230 (TD-233 slice 1). The chip was empty through three
+    promotes because the endpoint answered 429 and every failure was one silence, so the host agent
+    keeps the last good reading with the adapter's `reason` beside it and the chip draws it — **held,
+    not out**. It then said *· stale*, which on 2026-09-28 read the same at five minutes and at six
+    hours while the account ran to two points from its line. So the word went for **the age**: past
+    five minutes it follows the number, past fifteen the chip is dimmed (still red at a cap), past
+    three hours — or once the window's reset has passed — the number is no longer offered as the
+    account's: *unknown since 16:00 (was 88%)*. The hover says when it was read, from where, and why
+    the poll since failed. A refusal with nothing ever held is *no reading yet*; a tool that reports
+    no quota has no chip."""
     from agentorc.ui.app import usage_chip
 
-    got = {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
-    assert got["fresh"] == {"text": "grind · week 88%", "title": "week 88% (resets ?) · 5h 19% (resets r1)",
+    got = {k: usage_chip("grind", u, USAGE_NOW) for k, u in USAGE_CASES.items()}
+    read = f"read at {_clock('2026-09-20T20:00:00Z')}, 3m ago, asked of the endpoint"
+    assert got["fresh"] == {"text": "grind · week 88%", "title": f"{read}. week 88% (resets ?) · 5h 19% (resets r1)",
                             "pct": 88, "cls": "near", "near": True}  # fmt: skip
-    assert got["legacy"]["text"] == "grind · day 40%" and got["legacy"]["cls"] == ""  # no reason is ok, not stale
-    held = got["held_429"]
-    assert held["text"] == "grind · week 49% · stale" and held["cls"] == "stale" and held["pct"] == 49
-    assert held["title"].startswith("held reading from 2026-09-20T20:00:00Z — the last poll was refused: ")
+    assert got["legacy"]["text"] == "grind · day 40%" and got["legacy"]["cls"] == ""  # no time on it: no age
+    held = got["held_429"]  # three minutes old and refused since: no mark, the why on hover
+    assert held["text"] == "grind · week 49%" and held["cls"] == "" and held["pct"] == 49
+    assert held["title"].startswith(f"{read}. the last poll was refused: ")
     assert "rate-limited by the usage endpoint, which asked to be left 30 min" in held["title"]
     assert held["title"].endswith("week 49% (resets r3)")  # every window is still on hover
-    # a stale reading at a cap is still red: it is the best evidence there is
-    assert got["held_cap"]["cls"] == "cap stale" and "could not be read" in got["held_cap"]["title"]
+    assert got["held_cap"]["cls"] == "cap" and "could not be read" in got["held_cap"]["title"]
     assert "asked to be left 3 min" in got["held_odd_wait"]["title"]  # rounded up, in both homes alike
-    assert got["never_read"]["text"] == "grind: no reading yet" and got["never_read"]["cls"] == "stale"
+    assert got["never_read"]["text"] == "grind: no reading yet" and got["never_read"]["cls"] == "unknown"
     assert "no credentials for this profile" in got["never_read"]["title"]
     assert "brand_new_reason" in got["unknown_word"]["title"]  # a word we do not know is shown, not dropped
     assert got["no_quota"] is None and got["not_a_dict"] is None
     assert got["junk_window"] is None  # a window whose number is not a number is not drawn from
+    # the age: printed past five minutes, dimmed past fifteen, still red at a cap
+    assert got["aged_7m"]["text"] == "grind · week 40% · 7m" and got["aged_7m"]["cls"] == ""
+    assert got["aged_1h"]["text"] == "grind · week 100% · 1h" and got["aged_1h"]["cls"] == "cap old"
+    one = _clock("2026-09-20T18:59:00Z")
+    assert got["aged_1h"]["title"].startswith(f"read at {one}, 1h ago, reported by a session")
+    # past three hours the number is no longer the account's; it stays on the hover
+    assert got["aged_4h"] == {
+        "text": f"grind · week unknown since {_clock('2026-09-20T16:00:00Z')} (was 88%)",
+        "title": f"read at {_clock('2026-09-20T16:00:00Z')}, 4h ago, asked of the endpoint. the last poll was"
+        " refused: rate-limited by the usage endpoint. week 88% (resets 2026-09-25T00:00:00Z)",
+        "pct": 0, "cls": "unknown", "near": False,
+    }  # fmt: skip
+    days = datetime(2026, 9, 18, 16, tzinfo=UTC).astimezone().strftime("%a %H:%M")
+    assert got["aged_2d"]["text"] == f"grind · week unknown since {days} (was 88%)"  # a day old: the day too
+    # a window past its reset is unknown until read again, and never the worst while another is not
+    assert got["past_reset"]["text"] == "grind · week 40% · 2h" and got["past_reset"]["near"] is False
+    assert f"5h unknown since its reset at {_clock('2026-09-20T19:00:00Z')} (was 97%)" in got["past_reset"]["title"]
+    assert got["all_reset"]["text"] == f"grind · 5h unknown since {_clock('2026-09-20T19:00:00Z')} (was 97%)"
+    assert got["all_reset"]["cls"] == "unknown" and got["all_reset"]["near"] is False
+    assert all("stale" not in (c or {}).get("text", "") for c in got.values())  # the word is gone
 
 
 def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap():
@@ -470,7 +519,7 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
     70% line — and *near* is within ten points of a line, 80% without one."""
     from agentorc.ui.app import usage_chip, with_lines
 
-    got = {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
+    got = {k: usage_chip("grind", u, USAGE_NOW) for k, u in USAGE_CASES.items()}
     lined = got["lined"]
     assert lined["text"] == "grind · week 61% / 70%" and lined["pct"] == 61
     assert lined["near"] is True and lined["cls"] == "near"  # 9 points under its line
@@ -545,7 +594,8 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
 def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):
     """The chip is drawn twice — server-side at page load, and by `app.js` on each pushed `usage`
     event — so the rule lives twice, and a rule kept in two places is held to one set of cases here
-    or the two drift (the page would say *stale* until the first push, and then not)."""
+    or the two drift (the page would print an age until the first push, and then not). Both are
+    handed one `now`, so the ages agree."""
     import json
     import shutil
     import subprocess
@@ -558,10 +608,10 @@ def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):
     probe = tmp_path / "usage_probe.js"
     probe.write_text(USAGE_PROBE)
     app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
-    out = subprocess.run([node, str(probe), str(app_js), json.dumps(USAGE_CASES)],
+    out = subprocess.run([node, str(probe), str(app_js), json.dumps(USAGE_CASES), USAGE_NOW.isoformat()],
                          capture_output=True, text=True, timeout=30)  # fmt: skip
     assert out.returncode == 0, out.stderr
-    assert json.loads(out.stdout) == {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
+    assert json.loads(out.stdout) == {k: usage_chip("grind", u, USAGE_NOW) for k, u in USAGE_CASES.items()}
     assert "AO.usageChip(ev.account, ev.usage)" in app_js.read_text()  # and the push really uses it
 
 
@@ -581,7 +631,7 @@ global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const cases = JSON.parse(process.argv[3]), out = {};
-for (const k of Object.keys(cases)) out[k] = window.AO.usageChip("grind", cases[k]);
+for (const k of Object.keys(cases)) out[k] = window.AO.usageChip("grind", cases[k], Date.parse(process.argv[4]));
 console.log(JSON.stringify(out));
 """
 

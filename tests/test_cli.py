@@ -1551,7 +1551,6 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
     assert got["restarted"] is True and got["error"] == "host agent closed the connection"
 
 
-
 def test_a_session_is_found_by_its_ancestors_environment_when_its_own_is_gone(tmp_path):
     """TD-089, design §4.8a *With no host agent to ask*: the launch sets `AGENTORC_SESSION` on the
     pane's first process, so a process that lost it still has an ancestor started with it. The walk
@@ -1790,6 +1789,22 @@ def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
     assert "x 5/day → no line" in line
     assert _gate_line("grind", [{"label": "5h", "reserve": 30, "unread": True}]) == "grind · 5h 30 → no reading yet"
     assert _gate_line("", []) == "(default)"
+
+
+def test_ao_gate_says_how_old_each_reading_is():
+    """design §4.7 `ao gate` (TD-230, TD-233 slice 1): each window read from a reading ends with its
+    age and source, *· read 6h ago (asked)*; a reading with no time on it, or none, says nothing."""
+    from agentorc.cli import _gate_line, _gate_read
+
+    six = _iso(datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=6, minutes=1))
+    assert _gate_read({"fetched": six}) == " · read 6h ago (asked)"
+    assert _gate_read({"fetched": six, "source": "reported"}) == " · read 6h ago (reported)"
+    assert _gate_read({"fetched": "x"}) == _gate_read({"fetched": "2026-09-20T20:00:00"}) == _gate_read(None) == ""
+    rows = [{"label": "5h", "reserve": 30, "line": 70, "pct": 12, "next": None}]
+    got = _gate_line("grind", rows, _gate_read({"fetched": six}))
+    assert got == "grind · 5h 30 → line 70%, now 12% · read 6h ago (asked)"
+    unread = [{"label": "5h", "reserve": 30, "unread": True}]
+    assert _gate_line("grind", unread, " · read 1m ago (asked)") == "grind · 5h 30 → no reading yet"
 
 
 def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys, monkeypatch):
