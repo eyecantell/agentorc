@@ -3404,7 +3404,7 @@ not vary by role** — that would be the first thing to key on one — and the c
 by role without a rule, because it draws whichever channels are non-empty. The built-ins ship
 with the package; a repo may redefine any of them or add its own (§5, TD-040):
 `agentorc.repoconfig` reads the file, the templates are `agentorc/briefs/<role>.md` with the
-`{lane}`, `{techlead}` and `{manager}` placeholders (`{context}` in the techlead's; `{repo}` in every one), a repo's `roles.<name>` overrides per key over the built-in, and the record
+`{lane}`, `{techlead}` and `{manager}` placeholders (`{context}` and `{entry}` in the techlead's — `{entry}` takes the package's `entry.md`, what a new ledger entry needs, §4.9 *Add an entry to the ledger*; `{repo}` in every one), a repo's `roles.<name>` overrides per key over the built-in, and the record
 carries `role` and the repo's `ledger:` (so the derived-report tick reads the right file without
 `sessionorc` knowing the config).
 
