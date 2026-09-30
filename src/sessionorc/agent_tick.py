@@ -862,11 +862,19 @@ class TickMixin:
             except (ValueError, TypeError):
                 at = None
             if root and rel and at is not None:
-                then, why = await asyncio.to_thread(ledger_mod.entries_before, root, str(rel), at)
-                if not s.out_of_work or s.lane_seen is not None:
+                decl = dict(s.out_of_work or {})
+
+                def both() -> tuple[Any, str, Any]:
+                    then, why = ledger_mod.entries_before(root, str(rel), at)
+                    return then, why, ledger_mod.entries_before(root, str(rel), None)[0] if then is not None else None
+
+                then, why, tip = await asyncio.to_thread(both)
+                if s.out_of_work != decl or s.lane_seen is not None:
                     return  # the declaration moved while git was read: the next tick looks afresh
-                if then is not None:
-                    seen, read = matching(then), f"the ledger at the declaration ({why})"
+                if then is not None and tip is not None:
+                    # both sides from origin: an entry only a branch checked out here holds is not new
+                    seen, ids = matching(then), matching(tip)
+                    read = f"the ledger at the declaration ({why}) against origin's tip"
                 else:
                     read = f"the reading at this tick ({why})"
             s.lane_seen = {"at": now_iso(), "ids": seen}

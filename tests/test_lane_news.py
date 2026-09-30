@@ -82,6 +82,7 @@ def test_the_ledger_before_an_instant_is_read_from_origin(tmp_path):
     assert entries_before(tmp_path, "docs/technical_debt.md", datetime(2026, 9, 1, tzinfo=UTC))[0] is None
     assert entries_before(tmp_path, "docs/nope.md", datetime(2026, 9, 29, tzinfo=UTC))[0] is None
     assert entries_before(tmp_path / "docs", "technical_debt.md", datetime(2026, 9, 29, tzinfo=UTC))[0] is None
+    assert [e["id"] for e in entries_before(tmp_path, "docs/technical_debt.md", None)[0]] == ["TD-001", "TD-002"]
 
 
 async def test_the_first_write_is_the_ledger_at_the_declaration(agent, tmp_path):
@@ -95,12 +96,13 @@ async def test_the_first_write_is_the_ledger_at_the_declaration(agent, tmp_path)
     _commit(repo, ["TD-001"], "2026-09-27T10:00:00Z")
     _commit(repo, ["TD-001", "TD-002"], "2026-09-27T21:00:00Z")
     async with LocalClient() as person:
-        led = [_e("TD-001"), _e("TD-002")]
+        # the checkout's reading also holds TD-009, an entry only a branch here has: never told as new
+        led = [_e("TD-001"), _e("TD-002"), _e("TD-009")]
         sid = await _finished(agent, person, repo, "w", ["free-pick"], led)
         agent._repos[str(repo)]["ledger"]["path"] = "docs/technical_debt.md"
         rec = agent.sessions[sid]
         await agent._lane_news(rec, now)
-        assert rec.lane_seen["ids"] == ["TD-001", "TD-002"]
+        assert rec.lane_seen["ids"] == ["TD-001", "TD-002"] and "TD-009" not in _notes(agent, sid)[0]
         assert (
             len(_notes(agent, sid)) == 1
             and "gained 1 entry since you declared out of work: TD-002" in _notes(agent, sid)[0]

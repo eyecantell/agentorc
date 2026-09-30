@@ -208,12 +208,13 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
 
 
 def entries_before(
-    root: Path | str, rel: str, before: datetime, timeout: float = 10.0
+    root: Path | str, rel: str, before: datetime | None, timeout: float = 10.0
 ) -> tuple[list[dict[str, Any]] | None, str]:
     """The ledger's entries as the last commit of `origin/<default>` before `before` held them
     (design §6 rule 6, TD-227: `lane_seen`'s first write is the ledger at the declaration), and
     what was read — `origin/main at 1a2b3c4d` — or None and why not. `--before` reads committer
-    dates, which is the merge's time for a squash. Read-only: nothing is fetched."""
+    dates, which is the merge's time for a squash. `before` None reads the ref's tip. Read-only:
+    nothing is fetched."""
 
     def git(*args: str) -> str | None:
         try:
@@ -225,11 +226,12 @@ def entries_before(
         return cp.stdout if cp.returncode == 0 else None
 
     for ref in DEFAULT_REFS:
-        sha = git("rev-list", "-1", f"--before={before.isoformat()}", ref)
+        when = [f"--before={before.isoformat()}"] if before is not None else []
+        sha = git("rev-list", "-1", *when, ref)
         if sha is None:
             continue  # no such ref here: the next name
         if not (sha := sha.strip()):
-            return None, f"no commit of {ref} before {before.isoformat()}"
+            return None, f"no commit of {ref} before {before.isoformat() if before else 'now'}"
         text = git("show", f"{sha}:{rel}")
         if text is None:
             return None, f"no {rel} at {ref} {sha[:8]}"
