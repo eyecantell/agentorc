@@ -779,7 +779,7 @@ class TickMixin:
             n = s.asks_waiting(home=self.host) if s.seat_due else 0
             if not n:
                 return None
-            # an entry the person handed the seat, read already, owes its outcome rather than a read (TD-218)
+            # an entry the person handed the seat owes its outcome, read or not: named apart from the questions (TD-218)
             h = s.asks_waiting(home=self.host, handed_only=True)
             parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []
             if h:

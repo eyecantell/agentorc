@@ -107,7 +107,12 @@ class InboxMixin:
         handed: list[str] = []
         for addr, r in list(self._graph().items()):
             for e in r.inbox:
-                if e.id in wanted and e.id not in held and e.handed and e.owes and e.id not in handed:
+                if (
+                    e.id in wanted
+                    and e.id not in handed
+                    and e.handed
+                    and (e.owes or (e.outcome or {}).get("state") == "blocked")  # a blocked row is dismissed too
+                ):
                     self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": ""})
                     self._system_note(addr, f"the person dismissed {e.id}: no outcome is owed on it")
                     handed.append(e.id)

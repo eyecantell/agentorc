@@ -295,6 +295,12 @@ async def test_the_persons_dismiss_ends_a_handed_entry_and_tells_the_seat(agent,
         assert any(x.from_ == "system" and "dismissed m-entry" in x.text for x in rec.inbox)
         assert (await person.call("inbox_dismiss", msg=["m-entry"]))["skipped"] == ["m-entry"]
         assert (await person.call("inbox"))["handed"] == [], "settled: no row waits on it"
+        blocked = _handed("m-blocked", to=sid)
+        blocked.outcome = {"state": "blocked", "text": "no repo", "at": "t", "by": "m-y"}
+        rec.inbox.append(blocked)
+        assert [e["id"] for e in (await person.call("inbox"))["handed"]] == ["m-blocked"]
+        assert (await person.call("inbox_dismiss", msg=["m-blocked"]))["dismissed"] == ["m-blocked"]
+        assert blocked.outcome["state"] == "dismissed" and (await person.call("inbox"))["handed"] == []
         await person.call("kill", id=sid)
 
 
