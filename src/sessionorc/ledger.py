@@ -34,12 +34,14 @@ DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `agentorc.repoconfig` has it
 REPO_FILE = ".agentorc.yml"
 
-HEADING = re.compile(r"^## (TD-\d{3,}):[ \t]*(.*)$", re.M)
+HEADING = re.compile(r"^## (TD-\d+):[ \t]*(.*)$", re.M)
 SECTION = re.compile(r"^## ", re.M)  # a body ends at the next `## ` heading of any kind, as the script reads it
 # Parity (cadence §7): §2.12's header-block rule, as dev-cadence's `scripts/ledger.py` reads it.
 FIELD = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one line, one field
-# the fields read further down the body when the header block lacks them (the script's three, and ours)
-BELOW = ("priority", "type", "blocked by", "owner", "kind", "pickable")
+# the fields read further down the body when the header block lacks them: the script's three by their
+# exact spelling, as it reads them, and ours by any spelling
+BELOW_EXACT = ("Priority", "Type", "Blocked by")
+BELOW = ("owner", "kind", "pickable")
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 ID_ITEM = re.compile(r"^TD-(\d+)$")
 XREPO_ITEM = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")  # cadence §2.4's `<repo>#TD-NNN`
@@ -87,7 +89,9 @@ def _header(body: str) -> dict[str, str]:
         if m := FIELD.match(line):
             fields.setdefault(_key(m.group(1)), m.group(2))
     for line in body.split("\n"):
-        if (m := FIELD.match(line)) and (k := _key(m.group(1))) in BELOW and k not in fields:
+        if not (m := FIELD.match(line)) or (k := _key(m.group(1))) in fields:
+            continue
+        if m.group(1) in BELOW_EXACT or k in BELOW:
             fields[k] = m.group(2)
     return fields
 
@@ -188,7 +192,7 @@ def entries(
     for m in heads:
         nxt = SECTION.search(t, m.end())
         fields = _header(t[m.end() : nxt.start() if nxt else len(t)])
-        etype = _word(fields.get("type", ""))
+        etype = (fields.get("type") or "").split()[0].lower() if (fields.get("type") or "").split() else ""
         blocked_by: list[str] = []
         raw = fields.get("blocked by") or ""  # an empty line blocks nothing
         if raw:
@@ -233,6 +237,21 @@ def _git(root: Path | str, *args: str, timeout: float = 10.0) -> str | None:
     return cp.stdout if cp.returncode == 0 else None
 
 
+def default_ref(root: Path | str, timeout: float = 10.0) -> str | None:
+    """`origin/<default>` as cadence §9's default-branch rule names it, the script's own: the first
+    of `origin/HEAD`'s target, `init.defaultBranch`, `main` and `master` that exists on origin; None
+    where none does (the working tree is read instead)."""
+    names: list[str] = []
+    if head := _git(root, "symbolic-ref", "-q", "refs/remotes/origin/HEAD", timeout=timeout):
+        names.append(head.strip().removeprefix("refs/remotes/origin/"))
+    if init := _git(root, "config", "--get", "init.defaultBranch", timeout=timeout):
+        names.append(init.strip())
+    for name in dict.fromkeys([*names, "main", "master"]):
+        if name and _git(root, "rev-parse", "--verify", "-q", f"refs/remotes/origin/{name}", timeout=timeout):
+            return f"origin/{name}"
+    return None
+
+
 class Registry:
     """Resolves `<repo>#TD-NNN` through the home's registry (§4.4 *Repo facts*: the host's
     `repos()`), as the script's roster does: `<repo>` is a checkout's directory name and `owner/name`
@@ -264,7 +283,7 @@ class Registry:
 
     def _repo(self, root: Path) -> tuple[set[str], set[str]] | None:
         if root not in self._read:
-            ref = next((r for r in DEFAULT_REFS if _git(root, "rev-parse", "--verify", "-q", r) is not None), None)
+            ref = default_ref(root)
 
             def read(rel: str) -> str | None:
                 if ref is not None:

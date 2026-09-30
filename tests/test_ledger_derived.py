@@ -103,6 +103,17 @@ LEDGER = """# Technical Debt
 
 **Priority:** Medium
 **Blocked by:** other#TD-003, nowhere#TD-001
+
+## TD-2: a short id, and a Type the script reads as debt
+
+**Type:** feature,
+
+## TD-019: a blocker below the header, spelt as the script does not read it
+
+**Priority:** Low
+
+**Blocked-by:** TD-010
+**Type:** `feature`
 """
 
 ARCHIVE = """# Archive
@@ -136,7 +147,8 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
     (reg / "repos.txt").write_text(f"{here}\n{other}\n", encoding="utf-8")
     home = _home(LEDGER, ARCHIVE, [str(here), str(other)])
     _same(_script(here, reg), home)
-    assert {t for t, e in home.items() if e["pickable"] == "yes"} == {"TD-010", "TD-012", "TD-016"}
+    assert {t for t, e in home.items() if e["pickable"] == "yes"} == {"TD-010", "TD-012", "TD-016", "TD-2", "TD-019"}
+    assert home["TD-2"]["type"] == home["TD-019"]["type"] == "debt", "the Type's first word, as the script splits it"
     assert home["TD-011"]["blocked_by"] == ["TD-010"] and home["TD-013"]["blocked_by"] == ["TD-777"]
     assert home["TD-014"]["blocked_by"] == ["decision (Paul)"], "what follows the decision is its pointer"
     assert home["TD-015"]["blocked_by"] == ["decision (Paul)", "'after the decision: TD-010'", "'soon'"]
@@ -165,7 +177,7 @@ def test_a_written_no_still_blocks_while_the_line_lasts():
 def test_a_ledger_with_no_header_lines_gives_free_pick_every_unblocked_entry():
     got = ledger.entries(LEDGER, ARCHIVE)
     matched = {e["id"] for e in got if ledger.lane_matches(["free-pick"], e)}
-    assert matched == {e["id"] for e in got if not e["blocked_by"]} == {"TD-010", "TD-012", "TD-016"}
+    assert matched == {e["id"] for e in got if not e["blocked_by"]} == {"TD-010", "TD-012", "TD-016", "TD-2", "TD-019"}
     assert not any(ledger.lane_matches(["design-first"], e) for e in got)
 
 
