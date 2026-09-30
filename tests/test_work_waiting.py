@@ -133,9 +133,11 @@ async def test_a_ledger_that_cannot_be_read_keeps_the_mark(agent, tmp_path):
     await agent._work_marks(now)
     await agent._work_marks(now + WORK_SETTLE)
     mark = agent._host_rec["teams"]["g"]["work_waiting"]
+    first = dict(agent._work_first)
     agent._repos[repo]["ledger"] = {"error": "docs/technical_debt.md: unreadable"}
     await agent._work_marks(now + WORK_SETTLE + timedelta(minutes=1))
     assert agent._host_rec["teams"]["g"]["work_waiting"] == mark
+    assert agent._work_first == first, "the settle's memory kept"
     agent._repos[repo]["ledger"] = good
     await agent._work_marks(now + WORK_SETTLE + timedelta(minutes=2))
     assert agent._host_rec["teams"]["g"]["work_waiting"] == mark, "no second settle, the same `at`"
