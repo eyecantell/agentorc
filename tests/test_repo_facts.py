@@ -68,11 +68,14 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "priority": "high",
         "owner": "grinder",
         "kind": "build",
+        "type": "debt",
+        "blocked_by": [],
         "pickable": "yes",
         "for_page": "pickable",
     }
     assert [got[t]["for_page"] for t in got] == ["pickable", "design-first", "for-you", "for-you", "other"]
-    assert got["TD-014"]["pickable"] == ""  # absent is empty, never a guess
+    # derived (TD-228): no Blocked by is pickable; a written `no` still reads as blocked while the line lasts
+    assert got["TD-014"]["pickable"] == "yes" and got["TD-011"]["pickable"] == "no"
 
 
 def test_the_repos_own_ledger_parses_every_entry_the_heading_regex_finds():

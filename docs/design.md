@@ -656,11 +656,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `None`, never `[]`). **The ledger**: the repo's `ledger:` file (`.agentorc.yml`, default
   `docs/technical_debt.md`) read when its mtime moves, its history every five minutes, by `sessionorc.ledger` — the one reader of
   the entry's header fields (`## TD-NNN: title`, `**Priority:**`, `**Owner:**`, `**Kind:**`,
-  `**Pickable:**`), kept as `{entries: [...], by_priority, by_kind, at}`; an entry counts while
-  its section is in the file, and its kind for the page is *pickable* (`Pickable: yes`),
-  *design-first* (`Kind: design-first`), *for you* (`Owner: paul` or `Kind: decision`), else
-  *other*. **Pickable is derived, never written** (TD-223, TD-198; designed 2026-09-28, not
-  built — TD-228, until when the sentence before this one is what runs). It is cadence §2.4's
+  `**Type:**`, `**Blocked by:**`, and `**Pickable:**` while the fallback below lasts), kept as
+  `{entries: [...], by_priority, by_kind, at}`; an entry counts while its section is in the file.
+  **Pickable is derived, never written** (TD-223, TD-198; designed 2026-09-28; the reader, the
+  page's kinds and the lane words built — TD-228 slice 1; the page's lists and `ao repo`'s order
+  are slice 2's). It is cadence §2.4's
   rule, the one dev-cadence's `scripts/ledger.py --pickable` applies, so a repo's own tool and
   the home give one answer: an entry is **blocked** while its `**Blocked by:**` names an entry
   that is not archived — one still open, or one found in neither the ledger nor its archive,
@@ -3586,8 +3586,8 @@ gave as its example, *questions → manager-ao-1*, are not derivable from them).
 
 **Choosing in a free-pick lane (TD-202).** A `free-pick` worker chooses by priority: High, then
 Medium, then Low (the ledger has no Critical), ties in the ledger's order. It chooses among the
-entries the ledger reading calls pickable (§4.4 *Repo facts*: derived from `Blocked by:`, TD-223;
-until TD-228 is built, those whose header says `Pickable: yes`, TD-118) and that match its lane,
+entries the ledger reading calls pickable (§4.4 *Repo facts*: derived from `Blocked by:`, TD-223,
+built — TD-228 slice 1; a written `Pickable: no` still blocks until the migration) and that match its lane,
 less what its brief excludes and what a live
 sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities, beside what
 each live member holds, read from the main checkout, which the worker confirms on `origin` before
@@ -6432,12 +6432,10 @@ code and needs no grant; a session doing the same work does.
      (a branch checked out at the home) is written into it untold, so no tick, this one or a later
      one reading the checkout, tells as new an entry `origin/<default>` does not hold;
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
-     `design-first` matches an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
-     matches one with `Pickable: yes` that is not design-first (**with pickable derived**, TD-223,
-     not built — TD-228: `design-first` is a pickable entry of that kind, and `free-pick` a
-     pickable entry whose kind is `build` or unwritten, so a live check, an evaluation and a
-     decision match no lane, and a ledger with no header lines at all gives a `free-pick` lane
-     everything it has unblocked); a lane of references gains
+     with pickable derived (§4.4 *Repo facts*, TD-223; built — TD-228 slice 1), `design-first`
+     is a pickable entry with `Kind: design-first`, and `free-pick` a pickable entry whose kind
+     is `build` or unwritten, so a live check, an evaluation and a decision match no lane, and a
+     ledger with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.
      **An `owner:<word>` in a lane narrows it** (TD-214; built — TD-227 slice 1): with one or more,
      an entry matches when it matches one of the lane's other words and its `Owner:` is one of
