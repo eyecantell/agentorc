@@ -82,7 +82,7 @@ def test_the_form_defaults_to_the_senders_repos_board_and_the_page_carries_it(tm
     host(tmp_path, monkeypatch, repos=[a])
     from agentorc.ui import app as uiapp
 
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: ([], ""))
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([], ""))
     board = str(a.resolve() / "docs/user_attention.md")
     Fake.fleet = [rec("ao-w1", "idle", repo=str(a)), rec("ao-w2", "idle", repo="/elsewhere")]
     Fake.inbox = {
@@ -113,7 +113,7 @@ def test_a_host_with_no_board_says_so_in_the_form(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
     from agentorc.ui import app as uiapp
 
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: ([], ""))
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([], ""))
     Fake.fleet, Fake.inbox = [], {"entries": [], "trail": []}
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
     with TestClient(uiapp.create_app()) as c:
@@ -130,7 +130,7 @@ def test_put_it_on_goes_to_the_write_backs_one_add_and_the_boards_are_read_again
     from agentorc.ui import app as uiapp
 
     reads = []
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (reads.append(1), ([], ""))[1])
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
     Fake.calls, Fake.fleet, Fake.inbox = [], [], {"entries": [], "trail": []}
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
     board = str(tmp_path / "r/docs/user_attention.md")
