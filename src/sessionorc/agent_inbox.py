@@ -234,6 +234,8 @@ class InboxMixin:
         mid = (sent.get("entry") or {}).get("id")
         if not mid:
             raise RpcError(f"the entry was not delivered to {seat}")
+        # a seat closed and started again under its name is followed to the record that took it (review of #764)
+        seat = next(iter(sent.get("delivered") or ()), seat)
         # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
         self._mark(mid, handed=True, entry={"repo": name, "type": kind}, bound=None)
         await self._push_changes()

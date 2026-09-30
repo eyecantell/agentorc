@@ -210,6 +210,11 @@ async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_pa
         # by path as well as by name — `ao td add` hands the checkout it runs in
         again = await person.call("entry_add", repo=str(repo), type="feature", text="a second", teams=teams)
         assert again["repo"] == "agentorc" and again["type"] == "feature"
+        # a seat on call — its record exited — reads *fills this seat*, with no bound after it
+        rec.state, rec.pane, rec.exit_code = "exited", True, 0
+        agent.store.save(rec)
+        third = await person.call("entry_add", repo="agentorc", type="debt", text="a third", teams=teams)
+        assert third["read_when"] == "fills this seat: a session starts on the next tick and reads it first"
         await person.call("kill", id=sid)
 
 
