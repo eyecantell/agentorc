@@ -9,3 +9,30 @@ promote:
   check: >-
     "$HOME/.local/share/agentorc-venv/bin/python" -c 'import sys; from sessionorc import build;
     c = build.info().get("commit"); print(c) if c else sys.exit("build unknown: the live install carries no build record")'
+
+# The ao-grind team, defined in the repo it works (design §4.9 *The org is an aggregate*; TD-229
+# slice 2): the org file's definition as it stood on 2026-09-30, the names, lanes, briefs and
+# techlead seat unchanged. While `~/.agentorc/org.yml` still defines `ao-grind` it wins the name and
+# this one reads *shadowed by org.yml*, so nothing that runs changes; removing the team from the org
+# file is the switch. The profiles stay the org file's `roles:` overlay (the install's word), and
+# no `host:` — where a repo's team lands is the org's `place:`.
+teams:
+  ao-grind:
+    manager: {role: manager, name: manager-ao-1, brief: docs/briefs/manager-ao-1.md}
+    techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}
+    members:
+      - {role: grinder, name: grinder-ao-1, lane: free-pick, brief: docs/briefs/grinder-ao-1.md}
+      # the page and git lane, apart from the host agent: the split is by file and lives in its brief
+      - {role: grinder, name: grinder-ao-2, lane: free-pick, brief: docs/briefs/grinder-ao-2.md}
+      # its lane is the ledger's design-first entries; it decides what Paul sees (design §4.8)
+      - {role: designer, name: designer-ao-1, unattended: true, lane: design-first}
+
+# A repo's held paths are the repo's (design §4.9, TD-209): `review:` whole on the role, the last
+# layer of a preset, so `src/sessionorc/**` is never carried into another repo by an org-wide role.
+# A grinder's or the designer's PR on these paths waits for the techlead seat's read (§4.9b).
+roles:
+  grinder:
+    review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}
+  designer:
+    brief: docs/briefs/designer-ao-1.md
+    review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}

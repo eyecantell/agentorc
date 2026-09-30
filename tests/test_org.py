@@ -561,3 +561,45 @@ def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path,
     f.write_text(base + "    entries: {feature: designer}\n")
     (row,) = teamrun.rows(org.load(f), [])
     assert row["entries"] == {"debt": "techlead", "feature": "designer"}
+
+
+def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monkeypatch):
+    """TD-229 slice 2: this repo's `.agentorc.yml` carries ao-grind and the roles' held paths, so
+    removing the team from the org file starts the same team from the repo; while the org file
+    still defines it, the repo's reads *shadowed* and nothing that runs changes."""
+    from agentorc import repoconfig
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    here = Path(__file__).resolve().parents[1]
+    repo = tmp_path / "agentorc"  # the checkout's directory name is the team's project
+    repo.mkdir()
+    (repo / ".agentorc.yml").write_text((here / ".agentorc.yml").read_text())
+    overlay = {"roles": {"grinder": {"profile": "grind"}, "designer": {"profile": "grind-fable"}}}
+
+    aggregate, notes = org.with_repos(org.load(write(tmp_path, overlay)), [repo])
+    assert notes == []
+    team = aggregate.teams["ao-grind"]
+    assert team.source == repo.resolve() / ".agentorc.yml" and team.projects == ["agentorc"] and not team.host
+    assert (team.manager.name, team.manager.brief) == ("manager-ao-1", "docs/briefs/manager-ao-1.md")
+    assert (team.techlead.name, team.techlead.context) == ("techlead-ao-1", "docs/briefs/techlead-context.md")
+    got = [(m.role, m.names(), m.lane, m.brief, m.unattended) for m in team.members]
+    assert got == [
+        ("grinder", ["grinder-ao-1"], ["free-pick"], "docs/briefs/grinder-ao-1.md", True),
+        ("grinder", ["grinder-ao-2"], ["free-pick"], "docs/briefs/grinder-ao-2.md", True),
+        ("designer", ["designer-ao-1"], ["design-first"], None, True),
+    ]
+    briefs = [team.manager.brief, team.techlead.context, *(m.brief for m in team.members if m.brief)]
+    assert all((here / b).is_file() for b in briefs)
+
+    # the held paths are the repo's, written whole; the profile is still the org overlay's
+    cfg = repoconfig.load(repo)
+    held = {"reader": "techlead", "held": ["src/sessionorc/**", "docs/briefs/**"], "bound": "2h"}
+    for name, profile in (("grinder", "grind"), ("designer", "grind-fable")):
+        role = repoconfig.resolve_role(cfg, name, aggregate.roles)
+        assert (role.review, role.profile) == (held, profile)
+    assert (here / repoconfig.resolve_role(cfg, "designer", aggregate.roles).brief).is_file()
+
+    # while the org file defines ao-grind it wins, and the repo's is recorded as shadowed
+    shadowing, _ = org.with_repos(org.load(write(tmp_path, ORG)), [repo])
+    assert shadowing.teams["ao-grind"].source == tmp_path / "org.yml"
+    assert shadowing.shadowed == {"ao-grind": [repo.resolve() / ".agentorc.yml"]}
