@@ -748,6 +748,8 @@ def edit_members(
     line: a multi-line member, a `{team: …}` member, a team without a `members:` block. After the
     write the file is parsed again; a parse that fails restores the bytes and refuses, so a
     definition is never left unreadable. Returns what was done, in words."""
+    if path.name == repoconfig.FILE:  # a repo's team is changed by PR (§4.9 *The org is an aggregate*, TD-229)
+        raise ValueError(f"{path}: a repo's .agentorc.yml is changed by PR — Members… edits the org file only")
     raw = path.read_bytes()
     text = raw.decode("utf-8")
     lines = text.splitlines(keepends=True)

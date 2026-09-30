@@ -582,6 +582,7 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
         return {"name": n, "id": s["id"] if s else "", "state": s.get("state") if s else "not live"}
 
     editable = bool(team.source and org.path and Path(team.source) == Path(org.path))
+    repo = Path(team.source).parent.name if team.source else "the repo"
     entries = []
     for i, m in enumerate(team.members):
         if m.team is not None:
@@ -601,7 +602,8 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
         "team": team.name,
         "source": str(team.source) if team.source else None,
         "editable": editable,
-        "note": "" if editable else "defined in the repo — edit it by PR; this card only reads it",
+        # the reason the card's disabled Members… gives (§4.5a *Members… on a repo-defined team*, TD-229)
+        "note": "" if editable else f"defined in {repo}'s .agentorc.yml — changed by PR",
         "live": bool(live(crew(name, sessions))),
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,

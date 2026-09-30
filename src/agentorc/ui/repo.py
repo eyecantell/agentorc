@@ -313,6 +313,8 @@ def team_groups(
                 "defined": team in defs,
                 "source": row.get("source"),
                 "in_org": bool(row.get("in_org")),  # Members… edits org.yml's teams only (TD-172)
+                # the repo whose `.agentorc.yml` defines it, for the disabled Members…'s reason (TD-229)
+                "source_repo": Path(row["source"]).parent.name if row.get("source") and not row.get("in_org") else "",
                 "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
                 "def_techlead": row.get("techlead"),  # the seat's name (§4.9b), when the definition has one
