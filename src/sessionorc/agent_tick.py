@@ -27,6 +27,7 @@ from sessionorc import brief as brief_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
+from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     BRIEF_SETTLE,
     COMPOSER_LINES,
@@ -135,6 +136,7 @@ class TickMixin:
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
         await self._keep_running(snapshot_at)
+        await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._ring_doorbells()
@@ -905,6 +907,96 @@ class TickMixin:
         )
         self._save(s)
         log.info("%s: told of %s new in its lane", self._address(s), count)
+
+    async def _work_marks(self, now: datetime) -> None:
+        """Rule 8 (design §6 *Work for a team that wound down*, TD-227): on every tick at the home,
+        each team read as **wound down** from its records (`work.team_wound_down`, the card's own
+        reading) whose members' lanes hold ids their `lane_seen` does not gets `work_waiting: {at,
+        repo, members: {<name>: [ids]}}` on the home's `host` record under its name, once
+        `WORK_SETTLE` has passed since the home first read the newest of them (a time kept in
+        memory, so a restart settles again). It is removed when the team is no longer wound down —
+        a crew session live again, or a member that never declared — when no id is new, and under
+        `on_work: off`. `lane_seen` itself is rule 6's, written for a member that is gone as for a
+        live one. One team's surprise is a log line, never another's."""
+        if self.mode != "home":
+            return
+        teams = self._host_rec.setdefault("teams", {})
+        try:
+            settings = settings_mod.teams(settings_mod.load())
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
+            log.exception("reading the teams' settings for rule 8 failed")
+            return
+        by_team: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        firsts: dict[tuple[str, str], datetime] = {}
+        dirty = False
+        for team in sorted(set(by_team) | {t for t, rec in teams.items() if "work_waiting" in rec}):
+            try:
+                rec = teams.get(team) or {}
+                old = rec.get("work_waiting")
+                on_work = (settings.get(team) or {}).get("on_work", "ask")
+                new = self._work_mark(team, old, by_team.get(team) or [], on_work, now, firsts)
+                if new == old:
+                    continue
+                dirty = True
+                if new is None:
+                    rec.pop("work_waiting", None)
+                    log.info("rule 8: %s has no work waiting", team)
+                else:
+                    rec["work_waiting"] = new
+                    log.info("rule 8: %s wound down with work waiting: %s", team, new["members"])
+                if rec:
+                    teams[team] = rec
+                else:
+                    teams.pop(team, None)
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never the others'
+                log.exception("reading %s's work for rule 8 failed", team)
+        self._work_first = firsts  # an id no longer new starts its settle again if it comes back
+        if dirty:
+            try:
+                self.host_store.save(self._host_rec)
+            except OSError:
+                log.exception("writing the home's host record failed")
+            await self._push_changes()
+
+    def _work_mark(
+        self,
+        team: str,
+        old: Any,
+        records: list[Session],
+        on_work: str,
+        now: datetime,
+        firsts: dict[tuple[str, str], datetime],
+    ) -> dict[str, Any] | None:
+        """One team's `work_waiting` as it reads now (`_work_marks`), or None. Its repo is the ledger's
+        — a registry root, since two repos may hold one id — and a team whose members' news is in two
+        repos is written for the first by name; the other's waits for the next wind-down."""
+        if on_work == "off" or work_mod.team_wound_down(records) is None:
+            return None
+        news: dict[str, dict[str, list[str]]] = {}  # repo → member → ids
+        for r in sorted(work_mod.crew(records), key=lambda r: (r.name, r.id)):
+            if r.seat is not None or r.superseded_by:
+                continue
+            led = (self._repos.get(r.repo or "") or {}).get("ledger") or {}
+            if "error" in led or not isinstance(led.get("entries"), list):
+                continue
+            ids = news.setdefault(str(r.repo), {}).setdefault(r.name, [])
+            ids.extend(i for i in work_mod.gained(r, led["entries"]) if i not in ids)
+        news = {repo: {m: ids for m, ids in ms.items() if ids} for repo, ms in news.items()}
+        news = {repo: ms for repo, ms in news.items() if ms}
+        if not news:
+            return None
+        repo = min(news)
+        members = news[repo]
+        newest = max(
+            firsts.setdefault((team, i), self._work_first.get((team, i), now)) for ids in members.values() for i in ids
+        )
+        if now - newest < agent_common.WORK_SETTLE:
+            return old if isinstance(old, dict) else None  # still settling: what stands, stands
+        at = old.get("at") if isinstance(old, dict) and old.get("at") else now_iso()
+        return {"at": at, "repo": repo, "members": members}
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:

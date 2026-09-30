@@ -102,6 +102,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     USAGE_COOL,  # noqa: F401
     USAGE_FRESH,  # noqa: F401
     USAGE_ONLY_EVERY,  # noqa: F401
+    WORK_SETTLE,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
     RpcError,  # noqa: F401
     _alarm_report,  # noqa: F401
@@ -445,6 +446,9 @@ class HostAgent(
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
         self.host_store = HostStore()
         self._host_rec: dict[str, Any] = self.host_store.load()
+        # rule 8 (§6, TD-227): (team, id) → when the home first read that id as new in a wound-down
+        # team's lane; in memory, so a restart of the home starts the settle again
+        self._work_first: dict[tuple[str, str], datetime] = {}
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}

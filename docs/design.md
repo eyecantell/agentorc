@@ -6510,7 +6510,8 @@ code and needs no grant; a session doing the same work does.
      a team started from a branch. `org.yml` is not a brief's file: a changed lane, profile or
      member is a person's Start or **Members…**.
 
-  8. **Work for a team that wound down** (TD-214; designed 2026-09-28, not built — TD-227). A
+  8. **Work for a team that wound down** (TD-214; designed 2026-09-28; the reading, `work_waiting`,
+     `on_work` and `clear_work` built — TD-227 slice 2; the row, the words and the start not yet). A
      team that winds down closes its members, so rule 6 has nobody to tell: ao-grind wound down
      at 2026-09-28T06:56Z, its designer's lane gained ten entries over the day, and the team sat
      until a person saw the page. The tick keeps `lane_seen` for a member that is gone as it
@@ -6519,13 +6520,17 @@ code and needs no grant; a session doing the same work does.
      person in the team*): none of them live, and every one that is not a seat — the record's
      `seat` field, since the home reads no definition — having declared `out_of_work`; a member
      killed or closed by a person makes it *stopped*, which this rule leaves alone, and a
-     person's own session in the team changes nothing.
+     person's own session in the team changes nothing. The reading is written once
+     (`sessionorc.work`), and the card's is the same function given the definition's seat names.
      When a wound-down team's member's lane holds a matching id its `lane_seen` does not, and
      `WORK_SETTLE` (ten minutes) has passed since the home first read the newest of them — a
      time the home keeps in memory, so a restart of the home starts the settle again and
      entries filed together are one event — the home writes **`work_waiting: {at, repo,
      members: {<name>: [ids]}}`**, `repo` being the ledger's, since two repos may hold one id, on its own
-     `host` record under the team's name. What follows is the team's setting,
+     `host` record under the team's name — for the first repo by name where the team's news is in
+     two, the other's waiting for the next wind-down. It is removed when the team is no longer
+     wound down (a crew session live again), when no id is new, and under `off`; while more ids
+     settle, what stands stands, its `at` kept, its ids possibly stale until the settle ends. What follows is the team's setting,
      **`teams.<team>.on_work`** (§5 `settings.yml`), a person's alone:
      - **`ask`**, and what a team with no key has: the **Inbox row: team start** (§4.5a) under
        *Needs you* — *ao-grind · wound down 00:56 · its lanes gained 3 entries: TD-213, TD-214,
@@ -6545,7 +6550,8 @@ code and needs no grant; a session doing the same work does.
        minutes), which is a team that found nothing and would be started into the same nothing.
      - **`off`**: nothing is written and nothing drawn; the team waits for Start or its schedule.
 
-     Dismiss adds the ids to each member's `lane_seen`, so an entry asks once; a start needs no
+     Dismiss — `clear_work {team}`, a person's own RPC and the home's alone (`modes.HOME_EDITS`:
+     a node forwards it and refuses it offline) — adds the ids to each member's `lane_seen`, so an entry asks once; a start needs no
      such write, since the records it makes begin with no `lane_seen` and rule 6 writes theirs
      at their next declaration. A person's Start, a schedule's, or Dismiss clears
      `work_waiting`. The note on the team card (§4.5a *work waiting* note) says which of the

@@ -22,6 +22,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import teams
+from sessionorc.work import wound_down  # one reading for the card and the home's rule 8 (TD-227)
 
 Call = Callable[..., Any]
 
@@ -105,30 +106,6 @@ def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[d
     lead_name = team.manager.name if team and team.manager.role != orgmod.PERSON else None
     lead = next((s for s in sessions if s.get("name") == lead_name), None)
     return lead, sorted((s for s in sessions if s is not lead), key=lambda s: s.get("name") or s["id"])
-
-
-def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> str | None:
-    """When a team's sessions all declared they were out of work, the latest of those instants
-    (design §4.9a, §4.5a **Teams** strip, TD-053 step 6) — else None.
-
-    *Nothing running* and *nothing left to run* are different facts about a team, and only the
-    second is an answer: a team stopped by a person, by a clock or by a crash looks identical on the
-    strip otherwise. The rule is deliberately all-or-nothing and reads the records rather than
-    counting ledger rows, exactly as §4.9a asks: one member's exhaustion is not the team's, and a
-    single session that never declared means the team stopped for some other reason. A team with no
-    session carrying its badge has never run, or has been forgotten, and is neither.
-
-    `seats` are the names the team's seats run under — its techlead and any seat with a trigger
-    (`seat_names`; design §4.9b, TD-075 step 4, TD-098): a seat is empty or filled, never
-    finished, so it never declares and is not counted — read from the definition, never from a
-    role badge (§9 invariant 9).
-    """
-    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions if s.get("name") not in seats]
-    if not seen or not all(d.get("at") for d in seen):
-        return None
-    # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
-    # the strip is on the same page as every card (review of PR #203)
-    return max(str(d["at"]) for d in seen)
 
 
 def _declared_at(s: dict[str, Any]) -> tuple[str, bool] | None:
