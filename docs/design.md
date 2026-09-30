@@ -3064,7 +3064,7 @@ on a later tick, as §6 says, and for this repo the command's own host agent goe
 9c1e0f2, 3 ahead · checks green · auto off*, in flight or failed with the log — and `--json` the
 `promotes` field of `host`. `ao status -v`'s build line stays: it is this repo's `check` read from
 the client's side, and the one line a session may read. **The rollback** (TD-212, designed
-2026-09-28; not built — TD-226, until when `--sha` is refused): `--sha <commit>` takes a
+2026-09-28; the press, `--back` and `ao promote clear` built 2026-09-29 — TD-226 slices 1–2): `--sha <commit>` takes a
 commit's hex, in full or a prefix of seven or more that names one, never a branch, a tag or
 `HEAD~n`, and **`--back`** is the commit that was live before the last
 promote that concluded, so putting the live copy back takes no looking up. §6 *A rollback* says
@@ -6534,7 +6534,7 @@ code and needs no grant; a session doing the same work does.
   unknown*. The home reads it from the checkout, so it stands as soon as the checkout's `main` holds
   it; with `auto` off, the row or `ao promote` is the person's press, and CLAUDE.md's pair by hand
   stays the fallback while the agent is down.
-  **A rollback** (TD-212, designed 2026-09-28; not built — TD-226) is a person's press with a
+  **A rollback** (TD-212, designed 2026-09-28; the commit, the run and the hold built 2026-09-29 — TD-226 slices 1–2; the row's *rolled back* reading is slice 3) is a person's press with a
   commit: `ao promote --sha <commit>` or `--back` (§4.7), never the policy's and never the page's,
   since the page may be what broke.
   - **Which commit.** The home fetches, then resolves the commit in the checkout. It is refused

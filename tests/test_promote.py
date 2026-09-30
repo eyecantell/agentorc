@@ -327,7 +327,7 @@ async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(ag
         assert agent._promotes["repo"]["inflight"] is None and agent._promotes["repo"]["live"] == main
         with pytest.raises(AgentError, match="no registered repo"):
             await person.call("promote", repo="elsewhere")
-        with pytest.raises(AgentError, match="--sha is not built"):
+        with pytest.raises(AgentError, match="is live already"):
             await person.call("promote", repo="repo", sha=main)
 
 
@@ -340,7 +340,7 @@ async def test_a_failure_standing_refuses_the_press_until_dismissed(agent, check
     async with LocalClient() as person:
         with pytest.raises(AgentError, match="failed and is not cleared.*precondition: failed"):
             await person.call("promote", repo="repo")
-        assert (await person.call("clear_promote", repo="repo")) == {"repo": "repo", "cleared": True}
+        assert (await person.call("clear_promote", repo="repo")) == {"repo": "repo", "cleared": True, "which": "failed"}
         assert (await person.call("clear_promote", repo="repo"))["cleared"] is False
         assert (await person.call("promote", repo="repo"))["repo"] == "repo"
 
@@ -427,3 +427,239 @@ def test_this_repos_block_is_the_promote_pair_read_from_the_checkout():
     assert "/agentorc-venv/bin" in b["run"] and '"$(pwd -P)[ui]"' in b["run"] and b["run"].endswith("service install")
     assert "/home/kmaster" not in b["run"] + b["check"]  # never a hard-coded checkout or home
     assert "build.info()" in b["check"] and "sys.exit(" in b["check"]  # no record → exit 1 saying why
+
+
+# ── TD-226: the rollback — `--sha`, `--back`, the worktree, the hold (§6 *A rollback*) ─────────
+
+
+def _rollback_block(checkout: Path, run_extra: str = "") -> Path:
+    """The fixture's block, its `run` also recording where it ran and what it was handed."""
+    live = checkout.parent / "live"
+    seen = checkout.parent / "seen"
+    handed = "$AGENTORC_PROMOTE_SHA $AGENTORC_PROMOTE_FROM $AGENTORC_PROMOTE_ROOT"
+    run = f'{run_extra}git rev-parse HEAD > {live}; echo "$(pwd -P) {handed}" > {seen}'
+    (checkout / ".agentorc.yml").write_text(yaml.safe_dump({"promote": {"run": run, "check": f"cat {live}"}}))
+    _git(checkout, "add", "-A")
+    _git(checkout, "commit", "-q", "-m", "block")
+    _git(checkout, "push", "-q", "origin", "main")
+    live.write_text(_git(checkout, "rev-parse", "HEAD") + "\n")  # live is main's head
+    return seen
+
+
+async def _promote_to_main(agent, person, checkout) -> str:
+    """A plain press that concludes, so `last.json` holds what was live before it."""
+    got = await person.call("promote", repo="repo")
+    _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
+    await agent._refresh_promotes()
+    assert agent._promotes["repo"]["live"] == got["sha"]
+    return got["sha"]
+
+
+async def _settle(agent) -> None:
+    _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
+    agent._promote_watch_at = float("-inf")
+    await agent._refresh_promotes()
+
+
+async def test_a_rollback_runs_in_a_worktree_and_leaves_the_checkout_alone(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    seen = _rollback_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD")
+    (checkout.parent / "live").write_text(old + "\n")
+    _merge(checkout, "b")
+    async with LocalClient() as person:
+        new = await _promote_to_main(agent, person, checkout)
+        assert promote.last("repo")["from"] == old
+        # the person's checkout on a branch with a change left in it: not what a rollback installs
+        _git(checkout, "checkout", "-q", "-b", "td9-wip")
+        (checkout / "b").write_text("dirty")
+        before = (_git(checkout, "rev-parse", "HEAD"), _git(checkout, "status", "--porcelain"))
+        got = await person.call("promote", repo="repo", back=True)
+        assert (got["kind"], got["sha"], got["from"], got["checks"]) == ("rollback", old, new, "green")
+        tree = promote.repo_dir("repo") / "tree"
+        assert agent._promotes["repo"]["inflight"]["tree"] == str(tree)
+        await _settle(agent)
+    r = agent._promotes["repo"]
+    assert r["live"] == old and r["inflight"] is None and r["held"]["from"] == new and r["held"]["sha"] == old
+    assert seen.read_text().split() == [str(tree.resolve()), old, new, str(checkout)]
+    assert (_git(checkout, "rev-parse", "HEAD"), _git(checkout, "status", "--porcelain")) == before
+    assert _git(checkout, "rev-parse", "--abbrev-ref", "HEAD") == "td9-wip"
+    assert tree.exists()  # kept: what was installed from it may name it as its source
+    notes = [e.text for e in agent.person_inbox if e.from_ == "system"]
+    assert notes[-1] == f"rolled back `repo` to `{old[:7]}` from `{new[:7]}` — main is 1 commit ahead"
+    assert promote.last("repo")["sha"] == old
+
+
+async def test_the_commit_is_refused_by_name(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    first = _git(checkout, "rev-parse", "HEAD")
+    _git(checkout, "tag", "v1")
+    _git(checkout, "checkout", "-q", "-b", "td9-side")
+    side = _commit(checkout, "side")
+    _git(checkout, "push", "-q", "origin", "td9-side")
+    _git(checkout, "checkout", "-q", "main")
+    _merge(checkout, "b")
+    async with LocalClient() as person:
+        for bad in ("td9-side", "v1", "HEAD~1", "abc12"):
+            with pytest.raises(AgentError, match="is not a commit's hex"):
+                await person.call("promote", repo="repo", sha=bad)
+        with pytest.raises(AgentError, match="is not on main: a branch is never promoted"):
+            await person.call("promote", repo="repo", sha=side[:9])
+        with pytest.raises(AgentError, match="names no commit"):
+            await person.call("promote", repo="repo", sha="0" * 12)
+        with pytest.raises(AgentError, match="is live already"):
+            await person.call("promote", repo="repo", sha=first)
+        with pytest.raises(AgentError, match="--sha or --back, not both"):
+            await person.call("promote", repo="repo", sha=first, back=True)
+        with pytest.raises(AgentError, match="no promote of repo has concluded"):
+            await person.call("promote", repo="repo", back=True)
+
+
+def test_an_ambiguous_prefix_names_more_than_one_commit(checkout, monkeypatch):
+    a, b = "abcdef1" + "0" * 33, "abcdef1" + "1" * 33
+    real = promote._git
+
+    def fake(root, *args, **kw):
+        if args[0] == "rev-parse" and args[1] == "--verify":
+            return None, "git rev-parse: short object ID abcdef1 is ambiguous"
+        if args[0] == "rev-parse" and args[1].startswith("--disambiguate="):
+            return f"{a}\n{b}", ""
+        if args[0] == "cat-file":
+            return "commit", ""
+        return real(root, *args, **kw)
+
+    monkeypatch.setattr(promote, "_git", fake)
+    assert promote.resolve(checkout, "ABCDEF1") == (None, "abcdef1 names 2 commits: give more of it")
+
+
+async def test_back_is_refused_when_what_was_live_was_never_read(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    main = _merge(checkout, "b")
+    promote.repo_dir("repo").mkdir(parents=True)
+    (promote.repo_dir("repo") / "last.json").write_text(json.dumps({"sha": main, "from": None}))
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="was never read"):
+            await person.call("promote", repo="repo", back=True)
+
+
+async def test_a_rollback_goes_through_a_failure_and_clears_it(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    _rollback_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD~1")
+    promote.repo_dir("repo").mkdir(parents=True)
+    (promote.repo_dir("repo") / "failed.json").write_text(json.dumps({"sha": "f" * 40, "why": "it broke"}))
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="precondition: failed"):
+            await person.call("promote", repo="repo")
+        await person.call("promote", repo="repo", sha=old[:7])
+        await _settle(agent)
+    r = agent._promotes["repo"]
+    assert r["live"] == old and r["failed"] is None and promote.failed("repo") is None and r["held"]
+
+
+async def test_the_hold_stops_auto_until_the_person_clears_it(agent, checkout, monkeypatch):
+    await park_ticks(agent)
+    monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
+    monkeypatch.setattr(type(agent), "_promote_auto", staticmethod(lambda: {"repo": True}))
+    _register(checkout)
+    _rollback_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD~1")
+    async with LocalClient() as person:
+        await person.call("promote", repo="repo", sha=old)
+        await _settle(agent)
+        first = promote.held("repo")
+        assert first["sha"] == old
+        with pytest.raises(AgentError, match="a rollback's hold stands"):
+            await person.call("promote", repo="repo", back=True)
+        _merge(checkout, "c")
+        agent._promote_read_at = float("-inf")
+        await agent._refresh_promotes()
+        r = agent._promotes["repo"]
+        assert r["inflight"] is None and r["unmet"]["name"] == "held"  # however far main moves
+        # a second rollback under the hold keeps what the person first went back from
+        other = _git(checkout, "rev-parse", "HEAD~1")  # the block's commit: neither live nor main
+        await person.call("promote", repo="repo", sha=other)
+        await _settle(agent)
+        assert promote.held("repo")["sha"] == other and promote.held("repo")["from"] == first["from"]
+        # Dismiss with a failure and a hold standing clears the failure first
+        (promote.repo_dir("repo") / "failed.json").write_text(json.dumps({"sha": "f" * 40, "why": "x"}))
+        assert (await person.call("clear_promote", repo="repo"))["which"] == "failed"
+        assert (await person.call("clear_promote", repo="repo"))["which"] == "held"
+        assert (await person.call("clear_promote", repo="repo"))["which"] is None
+        agent._promote_read_at = float("-inf")
+        await agent._refresh_promotes()
+        assert agent._promotes["repo"]["inflight"]["by"] == "auto"  # auto goes on as if nothing were held
+        await _settle(agent)
+
+
+async def test_a_plain_press_that_concludes_ends_the_hold(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    _rollback_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD~1")
+    async with LocalClient() as person:
+        await person.call("promote", repo="repo", sha=old)
+        await _settle(agent)
+        assert promote.held("repo")
+        got = await person.call("promote", repo="repo")  # the press is not refused by the hold
+        await _settle(agent)
+    assert agent._promotes["repo"]["live"] == got["sha"] and promote.held("repo") is None
+    assert agent._promotes["repo"]["held"] is None
+
+
+async def test_a_run_that_refuses_before_changing_anything_is_a_failure(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    live = checkout.parent / "live"
+    (checkout / ".agentorc.yml").write_text(
+        yaml.safe_dump({"promote": {"run": "echo too old to go back to; exit 2", "check": f"cat {live}"}})
+    )
+    _git(checkout, "add", "-A")
+    _git(checkout, "commit", "-q", "-m", "block")
+    _git(checkout, "push", "-q", "origin", "main")
+    before = live.read_text().strip()
+    target = _git(checkout, "rev-parse", "HEAD~1")
+    live.write_text(_git(checkout, "rev-parse", "HEAD") + "\n")
+    async with LocalClient() as person:
+        await person.call("promote", repo="repo", sha=target)
+        await _settle(agent)
+    f = agent._promotes["repo"]["failed"]
+    assert f["tail"] == ["too old to go back to"] and f["exit"] == 2
+    assert agent._promotes["repo"]["live"] != before and promote.held("repo") is None
+
+
+async def test_a_leftover_tree_does_not_stop_the_next_rollback(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    _rollback_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD~1")
+    tree = promote.repo_dir("repo") / "tree"
+    tree.mkdir(parents=True)
+    (tree / "stale").write_text("left by a run the agent never saw end")
+    async with LocalClient() as person:
+        await person.call("promote", repo="repo", sha=old)
+        await _settle(agent)
+    assert agent._promotes["repo"]["live"] == old and not (tree / "stale").exists()
+
+
+def test_ao_promote_status_reads_rolled_back_and_held(monkeypatch, capsys):
+    from agentorc import cli
+
+    reading = {
+        "live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": True,
+        "held": {"sha": "4" * 40, "from": "9" * 40, "main": "9" * 40, "at": "t"},
+    }  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"agentorc": reading}})
+    assert cli.main(["promote", "status"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(
+        "agentorc · live 4444444, rolled back from 9999999 · main 9999999, 3 ahead · checks green · auto on · held"
+    )
+    calls = []
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: calls.append((m, p)) or {"repo": "agentorc", "which": "held"})
+    assert cli.main(["promote", "clear", "agentorc"]) == 0
+    assert calls == [("clear_promote", {"repo": "agentorc"})] and "the hold is cleared" in capsys.readouterr().out

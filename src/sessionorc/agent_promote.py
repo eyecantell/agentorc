@@ -77,19 +77,25 @@ class PromoteMixin:
         if self.mode != "home":
             raise RpcError(f"{method} runs at the home (design §6 Promote): this host is a node")
 
-    async def rpc_promote(self, repo: str = "", sha: str = "", caller: Any = None) -> dict[str, Any]:
+    async def rpc_promote(
+        self, repo: str = "", sha: str = "", back: bool = False, caller: Any = None
+    ) -> dict[str, Any]:
         """The press (design §6 *Promote*, §4.7 `ao promote`, TD-132 slice 2): a person's own, refused
         to a session as `set_settings` is. Takes a fresh reading of the repo, refuses — naming it —
         on precondition (1) (the checkout on main's head, clean) or (3) (a run in flight, a failure
         standing), and goes on through (2), the checks, with what they read in the reply: the press
-        is the person's word. Starts `run` detached and returns `{repo, sha, started, log, checks,
-        checks_why}`; the outcome is `check`'s on a later tick (§6), as it is for `auto`."""
+        is the person's word. Starts `run` detached and returns `{repo, sha, kind, from, started, log,
+        checks, checks_why}`; the outcome is `check`'s on a later tick (§6), as it is for `auto`.
+
+        With `sha` or `back` it is a **rollback** (§6 *A rollback*, TD-226): the commit resolved
+        after the fetch (hex only, one commit, on main, not live already), or `back`'s — `from` in
+        `last.json`, refused under a hold; `run` started in a detached worktree at it, so neither
+        (1) nor a failure standing refuses it, and the checks it reports are that commit's."""
         self._promote_person("promote", caller)
-        if sha:
-            raise RpcError(
-                "promote --sha is not built: `run` installs the checkout's tree, and how a rollback's "
-                "commit reaches it is not designed yet (TD-132)"
-            )
+        if sha and back:
+            raise RpcError("promote takes --sha or --back, not both")
+        if sha or back:
+            return await self._rollback(repo, sha, back)
         root = self._promote_root(repo)
         name = Path(root).name
         async with self._promote_lock:
@@ -114,8 +120,9 @@ class PromoteMixin:
                 raise RpcError(f"{name}: live is main's head {r['main'][:7]} already — nothing to promote")
             block = await asyncio.to_thread(promote_mod.block, root)
             assert block is not None  # survey read it a moment ago
+            frm = None if r.get("live_why") else r.get("live")
             r["inflight"] = await asyncio.to_thread(
-                promote_mod.start, root, name, r["main"], block["run"], "person", r.get("ahead")
+                promote_mod.start, root, name, r["main"], block["run"], "person", r.get("ahead"), "promote", frm
             )
             u = promote_mod.unmet(r)
             r["unmet"] = {"name": u[0], "text": u[1]} if u else None
@@ -124,22 +131,94 @@ class PromoteMixin:
         return {
             "repo": name,
             "sha": r["main"],
+            "kind": "promote",
+            "from": frm,
             "started": r["inflight"]["at"],
             "log": r["inflight"]["log"],
             "checks": r.get("checks"),
             "checks_why": r.get("checks_why"),
         }
 
-    async def rpc_clear_promote(self, repo: str = "", caller: Any = None) -> dict[str, Any]:
-        """Dismiss's half (design §4.5a *Inbox row: promote*): clears a failure standing, after which
-        promoting goes on. A person's own. `{repo, cleared}`, `cleared` false when none stood."""
-        self._promote_person("clear_promote", caller)
-        name = Path(self._promote_root(repo)).name
-        had = await asyncio.to_thread(promote_mod.failed, name)
-        await asyncio.to_thread(promote_mod.clear, name, "failed")
-        if name in self._promotes:
-            r = self._promotes[name]
-            r["failed"] = None
+    async def _rollback(self, repo: str, sha: str, back: bool) -> dict[str, Any]:
+        """`promote` with a commit (§6 *A rollback*): the refusals in §6's order, each naming its
+        reason, then `run` in the detached worktree. The hold is written when it concludes."""
+        root = self._promote_root(repo)
+        name = Path(root).name
+        async with self._promote_lock:
+            readings, notes, bad = await asyncio.to_thread(promote_mod.survey, [root], {}, True, {}, datetime.now(UTC))
+            for text in notes:
+                log.info("promote: %s", text)
+                self._system_note(PERSON, text)
+            if root in bad:
+                raise RpcError(bad[root])
+            r = readings.get(name)
+            if r is None:
+                raise RpcError(f"{root} has no promote: block in its .agentorc.yml (design §5): nothing to press")
+            r["auto"] = self._promotes.get(name, {}).get("auto", False)
+            self._promotes[name] = r
+            if back:
+                if r.get("held"):
+                    raise RpcError(
+                        f"promote {name} --back refused — a rollback's hold stands: the last promote was the rollback "
+                        "itself; name the commit with --sha, or promote main (design §6 A rollback)"
+                    )
+                last = await asyncio.to_thread(promote_mod.last, name)
+                if not last:
+                    raise RpcError(f"promote {name} --back refused — no promote of {name} has concluded here yet")
+                if not last.get("from"):
+                    raise RpcError(
+                        f"promote {name} --back refused — what was live before {str(last.get('sha'))[:7]} "
+                        "was never read"
+                    )
+                sha = str(last["from"])
+            full, why = await asyncio.to_thread(promote_mod.resolve, root, sha)
+            if not full:
+                raise RpcError(f"promote {name} --sha refused — {why} (design §6 A rollback)")
+            if r.get("live") == full and not r.get("live_why"):
+                raise RpcError(f"promote {name} --sha refused — {full[:7]} is live already")
+            if (u := promote_mod.unmet(r, press=True, kind="rollback")) is not None:
+                raise RpcError(f"promote {name} --sha refused — {u[1]} (design §6 A rollback, precondition: {u[0]})")
+            checks, checks_why = await asyncio.to_thread(promote_mod.read_checks, root, full)
+            block = await asyncio.to_thread(promote_mod.block, root)
+            assert block is not None  # survey read it a moment ago
+            frm = None if r.get("live_why") else r.get("live")
+            try:
+                r["inflight"] = await asyncio.to_thread(
+                    promote_mod.start, root, name, full, block["run"], "person", None, "rollback", frm
+                )
+            except ValueError as e:
+                raise RpcError(f"promote {name} --sha failed to start — {e}") from None
             u = promote_mod.unmet(r)
             r["unmet"] = {"name": u[0], "text": u[1]} if u else None
-        return {"repo": name, "cleared": had is not None}
+            self._promote_watch_at = float("-inf")
+        log.info("promote: %s rolled back by the person to %s from %s", name, full[:12], str(frm)[:12])
+        return {
+            "repo": name,
+            "sha": full,
+            "kind": "rollback",
+            "from": frm,
+            "started": r["inflight"]["at"],
+            "log": r["inflight"]["log"],
+            "checks": checks,
+            "checks_why": checks_why or None,
+        }
+
+    async def rpc_clear_promote(self, repo: str = "", caller: Any = None) -> dict[str, Any]:
+        """Dismiss's half (design §4.5a *Inbox row: promote*, §6 *The hold*): clears a failure
+        standing, or a rollback's hold when no failure stands, after which promoting goes on. A
+        person's own. `{repo, cleared, which}`: `which` is `failed`, `held` or None when neither stood."""
+        self._promote_person("clear_promote", caller)
+        name = Path(self._promote_root(repo)).name
+        which = None
+        if await asyncio.to_thread(promote_mod.failed, name):
+            which = "failed"
+        elif await asyncio.to_thread(promote_mod.held, name):
+            which = "held"
+        if which:
+            await asyncio.to_thread(promote_mod.clear, name, which)
+        if name in self._promotes:
+            r = self._promotes[name]
+            r[which or "failed"] = None
+            u = promote_mod.unmet(r)
+            r["unmet"] = {"name": u[0], "text": u[1]} if u else None
+        return {"repo": name, "cleared": which is not None, "which": which}
