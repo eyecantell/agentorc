@@ -197,6 +197,8 @@ def load(path: Path | None = None) -> Org:
         # the file is read, never a preset that silently gains a key nothing reads
         org.roles[str(rname)] = repoconfig._role_block(str(rname), raw, f"{label}: roles")
     _validate(org, label)
+    for team in org.teams.values():
+        _entries_resolve(org, team, f"{label}: teams.{team.name}.entries", ())
     return org
 
 
@@ -225,7 +227,11 @@ def merge_repo_teams(
         raw = dict(_mapping(raw, f"{label}: teams.{tname}"))
         raw.setdefault("projects", [rname])
         merged.teams[tname] = _team(tname, raw, f"{label}: teams.{tname}", source=source)
-    _validate(merged, label, repo_roles)
+    _validate(merged, label)
+    for tname in teams:  # only the teams this repo adds: each is checked once, against its own repo's roles
+        team = merged.teams[str(tname)]
+        if team.source == source:
+            _entries_resolve(merged, team, f"{label}: teams.{tname}.entries", repo_roles)
     return merged
 
 
@@ -479,7 +485,7 @@ def _trigger(raw: Any, key: str) -> tuple[str, str]:
 # ── validation ────────────────────────────────────────────────────────────────────────────────
 
 
-def _validate(org: Org, label: str, repo_roles: Collection[str] = ()) -> None:
+def _validate(org: Org, label: str) -> None:
     """The cross-references and the `home` rule (§4.9), reported one at a time, first error first."""
     for team in org.teams.values():
         key = f"{label}: teams.{team.name}"
@@ -504,7 +510,6 @@ def _validate(org: Org, label: str, repo_roles: Collection[str] = ()) -> None:
                     raise ValueError(f"{mkey}.team: {m.team!r} is not a defined team ({sorted(org.teams)})")
                 continue
             m.home = _home(m.home, repos, f"{mkey}.home")
-        _entries_resolve(org, team, f"{key}.entries", repo_roles)
     _no_cycles(org, label)
 
 

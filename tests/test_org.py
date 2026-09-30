@@ -552,6 +552,11 @@ def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path,
     with pytest.raises(ValueError, match="unknown role 'scribe'"):
         org.merge_repo_teams(org.load(f), repo, teams)
     assert org.merge_repo_teams(org.load(f), repo, teams, ["scribe"]).teams["g"].entry_role("feature") == "scribe"
+    # …and a second repo's merge does not check the first's team against its own roles (review of #761)
+    other = tmp_path / "other"
+    other.mkdir()
+    merged = org.merge_repo_teams(org.merge_repo_teams(org.load(f), repo, teams, ["scribe"]), other, {"h": {}})
+    assert merged.teams["g"].entry_role("feature") == "scribe" and "h" in merged.teams
     # `ao team list --json` (the rows) carries both types, said
     from agentorc import teamrun
 
