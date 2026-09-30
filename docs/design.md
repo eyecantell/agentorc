@@ -2638,7 +2638,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller does not act on one — so it is drawn as wanting a person instead |
 | card / Focus header | **brief changed** chip | designed 2026-09-28 (TD-199; built — TD-217 slice 3; §6 *Keeping a team running* rule 7). When the record carries `brief_changed`: fixed words, and on hover, as text, the files that changed by name and when (*manager.md · changed 2026-09-26 14:02*) — paths the home read, nothing a session wrote. Drawn as the *restart wanted* chip is and where it is, and for the same reason a mark, never pressable, and not a state. It goes when the member is next started. `ao status -v` prints `brief: changed <when> (<files>)`, and `--json` carries `brief` and `brief_changed`. No Inbox row: nothing waits on the person — the tick restarts an idle member and a working one is told on its `ao` replies; a member it cannot restart reaches the Inbox as any restart past its ceiling does (*Inbox row: restart*) |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a, TD-053); on the team's card, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
-| Org | team card: **over its line** note | display only (TD-177; designed 2026-09-29, not built — TD-239; §6 *Balance*): on the header's second line of a team whose `balance` mark stands, amber, *over its line since <t>: 9 open PRs ≥ 8* — each crossed line in the mark's own numbers, *oldest PR 3d ≥ 2d*, *review waiting 5h ≥ 2h* — its tooltip *its members take no new claim until it clears · Settings*; gone when the mark goes. Never pressable: the line is moved on the Settings page |
+| Org | team card: **over its line** note | display only (TD-177; designed 2026-09-29, not built — TD-239; §6 *Balance*): on the header's second line of a team whose `balance` mark stands, amber, *over its line since <t>: 9 open PRs, line 8* — each crossed line in the mark's own numbers, *oldest PR 3d, line 2d*, *review waiting 5h, bound 2h* — its tooltip *its members take no new claim until it clears · Settings*; gone when the mark goes. Never pressable: the line is moved on the Settings page |
 | Org | team card: **work waiting** note | display only (TD-214; designed 2026-09-28, not built — TD-227; §6 rule 8): beside *wound down <t>* on a team whose lanes gained work, *· n entries waiting since <t>* from `work_waiting`, its tooltip the ids by member; on a live team a start by the rule made reads *started <t> for TD-213 and 2 more* on the header's second line until the team next winds down, from the `restarts` entries' `why: work`. Never pressable: the press is the card's Start or the Inbox row's |
 | Org | team card: **starts** note | display only (TD-026, §6 *Schedule*; not built — TD-133): on a team card with nothing live whose name carries a rule in `settings.yml` (`teams.<team>.schedule`), beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant from the account's reading, in the reader's clock, by the formatter the *stops* note uses. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
@@ -6775,8 +6775,8 @@ teams:
   person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team
   balance`, §4.7), a setting and not a definition, since it is a number a person turns without
   redefining the team (ADR 2026-09-25 §5). Three lines, each optional, any one of them enough:
-  - **`prs: n`** — the repo has more than `n` open pull requests that are not drafts, counted
-    from the reading's `prs.open` as the card counts them, whoever opened them;
+  - **`prs: n`** — the repo has more than `n` open pull requests, counted from the reading's
+    `prs.open` as the card counts them: drafts included, whoever opened them;
   - **`oldest: d`** (`12h`, `2d`) — the oldest of those has been open longer than `d`;
   - **`review: true`** — the reader's queue is past its bound: the oldest pull request waiting
     at the team's techlead seat (`prs_waiting.oldest` on the seat's record, §4.9b *The reader*)
@@ -6786,15 +6786,19 @@ teams:
   **Who reads it** is the home's tick, never the manager's round: a session's `ao repo` cannot
   see the reader's queue (§4.7), and nothing mechanical waits on a round (*Keeping a team
   running*). After every repo reading and on every tick for the queue, the home reads the
-  lines for each team that has the key, the team's repo being the one its live members'
-  directories are checkouts of (a team over two repos is read against each, and either
-  crossing counts). A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
-  on the home's own `host` record under the team's name, where `work_waiting` is kept, and the
+  lines for each team that has the key, the team's repo being the registry root its live
+  members' records name (`repo`; a team over two repos is read against each, either crossing
+  counts, and every member is refused whichever repo it sits in). A team with no live member
+  is not read, and a mark it carried goes: there is nobody to refuse. A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
+  on the home's own `host` record under the team's name — the record rule 8 designs for
+  `work_waiting` (TD-227, not built; whichever of the two builds lands first makes it) — served
+  with the `repos` reading, so a client and a session's `ao repo` read it there, and the
   mark goes when no line is crossed. **A reading that failed crosses nothing and clears
   nothing**: the mark stands as it was, as the chip's reading does.
 
   **What it does** is one thing: while the mark stands, **a new claim by an unattended member
-  of that team is refused** — `ao progress claim TD-NNN` answers *ao-grind is over its line: 9
+  of that team is refused** — a record that is `unattended` and no seat; a seat's record is
+  never refused, and a manager claims nothing — `ao progress claim TD-NNN` answers *ao-grind is over its line: 9
   open PRs, the line is 8 (since 14:02). Take nothing new: finish, rebase or answer what is
   open of yours, then end your turn — you are told when the line clears.* It is refused in the
   step that would write it, as a lease is, and unlike a lease **`--force` does not pass it**:
@@ -6808,12 +6812,13 @@ teams:
   and rule 8 holds a start back with *its repo is over its line* as a fifth bound. Never a
   pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
 
-  **Who is told**, once per crossing and once when it clears, by `system` note: the team's
+  **Who is told**, once per crossing and once when it clears — a mark that comes and goes
+  inside ten minutes tells once, not each time — by `system` note: the team's
   **manager** (the controller its members share), which logs the line in its round — *14:02
-  over the line: 9 open PRs ≥ 8; no new claims until it clears* — and does nothing else, since
+  over the line: 9 open PRs, line 8; no new claims until it clears* — and does nothing else, since
   its members are neither crashed nor finished; and the **person**, FYI and uncounted. **The
   techlead is asked by what already asks it**: every pull request in the reader's queue is an
-  `ask` on the seat, which the tick fills while one waits (rule 3), so a crossing of `review`
+  `ask` on the seat, which the tick fills for a seat whose trigger is `asks` (rule 3), so a crossing of `review`
   needs no second message, and a crossing of `prs` or `oldest` with nothing in the queue is
   not the reader's to cure. When the mark goes, each member whose claim was refused is rung
   with *the line is clear again: pick as your lane says*, within its wake budget.
