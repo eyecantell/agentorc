@@ -6530,7 +6530,7 @@ code and needs no grant; a session doing the same work does.
      `host` record under the team's name — for the first repo by name where the team's news is in
      two, the other's waiting for the next wind-down. It is removed when the team is no longer
      wound down (a crew session live again), when no id is new, and under `off`; while more ids
-     settle, what stands stands, its `at` kept. What follows is the team's setting,
+     settle, what stands stands, its `at` kept, its ids possibly stale until the settle ends. What follows is the team's setting,
      **`teams.<team>.on_work`** (§5 `settings.yml`), a person's alone:
      - **`ask`**, and what a team with no key has: the **Inbox row: team start** (§4.5a) under
        *Needs you* — *ao-grind · wound down 00:56 · its lanes gained 3 entries: TD-213, TD-214,
