@@ -101,6 +101,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     TRANSCRIPT_TURNS_MAX,
     USAGE_COOL,  # noqa: F401
     USAGE_FRESH,  # noqa: F401
+    USAGE_ONLY_EVERY,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
     RpcError,  # noqa: F401
     _alarm_report,  # noqa: F401

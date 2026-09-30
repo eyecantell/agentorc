@@ -530,7 +530,7 @@ class Adapter(Protocol):
                                                           # (`week · Fable`), so the chip's worst-window rule sees it
     def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
     def usage_report(self, payload: dict) -> list[dict] | None
-                                                          # optional (TD-231; not built — TD-233): the windows a session of the
+                                                          # optional (TD-231; the host agent's RPC built, the adapter's not — TD-233): the windows a session of the
                                                           # tool was told, read from what its hook command was handed —
                                                           # {windows: [{label, pct, resets}], fresh}: the labels `usage` gives
                                                           # the same windows, pct to one decimal, resets an instant, `fresh`
@@ -727,8 +727,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   the reads run.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
 - Usage, **reported first and asked for last** (TD-231, TD-230; designed 2026-09-28, partly
-  built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the report is
-  not built, so until then the poll described after this paragraph is the one source). The usage
+  built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the host
+  agent's side of the report — the `usage_report` RPC, the merge, the history and the hourly ask
+  for an endpoint-only window — is slice 2's first half; the status-line command that sends it and
+  a node's report to the home are not built, so until then the poll described after this
+  paragraph is the one source). The usage
   endpoint is no documented interface, and on 2026-09-28 it refused every poll for six hours
   though agentorc asked once per account: the tool's own clients read it too, and its refusals
   carry no usable `Retry-After`. What a session of the tool is *told* about its limits is
@@ -761,10 +764,16 @@ Python, one process per host, started by the same systemd user unit. Responsibil
     session has had a response since its last report, read from the payload's own running
     totals of the session's API work; a report that is not fresh changes no reading's age.
   - **The reading** is per account and per window, `{label, pct, resets, at, source}`, `source`
-    `reported` or `asked`. Reports are **merged by what a window can do, not by who spoke
-    last**: inside one `resets` a window's use never falls, so the highest percentage
-    stands, and a later `resets` replaces the window outright; `at` moves when a fresh
-    report or an answer confirms the number. A window whose `resets` has passed is
+    `reported` or `asked`, and the reading's own `fetched`, `source` and `by` (the reporting
+    session's name) are the newest confirmation's, which is the age the chip prints. Reports are
+    **merged by what a window can do, not by who spoke last**: inside one `resets` a window's
+    use never falls, so the highest percentage stands, and a later `resets` replaces the window
+    outright; two resets within five minutes of each other are one window (`RESET_SLACK`: the
+    status line hands epoch seconds, the endpoint an instant of its own, and a rolling window's
+    reset drifts between reads). The endpoint's answer is the account's own rather than one
+    session's view of it, so it sets each window it names outright, a lower number included,
+    and keeps the windows it does not name; `at` moves when a fresh report or an answer
+    confirms the number. A window whose `resets` has passed is
     **unknown until it is read again**, never zero and never a cap: `limited` (§4.2) is not
     read from it. **A short history** is kept beside each window in `usage.json`: the newest
     reading and one per ten minutes for the three hours before it, which is what a
