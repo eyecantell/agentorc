@@ -60,8 +60,14 @@ def test_the_home_reads_wound_down_as_the_card_does():
     assert teamrun.wound_down is work.wound_down
 
 
-async def test_a_wound_down_teams_lane_news_waits_the_settle_then_is_written(agent, tmp_path):
+async def test_a_wound_down_teams_lane_news_waits_the_settle_then_is_written(agent, tmp_path, monkeypatch):
     await park_ticks(agent)
+    replays: list[tuple] = []
+
+    async def replay(*a, **k):
+        replays.append(a)
+
+    monkeypatch.setattr(agent, "_replay", replay)  # `on_work` unset is `ask`: the row, never a start
     now = datetime.now(UTC)
     repo = str(tmp_path)
     agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001"), _e("TD-002"), _e("TD-003")]}}
@@ -82,6 +88,7 @@ async def test_a_wound_down_teams_lane_news_waits_the_settle_then_is_written(age
     assert mark["repo"] == repo and mark["members"] == {"grinder-ao-1": ["TD-002", "TD-003"]}
     at = mark["at"]
     assert agent.host_store.load()["teams"]["g"]["work_waiting"] == mark, "saved on the host record"
+    assert replays == [], "`ask` starts nothing"
 
     # a later entry settles again, and the mark keeps its age meanwhile
     agent._repos[repo]["ledger"]["entries"].append(_e("TD-004"))
