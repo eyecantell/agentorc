@@ -729,9 +729,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
 - Usage, **reported first and asked for last** (TD-231, TD-230; designed 2026-09-28, partly
   built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the report,
-  the merge, the history and the hourly ask for an endpoint-only window are slice 2; a node's
-  report to the home is not built, so a node's sessions are read by the poll described after
-  this paragraph alone). The usage
+  the merge, the history and the hourly ask for an endpoint-only window are slice 2, a node's
+  report to the home with them; the home's send of the reading to its nodes is not built, so a
+  node's gate reads its own sessions' reports and its own asks). The usage
   endpoint is no documented interface, and on 2026-09-28 it refused every poll for six hours
   though agentorc asked once per account: the tool's own clients read it too, and its refusals
   carry no usable `Retry-After`. What a session of the tool is *told* about its limits is
@@ -779,10 +779,17 @@ Python, one process per host, started by the same systemd user unit. Responsibil
     read from it. **A short history** is kept beside each window in `usage.json`: the newest
     reading and one per ten minutes for the three hours before it, which is what a
     projection takes its rate from (§6 *Usage gate*).
-  - **A node's sessions report to their node**, which sends each report on to the home over
-    the link (`usage_report`, node to home; one the link could not carry is dropped, not
-    queued, for the reason above). The home holds the account's reading and sends it to the
-    nodes as it sends the metered sums.
+  - **A node's sessions report to their node**, which merges the report for its own gate and
+    sends it on to the home over the link (`usage_report {id, account, windows, fresh}`, node to
+    home; one the link could not carry, or sent before its snapshot is taken, is dropped, not
+    queued, for the reason above). `account` is the key the node reads the session's profile
+    under, since the node holds the profile's credentials and a profile of the same name at the
+    home may be another login; the home takes it only for a record of that link's host and an
+    account of that record's adapter, and remembers it per node and profile. The home merges
+    the report as its own sessions' and shows the account while that session lives, never
+    asking the endpoint for it; a profile a session at the home runs under keeps the home's own
+    account's reading, since a reading is per profile. The home holds the account's reading and
+    sends it to the nodes as it sends the metered sums (not built: a node reads its own).
   - **The endpoint is the fallback, on demand**: asked only when an account a live session's
     profile names has no reading younger than `USAGE_FRESH` (fifteen minutes), at most once
     per `USAGE_FRESH` per account, and after a `rate_limited` answer not for a fixed hour

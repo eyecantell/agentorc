@@ -1562,6 +1562,18 @@ class TickMixin:
             if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
         ]
 
+    def _usage_remote_live(self) -> list[Session]:
+        """The nodes' live tool sessions, as this home holds them: shown on the chip by what they
+        report (§4.4 *A node's sessions report to their node*, TD-233 slice 2), never asked for
+        here, since the credentials are the node's, and never marked `limited` here, a node-owned
+        field."""
+        return [
+            s
+            for recs in self.remote.values()
+            for s in recs.values()
+            if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
+        ]
+
     async def _refresh_usage_inner(self) -> None:
         live = self._usage_live()
         # A metered profile is never polled (§4.2a): its reading is the spend pass's sum, and the cap
@@ -1584,11 +1596,26 @@ class TickMixin:
                 profs.append(s.profile)
             meta.setdefault(key, {"account": account, "tool": str(getattr(ad, "label", "") or s.adapter)})
             ask.setdefault(key, (fn, s.profile))
+        # a node's session is kept and shown while its node reports it, and never asked for here;
+        # a profile a live session here runs under is this host's own reading, so one profile
+        # never carries two accounts' (the chip is per account, the reading per profile)
+        here = {s.profile for s in live}
+        for s in self._usage_remote_live():
+            ad = adapters.get(s.adapter)
+            if s.profile in here or (key := self._usage_remote_keys.get((s.host, s.profile))) is None:
+                continue
+            account = key.split(":", 1)[1]
+            profs = groups.setdefault(key, [])
+            if s.profile not in profs:
+                profs.append(s.profile)
+            meta.setdefault(key, {"account": account, "tool": str(getattr(ad, "label", "") or s.adapter)})
         for key, profs in groups.items():
             self._usage_seed(key, profs)
         due: dict[str, tuple[Any, str]] = {}
         whole: dict[str, Any] | None = None  # the settings, read once and only for a young reading
         for key, profs in groups.items():
+            if key not in ask:
+                continue
             wait = self._usage_wait.get(key, agent_common.USAGE_FRESH)
             if mono - self._usage_checked.get(key, -wait) < wait:
                 continue
@@ -1670,11 +1697,21 @@ class TickMixin:
         if acct is None:
             return
         changed = False
-        for s in self._usage_live():
-            ad = adapters.get(s.adapter)
-            if not getattr(ad, "usage_for", None) or _usage_key(ad, s.adapter, s.profile)[0] != key:
+        mine = [
+            (s, _usage_key(ad, s.adapter, s.profile))
+            for s in self._usage_live()
+            if getattr(ad := adapters.get(s.adapter), "usage_for", None)
+        ]
+        here = {s.profile for s, _ in mine}
+        theirs = [  # a node's, where no session here runs under the profile (`_refresh_usage_inner`)
+            (s, (k, k.split(":", 1)[1]))
+            for s in self._usage_remote_live()
+            if s.profile not in here and (k := self._usage_remote_keys.get((s.host, s.profile)))
+        ]
+        for s, (k, account) in [*mine, *theirs]:
+            if k != key:
                 continue
-            _, account = _usage_key(ad, s.adapter, s.profile)
+            ad = adapters.get(s.adapter)
             reading = {**acct, "account": account, "tool": str(getattr(ad, "label", "") or s.adapter)}
             if self._usage.get(s.profile) != reading:
                 self._usage[s.profile] = reading

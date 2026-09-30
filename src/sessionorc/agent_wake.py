@@ -295,22 +295,35 @@ class WakeMixin:
         report is never refused in words, since the status line that sends it prints nothing."""
         s = self.sessions.get(str(caller or ""))
         cleaned = usage_mod.clean_windows(windows)
-        if s is None or s.adapter == "shell" or s.state in ("exited", "closed") or not cleaned:
+        if s is None or (key := await self._usage_merge_report(s, cleaned, bool(fresh))) is None:
             return {"taken": False}
+        self._forward_usage_report(s, key, cleaned, bool(fresh))
+        return {"taken": True}
+
+    async def _usage_merge_report(
+        self, s: Session, cleaned: list[dict[str, Any]], fresh: bool, key: str | None = None
+    ) -> str | None:
+        """One session's report merged into its account's reading, this host's session or a node's
+        (§4.4 *A node's sessions report to their node*, TD-233 slice 2), under `key`, the account
+        a node keyed its session's profile by, or the one this host keys it by. The account key it
+        merged under, or None for a session that is no live tool session, a metered profile, or
+        no windows."""
+        if s.adapter == "shell" or s.state in ("exited", "closed") or not cleaned:
+            return None
         ad = adapters.get(s.adapter)
         if not getattr(ad, "usage_for", None) or s.profile in self._metered:
-            return {"taken": False}
-        key, _ = _usage_key(ad, s.adapter, s.profile)
+            return None
+        key = key or _usage_key(ad, s.adapter, s.profile)[0]
         was = self._usage_acct.get(key)
         if was is None and isinstance(self._usage.get(s.profile), dict):
             was = {k: v for k, v in self._usage[s.profile].items() if k not in ("account", "tool")}
-        merged = usage_mod.merge(was, cleaned, at=now_iso(), source="reported", fresh=bool(fresh), by=s.name)
+        merged = usage_mod.merge(was, cleaned, at=now_iso(), source="reported", fresh=fresh, by=s.name)
         if merged != was:
             self._usage_acct[key] = merged
             await self._usage_spread(key)
             self._usage_limits(self._usage_live(), self._metered)
             await self._push_changes()
-        return {"taken": True}
+        return key
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:
         s = self.sessions.get(session)

@@ -22,6 +22,7 @@ from sessionorc import (
     naming,
 )
 from sessionorc import settings as settings_mod
+from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
     HOME_EDITS,
@@ -440,6 +441,9 @@ class RemoteMixin:
                 return await self._take_derived(host, params)
             if method == "spend":
                 return await self._take_spend(host, params)
+            if method == "usage_report":
+                await self._take_usage_report(host, params)
+                return None
             if method == "forward":
                 return await self._forwarded(host, params)
             if method == "cancel":
@@ -459,6 +463,23 @@ class RemoteMixin:
                 log.warning("link from %s: down — %s", host, why)
                 with contextlib.suppress(Exception):
                     await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    async def _take_usage_report(self, host: str, params: dict[str, Any]) -> None:
+        """A report one of a node's sessions made (§4.4 *A node's sessions report to their node*,
+        TD-233 slice 2), merged here as this home's own sessions' are, only for a record of the
+        link's host. The account is the key the node gave, which its credentials decide (a
+        profile of one name may be another login here); it must be in the record's adapter's
+        namespace, and it is remembered for the record's profile, so the poll keeps and shows it
+        while that session lives."""
+        s = self.remote.get(host, {}).get(str(params.get("id") or ""))
+        key = str(params.get("account") or "")
+        if s is None or not key.startswith(f"{s.adapter}:") or len(key) <= len(s.adapter) + 1:
+            log.warning("a usage report from %s names no record of that host, or no account of it: dropped", host)
+            return
+        self._usage_remote_keys[(host, s.profile)] = key  # before the merge, whose spread reads it
+        await self._usage_merge_report(
+            s, usage_mod.clean_windows(params.get("windows")), bool(params.get("fresh")), key
+        )
 
     async def _take_derived(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
         """A node's tick derived reports for one of its records (§4.4a, step 4b.2): applied as this
