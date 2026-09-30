@@ -219,3 +219,17 @@ def test_the_archive_is_read_beside_the_ledger(tmp_path):
     assert got["TD-012"]["pickable"] == "yes", "its blocker is archived beside it"
     assert ledger.archive_path("docs/technical_debt.md") == "docs/technical_debt_archive.md"
     assert ledger.archive_path("notes/ledger.md") == "notes/ledger_archive.md"
+
+
+def test_a_pass_that_rereads_one_repo_still_resolves_among_the_whole_registry(tmp_path):
+    """The techlead's read of #793: a pass re-reads only the checkouts whose ledger moved, and a
+    `<repo>#TD-NNN` blocker is still looked up among every checkout the registry lists."""
+    from sessionorc.agent_tick import TickMixin
+
+    here = _repo(tmp_path / "here", "# L\n\n## TD-010: x\n\n**Blocked by:** other#TD-002\n", None)
+    other = _repo(tmp_path / "other", "# L\n", "# A\n\n## TD-002: archived there\n")
+    roots = [str(here), str(other)]
+    got = TickMixin._read_repos([str(here)], {}, set(), roots)
+    assert got[str(here)]["ledger"]["entries"][0]["pickable"] == "yes"
+    alone = TickMixin._read_repos([str(here)], {}, set())
+    assert alone[str(here)]["ledger"]["entries"][0]["blocked_by"] == ["other#TD-002"], "the pass's own roots alone"

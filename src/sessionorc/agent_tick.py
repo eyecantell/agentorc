@@ -1324,7 +1324,7 @@ class TickMixin:
             prev = {r: self._repos.get(r) or {} for r in todo}
             # a checkout read for the first time gets the whole reading at once, not in five minutes
             full = {r for r in todo if due or r not in self._repos}
-            got = await asyncio.to_thread(self._read_repos, todo, prev, full) if todo else {}
+            got = await asyncio.to_thread(self._read_repos, todo, prev, full, roots) if todo else {}
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             for root in todo:
@@ -1442,7 +1442,9 @@ class TickMixin:
         return out
 
     @staticmethod
-    def _read_repos(roots: list[str], prev: dict[str, dict[str, Any]], full: set[str]) -> dict[str, dict[str, Any]]:
+    def _read_repos(
+        roots: list[str], prev: dict[str, dict[str, Any]], full: set[str], registry: list[str] | None = None
+    ) -> dict[str, dict[str, Any]]:
         """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
         the rest carried from `prev`. One checkout's read that raises keeps its last reading with
@@ -1451,7 +1453,9 @@ class TickMixin:
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
         out: dict[str, dict[str, Any]] = {}
-        resolve = ledger_mod.Registry(roots)  # `<repo>#TD-NNN` blockers, each repo read once per pass (TD-228)
+        # `<repo>#TD-NNN` blockers resolve among every checkout the registry lists, not only the ones
+        # re-read this pass (the techlead's read of #793); each repo read once per pass (TD-228)
+        resolve = ledger_mod.Registry(registry if registry is not None else roots)
         for root in roots:
             old = prev.get(root) or {}
             try:

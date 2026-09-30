@@ -406,7 +406,8 @@ def entries_before(
     """The ledger's entries as the last commit of `origin/<default>` before `before` held them
     (design §6 rule 6, TD-227: `lane_seen`'s first write is the ledger at the declaration), and
     what was read — `origin/main at 1a2b3c4d` — or None and why not; the archive is read at the same
-    commit, so `pickable` is derived as it was then. `--before` reads committer dates, which is the
+    commit, so `pickable` is derived as it was then, except that a `<repo>#TD-NNN` item is resolved at
+    the other repo's `origin/<default>` as it stands now. `--before` reads committer dates, which is the
     merge's time for a squash. `before` None reads the ref's tip. Read-only: nothing is fetched."""
     for ref in DEFAULT_REFS:
         when = [f"--before={before.isoformat()}"] if before is not None else []
