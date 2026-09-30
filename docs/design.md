@@ -4017,7 +4017,9 @@ repo. The org a client sees is the union:
   install's `profiles.yml` has to hold; the overlay is the better place for it, and `ao org
   check` says when a name is not held.
 - **Where a repo's team lands**: `place:` when it names the team; else this host when its
-  registry holds the repo; else the one linked node whose registry does (asked over the link);
+  registry holds the repo; else the one linked node whose registry does (asked over the link:
+  the home's `host_repos {host}` RPC, a read like `host_dir` that returns the registry's paths
+  through the node's `repos` link method — built, TD-229 slice 3's host-agent half);
   with the repo on several nodes and no `place:`, the start is refused, naming them.
 - **Names are the org's.** Two repos that define one team name are both refused, each naming
   the other, since a team's name keys its settings (§5 `teams.<team>`) and its badge. The org

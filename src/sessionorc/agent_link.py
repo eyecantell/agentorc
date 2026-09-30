@@ -285,6 +285,8 @@ class LinkMixin:
                 )
             except ValueError as e:
                 raise link.LinkError(str(e)) from None
+        if method == "repos":  # this node's registry, for the home's `host_repos` (§4.9, TD-229)
+            return {"repos": await asyncio.to_thread(lambda: hosts.local_host().repos())}
         if method == "stat":
             d = Path(str(params.get("dir") or "")).expanduser()
             return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}

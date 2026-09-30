@@ -1500,6 +1500,35 @@ def test_a_checkouts_files_are_read_inside_it_and_nothing_else(tmp_path):
         read_checkout(str(repo), ["pipe"])
 
 
+async def test_host_repos_reads_a_hosts_registry_here_or_through_its_node(agent, tmp_path, monkeypatch):
+    """§4.9 *Where a repo's team lands* (TD-229 slice 3): this host's registry read here, a node's
+    through its `repos` link method, an unreachable node refused in words."""
+    import dataclasses
+
+    from sessionorc import hosts
+
+    reg = tmp_path / "repos.txt"
+    reg.write_text("# mine\n/w/a\n/w/b\n/w/a\n")
+    real = hosts.local_host
+    monkeypatch.setattr(hosts, "local_host", lambda: dataclasses.replace(real(), repos_registry=reg))
+
+    class Repos(FakeMux):
+        async def request(self, method, timeout=None, **params):
+            self.sent.append((method, params))
+            return {"repos": ["/srv/samscrape"]}
+
+    async with LocalClient() as person:
+        assert await person.call("host_repos", host=agent.host) == {"host": agent.host, "repos": ["/w/a", "/w/b"]}
+        agent._take_records("laptop", [record()], whole=True)
+        with pytest.raises(AgentError, match="runs on laptop: unreachable"):
+            await person.call("host_repos", host="laptop")
+        agent._link_muxes["laptop"] = mux = Repos()
+        agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+        assert await person.call("host_repos", host="laptop") == {"host": "laptop", "repos": ["/srv/samscrape"]}
+        assert mux.sent == [("repos", {})]
+    assert await agent._from_home("repos", {}) == {"repos": ["/w/a", "/w/b"]}, "the node's half"
+
+
 async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(agent, tmp_path):
     """The home's `host_files` (step 4b.3): this host's checkout read here, another host's through its
     node's `files` link method, unreachable refused; a session needs `control`, as a team start
