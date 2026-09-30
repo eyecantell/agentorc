@@ -972,7 +972,9 @@ class TickMixin:
     ) -> dict[str, Any] | None:
         """One team's `work_waiting` as it reads now (`_work_marks`), or None. Its repo is the ledger's
         — a registry root, since two repos may hold one id — and a team whose members' news is in two
-        repos is written for the first by name; the other's waits for the next wind-down."""
+        repos is written for the first registry root in order; the other's waits for the next
+        wind-down. A crew member's ledger that cannot be read keeps what stands: *could not look*
+        is not *no id new* (the techlead's read of #788)."""
         if on_work == "off" or work_mod.team_wound_down(records) is None:
             return None
         news: dict[str, dict[str, list[str]]] = {}  # repo → member → ids
@@ -981,6 +983,10 @@ class TickMixin:
                 continue
             led = (self._repos.get(r.repo or "") or {}).get("ledger") or {}
             if "error" in led or not isinstance(led.get("entries"), list):
+                if isinstance(old, dict):
+                    # the settle's memory kept too, so the ids read back later need no second settle
+                    firsts.update({k: t for k, t in self._work_first.items() if k[0] == team})
+                    return old
                 continue
             ids = news.setdefault(str(r.repo), {}).setdefault(r.name, [])
             ids.extend(i for i in work_mod.gained(r, led["entries"]) if i not in ids)

@@ -6527,9 +6527,11 @@ code and needs no grant; a session doing the same work does.
      time the home keeps in memory, so a restart of the home starts the settle again and
      entries filed together are one event — the home writes **`work_waiting: {at, repo,
      members: {<name>: [ids]}}`**, `repo` being the ledger's, since two repos may hold one id, on its own
-     `host` record under the team's name — for the first repo by name where the team's news is in
-     two, the other's waiting for the next wind-down. It is removed when the team is no longer
-     wound down (a crew session live again), when no id is new, and under `off`; while more ids
+     `host` record under the team's name — for the first registry root, in sort order, where the
+     team's news is in two, the other's waiting for the next wind-down. It is removed when the team is no longer
+     wound down (a crew session live again), when no id is new, and under `off`; a member's
+     ledger that cannot be read removes nothing, since *could not look* is not *no id new*: what
+     stands stands, its `at` and the settle's memory kept; while more ids
      settle, what stands stands, its `at` kept, its ids possibly stale until the settle ends. What follows is the team's setting,
      **`teams.<team>.on_work`** (§5 `settings.yml`), a person's alone:
      - **`ask`**, and what a team with no key has: the **Inbox row: team start** (§4.5a) under
@@ -6866,7 +6868,7 @@ teams:
   counts, and every member is refused whichever repo it sits in). A team with no live member
   is not read, and a mark it carried goes: there is nobody to refuse. A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
   on the home's own `host` record under the team's name — the record rule 8 designs for
-  `work_waiting` (TD-227, not built), which is `host.json` in the home, `{teams: {<team>: {balance}}}`,
+  `work_waiting` (TD-227; the mark built), which is `host.json` in the home, `{teams: {<team>: {balance}}}`,
   kept across a restart so a mark keeps its `since` — served with the `repos` reading, each
   checkout's reading carrying `balance: {<team>: mark}` for the marks whose `repo` it is, so a
   client and a session's `ao repo` read it there, and the mark goes when no line is crossed.

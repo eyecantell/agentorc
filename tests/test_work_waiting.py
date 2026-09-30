@@ -119,6 +119,28 @@ async def test_a_stopped_team_and_on_work_off_write_nothing(agent, tmp_path):
     assert agent._host_rec["teams"]["g"]["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}
 
 
+async def test_a_ledger_that_cannot_be_read_keeps_the_mark(agent, tmp_path):
+    """The techlead's read of #788: *could not look* is none of rule 8's three removals. A tick
+    whose ledger reading carries `error` keeps the mark and its `at`, and the ids read back need no
+    second settle."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    repo = str(tmp_path)
+    good = {"entries": [_e("TD-001"), _e("TD-002")]}
+    agent._repos[repo] = {"name": "r", "root": repo, "ledger": good}
+    member = _rec("grinder-ao-1", lane=["free-pick"], lane_seen={"at": "x", "ids": ["TD-001"]})
+    _team(agent, repo, _rec("manager-ao", lane=["TD-900"], lane_seen={"at": "x", "ids": []}), member)
+    await agent._work_marks(now)
+    await agent._work_marks(now + WORK_SETTLE)
+    mark = agent._host_rec["teams"]["g"]["work_waiting"]
+    agent._repos[repo]["ledger"] = {"error": "docs/technical_debt.md: unreadable"}
+    await agent._work_marks(now + WORK_SETTLE + timedelta(minutes=1))
+    assert agent._host_rec["teams"]["g"]["work_waiting"] == mark
+    agent._repos[repo]["ledger"] = good
+    await agent._work_marks(now + WORK_SETTLE + timedelta(minutes=2))
+    assert agent._host_rec["teams"]["g"]["work_waiting"] == mark, "no second settle, the same `at`"
+
+
 def test_on_work_is_ask_start_or_off():
     assert settings_mod.parse_team({"on_work": "start"}) == {"on_work": "start"}
     with pytest.raises(ValueError, match="ask, start or off"):
