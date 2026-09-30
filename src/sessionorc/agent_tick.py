@@ -25,6 +25,7 @@ from sessionorc import (
 from sessionorc import brief as brief_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
+from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     BRIEF_SETTLE,
     COMPOSER_LINES,
@@ -1402,10 +1403,20 @@ class TickMixin:
         for key, profs in groups.items():
             self._usage_seed(key, profs)
         due: dict[str, tuple[Any, str]] = {}
-        for key in groups:
+        whole: dict[str, Any] | None = None  # the settings, read once and only for a young reading
+        for key, profs in groups.items():
             wait = self._usage_wait.get(key, agent_common.USAGE_FRESH)
-            if mono - self._usage_checked.get(key, -wait) >= wait and not self._usage_young(key):
+            if mono - self._usage_checked.get(key, -wait) < wait:
+                continue
+            if not self._usage_young(key):
                 due[key] = ask[key]
+            elif mono - self._usage_only_at.get(key, float("-inf")) >= agent_common.USAGE_ONLY_EVERY:
+                # once an hour for a window only the endpoint gives, by this clock and not the
+                # window's `at`, which never moves if the endpoint stops naming it
+                whole = settings_mod.load() if whole is None else whole
+                if self._usage_only_due(key, profs, whole):
+                    self._usage_only_at[key] = mono
+                    due[key] = ask[key]
         changed = False
         if due:
             results = await asyncio.gather(
@@ -1433,12 +1444,19 @@ class TickMixin:
             self._usage_acct.pop(key, None)
             self._usage_checked.pop(key, None)
             self._usage_wait.pop(key, None)
+            self._usage_only_at.pop(key, None)
         shown = {p for profs in groups.values() for p in profs} | metered
         if dropped := [p for p in self._usage if p not in shown]:
             for prof in dropped:
                 self._usage.pop(prof, None)
                 await self._broadcast({"event": "usage", "profile": prof, "usage": None})
             self.usage_store.save(self._usage)
+        self._usage_limits(live, metered)
+
+    def _usage_limits(self, live: list[Session], metered: set[str]) -> None:
+        """The `limited` rule over the readings `_usage` holds (§4.2), for the poll and for a report
+        between polls alike (TD-233 slice 2): a session's cap is marked when it is read, not on the
+        next poll."""
         for s in live:
             cap = None if s.profile in metered else _cap(self._usage.get(s.profile))
             if cap and s.state not in ("limited", "needs-you"):
@@ -1450,6 +1468,36 @@ class TickMixin:
                 # back to what it was (idle stays idle: no hook will come to correct a wrong `working`)
                 s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
                 self.store.save(s)
+
+    def _usage_only_due(self, key: str, profs: list[str], whole: dict[str, Any]) -> bool:
+        """Whether a young reading still wants the endpoint, for a window only it gives (§4.4
+        *Usage*, TD-233 slice 2): once per `USAGE_ONLY_EVERY` while the account reports and a
+        reserve of a profile on it names the window, or the window stood within ten points of
+        its cap."""
+        watched = {str(label) for p in profs for label in self._gate_reserves(whole, p) or {}}
+        return usage_mod.asked_only_due(
+            self._usage_acct.get(key), datetime.now(UTC), agent_common.USAGE_ONLY_EVERY, watched
+        )
+
+    async def _usage_spread(self, key: str) -> None:
+        """The account's reading copied under every live profile sharing it, pushed and written
+        when it moved (the refresh's own step, for a reading a report changed between polls)."""
+        acct = self._usage_acct.get(key)
+        if acct is None:
+            return
+        changed = False
+        for s in self._usage_live():
+            ad = adapters.get(s.adapter)
+            if not getattr(ad, "usage_for", None) or _usage_key(ad, s.adapter, s.profile)[0] != key:
+                continue
+            _, account = _usage_key(ad, s.adapter, s.profile)
+            reading = {**acct, "account": account, "tool": str(getattr(ad, "label", "") or s.adapter)}
+            if self._usage.get(s.profile) != reading:
+                self._usage[s.profile] = reading
+                changed = True
+                await self._broadcast({"event": "usage", "profile": s.profile, "usage": reading})
+        if changed:
+            self.usage_store.save(self._usage)
 
     def _usage_young(self, key: str) -> bool:
         """Whether the account's reading is younger than `USAGE_FRESH` by its own time (§4.4
@@ -1515,9 +1563,14 @@ class TickMixin:
             # once per change of reason, never per poll: a 429 every five minutes is one line
             log.info("usage for account %s: %s (was %s)", key, reason, was.get("reason") or "no reading yet")
         if reason == "ok":
-            out = {"windows": r.get("windows"), "fetched": r.get("fetched"), "reason": "ok"}
+            # merged with what the account's sessions reported, by the same rule (TD-233 slice 2)
+            windows = usage_mod.clean_windows(r.get("windows"))
+            fetched = r.get("fetched")
+            at = fetched if isinstance(fetched, str) and fetched else now_iso()
+            out = usage_mod.merge(was, windows, at=at, source="asked", fresh=True)
+            out = {k: v for k, v in out.items() if k not in ("retry_after", "cool_until")} | {"reason": "ok"}
         else:
-            out = {**{k: v for k, v in was.items() if k in ("windows", "fetched")}, "reason": reason}
+            out = {**{k: v for k, v in was.items() if k in ("windows", "fetched", "source", "by")}, "reason": reason}
             if isinstance(r.get("retry_after"), int | float):
                 out["retry_after"] = r["retry_after"]
             if reason == "rate_limited":

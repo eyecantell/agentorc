@@ -209,6 +209,9 @@ REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state
 # could not learn a window the endpoint never names; the tool itself spends the same allowance.
 USAGE_FRESH = 900.0
 USAGE_COOL = 3600.0
+# A window only the endpoint gives (a per-model weekly one) is asked for this often while the account
+# reports and a reserve names the window or it stood within ten points of its cap (TD-233 slice 2).
+USAGE_ONLY_EVERY = 3600.0
 # Seconds between reads of the repo facts (design §4.4 *Repo facts*, TD-176): each registered
 # checkout's PRs through `gh` and its ledger's git history, in a thread. The ledger itself is
 # re-read on any tick its file's mtime moved, since that read is a local file.

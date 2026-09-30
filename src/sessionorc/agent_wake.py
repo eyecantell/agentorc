@@ -22,11 +22,13 @@ from sessionorc import (
 )
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
+from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     COMPOSER_LINES,
     DOORBELL_TRIES,
     RpcError,
     _parse,
+    _usage_key,
     _Wait,
     log,
 )
@@ -281,6 +283,34 @@ class WakeMixin:
         self._apply_event(session, event)
         await self._push_changes()
         return None
+
+    async def rpc_usage_report(self, windows: Any = None, fresh: bool = False, caller: Any = None) -> dict[str, Any]:
+        """What a session of the tool was told about its account's limits (§4.4 *Usage, reported
+        first and asked for last*, TD-233 slice 2), from its adapter's hook command: `windows`
+        `[{label, pct, resets}]` as the adapter's `usage_report` read them, `fresh` whether the
+        session had a response since its last report. The caller is the session, as the envelope
+        names it. Merged into its account's reading by what a window can do (`sessionorc.usage`),
+        never by who spoke last; a report that is not fresh moves no age. Answers `{taken}`: false
+        for a caller that is no live tool session here, a metered profile, or no windows — a
+        report is never refused in words, since the status line that sends it prints nothing."""
+        s = self.sessions.get(str(caller or ""))
+        cleaned = usage_mod.clean_windows(windows)
+        if s is None or s.adapter == "shell" or s.state in ("exited", "closed") or not cleaned:
+            return {"taken": False}
+        ad = adapters.get(s.adapter)
+        if not getattr(ad, "usage_for", None) or s.profile in self._metered:
+            return {"taken": False}
+        key, _ = _usage_key(ad, s.adapter, s.profile)
+        was = self._usage_acct.get(key)
+        if was is None and isinstance(self._usage.get(s.profile), dict):
+            was = {k: v for k, v in self._usage[s.profile].items() if k not in ("account", "tool")}
+        merged = usage_mod.merge(was, cleaned, at=now_iso(), source="reported", fresh=bool(fresh), by=s.name)
+        if merged != was:
+            self._usage_acct[key] = merged
+            await self._usage_spread(key)
+            self._usage_limits(self._usage_live(), self._metered)
+            await self._push_changes()
+        return {"taken": True}
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:
         s = self.sessions.get(session)

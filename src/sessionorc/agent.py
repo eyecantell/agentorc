@@ -101,6 +101,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     TRANSCRIPT_TURNS_MAX,
     USAGE_COOL,  # noqa: F401
     USAGE_FRESH,  # noqa: F401
+    USAGE_ONLY_EVERY,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
     RpcError,  # noqa: F401
     _alarm_report,  # noqa: F401
@@ -396,6 +397,7 @@ class HostAgent(
         # Seeded per account on the first refresh, from its profiles' held readings.
         self._usage_checked: dict[str, float] = {}
         self._usage_wait: dict[str, float] = {}
+        self._usage_only_at: dict[str, float] = {}  # when an endpoint-only window was last asked for (TD-233)
         self._usage_task: asyncio.Task[None] | None = None
         # A metered account's ledger (§4.4 *Usage*, TD-151): `spend.json`, the rows and the cursors
         # that make its reading a sum, written only when it changed. `_metered` is the profiles the

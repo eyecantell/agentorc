@@ -286,6 +286,11 @@ async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeyp
         await c.call("kill", id=own["id"])
 
 
+def _bare(windows):
+    """A reading's windows without the age, source and history each carries (TD-233 slice 2)."""
+    return [{k: w[k] for k in ("label", "pct", "resets")} for w in windows]
+
+
 async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
     """TD-001: a profile at 100% of a window makes its interactive sessions `limited` with the reset
     time; the cap lifting (or the reset time passing) brings them back to `working`; a session that
@@ -360,7 +365,7 @@ async def test_limited_from_one_daily_window(agent, hookstub, tmp_path, monkeypa
         hookstub.usage_value = {"windows": [{"label": "day", "pct": 100, "resets": soon}], "fetched": soon}
         got = await wait_state(c, s["id"], "limited")
         assert got["pending"]["text"] == f"day cap · resets {soon[11:16]}Z"
-        assert (await c.call("usage"))["pd"]["windows"] == [{"label": "day", "pct": 100, "resets": soon}]
+        assert _bare((await c.call("usage"))["pd"]["windows"]) == [{"label": "day", "pct": 100, "resets": soon}]
         # only profiles a live session runs under are shown: the record goes, and so does the figure
         hookstub.usage_value = None
         await c.call("kill", id=s["id"])
@@ -1858,7 +1863,10 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         s = await c.call("create", name="u", dir=str(tmp_path), adapter="hookstub", profile="p9")
         hookstub.usage_value = {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": "t1"}
         assert await wait_for(lambda: bool(agent._usage.get("p9")), timeout=5.0, step=0.1)
-        assert agent._usage["p9"] == {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": "t1"} | {
+        assert _bare(agent._usage["p9"]["windows"]) == [{"label": "5h", "pct": 40, "resets": None}]
+        assert {k: v for k, v in agent._usage["p9"].items() if k != "windows"} == {
+            "fetched": "t1",
+            "source": "asked",  # the endpoint's answer (TD-233 slice 2)
             "reason": "ok",
             "account": "p9",  # the stub names no account for p9: it keys on the profile (TD-122)
             "tool": "Stub",
@@ -1868,7 +1876,7 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         # a 429 keeps the reading, says why, and cools off an hour: a shorter word is not believed
         hookstub.usage_value = {"reason": "rate_limited", "retry_after": 900.0}
         assert await wait_for(lambda: agent._usage["p9"].get("reason") == "rate_limited", timeout=5.0, step=0.1)
-        assert agent._usage["p9"]["windows"] == [{"label": "5h", "pct": 40, "resets": None}]  # not lost
+        assert _bare(agent._usage["p9"]["windows"]) == [{"label": "5h", "pct": 40, "resets": None}]  # not lost
         assert agent._usage["p9"]["fetched"] == "t1" and agent._usage["p9"]["retry_after"] == 900.0
         assert agent._usage_wait[K] == USAGE_COOL == 3600.0
 
@@ -1893,12 +1901,10 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         # an adapter that raises is an error too, never a crash in the poll
         assert agent._usage_reading(K, RuntimeError("boom")) is None  # already `error`: nothing new to say
 
-        # a good reading replaces it and clears the reason
-        assert agent._usage_reading(K, {"windows": [], "fetched": "t2", "reason": "ok"}) == {
-            "windows": [],
-            "fetched": "t2",
-            "reason": "ok",
-        }
+        # a good reading replaces it and clears the reason; a window it does not name is kept (TD-233)
+        good = agent._usage_reading(K, {"windows": [], "fetched": "t2", "reason": "ok"})
+        assert good is not None and good["fetched"] == "t2" and good["reason"] == "ok" and "retry_after" not in good
+        assert _bare(good["windows"]) == [{"label": "5h", "pct": 40, "resets": None}]
         await c.call("kill", id=s["id"])
 
 
@@ -1933,7 +1939,7 @@ async def test_the_endpoint_is_asked_only_for_a_reading_past_fresh(agent, hookst
         await agent._refresh_usage_inner()
         asked = hookstub.usage_asked.count("pf")
         assert asked >= 1
-        assert agent._usage_acct[K]["windows"] == [{"label": "5h", "pct": 40, "resets": None}]
+        assert _bare(agent._usage_acct[K]["windows"]) == [{"label": "5h", "pct": 40, "resets": None}]
 
         agent._usage_acct[K]["fetched"] = iso(now - timedelta(seconds=USAGE_FRESH + 60))  # aged again at once
         await agent._refresh_usage_inner()
@@ -1992,7 +1998,7 @@ async def test_usage_is_polled_once_per_account_and_backed_off_as_one(agent, hoo
         await agent._refresh_usage_inner()
         assert agent._usage_wait["hookstub:paul"] == 3600.0 and "hookstub:pa" not in agent._usage_wait
         assert agent._usage["pa"]["reason"] == agent._usage["pb"]["reason"] == "rate_limited"
-        assert agent._usage["pb"]["windows"] == [{"label": "week", "pct": 24, "resets": None}]  # kept
+        assert _bare(agent._usage["pb"]["windows"]) == [{"label": "week", "pct": 24, "resets": None}]  # kept
         hookstub.usage_value = {"windows": [{"label": "week", "pct": 25, "resets": None}], "fetched": "t2"}
         agent._usage_wait.pop("hookstub:other", None)  # `other` was refused too; let it be asked again
         hookstub.usage_asked.clear()
