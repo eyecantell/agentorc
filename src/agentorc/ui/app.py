@@ -168,6 +168,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_rows,  # noqa: F401
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
+    handed_rows,  # noqa: F401
     horizon_of,  # noqa: F401
     inbox_sections,  # noqa: F401
     promote_rows,  # noqa: F401
@@ -664,6 +665,9 @@ def create_app() -> FastAPI:
                 # Overrule writes to the asker, so its dialog's line is the asker's (TD-168)
                 e["asker_when"] = str(((records.get(asker) or {}).get("read_when") or {}).get("note") or "")
                 e["asker_open"] = asker if asker in names else ""
+        # §4.10 *An entry handed to a seat* (TD-219): the holder's copy of each entry the person
+        # handed, drawn under *Waiting on them* (or *Needs you*, once `blocked`) by its id
+        got["handed"] = handed_rows(got.get("handed") or (), records, at)
         return got
 
     def inbox_html(sections: dict[str, Any], origin: str = "") -> dict[str, str]:
@@ -721,6 +725,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         person_needs = person_fyi = person_overdue = 0
         info: dict[str, Any] | None = None
         entries: list[dict[str, Any]] = []
+        handed: Any = ()
         try:
             sessions = await call("list")
             usage = await call("usage")
@@ -732,7 +737,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # the top bar's number: the Inbox page's **Needs you** section, and not unread mail
                 # (§4.5a **Inbox page**, TD-069 steps 1–2) — mail *and* the session states, from the
                 # same `inbox_sections` the page uses, so the two numbers cannot drift apart
-                entries = (await call("inbox"))["entries"]
+                person = await call("inbox")
+                entries = person["entries"]
+                handed = person.get("handed") or ()
             except HTTPException as e:
                 # a node whose link is down refuses the mailbox (§4.4a): the banner says why, and
                 # the page is still this host's sessions
@@ -756,7 +763,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # §4.5a *Inbox row: promote* (TD-132 slice 3): the same rows the Inbox counts, from the
         # `host` reading this page already took, so the top bar and the Inbox cannot disagree
         promos = [] if agent_down else promote_rows((info or {}).get("promotes"))
-        if entries or vs or boards or promos:
+        if entries or handed or vs or boards or promos:
             secs = inbox_sections(
                 entries,
                 states=state_rows(
@@ -767,6 +774,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 )
                 + promos,
                 boards=boards,
+                handed=handed_rows(handed, {s.get("id"): s for s in sessions}, datetime.now(UTC)),
             )
             person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]
         return templates.TemplateResponse(
@@ -1912,6 +1920,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             states=states,
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
+            handed=got.get("handed") or (),
             boards=hz["due"],
         )
         picks = rail_picks(request.query_params)
@@ -1975,6 +1984,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             states=states,
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
+            handed=got.get("handed") or (),
         )
         for sec in INBOX_SECTIONS:
             e = next((x for x in sections[sec] if x.get("id") == mid and not x.get("row")), None)
@@ -1989,8 +1999,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 except HTTPException as err:
                     ctx["gone"] = str(err.detail)
             return templates.TemplateResponse(request, "inbox_entry.html", ctx)
+        if ctx["entry"].get("handed_row"):
+            # a handed entry's one copy is its holder's, and `thread` reads the person inbox alone:
+            # its thread here is the person inbox's entries on its root — the seat's questions and
+            # the person's answers to them (§4.10 *An entry handed to a seat*)
+            th = {"entries": [e for e in got["entries"] if e.get("root") == mid], "pruned": False}
+        else:
+            th = None
         try:
-            th = await call("thread", msg=mid)
+            th = th or await call("thread", msg=mid)
         except HTTPException as err:
             # an older host agent has no `thread`: the entry still reads whole, the thread says why
             ctx["thread_error"] = str(err.detail)
@@ -2051,6 +2068,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             states=states,
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
+            handed=got.get("handed") or (),
             boards=hz["due"],
         )
         got["agent_down"] = False

@@ -129,6 +129,41 @@
 </div>
 {%- endmacro %}
 
+{# design §4.10 *An entry handed to a seat* (§4.5a **Hand to the techlead**; TD-219): the words the
+   person handed a seat from the Add entry form, under *Waiting on them* from the press until the
+   seat reports the entry and its PR, and under *Needs you*, counted, once it came back `blocked`.
+   The one copy is the holder's, so the row names the holder and opens it; **Dismiss** ends the
+   debt and the seat is told (`inbox_dismiss` naming its id). There is no Reply: the seat's own
+   questions come as `ask`s on the entry's thread, each a row of its own. #}
+{% macro handed(e, section) -%}
+{%- set en = e.entry or {} %}
+<div class="row gap wrap mhead">
+  <span class="ref">you</span><span class="st">→</span>
+  <span class="ref" title="{{ e.holder }}">{{ e.holder_name }}</span>
+  {%- if e.holder_open %} <a class="btn sm ghost" href="/focus/{{ e.holder_open }}" title="Focus on {{ e.holder_name }}">Open</a>{% endif %}
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
+  <span class="badge kindmark k-{{ e.kind }}" title="an entry you handed to be drafted into the ledger">entry{% if en.type %} · {{ en.type }}{% endif %}</span>
+  {%- if en.repo %} <span class="st">for {{ en.repo }}</span>{% endif %}
+  <span class="grow"></span>
+  {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
+  <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
+</div>
+{{ body(e) }}
+{{ outcome_line(e) }}
+{%- if e.holder_doing %}<div class="st" title="what the holder says it is doing (design §4.8): its own words">doing: {{ e.holder_doing.text }}{% if e.holder_doing.age %} · says {{ e.holder_doing.age }} ago{% endif %}</div>{% endif %}
+<div class="row gap wrap mfoot">
+  {%- if section == 'needs' %}
+  <span class="st">blocked on something only a person can move — {{ e.holder_name }}'s questions come as rows of their own</span>
+  {%- elif e.holder_state in ('exited', 'closed') %}
+  <span class="st">handed · {{ e.holder_name }} {{ e.holder_state }} before reporting — the seat is filled again to finish it</span>
+  {%- else %}
+  <span class="st">handed · waiting on {{ e.holder_name }} to report the entry and its PR</span>
+  {%- endif %}
+  <span class="grow"></span>
+  <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this? It says you do not need to hear back: the debt ends and {{ e.holder_name }} is told. A draft PR it opened stays open.">Dismiss</button>
+</div>
+{%- endmacro %}
+
 {# In *Needs you*, counted: `blocked`, and a debt whose asker exited without reporting. Both are
    work that stopped on something only a person can move (§4.10). A person's **Reply** here is an
    ordinary reply and starts no new debt; one begins only if the session asks again. #}
@@ -614,7 +649,8 @@
 <div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
-{%- if section == 'snoozed' %}{{ snoozed(e, section) }}
+{%- if e.handed_row %}{{ handed(e, section) }}
+{%- elif section == 'snoozed' %}{{ snoozed(e, section) }}
 {%- elif section == 'waiting' %}{{ waiting(e, section) }}
 {%- elif section == 'answered' %}{{ answered(e, section) }}
 {#- in *Needs you* an entry that is not open is one of the two §4.10 puts there: a `blocked`
