@@ -1277,7 +1277,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             **teams.gate_prompts(False),
             worktree=plan["name"],
             repo=root,
-            capabilities=list(preset.grants),
+            capabilities=[g for g in dict.fromkeys(preset.grants) if g in GRANTS],  # as New session ticks them
             lane=[],
             role=preset.name,
             review=review,

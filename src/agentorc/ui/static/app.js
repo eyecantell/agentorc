@@ -1858,10 +1858,16 @@
     const err = $("#entryerr");
     const say = (m) => { err.textContent = m || ""; err.hidden = !m; };
     const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
+    let asked = 0;  // a later Type press wins over an earlier answer that arrives after it
     async function plan() {
+      const mine = ++asked;
       $("#entryline").textContent = "";
-      const r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}`);
-      const v = await r.json();
+      let r, v;
+      try {
+        r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}`);
+        v = await r.json();
+      } catch (e) { if (mine === asked) { say(`the page could not ask: ${e.message}`); $("#entrygo").disabled = true; } return; }
+      if (mine !== asked) return;
       if (!r.ok) { say(v.detail || "the repo could not be read"); $("#entrygo").disabled = true; return; }
       say(""); $("#entrygo").disabled = false;
       $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
@@ -1872,8 +1878,11 @@
     dlg.querySelectorAll("input[name=entrytype]").forEach((x) => { x.onchange = plan; });
     $("#entrygo").onclick = async () => {
       $("#entrygo").disabled = true;
-      const r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
-      const got = await r.json();
+      let r, got;
+      try {
+        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
+        got = await r.json();
+      } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }
       try { localStorage.setItem(AO.draftKey(got.id), got.text); } catch (_) { /* no storage: Focus opens with an empty composer */ }
       location.href = `/focus/${encodeURIComponent(got.id)}`;
