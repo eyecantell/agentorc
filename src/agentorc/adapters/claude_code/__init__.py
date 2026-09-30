@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import uuid
 from collections.abc import Iterator
@@ -176,24 +177,37 @@ CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
 # is current again once its branch carries the runner line. Only `.claude/settings.json` is read:
 # dev-cadence seeds the line there and nowhere else (a hand-copied line in settings.local.json
 # would run the set twice).
+# The status line (design §4.4 *A report*, TD-233): redrawn at least this often, in seconds, so a
+# session deep in one long tool run still reports; the flag that makes `agentorc-hook` the command.
+STATUSLINE_REFRESH = 60
+STATUSLINE_FLAG = "--statusline"
 CADENCE_WIRED_MARKERS = ("scripts/cadence_hooks.sh", "scripts/nudge_user_attention.py")
 
 
-def hooks_file(profile: Profile, cadence_line: bool = False, unattended: bool = False) -> Path:
+def hooks_file(profile: Profile, cadence_line: bool = False, unattended: bool = False, padding: int = 0) -> Path:
     suffix = ("+cadence" if cadence_line else "") + ("+unattended" if unattended else "")
+    suffix += f"+pad{padding}" if padding else ""
     return paths.home() / "claude-hooks" / f"{profile.name}{suffix}.json"
 
 
 def hooks_settings(
-    profile: Profile, hook_cmd: str = "agentorc-hook", cadence_line: bool = False, unattended: bool = False
+    profile: Profile,
+    hook_cmd: str = "agentorc-hook",
+    cadence_line: bool = False,
+    unattended: bool = False,
+    padding: int = 0,
 ) -> dict:
-    """The settings layer passed with `--settings`. Hooks, and two settings; the profile's own settings
-    still apply. With `cadence_line`, SessionStart also runs dev-cadence's hook runner
-    (CADENCE_HOOK_LINE). With `unattended`, the tool's own peer messages are refused (design §4.10
-    *The tool's own peer channel*, TD-064): its default holds one behind a deliver-or-deny panel that
-    no hook reports and nobody at an unattended pane answers; the sender is told, and `ao msg` is the
-    channel, and its prompt suggestions are off (TD-201). An interactive launch keeps the tool's
-    defaults — its person is there to answer, and to read a suggestion."""
+    """The settings layer passed with `--settings`. Hooks, the status line, and two settings; the
+    profile's own settings still apply. With `cadence_line`, SessionStart also runs dev-cadence's hook
+    runner (CADENCE_HOOK_LINE). With `unattended`, the tool's own peer messages are refused (design
+    §4.10 *The tool's own peer channel*, TD-064): its default holds one behind a deliver-or-deny panel
+    that no hook reports and nobody at an unattended pane answers; the sender is told, and `ao msg` is
+    the channel, and its prompt suggestions are off (TD-201). An interactive launch keeps the tool's
+    defaults — its person is there to answer, and to read a suggestion.
+
+    The status line is `agentorc-hook --statusline` on every launch (design §4.4 *A report*,
+    TD-233): it reports the account's limits and then runs the status line it displaced, whose
+    `padding` is carried here since the layer's is the one the tool draws with."""
     hooks: dict[str, list] = {}
     for ev in HOOK_EVENTS:
         # PermissionRequest may block for the whole permission wait; the others must be instant.
@@ -204,6 +218,12 @@ def hooks_settings(
             {"type": "command", "command": CADENCE_HOOK_LINE, "timeout": CADENCE_HOOK_TIMEOUT}
         )
     layer: dict = {"hooks": hooks}
+    layer["statusLine"] = {
+        "type": "command",
+        "command": f"{shlex.quote(hook_cmd)} {STATUSLINE_FLAG}",
+        "refreshInterval": STATUSLINE_REFRESH,
+        **({"padding": padding} if padding else {}),
+    }
     if unattended:
         layer["crossSessionInbound"] = "refuse"
         # Nobody reads a suggested next prompt at an unattended pane, its generation spends usage
@@ -232,7 +252,9 @@ def write_hooks_file(profile: Profile, cwd: Path | None = None, unattended: bool
     hooks itself, the `+unattended` variant for an unattended launch. Up to four files per profile,
     chosen by name, so concurrent launches never overwrite each other's choice."""
     cadence_line = cwd is not None and not repo_wires_cadence(cwd)
-    p = hooks_file(profile, cadence_line, unattended)
+    displaced = displaced_status_line(cwd, config_dir(profile)) if cwd is not None else None
+    padding = displaced_padding(displaced)
+    p = hooks_file(profile, cadence_line, unattended, padding)
     p.parent.mkdir(parents=True, exist_ok=True)
     cmd = shutil.which("agentorc-hook")
     if cmd is None:
@@ -242,8 +264,70 @@ def write_hooks_file(profile: Profile, cwd: Path | None = None, unattended: bool
             "agentorc-hook not on PATH (%s); hooks for profile %s may never fire", os.environ.get("PATH"), profile.name
         )
         cmd = "agentorc-hook"
-    p.write_text(json.dumps(hooks_settings(profile, cmd, cadence_line, unattended), indent=1), encoding="utf-8")
+    layer = hooks_settings(profile, cmd, cadence_line, unattended, padding)
+    p.write_text(json.dumps(layer, indent=1), encoding="utf-8")
     return p
+
+
+def displaced_status_line(cwd: Path, cfg_dir: Path) -> dict | None:
+    """The status line the launch's layer displaced (design §4.4 *The person's own status line still
+    shows*): the first `statusLine` command named by the directory's `.claude/settings.local.json`,
+    its `.claude/settings.json`, then the profile's own `settings.json`. Ours is never the one
+    displaced — a file that names `agentorc-hook --statusline` is passed over, or the command would
+    run itself. An unreadable file names none."""
+    for f in (cwd / ".claude" / "settings.local.json", cwd / ".claude" / "settings.json", cfg_dir / "settings.json"):
+        try:
+            line = json.loads(f.read_text(encoding="utf-8")).get("statusLine")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if isinstance(line, dict) and isinstance(line.get("command"), str) and line["command"].strip():
+            if STATUSLINE_FLAG in line["command"] and "agentorc-hook" in line["command"]:
+                continue
+            return line
+    return None
+
+
+def displaced_padding(line: dict | None) -> int:
+    """The displaced status line's `padding`, a small whole number, else 0."""
+    pad = (line or {}).get("padding")
+    return int(pad) if isinstance(pad, int | float) and not isinstance(pad, bool) and 0 < pad <= 20 else 0
+
+
+# The status line's report (design §4.4 *A report*, §4.3 `usage_report`, TD-233): the windows the
+# tool hands its status line, by the labels `parse_usage` gives the same windows. A per-model window
+# is not in it, and `spend_limit` is a gateway's, not a subscription's.
+STATUSLINE_WINDOWS = {"five_hour": "5h", "seven_day": "week"}
+
+
+def usage_report(payload: dict) -> dict | None:
+    """What a session was told about its account's limits, from its status line's stdin:
+    `{windows: [{label, pct, resets}], work, sid}` — `pct` to one decimal, `resets` the instant the
+    epoch seconds name, `work` the session's running total of API time
+    (`cost.total_api_duration_ms`), which grows with each response and by which the command tells a
+    fresh report from a redraw, and `sid` the tool's session id, whose running totals those are.
+    None when the payload carries no window (an old client, a metered profile, before the session's
+    first response)."""
+    limits = payload.get("rate_limits") if isinstance(payload, dict) else None
+    windows = []
+    for key, label in STATUSLINE_WINDOWS.items():
+        w = limits.get(key) if isinstance(limits, dict) else None
+        pct = w.get("used_percentage") if isinstance(w, dict) else None
+        if not isinstance(pct, int | float) or isinstance(pct, bool):
+            continue
+        resets = w.get("resets_at")
+        try:
+            at = datetime.fromtimestamp(float(resets), UTC).replace(microsecond=0)
+            iso = at.isoformat().replace("+00:00", "Z")
+        except (TypeError, ValueError, OverflowError, OSError):
+            iso = None
+        windows.append({"label": label, "pct": round(float(pct), 1), "resets": iso})
+    if not windows:
+        return None
+    cost = payload.get("cost")
+    work = cost.get("total_api_duration_ms") if isinstance(cost, dict) else None
+    ok = isinstance(work, int | float) and not isinstance(work, bool)
+    sid = payload.get("session_id")
+    return {"windows": windows, "work": work if ok else None, "sid": sid if isinstance(sid, str) else None}
 
 
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")

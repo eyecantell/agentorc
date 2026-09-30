@@ -7,6 +7,10 @@ Every other event is fire-and-forget: socket first, `events/<session>.jsonl` if 
 An error in the reply is the agent answering — a refusal (design §4.8a) or a bug — and is never
 queued: the tick applies the queue unjudged, so a queued refusal would be applied anyway (TD-115).
 
+With `--statusline` it is the session's status line instead (design §4.4 *A report*, TD-233): it
+reports the account's limits the tool hands it as `usage_report`, then runs the status line it
+displaced and prints what that prints.
+
 Always exits 0. A hook that fails would break the session it is watching.
 """
 
@@ -16,10 +20,18 @@ import contextlib
 import json
 import os
 import socket
+import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
+from agentorc.adapters.claude_code import (
+    STATUSLINE_FLAG,
+    STATUSLINE_REFRESH,
+    displaced_status_line,
+    usage_report,
+)
 from sessionorc import paths
 from sessionorc.store import EventQueue
 
@@ -129,14 +141,18 @@ class Refused(Exception):
     """The host agent answered with an error: it is up, and the event is not to be queued."""
 
 
-def call_agent(params: dict[str, Any], timeout: float | None) -> Any:
+def call_agent(params: dict[str, Any], timeout: float | None, method: str = "hook", caller: str | None = None) -> Any:
     """One request over the socket; raises `Refused` on an error reply, and anything else on a
-    transport problem."""
+    transport problem. `caller` goes on the envelope, where a method that answers for its caller
+    reads it (`usage_report`); a `hook` names its session in `params`."""
+    req: dict[str, Any] = {"id": 1, "method": method, "params": params}
+    if caller:
+        req["caller"] = caller
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-        s.settimeout(5)
+        s.settimeout(min(5.0, timeout) if timeout else 5.0)
         s.connect(str(paths.socket_path()))
         s.settimeout(timeout)
-        s.sendall((json.dumps({"id": 1, "method": "hook", "params": params}) + "\n").encode())
+        s.sendall((json.dumps(req) + "\n").encode())
         buf = b""
         while not buf.endswith(b"\n"):
             chunk = s.recv(65536)
@@ -149,7 +165,107 @@ def call_agent(params: dict[str, Any], timeout: float | None) -> Any:
     return resp.get("result")
 
 
+# The status line's report (design §4.4 *A report*): sent with this timeout and never queued, since
+# the tool cancels a status line still running when the next is due and a late report reads as new.
+REPORT_TIMEOUT = 1.0
+# The status line it displaced gets this long; the tool cancels ours past its own bound anyway.
+CHAINED_TIMEOUT = 5.0
+
+
+def last_report_file(session: str) -> Path:
+    """What this session's status line last sent: one small file per session under the home."""
+    return paths.home() / "statusline" / f"{session}.json"
+
+
+def report_due(rep: dict[str, Any], last: dict[str, Any] | None, now: float) -> dict[str, Any] | None:
+    """The `usage_report` params to send for `rep`, or None when nothing is owed: a report goes when a
+    number or a reset changed, or `STATUSLINE_REFRESH` seconds passed, never on every redraw.
+    `fresh` says the session had a response since the last report — its running total of API time
+    grew — so a redraw that repeats what the tool last said moves no reading's age."""
+    if not isinstance(last, dict):
+        last = {}
+    same = last.get("windows") == rep["windows"]
+    sent = last.get("sent")
+    if same and isinstance(sent, int | float) and 0 <= now - sent < STATUSLINE_REFRESH:
+        return None
+    work, was = rep.get("work"), last.get("work")
+    if last.get("sid") != rep.get("sid"):
+        was = 0  # a new process under the same name counts its API time from nothing again
+    if work is None:
+        fresh = not same  # no running total to read: only a changed number says anything happened
+    else:
+        fresh = work > (was if isinstance(was, int | float) and not isinstance(was, bool) else 0)
+    return {"windows": rep["windows"], "fresh": fresh}
+
+
+def report_usage(session: str, payload: dict[str, Any], now: float) -> None:
+    """Send the payload's limits as `usage_report` when one is owed, and remember what was sent.
+    Nothing is remembered when the host agent was not reached, so the next redraw tries again."""
+    rep = usage_report(payload)
+    if rep is None:
+        return
+    f = last_report_file(session)
+    try:
+        last = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        last = None
+    params = report_due(rep, last, now)
+    if params is None:
+        return
+    call_agent(params, timeout=REPORT_TIMEOUT, method="usage_report", caller=session)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(json.dumps({**rep, "sent": now}), encoding="utf-8")
+    tmp.replace(f)
+
+
+def chained_output(raw: str, payload: dict[str, Any]) -> str:
+    """Run the status line the launch's layer displaced with the same stdin, in the session's
+    directory, and return what it printed ("" when there is none or it failed)."""
+    ws = payload.get("workspace") if isinstance(payload.get("workspace"), dict) else {}
+    cwd = Path(str(ws.get("project_dir") or payload.get("cwd") or ws.get("current_dir") or os.getcwd()))
+    cfg = Path(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser()
+    line = displaced_status_line(cwd, cfg)
+    if line is None:
+        return ""
+    try:
+        done = subprocess.run(  # noqa: S602 — the person's own status line, as the tool would run it
+            line["command"],
+            shell=True,
+            input=raw,
+            capture_output=True,
+            text=True,
+            cwd=cwd if cwd.is_dir() else None,
+            timeout=CHAINED_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return ""
+    return done.stdout
+
+
+def statusline() -> int:
+    """`agentorc-hook --statusline`: report, then print the person's own status line. It never
+    fails the status line — any error in the report is swallowed and the chained command still runs."""
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw or "{}")
+    except ValueError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    if session := os.environ.get("AGENTORC_SESSION"):
+        with contextlib.suppress(Exception):
+            report_usage(session, payload, time.time())
+    with contextlib.suppress(Exception):
+        out = chained_output(raw, payload)
+        if out:
+            sys.stdout.write(out)
+    return 0
+
+
 def main() -> int:
+    if STATUSLINE_FLAG in sys.argv[1:]:
+        return statusline()
     session = os.environ.get("AGENTORC_SESSION")
     if not session:
         return 0  # not an agentorc session; the hook layer is only ever passed to ours, but be safe
