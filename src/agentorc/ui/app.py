@@ -1232,7 +1232,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 break
         if not name:
             raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
-        manager, records = "", {r["id"]: r for r in await call("list")}
+        manager, records = "", {}
+        with contextlib.suppress(HTTPException):  # no list: the hand line reads as a seat nobody fills
+            records = {r["id"]: r for r in await call("list")}
         if team:
             t, here = org.teams[team], host_name()
             mid = teams.manager_id(org, t, t.host or here, here)

@@ -1910,11 +1910,12 @@
     const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
     let asked = 0;  // a later Type press wins over an earlier answer that arrives after it
     let handWhy = "…";  // **Hand to the techlead**'s reason to be disabled, from the plan (TD-219 slice 4)
+    let busy = false;  // a hand in flight: nothing re-enables the button under it, so one press hands once
     const hand = $("#entryhand");
     // disabled with its reason where no team or seat takes it, and while **What** is empty (§4.5a)
     const handState = () => {
       const empty = !$("#entrywhat").value.trim();
-      hand.disabled = !!handWhy || empty;
+      hand.disabled = busy || !!handWhy || empty;
       hand.title = handWhy || (empty ? "write what the entry is first" : "");
     };
     $("#entrywhat").oninput = handState;
@@ -1922,6 +1923,7 @@
       const mine = ++asked;
       $("#entryline").textContent = "";
       handWhy = "…"; handState();
+      $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";  // the last Type's, until this answer
       let r, v;
       try {
         r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}`);
@@ -1940,13 +1942,15 @@
       handState();
     }
     hand.onclick = async () => {
-      hand.disabled = true;
+      if (busy) return;
+      busy = true; handState();
       let r, got;
       try {
         r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
         got = await r.json();
-      } catch (e) { handState(); return say(`the page could not ask: ${e.message}`); }
-      if (!r.ok) { handState(); return say(got.detail || "refused"); }
+      } catch (e) { busy = false; handState(); return say(`the page could not ask: ${e.message}`); }
+      if (!r.ok) { busy = false; handState(); return say(got.detail || "refused"); }
+      busy = false;
       dlg.close();
       AO.toast(got.text, true, got.href);
     };

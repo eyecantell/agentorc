@@ -166,10 +166,9 @@ def test_hand_to_the_techlead_sends_the_words_to_the_repos_first_seat_and_names_
     assert got["text"] == "handed to techlead-sam · m-1" and got["href"] == "/inbox/m-1"
 
 
-def test_a_live_seat_says_its_own_sentence_and_no_seat_or_no_team_disables_the_button(tmp_path, monkeypatch):
+def test_a_live_seat_says_its_own_sentence(tmp_path, monkeypatch):
     """The sentence under the button is the seat's record's own when one is live (the agent's
-    `refill`, an ask's sentence with no bound); with no techlead seat, or no team at all, the plan
-    carries the reason the button is disabled, in the design's words."""
+    `refill`, an ask's sentence with no bound), not the one for a seat nobody fills."""
     world(tmp_path)
     from agentorc import org as orgmod
     from agentorc import teams
@@ -188,6 +187,8 @@ def test_a_live_seat_says_its_own_sentence_and_no_seat_or_no_team_disables_the_b
 @pytest.mark.parametrize(("team", "seat", "why"), [(True, False, "this team has no techlead seat"),
                                                    (False, True, "no team services this repo")])  # fmt: skip
 def test_hand_is_disabled_with_its_reason(tmp_path, monkeypatch, team, seat, why):
+    """With no techlead seat, or no team at all, the plan carries the reason the button is disabled,
+    in the design's words, and names no seat to hand to."""
     world(tmp_path, team=team, seat=seat)
     c = client(monkeypatch, tmp_path, fake([]))
     hand = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["hand"]
