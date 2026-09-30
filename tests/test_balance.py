@@ -272,3 +272,140 @@ async def test_a_mark_is_saved_with_no_repo_and_a_repo_the_home_does_not_read_is
             await asyncio.sleep(0.3)
             listener.cancel()
         assert got and got[0]["repo"]["balance"] == {"other": saved["other"]["balance"]}
+
+
+# -- the refusal (slice 2) ----------------------------------------------------------------------------
+
+
+def _mark(agent, team="grind", **over):
+    mark = {
+        "since": datetime.now(UTC).isoformat(),
+        "repo": "/r",
+        "crossed": [{"line": "prs", "value": 9, "limit": 8}],
+        **over,
+    }
+    agent._host_rec.setdefault("teams", {})[team] = {"balance": mark}
+    return mark
+
+
+def test_the_refusal_says_the_marks_numbers_and_the_durations_read_alike():
+    assert [balance.duration(s) for s in (0, 40 * 60, 5 * 3600 + 600, 2 * 86400, 3 * 86400 + 4 * 3600 + 59)] == [
+        "0m",
+        "40m",
+        "5h 10m",
+        "2d",
+        "3d 4h",
+    ]
+    mark = {
+        "since": "2026-09-29T14:02:00+00:00",
+        "crossed": [
+            {"line": "prs", "value": 9, "limit": 8},
+            {"line": "oldest", "value": 3 * 86400, "limit": 2 * 86400},
+            {"line": "review", "value": 5 * 3600, "limit": 7200},
+        ],
+    }
+    words = balance.refusal("ao-grind", mark)
+    assert words.startswith("ao-grind is over its line: 9 open PRs, the line is 8; the oldest PR open 3d, the line")
+    assert "the reader's queue waiting 5h, the bound is 2h (since " in words
+    assert "Take nothing new: finish, rebase or answer what is open of yours" in words
+    assert "you are told when the line clears" in words
+
+
+async def test_a_member_of_a_team_over_its_line_is_refused_a_new_claim(agent, tmp_path):
+    """Design §6 *Balance*: a declared claim by an unattended member that is no seat is refused while
+    its team's mark stands, `--force` or not, in the mark's numbers; a renewal, a pull request as the
+    reference, `done` and `dropped` pass, and so does every claim once the mark goes."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        g = await _member(person, tmp_path, "g1", unattended=True)
+        await person.call("progress", id=g, ref="TD-800", status="claimed")  # held before the crossing
+        _mark(agent)
+        for force in (False, True):
+            with pytest.raises(AgentError, match="grind is over its line: 9 open PRs, the line is 8") as no:
+                await person.call("progress", id=g, ref="TD-900", status="claimed", force=force)
+            assert no.value.data["balance"]["crossed"][0]["value"] == 9
+        rec = agent.sessions[g]
+        assert rec.balance_refused["ref"] == "TD-900" and not any(e.ref == "TD-900" for e in rec.progress)
+        assert json.loads((paths.sessions_dir() / f"{g}.json").read_text())["balance_refused"]["ref"] == "TD-900"
+
+        await person.call("progress", id=g, ref="TD-800", status="claimed")  # a renewal
+        await person.call("progress", id=g, ref="#712", status="claimed")  # reading a PR brings the count down
+        await person.call("progress", id=g, ref="TD-800", status="done", pr=712)
+        await person.call("progress", id=g, ref="TD-700", status="dropped", why="not mine")
+        with pytest.raises(AgentError, match="over its line"):
+            await person.call("progress", id=g, ref="TD-800", status="claimed")  # done: no longer held
+
+        agent._host_rec["teams"].pop("grind")
+        await person.call("progress", id=g, ref="TD-900", status="claimed")
+        assert rec.balance_refused is None, "the line cleared and it claimed: nothing left to ring"
+
+
+async def test_a_seat_an_interactive_member_and_another_team_are_not_refused(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        seat = await _member(person, tmp_path, "tl", unattended=True)
+        agent.sessions[seat].seat = {"trigger": "asks"}
+        mine = await _member(person, tmp_path, "paul")  # a person's own session in the team
+        other = await _member(person, tmp_path, "o1", team="other", unattended=True)
+        _mark(agent)
+        for sid in (seat, mine, other):
+            await person.call("progress", id=sid, ref="TD-900", status="claimed", force=True)
+            assert agent.sessions[sid].balance_refused is None
+
+
+async def test_none_is_refused_while_the_mark_stands_and_taken_once_it_goes(agent, tmp_path):
+    """A refused member is not out of work: its team idles over its line and never winds down on it."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        g = await _member(person, tmp_path, "g1", unattended=True)
+        _mark(agent, crossed=[{"line": "oldest", "value": 3 * 86400, "limit": 2 * 86400}])
+        async with LocalClient(caller=g) as me:
+            with pytest.raises(AgentError, match="the oldest PR open 3d, the line is 2d") as no:
+                await me.call("progress", id=g, status="none", why="nothing I may pick")
+            assert "balance" in no.value.data and agent.sessions[g].out_of_work is None
+            assert agent.sessions[g].balance_refused["ref"] is None
+            got = await me.call("progress", id=g, status="restart", why="context bound")
+            assert got["restart_wanted"]["why"] == "context bound"  # a restart is not a claim
+            agent.sessions[g].restart_wanted = None
+            agent._host_rec["teams"].pop("grind")
+            got = await me.call("progress", id=g, status="none", why="nothing I may pick")
+            assert got["out_of_work"]["why"] == "nothing I may pick"
+
+
+async def test_a_refused_member_is_neither_nudged_nor_told_of_its_lane_while_the_mark_stands(
+    agent, tmp_path, monkeypatch
+):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    root = str(tmp_path / "repo")
+    sent, notes = [], []
+
+    async def policy_send(s, text):
+        sent.append((s.id, text))
+        return True
+
+    monkeypatch.setattr(agent, "_policy_send", policy_send)
+    monkeypatch.setattr(agent, "_system_note", lambda to, text, **kw: notes.append((to, text)))
+    async with LocalClient() as person:
+        g = await _member(person, tmp_path, "g1", unattended=True, lane=["TD-1"])
+        rec = agent.sessions[g]
+        rec.supervised, rec.repo = True, root
+        rec.state, rec.confidence, rec.since = "idle", "hook", (now - timedelta(hours=1)).isoformat()
+        entry = {"id": "TD-002", "title": "x", "owner": "grinder", "kind": "build", "pickable": "yes"}
+        agent._repos[root] = {"name": "repo", "root": root, "ledger": {"entries": [entry]}}
+        rec.balance_refused = {"at": now.isoformat(), "ref": "TD-900"}
+        _mark(agent)
+
+        await agent._idle_nudge(rec, now)
+        assert sent == [] and rec.nudged_at is None
+        rec.lane, rec.out_of_work = ["free-pick"], {"at": now.isoformat(), "why": "x"}
+        rec.lane_seen = {"at": now.isoformat(), "ids": []}
+        await agent._lane_news(rec, now)
+        assert notes == [] and rec.lane_seen["ids"] == [], "untold, so it is told once the line clears"
+
+        agent._host_rec["teams"].pop("grind")  # the mark went: the field alone holds nothing back
+        await agent._lane_news(rec, now)
+        assert len(notes) == 1 and "TD-002" in notes[0][1]
+        rec.lane, rec.out_of_work, rec.lane_seen = ["TD-001"], None, None
+        await agent._idle_nudge(rec, now)
+        assert len(sent) == 1 and "TD-001" in sent[0][1]

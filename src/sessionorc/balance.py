@@ -77,3 +77,46 @@ def crossed(
     if not out and unknown:
         return None
     return out, where
+
+
+def duration(seconds: Any) -> str:
+    """Seconds as the page and the refusal write them: the largest unit and the next (`3d 4h`,
+    `5h 10m`, `40m`), a zero second part left off, so a line of `2d` reads `2d`."""
+    try:
+        n = max(0, int(seconds))
+    except (TypeError, ValueError):
+        return "?"
+    d, rest = divmod(n, 86400)
+    h, rest = divmod(rest, 3600)
+    m = rest // 60
+    parts = [(d, "d"), (h, "h"), (m, "m")]
+    while len(parts) > 1 and not parts[0][0]:
+        parts.pop(0)
+    big, small = parts[0], parts[1] if len(parts) > 1 else (0, "")
+    return f"{big[0]}{big[1]}" + (f" {small[0]}{small[1]}" if small[0] else "")
+
+
+def _line_words(c: dict[str, Any]) -> str:
+    v, lim = c.get("value"), c.get("limit")
+    if c.get("line") == "prs":
+        return f"{v} open PR{'' if v == 1 else 's'}, the line is {lim}"
+    if c.get("line") == "oldest":
+        return f"the oldest PR open {duration(v)}, the line is {duration(lim)}"
+    if c.get("line") == "review":
+        return f"the reader's queue waiting {duration(v)}, the bound is {duration(lim)}"
+    return f"{c.get('line')} {v}, the line is {lim}"
+
+
+def refusal(team: str, mark: dict[str, Any]) -> str:
+    """The words a refused claim — and a refused `none` — answers with (design §6 *Balance*), in the
+    mark's own numbers and its `since` in the home's clock."""
+    lines = "; ".join(_line_words(c) for c in mark.get("crossed") or [] if isinstance(c, dict))
+    since = ""
+    if (at := _when(mark.get("since"))) is not None:
+        at = at.astimezone()
+        day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
+        since = f" (since {day}{at:%H:%M})"
+    return (
+        f"{team} is over its line: {lines}{since}. Take nothing new: finish, rebase or answer what is open "
+        "of yours, then end your turn — you are told when the line clears (design §6 *Balance*)"
+    )

@@ -6027,7 +6027,7 @@ teams:                                        # per team, by the name org.yml or
     until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
     reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
     on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
-    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; the setting and the mark built — TD-239): over any of these the team's members take no new claim; absent, no rule
+    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; the setting, the mark and the refusal built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
   agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
 person:                                       # the person's own — nothing here reaches a policy
@@ -6854,7 +6854,7 @@ teams:
 - **Balance: a team over its line takes no new work** (TD-177; Paul, 2026-09-25: *if I want to
   make sure the team is balanced, I can make sure the PR count is not growing too much — the
   grinders outpacing the techlead*; designed 2026-09-29; the setting and the mark built — TD-239
-  slice 1 — and the refusal, the notes and what a person sees not yet). The numbers came
+  slice 1 — and the refusal, slice 2; the notes, what a person sees and rule 8's fifth bound not yet). The numbers came
   first (§4.4 *Repo facts*, the team card and the Repo page, TD-176), and the rule keys on
   exactly those, so what trips it is what a person has been watching. It is **off until a
   person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team
@@ -6874,7 +6874,10 @@ teams:
   lines for each team that has the key, the team's repo being the registry root its live
   members' records name (`repo`; a team over two repos is read against each, either crossing
   counts, and every member is refused whichever repo it sits in). A team with no live member
-  is not read, and a mark it carried goes: there is nobody to refuse. A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
+  is not read, and a mark it carried goes: there is nobody to refuse. A team whose live members
+  name no registry root has no repo to read, so `prs` and `oldest` cross nothing for it and only
+  `review` can mark it (with `repo` empty) — never *cannot be told*, which would keep a mark
+  standing for as long as the repo stays out of the registry. A crossing writes **`balance: {since, repo, crossed: [{line, value, limit}]}`**
   on the home's own `host` record under the team's name — the record rule 8 designs for
   `work_waiting` (TD-227; the mark built), which is `host.json` in the home, `{teams: {<team>: {balance}}}`,
   kept across a restart so a mark keeps its `since` — served with the `repos` reading, each
@@ -6889,7 +6892,9 @@ teams:
   of that team is refused** — a record that is `unattended` and no seat; a seat's record is
   never refused, and a manager claims nothing — `ao progress claim TD-NNN` answers *ao-grind is over its line: 9
   open PRs, the line is 8 (since 14:02). Take nothing new: finish, rebase or answer what is
-  open of yours, then end your turn — you are told when the line clears.* It is refused in the
+  open of yours, then end your turn — you are told when the line clears.* The mark is read from
+  the `host` record by the member's team, never from a repo's reading, since a `review` crossing
+  may name no repo. It is refused in the
   step that would write it, as a lease is, and unlike a lease **`--force` does not pass it**:
   the line is the person's, and a session cannot move it. Not refused: a claim on a reference
   the claimer already holds (a renewal), a claim on a pull request (a PR number as the
@@ -6897,7 +6902,10 @@ teams:
   `restart`, and any claim by an interactive session, a person's own included (§9 invariant
   5: policies leave those alone). **A refused member is not out of work**: `ao progress none`
   is refused to it while the mark stands, in the same words, so a team over its line idles
-  and never winds down on it; the idle nudge and rule 6's lane news pass such a member by,
+  and never winds down on it. A refusal, of a claim or of `none`, is kept on the record as
+  **`balance_refused: {at, ref}`** (`ref` null for `none`), so the clearing can ring it; a claim
+  taken once the mark has gone removes it. While the mark stands the idle nudge and rule 6's lane
+  news pass a record carrying it by — an entry left untold is told once the line clears —
   and rule 8 holds a start back with *its repo is over its line* as a fifth bound. Never a
   pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
 

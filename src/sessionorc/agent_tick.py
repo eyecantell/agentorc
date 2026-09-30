@@ -792,6 +792,8 @@ class TickMixin:
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
+        if s.balance_refused and self._balance_of(s):
+            return  # refused a claim over its team's line (§6 *Balance*): idling is what it was told to do
         line = self._nudge_line(s)
         if line and await self._policy_send(s, line):
             s.nudged_at = now_iso()
@@ -898,6 +900,8 @@ class TickMixin:
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
+        if s.balance_refused and self._balance_of(s):
+            return  # its claims are refused while its team is over its line (§6 *Balance*): told once it clears
         s.lane_seen = {"at": now_iso(), "ids": [*s.lane_seen.get("ids", []), *new]}
         named = ", ".join(new[:LANE_NEWS_NAMED]) + (
             f" and {len(new) - LANE_NEWS_NAMED} more" if len(new) > LANE_NEWS_NAMED else ""
