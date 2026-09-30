@@ -219,3 +219,36 @@ async def test_a_start_by_the_rule_replays_the_records_under_their_names(agent, 
         assert "work_waiting" not in _team_rec(agent) and len(_team_rec(agent)["work_started"]) == 1
         for sid in made.values():
             await person.call("kill", id=sid)
+
+
+async def test_a_repo_over_the_teams_balance_line_holds_the_start_as_the_fifth_bound(agent, tmp_path, monkeypatch):
+    """§6 *Balance*: the mark goes with the team's last live member, so rule 8 reads the lines itself —
+    against `work_waiting`'s repo, and the `review` line against the queue its ended seats keep."""
+    await park_ticks(agent)
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    seat = _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None)
+    later = await _settled(agent, tmp_path, _rec("manager-ao", lane=["TD-900"]), _rec("grinder-ao-1"), seat)
+    repo = str(tmp_path)
+    born = _iso(later - timedelta(hours=1))
+    agent._repos[repo]["prs"] = {"open": [{"number": 700 + i, "created": born} for i in range(3)], "at": born}
+
+    async def held(balance: dict) -> dict | None:
+        settings_mod.save({"teams": {"g": {"on_work": "start", "balance": balance}}})
+        await agent._work_marks(later)
+        return (_team_rec(agent).get("work_waiting") or {}).get("held")
+
+    got = await held({"prs": 2})
+    assert got == {"why": "balance", "repo": repo, "crossed": [{"line": "prs", "value": 3, "limit": 2}]}
+    agent._repos[repo]["prs"] = {"error": "gh: offline"}
+    assert (await held({"prs": 2}) or {}).get("why") != "balance", "a reading that cannot be told holds nothing"
+    replays.calls.clear()
+
+    # the review line: the ended seat's queue, three hours old against the two-hour bound
+    for k in list(_team_rec(agent)):
+        _team_rec(agent).pop(k)
+    await agent._work_marks(later - WORK_SETTLE)
+    waited = _iso(later - timedelta(hours=3))
+    monkeypatch.setattr(seat, "prs_waiting", lambda home=None: {"n": 1, "oldest": waited})
+    got = await held({"review": True})
+    assert got["why"] == "balance" and got["crossed"][0]["line"] == "review" and replays.calls == []

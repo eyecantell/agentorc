@@ -1026,7 +1026,7 @@ class TickMixin:
         now: datetime,
     ) -> dict[str, Any] | None:
         """Rule 8 under `on_work: start` (design §6, TD-227 slice 4): the person's standing press. The
-        four bounds are read before the first replay, and one that holds the start back leaves the
+        five bounds are read before the first replay, and one that holds the start back leaves the
         mark standing with `held: {why, …}`, which is what draws the row under `start`; otherwise the
         team's records are replayed (`_work_replays`, the lead first), each `restarts` entry
         `why: work` with the ids it was started for, the instant appended to `work_started` on the
@@ -1039,7 +1039,7 @@ class TickMixin:
         if not started:
             rec.pop("work_started", None)
         replays = self._work_replays(records, now)
-        held = self._work_held(replays, started, conf, now, team)
+        held = self._work_held(replays, started, conf, now, team, mark.get("repo"), records)
         bare = {k: v for k, v in mark.items() if k != "held"}
         if held is None:
             down = next((r.host for r in replays if r.host != self.host and r.host not in self._link_muxes), None)
@@ -1082,12 +1082,20 @@ class TickMixin:
         return sorted(out, key=lambda r: (self._address(r) not in leads, r.name, r.id))
 
     def _work_held(
-        self, replays: list[Session], started: list[str], conf: dict[str, Any], now: datetime, team: str
+        self,
+        replays: list[Session],
+        started: list[str],
+        conf: dict[str, Any],
+        now: datetime,
+        team: str,
+        repo: str | None = None,
+        records: list[Session] | None = None,
     ) -> dict[str, Any] | None:
         """The bound that holds rule 8's start back, in the design's order, or None (§6 rule 8): a
         member's profile over its usage line; the team's stop time passed and not cleared;
-        `WORK_STARTS_DAY` starts in the day; a start inside `WORK_EARLY`. Nothing to replay holds it
-        too: the row of `ask` is the person's way to start a team the rule cannot."""
+        `WORK_STARTS_DAY` starts in the day; a start inside `WORK_EARLY`; its repo over the team's
+        balance line (`_work_balance`). Nothing to replay holds it too: the row of `ask` is the
+        person's way to start a team the rule cannot."""
         if not replays:
             return {"why": "nothing"}
         for profile in dict.fromkeys(r.profile for r in replays):
@@ -1101,7 +1109,28 @@ class TickMixin:
             return {"why": "day", "count": len(started)}
         if started and _recent(started[-1], now, agent_common.WORK_EARLY):
             return {"why": "early", "started": started[-1]}
-        return None
+        return self._work_balance(conf.get("balance"), repo, records or replays, now)
+
+    def _work_balance(
+        self, bal: dict[str, Any] | None, repo: str | None, records: list[Session], now: datetime
+    ) -> dict[str, Any] | None:
+        """Rule 8's fifth bound (§6 *Balance*): the team's lines read by the rule itself, since the mark
+        went with the team's last live member — against `work_waiting`'s `repo`, and for `review`
+        the queue at its seats, which keep their inbox when they end, against the shortest bound its
+        records carry. `{why: balance, repo, crossed}` when a line is crossed; a reading that cannot
+        be told holds nothing, as a failed reading writes no mark."""
+        if not bal:
+            return None
+        roots = [repo] if repo and repo in self._repos else []
+        waiting = [str(w["oldest"]) for r in records if r.seat is not None and (w := r.prs_waiting(home=self.host))]
+        bounds = [d for r in records if (d := balance_mod.span((r.review or {}).get("bound")))]
+        got = balance_mod.crossed(
+            bal, roots, self._repos, min(waiting) if waiting else None,
+            min(bounds) if bounds else balance_mod.REVIEW_BOUND, now,
+        )  # fmt: skip
+        if not got or not got[0]:
+            return None
+        return {"why": "balance", "repo": got[1], "crossed": got[0]}
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
