@@ -4640,7 +4640,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
   question lands on an empty seat. An entry counts when it is open, an `ask` or a `steer`, and
   names the record in `to` — compared whole, host included, since names are unique per host
   (§4.4a); a copy does not, nor does an entry the record has passed up, **nor a handed entry while a question of the
-  seat's own on its thread waits on the person** (TD-180; not built — TD-218; §4.10 *An entry
+  seat's own on its thread waits on the person** — a handed entry counts while it owes its outcome,
+  open or not (TD-180; built 2026-09-29 — TD-218 slice 1, `MailEntry.handed_entry`; §4.10 *An entry
   handed to a seat*): the seat has nothing to do until the answer comes, so it is closed as an
   idle seat is, and the answer closes the question, the entry counts again and the seat is filled. The wake digest carries *whether* any
   wait, not how many: a manager wakes when the count leaves zero, not on 1→2. A node holds no
@@ -5032,7 +5033,7 @@ kind — and drawn in the composer (§4.5a **Message**), returned by `msg` per a
 |---|---|
 | a person's session (`unattended: false`) | *lands in its inbox and wakes nothing: a person's session is never rung (invariant 5) — the card's unread chip shows it* |
 | a seat on call (no live record, the definition names it), kind `ask` | *fills this seat: a session starts on the next tick and reads it first* — the trigger counts questions (§4.9b `asks_waiting`) |
-| a seat on call, a person's `reply` to a question the seat asked on a handed entry's thread (TD-180; not built — TD-218) | *fills this seat: a session starts on the next tick and reads it first* — the answer closes the question, and the entry counts toward the seat again (§4.9b `asks_waiting`) |
+| a seat on call, a person's `reply` to a question the seat asked on a handed entry's thread (TD-180; built 2026-09-29 — TD-218 slice 1: `read_when`'s `refills`, the view's `refill` sentence) | *fills this seat: a session starts on the next tick and reads it first* — the answer closes the question, and the entry counts toward the seat again (§4.9b `asks_waiting`) |
 | a seat on call, kind `note`, or any other `reply` | *waits in the seat's mailbox: a note fills no seat, and is read at the next fill, which a question causes* |
 | `exited` or `closed`, not a seat | *read when this session is resumed, or started again under this name* — the mail moves with the name (*The lifecycle of an entry*) |
 | `scheduled` (§6 *Start time*, TD-152) | *read when it starts, at <time>* |
@@ -5579,7 +5580,7 @@ without reporting**; the row offers **Open** (the session's details, Resume) and
 → done: merged as #261*. A lapsed `steer` owes nothing — nobody answered — and a declined question
 owes nothing either.
 
-**An entry handed to a seat (TD-180; designed 2026-09-28, not built — TD-218).** The Add entry
+**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add`, the close by its outcome and `ao td add` not built — TD-218).** The Add entry
 form's **Hand to the techlead** and `ao td add` (§4.9 *Add an entry to the ledger*) send an `ask`
 from the person whose envelope carries **`entry: {repo, type}`** — the repo's name in the home's
 registry and `debt` or `feature`, both from the form's fields and never read out of the text —

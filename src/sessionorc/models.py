@@ -311,6 +311,11 @@ class MailEntry:
     # asker's outbox — so work that travels the other way had no debt at all. `identity_log` is
     # its first and only writer; nothing else sets it until a design says so.
     handed: bool = False
+    # An entry handed to a seat (design §4.10 *An entry handed to a seat*, TD-180, TD-218): the
+    # Add entry form's `{repo, type}` — the repo's name in the home's registry and `debt` or
+    # `feature` — on a `handed` `ask` from the person. From the form's fields, never read out of
+    # the text.
+    entry: dict[str, str] | None = None
     # Passed up (design §4.9b *Passing up keeps the thread and the asker*, TD-075 step 3): when the
     # addressee of an open `ask` or `steer` handed it to the person — once — with its own
     # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text}`,
@@ -372,6 +377,12 @@ class MailEntry:
         and those could then neither be deleted nor pruned (review of PR #347). `Session.owed()`,
         `inbox_delete` and the retention sweep all ask it this way."""
         return self.owes and (self.handed or not session_inbox)
+
+    @property
+    def handed_entry(self) -> bool:
+        """A piece of work the person handed as an `ask` (§4.10 *An entry handed to a seat*): it
+        fills the seat, carries no bound, and closes by its outcome, never by a reply."""
+        return self.handed and self.kind == "ask" and self.from_ == PERSON
 
     @property
     def open(self) -> bool:
@@ -1012,12 +1023,19 @@ class Session:
             sid, host = naming.split_address(address)
             return sid, host or storing
 
+        # a handed entry (§4.10 *An entry handed to a seat*, TD-218) counts while it owes its
+        # outcome, read or not — so a seat that exited with it half done is filled again — and not
+        # while a question of the record's own to the person on its thread is open: the seat waits
+        # on the person then, and the person's answer closes that question and counts it again
+        asking = {e.root for e in self.outbox if e.open and e.kind == "ask" and PERSON in e.to}
         return sum(
             1
             for e in self.inbox
-            if e.open
-            and e.kind in ("ask", "steer")
-            and not e.passed_up  # the person's to answer now (§4.9b): no seat need be filled for it
+            if (
+                (e.owes and e.id not in asking)
+                if e.handed_entry
+                else (e.open and e.kind in ("ask", "steer") and not e.passed_up)
+            )  # passed up: the person's to answer now (§4.9b), no seat need be filled for it
             and any(where(x) == mine for x in e.to)
         )
 

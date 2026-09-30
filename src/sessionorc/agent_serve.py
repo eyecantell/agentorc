@@ -60,6 +60,8 @@ class ServeMixin:
         down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
         rings = getattr(adapters.get(s.adapter), "composer", None) is not None
         v["read_when"] = {k: mail.read_when(s, k, now, unreachable=down, rings=rings) for k in ("ask", "note")}
+        # the Reply composer's line for a person's answer on a handed entry's thread (TD-218)
+        v["read_when"]["refill"] = mail.read_when(s, "reply", now, unreachable=down, rings=rings, refills=True)
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)

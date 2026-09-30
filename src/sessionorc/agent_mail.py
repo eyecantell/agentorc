@@ -632,6 +632,16 @@ class MailMixin:
                 bound=span,
                 unreachable=sid in away,
                 rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
+                # a person's answer on a handed entry's thread fills a seat on call (TD-218)
+                # — a reply that closes the seat's own question on the thread of an entry it still owes
+                # (review of #760: an outcome note or a seat's FYI on the thread refills nothing)
+                refills=sender == PERSON
+                and entry.kind == "reply"
+                and bool(closes)
+                and replied is not None
+                and replied.kind == "ask"
+                and replied.from_ == sid
+                and any(e.id == root and e.handed_entry and e.owes for e in records[sid].inbox),
             )
             for sid in named
             if sid != PERSON and sid in records
@@ -915,12 +925,17 @@ class MailMixin:
         if mail.is_person(caller):
             if not id or id == PERSON:
                 held = [e for e in self.person_inbox if not (unread and e.read_at)]
+                # a handed entry still owed → its addressee, whose own open question on the thread
+                # the person's reply would close and so refill the seat
+                handed = {e.id: s.id for s in self.sessions.values() for e in s.inbox if e.handed_entry and e.owes}
                 return {
                     "id": PERSON,
                     "entries": [
                         {
                             **e.to_dict(),
                             "from_role": mail.from_role(self._graph(), PERSON, e.from_, controllers=self._ctl),
+                            # on a handed entry's thread (TD-218): the Reply composer's line is `refill`
+                            "on_handed": e.open and e.kind == "ask" and handed.get(e.root) == e.from_,
                         }
                         for e in held
                     ],
