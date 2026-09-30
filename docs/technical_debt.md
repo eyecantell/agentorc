@@ -123,6 +123,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Designed 2026-09-28 — the build is TD-233 |
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Open — pickable |
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Open — pickable |
+| TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Open — design-first |
 
 
 ---
@@ -2413,3 +2414,19 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home with `ao team balance <team> --prs 1` and two open pull requests in the scratch repo, a member's `ao progress claim` is refused with the numbers, the card reads *over its line*, the manager's inbox holds one note, and closing one pull request clears the mark within a repo reading and rings the member.
 
 **Related:** TD-177 (the design), TD-176 (the numbers), TD-227 (rule 8, which gains the fifth bound when both are built; whichever lands second adds it), TD-093 (the reader and its bound), TD-100 (the usage gate, the precedent for a line a person sets).
+
+## TD-240: Whether a team has finished is the manager's judgement from memory, not a reading of its members' records
+
+**Priority:** Medium
+**Added:** 2026-09-29 (Paul: *I wanted to start it, saw there was no start choice, so hit "wind down"… now the team seems to be idle with no start button*; then: *seems like we should be able to check member states mechanically*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/briefs/manager.md` (*Out of work*: the manager decides every member is finished and winds the team down), design §4.9a (the wind-down, *finished means declared*), §4.5a **team groups** (*concluded*: every live session idle and declared, the manager included), the tick (`agent_tick.py`)
+
+**Why:** dc-grind sat live and idle from 2026-09-29 04:19Z. grinder-dc-1 had declared `out_of_work` (dev-cadence: 0 pickable, three entries on Paul's decisions), but manager-dc-1 never wound the team down. Its rounds read *continued quiet, grinder still interactive under Paul*, a belief two days old: Paul had made the grinder interactive on 2026-09-27, and the anchor restarted it unattended the same day, as its record's `unattended: true` said throughout. Because the manager never declared, the page's *concluded* test (every live session idle **and** declared, the manager among them) never held. So the card offered **Wind down**, not **Start**, and when Paul wanted to start the team he could only wind it down. Every fact the manager needed was on the records: each member's `unattended`, `state`, `out_of_work`. The manager read its memory instead. TD-199 is the same shape: a running member keeps what it knew at its start.
+
+**Fix:** design the team's *finished* as a reading the home makes, not a judgement a session keeps. Options: (a) the tick, which already derives *concluded* for the page, winds a team down itself when every member is finished and its seats are idle (a policy beside TD-214's rule 8, which restarts it when work arrives); (b) the manager's round reads `ao team status --json` (the members' `unattended`, `state`, `out_of_work`) every round and is told never to rely on an earlier round's reading; (c) the page's *concluded* stops requiring the manager's own declaration when every member has declared, and offers **Start** (which closes the concluded sessions first) then. The round may take more than one. Also: the team card's controls should say why Start is absent (*live: manager-dc-1 has not declared*). Done when a team whose members have all declared out of work reads concluded, or winds down, within a tick or a round, and a test covers a manager that has not declared.
+
+**Related:** TD-199 (a running member keeps its start brief), TD-214 (rule 8, a wound-down team gaining work), TD-213 (the wind-down's closes), TD-053 (wind-down), §4.9a, §4.5a **team groups**.
