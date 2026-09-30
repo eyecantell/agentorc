@@ -406,19 +406,30 @@ class WakeMixin:
         """The usage gate as it stands (design §4.7 `ao gate`, §6, TD-100): every profile with a
         reserve in this host's `settings.yml`, each reserve, and the line it makes now against the
         profile's last reading — `{profiles: {profile: {reserves, windows, labels}}}`, `labels`
-        being what the adapter reported (empty with no reading yet). A read: never gated."""
+        being what the adapter reported (empty with no reading yet). A read: never gated.
+
+        A profile with unattended sessions live is read as the gate reads it (`_gate_windows`): a
+        window past `usage.max_age` carries its projection (`projected`) or `unknown: "rate"`, and
+        `max_age` is the setting as kept (TD-233 slice 4). An idle profile's rows are its reading."""
         now = datetime.now(UTC)
-        doc = settings_mod.reserves(settings_mod.load())
+        whole = settings_mod.load()
+        doc = settings_mod.reserves(whole)
+        watched = {
+            s.profile
+            for s in self.sessions.values()
+            if s.unattended and s.state not in ("exited", "closed", "scheduled")
+        }
         out: dict[str, Any] = {}
         for prof, by_label in sorted(doc.items()):
             windows = (self._usage.get(prof) or {}).get("windows")
+            if prof in watched:
+                windows = self._gate_windows(prof, now, whole)
             out[prof] = {
                 "reserves": by_label,
                 "windows": settings_mod.lines(by_label, windows, now),
                 "labels": [str(w.get("label")) for w in windows or []],
             }
         # a metered profile's amounts (§6 *Usage gate*, TD-151 slice 5), as written, with the spend
-        whole = settings_mod.load()
         for prof, by_label in sorted(settings_mod.amounts(whole).items()):
             written = ((whole.get("usage_gate") or {}).get(prof)) or {}
             mine = {label: written[label] for label in by_label if label in written}
@@ -428,7 +439,8 @@ class WakeMixin:
                 "labels": list(spend_mod.LABELS),
                 "metered": True,
             }
-        return {"profiles": out, "file": str(settings_mod.settings_file())}
+        max_age = settings_mod.usage(whole).get("max_age", settings_mod.MAX_AGE_DEFAULT)
+        return {"profiles": out, "file": str(settings_mod.settings_file()), "max_age": max_age}
 
     async def rpc_settings(self, caller: Any = None) -> dict[str, Any]:
         """`ao settings` and the Settings page's read (design §5, §4.7, TD-146): the home's
@@ -450,6 +462,7 @@ class WakeMixin:
             "usage_gate": gate,
             "teams": teams,
             "repos": settings_mod.repos(doc),
+            "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             "person": settings_mod.person(doc),
             "migrate": [],
         }
@@ -466,6 +479,7 @@ class WakeMixin:
         teams: dict[str, Any] | None = None,
         repos: dict[str, Any] | None = None,
         person: dict[str, Any] | None = None,
+        usage: dict[str, Any] | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
         """Write the home's `settings.yml` (design §5, §4.7 `ao gate` / `ao team until` / `ao team
@@ -484,11 +498,13 @@ class WakeMixin:
           definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
         - `repos`: `{repo: {promote: {auto: bool}} | None}`.
         - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?}}`, a None
-          clearing that key (or that field of terminal or inbox)."""
+          clearing that key (or that field of terminal or inbox).
+        - `usage`: `{max_age: "1h" | "90m" | "off" | None}` (§6 *A reading the gate can no longer
+          trust*, TD-233), None clearing it back to the default hour."""
         if not mail.is_person(caller):
             raise RpcError("set_settings is a person's own: refused to a session (design §5 settings.yml)")
-        if reserves is None and teams is None and repos is None and person is None:
-            raise RpcError("set_settings needs reserves, teams, repos or person (design §5 settings.yml)")
+        if reserves is None and teams is None and repos is None and person is None and usage is None:
+            raise RpcError("set_settings needs reserves, teams, repos, person or usage (design §5 settings.yml)")
         doc = settings_mod.load()
         before_teams = settings_mod.teams(doc)
         out: dict[str, Any] = {}
@@ -528,7 +544,22 @@ class WakeMixin:
         if person is not None:
             doc["person"] = self._person_change(doc.get("person"), person)
             out["person"] = settings_mod.person(doc)
-        for key in ("teams", "repos", "person"):
+        if usage is not None:
+            if not isinstance(usage, dict) or not usage:
+                raise RpcError("set_settings: usage is {max_age: 1h | 90m | off | null} (design §5 settings.yml)")
+            if unknown := sorted(set(map(str, usage)) - set(settings_mod.USAGE_KEYS)):
+                raise RpcError(f"usage: unknown key {', '.join(unknown)} (known: {', '.join(settings_mod.USAGE_KEYS)})")
+            kept = dict(doc["usage"]) if isinstance(doc.get("usage"), dict) else {}
+            if usage["max_age"] is None:
+                kept.pop("max_age", None)
+            else:
+                try:
+                    kept["max_age"] = settings_mod.parse_max_age(usage["max_age"])
+                except ValueError as e:
+                    raise RpcError(f"usage.max_age: {e}") from None
+            doc["usage"] = kept
+            out["usage"] = {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)}
+        for key in ("teams", "repos", "person", "usage"):
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
@@ -540,7 +571,7 @@ class WakeMixin:
                     (before_teams.get(str(name)) or {}).get("until"),
                     (after.get(str(name)) or {}).get("until"),
                 )
-        held = [k for k in ("usage_gate", "teams", "repos", "person") if k in doc]
+        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
         return out

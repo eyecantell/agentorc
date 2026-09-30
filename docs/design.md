@@ -5987,13 +5987,13 @@ session is never woken by mail at all.
   next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a
   *definition* — what a team, a repo, a host or a profile *is* — stays in its own file above and
   below this bullet; a *setting* is a value the person turns without redefining anything, and every
-  such value lives here, under four keys (a fifth, `usage:`, with TD-233):
+  such value lives here, under five keys (`usage:`, the fifth, since TD-233 slice 4):
 
 ```yaml
 usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
   grind: {"5h": 30, week: {per_day: 10}}      # line 70% on the session window; 100 − 10 × days left on the weekly
   grind-api: {day: "$5", week: "$20"}        # a metered profile's reserve is an amount (§4.2a): the window's 100; "2M tok" without prices
-usage: {max_age: 1h}                          # §6 *A reading the gate can no longer trust* (TD-230; not built — TD-233): past it the gate projects; `off` never. A key of its own: every key under usage_gate is a profile's name
+usage: {max_age: 1h}                          # §6 *A reading the gate can no longer trust* (TD-230; read by the gate, set by set_settings — TD-233 slice 4; ao gate --max-age and the Settings field not built): past it the gate projects; `off` never. A key of its own: every key under usage_gate is a profile's name
 teams:                                        # per team, by the name org.yml or a repo's teams: defines
   ao-grind:
     schedule: {start: reset, profile: grind, window: week}   # §6 *Schedule* (TD-133)
@@ -6693,8 +6693,10 @@ teams:
   every window is back under its line — the windows being the **account's** reading (reported or asked, §4.4 *Usage*), the one poll
   every profile on that account shares (§4.2a, TD-122), read against this profile's own lines; a
   fetch failure never pauses — the last good reading stands, as the chip's does (§4.5a, TD-087).
-  **A reading the gate can no longer trust** (TD-230; designed 2026-09-28, not built — TD-233,
-  until when the sentence before this one is the whole rule). On 2026-09-28 the held reading
+  **A reading the gate can no longer trust** (TD-230; designed 2026-09-28, the host agent's
+  half built — TD-233 slice 4: `usage.project` is the one reader, `_gate_windows` asks it for
+  the gate's pass, `_profile_gated` and `gate`; `ao gate --max-age`, its *projected* print and
+  the Settings field are not built, so `max_age` is set by `set_settings` or by hand). On 2026-09-28 the held reading
   was six hours old at 88% with the line at 95% and the account at 93%: the gate saw no
   crossing because it could see nothing. A window's reading older than **`max_age`** (§5
   `usage.max_age`, one hour unless set; `off` for never) is **projected**, for a profile with
@@ -6704,21 +6706,28 @@ teams:
   lie inside the two hours before the newest, never below zero, and **no rate at all** unless
   they span twenty minutes. One reader gives the gate its number, a reading or a projection,
   and every policy that asks whether a profile is over its line asks that reader, so a
-  profile paused on a projection is not restarted or filled the next tick. **When the
+  profile paused on a projection is not restarted or filled the next tick. A window with no
+  age at all (never confirmed, on a reading with none) and a metered profile's spend are read
+  as they are. **When the
   projection reaches the line** — the profile's, less a team's reserve priority as ever —
   **the gate pauses as it pauses on a reading**, the mark saying which it was — *paused ·
   usage (projected week 96% ≥ 95%, last read 6h ago)* — and one `system` note tells the
-  person, FYI, *pausing on a projection: no reading of Claude · paul for 6h*. **A pause on a
+  person, FYI, *pausing on a projection: no reading of Claude · paul for 6h*, once per account
+  while a pause on a projection stands. **A pause on a
   projection ends** when a reading shows every window under its line (paused sessions
   report nothing, so that reading is the endpoint's, asked for as §4.4 says), when the
   window's `resets` passes, or when the person turns `max_age` off or moves a reserve so
-  that the projection no longer reaches the line; `RESUME_MIN` holds as for any resume. **A
+  that the projection no longer reaches the line; `RESUME_MIN` holds as for any resume. A
+  pause, on a projection or a reading, never ends because a window went unknown for want of a
+  rate: that is a reading growing older, not one under the line. **A
   window that is unknown pauses nothing**: past its reset, or with no rate to project by,
   the gate has no number (past its reset built — TD-233: the gate's rows carry `unknown:
   "reset"` beside the number last read, which `ao gate` prints as *week 5 → unknown since its
   reset (was 99%)* and the Settings card as *unknown since its reset*, and a pause on that window
   lifts once the reset passes), and one note says *usage unknown for 1h, n unattended sessions
-  working*, once per account per day and not at all with `max_age: off`. A profile with
+  working*, once per account per day and not at all with `max_age: off` — for a window past its
+  reset, once it has been so for `max_age`, since a session at work reports the new window
+  within a minute. A profile with
   nothing unattended live is never projected: an idle account's old reading harms nobody. The
   windows and their labels are the adapter's (§4.3, TD-073); the gate knows none of them by name.
   **The line is computed from a reserve, never typed as a percentage.** What a person keeps back is

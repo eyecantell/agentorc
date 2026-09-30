@@ -66,6 +66,7 @@ from sessionorc.agent_common import (
 from sessionorc.agent_spend import _metered_of
 from sessionorc.gitinfo import git_info
 from sessionorc.models import (
+    PERSON,
     SYSTEM,
     Pending,
     Session,
@@ -291,8 +292,7 @@ class TickMixin:
                     changed = True
                 continue
             by_label = self._gate_reserves(whole, s.profile)
-            reading = self._usage.get(s.profile) or {}
-            windows = reading.get("windows")
+            windows = self._gate_windows(s.profile, now, whole)
             if windows is None and by_label:
                 continue  # no reading: the last word stands, whatever it was (§6: a failure never gates)
             extra = settings_mod.team_extra(whole, s.team)
@@ -309,7 +309,16 @@ class TickMixin:
                     "resets": over["resets"],  # so a card can say *resets* when `next` is the reset
                     "sent_at": (s.gated or {}).get("sent_at"),
                     **({"team_extra": {"team": s.team, "n": extra}} if extra else {}),
+                    **({"projected": over["projected"]} if over.get("projected") else {}),
                 }
+                was = s.gated or {}
+                if (
+                    was.get("projected")
+                    and mark.get("projected")
+                    and (was.get("label"), was.get("line")) == (mark["label"], mark["line"])
+                    and abs(float(was.get("pct") or 0) - float(mark["pct"] or 0)) < 1
+                ):
+                    mark = was  # a projection grows by the second: rewrite the mark only as it moves a point
                 if mark != s.gated:
                     if not s.gated:
                         log.info("%s paused by the usage gate: %s %s %s%% >= %s%%", s.id, s.profile,
@@ -331,6 +340,8 @@ class TickMixin:
                 continue
             if now - _parse(s.gated["since"]) < RESUME_MIN:
                 continue
+            if any(row["label"] == s.gated.get("label") and row.get("unknown") == "rate" for row in rows):
+                continue  # §6: a pause ends on a reading, never on an old one that has no rate to project by
             if s.gated.get("sent_at") and s.resume_prompt:
                 if self._on_a_dialog(s):
                     continue
@@ -343,8 +354,90 @@ class TickMixin:
             s.gated = None
             self.store.save(s)
             changed = True
+        self._projection_notes(whole, now)
         if changed:
             await self._push_changes()
+
+    def _gate_windows(self, profile: str, now: datetime, whole: dict[str, Any]) -> list[dict[str, Any]] | None:
+        """The gate's **one reader** (§6 *A reading the gate can no longer trust*, TD-233 slice 4):
+        the profile's windows as the gate reads them — the reading, or past `usage.max_age` its
+        projection (`usage.project`) — which the gate's pass, `_profile_gated` and `gate` all ask, so
+        a profile paused on a projection is not restarted or filled the next tick. A metered
+        profile's windows are its spend, which does not age, and are never projected."""
+        reading = self._usage.get(profile) or {}
+        windows = reading.get("windows")
+        if windows is None or self._is_metered(profile):
+            return windows
+        return usage_mod.project(windows, now, settings_mod.max_age(whole), reading.get("fetched"))
+
+    def _projection_notes(self, whole: dict[str, Any], now: datetime) -> None:
+        """The person's two FYI notes on an old reading (§6 *A reading the gate can no longer
+        trust*): *pausing on a projection*, once per account while a pause on a projection stands,
+        and *usage unknown*, once per account per day, for a window with a reserve that is unknown
+        (no rate to project by, or past its reset for longer than `max_age`) while its unattended
+        sessions work. Neither under `max_age: off`."""
+        limit = settings_mod.max_age(whole)
+        if limit is None:
+            self._projection_noted.clear()
+            return
+        paused: dict[str, dict[str, Any]] = {}
+        unknown: dict[str, tuple[dict[str, Any], int]] = {}
+        for s in self.sessions.values():
+            if not s.unattended or s.state in ("exited", "closed", "scheduled"):
+                continue
+            name = self._usage_name(s.profile)
+            if (s.gated or {}).get("projected"):
+                paused.setdefault(name, s.gated)
+            if s.state != "working":
+                continue
+            by_label = self._gate_reserves(whole, s.profile) or {}
+            for row in settings_mod.lines(by_label, self._gate_windows(s.profile, now, whole), now):
+                gone = self._unknown_for(row, now)
+                if gone is not None and gone >= limit:
+                    got = unknown.get(name)
+                    unknown[name] = ({**row, "for": gone}, (got[1] if got else 0) + 1)
+                    break
+        for name in [n for n in self._projection_noted if n not in paused]:
+            self._projection_noted.discard(name)
+        for name, mark in paused.items():
+            if name in self._projection_noted:
+                continue
+            self._projection_noted.add(name)
+            pr = mark["projected"]
+            self._system_note(
+                PERSON,
+                f"pausing on a projection: no reading of {name} for {_span(pr['age'])} — projected "
+                f"{mark['label']} {mark['pct']:g}% ≥ {mark['line']}%, from {pr['from']}% at {pr['rate']:g} a hour. "
+                "The pause ends on a reading under the line, at the window's reset, or when max_age or a "
+                "reserve is moved (design §6 Usage gate).",
+            )
+        today = now.date().isoformat()
+        for name, (row, n) in unknown.items():
+            if self._unknown_noted.get(name) == today:
+                continue
+            self._unknown_noted[name] = today
+            self._system_note(
+                PERSON,
+                f"usage unknown for {_span(row['for'])}: {name} {row['label']} (was {row['pct']}%), "
+                f"{n} unattended session{'s' if n != 1 else ''} working — the gate cannot see this window, "
+                "so it pauses nothing on it (design §6 Usage gate).",
+            )
+
+    @staticmethod
+    def _unknown_for(row: dict[str, Any], now: datetime) -> float | None:
+        """How long, in seconds, a gate row has been unknown: its reading's age for `rate`, the
+        time since its reset for `reset`; None for a row the gate can read."""
+        if row.get("unknown") == "rate":
+            return float(row.get("age") or 0)
+        if row.get("unknown") == "reset" and (t := usage_mod._instant(row.get("resets"))) is not None:
+            return (now - t).total_seconds()
+        return None
+
+    def _usage_name(self, profile: str) -> str:
+        """The account's name as the chip prints it, *Claude · paul*, else the profile's own."""
+        reading = self._usage.get(profile) or {}
+        tool, account = reading.get("tool"), reading.get("account")
+        return f"{tool} · {account}" if tool and account else str(account or profile)
 
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
@@ -454,10 +547,10 @@ class TickMixin:
         restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates).
         `team` is the record's: its reserve priority lowers the line exactly as it does at the gate
         (TD-146), or a teamed member would be restarted at 65% and paused on the next tick."""
-        windows = (self._usage.get(profile) or {}).get("windows")
+        whole = settings_mod.load()
+        windows = self._gate_windows(profile, now, whole)
         if windows is None:
             return False
-        whole = settings_mod.load()
         by_label = self._gate_reserves(whole, profile) or {}
         extra = settings_mod.team_extra(whole, team)
         return settings_mod.crossed(settings_mod.lines(by_label, windows, now, extra)) is not None
@@ -1897,3 +1990,11 @@ class TickMixin:
             last.pop(sid, None)
         self._scrub(sid)
         self._gone.append(sid)
+
+
+def _span(seconds: float) -> str:
+    """An age as a person reads it: *40m*, *6h*, *2d*."""
+    m = int(seconds // 60)
+    if m < 120:
+        return f"{m}m"
+    return f"{m // 60}h" if m < 48 * 60 else f"{m // 1440}d"

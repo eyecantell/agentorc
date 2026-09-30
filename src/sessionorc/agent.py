@@ -366,6 +366,10 @@ class HostAgent(
         self._brief_task: asyncio.Task[None] | None = None
         self._brief_read_at = datetime.min.replace(tzinfo=UTC)
         self._brief_differs: dict[str, tuple[tuple[str, ...], datetime]] = {}
+        # §6 *A reading the gate can no longer trust* (TD-233 slice 4): the accounts told of a pause
+        # on a projection while it stands, and the day each was last told its usage is unknown
+        self._projection_noted: set[str] = set()
+        self._unknown_noted: dict[str, str] = {}
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
         # trust dialog case — takes the classifier's verdict at once (TD-015)

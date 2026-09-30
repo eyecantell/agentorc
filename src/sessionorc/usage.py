@@ -168,3 +168,63 @@ def asked_only_due(reading: dict[str, Any] | None, now: datetime, every: float, 
         if when is None or (now - when).total_seconds() >= every:
             return True
     return False
+
+
+# The projection (§6 *A reading the gate can no longer trust*, TD-233 slice 4): the rate is the rise
+# per hour between the oldest and the newest kept points inside RATE_SPAN before the newest, and there
+# is none unless they span RATE_MIN.
+RATE_SPAN = timedelta(hours=2)
+RATE_MIN = timedelta(minutes=20)
+
+
+def rate(window: dict[str, Any]) -> float | None:
+    """The window's rise in points per hour from its history, never below zero, or None when its
+    kept points inside `RATE_SPAN` span less than `RATE_MIN`."""
+    points = []
+    for h in window.get("history") or ():
+        if isinstance(h, dict) and (t := _instant(h.get("at"))) is not None and (p := _pct(h.get("pct"))) is not None:
+            points.append((t, p))
+    if not points:
+        return None
+    points.sort()
+    newest = points[-1]
+    inside = [pt for pt in points if newest[0] - pt[0] <= RATE_SPAN]
+    oldest = inside[0]
+    span = newest[0] - oldest[0]
+    if span < RATE_MIN:
+        return None
+    return max(0.0, (newest[1] - oldest[1]) / (span.total_seconds() / 3600))
+
+
+def project(
+    windows: list[dict[str, Any]] | None, now: datetime, max_age: float | None, fetched: Any = None
+) -> list[dict[str, Any]] | None:
+    """The gate's one reader (§6 *A reading the gate can no longer trust*): each window as the gate
+    reads it. A window confirmed within `max_age` seconds (its own `at`, else the reading's
+    `fetched`), one with no age at all, one past its reset (`settings.lines` marks it unknown) and
+    every window under `max_age` None (`off`) are the reading itself. An older one is **projected**
+    — the held percentage plus its `rate` times its age, at most 100 — and carries `projected:
+    {from, rate, age}` (the age in seconds); with no rate it is `unknown: "rate"` and carries `age`."""
+    if windows is None or max_age is None:
+        return windows
+    out = []
+    for w in windows:
+        at = _instant(w.get("at")) or _instant(fetched)
+        resets = _instant(w.get("resets"))
+        held = _pct(w.get("pct"))
+        if at is None or held is None or (resets is not None and resets <= now):
+            out.append(w)
+            continue
+        age = (now - at).total_seconds()
+        if age <= max_age:
+            out.append(w)
+            continue
+        r = rate(w)
+        if r is None:
+            out.append({**w, "unknown": "rate", "age": round(age)})
+            continue
+        pct = min(100.0, held + r * age / 3600)
+        out.append(
+            {**w, "pct": round(pct, 1), "projected": {"from": w.get("pct"), "rate": round(r, 2), "age": round(age)}}
+        )
+    return out
