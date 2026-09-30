@@ -947,6 +947,16 @@ class MailMixin:
                         }
                         for e in held
                     ],
+                    # work the person handed a session (§4.10 *An entry handed to a seat*, TD-218 slice 3):
+                    # its one copy is the holder's, so the person's read lists it beside the inbox —
+                    # while it owes its outcome, or came back `blocked` — for the row under *Waiting on
+                    # them*; Dismiss names its id, and its outcome is written on that copy
+                    "handed": [
+                        {**e.to_dict(), "holder": addr, "holder_name": r.name, "holder_state": r.state}
+                        for addr, r in self._graph().items()
+                        for e in r.inbox
+                        if e.handed_entry and (e.owes or (e.outcome or {}).get("state") == "blocked")
+                    ],
                     "threads": {},
                     "sends": [],
                     "unread": sum(1 for e in self.person_inbox if not e.read_at),

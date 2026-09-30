@@ -285,12 +285,16 @@ async def test_the_persons_dismiss_ends_a_handed_entry_and_tells_the_seat(agent,
     async with LocalClient() as person:
         sid = await _seat_with_entry(person, agent, tmp_path)
         rec = agent.sessions[sid]
+        listed = (await person.call("inbox"))["handed"]
+        assert [(e["id"], e["holder"], e["holder_name"]) for e in listed] == [("m-entry", sid, "tl")]
+        assert all(e["id"] != "m-entry" for e in (await person.call("inbox"))["entries"]), "one copy: the seat's"
         got = await person.call("inbox_dismiss", msg=["m-entry"])
         assert got["dismissed"] == ["m-entry"]
         e = next(x for x in rec.inbox if x.id == "m-entry")
         assert e.outcome["state"] == "dismissed" and not e.owes and rec.asks_waiting() == 0
         assert any(x.from_ == "system" and "dismissed m-entry" in x.text for x in rec.inbox)
         assert (await person.call("inbox_dismiss", msg=["m-entry"]))["skipped"] == ["m-entry"]
+        assert (await person.call("inbox"))["handed"] == [], "settled: no row waits on it"
         await person.call("kill", id=sid)
 
 
