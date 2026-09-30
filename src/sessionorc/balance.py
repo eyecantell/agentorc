@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 REVIEW_BOUND = timedelta(hours=2)  # §6 *Balance*: the queue's bound where no live member carries one
+FLAP = timedelta(minutes=10)  # §6 *Balance*: a mark that comes and goes inside this tells once
+CLEAR = "the line is clear again: pick as your lane says (design §6 *Balance*)"  # the ring of a refused member
 
 
 def _when(text: Any) -> datetime | None:
@@ -107,16 +109,40 @@ def _line_words(c: dict[str, Any]) -> str:
     return f"{c.get('line')} {v}, the line is {lim}"
 
 
+def _since(mark: dict[str, Any]) -> str:
+    """The mark's `since` in the home's clock, the weekday before it when it is not today."""
+    if (at := _when(mark.get("since"))) is None:
+        return ""
+    at = at.astimezone()
+    day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
+    return f"{day}{at:%H:%M}"
+
+
+def _lines(mark: dict[str, Any]) -> str:
+    return "; ".join(_line_words(c) for c in mark.get("crossed") or [] if isinstance(c, dict))
+
+
+def crossing(team: str, mark: dict[str, Any]) -> str:
+    """The `system` note a crossing sends the team's manager and the person (design §6 *Balance*):
+    what crossed, in the mark's numbers, and what it means — neither crashed nor finished."""
+    since = _since(mark)
+    return (
+        f"{team} is over its line{f' since {since}' if since else ''}: {_lines(mark)} — its members take no new "
+        "claim until it clears; work in hand goes on, and nobody is crashed or finished (design §6 *Balance*)"
+    )
+
+
+def clearing(team: str, mark: dict[str, Any] | None) -> str:
+    """The note the clearing sends the same two: the line is clear, and since when it was over."""
+    over = f" (over since {since})" if (since := _since(mark or {})) else ""
+    return f"{team} is under its line again{over}: its members claim as their lanes say"
+
+
 def refusal(team: str, mark: dict[str, Any]) -> str:
     """The words a refused claim — and a refused `none` — answers with (design §6 *Balance*), in the
     mark's own numbers and its `since` in the home's clock."""
-    lines = "; ".join(_line_words(c) for c in mark.get("crossed") or [] if isinstance(c, dict))
-    since = ""
-    if (at := _when(mark.get("since"))) is not None:
-        at = at.astimezone()
-        day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
-        since = f" (since {day}{at:%H:%M})"
+    since = f" (since {s})" if (s := _since(mark)) else ""
     return (
-        f"{team} is over its line: {lines}{since}. Take nothing new: finish, rebase or answer what is open "
+        f"{team} is over its line: {_lines(mark)}{since}. Take nothing new: finish, rebase or answer what is open "
         "of yours, then end your turn — you are told when the line clears (design §6 *Balance*)"
     )

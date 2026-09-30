@@ -6027,7 +6027,7 @@ teams:                                        # per team, by the name org.yml or
     until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
     reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
     on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
-    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; the setting, the mark and the refusal built — TD-239): over any of these the team's members take no new claim; absent, no rule
+    balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; the setting, the mark, the refusal and the notes built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
   agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
 person:                                       # the person's own — nothing here reaches a policy
@@ -6858,7 +6858,7 @@ teams:
 - **Balance: a team over its line takes no new work** (TD-177; Paul, 2026-09-25: *if I want to
   make sure the team is balanced, I can make sure the PR count is not growing too much — the
   grinders outpacing the techlead*; designed 2026-09-29; the setting and the mark built — TD-239
-  slice 1 — and the refusal, slice 2; the notes, what a person sees and rule 8's fifth bound not yet). The numbers came
+  slice 1 — the refusal, slice 2, and the notes, slice 3; what a person sees and rule 8's fifth bound not yet). The numbers came
   first (§4.4 *Repo facts*, the team card and the Repo page, TD-176), and the rule keys on
   exactly those, so what trips it is what a person has been watching. It is **off until a
   person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team
@@ -6907,30 +6907,45 @@ teams:
   5: policies leave those alone). **A refused member is not out of work**: `ao progress none`
   is refused to it while the mark stands, in the same words, so a team over its line idles
   and never winds down on it. A refusal, of a claim or of `none`, is kept on the record as
-  **`balance_refused: {at, ref}`** (`ref` null for `none`), so the clearing can ring it; a claim
+  **`balance_refused: {at, ref}`** (`ref` null for `none`) — only when the member itself asked;
+  a person's `--id` claim on its record is refused alike and leaves nothing to ring — so the clearing can ring it; a claim
   or a `none` taken once the mark has gone removes it. While the mark stands the idle nudge and rule 6's lane
   news pass a record carrying it by — an entry left untold is told once the line clears —
   and rule 8 holds a start back with *its repo is over its line* as a fifth bound. Never a
   pause, never a wrap-up, never a kill: work in hand goes on, which is what clears the line.
 
   **Who is told**, once per crossing and once when it clears — a mark that comes and goes
-  inside ten minutes tells once, not each time — by `system` note: the team's
+  inside ten minutes tells once, not each time: a crossing within ten minutes of the last note
+  of either kind is told only once it has stood until those ten minutes are up — by `system` note: the team's
   **manager** (the controller its members share), which logs the line in its round — *14:02
   over the line: 9 open PRs, line 8; no new claims until it clears* — and does nothing else, since
   its members are neither crashed nor finished; and the **person**, FYI and uncounted. **The
   techlead is asked by what already asks it**: every pull request in the reader's queue is an
   `ask` on the seat, which the tick fills for a seat whose trigger is `asks` (rule 3), so a crossing of `review`
   needs no second message, and a crossing of `prs` or `oldest` with nothing in the queue is
-  not the reader's to cure. When the mark goes, each member whose claim was refused is rung
-  with *the line is clear again: pick as your lane says*, within its wake budget.
+  not the reader's to cure. What was last told is kept beside the mark, **`balance_told: {state,
+  at, since}`** on the same team entry of the `host` record (`over` or `clear`, when the last note
+  was sent, the mark's `since`), so a restart of the home tells nothing twice; it goes ten
+  minutes after a clearing, and at once when the team has no live member — a team that wound
+  down loses its mark with nobody to tell, and neither the manager nor the person is sent a
+  clearing. The manager is the controller the team's unattended, non-seat members share, read
+  from those that control no teammate, each address in the home's form (a node's member's is `id@host`); a team a person leads has none, and only the person is told.
+  When the mark goes, each member whose claim was refused is rung
+  with *the line is clear again: pick as your lane says*, within its wake budget, and its
+  `balance_refused` removed — an exited one's is removed with nothing sent.
 
   **What a person sees**: the team card's **over its line** note (§4.5a) and the same words
   in `ao team list` and `ao repo`; the Repo facet's numbers are the evidence, unchanged. **The
   designer's pull requests count**: one waiting on a steer's bound is open, so a team whose
   designer holds several for a night reaches `prs` sooner, and `n` is set with that in mind;
   the default the page offers when the rule is first turned on is `prs: 10`, `oldest: 2d`,
-  `review: true`. Not on a node: the mark is the home's and a claim made at a node's agent is
-  not checked against it; it waits for the node's replica of the mark, as rule 4 waits.
+  `review: true`. **A node's member is checked too**: a claim is a report, which its node
+  forwards to the home (§4.4a), so the home refuses it against its own mark, and on the clearing its note
+  lands in the home's copy of its record, read at its next forwarded `inbox` or `wait`: an idle
+  member on a node has no doorbell yet (§4.4a *The doorbell is the forwarded `wait`*), so it
+  learns of the clearing when something else has it read its inbox — its manager, told of the
+  clearing, is the one to look (TD-057). A node cut off from the home refuses every report,
+  so nothing is claimed unchecked.
 
 ## 7. Phases
 

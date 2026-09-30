@@ -1394,10 +1394,14 @@ class TickMixin:
             try:
                 rec = teams.get(team) or {}
                 old = rec.get("balance")
-                new = self._balance_mark(old, (settings.get(team) or {}).get("balance"), live.get(team) or [], now)
+                members = live.get(team) or []
+                new = self._balance_mark(old, (settings.get(team) or {}).get("balance"), members, now)
                 if new is ...:
                     continue  # could not look: the mark stands as it was, or stays absent
-                if new == old:
+                if new is None:
+                    self._balance_ring(team)
+                told = self._balance_tell(team, rec, new, members, now)
+                if new == old and not told:
                     continue
                 dirty = True
                 touched |= {m["repo"] for m in (old, new) if isinstance(m, dict) and m.get("repo")}
@@ -1419,6 +1423,62 @@ class TickMixin:
             log.exception("writing the home's host record failed")
         for root in sorted(touched):
             await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+
+    def _balance_tell(
+        self, team: str, rec: dict[str, Any], mark: dict[str, Any] | None, members: list[Session], now: datetime
+    ) -> bool:
+        """Design §6 *Balance*, *Who is told*: one `system` note to the team's manager and one to the
+        person on a crossing, and the same pair when it clears. What was last told is kept on the team's
+        `host` record (`balance_told: {state, at, since}`, `at` the last note of either kind), so a restart
+        tells nothing twice; a crossing inside `FLAP` of the last note waits until it is that far from
+        it, so a mark that comes and goes tells one pair. A team that wound down loses its mark with
+        nobody to tell, and its memory with it. True when `rec` changed."""
+        told = rec.get("balance_told") if isinstance(rec.get("balance_told"), dict) else {}
+        if not members:
+            return rec.pop("balance_told", None) is not None
+        at = _parse(told["at"]) if told.get("at") else None  # when the last note was sent, either kind
+        sent = now.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")  # the tick's clock
+        if mark is not None:
+            if told.get("state") == "over" or (at is not None and now - at < balance_mod.FLAP):
+                return False
+            text, told = (
+                balance_mod.crossing(team, mark),
+                {"state": "over", "at": sent, "since": mark.get("since")},
+            )
+        elif told.get("state") == "over":
+            text, told = balance_mod.clearing(team, told), {**told, "state": "clear", "at": sent}
+        elif told and (at is None or now - at >= balance_mod.FLAP):
+            return rec.pop("balance_told", None) is not None  # the flap window is over: nothing left to hold
+        else:
+            return False
+        for lead in self._balance_leads(members):
+            self._system_note(lead, text)
+        self._system_note(PERSON, text)
+        rec["balance_told"] = told  # after the notes: one that raised is sent again next tick
+        log.info("balance: %s", text)
+        return True
+
+    def _balance_leads(self, members: list[Session]) -> list[str]:
+        """The controllers the team's members share — its manager (§6 *Balance*) — read from the members
+        the rule refuses (unattended, no seat) that control no teammate; none when a person leads."""
+        leads = {c for m in members for c in self._ctl(m)}  # in the home's form: a node's member is `id@host`
+        sets = [set(self._ctl(m)) for m in members if self._address(m) not in leads and m.unattended and m.seat is None]
+        return sorted(set.intersection(*sets)) if sets else []
+
+    def _balance_ring(self, team: str) -> None:
+        """The mark went: each live member refused while it stood is rung, once, within its wake budget
+        (§6 *Balance*), and the field that held it back from the nudge and the lane news goes. A node's
+        member is refused at the home, so its record here carries the field and the note lands in the
+        home's copy of it, read at its next forwarded `inbox` or `wait`: nothing rings a node's idle
+        member yet (§4.4a, TD-057)."""
+        for s in self._graph().values():
+            if s.team != team or not s.balance_refused:
+                continue
+            s.balance_refused = None
+            if s.state in ("exited", "closed"):
+                self._save(s)
+                continue
+            self._system_note(self._address(s), balance_mod.CLEAR)  # saves the record
 
     def _balance_mark(
         self, old: Any, bal: dict[str, Any] | None, members: list[Session], now: datetime
