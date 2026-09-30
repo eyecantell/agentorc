@@ -13,8 +13,9 @@ promote:
 # The ao-grind team, defined in the repo it works (design §4.9 *The org is an aggregate*; TD-229
 # slice 2): the org file's definition as it stood on 2026-09-30, the names, lanes, briefs and
 # techlead seat unchanged. While `~/.agentorc/org.yml` still defines `ao-grind` it wins the name and
-# this one reads *shadowed by org.yml*, so nothing that runs changes; removing the team from the org
-# file is the switch. The profiles stay the org file's `roles:` overlay (the install's word), and
+# this one reads *shadowed by org.yml*, so no team start changes; removing the team from the org
+# file is the switch. The roles below equal the org overlay's `review:`; read without the overlay (the
+# New session form's role list) `designer` is now a role of this repo, where it was unknown. The profiles stay the org file's `roles:` overlay (the install's word), and
 # no `host:` — where a repo's team lands is the org's `place:`.
 teams:
   ao-grind:
