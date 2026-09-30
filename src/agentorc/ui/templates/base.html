@@ -98,7 +98,8 @@
 {#- design §4.5a **Add entry…** and the *Add entry form* (§4.9 *Add an entry to the ledger*, TD-219): one
     form from the Repo page and the team card's Repo facet, the repo fixed by the press and shown;
     **What** and **Type**, nothing else. **Open a session** starts the entry session; the page writes
-    no file. **Hand to the techlead** comes with TD-218 (slice 4). Filled by the script. -#}
+    no file. **Hand to the techlead** (TD-219 slice 4) sends the words to `entry_add`; disabled with its
+    reason where no team or no seat takes it, and while **What** is empty. Filled by the script. -#}
 <dialog id="entrydlg" class="card pad maildlg" aria-labelledby="entryhead">
   <form method="dialog" class="col gap">
     <div class="row gap"><span class="h2" id="entryhead">Add an entry to the ledger</span><span class="grow"></span><button class="btn sm ghost" value="close">Close</button></div>
@@ -109,7 +110,10 @@
       <label><input type="radio" name="entrytype" value="debt" checked> debt <span class="meta">something wrong now</span></label>
       <label><input type="radio" name="entrytype" value="feature"> feature <span class="meta">something new</span></label>
     </div>
-    <div class="col gap"><div class="row gap"><button class="btn primary" type="button" id="entrygo">Open a session</button></div>
+    <div class="col gap"><div class="row gap wrap"><button class="btn primary" type="button" id="entryhand" disabled>Hand to the techlead</button>
+        <span class="mono" id="entryseat"></span><span class="meta" id="entryhandwhat">drafts the entry and lands it by PR. Its questions come to your Inbox; the entry's id and PR come back as the outcome.</span></div>
+      <span class="meta" id="entrywhen"></span></div>
+    <div class="col gap"><div class="row gap"><button class="btn" type="button" id="entrygo">Open a session</button></div>
       <span class="meta" id="entryline"></span></div>
     <p class="note warn" id="entryerr" hidden></p>
   </form>

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from agentorc import org as orgmod
-from agentorc import repoconfig, teamrun
+from agentorc import repoconfig, teamrun, teams
+from sessionorc import mail
 from sessionorc.models import (
     has_control,
 )
@@ -44,6 +46,43 @@ def entry_composer(repo: str, type_: str, ledger: str, words: str) -> str:
     repo, the type and the ledger filled, then the person's words — or the lines alone."""
     head = repoconfig.entry_text(repo, type_, ledger)
     return f"{head}\n\n{words.strip()}" if words.strip() else head
+
+
+def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
+    """The teams that service the checkout `root` on `host`, in definition order, each `{team,
+    seat, name}` — `seat` the id its techlead takes (`teams.seat_id`), empty where it defines none,
+    and `name` that seat's name — which is what `entry_add` is handed (TD-218: the host agent does
+    not read `org.yml`). The first is the one **Hand to the techlead** hands to, as `repo_teams`
+    gives a repo its first team's badge."""
+    out = []
+    for tname, t in org.teams.items():
+        paths = {
+            str(Path(path).expanduser().resolve())
+            for pname in t.projects
+            for by in (org.projects[pname].repos.values() if pname in org.projects else ())
+            if (path := by.get(host))
+        }
+        if root in paths:
+            seat = teams.seat_id(org, t, t.host or host, host)
+            out.append({"team": tname, "seat": seat, "name": t.techlead.name if seat and t.techlead else ""})
+    return out
+
+
+def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, Any]], now: datetime) -> dict[str, str]:
+    """**Hand to the techlead**'s state on the Add entry form (§4.5a): `{team, to, name, why, line}`.
+    `why` is the reason the button is disabled — *no team services this repo*, *this team has no
+    techlead seat* — else empty; `line` is §4.10's *When it is read* for an `ask` with no bound, the
+    sentence the Message composer draws: the seat's record's own (`refill`, the agent's sentence for
+    what fills a seat as an `ask` does), or a seat nobody fills where there is no record."""
+    if not servicing:
+        return {"team": "", "to": "", "name": "", "why": "no team services this repo", "line": ""}
+    first = servicing[0]
+    if not first.get("seat"):
+        return {"team": first["team"], "to": "", "name": "", "why": "this team has no techlead seat", "line": ""}
+    rw = (records.get(first["seat"]) or {}).get("read_when")
+    line = rw.get("refill") if isinstance(rw, dict) and rw.get("refill") else ""
+    line = line or mail.read_when(None, "ask", now, seat=True, lapses=False)
+    return {"team": first["team"], "to": first["seat"], "name": first["name"], "why": "", "line": line}
 
 
 # -- the Repo page (design §4.5 screen 11, TD-176 slice 5) -------------------------------------------
