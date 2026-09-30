@@ -28,9 +28,14 @@ def _tracked(home: Path) -> set[str]:
 
 
 async def _committed(agent) -> None:
-    """The commit after `set_settings` runs detached (`_bg`): wait for it."""
-    while agent._bg:
-        await asyncio.gather(*list(agent._bg), return_exceptions=True)
+    """The commit after `set_settings` runs detached (`_bg`): wait for it, bounded, so a task that
+    is not a commit fails the test rather than hanging it."""
+
+    async def drained() -> None:
+        while agent._bg:
+            await asyncio.gather(*list(agent._bg), return_exceptions=True)
+
+    await asyncio.wait_for(drained(), 15)
 
 
 def test_init_tracks_the_three_files_and_ignores_the_rest(tmp_path):
