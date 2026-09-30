@@ -2424,4 +2424,4 @@ Both go away only when the record says who closed it.
 
 **Why:** the test failed on `main` when the suite ran within an hour of local midnight, and passed otherwise; a flaky test in the gate costs every PR a rerun. Reproduced at 23:30 MDT on 2026-09-29, at `test_spend.py:199`: after the pause at the day's amount the test ran the gate again at `now + timedelta(hours=1)` (*a restart of the home*), and a day window is the home's local day (§4.2a), so that instant was past the window's reset and the pause was lifted.
 
-**Resolved:** 2026-09-29 (PR #NNN, grinder-ao-1) — the second gate runs a second later, not an hour: the restart needs a later instant, not a later day. The test passes at 23:31 local, where it had failed a minute before.
+**Resolved:** 2026-09-29 (PR #787, grinder-ao-1) — the second gate runs a second later, not an hour: the restart needs a later instant, not a later day. The test passes at 23:31 local, where it had failed a minute before.
