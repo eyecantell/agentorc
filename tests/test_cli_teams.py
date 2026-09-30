@@ -495,6 +495,12 @@ def test_the_org_is_one_aggregate_of_the_registered_checkouts(world, capsys, mon
 
     org, notes = orgmod.with_repos(orgmod.load(), cli.hosts.local_host().repos())
     assert "twice" not in org.teams and any("defined twice" in n for n in notes)
+    # one checkout written twice in the registry is one repo, not a name defined twice against itself
+    reg = tmp_path / "home" / "repos.txt"
+    reg.write_text(f"{tmp_path / 'agentorc'}\n{tmp_path / 'agentorc'}/\n")
+    org, notes = orgmod.with_repos(orgmod.load(), cli.hosts.local_host().repos())
+    assert "twice" in org.teams and not org.refused and notes == []
+    reg.write_text("".join(f"{tmp_path / r}\n" for r in ("agentorc", "ao-api")))
     # spanning, placing and nesting are the org file's: the repo is skipped and named
     for bad, key in (
         ({"projects": ["ao"]}, "projects"),

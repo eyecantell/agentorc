@@ -1424,6 +1424,8 @@ def _defined_team(args: argparse.Namespace) -> str:
     """The team `args.name` names, checked against the org's definitions here — the agent takes the
     key as given (design §4.7): a team the org does not define is refused, naming the defined ones."""
     org = _org_here()
+    if args.name in org.refused:  # two repos define it (§4.9 *Names are the org's*): say why, not "no team"
+        raise AgentError(org.refused[args.name])
     if args.name not in org.teams:
         raise AgentError(
             f"no team {args.name!r}: the org defines {', '.join(sorted(org.teams)) or 'none'} (design §4.9)"

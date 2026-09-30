@@ -279,7 +279,12 @@ def with_repos(org: Org, roots: Collection[Path | str]) -> tuple[Org, list[str]]
     returned notes — one broken file must not empty the page or `ao team list`."""
     notes: list[str] = []
     found: list[tuple[repoconfig.RepoConfig, dict[str, Any]]] = []
+    seen: set[Path] = set()
     for root in roots:
+        where = Path(root).expanduser().resolve()
+        if where in seen:  # one checkout written twice (a trailing slash, a symlink) is one repo, not two
+            continue
+        seen.add(where)
         try:
             cfg = repoconfig.load(Path(root).expanduser())
         except (OSError, ValueError) as e:
