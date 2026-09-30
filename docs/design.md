@@ -529,14 +529,15 @@ class Adapter(Protocol):
                                                           # a per-model one labelled by the adapter with the model
                                                           # (`week · Fable`), so the chip's worst-window rule sees it
     def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
-    def usage_report(self, payload: dict) -> list[dict] | None
-                                                          # optional (TD-231; the host agent's RPC built, the adapter's not — TD-233): the windows a session of the
+    def usage_report(payload: dict) -> dict | None       # optional (TD-231, TD-233): the windows a session of the
                                                           # tool was told, read from what its hook command was handed —
-                                                          # {windows: [{label, pct, resets}], fresh}: the labels `usage` gives
-                                                          # the same windows, pct to one decimal, resets an instant, `fresh`
-                                                          # whether the session had a response since its last report;
-                                                          # None when the payload carries none. Claude Code: the status line's
-                                                          # `rate_limits` (`5h`, `week`); a per-model window is not in it and
+                                                          # {windows: [{label, pct, resets}], work, sid}: the labels `usage` gives
+                                                          # the same windows, pct to one decimal, resets an instant, `work`
+                                                          # the session's running total of API work and `sid` whose, from which
+                                                          # the command sets the RPC's `fresh`: whether the session had a
+                                                          # response since its last report; None when the payload carries none.
+                                                          # Claude Code: the status line's `rate_limits` (`5h`, `week`) and
+                                                          # `cost.total_api_duration_ms`; a per-model window is not in it and
                                                           # is read only when the endpoint is asked (§4.4 *Usage*)
     def account_for(self, profile: str) -> str | None     # optional: the account a profile runs under, which the core keys
                                                           # the usage poll, its cache and its back-off on (§4.2a, TD-122);
@@ -727,11 +728,10 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   the reads run.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
 - Usage, **reported first and asked for last** (TD-231, TD-230; designed 2026-09-28, partly
-  built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the host
-  agent's side of the report — the `usage_report` RPC, the merge, the history and the hourly ask
-  for an endpoint-only window — is slice 2's first half; the status-line command that sends it and
-  a node's report to the home are not built, so until then the poll described after this
-  paragraph is the one source). The usage
+  built — TD-233: the endpoint's on-demand cadence and cool-off below are slice 3; the report,
+  the merge, the history and the hourly ask for an endpoint-only window are slice 2; a node's
+  report to the home is not built, so a node's sessions are read by the poll described after
+  this paragraph alone). The usage
   endpoint is no documented interface, and on 2026-09-28 it refused every poll for six hours
   though agentorc asked once per account: the tool's own clients read it too, and its refusals
   carry no usable `Retry-After`. What a session of the tool is *told* about its limits is
@@ -807,8 +807,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   against a five-hour window while spending an allowance the tool itself shares (TD-087), and
   four profiles on one account asking four times is how the endpoint came to answer
   `rate_limited` to all of them. The ask for a window only the endpoint gives, once an hour under
-  a fresh report, waits for the report (slice 2). `limited` is read from the
-  same poll, so a session at its cap may show it up to fifteen minutes late; the pane's own limit
+  a fresh report, is `asked_only_due`'s. `limited` is read from the account's reading, so
+  while nothing reports a session at its cap may show it up to fifteen minutes late; the pane's own limit
   message marks it within a tick regardless (§4.2). The last answer is cached **per account** and
   served by `usage` under every profile that shares it — the same windows, `fetched`, `reason`
   and back-off on each — streamed as a `usage` event for the top bar's per-account chip, and drives the `limited` rule
