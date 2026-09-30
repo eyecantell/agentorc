@@ -1700,18 +1700,28 @@ class TickMixin:
             self.usage_store.save(self._usage)  # once for the batch: the file is whole either way
         # Only profiles a live session is running under are shown (TD-073, Paul 2026-09-19): one
         # account in use is one chip, and last night's profile does not sit in the top bar all day.
-        for key in [k for k in self._usage_acct if k not in groups]:
+        # a node's account is kept while its session lives, shown or not (a profile a session here
+        # runs under, or one a second node keys to another account), since the home sends it back
+        keyed = {k for (h, p), k in self._usage_remote_keys.items()}
+        for key in [k for k in self._usage_acct if k not in groups and k not in keyed]:
             self._usage_acct.pop(key, None)
             self._usage_checked.pop(key, None)
             self._usage_wait.pop(key, None)
             self._usage_only_at.pop(key, None)
-        shown = {p for profs in groups.values() for p in profs} | metered
+        # …and a node's profile, restored from `usage.json` at the start and not keyed since, keeps
+        # what it held while a live session of a node runs under it: its first report is merged onto
+        # it (`_usage_seed`). Only until then — a profile keyed or dropped once is shown by the rule.
+        self._usage_restored -= {p for _, p in self._usage_remote_keys}
+        waiting = {s.profile for s in self._usage_remote_live()} & self._usage_restored
+        shown = {p for profs in groups.values() for p in profs} | metered | waiting
         if dropped := [p for p in self._usage if p not in shown]:
             for prof in dropped:
                 self._usage.pop(prof, None)
+                self._usage_restored.discard(prof)
                 await self._broadcast({"event": "usage", "profile": prof, "usage": None})
             self.usage_store.save(self._usage)
         self._usage_limits(live, metered)
+        await self._push_usage_readings()
 
     def _usage_limits(self, live: list[Session], metered: set[str]) -> None:
         """The `limited` rule over the readings `_usage` holds (§4.2), for the poll and for a report
@@ -1776,17 +1786,19 @@ class TickMixin:
             return False
         return 0 <= age < agent_common.USAGE_FRESH
 
-    def _usage_seed(self, key: str, profs: list[str]) -> None:
+    def _usage_seed(self, key: str, profs: list[str], strict: bool = False) -> None:
         """An account the poll has not met since the agent started takes its reading, and its
         poll's allowance, from the newest reading its profiles hold (TD-087, TD-122): a restart
         keeps the chip and does not ask sooner than `fetched + USAGE_FRESH`. A reading with no
-        readable time is polled at once."""
+        readable time is polled at once. `strict`, for a node's account: a held reading that
+        names no account is not taken, since the profile's name here may be another login's."""
         # only a reading of this account: a node's profile can change hands between two accounts
         account = key.split(":", 1)[-1]
         held = [
             r
             for p in profs
-            if isinstance(r := self._usage.get(p), dict) and str(r.get("account") or account) == account
+            if isinstance(r := self._usage.get(p), dict)
+            and str(r.get("account") or ("" if strict else account)) == account
         ]
         if key not in self._usage_acct and held:
             newest = max(held, key=lambda r: str(r.get("fetched") or ""))

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import (
+    adapters,
     agent_common,
     containers,
     hosts,
@@ -22,6 +23,7 @@ from sessionorc import (
     naming,
 )
 from sessionorc import settings as settings_mod
+from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
     HOME_EDITS,
@@ -32,6 +34,7 @@ from sessionorc.agent_common import (
     RpcError,
     _drop_unknown,
     _urgent,
+    _usage_key,
     log,
     read_checkout,
 )
@@ -272,6 +275,9 @@ class LinkMixin:
         if method == "usage":
             self._take_usage(params)
             return None
+        if method == "usage_reading":
+            await self._take_usage_reading(params)
+            return None
         if method == "files":
             try:
                 return await asyncio.wait_for(
@@ -368,6 +374,36 @@ class LinkMixin:
                 self.store.save(s)
                 changed = True
         if changed:
+            await self._push_changes()
+
+    async def _take_usage_reading(self, params: dict[str, Any]) -> None:
+        """`usage_reading {account, reading}` from the home (§4.4 *A node's sessions report to their
+        node*): the account's reading as every host's reports made it, taken into this node's by
+        `usage.adopt` — each window the home confirmed later, or saw roll, is the home's — for an
+        account one of this node's live tool sessions is keyed to, and nothing else. Its age is
+        the one this node's fallback and gate read, so an idle node on an account another host's
+        sessions report through is not asked for."""
+        key, reading = str(params.get("account") or ""), params.get("reading")
+        if self.mode != "node" or not key or not isinstance(reading, dict):
+            return
+        profs = sorted(
+            {
+                s.profile
+                for s in self._usage_live()
+                if s.profile not in self._metered
+                and getattr(ad := adapters.get(s.adapter), "usage_for", None)
+                and _usage_key(ad, s.adapter, s.profile)[0] == key
+            }
+        )
+        if not profs:
+            return
+        self._usage_seed(key, profs)
+        was = self._usage_acct.get(key)
+        merged = usage_mod.adopt(was, reading)
+        if merged != was:
+            self._usage_acct[key] = merged
+            await self._usage_spread(key)
+            self._usage_limits(self._usage_live(), self._metered)
             await self._push_changes()
 
     def _forward_usage_report(self, s: Session, key: str, windows: list[dict[str, Any]], fresh: bool) -> None:

@@ -311,19 +311,23 @@ class WakeMixin:
         if s.adapter == "shell" or s.state in ("exited", "closed") or not cleaned:
             return None
         ad = adapters.get(s.adapter)
-        if not getattr(ad, "usage_for", None) or s.profile in self._metered:
+        # `_metered` is read from this host's profile files, and a node's profile of the same name
+        # may be another login there: a node withholds its own metered profiles (the techlead's
+        # read of #783)
+        if not getattr(ad, "usage_for", None) or (self.sessions.get(s.id) is s and s.profile in self._metered):
             return None
         key = key or _usage_key(ad, s.adapter, s.profile)[0]
+        # an account first met since a restart takes the reading its profile held, if it is of this
+        # account — a node's included, so its history does not start again (the techlead's read of #783)
+        self._usage_seed(key, [s.profile], strict=self.sessions.get(s.id) is not s)
         was = self._usage_acct.get(key)
-        # a node's profile may share its name with another login's here: its account starts clean
-        if was is None and self.sessions.get(s.id) is s and isinstance(self._usage.get(s.profile), dict):
-            was = {k: v for k, v in self._usage[s.profile].items() if k not in ("account", "tool")}
         merged = usage_mod.merge(was, cleaned, at=now_iso(), source="reported", fresh=fresh, by=s.name)
         if merged != was:
             self._usage_acct[key] = merged
             await self._usage_spread(key)
             self._usage_limits(self._usage_live(), self._metered)
             await self._push_changes()
+            await self._push_usage_readings()
         return key
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:

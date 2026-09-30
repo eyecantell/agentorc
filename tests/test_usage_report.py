@@ -290,3 +290,169 @@ async def test_two_nodes_keying_one_profile_to_two_accounts_show_one_and_never_f
     assert ("desk", "pn") not in agent._usage_remote_keys
     await agent._take_usage_report("laptop", {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 21.0)]})
     assert agent._usage["pn"]["account"] == "bob" and pcts(agent._usage["pn"]) == {"5h": 21.0}
+
+
+# -- the home sends the account's reading back to its nodes (TD-233 slice 2) ---------------------------
+
+
+def test_a_node_adopts_each_window_the_home_confirmed_later_and_keeps_its_own_word():
+    """`usage.adopt`: a window the home confirmed later, or saw roll, is the home's, history and all;
+    one the node confirmed no earlier, or saw roll first, stays the node's; a window only one of them
+    has is kept or added; `fetched` follows the newer confirmation, and the node's `reason` and
+    cool-off stay its own."""
+    held = usage.merge(None, [w("5h", 40.0), w("week", 20.0)], at="2026-10-01T01:00:00Z", source="asked", fresh=True)
+    held |= {"reason": "rate_limited", "cool_until": "2026-10-01T02:00:00Z"}
+    theirs = {
+        "windows": [
+            {
+                **w("5h", 55.0),
+                "at": "2026-10-01T01:30:00Z",
+                "source": "reported",
+                "history": [{"at": "2026-10-01T01:10:00Z", "pct": 50.0}, {"at": "2026-10-01T01:30:00Z", "pct": 55.0}],
+            },
+            {**w("week", 18.0), "at": "2026-10-01T00:30:00Z", "source": "reported", "history": []},
+            {**w("week · Fable", 10), "at": "2026-10-01T00:40:00Z", "source": "asked", "history": []},
+            {"label": "", "pct": 99},
+        ],
+        "fetched": "2026-10-01T01:30:00Z",
+        "source": "reported",
+        "by": "grinder-ao-1",
+    }
+    got = usage.adopt(held, theirs)
+    assert pcts(got) == {"5h": 55.0, "week": 20.0, "week · Fable": 10}
+    five = next(x for x in got["windows"] if x["label"] == "5h")
+    assert five["at"] == "2026-10-01T01:30:00Z" and [h["pct"] for h in five["history"]] == [50.0, 55.0]
+    assert got["fetched"] == "2026-10-01T01:30:00Z" and got["source"] == "reported" and got["by"] == "grinder-ao-1"
+    assert got["reason"] == "rate_limited" and got["cool_until"] == "2026-10-01T02:00:00Z"
+
+    # the node saw the window roll: the home's report of the window before it is over
+    rolled = usage.merge(None, [w("5h", 2.0, R2)], at="2026-10-01T01:00:00Z", source="reported", fresh=True)
+    assert pcts(usage.adopt(rolled, theirs))["5h"] == 2.0
+    # the home saw it roll first: its window replaces the node's, whatever its age
+    old = {"windows": [{**w("5h", 3.0, R2), "at": "2026-10-01T00:00:00Z", "source": "reported"}]}
+    assert pcts(usage.adopt(held, old))["5h"] == 3.0
+    # an older confirmation of the whole reading leaves the node's age as it was
+    assert usage.adopt(held, old)["fetched"] == "2026-10-01T01:00:00Z"
+    assert usage.adopt(held, None) == held and usage.adopt(None, {})["windows"] == []
+
+    # a reset one side does not know is no roll: the newer confirmation stands (the review)
+    unknown = usage.merge(None, [w("5h", 45.0, None)], at="2026-10-01T02:00:00Z", source="reported", fresh=True)
+    assert pcts(usage.adopt(unknown, theirs))["5h"] == 45.0
+    # the home's history is kept in order, whatever order it came in
+    shuffled = {"windows": [{**theirs["windows"][0], "history": theirs["windows"][0]["history"][::-1]}]}
+    assert [h["pct"] for h in usage.adopt(None, shuffled)["windows"][0]["history"]] == [50.0, 55.0]
+
+
+class _Mux:
+    def __init__(self):
+        self.sent: list[dict] = []
+
+    async def notify(self, method, **params):
+        if method == "usage_reading":
+            self.sent.append(params)
+
+
+async def test_the_home_sends_a_nodes_account_back_when_it_moves_and_again_on_a_new_link(agent, hookstub):
+    """The home sends the reading of each account a node keyed a live session to, as `usage_reading
+    {account, reading}`, when it moved since that link was told — not before the link's snapshot,
+    not twice for no change, and again to a new link."""
+    hookstub.usage_value = None
+    agent._take_records("laptop", [node_record()], whole=True)
+    mux = _Mux()
+    agent._link_muxes["laptop"] = mux
+    report = {"id": "ao-x-w", "account": "hookstub:laptop-paul", "windows": [w("5h", 71.0)], "fresh": True}
+    try:
+        await agent._take_usage_report("laptop", report)
+        assert mux.sent == []  # the link's snapshot is not taken yet
+        agent._intent_sent["laptop"] = {}
+        await agent._refresh_usage_inner()
+        assert [(m["account"], pcts(m["reading"])) for m in mux.sent] == [("hookstub:laptop-paul", {"5h": 71.0})]
+        assert set(mux.sent[0]["reading"]) == {"windows", "fetched", "source", "by"}
+
+        await agent._refresh_usage_inner()
+        await agent._take_usage_report("laptop", report | {"windows": [w("5h", 70.0)], "fresh": False})
+        assert len(mux.sent) == 1  # nothing moved: nothing sent
+        await agent._take_usage_report("laptop", report | {"windows": [w("5h", 73.0)]})
+        assert [pcts(m["reading"]) for m in mux.sent] == [{"5h": 71.0}, {"5h": 73.0}]
+
+        again = _Mux()
+        agent._link_muxes["laptop"] = again  # a new dial: told once more, though nothing moved
+        await agent._refresh_usage_inner()
+        assert [pcts(m["reading"]) for m in again.sent] == [{"5h": 73.0}]
+    finally:
+        agent._link_muxes.pop("laptop", None)
+        agent._intent_sent.pop("laptop", None)
+
+
+async def test_a_node_takes_the_homes_reading_for_its_own_account_and_is_not_asked_while_young(
+    agent, hookstub, tmp_path, monkeypatch
+):
+    """At the node, the home's reading of an account one of its live sessions is keyed to is adopted
+    into its own, so its chip, gate and fallback read the whole account; one it keys none to is
+    ignored; a young adopted reading holds off the endpoint."""
+    monkeypatch.setattr(hookstub, "accounts", {"pn": "paul"})
+    monkeypatch.setattr(hookstub, "usage_asked", [])
+    monkeypatch.setattr(agent, "mode", "node")
+    now = datetime.now(UTC)
+    async with LocalClient() as c:
+        (tmp_path / "n").mkdir()
+        s = await c.call("create", name="nw", dir=str(tmp_path / "n"), adapter="hookstub", profile="pn")
+        agent._usage_acct["hookstub:paul"] = usage.merge(
+            None, [w("5h", 40.0)], at=iso(now - timedelta(hours=1)), source="asked", fresh=True
+        )
+        reading = {
+            "windows": [{**w("5h", 55.0), "at": iso(now - timedelta(minutes=1)), "source": "reported"}],
+            "fetched": iso(now - timedelta(minutes=1)),
+            "source": "reported",
+            "by": "grinder-ao-1",
+        }
+        await agent._from_home("usage_reading", {"account": "hookstub:paul", "reading": reading})
+        assert pcts(agent._usage["pn"]) == {"5h": 55.0} and agent._usage["pn"]["by"] == "grinder-ao-1"
+
+        await agent._from_home("usage_reading", {"account": "hookstub:heather", "reading": reading})
+        assert "hookstub:heather" not in agent._usage_acct
+
+        hookstub.usage_value = {"reason": "ok", "windows": [w("5h", 1.0)]}
+        agent._usage_checked.clear()
+        await agent._refresh_usage_inner()
+        assert hookstub.usage_asked == [] and pcts(agent._usage["pn"]) == {"5h": 55.0}
+        hookstub.usage_value = None
+        await c.call("kill", id=s["id"])
+
+
+async def test_after_a_home_restart_a_nodes_account_keeps_its_history(agent, hookstub):
+    """The techlead's read of #783: the reading a node's profile held in `usage.json` survives the
+    passes before the node's first report, and that report merges onto it — history and all — when
+    it is of the node's account; one of another account starts clean."""
+    hookstub.usage_value = None
+    t0 = datetime.now(UTC) - timedelta(minutes=40)
+    held = usage.merge(None, [w("5h", 60.0)], at=iso(t0), source="reported", fresh=True)
+    held = usage.merge(held, [w("5h", 61.0)], at=iso(t0 + timedelta(minutes=20)), source="reported", fresh=True)
+    agent._usage["pn"] = held | {"account": "laptop-paul", "tool": "hookstub"}
+    agent._usage["pq"] = held | {"account": "laptop-paul", "tool": "hookstub"}
+    agent._usage_restored |= {"pn"}  # as `usage.json` gave it at the start; `pq` came later
+    agent._take_records("laptop", [node_record(), node_record("ao-x-q", name="nq", profile="pq")], whole=True)
+    await agent._refresh_usage_inner()
+    assert pcts(agent._usage["pn"]) == {"5h": 61.0}  # kept while no report has keyed it
+    assert "pq" not in agent._usage  # a profile not restored at the start is shown by the rule
+
+    report = {"id": "ao-x-w", "account": "hookstub:laptop-paul", "windows": [w("5h", 62.0)], "fresh": True}
+    await agent._take_usage_report("laptop", report)
+    assert [h["pct"] for h in agent._usage["pn"]["windows"][0]["history"]] == [60.0, 61.0, 62.0]
+
+    for other in ({"account": "someone-else"}, {}):  # another account's, or one that names none
+        agent._usage_acct.clear()
+        agent._usage["pn"] = held | other | {"tool": "hookstub"}
+        await agent._take_usage_report("laptop", report)
+        assert [h["pct"] for h in agent._usage["pn"]["windows"][0]["history"]] == [62.0]
+
+
+async def test_a_nodes_report_under_a_profile_metered_here_is_taken(agent, hookstub, monkeypatch):
+    """The techlead's read of #783: `_metered` is this host's reading of its own profile files, and a
+    node withholds its own metered profiles, so a node's report under a name metered here is taken."""
+    hookstub.usage_value = None
+    monkeypatch.setattr(agent, "_metered", {"pn"})
+    agent._take_records("laptop", [node_record()], whole=True)
+    report = {"id": "ao-x-w", "account": "hookstub:laptop-paul", "windows": [w("5h", 33.0)], "fresh": True}
+    await agent._take_usage_report("laptop", report)
+    assert pcts(agent._usage_acct["hookstub:laptop-paul"]) == {"5h": 33.0}

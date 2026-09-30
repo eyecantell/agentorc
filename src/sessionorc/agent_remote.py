@@ -482,6 +482,35 @@ class RemoteMixin:
         self._usage_remote_keys[(host, s.profile)] = key  # before the merge, whose spread reads it
         await self._usage_merge_report(s, windows, bool(params.get("fresh")), key)
 
+    async def _push_usage_readings(self) -> None:
+        """The home's reading of each account a node keyed one of its live sessions' profiles to,
+        sent to that node as `usage_reading {account, reading}` (§4.4 *A node's sessions report to
+        their node*) whenever it moved since that link was last told: every host's reports merge
+        here, so a node's gate and its fallback's age read the whole account and not only its own
+        sessions' view. A notification on the road the settings and the metered sums take, refused
+        not queued: a link that is down is told again once it is back and the reading next moves."""
+        if self.mode != "home":
+            return
+        pairs = {(h, k) for (h, _), k in self._usage_remote_keys.items()}
+        for pair in [p for p in self._usage_told if p not in pairs]:
+            del self._usage_told[pair]
+        for host, key in sorted(pairs):
+            mux, acct = self._link_muxes.get(host), self._usage_acct.get(key)
+            if mux is None or acct is None or host not in self._intent_sent:
+                continue  # nothing is pushed to a link before its snapshot is taken
+            reading = {k: v for k, v in acct.items() if k in ("windows", "fetched", "source", "by")}
+            mark = json.dumps(reading, sort_keys=True)
+            told = self._usage_told.get((host, key))
+            if told is not None and told[0] is mux and told[1] == mark:
+                continue
+            try:
+                async with asyncio.timeout(agent_common.REPORT_WRITE):
+                    await mux.notify("usage_reading", account=key, reading=reading)
+            except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
+                log.warning("the usage reading of %s did not reach %s: %s", key, host, e)
+                continue
+            self._usage_told[(host, key)] = (mux, mark)
+
     async def _take_derived(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
         """A node's tick derived reports for one of its records (§4.4a, step 4b.2): applied as this
         home's own tick applies its own — upserted under §9 invariant 10, the branch claims named
