@@ -24,6 +24,10 @@ from typing import Any
 
 import yaml
 
+from sessionorc.models import owner_word
+
+# origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
+DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `agentorc.repoconfig` has it
 REPO_FILE = ".agentorc.yml"
 
@@ -63,11 +67,21 @@ def kind_of(entry: dict[str, Any]) -> str:
     return "other"
 
 
-def lane_matches(word: str, entry: dict[str, Any]) -> bool:
-    """Whether an entry belongs to a lane word (design §6 rule 6, TD-195), by its header and never
-    its prose: `design-first` is an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
-    one with `Pickable: yes` that is not design-first. A reference, or any other word, matches
-    nothing until a role gives it a meaning here."""
+def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
+    """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
+    prose. A word: `design-first` is an entry with `Kind: design-first` and `Pickable: yes`;
+    `free-pick` one with `Pickable: yes` that is not design-first; a reference, or any other word,
+    matches nothing until a role gives it a meaning here. **An `owner:<word>` narrows the rest**
+    (TD-214, TD-227): with one or more, the entry's `Owner:` must be one named or absent, so
+    `[free-pick, owner:grinder]` leaves the anchor's entries out; it matches nothing by itself."""
+    owners = {o for w in lane if (o := owner_word(w))}
+    mine = str(entry.get("owner") or "").lower()
+    if owners and mine and mine not in owners:
+        return False
+    return any(_word_matches(w, entry) for w in lane if owner_word(w) is None)
+
+
+def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     if entry.get("pickable") != "yes":
         return False
     if word == "design-first":
@@ -191,6 +205,38 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     if cp.returncode != 0:
         return None
     return _parse_log(cp.stdout, skip)
+
+
+def entries_before(
+    root: Path | str, rel: str, before: datetime | None, timeout: float = 10.0
+) -> tuple[list[dict[str, Any]] | None, str]:
+    """The ledger's entries as the last commit of `origin/<default>` before `before` held them
+    (design §6 rule 6, TD-227: `lane_seen`'s first write is the ledger at the declaration), and
+    what was read — `origin/main at 1a2b3c4d` — or None and why not. `--before` reads committer
+    dates, which is the merge's time for a squash. `before` None reads the ref's tip. Read-only:
+    nothing is fetched."""
+
+    def git(*args: str) -> str | None:
+        try:
+            cp = subprocess.run(
+                ["git", "-C", str(root), *args], capture_output=True, text=True, errors="replace", timeout=timeout
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return cp.stdout if cp.returncode == 0 else None
+
+    for ref in DEFAULT_REFS:
+        when = [f"--before={before.isoformat()}"] if before is not None else []
+        sha = git("rev-list", "-1", *when, ref)
+        if sha is None:
+            continue  # no such ref here: the next name
+        if not (sha := sha.strip()):
+            return None, f"no commit of {ref} before {before.isoformat() if before else 'now'}"
+        text = git("show", f"{sha}:{rel}")
+        if text is None:
+            return None, f"no {rel} at {ref} {sha[:8]}"
+        return entries(text), f"{ref} at {sha[:8]}"
+    return None, "no origin/<default> here"
 
 
 def _count(stamps: list[datetime], now: datetime) -> dict[str, int]:

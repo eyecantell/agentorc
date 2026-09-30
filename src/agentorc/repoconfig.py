@@ -35,7 +35,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc.models import GRANTS, normalize_context, normalize_review
+from sessionorc.models import GRANTS, normalize_context, normalize_review, owner_word
 
 FILE = ".agentorc.yml"
 # Keys the file once carried and nothing ever read (TD-149 (1)): each is decided elsewhere, so a
@@ -71,6 +71,13 @@ MESSAGE_CAP = 120
 # person presses in place of typing — `{label, text}`, the label one line of at most this many.
 PROMPT_LABEL_CAP = 24
 LANE_PLACEHOLDER = "{lane}"
+
+
+def _no_owner(lane: list[str]) -> list[str]:
+    """A lane as the brief's slot prints it: its `owner:<word>`s left out (TD-227)."""
+    return [w for w in lane if owner_word(w) is None]
+
+
 # The team's techlead seat (design §4.9b): its session id, filled at launch as `{lane}` is; `none`
 # where the team has none, or the session was started by hand, so a brief reads right either way.
 TECHLEAD_PLACEHOLDER = "{techlead}"
@@ -321,7 +328,8 @@ class Role:
             (TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD),
             (MANAGER_PLACEHOLDER, manager or NO_MANAGER),
             (CONTEXT_PLACEHOLDER, context or NO_CONTEXT),
-            (LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)"),
+            # an owner word narrows what the home tells the member of (§6 rule 6), never its lane's words
+            (LANE_PLACEHOLDER, ", ".join(_no_owner(lane if lane is not None else self.lane)) or "(none given)"),
         )
         for slot, value in fills:
             text = text.replace(slot, value)

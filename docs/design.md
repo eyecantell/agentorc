@@ -6406,12 +6406,14 @@ code and needs no grant; a session doing the same work does.
      (home-owned) — written on the first tick after the declaration as the ids of the entries in
      its repo's ledger reading (§4.4 *Repo facts*) that **match its lane**, and cleared with
      `out_of_work`. **The first write is the ledger as it stood at the declaration** (TD-214;
-     designed 2026-09-28, not built — TD-227, until when it is the reading at that first tick):
+     designed 2026-09-28, built — TD-227 slice 1):
      the ledger file as the last commit of `origin/<default>` before `out_of_work.at` held it, read
      from the checkout's history, so an entry merged between the declaration and the first tick
      that looks — a day later, when the rule went live on 2026-09-28 with ten entries in the
-     designer's lane — is new and is told; where the history cannot be read, the reading at that
-     tick, as before. **A lane word matches by the entry's header, never its prose**:
+     designer's lane — is new and is told; an entry the checkout's reading holds and that ref's tip does not
+     (a branch checked out at the home) is written into it untold, so no tick, this one or a later
+     one reading the checkout, tells as new an entry `origin/<default>` does not hold;
+     where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      `design-first` matches an entry with `Kind: design-first` and `Pickable: yes`; `free-pick`
      matches one with `Pickable: yes` that is not design-first (**with pickable derived**, TD-223,
      not built — TD-228: `design-first` is a pickable entry of that kind, and `free-pick` a
@@ -6419,12 +6421,13 @@ code and needs no grant; a session doing the same work does.
      decision match no lane, and a ledger with no header lines at all gives a `free-pick` lane
      everything it has unblocked); a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.
-     **An `owner:<word>` in a lane narrows it** (TD-214; not built — TD-227): with one or more,
+     **An `owner:<word>` in a lane narrows it** (TD-214; built — TD-227 slice 1): with one or more,
      an entry matches when it matches one of the lane's other words and its `Owner:` is one of
      the owners named or is absent, so `[free-pick, owner:grinder]` leaves an entry that is the
      anchor's or Paul's out. The word is the lane's, written where the lane is (`org.yml`, a
      role's preset), and is compared with the ledger's line alone: a session's role badge is not
-     read (§9 invariant 9). A lane with no owner word matches as it did. An owner word is **not a reference and not a lane of its own**: it is set aside before a lane is checked as `free-pick` or a list of references (so `[free-pick, owner:grinder]` is accepted where `free-pick` beside a reference is refused), and it is never counted, nudged about or offered to `ao progress` as something held. When
+     read (§9 invariant 9). A lane with no owner word matches as it did. An owner word is **not a reference and not a lane of its own**: it is set aside before a lane is checked as `free-pick` or a list of references (so `[free-pick, owner:grinder]` is accepted where `free-pick` beside a reference is refused), and it is never counted, nudged about or offered to `ao progress` as something held; the brief's `{lane}` slot leaves it out (and the count and the nudge leave `design-first` out
+     as they leave `free-pick`), and the lane as written (the card, `ao team list`) shows it. When
      a later reading holds a matching id that `lane_seen` does not — an entry filed since, or one
      that has become pickable, its blocker archived or its decision made — and the member is **live** (not `exited`, not `closed`),
      with no wrap-up asked, no stop time passed, not gated and not suspended, the home delivers

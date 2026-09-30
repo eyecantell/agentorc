@@ -526,6 +526,26 @@ def reference_of(about: str | None) -> str | None:
     return None
 
 
+# A lane's words that are no reference (design §4.8, §6 rule 6): `free-pick` and `design-first` name
+# what a member may pick, and `owner:<word>` narrows it (TD-214, TD-227). None is counted, nudged
+# about or offered to `ao progress` as something held.
+LANE_WORDS = ("free-pick", "design-first")
+OWNER_WORD = "owner:"
+
+
+def owner_word(word: Any) -> str | None:
+    """The owner an `owner:<word>` lane word names, lower-cased, or None for any other word."""
+    w = str(word).strip()
+    if w[: len(OWNER_WORD)].lower() != OWNER_WORD:
+        return None
+    return w[len(OWNER_WORD) :].strip().lower() or None
+
+
+def lane_refs(lane: Iterable[Any]) -> list[str]:
+    """The references of a lane, in its order: its lane words and owner words left out."""
+    return [str(r) for r in lane if str(r) not in LANE_WORDS and owner_word(r) is None]
+
+
 def normalize_ref(ref: str) -> str:
     """A reference is a ledger id, a PR number, or an attention-board line (design §4.8). Only the
     two machine-readable shapes are canonicalised, so `td-27` and `TD-027` are one entry, not two."""
@@ -723,7 +743,7 @@ def report_line(session: dict[str, Any], prs: Mapping[int, str] | None = None) -
     its mark when `prs` says so, `TD-066 → #158 merged · 3/3 done` (`report_ref`, TD-193). Empty
     when the session has neither a lane nor a single entry."""
     progress = session.get("progress") or []
-    lane = [r for r in (session.get("lane") or []) if r != "free-pick"]
+    lane = lane_refs(session.get("lane") or [])
     done = [p for p in progress if p.get("status") == "done"]
     bits = []
     if ref := report_ref(session, prs):
