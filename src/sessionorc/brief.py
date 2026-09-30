@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from sessionorc import paths
 from sessionorc.models import now_iso
 
 GIT_TIMEOUT = 10.0
@@ -49,12 +50,14 @@ def read(path: str, merged: bool = True) -> tuple[str, str]:
     """`(text, sha)` of one file. With `merged`, a file inside a git checkout that has an origin is
     read at origin's default branch; a file that is not there (untracked, or only on a branch) is
     `Unreadable`, never the working tree's copy. A file outside any checkout, or in one with no
-    origin, is read from disk."""
+    origin, is read from disk, and so is one under the home's own work tree (design §4.9)."""
     p = Path(path)
     if merged and p.parent.is_dir():
         top = _git(p.parent, "rev-parse", "--show-toplevel")
-        if top is not None:
-            root = Path(top.decode().strip())
+        root = Path(top.decode().strip()) if top is not None else None
+        # the home is a work tree of its three definition files (§4.9), never a checkout a brief is
+        # merged into: a file kept under it is read from disk, whatever remote the person adds
+        if root is not None and root.resolve() != paths.home().resolve():
             for ref in DEFAULT_REFS:
                 if _git(root, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}") is None:
                     continue
