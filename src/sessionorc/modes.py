@@ -31,6 +31,8 @@ from sessionorc.mail import self_decide_refusal
 # `identity_log`'s — the home's mailbox, the home's mark.
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
 # holds the replica the home last sent, which the next frame overwrites.
+# **`clear_work`** (§6 rule 8, TD-227): Dismiss writes the members' `lane_seen` and the home's own
+# `host` record, where `work_waiting` lives; at a node both would be the replica's.
 HOME_EDITS = frozenset(
     {
         "set_controllers",
