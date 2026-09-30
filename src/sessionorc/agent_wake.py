@@ -308,6 +308,8 @@ class WakeMixin:
         if merged != was:
             self._usage_acct[key] = merged
             await self._usage_spread(key)
+            self._usage_limits(self._usage_live(), self._metered)
+            await self._push_changes()
         return {"taken": True}
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:

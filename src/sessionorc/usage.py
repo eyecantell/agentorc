@@ -12,6 +12,7 @@ from (§6 *Usage gate*, slice 4). Adapter-neutral: labels are the adapter's, nev
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -32,30 +33,37 @@ def _instant(value: Any) -> datetime | None:
     return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
+PCT_MAX = 1000  # a percentage past this is no reading: `_cap`'s `int()` of an `inf` would stop every pass
+
+
 def _pct(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    return float(value) if value >= 0 else None
+    if isinstance(value, int):
+        return float(value) if 0 <= value <= PCT_MAX else None
+    return value if math.isfinite(value) and 0 <= value <= PCT_MAX else None
 
 
 def clean_windows(raw: Any) -> list[dict[str, Any]]:
     """The windows of a report as the host agent keeps them — `{label, pct, resets}`, a label a
     short string, `pct` a number, `resets` an instant or None — and nothing else a caller sent."""
-    out: list[dict[str, Any]] = []
+    out: dict[str, dict[str, Any]] = {}
     for w in raw if isinstance(raw, list) else ():
         if not isinstance(w, dict) or not isinstance(w.get("label"), str) or not w["label"].strip():
             continue
         if (pct := _pct(w.get("pct"))) is None:
             continue
         resets = w.get("resets")
-        out.append(
-            {
-                "label": w["label"].strip()[:40],
-                "pct": w["pct"] if isinstance(w["pct"], int) else round(pct, 1),  # an endpoint's whole number stays one
-                "resets": str(resets) if _instant(resets) is not None else None,
-            }
-        )
-    return out[:8]
+        label = w["label"].strip()[:40]
+        n = {
+            "label": label,
+            "pct": w["pct"] if isinstance(w["pct"], int) else round(pct, 1),  # an endpoint's whole number stays one
+            "resets": str(resets) if _instant(resets) is not None else None,
+        }
+        if label in out and out[label]["pct"] >= n["pct"]:
+            continue  # a label twice in one report: the higher stands, as it would across two
+        out[label] = n
+    return list(out.values())[:8]
 
 
 def _history(held: list[Any], at: str, pct: float) -> list[dict[str, Any]]:
@@ -71,6 +79,12 @@ def _history(held: list[Any], at: str, pct: float) -> list[dict[str, Any]]:
         hist.pop()  # the last was only ever the newest point: this one supersedes it
     hist.append({"at": at, "pct": pct})
     return [h for h in hist if when - _instant(h["at"]) <= HISTORY_SPAN]  # type: ignore[operator]
+
+
+def _older(a: Any, b: Any) -> bool:
+    """Whether instant `a` is before instant `b`, both known."""
+    ta, tb = _instant(a), _instant(b)
+    return ta is not None and tb is not None and ta < tb
 
 
 def _later(a: Any, b: Any) -> bool:
@@ -105,6 +119,8 @@ def merge(
     moved = False
     for w in windows:
         o = old.get(w["label"])
+        if source == "asked" and o is not None and _older(at, o.get("at")):
+            continue  # an answer asked before a fresher report landed: the report stands
         if source == "asked":
             same = (
                 o is not None and not _later(w["resets"], o.get("resets")) and not _later(o.get("resets"), w["resets"])

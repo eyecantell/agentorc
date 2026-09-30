@@ -397,6 +397,7 @@ class HostAgent(
         # Seeded per account on the first refresh, from its profiles' held readings.
         self._usage_checked: dict[str, float] = {}
         self._usage_wait: dict[str, float] = {}
+        self._usage_only_at: dict[str, float] = {}  # when an endpoint-only window was last asked for (TD-233)
         self._usage_task: asyncio.Task[None] | None = None
         # A metered account's ledger (§4.4 *Usage*, TD-151): `spend.json`, the rows and the cursors
         # that make its reading a sum, written only when it changed. `_metered` is the profiles the

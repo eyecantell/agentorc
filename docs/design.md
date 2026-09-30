@@ -772,7 +772,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
     status line hands epoch seconds, the endpoint an instant of its own, and a rolling window's
     reset drifts between reads). The endpoint's answer is the account's own rather than one
     session's view of it, so it sets each window it names outright, a lower number included,
-    and keeps the windows it does not name; `at` moves when a fresh report or an answer
+    and keeps the windows it does not name, and one taken before a window's last report leaves
+    that window as the report left it; `at` moves when a fresh report or an answer
     confirms the number. A window whose `resets` has passed is
     **unknown until it is read again**, never zero and never a cap: `limited` (§4.2) is not
     read from it. **A short history** is kept beside each window in `usage.json`: the newest

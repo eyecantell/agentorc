@@ -12,12 +12,14 @@ from conftest import wait_for
 from sessionorc import usage
 from sessionorc.client import LocalClient
 
-R1 = "2026-10-01T05:00:00Z"
-R2 = "2026-10-01T10:00:00Z"
-
 
 def iso(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+# two resets five hours apart, a day ahead of whenever the suite runs
+R1 = iso(datetime.now(UTC) + timedelta(days=1))
+R2 = iso(datetime.now(UTC) + timedelta(days=1, hours=5))
 
 
 def w(label: str, pct: float, resets: str | None = R1) -> dict:
@@ -86,6 +88,18 @@ def test_clean_windows_keeps_only_what_a_window_is():
     assert usage.clean_windows({"not": "a list"}) == []
 
 
+def test_a_number_that_is_no_reading_is_dropped_and_a_label_twice_reads_the_higher():
+    """Review of #770: an `inf` from JSON's `1e999` would reach `_cap`'s `int()` and stop every pass."""
+    assert usage.clean_windows([w("5h", float("inf")), w("a", float("nan")), w("b", 10**400), w("c", -1)]) == []
+    assert usage.clean_windows([w("5h", 40.0), w("5h", 61.5), w("5h", 50.0)]) == [w("5h", 61.5)]
+
+
+def test_an_answer_asked_before_a_fresher_report_does_not_undo_it():
+    a = usage.merge(None, [w("5h", 70.0)], at="2026-10-01T01:05:00Z", source="reported", fresh=True, by="g1")
+    b = usage.merge(a, [w("5h", 60)], at="2026-10-01T01:00:00Z", source="asked", fresh=True)
+    assert pcts(b) == {"5h": 70.0} and b["windows"][0]["source"] == "reported"
+
+
 def test_a_window_only_the_endpoint_gives_is_asked_for_hourly_while_watched():
     now = datetime(2026, 10, 1, 3, 0, tzinfo=UTC)
     two_h = iso(now - timedelta(hours=2))
@@ -132,6 +146,11 @@ async def test_a_report_reaches_the_accounts_reading_and_holds_the_endpoint_off(
         merged = agent._usage_reading("hookstub:paul", hookstub.usage_value)
         assert merged is not None and merged["source"] == "asked" and "by" not in merged
         assert pcts(merged) == {"5h": 59, "week": 30.2, "week · Fable": 17}
+
+        # a report at a cap marks the account's sessions `limited` at once, not on the next poll
+        async with LocalClient(caller=sa["id"]) as me:
+            await me.call("usage_report", windows=[w("5h", 100.0, R1)], fresh=True)
+        assert agent.sessions[sa["id"]].state == "limited" and agent.sessions[sb["id"]].state == "limited"
 
         async with LocalClient() as nobody:
             assert await nobody.call("usage_report", windows=[w("5h", 99.0)], fresh=True) == {"taken": False}
