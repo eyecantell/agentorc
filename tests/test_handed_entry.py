@@ -119,3 +119,39 @@ async def test_the_seat_is_filled_for_a_handed_entry_and_waits_on_its_own_questi
         await agent._keep_running(now)
         assert agent.sessions[sid] is not rec, "the answer counts the entry again, and the tick fills the seat"
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_reply_on_the_thread_that_closes_no_question_of_the_seats_reads_as_a_note(agent, tmp_path):
+    """Review of #760: an outcome or an FYI from the seat on the entry's thread, answered by the
+    person, refills nothing — the sentence says so, and the Reply dialog is not told otherwise."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = (
+            await person.call(
+                "create",
+                name="tl",
+                dir=str(tmp_path),
+                adapter="shell",
+                argv=["bash", "--norc", "--noprofile"],
+                unattended=True,
+                supervised=True,
+                prompt="the seat's brief",
+                seat={"trigger": "asks"},
+            )  # fmt: skip
+        )["id"]
+        rec = agent.sessions[sid]
+        rec.inbox.append(_handed(to=sid))
+        async with LocalClient(caller=sid) as tl:
+            fyi = (await tl.call("msg", to=PERSON, kind="note", text="drafting it on td240-x"))["entry"]
+        for box in (rec.outbox, agent.person_inbox):
+            for e in box:
+                if e.id == fyi["id"]:
+                    e.root = "m-entry"
+        rec.state, rec.pane, rec.exit_code = "exited", True, 0
+        agent.store.save(rec)
+        mine = (await person.call("inbox"))["entries"]
+        assert next(e for e in mine if e["id"] == fyi["id"])["on_handed"] is False
+        got = await person.call("msg", to=sid, kind="reply", reply_to=fyi["id"], text="thanks")
+        assert got["read_when"][sid].startswith("waits in the seat's mailbox")
+        await person.call("kill", id=sid)
