@@ -632,6 +632,10 @@ class MailMixin:
                 bound=span,
                 unreachable=sid in away,
                 rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
+                # a person's answer on a handed entry's thread fills a seat on call (TD-218)
+                refills=sender == PERSON
+                and entry.kind == "reply"
+                and any(e.id == root and e.handed_entry for e in records[sid].inbox),
             )
             for sid in named
             if sid != PERSON and sid in records
@@ -915,12 +919,15 @@ class MailMixin:
         if mail.is_person(caller):
             if not id or id == PERSON:
                 held = [e for e in self.person_inbox if not (unread and e.read_at)]
+                handed = {e.id for s in self.sessions.values() for e in s.inbox if e.handed_entry}
                 return {
                     "id": PERSON,
                     "entries": [
                         {
                             **e.to_dict(),
                             "from_role": mail.from_role(self._graph(), PERSON, e.from_, controllers=self._ctl),
+                            # on a handed entry's thread (TD-218): the Reply composer's line is `refill`
+                            "on_handed": e.root in handed,
                         }
                         for e in held
                     ],

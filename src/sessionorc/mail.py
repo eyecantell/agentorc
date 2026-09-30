@@ -363,6 +363,7 @@ def read_when(
     bound: timedelta | None = None,
     unreachable: bool = False,
     rings: bool = True,
+    refills: bool = False,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -373,7 +374,9 @@ def read_when(
     person restore it*), so only a session's reads *budget spent*; `unreachable` is the home's word
     that the record's host link is down (§4.4a), which the record's own state may not say yet;
     `rings` is whether its adapter has a composer the doorbell can type into (`_bell_blocked`).
-    Advice, never a refusal."""
+    `refills` is a person's `reply` on a handed entry's thread (TD-218): to a seat on call it
+    closes the seat's question and the entry counts toward the seat again, so it fills it as an
+    `ask` does. Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask else ""
     if s is not None and not mail_wakes(s):
@@ -388,7 +391,7 @@ def read_when(
         return "lands at the home; its host cannot be reached, so it is delivered when the link is back" + tail
     on_call = (seat or (s is not None and bool(s.seat))) and state in ("exited", "closed")
     if on_call:
-        if ask:
+        if ask or refills:
             return "fills this seat: a session starts on the next tick and reads it first" + tail
         return (
             "waits in the seat's mailbox: a note fills no seat, and is read at the next fill, which a question causes"

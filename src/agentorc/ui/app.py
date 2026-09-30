@@ -615,8 +615,10 @@ def create_app() -> FastAPI:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
-            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
-            e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does,
+            # but on a handed entry's thread, where it fills a seat on call as an ask does (TD-218)
+            rw = (records.get(e["from"]) or {}).get("read_when") or {}
+            e["reply_when"] = str((e.get("on_handed") and rw.get("refill")) or rw.get("note") or "")
             e["board_default"] = board_of(e["from"])
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
