@@ -218,6 +218,11 @@ not mix:
   *Not:* attention list. — *proposed*.
 - **ledger** — `docs/technical_debt.md`: known issues and deferred work as `TD-NNN` entries. —
   *proposed*.
+- **Add entry** — the form by which the person puts an entry in the ledger from a page: their
+  words and a Type, then **Hand to the techlead** (mail that fills the seat, which drafts the
+  entry and lands it by PR) or **Open a session** (an interactive session with the words in its
+  composer, not sent). The page writes no file (design §4.9 *Add an entry to the ledger*).
+  *Not:* drafter, as a role or a seat: the techlead seat drafts. — *proposed 2026-09-28*.
 - **rollup** — the row of four facets under the Org's title: Agents, TDs in motion, PRs in motion, Needs you, summed over every live team (design §4.5 screen 1). — *proposed 2026-09-26*.
 - **summary (team card)** — the three facets between a team's header and its members: Repo, TDs in motion, Answer needed / Doing (design §4.5 screen 1). *Not:* dashboard. — *proposed 2026-09-26*.
 - **TDs in motion** — the ledger entries a team's members hold, each with its **phase**: *add* (a hunter filing it), *design* (a designer holds a design-first entry), *grind* (a claim, no PR), *review* (a claim with an open PR); derived from the records, never declared. — *proposed 2026-09-26*.
