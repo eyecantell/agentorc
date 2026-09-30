@@ -867,8 +867,11 @@ class TickMixin:
                 decl = dict(s.out_of_work or {})
 
                 def both() -> tuple[Any, str, Any]:
-                    then, why = ledger_mod.entries_before(root, str(rel), at)
-                    return then, why, ledger_mod.entries_before(root, str(rel), None)[0] if then is not None else None
+                    resolve = ledger_mod.Registry(hosts.local_host().repos())
+                    then, why = ledger_mod.entries_before(root, str(rel), at, resolve=resolve)
+                    if then is None:
+                        return then, why, None
+                    return then, why, ledger_mod.entries_before(root, str(rel), None, resolve=resolve)[0]
 
                 then, why, tip = await asyncio.to_thread(both)
                 if s.out_of_work != decl or s.lane_seen is not None:
@@ -1448,10 +1451,11 @@ class TickMixin:
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
         out: dict[str, dict[str, Any]] = {}
+        resolve = ledger_mod.Registry(roots)  # `<repo>#TD-NNN` blockers, each repo read once per pass (TD-228)
         for root in roots:
             old = prev.get(root) or {}
             try:
-                out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote)
+                out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote, resolve)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
                 log.exception("reading the repo facts of %s failed", root)
                 why = f"the read failed: {type(e).__name__}"
@@ -1467,14 +1471,19 @@ class TickMixin:
 
     @staticmethod
     def _read_repo(
-        root: str, old: dict[str, Any], due: bool, now: datetime, by_remote: dict[str, dict[str, Any]]
+        root: str,
+        old: dict[str, Any],
+        due: bool,
+        now: datetime,
+        by_remote: dict[str, dict[str, Any]],
+        resolve: ledger_mod.Resolve | None = None,
     ) -> dict[str, Any]:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read."""
         stamp = now.isoformat()
         remote = reports._git(root, "remote", "get-url", "origin") if due else None
         remote = (remote or "").strip() if due else str(old.get("remote") or "")
-        led = ledger_mod.reading(root, now, with_history=due)
+        led = ledger_mod.reading(root, now, with_history=due, resolve=resolve)
         old_led = old.get("ledger") or {}
         if "error" in led:
             led = {**old_led, "error": led["error"], "failed_at": stamp}
