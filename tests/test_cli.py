@@ -1094,7 +1094,14 @@ def test_the_manager_brief_names_none_of_the_four_jobs_the_tick_took():
     root = pathlib.Path(__file__).parents[1]
     text = (root / "src/agentorc/briefs/manager.md").read_text()
     supplement = (root / "docs/briefs/manager-ao-1.md").read_text()
-    for gone in ("check_cadence.py", "cadence-changes.md` on", "relayed.json", "cadence_changes.py", "Chase it while", "Put those ids on"):
+    for gone in (
+        "check_cadence.py",
+        "cadence-changes.md` on",
+        "relayed.json",
+        "cadence_changes.py",
+        "Chase it while",
+        "Put those ids on",
+    ):
         assert gone not in text and gone not in supplement, gone
     assert "one `ao send --wait` naming the PR" not in text and "naming the PR and the rule" not in supplement
     assert "gh pr list --state merged" not in supplement and "§6 rule 11: `held_missed`" in supplement
