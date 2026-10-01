@@ -412,8 +412,8 @@ def _team_slots(args: argparse.Namespace) -> dict[str, str]:
     too (design §6 rule 7). Nothing for no team, an undefined one, or an org that cannot be read:
     `_team_defaults` says which on stderr, and each slot then reads `none`."""
     name = getattr(args, "team", None) or ""
-    if not name:
-        return {}
+    if not name or not (getattr(args, "role", None) or getattr(args, "brief", None)):
+        return {}  # no brief to fill: the org is not read for it
     try:
         org, _notes = _org_notes()
     except ValueError:
