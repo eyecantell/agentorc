@@ -756,6 +756,20 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
     assert ".badge.rw.early" in css  # …and it does not look the same
 
+    # what made it early is the home's reading, on the mark (§4.9a, TD-249 slice 6): the hover ends
+    # with its words, and a repeat names its entry in place of *early*
+    words = "repeats TD-229: reported done by an earlier run too"
+    again = view({**base, "restart_wanted": {**said, "early": True, "repeat": {"ref": "TD-229"}, "decided": words}})
+    assert again["restart_wanted"]["repeat"] == "TD-229" and early["restart_wanted"]["repeat"] == ""
+    pages = [("card", card.render(s=again))]
+    pages.append(("focus", focus.render(s={**again, "grants_all": [], "ready": []}, host="h", active="Org")))
+    for where, html in pages:
+        assert "restart wanted · repeats TD-229" in html and "· early" not in html, where
+        assert f"{words}, so a controller does not act on it" in html, where
+    assert "restart wanted · repeats TD-229 — for a person" in pages[0][1]
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "repeats ${r.repeat}" in js and "r.decided" in js  # the delta draws the same words
+
     # on Focus both report-line marks are **always in the page, hidden until true**, and the header's
     # render keeps them current: Focus re-renders its header in place rather than being replaced
     # whole like a card, so a chip drawn only at load would go stale the moment a watched session

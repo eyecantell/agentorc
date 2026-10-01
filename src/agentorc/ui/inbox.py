@@ -88,8 +88,10 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
     """Design §4.5a **Inbox row: restart** (§6 *Keeping a team running*, TD-103 slice 5): `(the
     mark's own time, the row's words)` for a record the tick could not restart — at a ceiling,
     held by work left, or an `early` `restart_wanted` that neither a controller nor the tick acts
-    on (§4.9a) — else None. The words are fixed, from the record's fields; the `why` of an early
-    one is the session's own sentence and is shown as such, never acted on."""
+    on (§4.9a) — else None. The words are fixed, from the record's fields: an early one says what
+    decided it (`restart_wanted.decided`, the host agent's reading — *early: nothing reported done
+    this run*, *repeats TD-229: reported done by an earlier run too*; TD-249 slice 6), and its `why`
+    is the session's own sentence, shown as such and never acted on."""
     if v.get("superseded_by"):
         return None
     ceiling, held, wanted = v.get("restart_ceiling"), v.get("restart_blocked"), v.get("restart_wanted")
@@ -111,7 +113,8 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
         )
     if isinstance(wanted, dict) and wanted.get("early") and v.get("state") in ("idle", "exited"):
         why = _first_line(wanted.get("why") or "") or "no reason given"
-        return str(wanted.get("at") or ""), f"restart wanted · early — asked inside its first half hour: {why}"
+        decided = _first_line(wanted.get("decided") or "") or "early"  # a mark older than the field
+        return str(wanted.get("at") or ""), f"restart wanted · {decided} — {why}"
     return None
 
 

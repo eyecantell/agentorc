@@ -101,6 +101,24 @@ def test_a_claim_left_by_the_last_two_runs_and_left_again_is_a_repeat():
     assert _restart_reading(_rec(SHORT, [DONE], bare[1:]), NOW)["repeat"] is None
 
 
+@pytest.mark.unit
+def test_a_derived_done_the_last_run_reported_is_not_this_runs_repeat():
+    """Slice 6: after a replay the new record sits on the old branch, and the tick's first derivation
+    writes the earlier run's merge as a `done` again. That is not the run's report: a run that then
+    did nothing is early inside `RESTART_EARLY` and an ordinary restart past it, never a repeat —
+    while a derived `done` with a new pair is still new work."""
+    earlier = [_entry(timedelta(minutes=30), done=[{"ref": "TD-1", "pr": 812}])]
+    again = {**DONE, "source": "derived"}
+    got = _restart_reading(_rec(SHORT, [again], earlier), NOW)
+    assert got == {"early": True, "repeat": None, "words": "early: nothing reported done this run"}
+    assert _restart_reading(_rec(LONG, [again], earlier), NOW) == {"early": False, "repeat": None, "words": None}
+    # the run's own word for the same pair is a repeat, with the derived one beside it or not
+    assert _restart_reading(_rec(LONG, [DONE], earlier), NOW)["repeat"] == {"ref": "TD-1"}
+    # and a merge the tick read that no earlier run reported is work done
+    fresh = {"ref": "TD-1", "status": "done", "pr": 813, "source": "derived"}
+    assert _restart_reading(_rec(SHORT, [fresh], earlier), NOW)["early"] is False
+
+
 @pytest.mark.integration
 async def test_the_declaration_writes_the_reading_and_the_reply_names_it(agent, tmp_path):
     await park_ticks(agent)
@@ -112,6 +130,7 @@ async def test_the_declaration_writes_the_reading_and_the_reply_names_it(agent, 
             got = await w.call("progress", id=sid, status="restart", why="context bound")
             assert got["restart_wanted"]["early"] is True and "repeat" not in got["restart_wanted"]
             assert got["decided"] == "early: nothing reported done this run"
+            assert got["restart_wanted"]["decided"] == got["decided"]  # the mark keeps the words (slice 6)
 
             await w.call("progress", id=sid, ref="TD-1", status="done", pr=812)
             got = await w.call("progress", id=sid, status="restart", why="context bound")
@@ -122,7 +141,7 @@ async def test_the_declaration_writes_the_reading_and_the_reply_names_it(agent, 
             rec.restarts[0]["at"] = _iso(datetime.now(UTC))
             got = await w.call("progress", id=sid, status="restart", why="context bound")
             assert got["restart_wanted"]["early"] is True and got["restart_wanted"]["repeat"] == {"ref": "TD-001"}
-            assert got["decided"].startswith("repeats TD-001")
+            assert got["decided"].startswith("repeats TD-001") and got["restart_wanted"]["decided"] == got["decided"]
             # a restart its changed brief asked for is neither (§6 rule 7)
             rec.brief_changed = {"at": "2026-09-30T00:00:00Z"}
             got = await w.call("progress", id=sid, status="restart", why="the brief changed")

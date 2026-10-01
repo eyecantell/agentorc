@@ -51,7 +51,7 @@
          whole like a card, so a server-rendered chip would go stale the moment a watched session
          declared or cleared one (review of PR #323). #}
       <span class="badge rw{% if s.restart_wanted and s.restart_wanted.early %} early{% endif %}{% if not s.restart_wanted %} hidden{% endif %}" id="frw"
-            title="{{ (s.restart_wanted or {}).why or 'no reason recorded' }}{% if s.restart_wanted and s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted and s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted and s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>
+            title="{{ (s.restart_wanted or {}).why or 'no reason recorded' }}{% if s.restart_wanted and s.restart_wanted.early %} — {{ s.restart_wanted.decided or 'early' }}, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted and s.restart_wanted.early %} · {% if s.restart_wanted.repeat %}repeats {{ s.restart_wanted.repeat }}{% else %}early{% endif %}{% endif %}{% if s.restart_wanted and s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>
       {# design §4.5a **brief changed** (§6 rule 7, TD-217): a mark, never pressable, the files and
          when on hover; always in the page and hidden until true, kept current from the delta. #}
       <span class="badge bc{% if not s.brief_changed %} hidden{% endif %}" id="fbc"
