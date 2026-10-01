@@ -120,8 +120,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-231 | The usage endpoint answers 429 for hours though agentorc polls once per account: read the limits from the sessions' statusline instead (research done) | High | Designed 2026-09-28 — the build is TD-233 |
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Built — slices 1–4 (#768, #770, #776, #780, #781, #783, #786, #789, #791); live check pending |
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slices 1–3 and 6 built (the setting, the mark, the refusal, the notes, the tests); slices 4–5 open |
-| TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Designed 2026-09-29 — the build is TD-241 |
-| TD-241 | Build finished as the home's reading: `finished` in `sessionorc`, the page's *concluded* and the *not concluded* line from it, rule 9's wind-down by the tick with its send, close, mark and announcement, `ao team status --json`'s fields, the manager brief | High | Partly done — slices 1, 2 and 3 built (the reading, PR #816; the page and the terminal, PR #828 and PR #831; the tick's wind-down, PR #821); slice 4 (the manager's brief) open |
 | TD-244 | Groom the agentorc attention board onto the Inbox's features: 58 open items and none carries `Answers:`; close what is done, give every question its answers and a `(default)`, ledger what is overdue 14 days behind `Blocked by: decision (Paul)` | High | Partly done — the pass is built (3 closed, one by its raiser; 5 with answers, 5 act, 45 watch); the archive is built (#811); left: the 45 live looks against the 15, on Paul's answer to the steer |
 | TD-245 | A member that ends its run at an entry's end, past its context bound, is marked `early` when the run was under thirty minutes, and nothing restarts it: grinder-ao-2 sat idle 20 hours on 2026-09-30 with the team's work in its package; and 200k is under what one entry in this repo costs | High | Open — design-first |
 | TD-246 | A person cannot restart a member unattended: the restart row says *yours now* and its one button, Resume, brings the session back attended; there is no `ao restart` | Medium | Open — design-first |
@@ -131,11 +129,29 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-252 | The team card's *TDs in motion* rows have one fixed column and the rest as wide as their text, and the header's *who for what* line is boilerplate that tells Paul nothing: lay the rows out in columns, drop the line from the header | Medium | Open — pickable |
 | TD-253 | A restarted grinder's brief names its techlead and its manager as `none` while both exist, so its asks and its `done` lines are addressed to nobody | Medium | Open |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Open — design-first |
+| TD-256 | Rule 9's marks (`finished_sent_at`, `closed_for: finished`) outlive a person's Resume of the manager, so it raises *manager did not close* at once; and a person's Close of a person-led team's last member ends the team with no note | Low | Open |
 
 
 ---
 
 <!-- Entry template:
+## TD-001: Short title of the problem
+
+**Priority:** High | Medium | Low
+**Added:** YYYY-MM-DD
+**Owner:** anchor | grinder | paul | dev-cadence
+**Kind:** build | design-first | live-check | evaluation | decision
+**Pickable:** yes | no — <one clause>
+**Status:** Open
+**Location:** `path/to/file.py` (function/section)
+
+**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
+
+**Fix:** concrete direction(s), and what would count as done.
+
+**Related:** other TDs, PRs, decision docs.
+-->
+
 ## TD-002: Focus composer: Attach / drop / paste upload
 
 **Priority:** Medium
@@ -2359,47 +2375,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-177 (the design), TD-176 (the numbers), TD-227 (rule 8, which gains the fifth bound when both are built; whichever lands second adds it), TD-093 (the reader and its bound), TD-100 (the usage gate, the precedent for a line a person sets).
 
-## TD-240: Whether a team has finished is the manager's judgement from memory, not a reading of its members' records
-
-**Priority:** Medium
-**Added:** 2026-09-29 (Paul: *I wanted to start it, saw there was no start choice, so hit "wind down"… now the team seems to be idle with no start button*; then: *seems like we should be able to check member states mechanically*)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — designed; the build is TD-241
-**Status:** Designed 2026-09-29 (the designer, PR #775; the steer to Paul is `m-131e40cf9385`, bound 2026-09-30 09:02 MDT): design §6 rule 9 *Finished is the home's reading*, §4.9a, §4.5a *team groups* (*concluded* from the same reading, the *not concluded* line), §4.9 `ao team status --json`. Of the Fix's three: (a) and (c) together, since the page and the tick must agree, and (b) as the brief's word. Closes with TD-241.
-**Blocked by:** TD-241
-**Location:** `src/agentorc/briefs/manager.md` (*Out of work*: the manager decides every member is finished and winds the team down), design §4.9a (the wind-down, *finished means declared*), §4.5a **team groups** (*concluded*: every live session idle and declared, the manager included), the tick (`agent_tick.py`)
-
-**Why:** dc-grind sat live and idle for most of 2026-09-29. grinder-dc-1 declared `out_of_work` at 04:19Z, took TD-072 later in the day, and declared again at 23:54Z (dev-cadence: 0 pickable, three entries on Paul's decisions), but manager-dc-1 never wound the team down. Its rounds read *continued quiet, grinder still interactive under Paul*, a belief two days old: Paul had made the grinder interactive on 2026-09-27, and the anchor restarted it unattended the same evening (`ao new`, 22:06 MDT), as its record's `unattended: true` said throughout. Because the manager never declared, the page's *concluded* test (every live session idle **and** declared, the manager among them) never held. So the card offered **Wind down**, not **Start**, and when Paul wanted to start the team he could only wind it down. Every fact the manager needed was on the records: each member's `unattended`, `state`, `out_of_work`. The manager read its memory instead. TD-199 is the same shape: a running member keeps what it knew at its start.
-
-**Fix:** design the team's *finished* as a reading the home makes, not a judgement a session keeps. Options: (a) the tick, which already derives *concluded* for the page, winds a team down itself when every member is finished and its seats are idle (a policy beside TD-214's rule 8, which restarts it when work arrives); (b) the manager's round reads `ao team status --json` (the members' `unattended`, `state`, `out_of_work`) every round and is told never to rely on an earlier round's reading; (c) the page's *concluded* stops requiring the manager's own declaration when every member has declared, and offers **Start** (which closes the concluded sessions first) then. The round may take more than one. Also: the team card's controls should say why Start is absent (*live: manager-dc-1 has not declared*). Done when a team whose members have all declared out of work reads concluded, or winds down, within a tick or a round, and a test covers a manager that has not declared.
-
-**Related:** TD-199 (a running member keeps its start brief), TD-214 (rule 8, a wound-down team gaining work), TD-213 (archived: the wind-down's closes took the person's questions), TD-053 (wind-down), §4.9a, §4.5a **team groups**.
-
-## TD-241: Build finished as the home's reading — rule 9, the page's concluded, the manager's brief
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-09-29 (the designer, from TD-240's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1, PR #816):** `work.finished(records, seats)` and `work.manager_of`, over the home's `Session`s or a client's views; `teamrun.concluded` returns the reading where it holds, so the page and `_close_concluded` take an idle manager that never declared; `tests/test_finished.py` holds slice 5's cases for the reading (the `why` clauses, a working seat, an interactive member, a dead member with `restart_wanted`, `restart` true). The answer is given for every team with an unattended session live and **holds when `why` is empty**; a blocking dead member has a clause too. **For slice 2:** `rows` does not carry `why` yet (it calls `concluded`; the *not concluded:* line reads `finished(mine, seat_names(t, mine))["why"]`), and `group_head.html`'s title on *concluded* still says every session *has declared its run over*, which the manager need not have. **Slice 3 built 2026-09-30 (grinder-ao-1, PR #821):** `_finished_pass` / `_finished_team` in `agent_tick.py`, run on the home's tick after the keep-running pass — `_finished_first` in memory, `FINISHED_SETTLE` (`agent_common`), `_finished_close` (idle, git fields known and clean, a node's over its link), the manager's one line and `finished_sent_at` (`models`, home-owned), its close `WRAPUP_GRACE` later with `closed_for: {why: finished}`, `_finished_tell`'s note to the person, and `work.wound_down` passing over a manager with that mark (`work.closed_finished`); slice 5's tick cases are `tests/test_finished_tick.py`. **For slice 2, from slice 3:** the Inbox row *manager did not close* is a live record whose `finished_sent_at` is older than `WRAPUP_GRACE` (nothing else is stored), and the card's *· by the tick* is a manager record for which `work.closed_finished` is true. Not tested against a pane or a link: the line's typing is `_policy_send`'s, and a node's close is `_route_act`'s. **Known gap, from the review of #821:** where no manager is live to carry `finished_sent_at`, the note to the person is written only on a tick whose own close ends the last member, so a person's Close of a member left open with work ends the team with no note — a mark on the team's `host` entry would cover it, if it is ever seen. **Slice 2 built 2026-09-30 (grinder-ao-1, PR #828), but for what reads slice 3's fields:** `teamrun.rows` asks the reading once and carries `not_concluded` (its `why`), `ui/repo.py` `team_groups` passes it for a live team that is not concluded, and `group_head.html` draws *not concluded: …* under the counts, above *who for what*, with the new help entry *not concluded* (`ui/help.py`, §4.5a's list) as its hover; *concluded*'s hover says every member declared, not every session; `ao team status --json` carries `unattended`, `seat`, `out_of_work`, `restart_wanted` per row and `finished` on the reply (`tests/test_cli_teams.py`, `tests/test_ui_teams.py`). **The rest of slice 2 built 2026-09-30 (grinder-ao-1, PR #831):** the Inbox row *manager did not close* (`ui/inbox.py` `unclosed_mark`, raised in `state_rows`; §4.5a's new row, **Open** alone — a steer to the techlead with that default, m-8e0282638dba) and the card's *· by the tick* (`teamrun.rows` `by_tick`); tests in `tests/test_ui_inbox.py` and `tests/test_ui_teams.py`. **Known gap, from the review of #831 (`sessionorc`, the writer's):** a person's Resume of a manager rule 9 closed keeps `finished_sent_at` and `closed_for: finished` on the record — only a member at work removes the first and only a Close rewrites the second — so the resumed manager raises *manager did not close* at once (and the tick closes it again once idle and clean), and if it then exits its team still reads *· by the tick*; the cure is to drop both marks where a resume brings the record back. Slice 4 open; the live half of *Done when* is on the board.
-**Location:** `src/sessionorc/` (a `finished(records)` reading in `work.py`, beside `wound_down` and `team_wound_down`, which TD-227 put there; `agent_tick.py` `_keep_running`, a team pass beside `_team_stop_times`; `agent_common.py` `FINISHED_SETTLE`; the close and `closed_for` of rule 2 in `_wanted_restart`; `agent_mail.py` `_system_note`), `src/agentorc/teamrun.py` (`concluded`, `wound_down`, `rows`, `_close_concluded`, `stop_members`, `stop_lead`), `src/agentorc/ui/repo.py` (`team_groups`: `concluded`, `stopped`), `ui/templates/group_head.html`, `src/agentorc/cli.py` (`cmd_team_status`), `src/agentorc/briefs/manager.md` (*A round*, *Out of work*), `tests/test_cli_teams.py` (or a new `tests/test_finished.py`) and the tick's tests
-
-**Why:** TD-240's *Why*: dc-grind sat live and idle for a day because its manager's memory said a member was interactive, and the page asked for that manager's own declaration before it would offer Start.
-
-**Fix, in slices a PR each:**
-1. **The reading** (`sessionorc`): `finished` takes the team's badged records and nothing else — a seat is a record with `seat`, the manager the record the others list in `controllers` that holds `control`, a person's `unattended: false` — and answers `{at, restart, names, why: [...]}` or none — every unattended live non-seat non-manager record finished (`out_of_work`; a dead one with `out_of_work` counts, a crashed one or a dead one with `restart_wanted` blocks, other dead ones are passed over), `restart` true when any counted member carries `restart_wanted`, seats idle or gone, the manager idle when live; interactive records ignored; `why` one clause per unattended live session that keeps it from holding (*grinder-dc-1 working*, *grinder-dc-2 idle, not declared*). The clients' `teamrun.concluded` calls it, so the page and `ao team start`'s `_close_concluded` change with it: the idle manager is among what Start closes.
-2. **The page and the terminal**: `group_head.html` draws the *not concluded:* line from `why` on a live, defined team that is not concluded; `cmd_team_status --json` adds `unattended`, `seat`, `out_of_work`, `restart_wanted` per row and `finished` on the reply; help text for the line goes into §4.5a's help list and `ui/help.py` together (bound by `tests/test_help.py`; the wording is this slice's).
-3. **Rule 9** (`sessionorc`): a team pass on the home's tick keeps, in memory, when the reading first held per team, dropped when it stops holding; past `FINISHED_SETTLE` (ten minutes), and only with `restart` false, it closes each finished member under `_unsafe_to_close`'s check (the tick's own form of it), sends a home manager the fixed line once (`finished_sent_at`; an idle composer only, as rule 4; a node's manager gets no line), and `WRAPUP_GRACE` after `finished_sent_at` closes the manager once `idle` and clean with `closed_for: {why: finished, closed_at}`, or leaves it and draws the Inbox row *manager did not close*; a node's member is closed as rule 2 closes one; seats are left to rule 3. Then one `system` note to the person — the PRs from the members' `progress` entries reported `done` with a `pr` since the earliest `created_at` among the team's records that are neither superseded nor forgotten, and each member's `out_of_work.why` — unless a `note` from the manager reached the person inbox after the reading first held. `work.wound_down` and `work.team_wound_down` (the card's reading and rule 8's, since TD-227) skip a manager whose `closed_for` says `finished`, and the card's *wound down* gains *· by the tick* from the mark.
-4. **The brief**: *A round* says the members' states are read from `ao team status --json` (or `ao status --json`) every round and never carried from an earlier one — an `interactive` member is one whose record says `unattended: false` now; *Out of work* says the team's finished is the home's reading, that the round may still end the team first, and what the tick's line means when it arrives.
-5. **Tests**: two members declared and a manager idle without declaring reads finished, and `concluded` on the page agrees; a member `restart_wanted` reads *restart*; a working seat blocks it; an interactive member counts for nothing; a member that claims again inside the settle stops the wind-down; the tick closes the members and sends the manager one line, then closes it after the grace with the mark, and the team then reads *wound down · by the tick*; a member with unpushed work stays open and is named; a member `exited` with `restart_wanted` blocks the reading; a team with `restart` true is not wound down; the announcement is written when the manager wrote none and not when it did; the `why` clauses name the right sessions.
-
-**Done when:** on a scratch home, a team whose two grinders declared `none` while its manager sits idle reads *concluded* on the card with Start as its one control within a tick, and, left alone, is wound down by the tick within `FINISHED_SETTLE` + `WRAPUP_GRACE` with one note in the person's inbox and *wound down · by the tick* on the card.
-
-**Related:** TD-240 (the design), TD-199 and TD-217 (a member's stale memory of its brief, the same shape), TD-214 / TD-227 (rule 8 starts a wound-down team again), TD-237 and TD-238 (`closed_for`), TD-125 (the announcement), TD-053 (the wind-down).
-
 ## TD-244: Groom the agentorc attention board onto the Inbox's features
 
 **Priority:** High
@@ -2600,3 +2575,22 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** the design's §4.5a rows say all of it and a build entry carries the slices; on a scratch home a board item's answers are buttons on its Inbox row, one with a default is decided by one press, a live look by one of two, and the board line carries `Decided:` after each.
 
 **Related:** dev-cadence TD-074 (the guidance and the pair), TD-244 (the groom), TD-142 (Reply on a board row), TD-218 and TD-219 (an entry handed to the techlead), TD-124 (the pages' keys); the steer's *Go with it*: §4.5a **Inbox row: `steer`**, §4.10.
+
+## TD-256: Rule 9's marks outlive a resumed manager, and a person's Close of the last member ends a person-led team with no note
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-09-30 (grinder-ao-1, from the reviews of PR #821 and PR #831; carried out of TD-241 when it was archived)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — neither has been seen live; both were found by reading.
+**Location:** `src/sessionorc/agent_tick.py` (`_finished_team`, `_finished_tell`), `src/sessionorc/work.py` (`closed_finished`, `wound_down`), `src/sessionorc/models.py` (`finished_sent_at`, `closed_for`), wherever a resume brings a record back, `src/agentorc/ui/inbox.py` (`unclosed_mark`), `src/agentorc/teamrun.py` (`rows`, `by_tick`), `tests/test_finished_tick.py`
+
+**Why:** two gaps in rule 9 (design §6) as built by TD-241. (1) **A person's Resume of a manager the tick closed keeps `finished_sent_at` and `closed_for: {why: finished}` on the record**: only a member at work removes the first and only a Close rewrites the second. The resumed manager therefore raises the Inbox row *manager did not close* at once, the tick closes it again as soon as it is idle and clean, and if it exits instead its team still reads *wound down · by the tick*. (2) **Where no manager is live to carry `finished_sent_at`, the note to the person is written only on a tick whose own close ends the last member**: a person-led team with one member left open holding work, which the person then closes by hand, ends with no note, though §6 rule 9 says a team that dissolves is never quiet.
+
+**Fix:** (1) drop both marks where a resume brings the record back, in the one place a resume rebuilds it, with a test that resumes a manager carrying them and reads no *manager did not close* row and no close on the next tick. (2) a mark the home keeps for the team rather than for a manager, saying the announcement is owed: written when the reading first passes its settle and cleared when the note is written, so the tick that finds the last member gone writes it whoever closed it. If (2) needs a stored field the design has no line for, it is a design line first (§4.3's list of the home's fields).
+
+**Done when:** a resumed manager that rule 9 closed reads as any resumed session does, and a person-led team whose last member a person closed has one `system` note in the person's inbox.
+
+**Related:** TD-241 and TD-240 (archived: rule 9), TD-237 and TD-238 (`closed_for`), TD-125 (the announcement).
