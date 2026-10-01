@@ -74,6 +74,8 @@ Added 2026-09-22 (grinder-ao-1):
   anchor while a PR carrying its own TD-126 was open). Before pushing a new entry, and again at the
   rebase, read `origin/main`'s highest `## TD-` and renumber; keep main's rows and yours row-wise.
 
+- Appending to the archive in Python: read into a variable first. `open(a,'w').write(open(a).read()+x)` truncates before it reads and leaves the archive holding one entry (2026-09-27, PR #677, caught by review).
+
 **Why:** these cost real time and one wrong PR state on the first run.
 **How to apply:** when scripting ledger moves or chaining merges in this repo, reuse these rules;
 a helper that skips the template block lives only in a session scratchpad, so rewrite it.
