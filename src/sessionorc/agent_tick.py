@@ -469,6 +469,7 @@ class TickMixin:
                 await self._seat_pass(s, now, records)
                 await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
                 await self._idle_nudge(s, now)
+                await self._idle_open(s, now)
                 await self._context_line(s, now)
                 await self._cadence_line(s, now)
                 await self._held_line(s, now)
@@ -833,6 +834,45 @@ class TickMixin:
             log.info("%s: idle %s with work open — nudged", s.id, IDLE_NUDGE)
             self._save(s)
             await self._push_changes()
+
+    @staticmethod
+    def _open_ref(s: Session) -> str | None:
+        """A member's first open reference (rule 4): a lane reference, then a declared claim, with
+        no `done` or `dropped` entry."""
+        ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
+        claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
+        return next((r for r in [*lane_refs(s.lane), *claimed] if r not in ended), None)
+
+    async def _idle_open(self, s: Session, now: datetime) -> None:
+        """*idle · open work* (design §6 rule 3, TD-259): `idle_open: {at, ref}` on a supervised
+        member, not a seat, that rule 4 nudged in this idle stretch and that is still hook-confirmed
+        idle `IDLE_NUDGE` after the nudge with work open and nothing declared. It stands while the
+        stretch does — the reference it names is the one open when it was written, None where the
+        work is an outcome owed alone — and is cleared
+        when the state changes, the work closes or the member declares."""
+        try:
+            stretch = bool(
+                s.state == "idle" and s.nudged_at and s.since and _parse(s.nudged_at) >= _parse(s.since)
+            ) and not (s.out_of_work or s.restart_wanted or s.superseded_by)
+        except ValueError:
+            stretch = False
+        ref = self._open_ref(s) if stretch and s.seat is None else None
+        # an outcome owed is open work too, as rule 4's nudge counts it (TD-258): the mark names no reference then
+        still = ref is not None or bool(stretch and s.seat is None and s.owed())
+        if s.idle_open:
+            if not still:
+                s.idle_open = None
+                self._save(s)
+                await self._push_changes()
+            return
+        if not still or not (s.supervised and s.unattended) or s.suspended:
+            return
+        if s.confidence != "hook" or s.pending or now - _parse(str(s.nudged_at)) < IDLE_NUDGE:
+            return
+        s.idle_open = {"at": now_iso(), "ref": ref}
+        log.info("%s: still idle %s after the nudge with %s open — idle · open work", s.id, IDLE_NUDGE, ref or "a debt")
+        self._save(s)
+        await self._push_changes()
 
     async def _context_line(self, s: Session, now: datetime) -> None:
         """Rule 5 (design §6, TD-190): a supervised member whose context reading is past its role's
@@ -1706,9 +1746,7 @@ class TickMixin:
             owed = self._owed_part([e.id for e in s.outbox if e.owes_for(session_inbox=False)])
             parts += [owed] if owed else []
             return "[agentorc] " + "; ".join(parts) if parts else None
-        ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
-        claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
-        ref = next((r for r in [*lane_refs(s.lane), *claimed] if r not in ended), None)
+        ref = self._open_ref(s)
         owed = self._owed_part(s.owed())
         minutes = int(IDLE_NUDGE.total_seconds() // 60)
         if ref is None:
@@ -1824,8 +1862,9 @@ class TickMixin:
         sits idle with nothing due and nothing left unpushed."""
         if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
             return
-        due = self._seat_due(s, now)
-        if due != s.seat_due:
+        filled = s.seat_filled
+        due = self._seat_due(s, now, records)
+        if due != s.seat_due or s.seat_filled != filled:
             s.seat_due = due
             self._save(s)
             await self._push_changes()
@@ -1833,19 +1872,74 @@ class TickMixin:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
         if s.state in ("exited", "closed") and s.seat_due:
             await self._fill(s, now, records)
-        elif s.state == "idle" and not s.seat_due and self._seat_has_run(s, now):
+        elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
             log.info("%s: a seat with nothing due, idle and pushed — closing it (§6 rule 3)", s.id)
             if s.host == self.host:
                 await self.rpc_close(s.id)
             else:
                 await self._route_act("close", {"id": s.id}, None, s.host)
 
-    def _seat_due(self, s: Session, now: datetime) -> dict[str, Any] | None:
+    @staticmethod
+    def _seat_done(s: Session) -> bool:
+        """Whether an idle seat has nothing left that this run of it will take: nothing due — or,
+        for a manager on call, a reading of a member that came due after its fill, which the next
+        fill is for, since a fill starts cold on the one reading its `seat_due` names (§6 rule 3,
+        TD-259). A question waiting is the idle seat's own to read, as the techlead's is."""
+        if not s.seat_due:
+            return True
+        return (s.seat or {}).get("trigger") == "team" and s.seat_due.get("by") != "asks"
+
+    def _team_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
+        """What a manager on call is filled for (§6 rule 3, TD-259), each a reading of the records
+        and never of a screen, in this order: `asks` — each open `ask` or `steer` addressed to it,
+        by id; then, of its members (the supervised records listing it in `controllers`), `pending`
+        — hook-confirmed `needs-you` on a permission (a question or a menu is a person's);
+        `stalled` — `stalled?`; `open` — carrying `idle_open`."""
+        causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
+        me = self._address(s)
+        members = [
+            r
+            for r in records
+            if r is not s and r.supervised and not r.superseded_by and not r.suspended and me in self._ctl(r)
+        ]
+        for by in ("pending", "stalled", "open"):
+            for r in members:
+                if by == "pending":
+                    met = (
+                        r.state == "needs-you"
+                        and r.confidence == "hook"
+                        and (r.pending or {}).get("kind") == "permission"
+                    )
+                elif by == "stalled":
+                    met = r.state == "stalled?"
+                else:
+                    met = r.state == "idle" and bool(r.idle_open)
+                if met:
+                    causes.append({"by": by, "member": self._address(r)})
+        return causes
+
+    def _seat_due(self, s: Session, now: datetime, records: list[Session]) -> dict[str, Any] | None:
         """`seat_due: {at, by}` (§6 rule 3): set once the trigger is met and kept until the fill — but
         `asks` is a question waiting now, so it clears again if none is. `prs` reads `seat_count`,
-        which `_count_seats` keeps; `every` is the time since this record was created."""
+        which `_count_seats` keeps; `every` is the time since this record was created. `team` is a
+        manager on call's (TD-259): `{at, by, member}` — `ask` in `member`'s place for `asks` — the
+        first cause standing that no fill was made for; `seat_filled` loses each entry whose cause
+        has gone, here, and a due whose cause went before the fill is cleared as `asks` is."""
         seat = s.seat or {}
         trigger = seat.get("trigger")
+        if trigger == "team":
+            causes = self._team_causes(s, records)
+
+            def same(a: dict[str, Any], b: dict[str, Any]) -> bool:
+                return all(a.get(k) == b.get(k) for k in ("by", "member", "ask"))
+
+            kept = [e for e in s.seat_filled if isinstance(e, dict) and any(same(e, c) for c in causes)]
+            if kept != s.seat_filled:
+                s.seat_filled = kept
+            fresh = [c for c in causes if not any(same(e, c) for e in kept)]
+            if s.seat_due and any(same(s.seat_due, c) for c in fresh):
+                return s.seat_due
+            return {"at": now_iso(), **fresh[0]} if fresh else None
         if trigger == "asks":
             return (s.seat_due or {"at": now_iso(), "by": "asks"}) if s.asks_waiting(home=self.host) else None
         if s.seat_due:
@@ -1893,7 +1987,15 @@ class TickMixin:
                 await self._push_changes()
             return
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
+        cause = s.seat_due if (s.seat or {}).get("trigger") == "team" else None
+        if cause and any(e.id == cause.get("ask") and e.handed_entry for e in s.inbox):
+            cause = None  # an entry the person handed it fills the seat while it owes, as any seat's (TD-218)
         await self._replay(s, "fill", keep_mail=True)
+        new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
+        if cause and new is not None and new is not s:
+            # the fill was made: the cause is remembered on the record that took the seat
+            new.seat_filled = [*s.seat_filled, {**{k: v for k, v in cause.items() if k != "at"}, "at": now_iso()}]
+            self._save(new)
 
     def _seat_has_run(self, s: Session, now: datetime) -> bool:
         """A seat to close (§6 rule 3): hook-confirmed idle for `SEAT_IDLE_GRACE`, with its git known

@@ -1067,7 +1067,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — not built), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — built, TD-259 slice 2), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -4290,11 +4290,11 @@ entry of the home — default the host the start runs on. Checkouts are resolved
 (default `manager`; **`person`** means the person manages — no session is started and members
 get an empty `controllers` list plus the team badge), `name` (default `<team>-lead`), `home` (a
 repo name from the team's projects — required when the projects list more than one repo,
-defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key, the launch and the seat's brief built 2026-10-01 — TD-259 slices 1 and 5, the tick's `team` trigger and the slot not built:
+defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key, the launch and the seat's brief built 2026-10-01 — TD-259 slices 1 and 5; the slot's words and the tick's `team` trigger too — slices 4 and 2:
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's trigger slice lands a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`), because a manager started as a seat before the tick reads `team` is closed idle and never filled; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` now, and the flip waits on slice 3, the mail sweep sparing a question to a closed seat, because until then a question to a manager on call whose fill was refused is lost; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
@@ -6668,8 +6668,8 @@ code and needs no grant; a session doing the same work does.
      count toward `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from
      `seat_count` (*on call — runs after 10 PRs · 4 of 10*), which §4.9b could not while the
      number was the manager's. (This is TD-104, folded here.)
-     **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30, not built —
-     TD-259). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
+     **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30; the trigger,
+     `idle_open` and `seat_filled` built — TD-259 slice 2; the sweep's exception is slice 3's). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
      say `on_call: false` (§4.9), and the tick sets its `seat_due` with `by` one of four words, each a
      reading of the records and never of a screen: **`asks`**, as the techlead's — an open `ask`
      or `steer` addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its
@@ -6678,14 +6678,30 @@ code and needs no grant; a session doing the same work does.
      state row has it); **`stalled`** — a member `stalled?`; **`open`** — a member *idle · open
      work*: `nudged_at` set and the member still hook-confirmed idle `IDLE_NUDGE` after it with
      the same work open, which the tick writes as **`idle_open: {at, ref}`** on the member's
-     record (home-owned, cleared when its state changes), the one reading the card's slot, this
+     record (home-owned; a member's alone, never a seat's; `ref` the first open reference when it was
+     written, and none where the open work is an outcome owed alone, rule 4's owed clause; cleared
+     when its state changes, the work closes or the member declares), the one reading the card's slot, this
      trigger and the person-led team's Inbox row (§4.5a *Inbox row: idle · open work*) draw;
      the page reads it from the record, and derives the slot from `nudged_at` as it did only where the record carries no `idle_open` (a home whose tick does not write it yet). `seat_due` carries the cause — `{at, by,
      member}` — and **a cause fills once per stretch**: the home keeps **`seat_filled:
      [{member, by, at}]`** on the seat's record, an entry dropped when its cause has gone (the
      state changed, the question closed), and a cause still standing after a fill raises no
      second `seat_due` until then, so a manager that chose to leave a member as it was is not
-     refilled into the same reading two minutes later; the fill ceiling guards the rest. The
+     refilled into the same reading two minutes later; the fill ceiling guards the rest. **A
+     question is a cause by its id**: for `asks` the due and the entry carry `ask`, the
+     question's id, in `member`'s place, so a question the manager left standing does not fill
+     it again and a second question does — an entry the person handed it excepted, which is
+     never remembered and fills the seat while it owes its outcome, as it does any seat (§4.10).
+     A member's cause is its word and the member, nothing finer: a second permission raised
+     before a tick saw the first one go is the same cause, and waits for a person as a
+     question does; and a question waiting on an idle, filled seat holds its due, as the
+     techlead's does, so a member's reading waits behind it for rule 4's nudge or the answer. The causes are read in that order — questions, then
+     each member's permission, `stalled?`, *idle · open work* — and the first one no fill was
+     made for is the due; one whose cause goes before the fill is cleared, as `asks` is. **A
+     reading that comes while the seat is filled is the next fill's**: a fill starts cold on the
+     one reading its `seat_due` names, so a manager on call that is idle past `SEAT_IDLE_GRACE`
+     with a member's reading due — never a question, which an idle seat reads as the techlead
+     does — is closed as one with nothing due is, and filled for it on the next tick. The
      fill and the close are this rule's as for any seat — `create` with `keep_mail`, the launch
      record, `restarts: [{why: fill}]`; closed once idle with no `seat_due` for
      `SEAT_IDLE_GRACE` with nothing dirty or unpushed. Its `control` grant and its place in its
