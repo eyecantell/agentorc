@@ -121,7 +121,25 @@ def test_the_manager_is_read_from_the_records():
     assert work.finished([lead, sub, w])["why"] == ["lead idle, not declared"]
 
 
+def test_a_dead_manager_is_passed_over_and_its_members_still_read():
+    """A manager that exited is still the manager — never a member that crashed or must declare."""
+    gone = _manager("exited", pane=True)
+    assert work.manager_of([gone, _rec("g1")]) is gone
+    assert work.finished([gone, _rec("g1", out_of_work=OUT)])["why"] == []
+    assert work.finished([gone, _rec("g1")])["why"] == ["g1 idle, not declared"]
+
+
+def test_a_start_replaces_a_dead_record_in_place_so_only_a_stray_one_blocks():
+    """A member started again takes its old record's id (`_take_name`), so a dead `restart_wanted`
+    blocks only while rule 2 has not acted — or on a record nothing will start again, which is a
+    person's to Forget, and the clause names it."""
+    stray = _rec("old-name", "closed", restart_wanted=WANTS, pane=False)
+    got = work.finished([_manager(), _rec("g1", out_of_work=OUT), stray])
+    assert got["why"] == ["old-name closed, restart wanted"]
+
+
 def test_a_declaration_in_any_other_shape_is_none_and_never_a_raise():
     for junk in ("x", ["y"], 7, {"why": "no at"}):
-        view = {"id": "ao-t-g1", "name": "g1", "team": "g", "state": "idle", "out_of_work": junk}
-        assert work.finished([view])["why"] == ["g1 idle, not declared"]
+        for key in ("out_of_work", "restart_wanted"):
+            view = {"id": "ao-t-g1", "name": "g1", "team": "g", "state": "idle", key: junk}
+            assert work.finished([view])["why"] == ["g1 idle, not declared"]

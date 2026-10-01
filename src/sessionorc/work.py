@@ -70,7 +70,9 @@ def manager_of(records: Collection[Any]) -> Any | None:
     """The team's manager among its own records, read without a definition (§6 rule 9): the record
     that holds `control` and that the team's other records list in `controllers`. Where a lead
     under the manager fits too (manager → lead → worker), it is the one no other such record
-    controls; the first by name where that still leaves two. None where a person leads the team."""
+    controls; the first by name where that still leaves two. None where a person leads the team.
+    Only the team's own records are read: a manager carrying another badge, which no team start
+    produces, is not found, and a lead under it would be read as the manager."""
     named = {str(c) for r in records for c in (_f(r, "controllers") or []) if str(c) != str(_f(r, "id"))}
     fit = [r for r in records if has_control(_f(r, "capabilities")) and str(_f(r, "id")) in named]
     ids = {str(_f(r, "id")) for r in fit}
