@@ -159,6 +159,18 @@ async def test_every_refusal_is_by_name_and_changes_nothing(agent, composerstubs
         rec.git = None
         await refused("w has git state unknown")
         rec.git = dict(CLEAN)
+        del agent.sessions[sid]
+        agent.sessions[sid + "-2"] = rec  # a record under a suffixed id: the create would not find it
+        with pytest.raises(AgentError, match="does not hold its launch record's name, 'w'"):
+            await person.call("restart", id=sid + "-2")
+        del agent.sessions[sid + "-2"]
+        agent.sessions[sid] = rec
+        assert rec.state == "idle"
+        twin = await _member(agent, person, tmp_path, name="twin")
+        agent.sessions[twin].name, agent.sessions[twin].dir = "w", rec.dir
+        await refused(f"w is the name of {twin}")
+        await person.call("kill", id=twin)
+        await person.call("remove", id=twin)
         rec.seat = {"trigger": "asks"}
         await refused("w is a seat: rule 3 fills it")
         rec.seat = None

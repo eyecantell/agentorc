@@ -687,13 +687,13 @@ class WakeMixin:
         s = self._find(id)
         now = datetime.now(UTC)
         params = self._restart_check(s, now)
+        entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
+        read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
         if s.state == "idle":
             if s.host == self.host:
                 await self.rpc_close(s.id)
             else:
                 await self._route_act("close", {"id": s.id}, None, s.host)
-        entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
-        read = await self._refill_prompt(s, params, entry)
         try:
             if s.host == self.host:
                 view = await self.rpc_create(**params)
@@ -751,6 +751,15 @@ class WakeMixin:
             live = r.state not in ("exited", "closed") and not r.superseded_by
             if r is not s and live and r.host == s.host and r.name == s.name and (r.repo or r.dir) == scope:
                 raise RpcError(f"{s.name} is the name of {self._address(r)}, which is {r.state}: one of a name {rule}")
+        if s.host == self.host:
+            # the create finds what it supersedes at the name's own id: a record under a suffixed id
+            # (tmux held the base when it started) is not there, and the create would refuse after the close
+            base = naming.base_id(s.dir, s.repo, str(launch.get("name") or ""))
+            if self.sessions.get(base) is not s:
+                raise RpcError(
+                    f"{s.name} ({s.id}) does not hold its launch record's name, {launch.get('name')!r} ({base}): "
+                    f"Resume with changes… is the way back {rule}"
+                )
         until = launch.get("run_until")
         try:
             passed = bool(until) and now >= _parse(str(until))
@@ -770,8 +779,8 @@ class WakeMixin:
             raise RpcError(
                 f"{s.name} has {left}: a restart closes a session only with its work committed and pushed {rule}"
             )
-        # `keep_mail`: the new record is a new record, so its mail moves as a seat's fill moves it — a
-        # question that was waiting on the member is still there for the run that answers it
+        # `keep_mail`: the new record is a new record, so its inbox and outbox move as a seat's fill moves
+        # them. Its own open questions to the person end with the close of an idle one, as at any close.
         return {**launch, "supervised": True, "keep_mail": True}
 
     def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any) -> dict[str, Any]:
