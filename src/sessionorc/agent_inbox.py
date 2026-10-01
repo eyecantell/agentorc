@@ -569,7 +569,8 @@ class InboxMixin:
     async def _sweep_mail(self, now: datetime) -> None:
         """Once a tick: an `ask` past its bound expires on every copy and a `steer` past its bound
         **lapses**; an addressee that exited leaves the `ask`s addressed to it pending, a closed one
-        expires them (design §4.10 lifecycle); read entries past retention are pruned, open asks
+        expires them — but for a **seat**, which is closed whenever it is empty and keeps them
+        pending for its fill (design §4.10 lifecycle, §6 rule 3); read entries past retention are pruned, open asks
         exempt. Two things a `steer` does differently (§4.10 *What a person is asked*): its bound
         runs whatever becomes of the addressee — an exit leaves it no `pending` and a close expires
         nothing, it lapses on time — and while the person has **paused** it the sweep skips it
@@ -585,9 +586,11 @@ class InboxMixin:
                     self._lapse_or_expire(e, stamp)
                 elif e.kind == "steer":
                     continue  # the sender goes on: nothing the addressee does closes it early
-                elif r.state == "closed":
+                elif r.state == "closed" and r.seat is None:
                     self._close_entry(e.id, "expired", stamp)
-                elif r.state == "exited" and r.id not in e.pending:
+                elif r.state in ("exited", "closed") and r.id not in e.pending:
+                    # a closed seat is an empty one (§6 rule 3): its question waits for the fill as
+                    # an exited record's does, however long a ceiling, a gate or a down link holds it
                     self._mark(e.id, pending=r.id)
             for e in list(r.outbox):
                 if e.open and not e.paused_at and e.bound and _parse(e.bound) <= now:

@@ -4294,7 +4294,7 @@ defaulted to the only one otherwise), `profile` (overrides the role's), **`on_ca
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` now, and the flip waits on slice 3, the mail sweep sparing a question to a closed seat, because until then a question to a manager on call whose fill was refused is lost; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` and the mail sweep spares a question to a closed seat (slices 2 and 3), and the flip is a step of its own, made with the seat's held briefs; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
@@ -5682,7 +5682,7 @@ and **an entry is open exactly when it is an `ask`, `steer` or `conflict` with n
 — which is what *never pruned while open*, the depths above and the FYI list all read. The older
 fields are still written, so nothing that reads them changes: `replied` sets `closed_by` (the
 reply's id) and `closed_at`; `expired` — a session-to-session `ask` whose bound ran out, or whose
-addressee was closed or forgotten — sets `expired_at`; `lapsed`, `declined`, `go_with_it`,
+addressee was closed or forgotten (a closed **seat** excepted: lifecycle, below) — sets `expired_at`; `lapsed`, `declined`, `go_with_it`,
 `asker_gone` and `asked_person` (§4.9b *When it cannot answer*) set `closed_at` alone. Retention
 for every closed entry runs from `closed_at` or `expired_at`, whichever it has. An entry with no
 `closed_reason` (written before the field existed) reads as closed when `closed_by` or
@@ -6095,7 +6095,7 @@ The evidence to re-read is the same: the records of a night's team.
   wall-clock on the home's clock (§4.4a) — never turns: a worker busy for hours completes none. It
   runs from the moment the `ask` was sent, **read or not** — a read-but-unanswered `ask` is the
   likeliest thing to strand. When the bound expires, or an addressee is gone — closed or forgotten;
-  an exited one leaves the `ask` pending (lifecycle, below) — the `ask` is marked expired on the
+  an exited one, and a closed seat, leave the `ask` pending (lifecycle, below) — the `ask` is marked expired on the
   record, both cards show it, and the asker's `ao` replies say so. What to do next — a board line,
   a `send`, dropping it — is the asker's call, as with a refused exchange.
 - **Damped at delivery.** The per-thread bound cannot see one session writing many threads, so
@@ -6136,6 +6136,10 @@ The evidence to re-read is the same: the records of a night's team.
    **resume carries mail forward** (below): a worker that crashed and is resumed inside the window
    still receives the note its manager sent. An open `ask`, `steer` or `conflict` is untouched — it
    keeps the lifecycle it has, pending while the record is only exited and expired when it closes.
+   **A seat is the exception** (§6 rule 3, TD-259): a record carrying `seat` is closed whenever the
+   seat is empty, so an `ask` addressed to it stays open and pending across the close, as across
+   an exit, and is there at the fill — whichever seat, and however long a ceiling, a gate or a
+   down link holds the fill back. Its bound still runs, and Forget still expires it with the record.
    The per-thread exchange count is kept as its own tally on the
    record, never recounted from the entries that survive, so pruning cannot reset the deadlock
    bound.
@@ -6708,9 +6712,9 @@ code and needs no grant; a session doing the same work does.
      members' `controllers` are the record's and survive the close, since a fill supersedes the
      record in place at the same id (§4.1): a member's mail to its controller lands in the
      closed seat's inbox and waits for the fill, as a question to the techlead does — and the
-     mail sweep (§4.10) **spares an `ask` to a closed record that carries `seat`**; today it
-     expires one on the next sweep, which a fill refused by its ceiling, a gate or a down link
-     turns into a lost question, so the build closes that gap for every seat. **The ceiling's
+     mail sweep (§4.10) **spares an `ask` to a closed record that carries `seat`**, for every seat:
+     a fill refused by its ceiling, a gate or a down link would otherwise turn a question to
+     an empty seat into a lost one on the next sweep. **The ceiling's
      groups**: `FILL_CEILING` is over the seats sharing a controller, so a team's techlead and
      auditors (`controllers: [manager]`) are one group whether the manager is standing or on
      call, the manager seat itself is a group of one (its controller is a director's, where
