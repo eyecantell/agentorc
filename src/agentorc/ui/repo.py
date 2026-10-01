@@ -310,6 +310,9 @@ def team_groups(
                 # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
                 # since a wind-down would only wake the manager to find nothing to wind down
                 "concluded": concluded,
+                # a live, defined team that is not: why there is no Start, a clause per session
+                # that keeps it from the reading (§4.5a *team groups*, TD-241)
+                "not_concluded": list(row.get("not_concluded") or []) if live and concluded is None else [],
                 "concluded_age": row.get("concluded_age") if concluded else "",
                 "stopped": not live or concluded is not None,
                 # a person's live sessions in the team, named apart in Wind down's and Stop now's

@@ -654,6 +654,41 @@ def test_status_lists_the_members_with_state_lane_and_report_line(world, capsys)
     assert rows[-1]["running"] is False
 
 
+def test_status_json_carries_what_the_homes_reading_reads_and_the_reading(world, capsys):
+    """TD-241 slice 2, design §4.9: under `--json` each row has `unattended`, `seat`, `out_of_work`
+    and `restart_wanted` as the record has them, and the reply `finished` — `work.finished` over
+    the same records, so a manager's round reads what the tick reads."""
+    tmp_path, state = world
+    started(state)
+    capsys.readouterr()
+    out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
+    by = {s["name"]: s for s in state["sessions"]}
+    by["grind-1"].update(state="idle", out_of_work=out)
+    by["grind-2"].update(state="idle")
+    by["orc-ao"].update(capabilities=["control"])  # as the team start's grant leaves the manager's record
+    assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    rows = {r["name"]: r for r in got["sessions"]}
+    assert rows["grind-1"]["out_of_work"] == out and rows["grind-1"]["unattended"] is True
+    assert rows["grind-2"]["out_of_work"] is None and rows["grind-2"]["restart_wanted"] is None
+    assert "seat" in rows["orc-ao"]
+    assert got["finished"]["why"] == ["orc-ao working", "grind-2 idle, not declared", "hunt working"]
+    assert got["finished"]["at"] is None
+
+    for name in ("grind-2", "hunt"):
+        by[name].update(state="idle", out_of_work=out)
+    by["orc-ao"].update(state="idle")  # the manager, idle and never declared
+    assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
+    f = json.loads(capsys.readouterr().out)["finished"]
+    assert f["why"] == [] and f["at"] == out["at"] and f["restart"] is False
+
+    state["sessions"] = [s for s in state["sessions"] if s["name"] == "nobody"]
+    assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["finished"] is None, "nothing live: wound_down's to describe"
+    assert got["sessions"][0]["running"] is False and got["sessions"][0]["out_of_work"] is None
+
+
 def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, capsys):
     tmp_path, state = world
     (tmp_path / "agentorc" / ".agentorc.yml").write_text(

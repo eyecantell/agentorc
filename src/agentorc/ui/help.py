@@ -66,6 +66,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "not-concluded",
+        "not concluded",
+        "a live team's header",
+        (
+            "Says why this team has no Start yet: one clause for each session that keeps it from reading "
+            "concluded — one that is working, one idle that has not declared, one that crashed or wants a "
+            "restart. Read it to see what to wait for, or which session to message or close, before the team can "
+            "be started again. It is read from the sessions' records each time the page is drawn and is nothing "
+            "to press: Wind down and Stop now are the controls beside it."
+        ),
+    ),
+    Help(
         "forget",
         "Forget",
         "a card's foot, the exited banner",
@@ -236,7 +248,18 @@ BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
 
 # §4.5a the ***i*** mark row: one mark per control group, and the group's controls in its order
 GROUPS: dict[str, tuple[str, ...]] = {
-    "team": ("start", "wind-down", "stop-now", "forget-all", "fold", "forget", "resume", "close", "message"),
+    "team": (
+        "start",
+        "wind-down",
+        "stop-now",
+        "not-concluded",
+        "forget-all",
+        "fold",
+        "forget",
+        "resume",
+        "close",
+        "message",
+    ),
     "focus": ("wrap-up", "kill", "close", "message"),
     "exited": ("resume", "forget"),
 }
@@ -248,7 +271,18 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "org",
         "Org",
-        ("start", "wind-down", "stop-now", "fold", "forget-all", "forget", "close", "message", "switch-profile"),
+        (
+            "start",
+            "wind-down",
+            "stop-now",
+            "fold",
+            "not-concluded",
+            "forget-all",
+            "forget",
+            "close",
+            "message",
+            "switch-profile",
+        ),
     ),
     ("focus", "Focus", ("wrap-up", "kill", "resume")),
     ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss", "work-start", "work-snooze", "work-dismiss")),

@@ -28,7 +28,7 @@
    where it is (§4.10) #}
 {% if g.team and g.unread %}<span class="badge unread foldmail" title="{{ g.unread }} unread message{{ '' if g.unread == 1 else 's' }} in this team's folded sessions — it stays there, and a start under the same name hands it to the new run (design §4.10); unfold to read it">✉ {{ g.unread }}</span>{% endif %}
 <span class="grow"></span>
-{% if g.team and g.concluded %}<span class="meta" title="every session still here is idle and has declared its run over ({{ 'one asks for a restart' if g.concluded.restart else 'out of work' }}) — Start closes them and starts the team again">concluded{% if g.concluded_age %} {{ g.concluded_age }} ago{% endif %} · {{ 'restart wanted' if g.concluded.restart else 'out of work' }}</span>
+{% if g.team and g.concluded %}<span class="meta" title="every session still here is idle, and every member has declared its run over ({{ 'one asks for a restart' if g.concluded.restart else 'out of work' }}) — Start closes them and starts the team again">concluded{% if g.concluded_age %} {{ g.concluded_age }} ago{% endif %} · {{ 'restart wanted' if g.concluded.restart else 'out of work' }}</span>
 {% elif g.team and not g.live %}{% if g.wound_down %}<span class="meta" title="every session that carried this team's badge declared it was out of work — Start is the restart">wound down{% if g.wound_down_age %} {{ g.wound_down_age }} ago{% endif %}</span>
 {#- design §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only — the press is Start, here or on the Inbox row #}
 {% if g.work_note %}<span class="meta workwaiting" title="{{ g.work_note.title }}">· {{ g.work_note.n }} entr{{ 'y' if g.work_note.n == 1 else 'ies' }} waiting since <span class="localtime" data-at="{{ g.work_note.at }}">{{ g.work_note.age ~ ' ago' if g.work_note.age else g.work_note.at }}</span></span>{% endif %}
@@ -69,6 +69,10 @@
    `ao inbox <seat>`'s #}
 {% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
+{#- design §4.5a *team groups* ***not concluded:*** (§6 rule 9, TD-240, built by TD-241): on a live,
+    defined team that is not concluded, why there is no Start — one clause per unattended session
+    that keeps it from the home's reading, from the records; display only #}
+{% if g.team and g.defined and g.not_concluded %}<div class="meta notconcluded" title="{{ help_title('not-concluded') }}">not concluded: {{ g.not_concluded | join(' · ') }}</div>{% endif %}
 {#- design §4.5a *team groups* **who for what** (§4.8, TD-162, built by TD-171): a second line, whom to
     write to by role, from each role's `message:` line — the definition's words, display only, and
     drawn only when a role carries one #}

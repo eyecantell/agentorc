@@ -311,6 +311,22 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     assert (
         "every session still here is idle" not in head and ">Wind down</button>" in head
     )  # the tmp path says concluded
+    # …and the header says why there is no Start, a clause per session (TD-241 slice 2)
+    assert '<div class="meta notconcluded"' in head and "not concluded: grind-1 working</div>" in head
+    assert 'title="Says why this team has no Start yet:' in head
+    lead = {"tail": [], "capabilities": ["control"]}  # the manager, as the records say it: never declares
+    member = {"tail": [], "controllers": ["orc-ao"]}
+    fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="needs-you"), **lead}
+    fleet.sessions[1] = {**badged("grind-1", "ao-grind", state="idle"), **member}
+    html = client.get("/").text
+    assert "not concluded: orc-ao needs-you · grind-1 idle, not declared</div>" in html
+    # a concluded team, and one with nothing live, carry no such line
+    fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="idle"), **lead}
+    fleet.sessions[1] = {**badged("grind-1", "ao-grind", state="idle"), **member, "out_of_work": out}
+    assert "concluded" in client.get("/").text
+    assert "not concluded:" not in client.get("/").text
+    fleet.sessions[:2] = [{**badged(n, "ao-grind", state="exited"), "tail": []} for n in ("orc-ao", "grind-1")]
+    assert "not concluded:" not in client.get("/").text
     assert 'data-fold="ao-grind"' in head  # a live team folds too (TD-194)
 
 
