@@ -2625,3 +2625,20 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-10-01 (PR #865, grinder-ao-1) — `agent._bound` makes and binds each socket by hand under a umask of `0177`, with no `await` inside, and `start_unix_server` takes it as `sock=`; the `chmod` after the bind is gone for `agent.sock` and the link sockets alike. `tests/test_link.py` holds the mode and the umask's return; the container-node test passed 100 runs in a row. The third failure named above was real and a test's own: `test_the_debt_has_a_bound_of_its_own_and_is_never_pruned` left `MAIL_RETENTION` at zero, every tick sweeps mail, and a tick between its last `close` and the read after it pruned the settled question — the test now restores the retention first. Not reproduced in 40 runs; read from the code.
 
 **Related:** TD-057 (step 3c, the link sockets).
+
+## TD-261: `test_send_wait_three_outcomes` hangs to the timeout on CI now and then
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-01 (grinder-ao-1, from a CI failure on PR #865)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `tests/test_agent.py` (`test_send_wait_three_outcomes`), `src/sessionorc/agent.py` (`rpc_send` with `wait`)
+
+**Why:** on PR #865's run 36827137106 the Python 3.13 job hit pytest's 120 s timeout in this test, the seventh of the run; 3.12 passed the same commit and the rerun passed. The dump shows the main thread in the event loop's `select` and all four `asyncio_n` worker threads idle, so the test was awaiting something that never came — a `send --wait` whose turn never started or never settled, or the stub pane's output never arriving — and not a blocked thread. It passed 25 runs in a row on kmaster (3.13). It is likely the hang TD-260's entry mentions and could not name (run 36815754454, 3.12). The harm is a rerun now and then, and a `--wait` path that may be able to wait for ever where its own bounds (`prompt-stalled`, `timeout`) should end it.
+
+**Resolved:** 2026-10-01 (PR #866, grinder-ao-1) — the cause is named: the test's last case forgets a record whose pane is alive, the tick (0.3 s in the fixture) adopts that pane as a shell under the same id, and when the adoption fell inside one 0.1 s poll `_wait_state` never saw the id empty and a `send --wait` with no timeout read the adopted record for ever. `rpc_send`'s wait now holds the record it typed into (`_wait_state`, `_raise_not_settled`), and an id that is another record's ends it as `removed`; design §4.2's `removed` clause says so. `tests/test_agent.py` `test_send_wait_ends_when_its_id_is_taken_by_another_record` holds it, failing on the old code. The earlier 3.12 hang (run 36815754454) left no dump, so that it was this is likely and not shown.
+
+**Related:** TD-260 (the other two CI races of that week), TD-016 (`send --wait`).

@@ -128,7 +128,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-250 | Build the person's restart: the `restart` RPC (close under the safety check, replay from the launch record, the marks and `restarts` cleared, `{why: person}`), Restart on the Inbox row and the card's more menu with its help, `ao restart`, the manager brief's board line | Medium | Partly done — slice 1 (the RPC) built; the row, the card and `ao restart` left |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Designed 2026-09-30 — the build is TD-255 |
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Partly done — slices 1–2 built (the write-back; the buttons, Go with it, the keys, the help); slices 3–4 wait on dev-cadence TD-074's pair |
-| TD-261 | `test_send_wait_three_outcomes` hangs to the 120 s timeout on CI now and then (3.13, run 36827137106): the loop idle in `select`, every worker thread idle, nothing reproduced in 25 local runs | Low | Open — pickable |
 
 
 ---
@@ -2565,20 +2564,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, a board item's answers are buttons on its Inbox row, one with a default is decided by one press, a live look by one of two, and the board line carries `Decided:` after each; the help entries are in §4.5a's list; this repo's live looks carry the pair.
 
 **Related:** TD-254 (the design), dev-cadence TD-074 (the guidance and the pair), TD-244 (the groom), TD-142 (Reply), TD-218 / TD-219 (an entry handed to the techlead), TD-124 (the keys), TD-140 (Put on the board, the first add), TD-036 (`board_edit.py`).
-
-## TD-261: `test_send_wait_three_outcomes` hangs to the timeout on CI now and then
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-01 (grinder-ao-1, from a CI failure on PR #865)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `tests/test_agent.py` (`test_send_wait_three_outcomes`), `src/sessionorc/agent.py` (`rpc_send` with `wait`)
-
-**Why:** on PR #865's run 36827137106 the Python 3.13 job hit pytest's 120 s timeout in this test, the seventh of the run; 3.12 passed the same commit and the rerun passed. The dump shows the main thread in the event loop's `select` and all four `asyncio_n` worker threads idle, so the test was awaiting something that never came — a `send --wait` whose turn never started or never settled, or the stub pane's output never arriving — and not a blocked thread. It passed 25 runs in a row on kmaster (3.13). It is likely the hang TD-260's entry mentions and could not name (run 36815754454, 3.12). The harm is a rerun now and then, and a `--wait` path that may be able to wait for ever where its own bounds (`prompt-stalled`, `timeout`) should end it.
-
-**Fix:** reproduce under load (the test in a loop beside a full `pdm run test`, or with the stub's child slowed), find which of the three outcomes was being awaited from the CI log's captured output, and either bound the wait the test makes or fix the path that misses its own `SEND_STALL_SECONDS`. Done when the cause is named and the test passes two hundred runs under load.
-
-**Related:** TD-260 (the other two CI races of that week), TD-016 (`send --wait`).
