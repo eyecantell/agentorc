@@ -3644,7 +3644,22 @@ default is every repo's and moves only on evidence that is every repo's: TD-189'
 a fresh run's start-up cost, weighted, at a median 342k and the cost break-even *around 300k*,
 and recommended 200–250k for a grinder; the default takes the break-even, since a bound under
 start-up plus one entry restarts after every entry, so the worker presets carry **300k** once
-TD-249 lands, and 200k stays the number here until it does.
+TD-249 lands, and 200k stays the number here until it does. **300k is also the default for
+every role that sets none** (Paul, 2026-09-30: designer-ao-1 had reached 352k and manager-ao-1
+756k untold, since only the three worker presets carried a bound and a role an org defines, or
+the manager, carried none): a supervised member whose role has no `context:` takes 300k; a
+**seat** takes none, as today (it is short, and on call); and `context: none` written on a role
+still switches the bound off. So `manager` and `plain` members and every org-defined role are
+bounded unless their definition says otherwise, and `ao roles` prints *context bound: 300k
+(default)* for them. **The manager's restart at the bound** is its own round's ending, not an
+entry's: it holds no claim, so rule 5's idle line rarely finds it (a manager blocks in `ao
+wait`, which is a turn), and what it reads is the reply clause on its `ao` calls; its brief says
+that a round in which that clause appears ends with `ao progress restart --why "context
+bound"` **in place of `ao wait`**, once the round's sends are made and nothing it owes is open,
+and rule 2 restarts it as it restarts a member (§4.9a *Not finished, so the team does not wind
+down*): its round log is keyed by its name beside its run logs, so the next run reads where
+the last left off, and the members notice nothing — their controller's id is the record's,
+superseded in place.
 What is particular to one repo goes in that repo's `.agentorc.yml` as `roles.<role>.context:
 {bound}` — agentorc's design is about 760 KB and its ledger 710 KB, each most of 200k tokens read
 whole, so a run here crossed the bound inside its first entry and restarted after every one —
@@ -6531,15 +6546,17 @@ code and needs no grant; a session doing the same work does.
      **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
      kept beside the tokens, since the model may change mid-run) is over its role's
      **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,
-     auditor; 300k once TD-249 lands, and a repo's own number under its `.agentorc.yml`, §4.8 *The
-     bound has two layers* — none for `manager`, `techlead` and `plain`) is told so **once it is hook-confirmed
+     auditor; 300k once TD-249 lands, for them and for every role that sets none, a seat excepted,
+     and a repo's own number under its `.agentorc.yml`, §4.8 *The bound has two layers* — until
+     then none for `manager`, `techlead` and `plain`) is told so **once it is hook-confirmed
      `idle` and holds no claim in progress** — between entries, never mid-turn — by **one fixed line**
      through `send`'s path, as rule 4's is: *[agentorc] context 231k, over your 200k bound — take
      nothing new: push, ledger, then `ao progress restart --why "context bound"`*; `context_sent_at`
      marks it, and it is sent again after twenty minutes if the member is still idle and over. A
      member that is `working` past the bound is not interrupted: every `ao` reply it makes ends with
      *(context 231k over the 200k bound)* beside the unread line (§4.10 *Busy for hours*), and its brief
-     says what that means — finish the entry in hand, then declare. The declaration is the member's
+     says what that means — finish the entry in hand, then declare; for a manager, end the round
+     with the declaration in place of `ao wait` (§4.8 *The manager's restart at the bound*, TD-245). The declaration is the member's
      (§4.9a *A run that ends with work left*, §9 invariant 14) and rule 2 restarts it; the line is
      the trigger the brief's *your context is long* never had. Ordered as the doorbell is: a wrap-up
      under way or a gate pause beats it, and a member that has declared already (out of work, a restart
