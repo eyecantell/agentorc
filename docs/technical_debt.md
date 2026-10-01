@@ -124,6 +124,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Designed 2026-09-29 — the build is TD-241 |
 | TD-241 | Build finished as the home's reading: `finished` in `sessionorc`, the page's *concluded* and the *not concluded* line from it, rule 9's wind-down by the tick with its send, close, mark and announcement, `ao team status --json`'s fields, the manager brief | Medium | Open — pickable |
 | TD-244 | Groom the agentorc attention board onto the Inbox's features: 58 open items and none carries `Answers:`; close what is done, give every question its answers and a `(default)`, ledger what is overdue 14 days behind `Blocked by: decision (Paul)` | High | Open — pickable |
+| TD-245 | A member that ends its run at an entry's end, past its context bound, is marked `early` when the run was under thirty minutes, and nothing restarts it: grinder-ao-2 sat idle 20 hours on 2026-09-30 with the team's work in its package; and 200k is under what one entry in this repo costs | High | Open — design-first |
+| TD-246 | A person cannot restart a member unattended: the restart row says *yours now* and its one button, Resume, brings the session back attended; there is no `ao restart` | Medium | Open — design-first |
 
 
 ---
@@ -2442,3 +2444,46 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** the board has 15 or fewer open items; every open `decide` item carries `Answers:` with at most one `(default)`; none is overdue 14 days or more; every ledgered item's entry is listed by `python3 scripts/ledger.py --pickable` as blocked on `decision (Paul)` or its TD, or is `Owner: paul`; the PR body carries one table row per item the board held at the start — the line's first words, what was done (closed / answers / ledgered TD-NNN / kind and due / duplicate / answers unclear), and the evidence or the default — so Paul can check the groom from the PR alone; and, once 10 or more lines are closed, §3.4's archive PR has moved them.
 
 **Related:** cadence §3.3–§3.5 (`Answers:` and the default: dev-cadence#TD-036, dev-cadence#TD-066), cadence §2.4 (`Blocked by:`: dev-cadence#TD-064), TD-223 and TD-228 (pickable derived), TD-218 and TD-219 (the Inbox's handed entries), PR #693 (the ledger's groom).
+
+## TD-245: A restart at an entry's end, past the context bound, is marked early and left to the person; and 200k is under one entry's cost here
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-09-30 (Paul, on grinder-ao-2's 20 idle hours: *would it make the most sense to have the grinder restart on a TD boundary after 200K (or larger if that is determined) instead of during a TD? That handles both the large case (restarts after single TD) and small case (restarts after n TDs)*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — design-first: §4.9a's `early` rule and §6 rule 5's bound change
+**Status:** Open
+**Location:** design §4.9a (*Inside the ceiling*: `RESTART_EARLY`, `restart_wanted.early`), §6 rule 2 and rule 5; `src/sessionorc/agent_common.py` (`RESTART_EARLY`), `agent_tick.py` (`_wanted_restart`), where `ao progress restart` writes `early`; `src/agentorc/repoconfig.py` (`WORKER_CONTEXT = {"bound": "200k"}`); `src/agentorc/briefs/grinder.md`
+
+**Why:** the boundary restart Paul describes is what TD-189/TD-190 built: past the bound a member is told *finish the entry in hand, push, then `ao progress restart`*, and rule 2 restarts it. Two things defeat it. (1) **`early` reads a run that finished its entry fast as a run that never began.** A `restart` declared inside thirty minutes of the record's start carries `early: true`, and neither the tick nor a controller acts on one. grinder-ao-2's record on 2026-09-30: restarts at 00:58Z, 01:29Z, 02:14Z and 03:15Z, each a clean restart after merged work, then `restart_wanted` at 03:40Z — 25 minutes in, context 209k, TD-229 slices 1 and 4 merged (#778, #779), nothing unpushed — marked `early`. It sat idle until Paul had it restarted by hand at about 23:50Z, holding the team's remaining package, with TD-244 (High) merged and unclaimed for 11 hours, the manager waiting on Paul each round, and no Start on the card (a member wanting a restart is not finished). (2) **The bound is under what one entry costs here.** `docs/design.md` is 755 KB and `docs/technical_debt.md` 692 KB, each most of 200k tokens if read whole; grinder-ao-2's fresh run on TD-244, a docs-only entry, read 148k with its PR open. TD-189's own research put a fresh run's start-up at a median 342k weighted and the cost break-even *around 300k*; 200k was Paul's starting number. So a run crosses the bound inside its first entry, restarts after one entry every time, and when that entry is quick the restart is `early`.
+
+**Fix — a design round, then the build:**
+1. **`early` is decided from fields, not the clock alone.** A `restart` inside `RESTART_EARLY` is not early when the run did work: the record holds a `progress` entry reported `done` since its start, or its `context.tokens` is at or past its bound. What stays early is the case the rule was written for — a run that is over before it began: no `done`, context under the bound. The `why` is still never read.
+2. **The loop guard that remains is the ceiling** (three restarts in two hours, TD-186's window), which already goes to the person. The round says whether a run of one-entry restarts should count toward it differently from crash restarts, and what the Inbox row says when it does.
+3. **The bound.** Raise the grinder default toward TD-189's break-even (300k) or set it per repo, and say which; measure first what a fresh grinder run reads before its first claim in this repo (brief, `ao --skill`, the primer, how much of design.md and the ledger) from the run logs under `~/.agentorc/runs/`, since a bound under start-up plus one entry restarts every entry.
+4. **The reading at start-up** is the cheaper half: whether the grinder brief should say *never read design.md or the ledger whole — `scripts/ledger.py --pickable`, then the entry and the sections it names* (TD-118 holds the token-cost side).
+5. **Tests:** a restart 20 minutes in with a `done` since the start is acted on by rule 2; one with no `done` and context under the bound is `early` and is not; the ceiling still stops a fourth in two hours.
+
+**Done when:** a grinder that finishes an entry and declares `restart` past its bound is restarted by the tick within a tick however short the run was, a run that declares with nothing done is still the person's, and a fresh run in this repo finishes at least one entry before its bound.
+
+**Related:** TD-189 and TD-190 (the bound, its research and its build), TD-188 (the design), TD-186 (the ceiling's window), TD-103 (rule 2), TD-083 (`restart_wanted`), TD-118 (start-up reading), TD-246 (the person's restart), TD-240 and TD-241 (the card with no Start).
+
+## TD-246: A person cannot restart a member unattended — Resume brings it back attended and there is no `ao restart`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-30 (the anchor, restarting grinder-ao-2 for Paul)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — design-first: a new control, so §4.5a's table first
+**Status:** Open
+**Location:** design §4.5a (**Inbox row: restart**, the card's ⋯), §4.9 (the CLI), §6 rule 2; `src/agentorc/ui/templates/inbox_row.html` (the `restart` row), `src/sessionorc/agent_tick.py` (`_wanted_restart`, `_replay`), `src/agentorc/cli.py`
+
+**Why:** the Inbox's restart row reads *the host agent will not restart it — yours now*, and offers Open, Resume, Snooze and Dismiss. Resume brings the session back **attended**, which takes a supervised member out of its team's run. `ao` has no `restart`, and `ao team start` refuses while the names are held. On 2026-09-30 the anchor did it by hand: `ao close` on the idle, clean record, then `ao new -d ~/agentorc -w grinder-ao-2 --unattended --supervised --role grinder --brief docs/briefs/grinder-ao-2.md --lane free-pick --team ao-grind --project agentorc -p grind grinder-ao-2` — nine flags read off the old record, any one of which, wrong, starts a different session (the record's `restarts` list and its stored prompt are lost either way). The manager's board line asked Paul to *say restart it*, and nothing reads that sentence.
+
+**Fix:** design, then build, the person's restart: the tick's own replay on a person's word — close if idle and clean (the same `_unsafe_to_close` check, refused by name otherwise), replay from the launch record with `why: person`, clear `restart_wanted`, `restart_ceiling` and `restart_blocked`, and count it or not toward the ceiling as the round decides. Surfaces: **Restart** on the Inbox restart row beside Resume (its help sentence saying which is which), the card's ⋯, and `ao restart <session>`. A person only: no controller gains it (TD-245 says why an early one is not a manager's). The round also says what an answer of *restart it* on a manager's board line should do, or that the manager's line should name the control instead.
+
+**Done when:** on a scratch home, a supervised member idle with an `early` `restart_wanted` is back `working`, unattended, under its manager and on its stored prompt after one press or one `ao restart`, with `restarts` carrying `why: person`; a dirty checkout is refused by name; a test covers both.
+
+**Related:** TD-245 (why the row appears), TD-103 slice 5 (the row), TD-083, TD-186, TD-172 (Members…).
