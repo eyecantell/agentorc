@@ -33,3 +33,5 @@
 - [Delete only your own branches, by name](delete-only-your-own-branches-by-name.md) — `git branch` is every session's; never loop a delete over it (2026-09-27 incident, refs/recovered)
 - [Designer run lessons 2026-09-28](designer-run-lessons-2026-09-28.md) — `ao msg`'s id is `.entry.id` and a warning is not a refusal; run test_ledger.py; re-check a "number taken" live; the host agent never moves the person's checkout
 - [Gate everything after a merge on its state](gate-everything-after-a-merge-on-its-state.md) — check `MERGED` before deleting the branch or reporting; a deleted branch closes the PR for good (2026-09-28, #727 → #730)
+- [The primer is a held path](primer-is-a-held-path.md) — docs/briefs/techlead-context.md is under docs/briefs/**; a design PR leaves it to the build entry's briefs slice
+- [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exits 2; put options first, and never pipe a send through `tail`
