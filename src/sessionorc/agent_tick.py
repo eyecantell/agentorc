@@ -552,18 +552,22 @@ class TickMixin:
         return bool(last and not last.get("error") and _recent(last.get("at"), now, agent_common.RESTART_SETTLE))
 
     def _profile_gated(self, profile: str, now: datetime, team: str = "") -> bool:
-        """Whether `profile` is over a usage line now (§6 *Usage gate*): the gate's own reading, for a
-        record the gate no longer marks — it clears `gated` on an exited one — so a policy does not
+        """Whether `profile` is over a usage line now (`_profile_over`'s reading, as a yes or no)."""
+        return self._profile_over(profile, now, team) is not None
+
+    def _profile_over(self, profile: str, now: datetime, team: str = "") -> dict[str, Any] | None:
+        """The window `profile` is over its usage line in now, or None (§6 *Usage gate*): the gate's own
+        reading — the row `settings.crossed` names, with its `resets` — for a record the gate no longer marks — it clears `gated` on an exited one — so a policy does not
         restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates).
         `team` is the record's: its reserve priority lowers the line exactly as it does at the gate
         (TD-146), or a teamed member would be restarted at 65% and paused on the next tick."""
         whole = settings_mod.load()
         windows = self._gate_windows(profile, now, whole)
         if windows is None:
-            return False
+            return None
         by_label = self._gate_reserves(whole, profile) or {}
         extra = settings_mod.team_extra(whole, team)
-        return settings_mod.crossed(settings_mod.lines(by_label, windows, now, extra)) is not None
+        return settings_mod.crossed(settings_mod.lines(by_label, windows, now, extra))
 
     async def _crash_restart(self, s: Session, now: datetime) -> None:
         """Rule 1 (design §6 *Keeping a team running*): restart a member that crashed by replaying
@@ -1038,8 +1042,11 @@ class TickMixin:
         team's records are replayed (`_work_replays`, the lead first), each `restarts` entry
         `why: work` with the ids it was started for, the instant appended to `work_started` on the
         home's record once however many records it replayed, and None is returned: the mark goes.
-        A member on a node whose link is down holds the whole start as `held: {why: link, host}`, looked
-        at again on the next tick (the techlead's read of #792)."""
+        Every entry of one start carries the same `start` instant and `of`, the number of records it
+        set out to replay, so a client counts *n of m* from the records when some replays failed
+        (the techlead's read of #792). A member on a node whose link is down holds the whole start as
+        `held: {why: link, host, hosts}` — every down host, `host` the first — looked at again on the
+        next tick."""
         started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
         if started != (rec.get("work_started") or []):
             rec["work_started"] = started  # a start older than the day counts for nothing
@@ -1050,17 +1057,21 @@ class TickMixin:
         held = self._work_held(replays, started, conf, now, team, records, standing)
         bare = {k: v for k, v in mark.items() if k != "held"}
         if held is None:
-            down = next((r.host for r in replays if r.host != self.host and r.host not in self._link_muxes), None)
-            if down is not None:
-                held = {"why": "link", "host": down}  # the whole team waits for it, looked at again next tick (§4.4a)
+            down = list(
+                dict.fromkeys(r.host for r in replays if r.host != self.host and r.host not in self._link_muxes)
+            )
+            if down:  # the whole team waits for them, looked at again next tick (§4.4a); `host` for an older page
+                held = {"why": "link", "host": down[0], "hosts": down}
         if held is not None:
             return {**bare, "held": held}
         ids = list(dict.fromkeys(i for got in (mark.get("members") or {}).values() for i in got))
-        rec["work_started"] = [*started, now_iso()]
+        at = now_iso()
+        rec["work_started"] = [*started, at]
+        about = {"ids": ids, "start": at, "of": len(replays)}
         log.info("rule 8: starting %s again for %s (%d records)", team, ids, len(replays))
         for r in replays:
             try:
-                await self._replay(r, "work", mark={"ids": ids}, **({"keep_mail": True} if r.seat is not None else {}))
+                await self._replay(r, "work", mark=dict(about), **({"keep_mail": True} if r.seat is not None else {}))
             except Exception:  # noqa: BLE001 — one record's failure is never the team's start
                 log.exception("%s: rule 8's replay failed", self._address(r))
         return None
@@ -1107,8 +1118,9 @@ class TickMixin:
         if not replays:
             return {"why": "nothing"}
         for profile in dict.fromkeys(r.profile for r in replays):
-            if self._profile_gated(profile, now, team):
-                return {"why": "usage", "profile": profile}
+            if (over := self._profile_over(profile, now, team)) is not None:
+                # the window's reset, when the reading has one, so the row can say when the hold lifts
+                return {"why": "usage", "profile": profile, **({"resets": over["resets"]} if over.get("resets") else {})}
         until = conf.get("until")
         with contextlib.suppress(TypeError, ValueError):
             if until and _parse(str(until)) <= now:

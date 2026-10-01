@@ -496,7 +496,8 @@ def work_held(held: Any, now: datetime) -> str:
         return ""
     why = held.get("why")
     if why == "usage":
-        return f"{held.get('profile') or 'its profile'} is over its line"
+        left = _left(str(held.get("resets") or ""), now)  # "" with no reset on the hold, or one already past
+        return f"{held.get('profile') or 'its profile'} is over its line" + (f", resets in {left}" if left else "")
     if why == "until":
         return "its stop time has passed"
     if why == "day":
@@ -506,7 +507,11 @@ def work_held(held: Any, now: datetime) -> str:
         ago = _age(held.get("started"), now)
         return f"started {ago + ' ago' if ago else 'just now'} and wound down again"
     if why == "link":
-        return f"{held.get('host') or 'a host'} is unreachable"
+        got = held.get("hosts")  # every down host; an older home names one, as `host`
+        down = [str(h) for h in got if h] if isinstance(got, list) else []
+        if len(down) > 1:
+            return f"{', '.join(down[:-1])} and {down[-1]} are unreachable"
+        return f"{(down[0] if down else held.get('host')) or 'a host'} is unreachable"
     if why == "nothing":
         return "no record to start"
     if why == "balance":
@@ -582,7 +587,10 @@ def work_note(mark: Any, now: datetime | None = None) -> dict[str, Any] | None:
 def work_started(members: Collection[Mapping[str, Any]], now: datetime | None = None) -> dict[str, Any] | None:
     """design §4.5a team card **work waiting** note on a live team: *started <t> for TD-213 and 2
     more*, from the newest `restarts` entry `why: work` on the team's live records (rule 8's start
-    writes one on every record it replays) — `{at, age, first, more}`, or None."""
+    writes one on every record it replays) — `{at, age, first, more}`, or None. A start whose
+    replays partly failed adds `n`, `of` and `failed`: every entry of one start carries its `start`
+    instant and `of`, the records it set out to replay, and a failed replay leaves its entry, with
+    `error`, on the ended record — *· 2 of 3 records started — manager-ao-1 did not*."""
     marks = [
         e
         for m in members
@@ -594,12 +602,24 @@ def work_started(members: Collection[Mapping[str, Any]], now: datetime | None = 
         return None
     last = max(marks, key=lambda e: str(e["at"]))
     ids = [str(i) for i in last.get("ids") or []]
-    return {
+    out: dict[str, Any] = {
         "at": str(last["at"]),
         "age": _age(last["at"], now or datetime.now(UTC)),
         "first": ids[0] if ids else "",
         "more": max(0, len(ids) - 1),
     }
+    start, of = last.get("start"), last.get("of")
+    if start and isinstance(of, int):  # a home before the count writes neither, and the note says nothing of it
+        same = [
+            (m, e)
+            for m in members
+            for e in (m.get("restarts") or [])
+            if isinstance(e, Mapping) and e.get("why") == "work" and e.get("start") == start
+        ]
+        failed = list(dict.fromkeys(str(m.get("name") or m.get("id") or "") for m, e in same if e.get("error")))
+        if failed:
+            out.update(n=of - len(failed), of=of, failed=failed)
+    return out
 
 
 def board_due_now(it: Mapping[str, Any]) -> bool:

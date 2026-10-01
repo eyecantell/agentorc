@@ -85,7 +85,11 @@ async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent,
     assert replays.calls == [], "not before the settle"
     await agent._work_marks(later)
     assert [c[0] for c in replays.calls] == ["manager-ao", "grinder-ao-1", "techlead-ao"], "the lead first; no person"
-    assert {c[1] for c in replays.calls} == {"work"} and all(c[2] == {"ids": ["TD-002"]} for c in replays.calls)
+    rec = _team_rec(agent)
+    # every entry of the one start carries its instant and how many records it set out to replay,
+    # so a client counts *n of m* when some replays fail (the techlead's read of #792)
+    about = {"ids": ["TD-002"], "start": rec["work_started"][-1], "of": 3}
+    assert {c[1] for c in replays.calls} == {"work"} and all(c[2] == about for c in replays.calls)
     assert replays.calls[2][3] == {"keep_mail": True} and replays.calls[0][3] == {}, "a seat keeps its mail"
     rec = _team_rec(agent)
     assert "work_waiting" not in rec and len(rec["work_started"]) == 1
@@ -113,8 +117,11 @@ async def test_each_bound_holds_the_start_back_and_says_which(agent, tmp_path, m
     assert _team_rec(agent)["work_started"] == day, "a start older than the day is dropped"
     early = _iso(later - WORK_EARLY + timedelta(minutes=1))
     assert await held({}, [early]) == {"why": "early", "started": early}
-    monkeypatch.setattr(agent, "_profile_gated", lambda profile, now, team="": True)
-    assert await held({}) == {"why": "usage", "profile": "grind"}
+    monkeypatch.setattr(agent, "_profile_over", lambda profile, now, team="": {"label": "week", "resets": None})
+    assert await held({}) == {"why": "usage", "profile": "grind"}, "a reading with no reset names none"
+    resets = _iso(later + timedelta(hours=3))
+    monkeypatch.setattr(agent, "_profile_over", lambda profile, now, team="": {"label": "week", "resets": resets})
+    assert await held({}) == {"why": "usage", "profile": "grind", "resets": resets}, "when the hold lifts"
     assert replays.calls == [], "nothing started while a bound held"
     assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}, "the row of ask, in its place"
 
@@ -124,7 +131,7 @@ async def test_each_bound_holds_the_start_back_and_says_which(agent, tmp_path, m
     assert "held" not in _team_rec(agent)["work_waiting"] and replays.calls == []
 
     # the bound lifts: the next tick starts the team
-    monkeypatch.setattr(agent, "_profile_gated", lambda profile, now, team="": False)
+    monkeypatch.setattr(agent, "_profile_over", lambda profile, now, team="": None)
     settings_mod.save({"teams": {"g": {"on_work": "start"}}})
     teams["g"]["work_started"] = [_iso(later - WORK_EARLY - timedelta(minutes=1))]
     await agent._work_marks(later)
@@ -197,8 +204,16 @@ async def test_a_member_behind_a_down_link_holds_the_start_as_link(agent, tmp_pa
     far.host = "far-node"
     _launch(agent._address(far))  # a node's record is launched under its address at the home
     await agent._work_marks(later)
-    assert replays.calls == [] and _team_rec(agent)["work_waiting"]["held"] == {"why": "link", "host": "far-node"}
+    held = {"why": "link", "host": "far-node", "hosts": ["far-node"]}
+    assert replays.calls == [] and _team_rec(agent)["work_waiting"]["held"] == held
     assert "work_started" not in _team_rec(agent)
+    near = next(r for r in agent.sessions.values() if r.name == "grinder-ao-1")
+    near.host = "other-node"  # two links down: both named, in replay order (the techlead's read of #797)
+    _launch(agent._address(near))
+    await agent._work_marks(later)
+    held = {"why": "link", "host": "other-node", "hosts": ["other-node", "far-node"]}
+    assert replays.calls == [] and _team_rec(agent)["work_waiting"]["held"] == held
+    near.host = agent.host
     far.host = agent.host  # the link is back: the next tick starts the team
     await agent._work_marks(later)
     assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "grinder-ao-2"]
