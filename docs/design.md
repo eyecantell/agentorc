@@ -7060,7 +7060,9 @@ code and needs no grant; a session doing the same work does.
      whose head moved is read again: the head and whether the PR is merged are one `gh pr view`
      before the script, and a head `gh` cannot give is no reading. A merged PR's head no longer
      moves, so its entry carries `merged` and a settled read of it stands with nothing asked,
-     until a new `done` names the PR. Of the PRs waiting, the one longest unread is the run's. **`pass`** writes the entry and nothing else. **`fail`**
+     until the member's own new `done` names the PR (a derived entry is written anew at every
+     derivation, so its date is no report). Of the PRs waiting, the one longest unread is looked at first.
+     A pass takes `told` away with `row`, so a fail after it is a first fail again. **`pass`** writes the entry and nothing else. **`fail`**
      the first time for that PR — `told` empty — is one fixed line to the member, rule 5's two
      ways: typed into the idle composer of an unattended member on the home's own host (never
      into an attended session, invariant 5: it is told by the clause), *[agentorc] PR #842 failed the

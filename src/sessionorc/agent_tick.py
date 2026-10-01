@@ -877,7 +877,9 @@ class TickMixin:
                 dones: dict[int, str] = {}
                 for e in s.progress:
                     if e.status == "done" and isinstance(e.pr, int):
-                        dones[e.pr] = max(dones.get(e.pr, ""), e.at)
+                        # a derived entry is written anew at every derivation, so only the
+                        # member's own word dates a new report
+                        dones[e.pr] = max(dones.get(e.pr, ""), e.at if e.source == "declared" else "")
                 for pr, done_at in dones.items():
                     old = cadence_mod.entry_of(s.checks, pr)
                     if old and old.get("merged") and not cadence_mod.stale(old, done_at):
@@ -904,7 +906,7 @@ class TickMixin:
                 ):
                     continue
                 got = await asyncio.to_thread(cadence_mod.check, root, pr)
-                if got is None or not self._is_record(s):
+                if got is None or not self._is_record(s) or not self._cadence_member(s):
                     continue
                 old = cadence_mod.entry_of(s.checks, pr)
                 new = cadence_mod.record(old, pr, sha, merged, got, now_iso())
@@ -927,8 +929,11 @@ class TickMixin:
         if not self._cadence_member(s) or not s.checks:
             return
         dirty = False
-        for c in s.checks:
-            if not c.get("read_by") and (who := cadence_mod.read_by(s, int(c["pr"]))):
+        for pr in [int(c["pr"]) for c in s.checks]:
+            c = cadence_mod.entry_of(s.checks, pr)
+            if c is None:
+                continue
+            if not c.get("read_by") and (who := cadence_mod.read_by(s, pr)):
                 c["read_by"], dirty = who, True
             if not cadence_mod.untold(c):
                 continue
@@ -938,9 +943,13 @@ class TickMixin:
                     continue
                 if s.gated or self._profile_gated(s.profile, now, s.team):
                     continue
-                ref = next((e.ref for e in reversed(s.progress) if e.status == "done" and e.pr == c["pr"]), "")
+                ref = next((e.ref for e in reversed(s.progress) if e.status == "done" and e.pr == pr), "")
                 if not await self._policy_send(s, cadence_mod.line(c, ref)):
                     continue  # not typed: the next tick looks again
+                # the detached read may have replaced the list while the line was typed
+                c = cadence_mod.entry_of(s.checks, pr)
+                if c is None:
+                    continue
             elif typed and s.state != "working":
                 continue  # exited, closed or at a dialog: nobody reads a reply now
             c["told"], dirty = now_iso(), True

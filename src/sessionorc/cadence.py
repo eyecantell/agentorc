@@ -93,9 +93,10 @@ def stale(old: dict[str, Any] | None, done_at: str) -> bool:
 
 def record(old: dict[str, Any] | None, pr: int, sha: str, merged: bool, got: dict[str, Any], at: str) -> dict[str, Any]:
     """The entry one read leaves: `{pr, at, sha, verdict, failed}`, `merged` once the PR is, and
-    the marks. **`pass`** removes `row`. **`fail`** on a merged PR — which no re-report cures — or
-    read again after the member was told (`told`) sets `row`, the Inbox row's mark. **`unknown`**
-    tells nothing and changes no mark. `told` and `read_by` are carried."""
+    the marks. **`pass`** removes `row` and `told`. **`fail`** on a merged PR — which no re-report
+    cures — or read again after the member was told (`told`, whatever was read in between but a
+    pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark.
+    `read_by` is carried."""
     new: dict[str, Any] = {"pr": pr, "at": at, "sha": sha, "verdict": got["verdict"], "failed": list(got["failed"])}
     if merged:
         new["merged"] = True
@@ -104,7 +105,8 @@ def record(old: dict[str, Any] | None, pr: int, sha: str, merged: bool, got: dic
             new[key] = old[key]
     if got["verdict"] == "pass":
         new.pop("row", None)
-    elif got["verdict"] == "fail" and (merged or (old and old.get("verdict") == "fail" and old.get("told"))):
+        new.pop("told", None)  # a fail after a pass is a first fail again, and told anew
+    elif got["verdict"] == "fail" and (merged or new.get("told")):
         new.setdefault("row", at)
     return new
 

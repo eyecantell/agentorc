@@ -17,6 +17,7 @@ from sessionorc.models import MailEntry, ProgressEntry, Session
 
 PASS = {"verdict": "pass", "failed": []}
 FAIL = {"verdict": "fail", "failed": ["review", "ledger"]}
+UNKNOWN = {"verdict": "unknown", "failed": []}
 
 
 def _script_json(number: int, verdict: str, **rows: str) -> str:
@@ -44,11 +45,15 @@ def test_a_read_leaves_the_entry_and_its_marks():
     second = cadence.record(told, 842, "bbb", False, FAIL, "t2")
     assert second["row"] == "t2" and second["told"] == "t1" and not cadence.untold(second)
     # an unknown read tells nothing and moves no mark
-    unknown = cadence.record(second, 842, "ccc", False, {"verdict": "unknown", "failed": []}, "t3")
+    unknown = cadence.record(second, 842, "ccc", False, UNKNOWN, "t3")
     assert unknown["row"] == "t2" and unknown["verdict"] == "unknown"
     # a later pass removes the row and leaves the entry
     passed = cadence.record(second, 842, "ccc", False, PASS, "t3")
-    assert "row" not in passed and passed["told"] == "t1" and passed["verdict"] == "pass"
+    assert "row" not in passed and "told" not in passed and passed["verdict"] == "pass"
+    assert cadence.untold(cadence.record(passed, 842, "ddd", False, FAIL, "t4")), "a fail after a pass is told anew"
+    # an unknown between two fails changes nothing: the second fail is still the row
+    again = cadence.record(cadence.record(told, 842, "bbb", False, UNKNOWN, "t2"), 842, "ccc", False, FAIL, "t3")
+    assert again["row"] == "t3"
     # a fail read on a merged PR is the row at once, and never a line
     merged = cadence.record(None, 843, "ddd", True, FAIL, "t4")
     assert merged["row"] == "t4" and merged["merged"] is True and not cadence.untold(merged)
@@ -198,9 +203,19 @@ async def test_a_fail_types_the_line_once_and_a_second_fail_marks_the_row(agent,
         assert rec.checks[0]["row"] and gh.ran == [842, 842]
         await agent._keep_running(now)
         assert len(await _submitted(agent, rec.id)) == 1, "the second fail is the row's, not another line"
-        gh.verdicts[842], gh.heads[842] = PASS, ("bbb", False)
+        gh.verdicts[842], gh.heads[842] = UNKNOWN, ("bbb", False)
+        await agent._cadence_pass([rec])
+        await agent._cadence_pass([rec])
+        assert gh.ran == [842] * 4 and rec.checks[0]["row"], "an unknown is read again each cadence, no mark moved"
+        await agent._keep_running(now)
+        assert len(await _submitted(agent, rec.id)) == 1, "and nothing is told"
+        gh.verdicts[842], gh.heads[842] = PASS, ("ccc", False)
         await agent._cadence_pass([rec])
         assert "row" not in rec.checks[0] and rec.checks[0]["verdict"] == "pass", "a later pass removes the row"
+        # a derived `done` is written anew at every derivation: its date is no new report
+        rec.progress = [ProgressEntry(ref="TD-257", status="done", pr=842, source="derived", at="9999-01-02T00:00:00Z")]
+        await agent._cadence_pass([rec])
+        assert gh.ran == [842] * 5, "read at that head: not run again"
         await person.call("kill", id=rec.id)
 
 
