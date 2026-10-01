@@ -130,7 +130,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Designed 2026-09-30 — the build is TD-255 |
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Open — pickable |
-| TD-256 | Rule 9's marks (`finished_sent_at`, `closed_for: finished`) outlive a person's Resume of the manager, so it raises *manager did not close* at once; and a person's Close of a person-led team's last member ends the team with no note | Low | Open |
 
 
 ---
@@ -2610,22 +2609,3 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** on a scratch home, a board item's answers are buttons on its Inbox row, one with a default is decided by one press, a live look by one of two, and the board line carries `Decided:` after each; the help entries are in §4.5a's list; this repo's live looks carry the pair.
 
 **Related:** TD-254 (the design), dev-cadence TD-074 (the guidance and the pair), TD-244 (the groom), TD-142 (Reply), TD-218 / TD-219 (an entry handed to the techlead), TD-124 (the keys), TD-140 (Put on the board, the first add), TD-036 (`board_edit.py`).
-
-## TD-256: Rule 9's marks outlive a resumed manager, and a person's Close of the last member ends a person-led team with no note
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-09-30 (grinder-ao-1, from the reviews of PR #821 and PR #831; carried out of TD-241 when it was archived)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — neither has been seen live; both were found by reading.
-**Location:** `src/sessionorc/agent_tick.py` (`_finished_team`, `_finished_tell`), `src/sessionorc/work.py` (`closed_finished`, `wound_down`), `src/sessionorc/models.py` (`finished_sent_at`, `closed_for`), wherever a resume brings a record back, `src/agentorc/ui/inbox.py` (`unclosed_mark`), `src/agentorc/teamrun.py` (`rows`, `by_tick`), `tests/test_finished_tick.py`
-
-**Why:** two gaps in rule 9 (design §6) as built by TD-241. (1) **A person's Resume of a manager the tick closed keeps `finished_sent_at` and `closed_for: {why: finished}` on the record**: only a member at work removes the first and only a Close rewrites the second. The resumed manager therefore raises the Inbox row *manager did not close* at once, the tick closes it again as soon as it is idle and clean, and if it exits instead its team still reads *wound down · by the tick*. (2) **Where no manager is live to carry `finished_sent_at`, the note to the person is written only on a tick whose own close ends the last member**: a person-led team with one member left open holding work, which the person then closes by hand, ends with no note, though §6 rule 9 says a team that dissolves is never quiet.
-
-**Fix:** (1) drop both marks where a resume brings the record back, in the one place a resume rebuilds it, with a test that resumes a manager carrying them and reads no *manager did not close* row and no close on the next tick. (2) a mark the home keeps for the team rather than for a manager, saying the announcement is owed: written when the reading first passes its settle and cleared when the note is written, so the tick that finds the last member gone writes it whoever closed it. If (2) needs a stored field the design has no line for, it is a design line first (§4.3's list of the home's fields).
-
-**Done when:** a resumed manager that rule 9 closed reads as any resumed session does, and a person-led team whose last member a person closed has one `system` note in the person's inbox.
-
-**Related:** TD-241 and TD-240 (archived: rule 9), TD-237 and TD-238 (`closed_for`), TD-125 (the announcement).

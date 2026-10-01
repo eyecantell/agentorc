@@ -461,6 +461,9 @@ class HostAgent(
         # rule 9 (§6, TD-241): team → when the home's reading of *finished* first held; in memory, and
         # dropped the tick it stops holding, so a restart of the home starts the settle again
         self._finished_first: dict[str, datetime] = {}
+        # team → that reading's first tick, where no manager is live to carry `finished_sent_at` and a
+        # member was left open with work: the note to the person is owed until the last one is gone
+        self._finished_owed: dict[str, datetime] = {}
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}
