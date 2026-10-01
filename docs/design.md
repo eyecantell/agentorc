@@ -3253,8 +3253,7 @@ grind's week — Thu 07:00*, or *no schedule*; `ao schedule <team> reset --profi
 which the host agent does not read) and that an adapter of the profile reports the label, and
 refuses naming which; the rule takes effect on the next tick.
 
-**`ao restart <session>`** (TD-246; §6 rule 2 *A person's restart*; designed 2026-09-30, not
-built — TD-250): a person's press in the terminal — the `restart` RPC, refused to a session as
+**`ao restart <session>`** (TD-246; §6 rule 2 *A person's restart*; built — TD-250): a person's press in the terminal — the `restart` RPC, refused to a session as
 `set_settings` is — on a supervised `idle`, `exited` or `closed` record with a launch record:
 closes it if still there under the tick's clean-and-pushed test, replays it from the launch
 record as that record was started, clears `restart_wanted`, `restart_ceiling`, `restart_blocked` and
@@ -4698,7 +4697,7 @@ person's **Restart** (§6 rule 2 *A person's restart*, TD-246; on the Inbox rest
 starts it attended (§4.5a *Focus (exited / closed)*, §6) — which supersedes the record in place
 and keeps its mail; or by the team's **Start**, which brings the whole definition; or, once
 TD-172 is built, by **Members…** → Add of the same role, which creates it fresh. The exited
-member's banner says the first (TD-172), and `ao team --skill`'s *Stop it* says all three.
+member's banner says the first two (TD-172, TD-250), and `ao team --skill`'s *Stop it* says all four.
 
 **A person's Start on a concluded team**. A team whose every live member is `idle` and
 has declared — `out_of_work` or `restart_wanted` — with its seats idle or gone and its manager
@@ -6600,8 +6599,7 @@ code and needs no grant; a session doing the same work does.
      member that has worked for hours since (TD-186) — and rule 1 never restarts past it; a person's Resume clears `restarts` with the mark, so a
      resumed session gets three fresh restarts, where the tick's own supersede carries the list. An `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
      neither does the tick.
-     **A person's restart** (TD-246; the RPC and the row's and the card's **Restart** are built, and
-     `ao restart` is not — TD-250). What the tick
+     **A person's restart** (TD-246; built — TD-250). What the tick
      would not do, a person can say in one press, and the home then does it the tick's way: the
      **`restart`** RPC — a person's alone, as `set_settings` is (§5; no controller gains it:
      an `early` or a `repeat` one is the person's by §4.9a, and a manager that could restart its
@@ -6617,7 +6615,7 @@ code and needs no grant; a session doing the same work does.
      person's own), the prompt as rule 7's replay hands it — refilled from the files it was
      made from, as merged, on the home's own host; the stored prompt for a node's member or a
      launch record with no `prompt_from` — and the mail kept: the create moves the old record's
-     mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). **The new record starts fresh** otherwise: no `out_of_work`, `progress`,
+     mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). What it asked the person follows the close, not the mail: an `idle` member is closed first, and a close ends the open `ask`s and `steer`s it put to the person (`asker_gone`, §4.10), while an `exited` or `closed` one is not closed again, so an exited member's open questions stand and their answers reach the new record. **The new record starts fresh** otherwise: no `out_of_work`, `progress`,
      `doing` or `lane_seen` of the old run. It **clears the marks the
      person is answering** — `restart_wanted`, `restart_ceiling`, `restart_blocked` — and, as a
      person's Resume does, **clears `restarts`**: the new list holds one entry, `{at, why:
