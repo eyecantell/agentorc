@@ -1067,7 +1067,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `checks`, `held_missed`, `conventions_seen`, `idle_open`, `seat_filled` (§6 rules 10–12 and rule 3's manager on call, TD-247 — not built), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -1724,7 +1724,8 @@ Screens:
    (§4.9b; by name, as `teamrun.wound_down` keys, never by role; keyed on `teamrun.seat_ids`) is
    drawn with the grey pill *◇ on call*; the state stays `exited` or `closed` in every payload;
    the slot says what would make it come — *on call — comes on the next question*, *on call —
-   runs after 10 PRs*, *on call — runs every 6h*, from the seat's trigger, with the tick's count
+   runs after 10 PRs*, *on call — runs every 6h*, *on call — comes when a member needs a reading* (a
+   manager on call, §6 rule 3 `team`; TD-247, not built — TD-259), from the seat's trigger, with the tick's count
    toward a `prs:` trigger after it (*· 4 of 10*, from `seat_count`, §6 rule 3 — nothing when
    there is no reading, never *0 of 10*); a seat at the fill ceiling reads *fills exhausted · 6 in
    1 h* instead, an ending; the caption is *last
@@ -2646,7 +2647,10 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
 | Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words; an early one says what decided it, then the session's own `why` — *restart wanted · early: nothing reported done this run — …* or, for a `repeat` (TD-245; built — TD-249 slice 6), *restart wanted · repeats TD-229: reported done by an earlier run too — …* / *repeats TD-229: claimed and left three runs running*, the words the mark carries as `decided` (a mark older than the field reads *early*). It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three counted restarts (§4.9a, TD-245) (§6, TD-186) |
 | Inbox row: manager did not close | **Open** | built 2026-09-30 (TD-241 slice 2, §6 rule 9 *What the tick does with it*): a live manager the tick told its team had finished and could not close — `finished_sent_at` on its record older than `WRAPUP_GRACE`, the manager never idle, `needs-you`, `limited`, or holding uncommitted or unpushed work — under *Needs you*, counted, in fixed words (*manager did not close — its team finished and the host agent told it so, and it has not closed; …*). Its own row beside any state row the record also has, as old as the send. **Open** focuses it, where Close is. No Snooze and no Dismiss: the row is read from the record on every draw and nothing is stored for it, so there is nowhere to keep either. It leaves when the manager is closed, by the tick once it is idle and clean or by a person, or when a member at work takes the wind-down back and `finished_sent_at` is removed |
-| Inbox row: restart | **Open**, **Restart**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words; an early one says what decided it, then the session's own `why` — *restart wanted · early: nothing reported done this run — …* or, for a `repeat` (TD-245; built — TD-249 slice 6), *restart wanted · repeats TD-229: reported done by an earlier run too — …* / *repeats TD-229: claimed and left three runs running*, the words the mark carries as `decided` (a mark older than the field reads *early*). It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — the attended way back, where **Restart** is the team's); **Restart** (TD-246; designed 2026-09-30, not built — TD-250; §6 rule 2 *A person's restart*) is the `restart` RPC — the record closed if still there under the tick's own clean-and-pushed test, replayed from its launch record as the record was started, `unattended` and `supervised` as that record says, its marks and `restarts` cleared with `{why: person}` the one entry — drawn only on a row whose record is not a seat (the *fills exhausted* row has no Restart); a refusal (work left, no launch record, working or needs-you, a passed stop time, a gated profile) is the row's toast and the row stands, and the row leaves with the mark; the help entry (TD-250's) says which of Restart and Resume is which; **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three counted restarts (§4.9a, TD-245) (§6, TD-186) |
+| Inbox row: cadence check failed | **Open**, **Snooze ▾**, **Dismiss** | designed 2026-09-30 (TD-247; not built — TD-258; §6 rule 10): a member's PR failed the cadence check twice, or failed on a PR already merged — `row` on the record's `checks` entry — under *Needs you*, counted, in fixed words: *grinder-ao-1 · PR #842 fails the cadence check: review, ledger · read 14:02* — the row names from the script's `rule` field, never its `detail`, `#842` a link to the PR, and beside *review* the word *recorded* or *read by techlead-ao-1* as rule 10 says. **Open** focuses the member; **Dismiss** clears `row` (the entry stays as the record of the read); **Snooze** is `attention_snooze` keyed on the record and the PR. It leaves by itself when a later read passes. The help paragraphs' wording is the build's |
+| Inbox row: merged without its read | **Open**, **Dismiss** | designed 2026-09-30 (TD-247; not built — TD-258; §6 rule 11): two held PRs of one member merged without the reader's reply — two entries on the record's `held_missed` — under *Needs you*, counted: *grinder-ao-2 · PR #845 and #851 touched held paths and merged without the techlead's read · src/sessionorc/…*, each `#n` a link, the paths from the entries. The first crossing is a `system` note to the person, FYI, and the member's fixed line; this row is the second. **Open** focuses the member; **Dismiss** clears the entries. No Snooze: a merge is done, and the row is read or dismissed. The help paragraphs' wording is the build's |
+| Inbox row: idle · open work | **Open**, **Snooze ▾** | designed 2026-09-30 (TD-247; not built — TD-259; §6 rule 3 `idle_open`): a supervised member of a team with **no manager** — `manager: {role: person}`, or no record holding `control` that its `controllers` name — still hook-confirmed idle `IDLE_NUDGE` after rule 4's nudge with the same work open, `idle_open` on its record, under *Needs you*, counted: *grinder-dc-1 · idle 40 min with TD-070 open, nudged 14:02* — the ref from the record, nothing from its screen. A team with a manager draws no row: the reading fills a manager on call (`seat_due.by: open`) or is a standing manager's round. **Open** focuses it, where Send and Wrap up are; **Snooze** is `attention_snooze` keyed on the record and the kind, as `stalled?`'s is. It leaves when the state changes. The help paragraphs' wording is the build's |
+| Inbox row: restart | **Open**, **Restart**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words; an early one says what decided it, *nothing reported done this run* or, for a `repeat` (TD-245; designed 2026-09-30, not built — TD-249), *repeats TD-229: reported done by its last run too* / *claimed and left twice running*, from the mark's fields. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — the attended way back, where **Restart** is the team's); **Restart** (TD-246; designed 2026-09-30, not built — TD-250; §6 rule 2 *A person's restart*) is the `restart` RPC — the record closed if still there under the tick's own clean-and-pushed test, replayed from its launch record as the record was started, `unattended` and `supervised` as that record says, its marks and `restarts` cleared with `{why: person}` the one entry — drawn only on a row whose record is not a seat (the *fills exhausted* row has no Restart); a refusal (work left, no launch record, working or needs-you, a passed stop time, a gated profile) is the row's toast and the row stands, and the row leaves with the mark; the help entry (TD-250's) says which of Restart and Resume is which; **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three counted restarts (§4.9a, TD-245) (§6, TD-186) |
 | Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; built 2026-09-27 — TD-132 slice 3; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha` or `--back`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row and on a held one, and clears the failure, or the hold when no failure stands — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is neither leaves when live catches up. **After a rollback** (§6 *A rollback*, TD-212; designed 2026-09-28, built 2026-09-29 — TD-226) the row is drawn while the hold stands, whatever `auto` says, under **Needs you**, counted: *`<repo>` · live `<sha7>`, rolled back from `<sha7>` <t> ago · main `<sha7>`, n commits ahead · checks … · auto on · held*, the word *rolled back* from the home's `held` reading. **Promote** on it goes to main's head and ends the hold when it concludes; Dismiss ends the hold and leaves live where it is |
 | Inbox row: team start | **Start**, **Snooze ▾**, **Dismiss** | designed 2026-09-28 (TD-214; built 2026-09-30 — TD-227 slice 3; §6 rule 8): one row per wound-down team whose lanes gained work, from the home's `work_waiting`, which the `host` read hands the clients as `work: {<team>: mark}` — *`<team>` · wound down <t> · its lanes gained n entries: TD-213, TD-214, TD-223*, five ids at most and *and n more*, each a link to the Repo page's entry, every part a structured reading (the ids are the ledger's, the team and the time the home's), never text a session wrote. Under **Needs you**, counted, aged from `work_waiting.at`, the links made with `work_waiting.repo`. Under `on_work: start` it is drawn only when a bound held the start back, and says which: *not started: grind is over its line* (the profile's name, and *, resets in 3h 0m* when `held` carries the window's `resets` and it is ahead), *its stop time has passed*, *started 3 times today*, *started 12 min ago and wound down again*, *laptop is unreachable* (*laptop and nas are unreachable*: every down host, from `hosts`), *no record to start*, and for `balance` the refusal's own numbers, *its repo is over its line: 9 open PRs, the line is 8*. **Start** is the team card's Start, run by the client from the definition with every check it makes, refused in place in its words; **Snooze ▾** as on the promote row, by time alone, kept under `work:<team>` in the attention store; **Dismiss** clears `work_waiting` and adds the ids to the members' `lane_seen`, so those entries do not ask again and a later one does. The row leaves when an unattended session carrying the team's badge is live; a person's own session in the team does not take it away, as it does not take the card's *wound down* |
 | Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | §4.8a *An alarm's answers* is the full text (TD-077). One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and counted: an alarm is a bug of ours or a session misbehaving, and a person should know which. Not built: under *Steering*, uncounted, while a techlead holds it (§4.8a *Who answers first*). The row lists the alarms in words — channel, what was claimed, the rpc, the count, first–last in the person's clock, *(others)* as *and n more distinct claims* — and the host's identity mode, since *observe* records what *enforce* would refuse. Two of the four are answers and only an answer ends the row (§4.10 *The Inbox is a queue*): **Dismiss** (wire name `identity_ack`) clears that list, the record's or the host's; trail *dismissed by you*. **Log TD** (`identity_log`) hands the alarm, in words the home composes from its fields, to the record's first live controller — read from the control graph, never a badge (`alarm_to`, the home's answer, which the RPC reads too) — as mail from the person that owes an outcome (§4.8a, TD-079's debt), clears the list; trail *logged by you → `<controller>`*. Drawn only where such a session exists — not on the host's row, not on a record with no live controller (a manager's own is one); elsewhere the row reads *no session answers for this one* (or *for the host's own list*); its confirm names that session and the outcome owed; a controller gone between draw and press is the agent's refusal, in words, as the toast, and the refreshed row says nobody answers. The other two act on the session and leave the row standing: **Open** focuses it while its record is here; **Suspend** (`rpc_suspend`) stops it at once — no wrap-up — keeps worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); offered only on a record's row while that session is live — not the host's row, not a record already suspended, `exited` or `closed`; its confirm says what it does. A suspended record's row says so in a flat mark — its only record, since a suspension ends no row and writes no trail; the mark is drawn wherever the record is (card, Focus header, Inbox state row), never pressable, with the when, who and why on hover, tolerant of a record another build wrote (it costs that card its mark, never the grid). No Unsuspend control anywhere, by design: a person's **Resume** and **Forget** lift it. The New session form's `suspended` verdict keeps Start enabled, since a person's create *is* the lift; the form prints the agent's sentence and adds what pressing Start does. All four are a person's own acts, caller-less and refused to every session as `inbox_delete` is (one exception, not built and never on a host that carries a person: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is a never-gated read — a session that could clear the list could erase evidence of its own forgery, one that could suspend could stop its rival. The host agent's log keeps every alarm, a line each. On the card the alarm is a mark and nothing more, as is *suspended*. A node's record is answered at that node: alarms are node-owned, an `id` naming another host is routed there (§4.4a step 4a), the node clears its list and the home takes the cleared record from the reply. **Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed. The host's own list is whichever host was asked, and never travels |
@@ -3786,7 +3790,14 @@ The manager is a **session, not code**: its brief is the samscrape supervisor's 
 for an agent driving `ao`. Rules that prove mechanical (wrap up at the stop time, retry a stalled
 send) move into the tick as §6 policies; those that need judgement (stuck or thinking? interrupt
 now?) stay in the brief. The grant is what makes this safe: the manager's power is a field the
-person can see on the Focus header and revoke, not a promise in its prompt.
+person can see on the Focus header and revoke, not a promise in its prompt. Since TD-247
+(designed 2026-09-30, not built — TD-258, TD-259) the brief's remaining mechanical jobs are §6
+rules 10–12 and rule 4's owed clause, and what is judgement is a **seat on call** (§6 *What is
+left is judgement*): a manager whose definition says `on_call: true` (§4.9) is a seat of §6
+rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
+question to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it
+has acted, holding `control` on its record across the close as a seat holds its mail; a standing
+manager is the definition's other choice, and the default until one team has run on call.
 
 ### 4.8a Who is calling: identity on one host (TD-077)
 
@@ -4262,8 +4273,12 @@ entry of the home — default the host the start runs on. Checkouts are resolved
 (default `manager`; **`person`** means the person manages — no session is started and members
 get an empty `controllers` list plus the team badge), `name` (default `<team>-lead`), `home` (a
 repo name from the team's projects — required when the projects list more than one repo,
-defaulted to the only one otherwise), `profile` (overrides the role's), and the same `lane`,
-`brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
+defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30, not built —
+TD-259: `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
+has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
+the default is `false` until dc-grind has run on call once, then `true`, a team keeping the shape
+it was started with until its next Start; refused beside `role: person`, which starts nothing to
+fill), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
 manager means *none*, which leaves it unable to act on its own members, and is written only on
@@ -4904,7 +4919,9 @@ team has one, the techlead answers it or passes it up, and the person is the top
   it, a seat that is `exited` or `closed` with `seat_due` set is filled (`create` with
   `keep_mail`, so a question that was waiting is still there), the ceiling of six fills an hour
   (`FILL_CEILING`) is over all seats sharing a controller, and a seat that is `idle` with no
-  `seat_due` is closed as the techlead is. A seat runs its brief and ends on
+  `seat_due` is closed as the techlead is. A fourth trigger, **`team`**, is the manager's alone,
+  written by `on_call: true` on `manager:` and refused under `seats:` (§6 rule 3 *A manager on
+  call is a seat of this rule*, TD-247; designed 2026-09-30, not built — TD-259). A seat runs its brief and ends on
   its own — it declares nothing (§4.9a), holds **no grants** (it files and opens PRs with `gh`,
   which is not an act on a session), and is not counted in a wind-down. `ao team start` starts
   each seat after the techlead with the manager as its controller and no grants;
@@ -6635,6 +6652,39 @@ code and needs no grant; a session doing the same work does.
      count toward `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from
      `seat_count` (*on call — runs after 10 PRs · 4 of 10*), which §4.9b could not while the
      number was the manager's. (This is TD-104, folded here.)
+     **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30, not built —
+     TD-259). `ao team start` writes `seat: {trigger: team}` on a manager whose definition says
+     `on_call: true` (§4.9), and the tick sets its `seat_due` with `by` one of four words, each a
+     reading of the records and never of a screen: **`asks`**, as the techlead's — an open `ask`
+     or `steer` addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its
+     team (a supervised record listing it in `controllers`) hook-confirmed `needs-you` with a
+     `permission` pending (a question or a menu fills nothing: it is a person's, and the Inbox's
+     state row has it); **`stalled`** — a member `stalled?`; **`open`** — a member *idle · open
+     work*: `nudged_at` set and the member still hook-confirmed idle `IDLE_NUDGE` after it with
+     the same work open, which the tick writes as **`idle_open: {at, ref}`** on the member's
+     record (home-owned, cleared when its state changes), the one reading the card's slot, this
+     trigger and the person-led team's Inbox row (§4.5a *Inbox row: idle · open work*) draw;
+     the page derived it from `nudged_at` until now. `seat_due` carries the cause — `{at, by,
+     member}` — and **a cause fills once per stretch**: the home keeps **`seat_filled:
+     [{member, by, at}]`** on the seat's record, an entry dropped when its cause has gone (the
+     state changed, the question closed), and a cause still standing after a fill raises no
+     second `seat_due` until then, so a manager that chose to leave a member as it was is not
+     refilled into the same reading two minutes later; the fill ceiling guards the rest. The
+     fill and the close are this rule's as for any seat — `create` with `keep_mail`, the launch
+     record, `restarts: [{why: fill}]`; closed once idle with no `seat_due` for
+     `SEAT_IDLE_GRACE` with nothing dirty or unpushed. Its `control` grant and its place in its
+     members' `controllers` are the record's and survive the close, since a fill supersedes the
+     record in place at the same id (§4.1): a member's mail to its controller lands in the
+     closed seat's inbox and waits for the fill, as a question to the techlead does — and the
+     mail sweep (§4.10) **spares an `ask` to a closed record that carries `seat`**; today it
+     expires one on the next sweep, which a fill refused by its ceiling, a gate or a down link
+     turns into a lost question, so the build closes that gap for every seat. **The ceiling's
+     groups**: `FILL_CEILING` is over the seats sharing a controller, so a team's techlead and
+     auditors (`controllers: [manager]`) are one group whether the manager is standing or on
+     call, the manager seat itself is a group of one (its controller is a director's, where
+     there is one), and in a person-led team, whose seats have empty `controllers`, every seat
+     is its own group with six fills an hour of its own — what the code does today and the
+     design did not say.
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped`, or, for a seat,
@@ -6647,7 +6697,12 @@ code and needs no grant; a session doing the same work does.
      waiting — run `ao inbox`*, and an entry the person handed it (§4.10 *An entry handed to a
      seat*) named apart, since one already read wants its outcome and not another read: *1 entry
      the person handed you owes its outcome — `ao msg person --outcome done|blocked|dropped "…"
-     --for <id>`* (TD-218 slice 3) — and nothing a session wrote; it is recorded on `sends` as the home's
+     --for <id>`* (TD-218 slice 3) — and, since TD-247 (designed 2026-09-30, not built — TD-258),
+     **an outcome the member owes** (§4.10 *Outcomes*: `owes` on its record, the `owed:` line
+     `ao status -v` prints) counts as open work for this rule, seat or not, named apart the same
+     way — *you owe 1 outcome on <id> — `ao msg person --outcome done|blocked|dropped "…" --for
+     <id>`*; a finished member is never sent to, and its debt is the Inbox's *Waiting on them*
+     and nothing more, so the manager's chase and its board line for a debt go — and nothing a session wrote; it is recorded on `sends` as the home's
      own (`system`). A node's member is not nudged yet: the composer is read on the member's host,
      and no node act does that (TD-103). Once per idle
      stretch (`nudged_at`; a stretch ends when the state changes), never a second before the
@@ -6655,11 +6710,44 @@ code and needs no grant; a session doing the same work does.
      wake budget (§4.10: it is the host agent's own clock, like a lapse). After the nudge the
      policy is done: what the member does next is its own, and a member still idle another
      `IDLE_NUDGE` later reads *idle · open work* in the slot for a person or its manager to judge.
-  **What stays the manager's**, because it is judgement: the cadence check and its verdicts, the
-  relay of convention changes, permission triage, chasing members' outcome debts, the second
-  reading of the ledger before a wind-down, and escalation prose. With the four rules on the
-  tick the manager's round is the fallback timer alone — `ao wait` on an hour, not ten minutes —
-  and a team whose needs are mechanical runs with `manager: person` and no manager session. The
+  **What is left is judgement, and a seat holds it** (TD-247; Paul, 2026-09-30: *ideally we
+  would not need [a manager] and all of its required jobs could be scripted or given to the agent
+  host*; designed 2026-09-30, not built — TD-258 the policies, TD-259 the seat). The manager's
+  round kept six jobs because they read as judgement; a read of the brief against the code
+  found four of them read fields and scripts and no screen — the cadence check
+  (`check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files
+  against `held:`, the reader's reply in a mailbox the home holds), the relay of
+  `docs/cadence-changes.md` (a file as merged, a list of headings) and the chase of an owed
+  outcome (`owes` on the record) — and they are rules 10, 11 and 12 below and rule 4's owed
+  clause: each fixed text and a mark, an Inbox row where a second failure earns one, none typed
+  by a session. What is left reads a screen or weighs words: an `ask` addressed to the manager,
+  a permission on an unattended member (rare, since an unattended launch skips them — §4.3's
+  `--dangerously-skip-permissions`; a profile's `unattended_args` may not), a `stalled?` member,
+  one *idle · open work* after the nudge, and the prose of an escalation — and for that a
+  standing manager woke every hour to find nothing: manager-ao-1 stood at 686k of context on
+  2026-09-30, its rounds reading *nothing needs a person*. So **the manager is a seat on call**
+  when its definition says so (`on_call: true`, §4.9), filled by rule 3's `team` trigger on
+  exactly those readings and closed when it has acted, as the techlead is; a standing manager
+  stays what a definition may ask for (`on_call: false`, the default until the proof below); and
+  `manager: {role: person}` means the readings are the person's — the Inbox's state rows for a
+  permission and a `stalled?` member, and the *idle · open work* row (§4.5a), nothing started.
+  **No permission allow-list joins the definition**: the tool's own settings are the allow-list,
+  an unattended launch passes them all, and what still prompts is by construction what nobody
+  pre-allowed — the judgement the seat is for; a second list in `org.yml` would be the same rule
+  in two places, and the host agent matching a prompt's text is a policy acting on text (this
+  section's first rule). The second reading of the ledger goes with the round: rule 6 tells a
+  dropped lease and an entry that became pickable, rule 8 a team that wound down, and the
+  member's own `none --why` names what it saw and left. **The default moves on proof** (TD-247
+  step 4): one team runs on call first — dc-grind, whose needs are the most mechanical — and what
+  it could not do is written in TD-259 before `on_call` defaults to true; a team keeps the shape
+  it was started with until its next Start, since the seat field is written at the create. The
+  wind-down is rule 9's whichever shape the manager has: a manager on call that is closed is not
+  live, so the reading holds without it, the home closes the members and writes the
+  announcement, and the seat is not filled for a finished team — every act the manager's last
+  round made (the declaration, the note, the board lines) is a row or a note the home already
+  writes: an orphaned question, a member left open, a refused start. With the four rules on the
+  tick a standing manager's round is the fallback timer alone — `ao wait` on an hour, not ten
+  minutes. The
   briefs carry none of the four rules — a brief is read at team start, so a team started before
   the cut keeps the old words until its next start — and the restart ceiling, the fill ceiling
   and the twenty minutes are these constants, never numbers in `manager.md`. Built: `supervised`, the launch record, `seat` written at team start, rule 1 with
@@ -6737,7 +6825,13 @@ code and needs no grant; a session doing the same work does.
      `out_of_work` as it always has (§4.9a), and a second `none` is a declaration like the first.
      **Not covered, on purpose**: an entry that was in the ledger when the member declared —
      one a sibling held and dropped, one that came off the board — is not new by this rule; that
-     reading is judgement, and it stays the manager's second reading of the ledger. **An exited
+     reading was the manager's second reading of the ledger, and since TD-247 (designed 2026-09-30,
+     not built — TD-258) the one case that is a fact on the records is this rule's: an id in
+     `lane_seen` whose lease a sibling released — a `dropped` entry in the `progress` of any
+     record of the same repo, its `at` later than the member's `out_of_work.at` — is told once as
+     a new id is (*TD-108, dropped by grinder-ao-2*), the release's instant kept beside the id in
+     `lane_seen` so a second look at the same drop tells nothing; an entry that came off the
+     board is *has become pickable*, above, already. **An exited
      or closed member is not written to**, and its `lane_seen` is kept all the same: what its
      lane gains while it is gone is rule 8's once its team has wound down. A finished member its manager closed while the team runs on is told by neither rule: its lane's new work waits for the team's next wind-down, or for the manager, whose second reading of the ledger it is. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
@@ -6948,6 +7042,90 @@ code and needs no grant; a session doing the same work does.
      (`ao team status --json`, §4.9) and never an earlier round's; what it may no longer do is
      keep a finished team live by not saying so.
 
+  10. **The cadence check** (TD-247; designed 2026-09-30, not built — TD-258). The manager ran
+     `scripts/check_cadence.py --pr <n> --json` on every `done` with a `pr` and read the rows;
+     the script's verdict needs no reader. For a supervised member, not a seat, each `progress`
+     entry `done` carrying `pr` — declared or derived, so a PR merged from the member's branch
+     is one too (§4.4 *Repo facts*, `reports.derive`) — that the record's **`checks: [{pr, at,
+     sha, verdict, failed, told, row}]`** (home-owned) does not hold at that head is checked
+     **at the home** on the reports' five-minute cadence, detached as `seat_count`'s read is:
+     the script run `--json` in the registry root the record's `repo` names, at the home (a
+     node's member's checkout is at the same absolute path, §4.4a; a path the home cannot see,
+     or a root without the script — a repo not on dev-cadence — gives no reading), one PR per
+     run; its exit of 2 (no such PR) ends the reading, and an `unknown` verdict is kept and read
+     again on the next cadence, nothing told. The entry keeps the head it was read at, so a PR
+     whose head moved is read again. **`pass`** writes the entry and nothing else. **`fail`**
+     the first time for that PR — `told` empty — is one fixed line to the member, rule 5's two
+     ways: typed into an idle composer on the home's own host, *[agentorc] PR #842 failed the
+     cadence check: review, ledger — fix it, then report `ao progress done TD-257 --pr 842`
+     again*, the row names from the script's `rule` field and never its `detail`, and on a
+     working member the clause at the end of every `ao` reply, *(PR #842 fails the cadence
+     check: review, ledger)*, read at the home as rule 5's is; `told` marks it. **The second**
+     fail of the same PR — read again at a new head, or after a new `done` names it, and still
+     failing — or **a fail read on a PR already merged**, which no re-report cures, is the
+     **Inbox row: cadence check failed** (§4.5a), under *Needs you*, counted, `#842` a link, the
+     failed rows named, and `row` on the entry; a later pass removes the row and leaves the
+     entry as the record of what was read. **The `review` row is still self-attested**: the
+     script proves the comment was posted before the merge, not that it was honest, and the
+     home adds beside the verdict what it alone knows — *read by techlead-ao-1* when a mailbox it
+     holds has an `ask` carrying `pr: 842` with a reply from the seat on its thread (§4.9b *The
+     reader*), *recorded* otherwise — and never says *verified*. `ao status -v` prints the
+     record's last check per PR; a member on a node is checked as any (the script runs at the
+     home) and told by the clause alone, as rule 5 tells it. **Not this rule's**: a PR from a
+     session with no `progress` entry naming it (a person's anchor — the cadence is theirs to
+     run), and a repo whose checkout holds no `scripts/check_cadence.py`.
+  11. **Merged without its read** (TD-247; designed 2026-09-30, not built — TD-258). `ao pr held
+     <n>` is the author's own read of its record's `review` against the PR's files (§4.9b *The
+     reader*), and the host agent only stored the field; whether a held PR merged without the
+     reader's reply was a sentence in this repo's manager supplement, and nothing checked it.
+     For a supervised member whose record carries `review`, each derived `done` whose PR is
+     **merged** (rule 10's read has it) is read once at the home: the PR's changed files
+     (`gh pr view --json files`, one read per merged PR, in the record's registry root at the
+     home — the matching moves from `agentorc.review` into `sessionorc`, where `ao pr held` then
+     reads it, since the package rule runs one way) against the record's `held:` globs; a PR
+     touching none is not held, and the reading ends. A held one looks for its read **in the
+     mail the home holds**: for `reader: techlead`, an `ask` carrying `pr: <n>` addressed to the
+     team's seat with a reply from that seat on its thread — the reply is the read, whatever it
+     says, since the seat merges or sends findings and never stays silent (§4.9b); for `reader:
+     person`, the same `ask` in the person inbox, replied. Neither found is a crossing, written
+     to the record as **`held_missed: [{pr, at, paths}]`** (home-owned): the member gets one
+     fixed line, rule 5's two ways — *[agentorc] PR #845 touched held paths
+     (`src/sessionorc/agent_tick.py`) and merged without the techlead's read — a held PR waits
+     for `ao msg --kind ask --pr <n> <seat> "…"` and the reply before the merge* — and the
+     person gets one `system` note, FYI and uncounted, naming the PR, the paths and the member,
+     since a gate was passed and the person should know each time; the **second** crossing by
+     the same member — two entries on `held_missed` — is the **Inbox row: merged without its
+     read** (§4.5a), under *Needs you*, counted, each `#<n>` a link, Open the member, Dismiss
+     clearing the entries. The home undoes nothing: a revert is a person's word, or the reader's
+     finding on a later thread. **Not a crossing**: a PR the reader merged itself, which replied;
+     a PR whose record carries no `review` (the anchor's); a PR merged before the record
+     carried `review`; a files read that failed — no reading, read again next cadence, never a
+     crossing by default. A node's member is read as rule 10 reads one.
+  12. **Conventions relayed** (TD-247; designed 2026-09-30, not built — TD-258). Each entry of
+     `docs/cadence-changes.md` went once, by the manager's `ao send --wait`, to every member that
+     started before it landed, with a record of who was told kept by hand in a JSON file the
+     supplement said to commit and the template said never to; dev-cadence's SessionStart hook
+     already prints the new entries to a session that starts, so only a session that outlives a
+     change needs telling. The tick tells it as rule 6 tells lane news. For each registry root at
+     the home whose checkout holds `scripts/cadence_changes.py`, the home runs it `--json` on the
+     reports' cadence — it reads the file as merged, `origin/<default>`, as rule 7 reads a
+     brief's file — taking each entry's `heading` and `landed`; a root without the script, or
+     whose origin has no default branch (exit 2), gives no reading. On each supervised member
+     record of that root, not a seat (every fill starts cold, and the hook tells it) and not
+     finished (`out_of_work`: never sent to, and its next start is told at its start), the home
+     keeps **`conventions_seen: {at, headings}`** (home-owned), written on the first tick after
+     the create as the headings whose `landed` is at or before the record's `created` — an entry
+     with no `landed` is on no merged commit yet and is nobody's — and when a later reading holds
+     a heading `conventions_seen` does not, landed after `created`, the member gets **one `note`
+     from `system`**: *docs/cadence-changes.md gained 1 entry since you started: "2026-09-29 —
+     a review comment's first line carries the verdict" — read it on `origin/main`, then go on*
+     — the headings as the file writes them, three at most and *and n more*, nothing a session
+     wrote — and the headings join `conventions_seen`, so each is told once. It is mail: the
+     doorbell wakes the member under every rule the doorbell has, one unit of the wake budget,
+     and a node's member is reached as any mail reaches it. A member restarted by any rule starts
+     with no `conventions_seen`, is written afresh at its create, and the hook has told it.
+     **The manager's `relayed.json` goes**: nothing reads it, and this repo's supplement drops
+     the step with the round.
 - **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
   `sessionorc.promote`; the press — `promote`, `clear_promote`, `ao promote` — slice 2; the Inbox
   row slice 3; this repo's block slice 4, `.agentorc.yml`): a repo's live copy — the

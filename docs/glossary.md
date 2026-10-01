@@ -51,7 +51,12 @@ not mix:
   manage a team instead (`manager: person`), in which case no manager session exists. Called
   **lead** from 2026-09-16 to 2026-09-20 and `orchestrator` before that; neither old role name
   resolves any more (TD-107). *Not:* lead, orchestrator, orc, supervisor.
-  — **decided** 2026-09-19 (Paul), confirmed 2026-09-20 (TD-076, design §4.8 *The names*).
+  — **decided** 2026-09-19 (Paul), confirmed 2026-09-20 (TD-076, design §4.8 *The names*). Since
+  2026-09-30 (TD-247, designed) a manager may be **on call** (`on_call: true` in its definition):
+  a seat of design §6 rule 3, filled when a member needs a reading no policy makes — a question
+  to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it has acted;
+  the lifecycle jobs are the host agent's tick (§6 rules 1–12). A **standing** manager is the
+  other shape, rounding on `ao wait`, and the default until one team has run on call.
 - **techlead** — the technical go-between of TD-075: a session that answers technical
   questions for a team's workers before they reach a person. Shown as *Tech Lead*. A team's
   optional `techlead:` seat; started per batch of questions, holds no grant (design §4.9b). —
@@ -101,7 +106,8 @@ not mix:
   choice the same evening).
 - **on call** — what a seat's card says while nobody is in it: grey, nothing for the person to
   do, and the slot says what would make it come. Not a state: the record is `exited` or `closed`.
-  — **decided** 2026-09-21 (Paul; *empty* and *available* read as something to do).
+  — **decided** 2026-09-21 (Paul; *empty* and *available* read as something to do). A manager on
+  call reads *on call — comes when a member needs a reading* (TD-247, designed 2026-09-30).
 - **auditor** — a role for a seat with a trigger: checks one area (docs, tests) every n merged
   PRs or every so often, files what it finds, and ends. Hunter-shaped unless its brief says
   otherwise. — *proposed* 2026-09-21 (design §4.9b *Seats with a trigger*, TD-098).
