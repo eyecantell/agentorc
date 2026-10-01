@@ -418,6 +418,11 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert "due          3d overdue  decide TD-283" in out
     # the servicing team's doing log, newest first; another team's is not this repo's
     assert out.index("g1: pushing TD-010") < out.index("g1: reading the ledger") and "not this repo's" not in out
+    # a team over its line in this repo is the last line, in the card's words (§6 *Balance*, TD-239)
+    assert "over its line" not in out
+    reading[str(repo)]["balance"] = {"t": {"since": "", "crossed": [{"line": "prs", "value": 9, "limit": 8}]}}
+    assert cli.main(["repo"]) == 0
+    assert capsys.readouterr().out.rstrip().endswith("  t is over its line: 9 open PRs, line 8")
     assert cli.main(["repo", "--all"]) == 0
     out = capsys.readouterr().out
     assert "other  PRs: could not look (no gh) · ledger: could not look (gone)" in out and "#9" not in out

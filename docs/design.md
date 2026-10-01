@@ -3165,10 +3165,18 @@ the org does not define, as the two below are, and prints the team's settings li
 *when work appears: start the team* where the file holds the key; `ao team list` says *work waiting: n entries*
 beside *wound down* from the home's `work_waiting`, and `--json` carries the count as `work_waiting` on each row.
 **`ao team balance <team> [--prs <n>] [--oldest <d>] [--review on|off] | --clear`** (TD-177, §6 *Balance*;
-designed 2026-09-29, not built — TD-239) writes `teams.<team>.balance` through `set_settings`, a line
+designed 2026-09-29, built 2026-09-30 — TD-239 slice 4) writes `teams.<team>.balance` through `set_settings`, a line
 not named left as it was, refused to a session and for a team the org does not define; with no
 option it prints the lines and, against them, the numbers as they read now. `ao team list` says
 *over its line since <t>* and `ao repo` ends with the same line, from the home's `balance`.
+The numbers are gathered as the tick gathers them (`teamrun.balance_now`: the registered repos the
+team's live sessions name, the most open pull requests among them, the oldest's age, the wait at
+the team's seats and its bound) — *open PRs: 9 (line 8) — over*, a line not drawn reading *(no
+line)* — and the mark's own line follows where it stands. `--review off` removes that line;
+an edit that would leave none is refused, naming `--clear`, which takes no line beside it. The
+mark is read from the `repos` reading (`teamrun.balance_marks`), so one that names no repo — a
+team whose members sit in no registered checkout, crossed on `review` alone — is said by the
+refusal and the notes and not by these lines. `ao settings` says *balance prs 8, oldest 2d, review* on the team's line.
 **`ao team until <team> <06:00|+8h|ISO> | --clear`** and **`ao team reserve <team> <n>`** (TD-100 (4);
 §6 *Team stop time*, *Usage gate*; built — TD-146 slice 3): the team's stop time,
 parsed in the caller's clock as `ao until` parses it, and its reserve priority, written to
@@ -7182,7 +7190,7 @@ teams:
 - **Balance: a team over its line takes no new work** (TD-177; Paul, 2026-09-25: *if I want to
   make sure the team is balanced, I can make sure the PR count is not growing too much — the
   grinders outpacing the techlead*; designed 2026-09-29; the setting and the mark built — TD-239
-  slice 1 — the refusal, slice 2, the notes, slice 3, and rule 8's fifth bound; what a person sees not yet). The numbers came
+  slice 1 — the refusal, slice 2, the notes, slice 3, rule 8's fifth bound, and `ao team balance` with the terminal's lines, slice 4; the card's note and the Settings page's fields not yet). The numbers came
   first (§4.4 *Repo facts*, the team card and the Repo page, TD-176), and the rule keys on
   exactly those, so what trips it is what a person has been watching. It is **off until a
   person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team

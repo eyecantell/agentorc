@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -78,6 +79,8 @@ def world(tmp_path, monkeypatch):
             if "host" not in state:
                 raise cli.AgentError("unknown method: host")  # a stub agent that answers no `host`
             return state["host"]
+        if method == "repos":  # the home's repo readings, with the balance marks (§6 *Balance*)
+            return state.get("repos", {})
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
         if method == "host_dir":
@@ -1792,3 +1795,70 @@ def test_td_add_is_a_persons_only_and_a_session_is_refused_before_stdin_is_read(
     assert cli.main(["td", "add", "--repo", "agentorc"]) == 1
     err = capsys.readouterr().err
     assert "a person's own act" in err and "ao finding" in err and not handed
+
+
+# ── the balance rule's words in the terminal (design §4.7, §6 *Balance*, TD-239 slice 4) ───────
+
+
+def test_team_list_and_repo_say_a_team_is_over_its_line(world, capsys):
+    tmp_path, state = world
+    started(state)
+    root = str(tmp_path / "agentorc")
+    mark = {"since": "2026-09-30T14:02:00Z", "repo": root, "crossed": [{"line": "prs", "value": 9, "limit": 8}]}
+    reading = {"name": "agentorc", "root": root, "prs": {"open": []}, "ledger": {"entries": []}, "at": mark["since"]}
+    state["repos"] = {root: {**reading, "balance": {"ao-grind": mark}}}
+    note = teamrun.balance_note(mark)
+    assert note.startswith("over its line since ") and note.endswith(": 9 open PRs, line 8")
+    assert cli.main(["team", "list"]) == 0
+    assert f"live, {note}" in capsys.readouterr().out
+    assert cli.main(["--json", "team", "list"]) == 0
+    assert json.loads(capsys.readouterr().out)["teams"][0]["balance"] == mark
+    state["repos"] = {root: reading}  # the mark gone, the line gone
+    assert cli.main(["team", "list"]) == 0
+    assert "over its line" not in capsys.readouterr().out
+    # `ao repo`'s last line is the same words, with the team's name
+    assert teamrun.balance_marks({root: {**reading, "balance": {"ao-grind": mark}}}) == {"ao-grind": mark}
+    both = {"crossed": [{"line": "oldest", "value": 3 * 86400, "limit": 2 * 86400},
+                        {"line": "review", "value": 5 * 3600, "limit": 7200}]}  # fmt: skip
+    assert teamrun.balance_note(both) == "over its line: oldest PR 3d, line 2d, review waiting 5h, bound 2h"
+
+
+def test_balance_now_reads_the_numbers_as_the_tick_gathers_them():
+    now = datetime(2026, 9, 30, 12, 0, tzinfo=UTC)
+    repos = {
+        "/r/a": {"prs": {"open": [{"created": "2026-09-27T12:00:00Z"}, {"created": "2026-09-30T11:00:00Z"}]}},
+        "/r/b": {"prs": {"error": "gh failed"}},
+    }
+    fleet = [
+        {"id": "g1", "team": "t", "state": "working", "repo": "/r/a", "review": {"bound": "90m"}},
+        {"id": "g2", "team": "t", "state": "idle", "repo": "/r/b"},
+        {
+            "id": "tl",
+            "team": "t",
+            "state": "idle",
+            "repo": "/r/a",
+            "seat": "techlead",
+            "prs_waiting": {"n": 2, "oldest": "2026-09-30T09:00:00Z"},
+        },  # fmt: skip
+        {"id": "gone", "team": "t", "state": "exited", "repo": "/r/zzz"},
+        {"id": "other", "team": "u", "state": "working", "repo": "/r/a"},
+    ]
+    got = teamrun.balance_now("t", fleet, repos, now)
+    assert got == {"members": 3, "repos": ["/r/a", "/r/b"], "prs": 2, "oldest": 3 * 86400, "review": 3 * 3600,
+                   "bound": 90 * 60}  # fmt: skip
+    # a failed read keeps its last `open` beside the error: could not look, as the tick reads it
+    stale = {"/r/a": {"prs": {"open": [{"created": "2026-09-27T12:00:00Z"}], "error": "gh failed"}}}
+    assert teamrun.balance_now("t", fleet, stale, now)["prs"] is None
+    rows = cli._balance_rows({"prs": 1, "oldest": "2d", "review": True}, got)
+    assert rows == [
+        "  open PRs: 2 (line 1) — over",
+        "  oldest PR: 3d (line 2d) — over",
+        "  reader's queue: 3h (bound 1h 30m) — over",
+    ]
+    assert cli._balance_rows({"prs": 2}, {**got, "prs": None, "oldest": None}) == [
+        "  open PRs: could not look (line 2)",
+        "  oldest PR: could not look (no line)",
+        "  reader's queue: 3h (no line)",
+    ]
+    none = teamrun.balance_now("nobody", fleet, repos, now)
+    assert (none["members"], none["prs"], none["oldest"], none["review"], none["bound"]) == (0, None, None, None, 7200)
