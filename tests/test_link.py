@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import os
 import signal
+import stat
 import subprocess
 import sys
 
@@ -1989,3 +1990,24 @@ async def test_a_persons_close_at_the_node_no_longer_matches_the_ticks_mark(agen
     agent._take_records("laptop", [record(state="closed", closed_at="2026-09-29T08:00:07Z")], whole=False)
     assert held.closed_for == {"why": "wanted", "closed_at": tick_close}, "the mark is the home's"
     assert not agent._closed_by_tick(held, "wanted")
+
+
+@pytest.mark.unit
+def test_a_socket_is_born_0600_whatever_the_umask_and_the_umask_is_put_back(tmp_path):
+    """TD-260: the agent's sockets are bound under their mode, so no reader ever sees another one —
+    a `chmod` after the bind left the file at the umask's mode for a moment."""
+    from sessionorc.agent import _bound
+
+    old = os.umask(0o022)
+    try:
+        s = _bound(tmp_path / "a.sock")
+        try:
+            assert stat.S_IMODE((tmp_path / "a.sock").stat().st_mode) == 0o600
+            assert os.umask(0o022) == 0o022, "the umask is the caller's again"
+        finally:
+            s.close()
+        with pytest.raises(OSError):
+            _bound(tmp_path / "a.sock")  # the path is taken: the refusal is the bind's own
+        assert os.umask(0o022) == 0o022, "and after a bind that failed"
+    finally:
+        os.umask(old)
