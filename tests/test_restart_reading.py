@@ -92,9 +92,13 @@ def test_a_claim_left_by_the_last_two_runs_and_left_again_is_a_repeat():
     # left by one run only, or by the one before last only: not yet
     assert _restart_reading(_rec(LONG, [{"ref": "TD-3"}], two), NOW)["repeat"] is None
     assert _restart_reading(_rec(LONG, [{"ref": "TD-9"}], two[:1]), NOW)["repeat"] is None
+    before_last = [two[0], _entry(timedelta(minutes=40), left=["TD-3"])]
+    assert _restart_reading(_rec(LONG, [{"ref": "TD-9"}], before_last), NOW)["repeat"] is None
     # an entry with no `left` (written before the field, or by a close that failed) says nothing
     bare = [two[0], {"at": two[1]["at"], "why": "wanted", "error": "close: x"}]
     assert _restart_reading(_rec(LONG, [{"ref": "TD-9"}], bare), NOW)["repeat"] is None
+    # and one with no `done` holds no earlier report against a run's own
+    assert _restart_reading(_rec(SHORT, [DONE], bare[1:]), NOW)["repeat"] is None
 
 
 @pytest.mark.integration
