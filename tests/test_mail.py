@@ -2188,9 +2188,13 @@ async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_pa
             await w.call("msg", to="person", text="a note is not a question", kind="note")  # never refused
             # read, and long past retention: an owing question stays, because nothing else records it
             await person.call("inbox")
+            kept = mail.MAIL_RETENTION
             monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
             await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
             assert [e["id"] for e in (await person.call("inbox"))["entries"] if e["id"] in owed] == owed
+            # back before anything settles: every tick sweeps, and under no retention a tick between the
+            # close below and the read after it prunes the settled question the last line looks up (TD-260)
+            monkeypatch.setattr(mail, "MAIL_RETENTION", kept)
             # reporting one frees the next question
             await w.call("msg", to="person", text="done: nothing to do", outcome="dropped", for_=owed[0])
             assert (await w.call("msg", to="person", text="one more?", kind="ask"))["entry"]["id"]

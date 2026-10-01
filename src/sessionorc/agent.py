@@ -18,6 +18,7 @@ import logging
 import os
 import secrets
 import signal
+import socket
 import sys
 import time
 from collections import OrderedDict, defaultdict
@@ -190,6 +191,23 @@ from sessionorc.store import (
     UsageStore,
 )
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+
+
+def _bound(path: Path) -> socket.socket:
+    """A unix socket bound at `path` and **born `0600`** (TD-260): made and bound by hand under a
+    umask of `0177`, with no `await` inside, and handed to `start_unix_server(sock=…)`. Binding
+    through `path=` and then `chmod` left the file at the umask's mode for a moment — and a umask
+    held across an awaited bind would leak into whatever else the loop creates meanwhile."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    old = os.umask(0o177)
+    try:
+        s.bind(str(path))
+    except BaseException:
+        s.close()
+        raise
+    finally:
+        os.umask(old)
+    return s
 
 
 class HostAgent(
@@ -500,8 +518,7 @@ class HostAgent(
             sock.unlink()
         self.tmux.ensure_server()
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
-        server = await asyncio.start_unix_server(self._handle_conn, path=str(sock), limit=link.FRAME_LIMIT)
-        os.chmod(sock, 0o600)
+        server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
         log.info("listening on %s", sock)
         link_servers = await self._bind_links() if self.mode == "home" else []
         # Kept on the agent as well as locally: a test that must own the clock cancels it rather
@@ -564,8 +581,7 @@ class HostAgent(
                     self._conns.discard(writer)
                     writer.close()
 
-            srv = await asyncio.start_unix_server(take, path=str(lsock), limit=link.FRAME_LIMIT)
-            os.chmod(lsock, 0o600)
+            srv = await asyncio.start_unix_server(take, sock=_bound(lsock), limit=link.FRAME_LIMIT)
             log.info("link socket for %s at %s", name, lsock)
             out.append((lsock, srv))
         return out
