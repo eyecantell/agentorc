@@ -1213,6 +1213,9 @@ class TickMixin:
                 log.info("rule 9: %s has a member at work again — the wind-down is off", team)
                 await self._push_changes()
                 return None
+            for m in members:
+                # one left open with work is closed once it is pushed, the manager live or gone
+                await self._finished_close(m)
             if manager.state in work_mod.DEAD:
                 if manager.state == "closed" and not work_mod.closed_finished(manager):
                     # it closed itself, as the line asked: the mark is what lets the team read
@@ -1223,8 +1226,6 @@ class TickMixin:
                     self._finished_tell(team, records, manager, since)
                     await self._push_changes()
                 return None
-            for m in members:
-                await self._finished_close(m)  # one left open with work is closed once it is pushed
             grace = now - _parse(manager.finished_sent_at) >= agent_common.WRAPUP_GRACE
             if grace and await self._finished_close(manager):
                 self._mark_closed(manager, "finished")
@@ -1244,8 +1245,9 @@ class TickMixin:
         if closed:
             log.info("rule 9: %s finished — closed %s", team, ", ".join(m.name for m in closed))
         if manager is None or manager.state in work_mod.DEAD:
-            if closed and not left:
-                self._finished_tell(team, records, manager, first)  # nobody live to tell
+            if closed and not left and not work_mod.closed_finished(manager):
+                # nobody live to tell; one rule 9 closed was announced then, and is never told twice
+                self._finished_tell(team, records, manager, first)
                 await self._push_changes()
             return first if left else None
         if manager.suspended:

@@ -252,3 +252,53 @@ async def test_a_team_a_person_leads_is_closed_and_announced_with_nobody_to_tell
     assert "its manager did not announce it" not in note and "g1: g1 found nothing pickable" in note
     await agent._finished_pass(now + FINISHED_SETTLE + timedelta(minutes=1))
     assert len(home.notes()) == 1
+
+
+async def test_a_member_left_with_work_is_closed_after_its_manager_is_gone_and_nothing_is_said_again(
+    agent, monkeypatch
+):
+    await park_ticks(agent)
+    g1, g2 = _rec("g1"), _rec("g2", git={"branch": "w", "dirty": 0, "unpushed": 2})
+    manager = _manager()
+    home = _Home(agent, monkeypatch, g1, g2, manager)
+    now = datetime.now(UTC)
+    told = now + FINISHED_SETTLE
+    await agent._finished_pass(now)
+    await agent._finished_pass(told)
+    manager.finished_sent_at = _iso(told)
+    await agent._finished_pass(told + WRAPUP_GRACE)
+    assert home.closed == ["g1", "manager"] and work.closed_finished(manager) and len(home.notes()) == 1
+
+    await agent._finished_pass(told + WRAPUP_GRACE + timedelta(minutes=1))
+    assert g2.state == "idle", "work left: still open"
+    g2.git = dict(CLEAN)
+    await agent._finished_pass(told + WRAPUP_GRACE + timedelta(minutes=2))
+    assert home.closed == ["g1", "manager", "g2"], "closed the tick its work reads pushed, its manager already closed"
+    assert len(home.notes()) == 1, "never told twice"
+
+
+async def test_a_nodes_manager_closed_with_a_member_left_is_announced_once(agent, monkeypatch):
+    await park_ticks(agent)
+    g1, g2 = _rec("g1"), _rec("g2", git={"branch": "w", "dirty": 1, "unpushed": 0})
+    manager = _manager()
+    home = _Home(agent, monkeypatch, g1, g2, manager)
+    manager.host = "node-1"  # no line typed: the close alone, routed over its link
+    manager.id = MANAGER
+    agent._link_muxes["node-1"] = object()
+
+    async def route(method, params, caller, host):
+        assert (method, host) == ("close", "node-1")
+        return await home._close(params["id"])
+
+    monkeypatch.setattr(agent, "_route_act", route)
+    monkeypatch.setattr(agent, "_address", lambda r: r.id)
+    now = datetime.now(UTC)
+    late = now + FINISHED_SETTLE
+    await agent._finished_pass(now)
+    await agent._finished_pass(late)
+    assert home.closed == ["g1", "manager"] and home.sent == [] and len(home.notes()) == 1
+
+    g2.git = dict(CLEAN)
+    await agent._finished_pass(late + timedelta(minutes=1))
+    await agent._finished_pass(late + timedelta(minutes=1) + FINISHED_SETTLE)
+    assert home.closed == ["g1", "manager", "g2"] and len(home.notes()) == 1, "the member's close says nothing again"

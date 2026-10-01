@@ -6674,7 +6674,7 @@ code and needs no grant; a session doing the same work does.
      (`closed`; one that `exited` is rule 1's or a person's kill, and is left) gets the same mark on the tick that finds it gone, so the team reads *wound down* without
      its declaration. **A member live and not finished after the send takes the wind-down
      back** — one working, one that never declared, or one that now wants a restart: `finished_sent_at` is removed and the reading is asked afresh; a member left open
-     with work is still finished, and is closed the tick its work reads pushed. A manager on a node gets no line and the close
+     with work is still finished, and is closed the tick its work reads pushed, its manager live or already closed, with nothing said again: a team whose manager carries the mark was announced. A manager on a node gets no line and the close
      alone, routed as rule 2 routes one, and waits for the link. **The announcement the manager
      did not make** the home makes: one `system` note to the person with the two lines §4.9a
      asks of the manager — the pull requests in the members' `progress` entries reported `done`
