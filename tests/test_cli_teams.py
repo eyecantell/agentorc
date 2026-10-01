@@ -1615,6 +1615,29 @@ def test_new_with_an_undefined_team_is_the_badge_alone(world, capsys):
     assert "--team nope: no such team in the org" in capsys.readouterr().err
 
 
+def test_new_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_brief(world):
+    """TD-253: `ao new --role --team` fills `{techlead}` and `{manager}` as a team start does, and
+    stores them in `prompt_from`, so a replay of the record (§6 rule 7) names both too."""
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    assert cli.main(["new", "grind-9", "--role", "grinder", "--team", "ao-grind", "--unattended"]) == 0
+    (made,) = creates(state)
+    slots = made["prompt_from"]["slots"]
+    assert slots["{techlead}"] == {"text": "ao-agentorc-tl-ao"} and slots["{manager}"] == {"text": "ao-agentorc-orc-ao"}
+    assert "Your team's techlead is `ao-agentorc-tl-ao`" in made["prompt"]
+    assert 'ao msg ao-agentorc-orc-ao "done: <ref>' in made["prompt"] and "ao msg none" not in made["prompt"]
+    # what a team start stores for the same member is what this create stores
+    planned = teams.plan(orgmod.load(), "ao-grind", HOST).members[0].prompt_from["slots"]
+    assert (planned["{techlead}"], planned["{manager}"]) == (slots["{techlead}"], slots["{manager}"])
+    # a team with no seat, an undefined one and no team at all each read `none`, as before
+    _reader_org(tmp_path, seat=False)
+    for argv, manager in ((["--team", "ao-grind"], "ao-agentorc-orc-ao"), (["--team", "nope"], "none"), ([], "none")):
+        state["calls"].clear()
+        assert cli.main(["new", "grind-9", "--role", "grinder", *argv]) == 0
+        slots = creates(state)[0]["prompt_from"]["slots"]
+        assert (slots["{techlead}"]["text"], slots["{manager}"]["text"]) == ("none", manager)
+
+
 def test_stop_leaves_a_persons_session_alone_and_names_it(world, capsys):
     tmp_path, state = world
     started(state)

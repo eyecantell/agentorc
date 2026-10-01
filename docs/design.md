@@ -3033,7 +3033,7 @@ for another's, since the channels are ungated:
   text only; `--json` carries the entries as the record holds them.
 - `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k*, and *(over)* past it — and `--json` the `context` and `context_bound` fields (§6 rule 5, TD-188, TD-190).
 
-**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, built 2026-09-27 — TD-173 slice 1) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does.
+**A person in the team.** `ao new <name> --team <team>` (TD-160; §4.9 *A person in the team*; designed 2026-09-25, built 2026-09-27 — TD-173 slice 1) is the terminal's form of the New session form's Team pick: the badge and the group, the team's live manager as a controller, and the record's `review` from the role's or else the team's — the reader a grinder has, so a person's held PR waits for the techlead as a worker's does. With `--role`, the brief names the team's seat and manager, as a team start's does (TD-253).
 
 **Presets and grants.** `ao new --role grinder --lane TD-027,TD-019` (TD-028, TD-040,
 `agentorc.repoconfig`): the preset fills the brief from its template with `{lane}` filled and `--brief <path>` in its `{repo}` slot (§4.8; `--prompt` is raw text and fills nothing, and is refused beside `--brief`), the
@@ -4327,6 +4327,12 @@ session form had no Team field, and nothing said what a team act does to a perso
   prefills Controllers with the team's manager when it is live (as `ao new --team` does), leaves
   Unattended off, and shows the reader the session will get (*held PRs read by techlead-ao-1 on
   src/sessionorc/**, docs/briefs/*** — or *no reader: the team has no techlead seat*).
+- **A role's brief names the team's seat and its manager.** A session started with `--team
+  <team>` and a role (the CLI or the form) has its brief's `{techlead}`, `{manager}` and
+  `{context}` slots filled from the team's definition, as a team start fills them for its
+  members (`teams.brief_ids`: the ids the seat and the manager take, and the seat's primer), and
+  stored in `prompt_from`, so every replay of the record names them too (§6 rule 7). A team with
+  no seat, a person-led one and a team the org does not define read `none` in that slot (TD-253).
 - **What a team act does to a person's session: nothing, and it says so.** A person's session
   carries the badge and sits in the team's group, counted by its state as any card is and marked
   *interactive* with the person mark as every interactive card is (§4.5 *The card's anatomy*).

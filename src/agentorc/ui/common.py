@@ -703,6 +703,14 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def team_brief_ids(team: str) -> dict[str, str]:
+    """What New session's **Team** pick gives a role's brief (design §4.9 *A person in the team*,
+    TD-253): `teams.brief_ids` over the org the picker lists — the `{techlead}`, `{manager}` and
+    `{context}` slots; nothing for a team no definition names."""
+    org, _notes = org_here()
+    return teams.brief_ids(org, team, host_name())
+
+
 def team_reader(team: str, directory: str) -> dict[str, Any]:
     """The reader a person's session in `team` gets when its role has none (design §4.9 *A person in
     the team*): `{review, line}` — `teams.team_review` over the member roles resolved in
