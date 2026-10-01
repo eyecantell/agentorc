@@ -772,9 +772,10 @@ def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(w
     assert teamrun.concluded([{**lead, "state": "working"}, member]) is None
     # the definition's row carries it only while something is live
     org = cli._org_here()
-    (row,) = teamrun.rows(org, [rec("orc-ao", out_of_work=out)])
+    # (a member's record: the manager is a seat unless its definition says `on_call: false`, TD-259)
+    (row,) = teamrun.rows(org, [rec("grind-1", out_of_work=out)])
     assert row["live"] == 1 and row["concluded"]["at"] == out["at"] and row["wound_down"] is None
-    (row,) = teamrun.rows(org, [rec("orc-ao", "closed", out_of_work=out)])
+    (row,) = teamrun.rows(org, [rec("grind-1", "closed", out_of_work=out)])
     assert row["concluded"] is None and row["wound_down"] == out["at"]
 
 
@@ -1452,7 +1453,8 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     seats = {p["name"]: p.get("seat") for p in made}
     assert seats["techlead-ao"] == {"trigger": "asks"}
     assert seats["audit-ao"]["trigger"] == "every" and seats["audit-ao"]["after"]  # as the definition gives it
-    assert all(seats[n] is None for n in ("orc-ao", "grind-1", "grind-2", "hunt"))  # never sent unset
+    assert seats["orc-ao"] == {"trigger": "team"}  # the manager, on call by default (§4.9 `on_call`, TD-259)
+    assert all(seats[n] is None for n in ("grind-1", "grind-2", "hunt"))  # never sent unset
     audit = made[2]
     # neither the role's grants nor its lane (the hunter preset has both): a seat's area is its brief's
     assert audit["role"] == "hunter" and audit["capabilities"] == [] and audit["lane"] == []

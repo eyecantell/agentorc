@@ -153,6 +153,7 @@ session it does not control. Tests run on private tmux sockets and a temporary h
 | observe before enforce; how to go back | §4.8a |
 | secrets are Doppler's, never printed | the person's cross-repo convention (`~/.claude/CLAUDE.md`) |
 | who reads a PR before it merges | TD-093 |
+| what is the tick's and what is the manager's; a manager on call is the default from the build (Paul, 2026-10-01) | §6 *What is left is judgement*, §4.9 `on_call`; TD-247 |
 
 §10 of the design is the dated question log: a question answered there is answered, with its
 date. §7 is the phase plan — what is in phase 1 and what is deliberately later.

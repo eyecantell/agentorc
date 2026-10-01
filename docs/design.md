@@ -4305,7 +4305,7 @@ defaulted to the only one otherwise), `profile` (overrides the role's), **`on_ca
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` and the mail sweep spares a question to a closed seat (slices 2 and 3), and the flip is a step of its own, made with the seat's held briefs; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start (`org.ON_CALL_DEFAULT`, flipped 2026-10-01 — TD-259, once the tick read `team` and the mail sweep spared a question to a closed seat, slices 2 and 3); refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
@@ -6697,7 +6697,7 @@ code and needs no grant; a session doing the same work does.
      written, and none where the open work is an outcome owed alone, rule 4's owed clause; cleared
      when its state changes, the work closes or the member declares), the one reading the card's slot, this
      trigger and the person-led team's Inbox row (§4.5a *Inbox row: idle · open work*) draw;
-     the page reads it from the record, and derives the slot from `nudged_at` as it did only where the record carries no `idle_open` (a home whose tick does not write it yet). `seat_due` carries the cause — `{at, by,
+     the page reads it from the record and derives nothing from `nudged_at`. `seat_due` carries the cause — `{at, by,
      member}` — and **a cause fills once per stretch**: the home keeps **`seat_filled:
      [{member, by, at}]`** on the seat's record, an entry dropped when its cause has gone (the
      state changed, the question closed), and a cause still standing after a fill raises no

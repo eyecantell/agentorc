@@ -832,12 +832,13 @@ def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, 
     # the crash restart's ceiling (§6 *Keeping a team running* rule 1, TD-103): an ending of its own
     ceil = view(_card(state="exited", exit_code=1, restart_ceiling={"at": "2026-09-22T20:00:00Z", "count": 3}))["slot"]
     assert ceil["text"] == "restarts exhausted · 3 in 2 h" and ceil["kind"] == "bad" and "Resume" in ceil["full"]
-    # the idle nudge (§6 rule 4): nudged in this stretch and still idle twenty minutes later
-    stale = view(_card(since="2026-09-21T01:00:00Z", nudged_at="2026-09-21T01:20:00Z"))["slot"]
-    assert stale["text"] == "idle · open work" and stale["kind"] == "lim"
-    # the tick's own reading (§6 rule 3 `idle_open`, TD-259 slice 4) is the slot's where the record has it
+    # the idle nudge (§6 rule 4), still idle twenty minutes later: the tick's own reading (§6 rule 3
+    # `idle_open`, TD-259) is the slot's, and a nudge alone — `nudged_at` — is not: the page derives nothing
     marked = view(_card(since="2026-09-21T01:00:00Z", idle_open={"at": "2026-09-21T01:40:00Z", "ref": "TD-070"}))
-    assert marked["slot"]["text"] == "idle · open work" and marked["open_work"] is True
+    assert marked["slot"]["text"] == "idle · open work" and marked["slot"]["kind"] == "lim"
+    assert marked["open_work"] is True
+    nudged = view(_card(since="2026-09-21T01:00:00Z", nudged_at="2026-09-21T01:20:00Z"))
+    assert nudged["open_work"] is False and nudged["slot"]["text"] != "idle · open work"
     assert not view(_card(state="working", idle_open={"at": "2026-09-21T01:40:00Z", "ref": "TD-070"}))["open_work"]
     # a manager on call (§4.9, TD-259): the slot says what fills it, and it *came*, as the techlead does
     oncall = view(_card(state="closed", pane=False), seats={"ao-w": "comes when a member needs a reading"})["slot"]
@@ -845,8 +846,6 @@ def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, 
         "last came"
     )
     assert "a member's permission, a stalled member or one idle with its work open fills the seat" in oncall["full"]
-    # a nudge from an earlier stretch says nothing about this one
-    assert view(_card(since="2026-09-21T02:00:00Z", nudged_at="2026-09-21T01:20:00Z"))["slot"]["text"] != stale["text"]
     said = view(_card(out_of_work=oow, doing=doing))["slot"]
     assert said["text"] == "out of work — the ledger is empty" and "second line" in said["full"]
     assert not said["caption"].startswith("says")  # an ending hides the line that caption would date

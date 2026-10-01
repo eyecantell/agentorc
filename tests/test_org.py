@@ -754,7 +754,8 @@ def test_a_manager_is_on_call_when_its_definition_says_so(tmp_path):
 
     assert team({"manager": {"on_call": True}}).manager.on_call is True
     assert team({"manager": {"on_call": False}}).manager.on_call is False
-    assert team({"manager": {}}).manager.on_call is org.ON_CALL_DEFAULT
+    assert org.ON_CALL_DEFAULT is True  # Paul, 2026-10-01: on call from the build; the flip is TD-259's
+    assert team({"manager": {}}).manager.on_call is True and team({}).manager.on_call is True
     assert team({"manager": {"role": "person"}}).manager.on_call is False  # nothing is started, whatever the default
     assert "on_call" in org.MANAGER_KEYS and "on_call" not in org.MEMBER_KEYS
     for block, why in (

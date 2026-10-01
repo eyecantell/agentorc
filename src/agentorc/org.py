@@ -64,12 +64,10 @@ class Project:
     repos: dict[str, dict[str, Path]] = field(default_factory=dict)  # repo name → host name → checkout
 
 
-# What a `manager:` with no `on_call` means (design §4.9). The design's default is on call *from the
-# build*, and the build is TD-259's slices: until the tick reads the `team` trigger (slice 2), a
-# manager started as a seat is closed at its first idle and never filled, so that slice flips this.
-# An `on_call: true` is honoured meanwhile, and does exactly that to its team: write it only once
-# slice 2 is live.
-ON_CALL_DEFAULT = False
+# What a `manager:` with no `on_call` means (design §4.9): a seat on call, since the tick reads the
+# `team` trigger and the mail sweep spares a question to a closed seat (TD-259 slices 2 and 3). A team
+# keeps the shape it was started with until its next Start; `on_call: false` asks for a standing one.
+ON_CALL_DEFAULT = True
 # What fills a manager on call, in the card's words (design §4.5 *The card's anatomy*, TD-259)
 MANAGER_WHEN = "comes when a member needs a reading"
 
