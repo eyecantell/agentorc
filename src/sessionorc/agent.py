@@ -119,6 +119,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _context_bound,  # noqa: F401
     _controllers,  # noqa: F401
     _cool_left,  # noqa: F401
+    _counted,  # noqa: F401
     _drop_unknown,  # noqa: F401
     _duration,  # noqa: F401
     _ended_by,  # noqa: F401
@@ -126,6 +127,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _grants,  # noqa: F401
     _is_branch_claim,  # noqa: F401
     _lane,  # noqa: F401
+    _new_done,  # noqa: F401
     _older,  # noqa: F401
     _oldest_first,  # noqa: F401
     _pane_title,  # noqa: F401
