@@ -113,6 +113,13 @@ def test_a_checkout_with_no_forge_draws_the_number_bare():
     assert "PR #842 fails the cadence check" in page and "https://forge" not in page
 
 
+def test_a_malformed_mark_never_breaks_the_page():
+    bad = rec(checks=[{**ROWED, "failed": 7}], held_missed=[{"pr": 1, "paths": "x"}, {"pr": 2, "paths": 3}])
+    cad, hel = rows_of(bad)
+    assert cad["text"].startswith("PR #842 fails the cadence check: no row named")
+    assert hel["text"] == "PR #1 and #2 touched held paths and merged without the techlead's read"
+
+
 def test_dismiss_is_clear_mark_with_the_session_the_mark_and_the_pr(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()

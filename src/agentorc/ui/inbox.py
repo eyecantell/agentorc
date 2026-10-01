@@ -189,7 +189,10 @@ def cadence_marks(v: dict[str, Any], names: Mapping[str, str] | None = None) -> 
     for c in cadence_mod.rows([c for c in v["checks"] if isinstance(c, dict) and isinstance(c.get("pr"), int)]):
         by = str(c.get("read_by") or "")
         note = f"read by {(names or {}).get(by) or by}" if by else "recorded"
-        failed = [f"{r} ({note})" if r == "review" else str(r) for r in c.get("failed") or []]
+        failed = [
+            f"{r} ({note})" if r == "review" else str(r)
+            for r in (c.get("failed") if isinstance(c.get("failed"), list) else [])
+        ]
         tail = f"fails the cadence check: {', '.join(failed) or 'no row named'}"
         if read := _clock(c.get("at")):
             tail += f" · read {read}"
@@ -209,7 +212,9 @@ def held_mark(v: dict[str, Any]) -> dict[str, Any] | None:
         return None
     reader = str((v.get("review") or {}).get("reader") or "") if isinstance(v.get("review"), dict) else ""
     whose = "the person's" if reader == "person" else "the techlead's"
-    paths = list(dict.fromkeys(str(p) for c in left for p in c.get("paths") or []))
+    paths = list(
+        dict.fromkeys(str(p) for c in left for p in (c.get("paths") if isinstance(c.get("paths"), list) else []))
+    )
     more = f" and {len(paths) - held_mod.NAMED} more" if len(paths) > held_mod.NAMED else ""
     tail = f"touched held paths and merged without {whose} read"
     if paths:
