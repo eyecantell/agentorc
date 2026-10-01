@@ -16,6 +16,7 @@ from typing import Any
 from sessionorc import balance as balance_mod
 from sessionorc import hosts
 from sessionorc import settings as settings_mod
+from sessionorc.agent_common import WRAPUP_GRACE
 from sessionorc.models import (
     normalize_ref,
 )
@@ -114,6 +115,23 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
     return None
 
 
+def unclosed_mark(v: dict[str, Any], now: datetime) -> tuple[str, str] | None:
+    """Design §4.5a **Inbox row: manager did not close** (§6 rule 9, TD-241): `(when it was told,
+    the row's words)` for a live manager the tick told its team had finished (`finished_sent_at`)
+    and could not close `WRAPUP_GRACE` later — never idle, `needs-you`, `limited`, or holding work
+    — else None. Read from the record each time: nothing more is stored, and the row leaves when
+    the manager is closed or a member at work takes the wind-down back."""
+    sent = _instant(v.get("finished_sent_at"))
+    if sent is None or v.get("superseded_by") or v.get("state") in ("exited", "closed"):
+        return None
+    if now - sent < WRAPUP_GRACE:
+        return None
+    return str(v["finished_sent_at"]), (
+        "manager did not close — its team finished and the host agent told it so, and it has not closed; "
+        "the host agent closes it only once it is idle with nothing uncommitted or unpushed"
+    )
+
+
 def state_rows(
     views: Collection[dict[str, Any]],
     *,
@@ -191,6 +209,8 @@ def state_rows(
             # its own row beside any state row, as an alarm is: a crashed record at its ceiling can
             # also be exited with unpushed work, and the two are answered differently
             rows.append({**base(v, "restart", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
+        if mark := unclosed_mark(v, now):
+            rows.append({**base(v, "unclosed", mark[1]), "at": mark[0], "age": ""})
         if alarms := v.get("alarms"):
             row = base(v, "alarm", alarm_note(alarms))
             # an alarm row is as old as its newest alarm, not as its session: what the order is

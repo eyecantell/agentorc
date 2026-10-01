@@ -664,6 +664,39 @@ def test_each_state_row_kind_carries_its_own_controls_and_no_others(tmp_path, mo
 
 
 @pytest.mark.unit
+def test_a_manager_the_tick_told_and_could_not_close_is_a_row_with_open_alone(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: manager did not close** (§6 rule 9, TD-241): a live manager whose
+    `finished_sent_at` is older than `WRAPUP_GRACE` raises one row, as old as the send, beside any
+    state row it also has, with **Open** and nothing else. Inside the grace, on a dead record and
+    on a superseded one there is none."""
+    from datetime import UTC, datetime
+
+    from sessionorc.agent_common import WRAPUP_GRACE
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    now = datetime.now(UTC)
+    late = (now - WRAPUP_GRACE - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    soon = (now - WRAPUP_GRACE + timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    records = [
+        rec("ao-m", "working", finished_sent_at=late, team="ao-grind"),
+        rec("ao-q", "needs-you", pending={"kind": "question", "text": "which?"}, finished_sent_at=late),
+        rec("ao-g", "idle", finished_sent_at=soon),  # inside its grace: the tick's still
+        rec("ao-c", "closed", finished_sent_at=late),  # it closed: the mark is the card's *by the tick*
+        rec("ao-x", "idle", finished_sent_at=late, superseded_by="ao-y"),
+        rec("ao-n", "idle"),
+    ]
+    got = state_rows_of(records)
+    unclosed = {r["sid"]: r for r in got if r["row"] == "unclosed"}
+    assert sorted(unclosed) == ["ao-m", "ao-q"]
+    assert {r["row"] for r in got if r["sid"] == "ao-q"} == {"question", "unclosed"}, "beside its state row"
+    assert unclosed["ao-m"]["text"].startswith("manager did not close — ") and unclosed["ao-m"]["at"] == late
+    html = rows("needs", [unclosed["ao-m"]])
+    assert "manager did not close" in html and ">Open<" in html and 'href="/focus/ao-m"' in html
+    for other in ('data-act="resume"', 'data-act="attention_snooze"', ">Dismiss<", 'data-act="allow"'):
+        assert other not in html, other
+
+
+@pytest.mark.unit
 def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeypatch):
     """§4.5a **Inbox row: restart** (§6 *Keeping a team running*, TD-103 slice 5): a record at the
     crash or the fill ceiling, one whose wanted restart is held by work left, and an `early`

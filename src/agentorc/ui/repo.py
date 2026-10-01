@@ -303,6 +303,7 @@ def team_groups(
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
+                "by_tick": bool(row.get("by_tick")),  # *· by the tick*: rule 9 wound it down (§6, TD-241)
                 # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only
                 "work_note": work_note((work or {}).get(team)) if not live and row.get("wound_down") else None,
                 "work_started": work_started(crew) if live and team != NO_TEAM else None,

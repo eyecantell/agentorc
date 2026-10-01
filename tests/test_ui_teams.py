@@ -265,7 +265,12 @@ def test_a_stopped_teams_card_reads_wound_down_where_it_would_have_read_stopped(
         for n in ("orc-ao", "grind-1")
     ]
     html = client.get("/").text
-    assert "wound down" in html and ">stopped<" not in html
+    assert "wound down" in html and ">stopped<" not in html and "by the tick" not in html
+    # the manager never declared and rule 9 closed it: the same words, and who ended it (TD-241)
+    closed_for = {"why": "finished", "closed_at": at}
+    fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="closed"), "tail": [], "closed_for": closed_for}
+    html = client.get("/").text
+    assert "wound down" in html and "> · by the tick</span>" in html and ">stopped<" not in html
     head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
     assert 'data-live="0"' in head[:200]  # what the fold and the quieter card key on
     head, grid = head.split('<div class="grid">', 1)
