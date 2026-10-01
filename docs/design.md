@@ -3820,7 +3820,7 @@ named as manager is one only where it says `on_call: true`) is a seat of §6
 rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
 question to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it
 has acted, holding `control` on its record across the close as a seat holds its mail; a standing
-manager is the definition's other choice (`on_call: false`); on call is the default from the build (Paul, 2026-10-01).
+manager is the definition's other choice (`on_call: false`); on call is the `manager` role's default from the build (Paul, 2026-10-01).
 The two shapes are two templates of the package (built 2026-10-01 — TD-259 slice 5): `briefs/manager.md` rounds on `ao wait`;
 `briefs/manager_on_call.md`, which `ao team start` composes for a manager on call (`repoconfig.ON_CALL_BRIEFS`), reads
 `seat_due.by` and `member` from its own record, makes that one reading — answers the `ask`, allows or denies the
@@ -4949,8 +4949,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
   `keep_mail`, so a question that was waiting is still there), the ceiling of six fills an hour
   (`FILL_CEILING`) is over all seats sharing a controller, and a seat that is `idle` with no
   `seat_due` is closed as the techlead is. A fourth trigger, **`team`**, is the manager's alone,
-  written by `on_call` on `manager:` (the default) and refused under `seats:` (§6 rule 3 *A manager on
-  call is a seat of this rule*, TD-247; designed 2026-09-30; the field is written since 2026-10-01, the tick does not read it yet — TD-259). A seat runs its brief and ends on
+  written by `on_call` on `manager:` (the `manager` role's default, §4.9) and refused under `seats:` (§6 rule 3 *A manager on
+  call is a seat of this rule*, TD-247; designed 2026-09-30; the field is written and the tick reads it since 2026-10-01 — TD-259). A seat runs its brief and ends on
   its own — it declares nothing (§4.9a), holds **no grants** (it files and opens PRs with `gh`,
   which is not an act on a session), and is not counted in a wind-down. `ao team start` starts
   each seat after the techlead with the manager as its controller and no grants;
@@ -6779,7 +6779,7 @@ code and needs no grant; a session doing the same work does.
   one *idle · open work* after the nudge, and the prose of an escalation — and for that a
   standing manager woke every hour to find nothing: manager-ao-1 stood at 686k of context on
   2026-09-30, its rounds reading *nothing needs a person*. So **the manager is a seat on call**
-  unless its definition says otherwise (`on_call`, §4.9), filled by rule 3's `team` trigger on
+  unless its definition says otherwise (`on_call`, §4.9, whose default is the `manager` role's alone), filled by rule 3's `team` trigger on
   exactly those readings and closed when it has acted, as the techlead is; a standing manager
   stays what a definition may ask for (`on_call: false`); and
   `manager: {role: person}` means the readings are the person's — the Inbox's state rows for a
