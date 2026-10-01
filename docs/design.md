@@ -6690,7 +6690,12 @@ code and needs no grant; a session doing the same work does.
      refilled into the same reading two minutes later; the fill ceiling guards the rest. **A
      question is a cause by its id**: for `asks` the due and the entry carry `ask`, the
      question's id, in `member`'s place, so a question the manager left standing does not fill
-     it again and a second question does. The causes are read in that order — questions, then
+     it again and a second question does — an entry the person handed it excepted, which is
+     never remembered and fills the seat while it owes its outcome, as it does any seat (§4.10).
+     A member's cause is its word and the member, nothing finer: a second permission raised
+     before a tick saw the first one go is the same cause, and waits for a person as a
+     question does; and a question waiting on an idle, filled seat holds its due, as the
+     techlead's does, so a member's reading waits behind it for rule 4's nudge or the answer. The causes are read in that order — questions, then
      each member's permission, `stalled?`, *idle · open work* — and the first one no fill was
      made for is the due; one whose cause goes before the fill is cleared, as `asks` is. **A
      reading that comes while the seat is filled is the next fill's**: a fill starts cold on the

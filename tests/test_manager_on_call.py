@@ -198,8 +198,8 @@ async def test_a_manager_on_call_is_closed_idle_and_a_reading_that_came_while_it
         await agent._keep_running(now)
         assert rec.state == "closed", "it found nothing and was closed"
         assert agent.sessions[a].controllers == [mgr], "its members name it across the close"
-        # a member stalls while the next run of the seat is still up and idle: that run is closed,
-        # and the fill that follows is for the reading
+        # a member stalls: the closed seat is filled for it; then a second reading comes while that
+        # run is up — it is closed once idle, and the fill that follows is for the reading
         agent.sessions[a].state = "stalled?"
         await agent._keep_running(now)
         run = agent.sessions[mgr]

@@ -1988,6 +1988,8 @@ class TickMixin:
             return
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
         cause = s.seat_due if (s.seat or {}).get("trigger") == "team" else None
+        if cause and any(e.id == cause.get("ask") and e.handed_entry for e in s.inbox):
+            cause = None  # an entry the person handed it fills the seat while it owes, as any seat's (TD-218)
         await self._replay(s, "fill", keep_mail=True)
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if cause and new is not None and new is not s:
