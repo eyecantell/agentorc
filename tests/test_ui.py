@@ -1782,7 +1782,15 @@ def test_a_roles_message_line_is_on_the_view_the_titles_and_the_team_header(tmp_
            "techlead": "techlead-ao-1", "seats": [], "members": 2, "wound_down": None, "concluded": None}  # fmt: skip
     (g,) = [g for g in uiapp.team_groups(views, [row]) if g["team"] == "ao-grind"]
     head = uiapp.templates.get_template("group_head.html").render(g=g)
-    assert '<div class="meta whofor"' in head and "manager-ao-1 · " in head and "Grinder: its own card" in head
+    # TD-252: the header draws no line; the team's help panel carries the lines under their paragraph
+    assert '<div class="meta whofor"' not in head and "manager-ao-1 · " not in head
+    panel = head[head.index('<div class="note secinfo helppanel"') :]
+    assert "<p><b>who for what</b> — Lists whom to write to" in panel
+    assert f'<ul class="whofor"><li>{views[0]["message_line"]} → manager-ao-1</li>' in panel.replace("&#39;", "'")
+    assert "<li>Grinder: its own card</li></ul>" in panel
+    g["who"] = []  # a team whose roles carry no line: neither the paragraph nor the list
+    bare = uiapp.templates.get_template("group_head.html").render(g=g)
+    assert "<b>who for what</b>" not in bare and "whofor" not in bare and "<b>Start</b>" in bare
     assert uiapp.who_for_what([{"role": "plain", "names": ["a"], "seat": False}], views) == []  # no line at all
 
 

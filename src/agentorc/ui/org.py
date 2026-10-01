@@ -113,6 +113,12 @@ def _pr_states(r: Mapping[str, Any] | None) -> dict[int, dict[str, Any]]:
 MOTION_PRIORITIES = ("high", "medium", "low")  # the letters a row in motion draws, in sort order
 
 
+def _holders_width(members: Collection[Mapping[str, Any]]) -> int:
+    """The characters a *TDs in motion* row's holders take: the names, *, * between them, and two for
+    the person glyph on a person's own session."""
+    return sum(len(str(m["name"])) + (2 if m.get("mine") else 0) for m in members) + 2 * (len(members) - 1)
+
+
 def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
     a `claimed` progress entry, with its **phase** derived here, never declared — *design* on an
@@ -183,6 +189,8 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+REF_WIDTH = 10  # *TDs in motion*'s reference column at most, in characters (§4.5a **Columns**, TD-252)
+HOLDERS_WIDTH = 14  # …and its holders column: one ordinary name; a longer list is cut and whole on hover
 DOER_WIDTH = 18  # the Doing list's doer column at most, in characters; a longer name is cut (§4.5a)
 
 
@@ -230,6 +238,11 @@ def team_summary(
         "repo": repo_facet(r, now, waiting) if r else None,
         "motion": motion,
         "phases": {ph: sum(1 for x in motion if x["phase"] == ph) for ph in PHASES},
+        # the reference and holders columns' widths, from the rows, so every row's grid is the same (§4.5a **Columns**)
+        "ref_w": min(max((len(x["ref"]) for x in motion), default=1), REF_WIDTH),
+        "who_w": min(max((_holders_width(x["members"]) for x in motion), default=1), HOLDERS_WIDTH),
+        # …and the PR column's: *#811*, or *#712 merged*; 0 where no row has a PR, so the title takes the room
+        "pr_w": max((len(f"#{x['pr']} {x['pr_state']}".rstrip()) for x in motion if x["pr"]), default=0),
         "answers": answers,
         "doing": (drows := doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}, now)),
         # the doer column's width, set here from the names in the list so a filter moves no column (§4.5a)
