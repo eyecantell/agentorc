@@ -4731,7 +4731,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   and not built (TD-053); it may take the same constant when it lands. A run that is over before
   it began did not run out of context.
   **Early is decided from the record, not from the clock alone** (TD-245; the declaration
-  built, TD-249 slice 2; the row's and the card's words and the ceiling's count are not — TD-249). A run that
+  and the ceiling's count built, TD-249 slices 2 and 3; the row's and the card's words are not — TD-249). A run that
   finished an entry fast is not a run that never began: grinder-ao-2 declared on 2026-09-30
   twenty-five minutes in, two slices merged, nothing unpushed, and sat idle twenty hours as
   *early*. So a `restart` inside `RESTART_EARLY` is early only when the run did **no new
@@ -6488,7 +6488,7 @@ code and needs no grant; a session doing the same work does.
      member). A kill (`pane` false) is a person's or
      a controller's act and is never undone; an exit after a wrap-up is an ending. **The
      ceiling**: `RESTART_CEILING` — three counted restarts of one session in two hours (a wanted
-     restart with new work is not counted: §4.9a *Inside the ceiling*, TD-245, not built — TD-249), `one_for_one`
+     restart with new work is not counted: §4.9a *Inside the ceiling*, TD-245; `agent_common._counted`, TD-249 slice 3), `one_for_one`
      (only the session that exited, never its siblings) — the numbers §4.8 took from OTP, systemd
      and Circus, now constants. Each restart is appended to the record's `restarts: [{at, why}]`
      (home-owned, carried across the supersede so the count survives the restart it counts;

@@ -750,6 +750,41 @@ def _reported(s: Session) -> dict[str, Any]:
     return {"done": done, "left": left}
 
 
+def _new_done(done: Any, earlier: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The `{ref, pr}` of `done` that none of the `restarts` entries in `earlier` holds in its own
+    `done` — the same pair, a `done` with no `pr` matching on `ref` alone (design §4.9a *Early is
+    decided from the record*): new work, by the one test the declaration and the ceiling share."""
+    held = [d for r in earlier for d in (r.get("done") or []) if isinstance(d, dict)]
+
+    def seen(d: dict[str, Any]) -> bool:
+        return any(e.get("ref") == d.get("ref") and (d.get("pr") is None or e.get("pr") == d.get("pr")) for e in held)
+
+    return [d for d in (done or []) if isinstance(d, dict) and not seen(d)]
+
+
+def _counted(restarts: list[Any], now: datetime, fills: bool = True) -> list[dict[str, Any]]:
+    """The `restarts` entries that count toward `RESTART_CEILING` now (design §4.9a *What counts
+    toward the ceiling*, §6 rule 1; TD-249 slice 3): those inside `RESTART_WINDOW`, leaving out a
+    `wanted` restart that carried new work — its `done` holds something no entry in the window
+    before its own held. A crash, a fill, a failed replay and a wanted restart with nothing new
+    (an early one a person let run, a repeat) count; an entry written before the fields has no
+    `done` and counts. `fills=False` leaves a seat's `fill` entries out, as rule 8's reading does."""
+    entries = [r for r in restarts if isinstance(r, dict)]
+    out = []
+    for i, r in enumerate(entries):
+        if not _recent(r.get("at"), now, RESTART_WINDOW) or (r.get("why") == "fill" and not fills):
+            continue
+        if r.get("why") == "wanted" and not r.get("error"):
+            try:
+                at = _parse(str(r.get("at")))
+            except ValueError:
+                at = now
+            if _new_done(r.get("done"), [e for e in entries[:i] if _recent(e.get("at"), at, RESTART_WINDOW)]):
+                continue
+        out.append(r)
+    return out
+
+
 def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     """What a `restart` declared now is, read from the record (design §4.9a *Early is decided from
     the record*, *Repeated work is the person's at once*; TD-249 slice 2): `{early, repeat, words}`.
@@ -763,18 +798,7 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     failed) says nothing either way. `words` is what decided it, for the reply."""
     run = _reported(s)
     entries = [r for r in s.restarts if isinstance(r, dict)]
-    earlier = [
-        d
-        for r in entries
-        if _recent(r.get("at"), now, RESTART_WINDOW)
-        for d in (r.get("done") or [])
-        if isinstance(d, dict)
-    ]
-
-    def seen(d: dict[str, Any]) -> bool:
-        return any(e.get("ref") == d["ref"] and (d["pr"] is None or e.get("pr") == d["pr"]) for e in earlier)
-
-    new = [d for d in run["done"] if not seen(d)]
+    new = _new_done(run["done"], [r for r in entries if _recent(r.get("at"), now, RESTART_WINDOW)])
     last = entries[-2:]
     both = len(last) == 2
     thrice = next((ref for ref in run["left"] if both and all(ref in (r.get("left") or []) for r in last)), None)

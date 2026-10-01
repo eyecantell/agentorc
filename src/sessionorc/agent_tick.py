@@ -583,7 +583,7 @@ class TickMixin:
             return
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
-        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+        recent = agent_common._counted(s.restarts, now)
         if len(recent) >= RESTART_CEILING:
             s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
             log.warning("%s: %d restarts in %s — the ceiling; it is a person's now", s.id, len(recent), RESTART_WINDOW)
@@ -653,7 +653,7 @@ class TickMixin:
         if git["dirty"] or git["unpushed"]:
             await self._restart_held(s, now, git["dirty"], git["unpushed"])
             return
-        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+        recent = agent_common._counted(s.restarts, now)
         if len(recent) >= RESTART_CEILING:
             s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
             log.warning("%s: %d restarts in %s — the ceiling; it is a person's now", s.id, len(recent), RESTART_WINDOW)
@@ -714,7 +714,7 @@ class TickMixin:
             return  # work left, or not known: its replies keep saying it, and it declares when it can
         if self._window_full(s, now):
             if not s.restart_ceiling:
-                recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+                recent = agent_common._counted(s.restarts, now)
                 s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
                 log.warning("%s: the brief changed at its restart ceiling — it is a person's now", s.id)
                 self._save(s)
@@ -764,7 +764,7 @@ class TickMixin:
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:
-        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+        recent = agent_common._counted(s.restarts, now)
         return len(recent) >= RESTART_CEILING
 
     async def _restart_held(self, s: Session, now: datetime, dirty: int, unpushed: int) -> None:
@@ -1088,11 +1088,7 @@ class TickMixin:
         for r in work_mod.crew(records):
             if r.state not in work_mod.DEAD or r.superseded_by or r.suspended or r.restart_ceiling:
                 continue
-            recent = [
-                e
-                for e in r.restarts
-                if isinstance(e, dict) and e.get("why") != "fill" and _recent(e.get("at"), now, RESTART_WINDOW)
-            ]
+            recent = agent_common._counted(r.restarts, now, fills=False)
             if len(recent) >= RESTART_CEILING:
                 continue
             if not (paths.launch_dir() / f"{self._address(r)}.json").is_file():
