@@ -73,10 +73,6 @@
     defined team that is not concluded, why there is no Start — one clause per unattended session
     that keeps it from the home's reading, from the records; display only #}
 {% if g.team and g.defined and g.not_concluded %}<div class="meta notconcluded" title="{{ help_title('not-concluded') }}">not concluded: {{ g.not_concluded | join(' · ') }}</div>{% endif %}
-{#- design §4.5a *team groups* **who for what** (§4.8, TD-162, built by TD-171): a second line, whom to
-    write to by role, from each role's `message:` line — the definition's words, display only, and
-    drawn only when a role carries one #}
 {#- …and on a live team the start the rule made (§4.5a **work waiting** note): the header's second line #}
 {% if g.work_started %}<div class="meta workstarted" title="the home started this team because its lanes gained work while it was wound down (design §6 rule 8, on_work: start)">started <span class="localtime" data-at="{{ g.work_started.at }}">{{ g.work_started.age ~ ' ago' if g.work_started.age else g.work_started.at }}</span>{% if g.work_started.first %} for {{ g.work_started.first }}{% if g.work_started.more %} and {{ g.work_started.more }} more{% endif %}{% endif %}</div>{% endif %}
-{% if g.who %}<div class="meta whofor" title="who for what: each role's message: line (design §4.8) — write to the one whose line fits">{{ g.who | join(' · ') }}</div>{% endif %}
-{% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{{ hm2.panel('team', 'team-' ~ g.team) }}{% endif %}
+{% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{#- **who for what** (§4.8, TD-171) is in the panel, not on the header (TD-252) #}{{ hm2.panel('team', 'team-' ~ g.team, g.who) }}{% endif %}

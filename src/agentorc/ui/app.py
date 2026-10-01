@@ -204,15 +204,18 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
+    HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
     MOTION_PRIORITIES,  # noqa: F401
     PHASES,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
+    REF_WIDTH,  # noqa: F401
     ROLLUP_STATES,  # noqa: F401
     WINDOWS,  # noqa: F401
     _bars,  # noqa: F401
     _blocks,  # noqa: F401
+    _holders_width,  # noqa: F401
     _https,  # noqa: F401
     _pr_states,  # noqa: F401
     answer_blocks,  # noqa: F401

@@ -161,7 +161,7 @@ def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str
 
 
 def who_for_what(roles: Collection[Mapping[str, Any]], views: Collection[Mapping[str, Any]]) -> list[str]:
-    """The team header's **who for what** line (design §4.5a *team groups*, §4.8 *A role says when to
+    """The team's **who for what** lines, drawn in its help panel (design §4.5a ***i*** mark, §4.8 *A role says when to
     message it*; TD-162, built by TD-171): one phrase per role the definition names, in its order,
     from the role's `message:` line — the definition's words, never a session's. A role one session
     holds reads *<line> → <name>*, and an empty seat *(on call)* after the name; a role several
@@ -330,7 +330,7 @@ def team_groups(
                 # design §4.5a team header **✉ n** (TD-071 item 2): what the fold hides of the cards'
                 # unread chips — display only, the mail stays where it is (§4.10)
                 "unread": sum(int(m.get("unread") or 0) for m in members),
-                # design §4.5a *team groups* **who for what** (§4.8, TD-171): whom to write to, by role
+                # design §4.5a ***i*** mark **who for what** (§4.8, TD-171): whom to write to, by role
                 "who": who_for_what((defs.get(team) or {}).get("roles") or (), views) if team != NO_TEAM else [],
             }
         )

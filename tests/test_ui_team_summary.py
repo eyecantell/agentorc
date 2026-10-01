@@ -3,6 +3,7 @@ of three facets — Repo, TDs in motion, Answer needed / Doing — and its membe
 
 from __future__ import annotations
 
+import pathlib
 import re
 from datetime import UTC, datetime, timedelta
 
@@ -176,6 +177,40 @@ def test_tds_in_motion_carry_the_entrys_priority_as_a_letter_and_sort_by_it():
     assert chips.count('<span class="mprio"></span>') == 3  # TD-200, TD-250, TD-999
     row = html[html.index('<div class="mrow">') :]
     assert row.index('class="phase') < row.index('class="mprio') < row.index("TD-050")  # between the two
+
+
+def test_tds_in_motion_are_drawn_in_columns_with_every_cell():
+    """TD-252 (design §4.5a *team card: TDs in motion*, **Columns**): each row carries the six cells
+    in order — phase, priority, reference, title, holders, PR — an empty one where the row has no
+    priority or no PR, and the facet the two widths the server set from its rows."""
+    r = reading("/r/s")
+    ms = [
+        member("g1", progress=[claim("TD-301", pr=7), claim("TD-999")]),
+        member("grinder-with-a-long-name", progress=[claim("TD-999")], unattended=False),
+    ]
+    s = ui.team_summary("grind", ms, {"/r/samscrape": r}, {}, now=NOW)
+    assert s["ref_w"] == len("TD-301")
+    assert s["who_w"] == ui.HOLDERS_WIDTH  # g1, grinder-with-a-long-name and the glyph: cut at the bound
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert s["pr_w"] == len("#7")
+    assert f'<div class="facet fmotion" style="--ref-n: 6; --who-n: {ui.HOLDERS_WIDTH}; --pr-n: 2">' in html
+    bare = ui.team_summary("grind", [member("g1", progress=[claim("TD-999")])], {"/r/samscrape": r}, {}, now=NOW)
+    assert (bare["ref_w"], bare["who_w"], bare["pr_w"]) == (6, 2, 0)  # no PR in the facet: no room kept for one
+    rows = html.split('<div class="mrow">')[1:]
+    assert len(rows) == 2
+    for row in rows:
+        cells = [row.index(f'class="{c}') for c in ("mphase", "mprio", "mref", "mtitle", "mwho", 'mpr"')]
+        assert cells == sorted(cells)
+    by_ref = {("TD-999" if ">TD-999<" in row else "TD-301"): row for row in rows}
+    assert '<span class="mpr"></span>' in by_ref["TD-999"] and '<span class="mprio"></span>' in by_ref["TD-999"]
+    assert '<span class="mpr"><' in by_ref["TD-301"] and "#7" in by_ref["TD-301"]
+    assert 'title="g1, grinder-with-a-long-name"' in by_ref["TD-999"]  # the whole list on hover
+    css = (pathlib.Path(ui.__file__).parent / "static" / "app.css").read_text(encoding="utf-8")
+    assert (
+        ".mrow { --mch: .62em; display: grid; grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch))"
+        in css
+    )
+    assert ".mrow .mpr { grid-column: 4 / -1; }" in css  # a phone: the PR under the title
 
 
 def test_answer_needed_opens_the_facet_and_doing_is_newest_first():

@@ -238,8 +238,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
                 "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
-                # the definition's roles in its order, each with the names that hold it — the team
-                # header's *who for what* line (design §4.5a *team groups*, TD-171)
+                # the definition's roles in its order, each with the names that hold it — the team's
+                # *who for what* lines (design §4.5a ***i*** mark, TD-171)
                 "roles": role_holders(t),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing

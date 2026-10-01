@@ -509,14 +509,12 @@ def team_desktop(team_first=False):
         acts = ('<span style="flex-grow: 1;"></span><span class="btn sm ghost" title="the definition\'s members: add one, remove one (design §4.9, TD-163)">Members…</span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
                 if team else "")
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
-        # who for what (design §4.5a *team groups*, TD-162): each role's `message:` line, with the session holding it
-        who = (f'<div class="meta" title="who for what: each role\'s message: line (design §4.8, TD-162)">questions → {title.split(" ")[0]}-lead · PRs and the architecture → techlead (on call) · a grinder about its own card</div>'
-               if team else "")
+        # who for what (TD-162) is in the team's help panel, under the *i* mark, not on the header (TD-252)
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
                 f'<div style="display: flex; align-items: center; gap: 10px;">'
                 f'<span style="font-weight: 600; font-size: 15px;">{title}</span>'
                 f'<span class="meta">{sub}</span>{flag}{acts}</div>'
-                f'{who}{strip}'
+                f'{strip}'
                 f'<div style="{GRID}">{cards_html}</div></div>')
 
     # design §4.5 screen 11 / §4.5a **team card: repo strip** (TD-176): one quiet line per repo the
