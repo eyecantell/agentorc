@@ -2621,7 +2621,7 @@ noted). If a control is not in this table it does not exist.
 | Org top bar | **Settings** tab | a link to `/settings`, last after Inbox (TD-123's rule: drawn since the page was built, 2026-09-27 — TD-148) |
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
-| Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three restarts (§6, TD-186) |
+| Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words; an early one says what decided it, *nothing reported done this run* or, for a `repeat` (TD-245; designed 2026-09-30, not built — TD-249), *repeats TD-229: reported done by its last run too* / *claimed and left twice running*, from the mark's fields. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is lifted by the tick only through rule 2, a clean `restart_wanted` once the two-hour window holds fewer than three counted restarts (§4.9a, TD-245) (§6, TD-186) |
 | Inbox row: manager did not close | **Open** | built 2026-09-30 (TD-241 slice 2, §6 rule 9 *What the tick does with it*): a live manager the tick told its team had finished and could not close — `finished_sent_at` on its record older than `WRAPUP_GRACE`, the manager never idle, `needs-you`, `limited`, or holding uncommitted or unpushed work — under *Needs you*, counted, in fixed words (*manager did not close — its team finished and the host agent told it so, and it has not closed; …*). Its own row beside any state row the record also has, as old as the send. **Open** focuses it, where Close is. No Snooze and no Dismiss: the row is read from the record on every draw and nothing is stored for it, so there is nowhere to keep either. It leaves when the manager is closed, by the tick once it is idle and clean or by a person, or when a member at work takes the wind-down back and `finished_sent_at` is removed |
 | Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; built 2026-09-27 — TD-132 slice 3; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha` or `--back`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row and on a held one, and clears the failure, or the hold when no failure stands — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is neither leaves when live catches up. **After a rollback** (§6 *A rollback*, TD-212; designed 2026-09-28, built 2026-09-29 — TD-226) the row is drawn while the hold stands, whatever `auto` says, under **Needs you**, counted: *`<repo>` · live `<sha7>`, rolled back from `<sha7>` <t> ago · main `<sha7>`, n commits ahead · checks … · auto on · held*, the word *rolled back* from the home's `held` reading. **Promote** on it goes to main's head and ends the hold when it concludes; Dismiss ends the hold and leaves live where it is |
 | Inbox row: team start | **Start**, **Snooze ▾**, **Dismiss** | designed 2026-09-28 (TD-214; built 2026-09-30 — TD-227 slice 3; §6 rule 8): one row per wound-down team whose lanes gained work, from the home's `work_waiting`, which the `host` read hands the clients as `work: {<team>: mark}` — *`<team>` · wound down <t> · its lanes gained n entries: TD-213, TD-214, TD-223*, five ids at most and *and n more*, each a link to the Repo page's entry, every part a structured reading (the ids are the ledger's, the team and the time the home's), never text a session wrote. Under **Needs you**, counted, aged from `work_waiting.at`, the links made with `work_waiting.repo`. Under `on_work: start` it is drawn only when a bound held the start back, and says which: *not started: grind is over its line* (the profile's name; `held` carries no reset time), *its stop time has passed*, *started 3 times today*, *started 12 min ago and wound down again*, *laptop is unreachable*, *no record to start*, and for `balance` the refusal's own numbers, *its repo is over its line: 9 open PRs, the line is 8*. **Start** is the team card's Start, run by the client from the definition with every check it makes, refused in place in its words; **Snooze ▾** as on the promote row, by time alone, kept under `work:<team>` in the attention store; **Dismiss** clears `work_waiting` and adds the ids to the members' `lane_seen`, so those entries do not ask again and a later one does. The row leaves when an unattended session carrying the team's badge is live; a person's own session in the team does not take it away, as it does not take the card's *wound down* |
@@ -3644,6 +3644,36 @@ Nothing checks the pick: it is the worker's judgement, said where it can be read
 supervised member to end its run: the built-in worker presets (`grinder`, `hunter`, `auditor`) carry
 200k, Paul's number from grinder-ao-1's 462k run, and `manager`, `techlead` and `plain` carry none
 (a manager restarts on its own rules, a seat is short, a plain session is often a person's).
+**The bound has two layers** (TD-245; designed 2026-09-30, not built — TD-249). The package
+default is every repo's and moves only on evidence that is every repo's: TD-189's research put
+a fresh run's start-up cost, weighted, at a median 342k and the cost break-even *around 300k*,
+and recommended 200–250k for a grinder; the default takes the break-even, since a bound under
+start-up plus one entry restarts after every entry, so the worker presets carry **300k** once
+TD-249 lands, and 200k stays the number here until it does. **300k is also the default for
+every role that sets none** (Paul, 2026-09-30: designer-ao-1 had reached 352k and manager-ao-1
+756k untold, since only the three worker presets carried a bound and a role an org defines, or
+the manager, carried none): a supervised member whose role has no `context:` takes 300k; a
+**seat** takes none, as today (it is short, and on call); and `context: none` written on a role
+still switches the bound off. So `manager` and `plain` members and every org-defined role are
+bounded unless their definition says otherwise, and `ao roles` prints *context bound: 300k
+(default)* for them. **The manager's restart at the bound** is its own round's ending, not an
+entry's: it holds no claim, so rule 5's idle line rarely finds it (a manager blocks in `ao
+wait`, which is a turn), and what it reads is the reply clause on its `ao` calls; its brief says
+that a round in which that clause appears ends with `ao progress restart --why "context
+bound"` **in place of `ao wait`**, once the round's sends are made and nothing it owes is open,
+and rule 2 restarts it as it restarts a member (§4.9a *Not finished, so the team does not wind
+down*): its round log is keyed by its name beside its run logs, so the next run reads where
+the last left off, and the members notice nothing — their controller's id is the record's,
+superseded in place.
+What is particular to one repo goes in that repo's `.agentorc.yml` as `roles.<role>.context:
+{bound}` — agentorc's design is about 760 KB and its ledger 710 KB, each most of 200k tokens read
+whole, so a run here crossed the bound inside its first entry and restarted after every one —
+set **after measuring** what a fresh run of that role reads before its first claim (the brief,
+`ao --skill`, the primer, the design and the ledger) from the run logs, since a bound under
+start-up plus one entry restarts every entry. The reading rule that keeps start-up small —
+*never read `design.md` or the ledger whole: `scripts/ledger.py --pickable`, then the entry and
+the sections it names* — is a repo's own and goes in that repo's brief supplements (this
+repo's `docs/briefs/grinder-ao-*.md`), never in the package template every repo's workers get.
 Layered as every preset key is; `none` removes it. A definition, not a setting: it is part of what
 the role is, as `review:` is, and changes by PR or by hand in `org.yml`. It is checked when the file is
 read (a typo is a line naming the key), and the start writes it onto the record as **`context_bound`**,
@@ -4647,7 +4677,8 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   or a person's own; a restart is not a start (§6): the host agent starts nothing *new* by
   itself (*It does not replace the clock*, below, TD-026, and §6 rule 8 for what a person's setting lets it start again). Whoever acts reads a structured
   field: the `why` is for the log and the person, and nothing is decided from its words.
-- **Inside the ceiling.** A wanted restart and a crash restart are **one count**: three
+- **Inside the ceiling.** A wanted restart and a crash restart are **one count** (a wanted
+  restart that carried new work is left out of it since TD-245, below): three
   restarts of one session in two hours (§4.8), then the board. A worker that asks again and
   again is a loop with better manners. And the mirror of false exhaustion, below: a `restart`
   declared inside **`RESTART_EARLY`, thirty minutes, of the record's own start** is written as
@@ -4657,6 +4688,40 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   controller reads a field, not a clock. False exhaustion's own early bound, below, is unset
   and not built (TD-053); it may take the same constant when it lands. A run that is over before
   it began did not run out of context.
+  **Early is decided from the record, not from the clock alone** (TD-245; designed
+  2026-09-30, not built — TD-249; until then the thirty minutes alone decide). A run that
+  finished an entry fast is not a run that never began: grinder-ao-2 declared on 2026-09-30
+  twenty-five minutes in, two slices merged, nothing unpushed, and sat idle twenty hours as
+  *early*. So a `restart` inside `RESTART_EARLY` is early only when the run did **no new
+  work**: it is **not** early when the record holds a `progress` entry reported `done` since
+  the record's `created` that is **new** — no `restarts` entry inside `RESTART_WINDOW` (two
+  hours, the ceiling's) holds the same `{ref, pr}` pair in its `done`, a `done` with no `pr`
+  matching on `ref` alone — which the record knows because **each `restarts` entry carries what
+  the run it replaced reported** (`done: [{ref, pr}]` and `left: [ref]`, the references it
+  claimed and did not close), copied at every replay, a crash's included, from the old
+  record's `progress` (§6 rule 1). An entry worked in slices is new work when its PR is a new
+  one. A person's Resume clears `restarts` (§6 rule 2) and this history with it. The context reading does not
+  lift it: a run that read itself past the bound and finished nothing is the loop the rule was
+  written for, and the `why` is never read. The reply names what decided it — *early: nothing
+  reported done this run* — and the record carries **`early: true`** as today.
+  **Repeated work is the person's at once** (Paul, 2026-09-30: *should we also check that new
+  work is being done, not repeated work?*). Beside the ceiling, which catches a loop by count,
+  a `restart` whose run reported **only what an earlier run in the ceiling's window already
+  reported** `done` — the same `{ref, pr}` again, nothing new by the test above — or whose run
+  **leaves a claim that both of the last two runs also left** (the reference is in the `left`
+  of both of the last two `restarts` entries: this is the third run on it with nothing reported
+  `done`; slices reported `done` with a new `pr` are not left), is written with
+  **`restart_wanted.repeat: {ref}`** beside **`early: true`**, so every reader of `early` —
+  the tick, the card, the row — stands as it is: nobody acts on it, and the Inbox row says which
+  entry repeats (*repeats TD-229: reported done by an earlier run too* / *claimed and left three
+  runs running*). The record carries it all (`restarts[].done`, `left`, `restart_wanted.repeat`),
+  so `ao status --json` shows what decided it and `ao status -v` prints the row's words. A run that declares `restart` past the
+  bound with new work each time, however short, is restarted by rule 2 within a tick.
+  **What counts toward the ceiling.** A wanted restart that carried new work does **not**
+  count toward `RESTART_CEILING`: the ceiling guards a crash loop and a loop with manners, and
+  a bound under one entry's cost (below) would otherwise reach it in an afternoon of merged
+  work. A crash, a `fill`, an early and a repeat restart count as today. The same count serves
+  rule 8's reading of a member at its ceiling, so there too a restart with new work is left out.
 - **Not finished, so the team does not wind down.** A member that wants a restart is by its own
   word not out of work, so it never counts toward *every member is finished*; a manager that
   wants one is restarted by the tick as a member is, since `ao team start` supervises it too
@@ -6380,10 +6445,14 @@ code and needs no grant; a session doing the same work does.
      own session read as *outside agentorc*, so two failed replays wrote a ceiling on a healthy
      member). A kill (`pane` false) is a person's or
      a controller's act and is never undone; an exit after a wrap-up is an ending. **The
-     ceiling**: `RESTART_CEILING` — three restarts of one session in two hours, `one_for_one`
+     ceiling**: `RESTART_CEILING` — three counted restarts of one session in two hours (a wanted
+     restart with new work is not counted: §4.9a *Inside the ceiling*, TD-245, not built — TD-249), `one_for_one`
      (only the session that exited, never its siblings) — the numbers §4.8 took from OTP, systemd
      and Circus, now constants. Each restart is appended to the record's `restarts: [{at, why}]`
-     (home-owned, carried across the supersede so the count survives the restart it counts);
+     (home-owned, carried across the supersede so the count survives the restart it counts;
+     since TD-245 — not built, TD-249 — each entry also carries `done: [{ref, pr}]` and
+     `left: [ref]`, what the run it replaced reported and what it claimed and did not close,
+     from the old record's `progress`, which the new record does not keep);
      `why` is `crash`, `wanted` or `fill` (and `start`, `schedule`, rule 7's `brief` and rule 8's `work`, each named where it is written), and a replay that failed keeps its `why` and adds
      `error` (the text), so a failed entry still says what it was trying. At the ceiling the policy stops, writes
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
@@ -6417,7 +6486,7 @@ code and needs no grant; a session doing the same work does.
      tick keeps looking: the moment the git fields read clean and pushed — a person or a sibling
      pushed — the restart runs and clears the mark itself, so `restart_blocked` is transient
      where `restart_ceiling` is not: the ceiling stands until a person's Resume or Forget, or until
-     the window holds fewer than `RESTART_CEILING` restarts and the member declares a clean
+     the window holds fewer than `RESTART_CEILING` counted restarts and the member declares a clean
      `restart_wanted`, which rule 2 then acts on — the ceiling guards against a crash loop, not a
      member that has worked for hours since (TD-186) — and rule 1 never restarts past it; a person's Resume clears `restarts` with the mark, so a
      resumed session gets three fresh restarts, where the tick's own supersede carries the list. An `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
@@ -6482,14 +6551,17 @@ code and needs no grant; a session doing the same work does.
      **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
      kept beside the tokens, since the model may change mid-run) is over its role's
      **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,
-     auditor — none for `manager`, `techlead` and `plain`) is told so **once it is hook-confirmed
+     auditor; 300k once TD-249 lands, for them and for every role that sets none, a seat excepted,
+     and a repo's own number under its `.agentorc.yml`, §4.8 *The bound has two layers* — until
+     then none for `manager`, `techlead` and `plain`) is told so **once it is hook-confirmed
      `idle` and holds no claim in progress** — between entries, never mid-turn — by **one fixed line**
      through `send`'s path, as rule 4's is: *[agentorc] context 231k, over your 200k bound — take
      nothing new: push, ledger, then `ao progress restart --why "context bound"`*; `context_sent_at`
      marks it, and it is sent again after twenty minutes if the member is still idle and over. A
      member that is `working` past the bound is not interrupted: every `ao` reply it makes ends with
      *(context 231k over the 200k bound)* beside the unread line (§4.10 *Busy for hours*), and its brief
-     says what that means — finish the entry in hand, then declare. The declaration is the member's
+     says what that means — finish the entry in hand, then declare; for a manager, end the round
+     with the declaration in place of `ao wait` (§4.8 *The manager's restart at the bound*, TD-245). The declaration is the member's
      (§4.9a *A run that ends with work left*, §9 invariant 14) and rule 2 restarts it; the line is
      the trigger the brief's *your context is long* never had. Ordered as the doorbell is: a wrap-up
      under way or a gate pause beats it, and a member that has declared already (out of work, a restart
