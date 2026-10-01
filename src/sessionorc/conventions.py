@@ -25,10 +25,10 @@ def has_script(root: Path | str) -> bool:
     return (Path(root) / SCRIPT).is_file()
 
 
-def read(root: Path | str, timeout: float = 60.0) -> dict[str, Any] | None:
+def read(root: Path | str, timeout: float = 180.0) -> dict[str, Any] | None:
     """One run of the script in `root`: `{ref, entries}`, or None for **no reading** — no script,
     an origin with no default branch (exit 2), a run that could not be made, or output that is not
-    the script's."""
+    the script's. The script asks git once per entry for its `landed`, hence the long timeout."""
     if not has_script(root):
         return None
     try:

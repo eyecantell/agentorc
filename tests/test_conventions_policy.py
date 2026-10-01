@@ -82,6 +82,7 @@ class _Script:
         self.says: dict[str, list[dict] | None] = {}
         self.ran: list[str] = []
         monkeypatch.setattr(conventions, "read", self._read)
+        monkeypatch.setattr(conventions, "has_script", lambda root: True)
 
     def _read(self, root, **kw):
         self.ran.append(str(root))
@@ -140,6 +141,9 @@ async def test_a_seat_a_finished_member_and_a_root_with_no_reading_are_told_noth
         "finished": {"out_of_work": {"at": "2026-09-29T13:00:00Z", "why": "nothing"}},
         "unsupervised": {"supervised": False},
         "replaced": {"superseded_by": "ao-x-next"},
+        "scheduled": {"state": "scheduled"},
+        "crashed": {"state": "exited"},
+        "closed": {"state": "closed"},
         "noroot": {"repo": "/elsewhere"},
     }
     recs = [_member(agent, name, root, **fields) for name, fields in quiet.items()]
@@ -170,3 +174,18 @@ def test_the_field_is_the_homes():
     from sessionorc import models
 
     assert "conventions_seen" in models.HOME_OWNED
+
+
+async def test_a_record_replaced_while_the_script_ran_is_left_alone(agent, monkeypatch):
+    root = "/repo"
+    agent._repos[root] = {}
+    s = _member(agent, "w", root)
+    monkeypatch.setattr(conventions, "has_script", lambda r: True)
+
+    def read(r, **kw):
+        _member(agent, "w", root, created="2026-09-30T00:00:00Z")  # a restart, mid-read
+        return {"ref": "origin/main", "entries": [_view(NEW), _view(OLD)]}
+
+    monkeypatch.setattr(conventions, "read", read)
+    await agent._conventions_pass([s])
+    assert s.conventions_seen is None and _notes(s) == [] and _notes(agent.sessions[s.id]) == []

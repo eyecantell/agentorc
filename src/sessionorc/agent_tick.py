@@ -967,7 +967,10 @@ class TickMixin:
     def _conventions_member(s: Session) -> bool:
         """Rule 12's subject: a supervised member, not a seat (every fill starts cold, and the hook
         tells it), not finished (never sent to; its next start is told at its start), on the record
-        that is its run now."""
+        that is its run now — one not running (`scheduled`, `exited`, `closed`) starts again as a
+        new record, which the hook tells."""
+        if s.state in ("scheduled", "exited", "closed"):
+            return False
         return bool(s.supervised and s.seat is None and not s.out_of_work and not s.superseded_by)
 
     async def _conventions_pass(self, records: list[Session]) -> None:
@@ -984,8 +987,11 @@ class TickMixin:
                 if self._conventions_member(s) and s.repo and s.repo in self._repos:
                     by_root.setdefault(str(s.repo), []).append(s)
             for root, members in by_root.items():
+                if not conventions_mod.has_script(root):
+                    continue
                 got = await asyncio.to_thread(conventions_mod.read, root)
                 if got is None:
+                    log.info("%s: %s gave no reading", root, conventions_mod.SCRIPT)
                     continue
                 for s in members:
                     if not self._is_record(s) or not self._conventions_member(s):

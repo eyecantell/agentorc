@@ -7135,10 +7135,11 @@ code and needs no grant; a session doing the same work does.
      brief's file — taking each entry's `heading` and `landed`; a root without the script, or
      whose origin has no default branch (exit 2), gives no reading. On each supervised member
      record of that root, not a seat (every fill starts cold, and the hook tells it) and not
-     finished (`out_of_work`: never sent to, and its next start is told at its start), the home
+     finished (`out_of_work`: never sent to, and its next start is told at its start) and not
+     `scheduled`, `exited` or `closed` (it runs again as a new record, which the hook tells), the home
      keeps **`conventions_seen: {at, headings}`** (home-owned), written at the first reading after
      the create as the headings whose `landed` is at or before the record's `created` — an entry
-     whose `landed` the script could not read (`None`: the `git log` call failed or timed out) is left for the next reading — and when a later reading holds
+     whose `landed` the script could not read (`None`: the `git log` call failed or timed out) is left for the next reading — and when that reading or a later one holds
      a heading `conventions_seen` does not, landed after `created`, the member gets **one `note`
      from `system`**: *docs/cadence-changes.md gained 1 entry since you started: "2026-09-29 —
      a review comment's first line carries the verdict" — read it on `origin/main`, then go on*
