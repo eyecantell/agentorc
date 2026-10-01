@@ -121,10 +121,11 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-233 | Build usage reported first: the status line's report through the hook channel, the reading per window with its age and history, the endpoint as a fallback with a fixed cool-off, the age on the chip and in `ao gate`, the gate's projection past `max_age` | High | Built — slices 1–4 (#768, #770, #776, #780, #781, #783, #786, #789, #791); live check pending |
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slices 1–3 and 6 built (the setting, the mark, the refusal, the notes, the tests); slices 4–5 open |
 | TD-240 | Whether a team has finished is the manager's judgement from what it remembers, not a reading of its members' records: manager-dc-1 believed its grinder was *interactive under Paul* for two days, so dc-grind never concluded and the page offered no Start | Medium | Designed 2026-09-29 — the build is TD-241 |
-| TD-241 | Build finished as the home's reading: `finished` in `sessionorc`, the page's *concluded* and the *not concluded* line from it, rule 9's wind-down by the tick with its send, close, mark and announcement, `ao team status --json`'s fields, the manager brief | Medium | Partly done — slice 1 built (the reading, PR #816); slices 2–4 open |
+| TD-241 | Build finished as the home's reading: `finished` in `sessionorc`, the page's *concluded* and the *not concluded* line from it, rule 9's wind-down by the tick with its send, close, mark and announcement, `ao team status --json`'s fields, the manager brief | High | Partly done — slice 1 built (the reading, PR #816); slices 2–4 open |
 | TD-244 | Groom the agentorc attention board onto the Inbox's features: 58 open items and none carries `Answers:`; close what is done, give every question its answers and a `(default)`, ledger what is overdue 14 days behind `Blocked by: decision (Paul)` | High | Partly done — the pass is built (3 closed, one by its raiser; 5 with answers, 5 act, 45 watch); the archive is built (#811); left: the 45 live looks against the 15, on Paul's answer to the steer |
 | TD-245 | A member that ends its run at an entry's end, past its context bound, is marked `early` when the run was under thirty minutes, and nothing restarts it: grinder-ao-2 sat idle 20 hours on 2026-09-30 with the team's work in its package; and 200k is under what one entry in this repo costs | High | Open — design-first |
 | TD-246 | A person cannot restart a member unattended: the restart row says *yours now* and its one button, Resume, brings the session back attended; there is no `ao restart` | Medium | Open — design-first |
+| TD-247 | The manager's remaining jobs are mostly mechanical and its judgement is occasional, yet it is a standing session waking each hour: move the cadence check, the held-path check, the convention relay and the outcome chase to the tick, and make what is left a seat on call | Medium | Open — design-first |
 
 
 ---
@@ -2372,7 +2373,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 ## TD-241: Build finished as the home's reading — rule 9, the page's concluded, the manager's brief
 
-**Priority:** Medium
+**Priority:** High
 **Type:** feature
 **Added:** 2026-09-29 (the designer, from TD-240's design)
 **Owner:** grinder
@@ -2463,3 +2464,27 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** on a scratch home, a supervised member idle with an `early` `restart_wanted` is back `working`, unattended, under its manager and on its stored prompt after one press or one `ao restart`, with `restarts` carrying `why: person`; a dirty checkout is refused by name; a test covers both.
 
 **Related:** TD-245 (why the row appears), TD-103 slice 5 (the row), TD-083, TD-186, TD-172 (Members…).
+
+## TD-247: The manager's remaining jobs are mostly mechanical: move them to the tick, and make its judgement a seat on call
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-09-30 (Paul: *if the manager is required for a team (wind downs, etc) we should probably default every team to having one. Ideally we would not need to and all of its required jobs could be scripted or given to the agent host, but let's investigate*; the anchor's read with two Sonnet readers, of the brief, design §6 and the code, nothing run)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — design-first: new tick policies and a change to what a team's manager is (§4.8, §6)
+**Status:** Open
+**Blocked by:** TD-241
+**Location:** design §6 (*Keeping a team running*, *What stays the manager's*), §4.8 (*The manager is a session, not code*, *Waking a manager*, `manager: {role: person}`), §4.9a, §4.9b (the seat rule); `src/agentorc/briefs/manager.md` (*A round*, *Out of work*, *Escalate*), `docs/briefs/manager-ao-1.md`, `src/sessionorc/agent_tick.py`, `src/agentorc/org.py` (the default manager), `scripts/check_cadence.py`, `scripts/cadence_changes.py`
+
+**Why:** what the read found. (1) **A manager is already every team's default and is not required**: a definition with no `manager:` gets one named `<team>-lead` (`org.py`), `manager: {role: person}` starts none, and supervision keys on no role or controller, so rules 1–7 and the balance rule act on a person-led team's members as on any. No team on kmaster is defined that way (four teams, four managers), so the shape is unproven. (2) **The one thing a person-led team cannot do is end**: nothing closes members that have declared and sit idle, so the team never reads wound down and rule 8 never starts it again; rule 9 does that and is TD-241, raised to High with this entry (Paul, 2026-09-30) and partly built. With a manager the same step hangs on its memory (TD-240), which is what left ao-grind with no Start that day. (3) **Of what the brief still gives the manager, four jobs read fields and scripts, not screens**: the cadence check on a member's PR (`check_cadence.py --pr N --json` gives a verdict per row), the held-path check (a PR merged on `src/sessionorc/**` or `docs/briefs/**` with no read from the seat), the relay of `docs/cadence-changes.md` entries once per member (`cadence_changes.py --json`, today `manager-ao-1.relayed.json`), and the chase of an owed outcome (rule 4 already names an entry the person handed). (4) **What needs a reader is occasional**: an `ask` addressed to the manager, a permission or a question outside an allow-list, a `stalled?` or *idle · open work* member read from its tail, the second reading of the ledger before a wind-down, and the prose of an escalation. For that a manager wakes every 25 to 60 minutes and mostly finds nothing: manager-ao-1 stood at 686k of context on 2026-09-30, its rounds reading *nothing needs a person*.
+
+**Fix — a design round, in this order:**
+1. **The four mechanical jobs as tick policies**, each a fixed line and an Inbox row on the second failure, none typed by a session: the cadence check when a member reports `done` with a `pr` or its PR merges; the held-path check on a merge; the relay per member per entry; the outcome chase as rule 4's own. The round says which run only on the home, what a node's member gets, and what the `review` row's *self-attested* means when no session reads the PR.
+2. **The judgement that is left, as a seat on call** (§4.9b's shape, as the techlead is): filled by a trigger the tick computes — a member `stalled?` or *idle · open work* past its nudge, a pending permission or question on an unattended member, an `ask` addressed to the team's manager — and closed when it has answered. The round says whether that is the `manager` role with a trigger or the techlead seat with a wider brief, what holds `control` while no manager is live (a seat's grant, as now, or nothing), and whether a permission allow-list in the definition takes the common prompts off it.
+3. **The default.** Whether a definition with no `manager:` should then mean the seat rather than a standing session, and what `manager: {role: person}` means beside it; and rule 3's fill ceiling, which groups seats by a shared controller and so gives each seat of a person-led team its own.
+4. **Proof before the default moves:** one team run person-led once TD-241 is live — dc-grind, whose needs are the most mechanical — and what it could not do written here.
+
+**Done when:** the design says, for each line of the manager brief's round, which tick policy or which seat trigger has it; TD-103's *done when* (a night with the brief silent) holds because the brief no longer lists those jobs; and a build entry carries the slices.
+
+**Related:** TD-103 (the first move of policy to the tick: built, live check pending), TD-240 and TD-241 (finished as the home's reading), TD-214 and TD-227 (rule 8), TD-239 (balance), TD-245 and TD-246 (the early restart, the person's restart), TD-098 (seats with triggers), TD-118 (one model for every role, the round's cost).
