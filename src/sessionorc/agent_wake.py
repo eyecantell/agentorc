@@ -820,12 +820,19 @@ class WakeMixin:
         """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
         whether the home can be reached — which a client on a node needs before it labels what it
         shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
-        promote's readings per repo (`promotes`, §6 *Promote*)."""
+        promote's readings per repo (`promotes`, §6 *Promote*) and each wound-down team's
+        `work_waiting` as the `host` record holds it (`work: {<team>: mark}`, §6 rule 8), which is
+        what draws the Inbox's team start row and the card's note."""
         out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
         out["built_from"], out["started_at"] = dict(self.build), self.started_at
         if self.mode == "home":
             out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
             out["promotes"] = self._promotes_view()
+            out["work"] = {
+                team: dict(rec["work_waiting"])
+                for team, rec in sorted((self._host_rec.get("teams") or {}).items())
+                if isinstance(rec, dict) and isinstance(rec.get("work_waiting"), dict)
+            }
         else:
             out["link"] = dict(self.home_link)
         return out

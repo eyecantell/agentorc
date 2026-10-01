@@ -142,10 +142,12 @@ class InboxMixin:
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot snooze the person's rows: a snooze is the person's own (design §4.10)")
         # `promote` (§4.5a *Inbox row: promote*, TD-132): keyed `promote:<repo>`, a repo and not a
-        # record, so Snooze is by time alone and a later merge does not wake the row
-        if kind not in (*ATTENTION_KINDS, "alarm", "restart", "promote"):
+        # record, so Snooze is by time alone and a later merge does not wake the row; `work`
+        # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`
+        if kind not in (*ATTENTION_KINDS, "alarm", "restart", "promote", "work"):
             raise RpcError(
-                f"unknown row kind {kind!r}; the state rows are: {', '.join(ATTENTION_KINDS)}, alarm, restart, promote"
+                f"unknown row kind {kind!r}; the state rows are: "
+                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, promote, work"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:

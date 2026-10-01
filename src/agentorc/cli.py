@@ -839,6 +839,14 @@ def cmd_team_list(args: argparse.Namespace) -> int:
     except ValueError as e:
         return fail(args, str(e), 1)
     rows = teamrun.rows(org, call_sync("list"))
+    # the home's `work_waiting` marks (§6 rule 8), as ids per team; an agent without the reading has none
+    waiting: dict[str, int] = {}
+    with contextlib.suppress(AgentError, AgentUnavailable):
+        for team, mark in (call_sync("host").get("work") or {}).items():
+            members = mark.get("members") if isinstance(mark, dict) and isinstance(mark.get("members"), dict) else {}
+            waiting[team] = len({str(i) for ids in members.values() if isinstance(ids, list) for i in ids})
+    for r in rows:
+        r["work_waiting"] = waiting.get(r["name"], 0) if not r["live"] and r["wound_down"] else 0
 
     def prose() -> None:
         if not rows:
@@ -850,6 +858,9 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             # CLI would disagree about the same definition. A live team whose every live session is
             # idle and declared is *concluded* on both (TD-099).
             live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
+            # *work waiting: n entries* beside *wound down* (§4.7, §6 rule 8), from the home's `work_waiting`
+            if not r["live"] and r["wound_down"] and (n := r.get("work_waiting")):
+                live += f", work waiting: {n} entr{'y' if n == 1 else 'ies'}"
             if r.get("concluded"):
                 live += ", concluded"
             print(

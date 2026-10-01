@@ -187,6 +187,37 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "work-start",
+        "Start",
+        "Inbox row: team start",
+        (
+            "Starts this team from its definition, exactly as the Start on its card does: every check first, "
+            "then the manager and the members with their briefs. Press it when the entries the row names "
+            "are work you want the team to take now. It is refused, in words, where the card's Start would "
+            "be, and it picks nothing for the team: the manager decides who runs."
+        ),
+    ),
+    Help(
+        "work-snooze",
+        "Snooze ▾",
+        "Inbox row: team start",
+        (
+            "Sets this row aside until the time you pick: +1 day, +1 week or a date. Press it when the "
+            "entries can wait and you want to be asked again then. It changes nothing at the home: the "
+            "entries stay waiting, and more of them meanwhile do not bring the row back early."
+        ),
+    ),
+    Help(
+        "work-dismiss",
+        "Dismiss",
+        "Inbox row: team start",
+        (
+            "Marks the entries this row names as seen by the team's members, so they do not ask again. "
+            "Press it when those entries are not a reason to start the team. It starts nothing and removes "
+            "no entry from the ledger, and an entry filed later raises a new row."
+        ),
+    ),
+    Help(
         "on-work",
         "when work appears",
         "Settings page: Teams",
@@ -220,7 +251,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("start", "wind-down", "stop-now", "fold", "forget-all", "forget", "close", "message", "switch-profile"),
     ),
     ("focus", "Focus", ("wrap-up", "kill", "resume")),
-    ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss")),
+    ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss", "work-start", "work-snooze", "work-dismiss")),
     ("settings", "Settings", ("on-work",)),
 )
 

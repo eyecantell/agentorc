@@ -152,6 +152,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
     RAIL_UNDER,  # noqa: F401
+    WORK_IDS,  # noqa: F401
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
     _civil,  # noqa: F401
@@ -188,6 +189,11 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     row_find,  # noqa: F401
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
+    work_held,  # noqa: F401
+    work_ids,  # noqa: F401
+    work_note,  # noqa: F401
+    work_rows,  # noqa: F401
+    work_started,  # noqa: F401
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     DOER_WIDTH,  # noqa: F401
@@ -546,7 +552,11 @@ def create_app() -> FastAPI:
         fleet = list(known.values())
         seats = await seats_of(fleet)
         groups = team_groups(
-            [view(s, fleet, seats=seats, repos=repos) for s in fleet], await team_rows(fleet), repos, doing
+            [view(s, fleet, seats=seats, repos=repos) for s in fleet],
+            await team_rows(fleet),
+            repos,
+            doing,
+            await work_marks(),
         )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
@@ -678,7 +688,29 @@ def create_app() -> FastAPI:
             identity_mode=str(info.get("mode") or ""),
         )
         # §4.5a *Inbox row: promote* (TD-132 slice 3): the home's readings; a node has none
-        return rows + promote_rows((await call("host")).get("promotes"))
+        home = await call("host")
+        # §4.5a *Inbox row: team start* (§6 rule 8, TD-227): the home's `work_waiting` marks, each
+        # with the card's own *wound down* instant
+        work = home.get("work") or {}
+        return rows + promote_rows(home.get("promotes")) + work_rows(work, wound_of(fleet) if work else None)
+
+    def wound_of(fleet: list[dict[str, Any]]) -> dict[str, Any]:
+        """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
+        return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
+
+    work_cache: dict[str, Any] = {"at": 0.0, "work": None}
+
+    async def work_marks() -> dict[str, Any]:
+        """The home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8), `{}` when the agent
+        cannot give them — an older agent, a node: the card then carries no note. Read at most once
+        in `DEFS_TTL` seconds, `identity_info`'s idiom, so a delta storm never asks per render."""
+        now = time.monotonic()
+        if work_cache["work"] is None or now - work_cache["at"] > DEFS_TTL:
+            got: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                got = dict((await call("host")).get("work") or {})
+            work_cache.update(at=now, work=got)
+        return work_cache["work"] or {}
 
     async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
@@ -848,6 +880,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # §4.5a *Inbox row: promote* (TD-132 slice 3): the same rows the Inbox counts, from the
         # `host` reading this page already took, so the top bar and the Inbox cannot disagree
         promos = [] if agent_down else promote_rows((info or {}).get("promotes"))
+        # …and the team start rows (§4.5a, §6 rule 8), from the same reading
+        work = {} if agent_down else (info or {}).get("work") or {}
+        promos += work_rows(work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")})
         if entries or handed or vs or boards or promos:
             secs = inbox_sections(
                 entries,
@@ -867,7 +902,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": (groups := team_groups(vs, strip["teams"], repos, doing)),
+                "groups": (groups := team_groups(vs, strip["teams"], repos, doing, work)),
                 "rollup": rollup(groups),
                 "strip": strip,
                 "counts": counts,
@@ -2326,6 +2361,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not repo:
                 raise HTTPException(400, f"{action} names the repo")
             got = await call(action, repo=repo)
+            return JSONResponse({"ok": True, **got})
+        if action == "clear_work":
+            # design §4.5a **Inbox row: team start** (§6 rule 8, TD-227): **Dismiss** — `clear_work`,
+            # the person's own: the ids go to the members' `lane_seen` and the mark is removed
+            team = str(body.get("team") or "").strip()
+            if not team:
+                raise HTTPException(400, "clear_work names the team")
+            got = await call("clear_work", team=team)
             return JSONResponse({"ok": True, **got})
         if action == "suspend":
             # design §4.8a *An alarm's answers* (TD-077 a2): **Suspend** — a person's own act, and
