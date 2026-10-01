@@ -145,10 +145,15 @@ class InboxMixin:
         # record, so Snooze is by time alone and a later merge does not wake the row; `work`
         # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`
         # `idle_open` (§4.5a *Inbox row: idle · open work*, TD-259): a record's row, keyed as `stalled` is
-        if kind not in (*ATTENTION_KINDS, "alarm", "restart", "idle_open", "promote", "work"):
+        # `cadence:<pr>` (§4.5a *Inbox row: cadence check failed*, TD-258): a record's row and one a
+        # PR, so the key carries the PR's number
+        cadence = (
+            kind.startswith("cadence:") and kind[8:].isascii() and kind[8:].isdigit() and kind[8:] == str(int(kind[8:]))
+        )
+        if not cadence and kind not in (*ATTENTION_KINDS, "alarm", "restart", "idle_open", "promote", "work"):
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
-                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, promote, work"
+                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, cadence:<pr>, promote, work"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:

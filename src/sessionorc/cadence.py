@@ -111,6 +111,20 @@ def record(old: dict[str, Any] | None, pr: int, sha: str, merged: bool, got: dic
     return new
 
 
+def rows(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The entries the **Inbox row: cadence check failed** draws (§4.5a): one row a PR."""
+    return [c for c in checks if c.get("row")]
+
+
+def dismiss(checks: list[dict[str, Any]], pr: int) -> tuple[list[dict[str, Any]], bool]:
+    """Dismiss's write: `row` taken off the PR's entry, which stays as the record of the read —
+    `told` kept, so a fail read later — at a new head, or after a new `done` names the PR — is
+    the row again. The list, and whether
+    a row stood."""
+    stood = any(c.get("pr") == pr and c.get("row") for c in checks)
+    return [{k: v for k, v in c.items() if k != "row"} if c.get("pr") == pr else c for c in checks], stood
+
+
 def untold(c: dict[str, Any]) -> bool:
     """A first fail the member has not been told of. A merged PR's fail is the row's, not a line's."""
     return c.get("verdict") == "fail" and not c.get("told") and not c.get("merged")

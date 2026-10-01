@@ -29,6 +29,7 @@ GH_TIMEOUT = 30.0
 GRACE = timedelta(minutes=15)
 READS = 5  # the PRs one pass of the tick reads: one `gh pr view` each
 NAMED = 3  # the paths one line names; the rest are *and n more*
+ROW = 2  # the crossings of one member, not dismissed, that are the Inbox row
 
 
 @lru_cache(maxsize=256)
@@ -141,8 +142,28 @@ def read_by(s: Session, pr: int) -> str | None:
 
 
 def crossing(pr: int, paths: list[str], at: str) -> dict[str, Any]:
-    """One entry of `held_missed`: `{pr, at, paths}`; `told` joins it once the member was."""
+    """One entry of `held_missed`: `{pr, at, paths}`; `told` joins it once the member was, and
+    `dismissed` once the person dismissed its row."""
     return {"pr": pr, "at": at, "paths": list(paths)}
+
+
+def standing(held_missed: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The crossings the person has not dismissed."""
+    return [c for c in held_missed if not c.get("dismissed")]
+
+
+def row(held_missed: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The entries the **Inbox row: merged without its read** draws (§4.5a): the standing
+    crossings once there are `ROW` of them, none before — the first is a note and a line."""
+    left = standing(held_missed)
+    return left if len(left) >= ROW else []
+
+
+def dismiss(held_missed: list[dict[str, Any]], at: str) -> tuple[list[dict[str, Any]], list[int]]:
+    """Dismiss's write: every standing entry marked `dismissed` and kept, since an entry is also
+    what keeps its PR from being read as a crossing again. The list, and the PRs it marked."""
+    marked = [int(c["pr"]) for c in standing(held_missed)]
+    return [c if c.get("dismissed") else {**c, "dismissed": at} for c in held_missed], marked
 
 
 def _paths(c: dict[str, Any]) -> str:

@@ -985,7 +985,8 @@ class Session:
     # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
     # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`
     # when the member was told of a fail, `row` while the Inbox row stands, and `read_by` once a
-    # reader's reply on the PR's `ask` was seen. The home's, written by the tick alone.
+    # reader's reply on the PR's `ask` was seen. The home's: the tick writes it, and Dismiss
+    # (`clear_mark`) takes `row` off.
     checks: list[dict[str, Any]] = field(default_factory=list)
     # The entries of `docs/cadence-changes.md` this member has been told of or started with (design
     # §6 rule 12, TD-258): `{at, headings}` — written at the first reading after the create as the
@@ -994,7 +995,8 @@ class Session:
     conventions_seen: dict[str, Any] | None = None
     # The held PRs of this member that merged without their reader's reply (design §6 rule 11,
     # TD-258): one entry per crossing, `{pr, at, paths}` — the held paths it touched — with `told`
-    # once the member was. Two entries are the Inbox row. The home's, written by the tick alone.
+    # once the member was and `dismissed` once the person dismissed its row. Two entries not dismissed
+    # are the Inbox row. The home's: the tick writes it, and Dismiss (`clear_mark`) marks it.
     held_missed: list[dict[str, Any]] = field(default_factory=list)
     # Who reads this session's PRs before they merge (design §4.9b *The reader*, TD-093):
     # `{reader, held, bound}` from its role preset's `review:`, written at start. The home stores
