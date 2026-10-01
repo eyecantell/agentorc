@@ -6880,8 +6880,10 @@ code and needs no grant; a session doing the same work does.
      with a `pr` since the team's start, the start being the earliest `created` among the
      team's records that are neither superseded nor forgotten (§4.9a's own list is the
      manager's, from `gh`), and each member's `out_of_work.why` — written on the tick the manager
-     is closed or found closed (for a team a person leads, the tick that closes its last
-     member), and only when no `note`
+     is closed or found closed (for a team with no live manager, the tick that closes its last
+     member; where one was left open with work, the tick that finds the last one gone, whoever
+     closed it — that the note is owed is kept in memory per team from the settle, as the settle's
+     clock is, and dropped the tick a member is at work again), and only when no `note`
      from the manager reached the person inbox after the reading first held, so a team that
      dissolves is never quiet and never told twice, whoever ended it. **Then the card reads
      *wound down <t> ago · by the tick*** — `wound_down` and rule 8's reading skip the manager

@@ -1217,6 +1217,20 @@ class TickMixin:
             by_address[v["id"]] for v in mine if v["seat"] is None and v is not top and v["state"] not in work_mod.DEAD
         ]
         first = self._finished_first.get(team)
+        led = manager is not None and manager.state not in work_mod.DEAD
+        if (
+            team in self._finished_owed
+            and not members
+            and not led
+            and not (manager is not None and manager.finished_sent_at)
+        ):
+            # the member left open with work is gone by another hand — a person's Close, a kill —
+            # and nobody live announced the team: the note is written now, whoever ended it
+            since = self._finished_owed.pop(team)
+            if not work_mod.closed_finished(manager):
+                self._finished_tell(team, records, manager, since)
+                await self._push_changes()
+            return None
         if manager is not None and manager.finished_sent_at:
             # the manager's half: from the send on the reading is no longer asked of it — its last
             # acts are work — and only a member live and not finished takes the wind-down back
@@ -1250,6 +1264,7 @@ class TickMixin:
             return since
         reading = work_mod.finished(views)
         if reading is None or reading["why"] or reading["restart"]:
+            self._finished_owed.pop(team, None)  # at work again, or started again: nothing is owed
             return None  # not finished, or one that wants another run: rule 2's
         first = first or now
         if now - first < agent_common.FINISHED_SETTLE:
@@ -1259,11 +1274,17 @@ class TickMixin:
         if closed:
             log.info("rule 9: %s finished — closed %s", team, ", ".join(m.name for m in closed))
         if manager is None or manager.state in work_mod.DEAD:
-            if closed and not left and not work_mod.closed_finished(manager):
+            if left:
+                # one left open with work: the note waits for the tick that finds the last one gone,
+                # kept in memory as the settle is, so a close by a person is announced too (TD-256)
+                self._finished_owed.setdefault(team, first)
+                return first
+            self._finished_owed.pop(team, None)
+            if closed and not work_mod.closed_finished(manager):
                 # nobody live to tell; one rule 9 closed was announced then, and is never told twice
                 self._finished_tell(team, records, manager, first)
                 await self._push_changes()
-            return first if left else None
+            return None
         if manager.suspended:
             return first
         if manager.host != self.host:

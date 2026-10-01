@@ -11,6 +11,7 @@ from conftest import park_ticks
 
 from sessionorc import work
 from sessionorc.agent_common import FINISHED_SETTLE, WRAPUP_GRACE
+from sessionorc.client import LocalClient
 from sessionorc.models import PERSON, SYSTEM, MailEntry, ProgressEntry, Session, now_iso
 
 CLEAN = {"branch": "w", "dirty": 0, "unpushed": 0}
@@ -302,3 +303,82 @@ async def test_a_nodes_manager_closed_with_a_member_left_is_announced_once(agent
     await agent._finished_pass(late + timedelta(minutes=1))
     await agent._finished_pass(late + timedelta(minutes=1) + FINISHED_SETTLE)
     assert home.closed == ["g1", "manager", "g2"] and len(home.notes()) == 1, "the member's close says nothing again"
+
+
+async def test_a_person_led_teams_last_member_closed_by_a_person_is_announced_once(agent, monkeypatch):
+    """TD-256 (2): no manager carries `finished_sent_at`, so that the note is owed is the home's to
+    keep — from the settle until the last member is gone, whoever closed it."""
+    await park_ticks(agent)
+    g1, g2 = _rec("g1", controllers=[]), _rec("g2", controllers=[], git={"branch": "w", "dirty": 0, "unpushed": 2})
+    home = _Home(agent, monkeypatch, g1, g2)
+    now = datetime.now(UTC)
+    late = now + FINISHED_SETTLE
+    await agent._finished_pass(now)
+    await agent._finished_pass(late)
+    assert home.closed == ["g1"] and home.notes() == [], "one left open with work: not dissolved yet"
+    await agent._finished_pass(late + timedelta(minutes=1))
+    assert home.notes() == []
+
+    await home._close(g2.id)  # the person's Close
+    await agent._finished_pass(late + timedelta(minutes=2))
+    (note,) = home.notes()
+    assert "g2: g2 found nothing pickable" in note and "its manager did not announce it" not in note
+    await agent._finished_pass(late + timedelta(minutes=3))
+    assert len(home.notes()) == 1, "never told twice"
+
+
+async def test_a_member_at_work_again_owes_no_note_and_one_member_alone_is_announced(agent, monkeypatch):
+    await park_ticks(agent)
+    g1 = _rec("g1", controllers=[], git={"branch": "w", "dirty": 3, "unpushed": 0})
+    home = _Home(agent, monkeypatch, g1)
+    now = datetime.now(UTC)
+    late = now + FINISHED_SETTLE
+    await agent._finished_pass(now)
+    await agent._finished_pass(late)
+    assert home.closed == [] and agent._finished_owed == {"g": now}
+    g1.set_state("working", confidence="hook")  # it took a turn: the reading no longer holds
+    await agent._finished_pass(late + timedelta(minutes=1))
+    assert agent._finished_owed == {}
+    await home._close(g1.id)
+    await agent._finished_pass(late + timedelta(minutes=2))
+    assert home.notes() == [], "closed at work: nothing finished, nothing announced"
+
+    # a team of one, finished with work left and closed by hand, is announced as any other
+    g1.set_state("idle", confidence="hook")
+    await agent._finished_pass(late + timedelta(minutes=3))
+    await agent._finished_pass(late + timedelta(minutes=3) + FINISHED_SETTLE)
+    await home._close(g1.id)
+    await agent._finished_pass(late + timedelta(minutes=4) + FINISHED_SETTLE)
+    assert len(home.notes()) == 1
+
+
+async def test_a_resumed_manager_carries_neither_of_rule_9s_marks(agent, hookstub, tmp_path):
+    """TD-256 (1): a resume builds its record anew (`rpc_create`), under the name or another, so
+    `finished_sent_at` and `closed_for` stay on the run rule 9 closed and never reach the next."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        made = {
+            "dir": str(tmp_path),
+            "adapter": "hookstub",
+            "unattended": True,
+            "team": "g",
+            "capabilities": ["control"],
+        }
+        old = await person.call("create", name="manager", **made)
+        await person.call("hook", session=old["id"], adapter_id="cc-41")
+        rec = agent.sessions[old["id"]]
+        rec.finished_sent_at = now_iso()
+        await person.call("close", id=old["id"])
+        agent._mark_closed(rec, "finished")
+        assert work.closed_finished(rec) and rec.finished_sent_at
+
+        same = await person.call("create", name="manager", resume="cc-41", **made)
+        assert same["id"] == old["id"]
+        again = agent.sessions[same["id"]]
+        assert again.finished_sent_at is None and again.closed_for is None
+        await person.call("kill", id=same["id"])
+        (tmp_path / "b").mkdir()
+        other = await person.call("create", name="manager-2", resume="cc-41", **{**made, "dir": str(tmp_path / "b")})
+        new = agent.sessions[other["id"]]
+        assert new.finished_sent_at is None and new.closed_for is None
+        await person.call("kill", id=other["id"])
