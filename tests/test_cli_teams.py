@@ -1646,6 +1646,29 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
     assert cli.main(["--json", "td", "add", "--repo", "agentorc"]) == 0
     assert handed[1]["text"] == "the parser drops\na trailing line" and handed[1]["type"] == "debt"
     assert json.loads(capsys.readouterr().out)["id"] == "m-1"
+    # a repo is named as the registry spells it — a symlinked checkout by its link — or by a path
+    (tmp_path / "link").symlink_to(tmp_path / "agentorc")
+    (tmp_path / "home" / "repos.txt").write_text(f"{tmp_path / 'link'}\n")
+    for said in ("link", str(tmp_path / "agentorc"), "../agentorc"):
+        assert cli.main(["td", "add", "--repo", said, "words"]) == 0, said
+        assert handed[-1]["repo"] == str(tmp_path / "agentorc")
+    assert cli.main(["td", "add", "--repo", "agentorc", "words"]) == 1  # the registry calls it `link`
+    assert "no registered repo is named 'agentorc'" in capsys.readouterr().err
+
+
+def test_td_add_says_when_standard_input_cannot_be_read(world, capsys, monkeypatch):
+    tmp_path, handed = _td_world(world, monkeypatch)
+
+    class Bytes:
+        def isatty(self):
+            return False
+
+        def read(self):
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(sys, "stdin", Bytes())
+    assert cli.main(["td", "add", "--repo", "agentorc"]) == 1
+    assert "standard input could not be read" in capsys.readouterr().err and not handed
 
 
 def test_td_add_from_a_worktree_hands_the_main_checkout(world, capsys, monkeypatch):

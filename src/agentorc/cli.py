@@ -1777,9 +1777,17 @@ def cmd_td_add(args: argparse.Namespace) -> int:
             f"{sid} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
             "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"
         )
-    roots = [str(pathlib.Path(r).expanduser().resolve()) for r in hosts.local_host().repos()]
+    # the registry's own spelling names a repo, as `ao repo` and the form read it (a symlinked
+    # checkout is named by its link); the resolved path is what is handed
+    by_raw = {str(r): str(pathlib.Path(r).expanduser().resolve()) for r in hosts.local_host().repos()}
+    roots = list(by_raw.values())
     if args.repo:
-        found = [r for r in roots if args.repo in (pathlib.Path(r).name, r)]
+        want = str(pathlib.Path(args.repo).expanduser().resolve())
+        found = [
+            path
+            for raw, path in by_raw.items()
+            if args.repo in (pathlib.Path(raw).expanduser().name, raw) or path == want
+        ]
         if not found:
             raise AgentError(f"no registered repo is named {args.repo!r}; ao repo --all lists them")
         root = found[0]
@@ -1796,7 +1804,15 @@ def cmd_td_add(args: argparse.Namespace) -> int:
     # the team defines whose home has no checkout on its host reads to `entry_add` as no seat at all
     if servicing and not servicing[0]["seat"] and servicing[0]["techlead"]:
         raise AgentError(f"{servicing[0]['techlead']}: the techlead seat has no checkout on its host")
-    words = " ".join(args.words).strip() if args.words else sys.stdin.read().strip()
+    if args.words:
+        words = " ".join(args.words).strip()
+    else:
+        if sys.stdin.isatty():
+            print("the entry's words, then Ctrl-D:", file=sys.stderr)
+        try:
+            words = sys.stdin.read().strip()
+        except (UnicodeDecodeError, OSError) as e:
+            raise AgentError(f"standard input could not be read as the entry's words: {e}") from None
     got = call_sync(
         "entry_add",
         repo=root,
