@@ -1169,7 +1169,7 @@ class TickMixin:
                 first = await self._finished_team(team, by_team[team], now)
             except Exception:  # noqa: BLE001 — one team's surprise is a log line, never the others'
                 log.exception("reading whether %s has finished failed", team)
-                continue
+                first = self._finished_first.get(team)  # a surprise is not the reading no longer holding
             if first is not None:
                 firsts[team] = first
         self._finished_first = firsts
@@ -1207,16 +1207,17 @@ class TickMixin:
             # the manager's half: from the send on the reading is no longer asked of it — its last
             # acts are work — and only a member live and not finished takes the wind-down back
             since = first or _parse(manager.finished_sent_at) - agent_common.FINISHED_SETTLE
-            if any(m.state != "idle" or not (m.out_of_work or m.restart_wanted) for m in members):
+            if any(m.state != "idle" or m.restart_wanted or not m.out_of_work for m in members):
                 manager.finished_sent_at = None
                 self._save(manager)
                 log.info("rule 9: %s has a member at work again — the wind-down is off", team)
                 await self._push_changes()
                 return None
             if manager.state in work_mod.DEAD:
-                if not work_mod.closed_finished(manager):
+                if manager.state == "closed" and not work_mod.closed_finished(manager):
                     # it closed itself, as the line asked: the mark is what lets the team read
-                    # *wound down* without its declaration, and what says the person was told
+                    # *wound down* without its declaration, and what says the person was told. One
+                    # that `exited` — a crash, a kill — is rule 1's or a person's, and is left
                     self._mark_closed(manager, "finished")
                     self._save(manager)
                     self._finished_tell(team, records, manager, since)
@@ -1306,10 +1307,11 @@ class TickMixin:
                     continue
         mine = [r for r in records if r.unattended and not r.superseded_by]
         start = min((r.created for r in mine if r.created), default="")
+        members = [r for r in mine if r.seat is None and r is not manager]
         prs = sorted(
             {
                 e.pr
-                for r in mine
+                for r in members
                 for e in r.progress
                 if e.status == "done" and e.pr and (not start or str(e.at) >= start)
             }
@@ -1323,9 +1325,9 @@ class TickMixin:
             if prs
             else "No pull request was reported done since the team started.",
         ]
-        for r in sorted(mine, key=lambda r: (r.name, r.id)):
+        for r in sorted(members, key=lambda r: (r.name, r.id)):
             why = (r.out_of_work or {}).get("why") if isinstance(r.out_of_work, dict) else None
-            if r.seat is None and r is not manager and why:
+            if why:
                 lines.append(f"{r.name}: {why}")
         self._system_note(PERSON, "\n".join(lines))
         log.info("rule 9: %s wound down by the tick — the person told", team)

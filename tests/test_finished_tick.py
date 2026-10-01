@@ -207,6 +207,38 @@ async def test_a_member_at_work_again_takes_the_wind_down_back(agent, monkeypatc
     await agent._finished_pass(now + WRAPUP_GRACE)
     assert manager.finished_sent_at is None and home.closed == [] and home.notes() == []
 
+    g1.set_state("idle", confidence="hook")
+    g1.git = dict(CLEAN)
+    g1.restart_wanted = {"at": _iso(now), "why": "context bound"}  # rule 2's, and a close would lose it
+    manager.finished_sent_at = _iso(now)
+    await agent._finished_pass(now + WRAPUP_GRACE)
+    assert manager.finished_sent_at is None and home.closed == [] and home.notes() == []
+
+
+async def test_a_killed_manager_is_not_marked_and_one_teams_surprise_is_not_anothers(agent, monkeypatch):
+    await park_ticks(agent)
+    g1, manager = _rec("g1", state="closed"), _manager()
+    h1, other = _rec("h1", team="h", controllers=[]), _rec("z1", team="z", controllers=[])
+    home = _Home(agent, monkeypatch, g1, manager, h1, other)
+    now = datetime.now(UTC)
+    manager.finished_sent_at = _iso(now)
+    manager.set_state("exited", confidence="scraped")
+    await agent._finished_pass(now)
+    assert manager.closed_for is None and home.notes() == [], "a kill or a crash is not the line's close"
+
+    real = agent._finished_team
+
+    async def surprised(team, records, at):
+        if team == "h":
+            raise RuntimeError("boom")
+        return await real(team, records, at)
+
+    monkeypatch.setattr(agent, "_finished_team", surprised)
+    agent._finished_first["h"] = now
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    assert agent._finished_first["h"] == now, "its settle is kept"
+    assert home.closed == ["z1"] and h1.state == "idle", "z was read, and wound down a settle after its first tick"
+
 
 async def test_a_team_a_person_leads_is_closed_and_announced_with_nobody_to_tell(agent, monkeypatch):
     await park_ticks(agent)
