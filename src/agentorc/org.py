@@ -612,9 +612,15 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         brief=_opt_str(manager_raw.get("brief"), f"{key}.manager.brief"),
         grants=_grants(manager_raw.get("grants"), f"{key}.manager.grants"),
         unattended=_flag(manager_raw.get("unattended"), f"{key}.manager.unattended", default=True),
-        # a person's team starts nothing, so it is never on call whatever the default
+        # a person's team starts nothing, so it is never on call whatever the default; and the default
+        # is the `manager` role's alone — the one whose template has a seat's shape
+        # (`repoconfig.ON_CALL_BRIEFS`): another role managing is a seat only where its definition says so
         on_call=manager_role != PERSON
-        and _flag(manager_raw.get("on_call"), f"{key}.manager.on_call", default=ON_CALL_DEFAULT),
+        and _flag(
+            manager_raw.get("on_call"),
+            f"{key}.manager.on_call",
+            default=ON_CALL_DEFAULT and manager_role == DEFAULT_MANAGER_ROLE,
+        ),
     )
     members_raw = raw.get("members")
     if members_raw is None:

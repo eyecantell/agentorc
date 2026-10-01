@@ -291,9 +291,8 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     rw = {"at": "2026-09-22T21:00:00Z", "why": "usage window, resets 06:00", "early": True}
     out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
     fleet.sessions = [
-        # the manager is on call unless its definition says otherwise (TD-259): a seat declares nothing
-        {**badged("orc-ao", "ao-grind", state="idle"), "tail": []},
-        {**badged("grind-1", "ao-grind", state="idle"), "tail": [], "restart_wanted": rw},
+        {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "restart_wanted": rw},
+        {**badged("grind-1", "ao-grind", state="idle"), "tail": [], "out_of_work": out},
         {**badged("adhoc-1", "adhoc"), "tail": []},
     ]
     html = client.get("/").text
@@ -307,7 +306,7 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     assert "It first closes grind-1, orc-ao" in head  # the confirm names what the Start closes
     assert html.index('data-team="adhoc"') < html.index('data-team="ao-grind"')  # sorted with the stopped
     # every declaration out of work: the header says so
-    fleet.sessions[1] = {**badged("grind-1", "ao-grind", state="idle"), "tail": [], "out_of_work": out}
+    fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "out_of_work": out}
     assert "ago · out of work" in client.get("/").text
     # one member took a turn: not concluded, and Wind down is back
     fleet.sessions[1]["state"] = "working"

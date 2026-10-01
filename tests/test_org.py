@@ -757,6 +757,9 @@ def test_a_manager_is_on_call_when_its_definition_says_so(tmp_path):
     assert org.ON_CALL_DEFAULT is True  # Paul, 2026-10-01: on call from the build; the flip is TD-259's
     assert team({"manager": {}}).manager.on_call is True and team({}).manager.on_call is True
     assert team({"manager": {"role": "person"}}).manager.on_call is False  # nothing is started, whatever the default
+    # the default is the `manager` role's, whose template has a seat's shape; another role says so itself
+    assert team({"manager": {"role": "grinder"}}).manager.on_call is False
+    assert team({"manager": {"role": "grinder", "on_call": True}}).manager.on_call is True
     assert "on_call" in org.MANAGER_KEYS and "on_call" not in org.MEMBER_KEYS
     for block, why in (
         ({"manager": {"on_call": "yes"}}, r"t\.manager\.on_call must be true or false"),

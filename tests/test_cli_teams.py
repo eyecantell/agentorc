@@ -772,10 +772,13 @@ def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(w
     assert teamrun.concluded([{**lead, "state": "working"}, member]) is None
     # the definition's row carries it only while something is live
     org = cli._org_here()
-    # (a member's record: the manager is a seat unless its definition says `on_call: false`, TD-259)
-    (row,) = teamrun.rows(org, [rec("grind-1", out_of_work=out)])
+    # (a standing manager's record: the definition reads *on call* by default, TD-259, and a manager
+    # is a seat by its record's `seat` — a team keeps the shape it was started with, so this one declares)
+    (row,) = teamrun.rows(org, [rec("orc-ao", out_of_work=out)])
     assert row["live"] == 1 and row["concluded"]["at"] == out["at"] and row["wound_down"] is None
-    (row,) = teamrun.rows(org, [rec("grind-1", "closed", out_of_work=out)])
+    assert teamrun.seat_names(org.teams["ao-grind"], [rec("orc-ao")]) == set()
+    assert teamrun.seat_names(org.teams["ao-grind"], [rec("orc-ao", seat={"trigger": "team"})]) == {"orc-ao"}
+    (row,) = teamrun.rows(org, [rec("orc-ao", "closed", out_of_work=out)])
     assert row["concluded"] is None and row["wound_down"] == out["at"]
 
 
@@ -1914,7 +1917,7 @@ def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys)
     assert cli.main(["team", "list"]) == 0
     assert "manager: orc-ao (on call)" in capsys.readouterr().out
     # the page's seat for it (TD-259 slice 4): *on call — comes when a member needs a reading* while empty
-    empty = {"id": "m", "name": "orc-ao", "team": "ao-grind", "state": "closed"}
+    empty = {"id": "m", "name": "orc-ao", "team": "ao-grind", "state": "closed", "seat": {"trigger": "team"}}
     assert teamrun.seat_ids(cli._org_here(), [empty])["m"] == "comes when a member needs a reading"
 
     doc["teams"]["ao-grind"]["manager"]["on_call"] = False

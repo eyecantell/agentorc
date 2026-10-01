@@ -274,12 +274,19 @@ def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, 
     if not whens:
         return {}
     members = {n for m in team.members if m.team is None for n in m.names()}
+    # a manager is a seat by its **record**, not by the definition alone: a team keeps the shape it was
+    # started with until its next Start (§4.9 `on_call`), so a standing manager started before the
+    # definition read *on call* is no seat — nothing would fill it, and it still declares
+    lead = team.manager.name if team.manager.on_call else None
+    named = {s.name for s in team.seats} | ({team.techlead.name} if team.techlead is not None else set())
     out: dict[str, str] = {}
     for s in sessions:
         n = str(s.get("name") or "")
         if not n or n in members:
             continue
         base = n if n in whens else re.sub(r"-\d+$", "", n)
+        if base == lead and base not in named and not isinstance(s.get("seat"), dict):
+            continue
         if base in whens:
             out[n] = whens[base]
     return out
