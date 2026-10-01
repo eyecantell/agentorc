@@ -1348,9 +1348,8 @@ class HostAgent(
         if state_sent != "idle":
             # Busy: the tool queues the text. Wait for the current turn to end; a stop on anything
             # but idle (a question, an exit) is returned as is — the prompt is still queued behind it.
-            if not await self._wait_state(id, lambda x: x.state in SETTLED, left()):
-                self._raise_not_settled(id, timeout)
-            s = self._get(id)
+            if not await self._wait_state(s, lambda x: x.state in SETTLED, left()):
+                self._raise_not_settled(s, timeout)
             if s.state != "idle":
                 return s.view()
             if s.rev - rev_sent >= 3:
@@ -1362,13 +1361,13 @@ class HostAgent(
         # Started: any transition since the baseline (a hook's UserPromptSubmit → working, a scraped
         # working, even an exit) within the stall window.
         stall = agent_common.SEND_STALL_SECONDS if left() is None else min(agent_common.SEND_STALL_SECONDS, left())
-        if not await self._wait_state(id, lambda x: x.rev != rev_before, stall):
-            if id not in self.sessions:
+        if not await self._wait_state(s, lambda x: x.rev != rev_before, stall):
+            if self.sessions.get(id) is not s:
                 raise RpcError(f"removed: {id} went away while waiting")
             raise RpcError(f"prompt-stalled: {id} showed no activity within {stall:g} s")
-        if not await self._wait_state(id, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
-            self._raise_not_settled(id, timeout)
-        return self._get(id).view()
+        if not await self._wait_state(s, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
+            self._raise_not_settled(s, timeout)
+        return s.view()
 
     @staticmethod
     def _refuse_gone(s: Session) -> None:
@@ -1452,19 +1451,21 @@ class HostAgent(
                 return False
             await asyncio.sleep(0.1)
 
-    def _raise_not_settled(self, sid: str, timeout: float | None) -> None:
-        live = self.sessions.get(sid)
-        if live is None:
-            raise RpcError(f"removed: {sid} went away while waiting")
-        raise RpcError(f"timeout: {sid} is still {live.state} after {timeout:g} s")
+    def _raise_not_settled(self, s: Session, timeout: float | None) -> None:
+        if self.sessions.get(s.id) is not s:
+            raise RpcError(f"removed: {s.id} went away while waiting")
+        raise RpcError(f"timeout: {s.id} is still {s.state} after {timeout:g} s")
 
-    async def _wait_state(self, sid: str, pred: Any, timeout: float | None) -> bool:
-        """Poll the record on the loop until `pred(session)` holds; False on timeout (None: no limit)
-        or when the record is gone."""
+    async def _wait_state(self, s: Session, pred: Any, timeout: float | None) -> bool:
+        """Poll the record on the loop until `pred(s)` holds; False on timeout (None: no limit) or
+        when the record is gone. Gone is *this* record no longer being the one under its id, not
+        the id being empty (TD-261): a record forgotten and its id taken again inside one poll — a
+        live pane the tick adopts, a new session under the name — is another session, whose turns
+        say nothing about the prompt typed into this one, and a wait with no timeout read it for
+        ever."""
         end = None if timeout is None else time.monotonic() + timeout
         while True:
-            s = self.sessions.get(sid)
-            if s is None:
+            if self.sessions.get(s.id) is not s:
                 return False
             if pred(s):
                 return True
