@@ -502,7 +502,8 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         "review": role.review,  # who reads its PRs (design §4.9b *The reader*); None is none
         # §4.8 *A role has a context bound* (TD-190); None is none. The default of a role that sets none
         # (*The bound has two layers*, TD-249) is an unattended session's: a person's own is never told
-        "context_bound": role.bound_for(bool(getattr(args, "unattended", False))),
+        # `--supervised` is a member in the making (§6): it takes the default as a team start's does
+        "context_bound": role.bound_for(bool(getattr(args, "unattended", False) or getattr(args, "supervised", False))),
     }
 
 

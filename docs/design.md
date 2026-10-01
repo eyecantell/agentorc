@@ -3702,7 +3702,7 @@ still switches the bound off. So `manager` and `plain` members and every org-def
 bounded unless their definition says otherwise, and `ao roles` prints *context bound: 300k
 (default)* for them. **A person's own session takes no default**: `ao new --role <role>`, the
 New session form and Add entry's *Open a session* write a default bound only on an unattended
-session (`Role.bound_for`) — a bound a role's definition wrote is written either way — and a
+session, or one `ao new --supervised` makes a member (`Role.bound_for`) — a bound a role's definition wrote is written either way — and a
 session started with no role has none to take one from; a team start writes the default on
 every member, attended or not, and on no seat. The bound is written at the start and stays:
 `ao mode` moves no bound either way.

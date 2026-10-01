@@ -1877,7 +1877,8 @@ def test_a_role_with_no_context_takes_300k_and_a_seat_and_a_persons_own_session_
     assert cli.main(["new", "mine", "--team", "ao-grind", "--role", "plain"]) == 0  # attended: a person's own
     assert cli.main(["new", "bot", "--team", "ao-grind", "--role", "plain", "--unattended"]) == 0
     assert cli.main(["new", "g", "--team", "ao-grind", "--role", "grinder"]) == 0  # the preset's own bound
-    assert [m["context_bound"] for m in creates(state)] == [None, None, 300_000, 300_000]
+    assert cli.main(["new", "sup", "--team", "ao-grind", "--role", "plain", "--supervised"]) == 0  # a member
+    assert [m["context_bound"] for m in creates(state)] == [None, None, 300_000, 300_000, 300_000]
     capsys.readouterr()
     assert cli.main(["roles", "-d", str(tmp_path / "agentorc")]) == 0
     out = capsys.readouterr().out
