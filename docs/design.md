@@ -4505,7 +4505,7 @@ is the fact; whether the process also went is the tool's business. A member that
 merely idle.
 
 **A team's finished is the home's reading, not the manager's memory** (TD-240; designed
-2026-09-29; the reading built 2026-09-30 — TD-241 slice 1, `sessionorc.work.finished`; the tick's wind-down not built — TD-241
+2026-09-29; the reading built 2026-09-30 — TD-241 slice 1, `sessionorc.work.finished`; the tick's wind-down built the same day — TD-241
 slice 3; §6 rule 9). A member's finished is its own declaration; a
 team's is read from those declarations by the home, on every tick, from the records: every
 unattended live member that is not a seat and not the manager finished, no restart wanted,
@@ -6630,7 +6630,8 @@ code and needs no grant; a session doing the same work does.
   9. **Finished is the home's reading** (TD-240; Paul, 2026-09-29: *seems like we should be able
      to check member states mechanically*; designed 2026-09-29; the reading built 2026-09-30 —
      TD-241 slice 1, `sessionorc.work.finished`, which the page's *concluded* returns; what the
-     tick does with it not built — TD-241 slice 3). Whether a
+     tick does with it built the same day — slice 3, `_finished_pass`; the Inbox row and the
+     card's *by the tick* not built — slice 2). Whether a
      team had finished was the manager's judgement (§4.9a *The manager runs the stop itself*),
      and a manager judges from what it remembers: manager-dc-1 held its grinder *interactive
      under Paul* for two days after the anchor had restarted it unattended, so dc-grind never
@@ -6680,13 +6681,20 @@ code and needs no grant; a session doing the same work does.
      `WRAPUP_GRACE` after `finished_sent_at` it is closed once `idle` and clean, with
      `closed_for: {why: finished, closed_at}` on its record as rule 2 marks its close; one that
      is never idle, or is `needs-you` or `limited`, is left as it is and is the Inbox row
-     *manager did not close*, under *Needs you*. A manager on a node gets no line and the close
+     *manager did not close*, under *Needs you* — drawn from `finished_sent_at` past its grace
+     on a live record, nothing more stored. A manager that closed itself, as the line asks,
+     (`closed`; one that `exited` is rule 1's or a person's kill, and is left) gets the same mark on the tick that finds it gone, so the team reads *wound down* without
+     its declaration. **A member live and not finished after the send takes the wind-down
+     back** — one working, one that never declared, or one that now wants a restart: `finished_sent_at` is removed and the reading is asked afresh; a member left open
+     with work is still finished, and is closed the tick its work reads pushed, its manager live or already closed, with nothing said again: a team whose manager carries the mark was announced. A manager on a node gets no line and the close
      alone, routed as rule 2 routes one, and waits for the link. **The announcement the manager
      did not make** the home makes: one `system` note to the person with the two lines §4.9a
      asks of the manager — the pull requests in the members' `progress` entries reported `done`
-     with a `pr` since the team's start, the start being the earliest `created_at` among the
+     with a `pr` since the team's start, the start being the earliest `created` among the
      team's records that are neither superseded nor forgotten (§4.9a's own list is the
-     manager's, from `gh`), and each member's `out_of_work.why` — written only when no `note`
+     manager's, from `gh`), and each member's `out_of_work.why` — written on the tick the manager
+     is closed or found closed (for a team a person leads, the tick that closes its last
+     member), and only when no `note`
      from the manager reached the person inbox after the reading first held, so a team that
      dissolves is never quiet and never told twice, whoever ended it. **Then the card reads
      *wound down <t> ago · by the tick*** — `wound_down` and rule 8's reading skip the manager

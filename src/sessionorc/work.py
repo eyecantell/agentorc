@@ -27,14 +27,26 @@ def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> s
     session carrying its badge has never run, or has been forgotten, and is neither.
 
     `seats` are the names the team's seats run under (§4.9b, TD-075 step 4, TD-098): a seat is empty
-    or filled, never finished, so it never declares and is not counted.
+    or filled, never finished, so it never declares and is not counted. Nor is a manager the tick
+    closed under rule 9 (`closed_for` says `finished`, §6): that rule's premise is a manager that
+    never declared, and the team it wound down reads *wound down* all the same.
     """
-    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions if s.get("name") not in seats]
+    seen = [
+        d if isinstance(d := s.get("out_of_work"), dict) else {}
+        for s in sessions
+        if s.get("name") not in seats and not closed_finished(s)
+    ]
     if not seen or not all(d.get("at") for d in seen):
         return None
     # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
     # the strip is on the same page as every card (review of PR #203)
     return max(str(d["at"]) for d in seen)
+
+
+def closed_finished(record: Any) -> bool:
+    """Whether a record is a manager rule 9 closed (design §6): `closed_for: {why: finished}`."""
+    mark = record.get("closed_for") if isinstance(record, Mapping) else getattr(record, "closed_for", None)
+    return isinstance(mark, Mapping) and mark.get("why") == "finished"
 
 
 def crew(records: Iterable[Session]) -> list[Session]:
@@ -51,7 +63,8 @@ def team_wound_down(records: Iterable[Session]) -> str | None:
     if any(r.state not in DEAD for r in mine):
         return None
     seats = {r.name for r in mine if r.seat is not None}
-    return wound_down([{"name": r.name, "out_of_work": r.out_of_work} for r in mine], seats)
+    said = [{"name": r.name, "out_of_work": r.out_of_work, "closed_for": r.closed_for} for r in mine]
+    return wound_down(said, seats)
 
 
 def _f(r: Any, key: str) -> Any:

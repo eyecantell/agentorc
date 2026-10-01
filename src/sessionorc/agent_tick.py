@@ -136,6 +136,7 @@ class TickMixin:
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
         await self._keep_running(snapshot_at)
+        await self._finished_pass(snapshot_at)
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
@@ -1147,6 +1148,191 @@ class TickMixin:
         if kept is not None and kept.get("repo") == got[1] and _lines(kept.get("crossed")) == _lines(got[0]):
             return kept
         return {"why": "balance", "repo": got[1], "crossed": got[0]}
+
+    async def _finished_pass(self, now: datetime) -> None:
+        """Rule 9 (design §6 *Finished is the home's reading*, TD-241): on every tick at the home,
+        each team whose records read **finished** (`work.finished`, the card's own *concluded*) with
+        no restart wanted, for `FINISHED_SETTLE`, is wound down by the home itself — its finished
+        members closed under the wrap-up's safety check, its manager told once and closed after
+        `WRAPUP_GRACE`, and the person told what the manager did not say. When the reading first held
+        is kept in memory per team and dropped the tick it stops holding. One team's surprise is a
+        log line, never another's."""
+        if self.mode != "home":
+            return
+        by_team: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        firsts: dict[str, datetime] = {}
+        for team in sorted(by_team):
+            try:
+                first = await self._finished_team(team, by_team[team], now)
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never the others'
+                log.exception("reading whether %s has finished failed", team)
+                first = self._finished_first.get(team)  # a surprise is not the reading no longer holding
+            if first is not None:
+                firsts[team] = first
+        self._finished_first = firsts
+
+    def _finished_view(self, r: Session) -> dict[str, Any]:
+        """What `work.finished` reads of a record, as this host addresses it: a node's member names
+        its controllers in its own host's form (§4.4a), and the manager is found by address."""
+        return {
+            "id": self._address(r),
+            "name": r.name,
+            "state": r.state,
+            "pane": r.pane,
+            "unattended": r.unattended,
+            "superseded_by": r.superseded_by,
+            "seat": r.seat,
+            "capabilities": r.capabilities,
+            "controllers": self._ctl(r),
+            "out_of_work": r.out_of_work,
+            "restart_wanted": r.restart_wanted,
+        }
+
+    async def _finished_team(self, team: str, records: list[Session], now: datetime) -> datetime | None:
+        """One team's pass of rule 9: when its reading first held, to keep for the next tick, or None
+        when it does not hold or the wind-down is over."""
+        by_address = {self._address(r): r for r in records}
+        views = [self._finished_view(r) for r in records]
+        mine = [v for v in views if v["unattended"] is not False and not v["superseded_by"]]
+        top = work_mod.manager_of(mine)
+        manager = by_address[top["id"]] if top is not None else None
+        members = [
+            by_address[v["id"]] for v in mine if v["seat"] is None and v is not top and v["state"] not in work_mod.DEAD
+        ]
+        first = self._finished_first.get(team)
+        if manager is not None and manager.finished_sent_at:
+            # the manager's half: from the send on the reading is no longer asked of it — its last
+            # acts are work — and only a member live and not finished takes the wind-down back
+            since = first or _parse(manager.finished_sent_at) - agent_common.FINISHED_SETTLE
+            if any(m.state != "idle" or m.restart_wanted or not m.out_of_work for m in members):
+                manager.finished_sent_at = None
+                self._save(manager)
+                log.info("rule 9: %s has a member at work again — the wind-down is off", team)
+                await self._push_changes()
+                return None
+            for m in members:
+                # one left open with work is closed once it is pushed, the manager live or gone
+                await self._finished_close(m)
+            if manager.state in work_mod.DEAD:
+                if manager.state == "closed" and not work_mod.closed_finished(manager):
+                    # it closed itself, as the line asked: the mark is what lets the team read
+                    # *wound down* without its declaration, and what says the person was told. One
+                    # that `exited` — a crash, a kill — is rule 1's or a person's, and is left
+                    self._mark_closed(manager, "finished")
+                    self._save(manager)
+                    self._finished_tell(team, records, manager, since)
+                    await self._push_changes()
+                return None
+            grace = now - _parse(manager.finished_sent_at) >= agent_common.WRAPUP_GRACE
+            if grace and await self._finished_close(manager):
+                self._mark_closed(manager, "finished")
+                self._save(manager)
+                self._finished_tell(team, records, manager, since)
+                await self._push_changes()
+                return None
+            return since
+        reading = work_mod.finished(views)
+        if reading is None or reading["why"] or reading["restart"]:
+            return None  # not finished, or one that wants another run: rule 2's
+        first = first or now
+        if now - first < agent_common.FINISHED_SETTLE:
+            return first
+        closed = [m for m in members if await self._finished_close(m)]
+        left = [m for m in members if m not in closed]
+        if closed:
+            log.info("rule 9: %s finished — closed %s", team, ", ".join(m.name for m in closed))
+        if manager is None or manager.state in work_mod.DEAD:
+            if closed and not left and not work_mod.closed_finished(manager):
+                # nobody live to tell; one rule 9 closed was announced then, and is never told twice
+                self._finished_tell(team, records, manager, first)
+                await self._push_changes()
+            return first if left else None
+        if manager.suspended:
+            return first
+        if manager.host != self.host:
+            # a node's manager gets no line and the close alone, routed as rule 2 routes one
+            if await self._finished_close(manager):
+                self._mark_closed(manager, "finished")
+                self._save(manager)
+                self._finished_tell(team, records, manager, first)
+                await self._push_changes()
+                return None
+            return first
+        line = (
+            "[agentorc] your team is finished: every member has declared. Make your last acts — "
+            "`ao progress none`, the note to the person — then `ao close` yourself"
+        )
+        if manager.state == "idle" and await self._policy_send(manager, line):
+            manager.finished_sent_at = now_iso()
+            log.info("rule 9: %s finished — its manager %s told", team, manager.name)
+            self._save(manager)
+            await self._push_changes()
+        return first
+
+    async def _finished_close(self, s: Session) -> bool:
+        """Rule 9's close, under the wrap-up's own safety check in the tick's form (rule 2's): only an
+        `idle` record whose git fields are known and show nothing uncommitted and nothing unpushed,
+        never a suspended one, and a node's only while its link is up. True when it was closed."""
+        if s.state != "idle" or s.suspended or not s.unattended:
+            return False
+        git = s.git or {}
+        if not all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed")):
+            return False  # work left, or not known: left open, and the Inbox row it is after any wrap-up
+        if s.host != self.host and s.host not in self._link_muxes:
+            return False  # its link is down: looked at again next tick (§4.4a)
+        try:
+            if s.host == self.host:
+                await self.rpc_close(s.id)
+            else:
+                await self._route_act("close", {"id": s.id}, None, s.host)
+        except Exception as e:  # noqa: BLE001 — a close that failed is tried again on the next tick
+            log.warning("%s: rule 9's close failed: %s", self._address(s), e)
+            return False
+        return s.state == "closed"
+
+    def _finished_tell(self, team: str, records: list[Session], manager: Session | None, since: datetime) -> None:
+        """The announcement the manager did not make (design §6 rule 9, §4.9a): one `system` note to
+        the person — the pull requests the members reported `done` since the team's start, the
+        earliest `created` among its records that are not superseded, and each member's
+        `out_of_work.why` — written only when no `note` from the manager reached the person inbox
+        since the reading first held, so a team that dissolves is never quiet and never told twice."""
+        if manager is not None:
+            sender = self._address(manager)
+            for e in self.person_inbox:
+                try:
+                    if e.from_ == sender and e.kind == "note" and _parse(e.at) >= since:
+                        return
+                except (ValueError, TypeError):
+                    continue
+        mine = [r for r in records if r.unattended and not r.superseded_by]
+        start = min((r.created for r in mine if r.created), default="")
+        members = [r for r in mine if r.seat is None and r is not manager]
+        prs = sorted(
+            {
+                e.pr
+                for r in members
+                for e in r.progress
+                if e.status == "done" and e.pr and (not start or str(e.at) >= start)
+            }
+        )
+        said = "; its manager did not announce it" if manager is not None else ""
+        lines = [
+            f"{team} finished and the host agent wound it down: every member declared out of work{said}. "
+            "Nothing is asked of you.",
+            "",
+            ("Pull requests reported done since the team started: " + ", ".join(f"#{n}" for n in prs) + ".")
+            if prs
+            else "No pull request was reported done since the team started.",
+        ]
+        for r in sorted(members, key=lambda r: (r.name, r.id)):
+            why = (r.out_of_work or {}).get("why") if isinstance(r.out_of_work, dict) else None
+            if why:
+                lines.append(f"{r.name}: {why}")
+        self._system_note(PERSON, "\n".join(lines))
+        log.info("rule 9: %s wound down by the tick — the person told", team)
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:

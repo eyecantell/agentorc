@@ -66,6 +66,9 @@ LANE_NEWS_NAMED = 5  # rule 6's note names this many new entries, then *and n mo
 # Rule 8 (§6, TD-227): a wound-down team's lanes' news is written as `work_waiting` once this long has
 # passed since the home first read the newest of its entries, so entries filed together are one event
 WORK_SETTLE = timedelta(minutes=10)
+# Rule 9 (§6, TD-241): the home winds a team down once its reading of *finished* has held this long —
+# a finished member may claim again on rule 6's news, and a manager's round may have the wind-down in hand
+FINISHED_SETTLE = timedelta(minutes=10)
 # Rule 8's `on_work: start` (§6, TD-227 slice 4): at most this many starts of one team by the rule in
 # `WORK_DAY`, and none inside `WORK_EARLY` of the last — a team that found nothing, started into the same nothing
 WORK_STARTS_DAY = 3

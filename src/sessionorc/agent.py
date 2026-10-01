@@ -65,6 +65,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     FILES_MAX,  # noqa: F401
     FILL_CEILING,  # noqa: F401
     FILL_WINDOW,  # noqa: F401
+    FINISHED_SETTLE,  # noqa: F401
     GIT_EVERY,  # noqa: F401
     HOME_EDITS,  # noqa: F401
     ID_RECHECK,  # noqa: F401
@@ -457,6 +458,9 @@ class HostAgent(
         # rule 8 (§6, TD-227): (team, id) → when the home first read that id as new in a wound-down
         # team's lane; in memory, so a restart of the home starts the settle again
         self._work_first: dict[tuple[str, str], datetime] = {}
+        # rule 9 (§6, TD-241): team → when the home's reading of *finished* first held; in memory, and
+        # dropped the tick it stops holding, so a restart of the home starts the settle again
+        self._finished_first: dict[str, datetime] = {}
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}

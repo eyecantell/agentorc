@@ -98,6 +98,7 @@ HOME_OWNED = frozenset(
         "restarts",
         "restart_ceiling",
         "closed_for",
+        "finished_sent_at",
         "restart_blocked",
         "restart_blocked_sent_at",
         "nudged_at",
@@ -921,6 +922,9 @@ class Session:
     # longer matches: what tells the tick's failed restart from a person's Close (§6 rule 2, TD-237,
     # TD-238). The home's, so an older node is sent nothing new.
     closed_for: dict[str, Any] | None = None
+    # Rule 9's (§6, TD-241): when the home typed the fixed *your team is finished* line at this
+    # record, the team's manager; from then its close waits `WRAPUP_GRACE`. The home's.
+    finished_sent_at: str | None = None
     # Rule 2, the wanted restart (§6, TD-103 slice 4): a `restart_wanted` with work left is not
     # restarted. `restart_blocked_sent_at` is when the one fixed send naming what is left was typed,
     # and `restart_blocked` is `{at, dirty, unpushed}` once the git fields still show work
