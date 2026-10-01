@@ -1002,7 +1002,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   presses never interleave a read and a write. Each refusal says why and what to do, in words the
   Inbox shows. A row the page read from origin offers no edit (TD-208; §4.5 screen 6 *Boards are read
   against origin*): the write-back is asked only for a line the checkout holds. **Decide** (TD-254;
-  designed 2026-09-30, not built — TD-255) is the fourth edit and the one cadence §4.5 always
+  the write-back built, the row's buttons not — TD-255) is the fourth edit and the one cadence §4.5 always
   allowed a tool: the edit `board_edit.py decide` makes — `Decided: <text> (<date>)` at the end of
   the item's line, committed as `agentorc: decide <head>: <answer> (session <name>)`, the form
   `check_cadence.py` already accepts — made here as the other three are, in `board.py` under the
@@ -1012,9 +1012,10 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   item's `answers` as the reader gave them, as `refs` are handed to a Reply, and the page offers
   only those: a plain answer is one of the item's `Answers:` word for word; the live look's
   second answer is `Not right: <what>` with the person's words after its colon, checked by its
-  prefix. A typed answer of any other shape is a Reply. **The two compose**: a Reply on a decided
-  item is written ahead of the `Decided:` field, which the reader anchors at the line's end, so a
-  reply never un-decides an item and a Decide after a reply follows the reply's tail. A decided
+  prefix. A typed answer of any other shape is a Reply. **The two compose**: a Reply is
+  written ahead of the line's `Answers:` and `Decided:` fields, which the reader anchors at the
+  line's end, so a reply never un-decides an item and never reads as part of its last answer, and
+  a Decide after a reply is still the line's last field. A decided
   item is not done (cadence §3.5): it stays on the board, due, as its session's work order, and
   the row says so; **a decide wakes nobody** — the reader's `decided` reaches the next session
   that reads the board, and the manager's round reads it through `ao repo --json` (§4.9).

@@ -453,3 +453,135 @@ async def test_a_refused_note_to_the_holder_is_said_beside_the_committed_line_an
             await me.call("msg", text="again", kind="reply", reply_to=q)
         assert (repo / board.BOARD).read_text().count(": this one. Context: TD-5.") == 1
         await me.call("kill", id=h)
+
+
+ASKED = (
+    "decide 2026-09-27 (session `grinder-ao-1` on kmaster) — **Which window?** Say. Context: TD-190. "
+    "Due: 2026-10-04. Answers: Keep it (default) | Lift it."
+)
+LOOK = (
+    "watch 2026-09-30 (session `grinder-ao-2` on kmaster) — **Merged, live look pending: the keys.** Look. "
+    "Due: 2026-10-01. Answers: Works | Not right: <what>."
+)
+
+
+def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
+    """TD-255 slice 1 (design §4.4 *Decide*): the edit `board_edit.py decide` makes."""
+    line = f"- [ ] {ASKED}\n"
+    got = board.edit_line(line, ASKED, "decide", answer="Lift  it", today="2026-10-01")
+    assert got == f"- [ ] {ASKED} Decided: Lift it (2026-10-01).\n"
+    assert board.DECIDED_RE.search(got.rstrip("\n")).group("text", "date") == ("Lift it", "2026-10-01")
+    # an item that ends no sentence is ended first: the field starts one, as the reader asks
+    assert board.edit_line("- [ ] n/a — undated", "n/a — undated", "decide", answer="Yes", today="2026-10-01") == (
+        "- [ ] n/a — undated. Decided: Yes (2026-10-01)."
+    )
+    assert board.message(ASKED, "decide", answer="Lift it") == (
+        "agentorc: decide Which window?: Lift it (session grinder-ao-1)"
+    )
+    long = board.message(ASKED, "decide", answer="Not right: " + "the ring is amber " * 9)  # a sentence is clipped
+    assert long.endswith("… (session grinder-ao-1)") and len(long) < 140
+    for bad in (
+        lambda: board.edit_line(line, ASKED, "decide", answer="  "),  # no answer
+        lambda: board.edit_line(got, ASKED, "decide", answer="Keep it"),  # the line moved: it is decided
+        lambda: board.edit_line(got, got[6:].strip(), "decide", answer="Keep it"),  # already decided
+        lambda: board.edit_line(line, ASKED, "decide", answer="No. Decided: yes"),  # the reader would misread it
+        lambda: board.edit_line(line, ASKED, "decide", answer="Not right: bad. Answers: z"),  # review of PR #861
+        lambda: board.edit_line(line, ASKED, "reply", reply="x. Decided: yes (2026-01-01)", by="t"),
+        lambda: board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "reply", reply="x. Answers: a | b", by="t"),
+    ):
+        with pytest.raises(board.Refused):
+            bad()
+
+
+READER = Path(__file__).parents[1] / "scripts" / "nudge_user_attention.py"
+
+
+def read_back(tmp_path: Path, line: str) -> dict:
+    """What dev-cadence's own reader makes of `line`: the fields the Inbox draws."""
+    import json
+    import sys
+
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    path = tmp_path / board.BOARD
+    path.write_text(f"# b\n\n## Needs the user\n\n{line}\n")
+    out = subprocess.run(
+        [sys.executable, str(READER), "--board", str(path), "--report", "--json"],
+        capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    return json.loads(out)["boards"][0]["items"][0]
+
+
+def test_a_reply_and_a_decide_compose_in_either_order(tmp_path):
+    """§4.4 *The two compose*: a reply goes ahead of the line's `Answers:` and `Decided:` fields,
+    which stay at its end and readable — by the board's own reader — and a decide after a reply
+    is still the line's last field."""
+    decided = f"{ASKED} Decided: Lift it (2026-10-01)."
+    got = board.edit_line(f"- [ ] {decided}", decided, "reply", reply="the node first", by="Paul", today="2026-10-02")
+    assert got == (
+        "- [ ] decide 2026-09-27 (session `grinder-ao-1` on kmaster) — **Which window?** Say. Context: TD-190. "
+        "Due: 2026-10-04. — Paul, 2026-10-02: the node first. Answers: Keep it (default) | Lift it. "
+        "Decided: Lift it (2026-10-01)."
+    )
+    read = read_back(tmp_path, got)
+    assert read["decided"] == {"text": "Lift it", "date": "2026-10-01"}
+    assert (read["answers"], read["default"], read["due"]) == (["Keep it", "Lift it"], "Keep it", "2026-10-04")
+    replied = board.edit_line(f"- [ ] {ASKED}", ASKED, "reply", reply="say more", by="Paul", today="2026-10-02")[6:]
+    assert replied.endswith("— Paul, 2026-10-02: say more. Answers: Keep it (default) | Lift it.")
+    got = board.edit_line(f"- [ ] {replied}", replied, "decide", answer="Keep it", today="2026-10-03")
+    read = read_back(tmp_path, got)
+    assert read["decided"] == {"text": "Keep it", "date": "2026-10-03"} and read["answers"] == ["Keep it", "Lift it"]
+    # with no fields on the line a reply is its tail, and a decide follows it
+    bare = "n/a — undated."
+    replied = board.edit_line(f"- [ ] {bare}", bare, "reply", reply="go on", by="Paul", today="2026-10-02")[6:]
+    assert board.edit_line(f"- [ ] {replied}", replied, "decide", answer="Yes", today="2026-10-03") == (
+        "- [ ] n/a — undated. — Paul, 2026-10-02: go on. Decided: Yes (2026-10-03)."
+    )
+
+
+def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
+    (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {ASKED}\n")
+    git(repo, "commit", "-qam", "asked")
+    got = board.write_back(repo, 9, ASKED, "decide", answer="Keep it")
+    assert got["message"] == "agentorc: decide Which window?: Keep it (session grinder-ao-1)"
+    assert git(repo, "log", "-1", "--format=%s") == got["message"] and git(repo, "status", "--porcelain") == ""
+    assert board.DECIDED_RE.search((repo / board.BOARD).read_text().splitlines()[8]).group("text") == "Keep it"
+    before, head = (repo / board.BOARD).read_text(), git(repo, "rev-parse", "HEAD")
+    for line, state in ((9, "decided"), (6, "moved"), (7, "dirty")):
+        if state == "dirty":
+            (repo / board.BOARD).write_text(before + "- [ ] a line being written.\n")
+        with pytest.raises(board.Refused):
+            board.write_back(repo, line, ASKED if line != 7 else ITEM, "decide", answer="Keep it")
+        assert git(repo, "rev-parse", "HEAD") == head
+
+
+async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo, tmp_path):
+    """The RPC's half: the answer is one of the reader's `answers` word for word, or `Not right:`
+    and words where the pair is among them; anything else is a Reply, and a session is refused."""
+    (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {ASKED}\n- [ ] {LOOK}\n")
+    git(repo, "commit", "-qam", "asked")
+    path, answers, pair = str(repo / board.BOARD), ["Keep it", "Lift it"], ["Works", "Not right: <what>"]
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    async with LocalClient(caller="ao-some-worker") as worker:
+        with pytest.raises(AgentError, match="person's own"):
+            await worker.call("board_edit", board=path, line=9, text=ASKED, action="decide", answer="Keep it")
+    async with LocalClient() as me:
+        for bad, offered in (("Keep", answers), ("", answers), ("Keep it", None), ("Not right: x", answers)):
+            with pytest.raises(AgentError, match="word for word"):
+                await me.call(
+                    "board_edit", board=path, line=9, text=ASKED, action="decide", answer=bad, answers=offered
+                )
+        for bad in ("Not right:", "Not right: <what>"):
+            with pytest.raises(AgentError, match="needs its words"):
+                await me.call("board_edit", board=path, line=10, text=LOOK, action="decide", answer=bad, answers=pair)
+        got = await me.call("board_edit", board=path, line=9, text=ASKED, action="decide", answer="Keep it",
+                            answers=["Keep  it", "Lift it"])  # fmt: skip
+        assert got["answer"] == "Keep it" and got["message"].startswith("agentorc: decide Which window?: Keep it")
+        got = await me.call("board_edit", board=path, line=10, text=LOOK, action="decide",
+                            answer="Not right: the ring is amber", answers=pair)  # fmt: skip
+        assert got["answer"] == "Not right: the ring is amber"
+    lines = (repo / board.BOARD).read_text().splitlines()
+    assert board.DECIDED_RE.search(lines[8]).group("text") == "Keep it"
+    assert board.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber"
