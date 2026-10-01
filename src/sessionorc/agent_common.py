@@ -768,12 +768,15 @@ def _counted(restarts: list[Any], now: datetime, fills: bool = True) -> list[dic
     `wanted` restart that carried new work — its `done` holds something no entry in the window
     before its own held. A crash, a fill, a failed replay and a wanted restart with nothing new
     (an early one a person let run, a repeat) count; an entry written before the fields has no
-    `done` and counts. `fills=False` leaves a seat's `fill` entries out, as rule 8's reading does."""
+    `done` and counts. A `person` entry — the one a person's Restart leaves — never counts.
+    `fills=False` leaves a seat's `fill` entries out, as rule 8's reading does."""
     entries = [r for r in restarts if isinstance(r, dict)]
     out = []
     for i, r in enumerate(entries):
         if not _recent(r.get("at"), now, RESTART_WINDOW) or (r.get("why") == "fill" and not fills):
             continue
+        if r.get("why") == "person":
+            continue  # a person's Restart never counts toward the ceiling it lifts (§6 rule 2, TD-250)
         if r.get("why") == "wanted" and not r.get("error"):
             try:
                 at = _parse(str(r.get("at")))

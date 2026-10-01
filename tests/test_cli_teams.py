@@ -589,7 +589,7 @@ def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, m
     by_id["ao-agentorc-grind-1"].update(
         state="idle",
         out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"},
-        git={"dirty": 0, "ahead": 0, "upstream": "origin/x"},
+        git={"dirty": 0, "ahead": 0, "upstream": "origin/x", "unpushed": 0},
     )
     by_id["ao-agentorc-grind-2"]["out_of_work"] = {"at": "2026-09-17T06:00:00Z", "why": "x"}  # declared, still working
     monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")

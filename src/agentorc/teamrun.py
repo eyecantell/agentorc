@@ -25,6 +25,7 @@ from typing import Any
 from agentorc import org as orgmod
 from agentorc import teams
 from sessionorc import balance as balance_mod
+from sessionorc.gitinfo import work_left
 from sessionorc.work import (
     closed_finished,
     finished,
@@ -613,15 +614,7 @@ def _unsafe_to_close(record: dict[str, Any]) -> str | None:
     flag and by Ready to close alike. This function used to run a third test of its own
     (`git branch -r --contains HEAD` for a branch with no upstream), which is now rule 3 of the
     measure and needs no subprocess here."""
-    git = record.get("git")
-    if not git:
-        return "git state unknown"
-    if git.get("dirty"):
-        return f"{git['dirty']} uncommitted"
-    if git.get("unpushed"):
-        against = git.get("pushed_against") or "its remote"
-        return f"{git['unpushed']} unpushed (vs {against})"
-    return None
+    return work_left(record.get("git"))
 
 
 def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
