@@ -1176,7 +1176,8 @@ def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_ba
     from sessionorc import board as board_mod
 
     today = date.today().isoformat()
-    line = f"- [ ] decide {today} (session `w` on kmaster) — **Ship it?** Pick. Due: {today}. Answers: approve | hold (default)."
+    head = f"- [ ] decide {today} (session `w` on kmaster) — **Ship it?** Pick."
+    line = f"{head} Due: {today}. Answers: approve | hold (default)."
     root = repo(tmp_path, "r", f"# Board\n\n## Needs the user\n\n{line}\n")
 
     def git(*a):
