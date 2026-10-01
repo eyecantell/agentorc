@@ -3166,6 +3166,8 @@
       teams: (f) => {
         const body = { team: f.dataset.team, reserve: f.elements.reserve.value.trim() };
         if (f.elements.until.value.trim()) body.until = f.elements.until.value.trim();
+        // **when work appears** (§6 rule 8): written only when the pick moved, so *ask me (default)* leaves the key absent
+        const ow = f.elements.on_work; if (ow && ow.value !== ow.dataset.was) body.on_work = ow.value;
         return ["teams", body];
       },
       you: (f) => {

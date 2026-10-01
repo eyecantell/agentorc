@@ -186,6 +186,19 @@ HELP: tuple[Help, ...] = (
             "to main's head at the next pass."
         ),
     ),
+    Help(
+        "on-work",
+        "when work appears",
+        "Settings page: Teams",
+        (
+            "Says what the home does when this team has wound down and its lanes then gain entries: ask you "
+            "with a row in the Inbox, start the team itself, or nothing. Pick start the team for a team you "
+            "would start every time the row asked, and leave ask me where you want to look first. It does "
+            "nothing while the team is live, and a start it would make is still held back, the row saying "
+            "why, by the usage line, a passed stop time, three starts in a day, a start in the last thirty "
+            "minutes, or the team's balance line."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -208,6 +221,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     ("focus", "Focus", ("wrap-up", "kill", "resume")),
     ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss")),
+    ("settings", "Settings", ("on-work",)),
 )
 
 

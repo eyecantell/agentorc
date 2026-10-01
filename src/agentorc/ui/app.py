@@ -1921,9 +1921,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/teams")
     async def settings_teams(request: Request):
-        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?}` — `until`
-        in the CLI's forms (`06:00`, `+8h`, ISO) read in this host's clock and handed over as an
-        instant, `null` to clear; `reserve` a whole percent, `0` or empty clearing it. A team the
+        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?, on_work?}` —
+        `until` in the CLI's forms (`06:00`, `+8h`, ISO) read in this host's clock and handed over as
+        an instant, `null` to clear; `reserve` a whole percent, `0` or empty clearing it; `on_work`
+        (**when work appears**, §6 rule 8) one of `ask`, `start`, `off`, as `ao team on-work`. A team the
         org does not define is refused, naming the defined ones, as `ao team until` refuses it."""
         body = await body_of(request)
         team = str(body.get("team") or "")
@@ -1944,8 +1945,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if r and not r.isdigit():
                 raise HTTPException(400, f"reserve priority is a whole percent, not {r!r}")
             change["reserve"] = int(r) if r and int(r) else None  # 0 clears it, as `ao team reserve 0` does
+        if "on_work" in body:
+            if body.get("on_work") not in setmod.settings_mod.ON_WORK:
+                raise HTTPException(400, f"when work appears is ask, start or off, not {body.get('on_work')!r}")
+            change["on_work"] = body["on_work"]
         if not change:
-            raise HTTPException(400, "teams: send until or reserve")
+            raise HTTPException(400, "teams: send until, reserve or on_work")
         return answer(await call("set_settings", teams={team: change}))
 
     @app.post("/api/settings/repos")
