@@ -6484,7 +6484,7 @@ code and needs no grant; a session doing the same work does.
      (only the session that exited, never its siblings) — the numbers §4.8 took from OTP, systemd
      and Circus, now constants. Each restart is appended to the record's `restarts: [{at, why}]`
      (home-owned, carried across the supersede so the count survives the restart it counts;
-     since TD-245 — not built, TD-249 — each entry also carries `done: [{ref, pr}]` and
+     since TD-245 each entry also carries `done: [{ref, pr}]` and
      `left: [ref]`, what the run it replaced reported and what it claimed and did not close,
      from the old record's `progress`, which the new record does not keep);
      `why` is `crash`, `wanted` or `fill` (and `start`, `schedule`, rule 7's `brief` and rule 8's `work`, each named where it is written), and a replay that failed keeps its `why` and adds
