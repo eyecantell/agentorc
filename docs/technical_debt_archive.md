@@ -2509,3 +2509,20 @@ Both go away only when the record says who closed it.
 **Related:** TD-240 (the design), TD-199 and TD-217 (a member's stale memory of its brief, the same shape), TD-214 / TD-227 (rule 8 starts a wound-down team again), TD-237 and TD-238 (`closed_for`), TD-125 (the announcement), TD-053 (the wind-down).
 
 **Resolved:** 2026-09-30 (PR #816, #821, #828, #831, #837; grinder-ao-1) — design §6 rule 9, §4.9a, §4.5a *team groups* and *Inbox row: manager did not close*, and §4.9 `ao team status --json` carry what was built; `tests/test_finished.py`, `tests/test_finished_tick.py`, `tests/test_ui_teams.py`, `tests/test_ui_inbox.py`, `tests/test_cli_teams.py` and the brief's test in `tests/test_cli.py` hold it. The live half of *Done when* is on `docs/user_attention.md` (the 2026-09-30 line, *the home winds a finished team down*); the two gaps the reviews of #821 and #831 named are TD-256.
+
+## TD-252: *TDs in motion* in columns, and the team header's *who for what* line dropped
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-09-30 (Paul, from the Org page: *put the "TDS IN MOTION" card data into columns. We can also drop the boilerplate "the team's work.." blurb — it does not really add good info*. TD-249 and TD-250 are the designer's, in PRs #822 and #825; TD-251 a grinder's.)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Built 2026-09-30 (grinder-ao-2, PR #838)
+**Location:** `src/agentorc/ui/templates/team_summary.html` (the `fmotion` facet's `mrow`), `templates/group_head.html` (the `whofor` line), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/repo.py` (`team_groups`: `who`), `src/agentorc/ui/help.py` and design §4.5a's help list (bound by `tests/test_help.py`), design §4.5a *team card: TDs in motion* and *team groups* (**who for what**), `docs/mockups/gen.py`
+
+**Why:** two things on the team card. (1) A *TDs in motion* row is a flex line — phase, priority letter, reference, title, holders, PR and its state — in which only the priority slot is a fixed width (TD-232) and the title takes what is left; the phase, the reference, the holders and the PR are each as wide as their text. So down a list the reference starts where the phase word ends, the holder and the PR wherever that row's own widths put them, and a row with no PR ends short. The *Doing* facet beside it was given fixed-width columns by TD-232 and reads at a glance; this one does not. (2) Under every team's header sits the *who for what* line (TD-162, built by TD-171): *the team's work: what it picks, its pace, a member that is stuck or should stop → manager-ao-1 · a PR on a held path … → techlead-ao-1 (on call) · Grinder: its own card only …*. It is each role's `message:` line joined, two lines of the same words on every team, read once and then only scrolled past; it takes the header's height on a page whose job is to show state.
+
+**Resolved:** 2026-09-30 (PR #838; grinder-ao-2) — design §4.5a *team card: TDs in motion* (**Columns**) and the ***i*** mark row (**who for what**) carry what was built; `tests/test_ui_team_summary.py` (the six cells, the widths) and `tests/test_ui.py` (no line on the header, the panel's list) hold it. The holders column is one ordinary name wide (14 characters), a longer list cut and whole on hover. Screenshots: `docs/mockups/reviews/2026-09-30-td252-*.png`; the live look is on the board.
+
+**Related:** TD-232 (the Doing list's columns and the priority letter), TD-176 (the team card's facets), TD-162 and TD-171 (*who for what*), TD-167 (the help panel).
