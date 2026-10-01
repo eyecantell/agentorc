@@ -1916,6 +1916,18 @@ def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, c
     assert cli.main(["team", "until", "ao-grind", "--clear"]) == 0
     assert cli.main(["team", "reserve", "ao-grind", "0"]) == 0
     assert "no stop time · no reserve priority" in capsys.readouterr().out.splitlines()[-1]
+    # `ao team on-work` (§6 rule 8, TD-227 slice 3): the key written, said in the page's words
+    assert cli.main(["team", "on-work", "nope", "start"]) != 0
+    assert "no team 'nope'" in capsys.readouterr().err
+    assert cli.main(["team", "on-work", "ao-grind", "start"]) == 0
+    assert capsys.readouterr().out.strip().endswith("when work appears: start the team")
+    assert cli.main(["--json", "settings"]) == 0
+    assert json.loads(capsys.readouterr().out)["teams"]["ao-grind"] == {"on_work": "start"}
+    with pytest.raises(SystemExit):
+        cli.main(["team", "on-work", "ao-grind", "maybe"])
+    capsys.readouterr()
+    assert cli.main(["team", "on-work", "ao-grind", "ask"]) == 0
+    assert "when work appears: ask me" in capsys.readouterr().out
     assert cli.main(["settings", "--where"]) == 0
     where = capsys.readouterr().out
     assert "settings.yml" in where and "at the host agent's start" in where and "ao service install" in where

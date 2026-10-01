@@ -22,6 +22,7 @@ from agentorc import repoconfig, service, teamrun, teams
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
+from sessionorc import settings as settings_mod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
@@ -1465,6 +1466,10 @@ def _defined_team(args: argparse.Namespace) -> str:
     return args.name
 
 
+# `teams.<team>.on_work` in the page's words (§4.5a *Settings page: Teams*, **when work appears**)
+ON_WORK_WORDS = {"ask": "ask me", "start": "start the team", "off": "do nothing"}
+
+
 def _team_setting_line(name: str, t: dict[str, Any]) -> str:
     until = stop_note({"run_until": t.get("until")}).replace("stops", "members stop") if t.get("until") else ""
     if t.get("passed"):
@@ -1475,6 +1480,8 @@ def _team_setting_line(name: str, t: dict[str, Any]) -> str:
     ]
     if t.get("schedule"):
         parts.append(f"schedule {t['schedule']}")
+    if t.get("on_work"):  # §6 rule 8: said only where the file holds the key; absent, the team asks
+        parts.append(f"when work appears: {ON_WORK_WORDS.get(t['on_work'], t['on_work'])}")
     return f"{name}: " + " · ".join(parts)
 
 
@@ -1503,6 +1510,19 @@ def cmd_team_reserve(args: argparse.Namespace) -> int:
     except ValueError as e:
         return fail(args, str(e), 1)
     got = call_sync("set_settings", teams={name: {"reserve": args.n or None}})
+    t = (got.get("teams") or {}).get(name) or {}
+    return emit(args, got, lambda: print(_team_setting_line(name, t)))
+
+
+def cmd_team_on_work(args: argparse.Namespace) -> int:
+    """`ao team on-work <team> ask|start|off` (design §4.7, §6 rule 8, TD-227): what the home does
+    when the team has wound down and its lanes gain work — the Inbox row, the start itself, or
+    nothing — written to `teams.<team>.on_work` through `set_settings`, a person's own."""
+    try:
+        name = _defined_team(args)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    got = call_sync("set_settings", teams={name: {"on_work": args.what}})
     t = (got.get("teams") or {}).get(name) or {}
     return emit(args, got, lambda: print(_team_setting_line(name, t)))
 
@@ -2496,6 +2516,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("n", type=int, help="a whole percent, 0–100; 0 clears it")
     q.set_defaults(fn=cmd_team_reserve)
+
+    q = add_team("on-work", help="what a wound-down team does when its lanes gain work: ask, start or off (§6 rule 8)")
+    q.add_argument("name")
+    q.add_argument("what", choices=settings_mod.ON_WORK, help="ask: an Inbox row (the default); start: the home starts")
+    q.set_defaults(fn=cmd_team_on_work)
 
     q = add_team("stop", help="wrap the members up, then the lead (--now kills instead of asking)")
     q.add_argument("name")

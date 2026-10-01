@@ -77,7 +77,7 @@
   </section>
 
   {# **Teams** (§4.5a *Settings page: Teams*) #}
-  {% set info_teams = "The three things you move for a team without redefining it: its schedule, its stop time — every live member and seat stops there, and the ones a start creates — and its reserve priority, an extra reserve on top of the profile's for this team's sessions, so two teams on one profile pause at different lines. The stop time takes 06:00, +8h or an ISO time, in this host's clock. Written to settings.yml's teams: through set_settings; the team itself is org.yml's, by hand." %}
+  {% set info_teams = "What you move for a team without redefining it: its schedule, its stop time — every live member and seat stops there, and the ones a start creates — its reserve priority, an extra reserve on top of the profile's for this team's sessions, so two teams on one profile pause at different lines, and what happens when it has wound down and its lanes gain entries. The stop time takes 06:00, +8h or an ISO time, in this host's clock. Written to settings.yml's teams: through set_settings; the team itself is org.yml's, by hand." %}
   <section class="isec" id="sec-teams">
     <div class="row gap sechead"><span class="h2">Teams</span>{{ imark("teams", "Teams", info_teams) }}</div>
     {{ panel("teams", info_teams) }}
@@ -90,6 +90,14 @@
       <label class="setrow"><span class="setlabel">reserve priority</span>
         <input class="input setin" name="reserve" value="{{ t.reserve or '' }}" placeholder="0" inputmode="numeric" autocomplete="off">
         <span class="note">{% if t.reserve %}+{{ t.reserve }} on the profile's reserve for this team's sessions{% else %}none — the profile's line{% endif %}</span></label>
+      {# **when work appears** (§4.5a, §6 rule 8, TD-227): `teams.<team>.on_work`, written only when the pick moves #}
+      <label class="setrow"><span class="setlabel">when work appears</span>
+        <select class="input setin" name="on_work" data-was="{{ t.on_work }}" title="{{ help_title('on-work') }}">
+          <option value="ask"{% if t.on_work == "ask" %} selected{% endif %}>ask me{% if not t.on_work_set %} (default){% endif %}</option>
+          <option value="start"{% if t.on_work == "start" %} selected{% endif %}>start the team</option>
+          <option value="off"{% if t.on_work == "off" %} selected{% endif %}>do nothing</option>
+        </select>
+        <span class="note">{% if t.on_work == "start" %}wound down, the home starts it when its lanes gain entries{% elif t.on_work == "off" %}wound down, it waits for Start or its schedule{% else %}wound down, an Inbox row asks when its lanes gain entries{% endif %}</span></label>
       <label class="setrow"><span class="setlabel">schedule</span>
         <input class="input setin" value="{{ t.schedule | tojson if t.schedule else '' }}" placeholder="at a reset" disabled>
         <span class="note">not built — TD-133</span></label>

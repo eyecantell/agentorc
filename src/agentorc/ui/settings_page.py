@@ -241,10 +241,12 @@ def usage_cards(
 def team_cards(
     defs: Mapping[str, Any], teams: Mapping[str, Any] | None, now: datetime | None = None
 ) -> list[dict[str, Any]]:
-    """**Teams** (§4.5 screen 8): a card per team the org defines, with the three settings a person
-    moves — the schedule (drawn disabled until TD-133), the stop time and the reserve priority —
-    as `settings.yml` holds them. The stop time is drawn in the reader's clock, as `ao team until`
-    takes it; one already past says so."""
+    """**Teams** (§4.5 screen 8): a card per team the org defines, with the settings a person
+    moves — the schedule (drawn disabled until TD-133), the stop time, the reserve priority and
+    **when work appears** (§6 rule 8) — as `settings.yml` holds them. The stop time is drawn in the
+    reader's clock, as `ao team until` takes it; one already past says so. `on_work` is the picker's
+    value, `ask` while the key is absent, which `on_work_set` tells apart (*ask me* is then marked
+    *default*)."""
     now = now or datetime.now(UTC)
     out = []
     for name, d in defs.items():
@@ -258,6 +260,8 @@ def team_cards(
                 "passed": bool(until and until <= now),
                 "reserve": t.get("reserve") if isinstance(t.get("reserve"), int) else 0,
                 "schedule": t.get("schedule") or None,
+                "on_work": t.get("on_work") if t.get("on_work") in settings_mod.ON_WORK else "ask",
+                "on_work_set": t.get("on_work") in settings_mod.ON_WORK,
             }
         )
     return out
