@@ -2121,6 +2121,11 @@
     });
   };
 
+  // The id a page's hash names, or "" — a hash that does not decode names nothing. Pure, for a test.
+  AO.hashId = function (hash) {
+    try { return decodeURIComponent(String(hash || "").replace(/^#/, "")); } catch (e) { return ""; }
+  };
+
   AO.repo = function () {
     const box = $("#repopage"); if (!box) return;
     const repo = box.dataset.repo, whoKey = "doingwho:" + repo;
@@ -2152,6 +2157,14 @@
       $$(`.rrow.folded[data-list="${CSS.escape(key)}"]`, box).forEach((r) => r.classList.remove("folded"));
       const b = $(`[data-unfold="${CSS.escape(key)}"]`, box); if (b) { b.hidden = true; b.dataset.unfolded = key; }
     }
+    // A link to an entry (`/repo/<name>#TD-227`, the Inbox's team start row) names a row its list may
+    // have folded, and a hidden row cannot be scrolled to: unfold that list, then go to the row.
+    function showHash() {
+      const id = AO.hashId(location.hash), row = id && document.getElementById(id);
+      if (!row || !box.contains(row) || !row.dataset.list) return;
+      if (row.classList.contains("folded")) unfold(row.dataset.list);
+      row.scrollIntoView({ block: "center" });
+    }
     box.addEventListener("click", (e) => {
       const p = e.target.closest(".tsum .seg[data-pick] button");
       if (p && !p.disabled) return pickSummary(p);
@@ -2166,6 +2179,8 @@
       if (i) { const panel = document.getElementById(i.getAttribute("aria-controls")); if (panel) { panel.hidden = !panel.hidden; i.setAttribute("aria-expanded", panel.hidden ? "false" : "true"); } }
     });
     apply();
+    showHash();
+    window.addEventListener("hashchange", showHash);
     setInterval(reread, 30000);  // the Inbox's poll; the events below are the fast path
     // a burst of deltas is one re-read, a second and a half after the last
     let soon = null;
