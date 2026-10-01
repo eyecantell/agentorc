@@ -48,33 +48,8 @@ def entry_composer(repo: str, type_: str, ledger: str, words: str) -> str:
     return f"{head}\n\n{words.strip()}" if words.strip() else head
 
 
-def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
-    """The teams that service the checkout `root` on `host`, in definition order, each `{team,
-    seat, name}` — `seat` the id its techlead takes (`teams.seat_id`), empty where it defines none,
-    and `name` that seat's name — which is what `entry_add` is handed (TD-218: the host agent does
-    not read `org.yml`). The first is the one **Hand to the techlead** hands to, as `repo_teams`
-    gives a repo its first team's badge."""
-    out = []
-    for tname, t in org.teams.items():
-        paths = {
-            str(Path(path).expanduser().resolve())
-            for pname in t.projects
-            for by in (org.projects[pname].repos.values() if pname in org.projects else ())
-            if (path := by.get(host))
-        }
-        if root in paths:
-            seat = teams.seat_id(org, t, t.host or host, host)
-            out.append(
-                {
-                    "team": tname,
-                    "seat": seat,
-                    "name": t.techlead.name if seat and t.techlead else "",
-                    # a seat the team defines whose home has no checkout on its host: `seat_id` is ""
-                    # for it as for no seat at all, and the reason under the button tells them apart
-                    "techlead": t.techlead.name if t.techlead else "",
-                }
-            )
-    return out
+# the teams that service a checkout: `agentorc.teams`' since TD-218 slice 4, where `ao td add` reads it too
+entry_teams = teams.entry_teams
 
 
 def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, Any]], now: datetime) -> dict[str, str]:

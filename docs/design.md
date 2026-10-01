@@ -3025,12 +3025,12 @@ refused with its name (the nested case itself is not built). A start ends with t
 agent's build line (§4.4 *What is running says which commit it is*), once and not per member: a
 build behind main is said and never refused on, since the promote is the person's (§6 *Promote*).
 
-**Entries (§4.9 *Add an entry to the ledger*, TD-180; designed 2026-09-28, not built — TD-218).**
+**Entries (§4.9 *Add an entry to the ledger*, TD-180; designed 2026-09-28; built 2026-09-30 — TD-218 slice 4).**
 `ao td add [--repo <name>] [--type debt|feature] ["<words>"]` is the terminal's form of **Hand to
 the techlead**: the words — the argument, or standard input when there is none — go as the
 person's `ask` to the techlead seat of the repo's team, carrying `entry` and marked `handed`. The
-repo defaults to the one the command is run in. It prints the message's id and when it will be
-read, as `ao msg` does, and is refused in words where the form's button is disabled. **A person's
+repo defaults to the one the command is run in — its main checkout, from a worktree too. It prints
+the message's id and when it will be read, as `ao msg` does, and is refused in words where the form's button is disabled. **A person's
 only**, refused to every session as the board write-back is: a session that wants an entry in the
 ledger writes it on its branch (cadence §2), or files an `ao finding`. The form's other way has no
 verb of its own: `ao new <name> --team <team> --role <role>` starts the session, and a terminal
@@ -4279,7 +4279,7 @@ its §2 called the org file *a team editor in waiting*, and this is the first ke
   text, preserving the file; a setting by the Settings page through `set_settings`. Nothing here
   writes `settings.yml`, and nothing on the Settings page writes `org.yml`.
 
-**Add an entry to the ledger (TD-180; designed 2026-09-28; the form, both its ways and the row a handed entry waits under built — TD-219, 2026-09-29; the handed entry's close by its outcome built — TD-218 slice 3; `ao td add` not built — TD-218).** Paul:
+**Add an entry to the ledger (TD-180; designed 2026-09-28; the form, both its ways and the row a handed entry waits under built — TD-219, 2026-09-29; the handed entry's close by its outcome built — TD-218 slice 3; `ao td add` built 2026-09-30 — TD-218 slice 4).** Paul:
 *it will look like the user giving short info, then an agent fleshing it out — asking questions
 as needed, then generating the TD.* An entry reaches the ledger only through a session: the
 person tells one in its terminal, and it writes the entry on a branch. A thought the person has
@@ -5674,7 +5674,7 @@ without reporting**; the row offers **Open** (the session's details, Resume) and
 → done: merged as #261*. A lapsed `steer` owes nothing — nobody answered — and a declined question
 owes nothing either.
 
-**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add` built 2026-09-29 — TD-218 slice 2; the close by its outcome, `--thread` on it and the person's Dismiss (`inbox_dismiss` naming its id) built 2026-09-29 — TD-218 slice 3, listed by the person's `inbox` read as `handed` with its holder, its row under *Waiting on them* drawn 2026-09-29 — TD-219; `ao td add` not built — TD-218).** The Add entry
+**An entry handed to a seat (TD-180; designed 2026-09-28; the count toward the seat and the answer's sentence built 2026-09-29 — TD-218 slice 1; `entry_add` built 2026-09-29 — TD-218 slice 2; the close by its outcome, `--thread` on it and the person's Dismiss (`inbox_dismiss` naming its id) built 2026-09-29 — TD-218 slice 3, listed by the person's `inbox` read as `handed` with its holder, its row under *Waiting on them* drawn 2026-09-29 — TD-219; `ao td add` built 2026-09-30 — TD-218 slice 4).** The Add entry
 form's **Hand to the techlead** and `ao td add` (§4.9 *Add an entry to the ledger*) send an `ask`
 from the person whose envelope carries **`entry: {repo, type}`** — the repo's name in the home's
 registry and `debt` or `feature`, both from the form's fields and never read out of the text —
