@@ -1067,7 +1067,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — not built), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — built, TD-259 slice 2), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -4290,11 +4290,11 @@ entry of the home — default the host the start runs on. Checkouts are resolved
 (default `manager`; **`person`** means the person manages — no session is started and members
 get an empty `controllers` list plus the team badge), `name` (default `<team>-lead`), `home` (a
 repo name from the team's projects — required when the projects list more than one repo,
-defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key, the launch and the seat's brief built 2026-10-01 — TD-259 slices 1 and 5, the tick's `team` trigger and the slot not built:
+defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key, the launch and the seat's brief built 2026-10-01 — TD-259 slices 1 and 5; the slot's words and the tick's `team` trigger too — slices 4 and 2:
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's trigger slice lands a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`), because a manager started as a seat before the tick reads `team` is closed idle and never filled; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` now, and the flip waits on slice 3, the mail sweep sparing a question to a closed seat, because until then a question to a manager on call whose fill was refused is lost; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
