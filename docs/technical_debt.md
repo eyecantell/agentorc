@@ -130,6 +130,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
 | TD-252 | The team card's *TDs in motion* rows have one fixed column and the rest as wide as their text, and the header's *who for what* line is boilerplate that tells Paul nothing: lay the rows out in columns, drop the line from the header | Medium | Open — pickable |
 | TD-253 | A restarted grinder's brief names its techlead and its manager as `none` while both exist, so its asks and its `done` lines are addressed to nobody | Medium | Open |
+| TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Open — design-first |
 
 
 ---
@@ -2575,3 +2576,27 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** a member restarted by rule 2 or rule 7 in a team with a techlead seat and a manager reads both ids in its brief.
 
 **Related:** TD-217 (rule 7's replay), TD-113 (the `{manager}` slot), TD-229 (the team's definition moving to the repo), TD-251 (the same brief's `--thread` form).
+
+## TD-254: A board row draws no answers at all — the answer buttons, *Go with it* as a steer has, and a live look's two answers
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-09-30 (Paul, on the Inbox after TD-244's groom: *I see many agentorc items in the inbox that do not have recommended answers*, then: *let's add "go with it" similar to the steering entries. We should probably build some guidance on this to keep it consistent*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a (**Inbox row: `steer`** for the shape; the board rows' controls: Snooze, Done, Reply, Open board — no Decide row exists), §4.5 screen 6, §4.10; `src/agentorc/ui/templates/inbox_row.html` (the `board()` macro, which never calls `answers(e)`), `src/agentorc/ui/inbox.py` (`BOARD_ACTS = ("snooze", "done")`), the board RPC (no `decide` action), `ui/help.py` and §4.5a's help list (bound by `tests/test_help.py`); `scripts/board_edit.py` (SYNCED: `decide`); `docs/briefs/grinder-ao-*.md` and the package briefs, where they say how a live look is written
+
+**Why:** after the groom the board holds 60 open items: 6 `decide`, each with `Answers:` and five with a `(default)`, 49 `watch` that are nearly all *merged, live look pending*, and 5 `act`. On the Inbox a steer shows the sender's one line and **Go with it**, and an `ask` its suggested answers as buttons. **A board row draws none of it**: its controls are Open board, Reply, Snooze and Done, the template never draws an item's `Answers:`, and neither the page nor the board RPC has a `decide` action, so the answers and the recommendation the groom wrote are invisible on the Inbox and the only way to record a `Decided:` is `board_edit.py decide` by hand. That is why Paul saw *many items that do not have recommended answers* the day after a groom whose point was to add them. A live look has the same four controls, so *I looked and it works* is Done with nothing recorded and *it does not* is prose in a Reply; 49 rows read as a wall with nothing to press. The guidance for what a session writes is the cadence's and is dev-cadence TD-074 (the fixed pair `Answers: Works | Not right: <what>.` on a live look, when a default is allowed); this entry is the Inbox's half.
+
+**Fix — a design round, then a build entry:**
+1. **The answer buttons on a board row** — the Decide control cadence §4.5 already allows a tool and this page never built: an item's `Answers:` drawn as the row's buttons, as an `ask`'s suggested answers are (display from the board's own fields, never a control built from prose), each press `board_edit.py decide --answer "<its text>"` through a `decide` action on the board RPC beside `snooze` and `done`, with the refusals `board_edit.py` already gives (the line moved, a board read from origin). The row then reads *decided: <text>* and stays until its session closes it.
+2. ***Go with it* on a row that carries a `(default)`**: one press, in the steer's words and place, that records the default — the same `decide`, the person's action as every Decide is, never something the board or a session falls to. Say how it sits beside the answer buttons (the default's button first and marked, or *Go with it* in its place), and that a row with no default has no such button.
+3. **A live look's pair as two buttons** once boards carry it: *Works* decides at once; *Not right…* opens the Reply composer and decides with the text. Say what follows each: *Works* is the raising team's order to close the line and archive the entry (rule 4's owed-outcome shape, or a board note to the manager), *Not right* a TD handed to the techlead as Add entry does (TD-218).
+4. **This repo's existing live looks** get the pair in one pass by a grinder, as TD-244 did the kinds, once TD-074 has settled the words; and the briefs' *merged, live look pending* line is written with the pair from then on.
+5. **Keys and help**: a key for *Go with it* on the ringed row beside `x` and `r`; the help sentences for both controls.
+
+**Done when:** the design's §4.5a rows say all of it and a build entry carries the slices; on a scratch home a board item's answers are buttons on its Inbox row, one with a default is decided by one press, a live look by one of two, and the board line carries `Decided:` after each.
+
+**Related:** dev-cadence TD-074 (the guidance and the pair), TD-244 (the groom), TD-142 (Reply on a board row), TD-218 and TD-219 (an entry handed to the techlead), TD-124 (the pages' keys); the steer's *Go with it*: §4.5a **Inbox row: `steer`**, §4.10.
