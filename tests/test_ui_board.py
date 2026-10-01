@@ -1026,3 +1026,186 @@ def test_after_a_pull_the_row_is_pressable_and_a_two_sided_board_warns(tmp_path,
     assert "a line made here" in html and "a second line on origin" not in html
     assert 'class="originnote meta warnish"' in html and "what origin added is not shown — pull" in html
     assert html.count('data-board-act="done"') == 3  # the checkout's rows are its own: pressable
+
+
+# ── §4.5a **answers** / **Go with it** on a board row (§4.4 *Decide*; TD-255 slice 2) ──────────────
+
+
+def decide_item(line=9, *, decided=None, default="hold"):
+    text = "**Ship it?** Pick one. Due: 2026-09-20. Answers: approve | hold (default) | ask <b>Ann</b>."
+    if not default:
+        text = text.replace(" (default)", "")
+    if decided:
+        text += f" Decided: {decided} (2026-09-21)."
+    return {
+        **item(line, text, "2026-09-20", "2d overdue"),
+        "answers": ["approve", "hold", "ask <b>Ann</b>"],
+        "default": default or None,
+        "decided": {"text": decided, "date": "2026-09-21"} if decided else None,
+        "kind": "decide",
+    }
+
+
+def rows_html(tmp_path, monkeypatch, it, **board):
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows, templates
+
+    rep = report(tmp_path / "samscrape", it)
+    rep["boards"][0].update(board)
+    rows = board_rows(rep)
+    return rows, templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
+
+
+@pytest.mark.unit
+def test_a_board_items_answers_are_buttons_in_the_order_written_and_go_with_it_is_in_the_foot(tmp_path, monkeypatch):
+    """Three answers and a default: three answer buttons in the order written, the default's marked,
+    each the `decide` act carrying its text and the reader's list; a bare **Go with it** in the
+    foot after Reply, its confirm naming the default; the body prints no `Answers:` tail. The
+    answers are the reader's field and escaped — a label, never markup."""
+    import html as htmllib
+    import json
+    import re
+
+    rows, html = rows_html(tmp_path, monkeypatch, decide_item())
+    assert rows[0]["body"] == "**Ship it?** Pick one. Due: 2026-09-20."
+    assert rows[0]["answers"] == ["approve", "hold", "ask <b>Ann</b>"] and rows[0]["default"] == "hold"
+    assert '<div class="body">**Ship it?** Pick one. Due: 2026-09-20.</div>' in html
+    btns = re.findall(r'<button class="btn sm answer" ([^>]*)>(.*?)</button>', html, re.S)
+    assert [htmllib.unescape(re.search(r'data-answer="([^"]*)"', a).group(1)) for a, _ in btns] == rows[0]["answers"]
+    assert ["default" in inner for _, inner in btns] == [False, True, False]
+    assert "<b>Ann</b>" not in html and "&lt;b&gt;Ann&lt;/b&gt;" in html
+    for attrs, _ in btns:
+        assert 'data-act="board"' in attrs and 'data-board-act="decide"' in attrs and 'data-line="9"' in attrs
+        assert json.loads(re.search(r"data-answers='([^']*)'", attrs).group(1)) == rows[0]["answers"]
+        assert "disabled" not in attrs and "data-confirm" not in attrs
+    foot = html[html.index('class="row gap wrap mfoot"') :]
+    assert foot.index(">Reply<") < foot.index(">Go with it<") < foot.index(">Snooze<") < foot.index(">Done<")
+    gwi = foot[: foot.index(">Go with it<")].rsplit("<button", 1)[1]
+    assert 'data-board-act="decide"' in gwi and 'data-answer="hold"' in gwi
+    assert "Go with it? &ldquo;hold&rdquo; is written on samscrape" in gwi
+    assert html.count('data-board-act="decide"') == 4
+
+
+@pytest.mark.unit
+def test_a_row_with_no_default_has_no_go_with_it_and_one_with_no_answers_no_buttons(tmp_path, monkeypatch):
+    _, html = rows_html(tmp_path, monkeypatch, decide_item(default=""))
+    assert html.count('class="btn sm answer"') == 3 and "Go with it" not in html and ">default<" not in html
+    plain = item(4, "Look at it. Answers: in the prose only. Due: 2026-09-20.", "2026-09-20", "2d overdue")
+    rows, html = rows_html(tmp_path, monkeypatch, plain)
+    # the reader gave no `answers`: the prose is prose, the body whole, and nothing is a button
+    assert rows[0]["body"] == plain["text"] and rows[0]["answers"] == []
+    assert "btn sm answer" not in html and "Go with it" not in html and "decide" not in html
+
+
+@pytest.mark.unit
+def test_a_decided_row_reads_decided_in_place_of_the_buttons(tmp_path, monkeypatch):
+    """Once decided the row reads *decided: <text> · <date>* from the reader's `decided`, the body
+    prints neither tail, no answer and no Go with it is offered — and **Reply** and **Done** stand."""
+    rows, html = rows_html(tmp_path, monkeypatch, decide_item(decided="approve"))
+    assert rows[0]["decided"] == {"text": "approve", "date": "Sep 21"} and rows[0]["due_now"]
+    assert rows[0]["body"] == "**Ship it?** Pick one. Due: 2026-09-20."
+    assert "decided: approve · Sep 21" in html and "work order" in html
+    assert "btn sm answer" not in html and "Go with it" not in html and 'data-board-act="decide"' not in html
+    assert 'data-act="board_reply"' in html and 'data-board-act="done"' in html
+    # the acts still hand back the whole line, which the agent re-checks word for word
+    assert "Decided: approve (2026-09-21)." in html
+
+
+@pytest.mark.unit
+def test_a_row_read_from_origin_draws_its_answers_and_go_with_it_disabled(tmp_path, monkeypatch):
+    _, html = rows_html(tmp_path, monkeypatch, decide_item(), source="origin/main")
+    import re
+
+    btns = re.findall(r'<button class="btn sm answer" ([^>]*)>', html)
+    assert len(btns) == 3 and all("disabled" in a and "data-act" not in a for a in btns)
+    assert "data-board-act" not in html
+    assert re.search(r"<button[^>]*disabled[^>]*>Go with it</button>", html)
+
+
+@pytest.mark.unit
+def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_path, monkeypatch):
+    """The route (§4.4 *Decide*): `board_edit {action: decide, answer, answers}`, caller-less, and
+    the boards read again at once so the row re-reads *decided*; a decide naming no answer or no
+    list is refused before the agent is asked, and the other acts carry neither field."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+
+    reads, calls = [], []
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
+
+    class Fake:
+        def __init__(self, *a, **k):
+            self.kw = k
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "board_edit":
+                calls.append((self.kw.get("caller"), kw))
+                return {"commit": "abc123", "answer": kw.get("answer")}
+            return {"list": [], "inbox": {"entries": [], "trail": []}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    board = str(tmp_path / "r/docs/user_attention.md")
+    base = {"action": "decide", "board": board, "line": 4, "text": "x"}
+    with TestClient(uiapp.create_app()) as c:
+        r = c.post("/api/person/board", json={**base, "answer": " hold ", "answers": ["approve", "hold"]})
+        assert r.status_code == 200 and r.json()["answer"] == "hold"
+        assert calls == [(None, {**base, "due": None, "answer": "hold", "answers": ["approve", "hold"]})]
+        assert len(reads) == 1
+        for bad in ({"answers": ["approve"]}, {"answer": "hold"}, {"answer": "hold", "answers": "hold"}):
+            assert c.post("/api/person/board", json={**base, **bad}).status_code == 400
+        assert len(calls) == 1
+
+
+@pytest.mark.integration
+def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_back(tmp_path, monkeypatch):
+    """End to end with dev-cadence's own reader and the real write-back: the reader's `answers` and
+    `default` draw the buttons; the answer the page would send is written as `Decided:`; and the
+    reader's next read gives `decided`, which the row prints in place of the buttons."""
+    import json
+    import subprocess
+    import sys
+
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows, templates
+    from sessionorc import board as board_mod
+
+    today = date.today().isoformat()
+    line = f"- [ ] decide {today} (session `w` on kmaster) — **Ship it?** Pick. Due: {today}. Answers: approve | hold (default)."
+    root = repo(tmp_path, "r", f"# Board\n\n## Needs the user\n\n{line}\n")
+
+    def git(*a):
+        subprocess.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+
+    shutil.rmtree(root / ".git")
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "T")
+    git("add", "-A")
+    git("commit", "-qm", "board")
+
+    def read():
+        out = subprocess.run(
+            [sys.executable, str(root / "scripts" / "nudge_user_attention.py"), "--report", "--json"]
+            + ["--board", str(root / "docs" / "user_attention.md")],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return board_rows(json.loads(out.stdout))
+
+    (row,) = read()
+    assert row["answers"] == ["approve", "hold"] and row["default"] == "hold" and row["decided"] is None
+    html = templates.get_template("inbox_rows.html").render(rows=[row], section="needs")
+    assert html.count('class="btn sm answer"') == 2 and ">Go with it<" in html
+    monkeypatch.setattr(board_mod, "default_branch", lambda r: "main")
+    board_mod.write_back(root, row["line"], row["text"], "decide", None, answer=row["default"])
+    (row,) = read()
+    assert row["decided"]["text"] == "hold" and row["due_now"] and "Answers:" not in row["body"]
+    html = templates.get_template("inbox_rows.html").render(rows=[row], section="needs")
+    assert "decided: hold · " in html and "btn sm answer" not in html and "Go with it" not in html

@@ -584,7 +584,24 @@
   <span class="grow"></span>
   <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
 </div>
-<div class="body">{{ e.text }}</div>
+<div class="body">{{ e.body or e.text }}</div>
+{#- §4.5a **answers** (§4.4 *Decide*, TD-255): the item's `Answers:` as the row's buttons, as an
+    `ask`'s suggested answers are — from the reader's `answers` field, never a control built from
+    prose — in the order written, the default's marked. A press is the `decide` write-back with that
+    answer's text, handed with the list the reader gave so the agent can hold the answer to it. Once
+    decided the row reads *decided: <text> · <date>* in their place: the item is its session's work
+    order now, not done. Read from origin, the buttons are drawn disabled. -#}
+{%- if e.decided %}
+<div class="st decided">decided: {{ e.decided.text }} · {{ e.decided.date }} <span class="dim">— not done: it stays on the board as its session's work order</span></div>
+{%- elif e.answers %}
+<div class="row gap wrap sugg" role="group" aria-label="this item's answers">
+  <span class="st sugglabel">its answers</span>
+  {%- for a in e.answers %}
+  <button class="btn sm answer" {% if ro %}disabled title="{{ ORIGIN_READONLY }}"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" title="{{ a }}"{% endif %}><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {%- endfor %}
+</div>
+{%- endif %}
+{%- set gwi = e.default and e.answers and not e.decided %}
 <div class="row gap wrap mfoot">
   {%- if ro %}
   <span class="st">{{ ORIGIN_READONLY }}</span>
@@ -595,10 +612,14 @@
   {%- if e.editor %}<a class="btn sm ghost" href="{{ e.editor }}" title="open {{ e.board }} at line {{ e.line }}">Open board</a>{% endif %}
   {%- if ro %}
   <button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Reply</button>
+  {%- if gwi %}<button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Go with it</button>{% endif %}
   <button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Snooze</button>
   <button class="btn sm" disabled title="{{ ORIGIN_READONLY }}">Done</button>
   {%- else %}
   <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-name="{{ e.repo }}'s board" title="your words appended to this line of the board — one commit, never pushed; the line stays due">Reply</button>
+  {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
+      steer row's words and place; the one press records the default — the same `decide`. -#}
+  {%- if gwi %}<button class="btn sm ghost" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo }}'s board as your decision.">Go with it</button>{% endif %}
   <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
     <div class="menu">
       <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 day</button>

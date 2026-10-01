@@ -455,6 +455,9 @@
           if (!due) return;
           body.due = due;
         }
+        // **answers** / **Go with it** (§4.4 *Decide*, TD-255): the answer pressed, and the item's
+        // answers as the reader gave them to the row — the agent holds the one to the other
+        if (body.action === "decide") { body.answer = b.dataset.answer; body.answers = JSON.parse(b.dataset.answers || "[]"); }
       }
       // §4.5a **Inbox row: state**: a state row's snooze. It is keyed on the record **and the row
       // kind** — the home has no mail entry to hang it on — and no `until` is the clear.
@@ -539,7 +542,8 @@
       if (action === "clear_promote") AO.toast(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
       if (action === "clear_work") AO.toast(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
-      if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
+      if (action === "board" && body.action === "decide") AO.toast(`decided: ${body.answer} — committed on the board, not pushed; the item stays, as its session's work order`, true);
+      else if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) AO.toast("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
       else if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
@@ -2975,6 +2979,11 @@
     { keys: ["r"], page: "inbox", ring: true, control: "Reply", sel: '[data-act="reply"]', text: ["Reply"] },
     { keys: ["s"], page: "inbox", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
     { keys: ["x"], page: "inbox", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
+    // **Go with it** on a `steer` row and on a board row with a default; and a row's answer buttons
+    // — an `ask`'s suggested answers, a board item's answers — in the order written (TD-254, TD-255).
+    // `1` and `2` are the page's on any row without them: `AO.keyAnswers` is where they yield.
+    { keys: ["g"], page: "inbox", ring: true, control: "Go with it", sel: "button", text: ["Go with it"] },
+    { keys: ["1", "2", "3", "4"], page: "inbox", ring: true, control: "its answers, in the order written (a row without any: 1 Org, 2 Inbox)", sel: ".btn.answer", nth: true },
   ];
   AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/inbox/") ? "msg" : path.startsWith("/focus/") ? "focus" : "other");
   // the message page's one row is its entry: its keys press that row's controls, never a thread's
@@ -2990,7 +2999,10 @@
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "") || (t.closest && t.closest(".xterm")))) return null;
     return ev.key === "Enter" && ev.shiftKey ? "Shift+Enter" : ev.key;
   };
-  AO.keyEntry = (page, name) => AO.KEYS.find((k) => (k.page === "all" || k.page === page) && k.keys.includes(name)) || null;
+  // `answers`: the ringed row has answer buttons, so a digit is the row's (`nth`) and not the page's
+  AO.keyEntry = (page, name, answers) => AO.KEYS.find((k) => (k.page === "all" || k.page === page) && k.keys.includes(name) && (!answers || k.nth || !/^[1-4]$/.test(name))) || null;
+  // A row's own answer buttons, in the order written — never those of a row drawn inside it
+  AO.keyAnswers = (row) => (row ? $$(".btn.answer", row).filter((el) => el.closest(RINGS.inbox) === row) : []);
   const shown = (el) => el.getClientRects().length > 0;
   const ringables = (page) => (RINGS[page] ? $$(RINGS[page]).filter(shown) : []);
   const ringed = (page) => (RINGS[page] && document.activeElement && document.activeElement.closest ? document.activeElement.closest(RINGS[page]) : null);
@@ -3058,9 +3070,12 @@
     }
     // Enter on a focused button or link is that button's own press, never the ringed card's
     if ((name === "Enter" || name === "Shift+Enter") && ev.target && ev.target.closest && ev.target.closest("button, a, summary")) return;
-    const k = AO.keyEntry(page, name);
+    // the digits yield to a ringed row that has answer buttons (§4.5a **keys**: the ring, TD-255)
+    const answers = page === "inbox" && /^[1-4]$/.test(name) ? AO.keyAnswers(ringed(page)) : [];
+    const k = AO.keyEntry(page, name, answers.length > 0);
     if (!k) return;
     ev.preventDefault();
+    if (k.nth) { const a = answers[Number(name) - 1]; if (a && !a.disabled) a.click(); return; }
     if (k.help) return keyHelp();
     if (k.g) { gUntil = Date.now() + 2000; return; }
     if (k.step) return AO.entryStep(k.step);
