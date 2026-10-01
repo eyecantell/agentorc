@@ -7286,9 +7286,10 @@ teams:
   member on a node has no doorbell yet (§4.4a *The doorbell is the forwarded `wait`*), so it
   learns of the clearing when something else has it read its inbox — its manager, told of the
   clearing, is the one to look (TD-057). A node cut off from the home refuses every report,
-  so nothing is claimed unchecked. **The presets say it** (built — TD-239 slice 5): `grinder`,
-  `hunter` and `auditor` say what a refusal *over its line* means — nothing new, finish what is
-  held, end the turn, never `none`, and no branch cut for a new entry as a way round — and
+  so nothing is claimed unchecked. **The presets say it** (built — TD-239 slice 5): `grinder`
+  says what a refusal *over its line* means — nothing new, finish what is held, end the turn,
+  never `none`, and no branch cut for a new entry as a way round; `hunter`, which claims nothing,
+  says the same of its `none`; `auditor` is a seat, never refused, and says nothing; and
   `manager` says such a team is neither crashed nor finished, that its part is one log line, and
   that an idle member on another host is told of the clearing with one send.
 

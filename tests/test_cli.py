@@ -2062,9 +2062,9 @@ def test_the_presets_say_what_over_its_line_means():
     assert "**Over its line** (design §6 *Balance*)" in grinder and "`--force` does not pass it" in grinder
     assert "a branch cut for a new entry is no way round it" in grinder and "Never declare `none` on it" in grinder
     assert grinder.index("A claim is a lease") < grinder.index("**Over its line**") < grinder.index("**Out of work**")
-    for name in ("hunter.md", "auditor.md"):
-        text = (briefs / name).read_text()
-        assert "**Over its line** (design §6 *Balance*)" in text and "you are not out of work" in text
+    hunter = (briefs / "hunter.md").read_text()
+    assert "**Over its line** (design §6 *Balance*)" in hunter and "Never declare `none` on it" in hunter
+    assert "over its line" not in (briefs / "auditor.md").read_text().lower()  # a seat is never refused
     manager = (briefs / "manager.md").read_text()
     assert "**A team over its line** (design §6 *Balance*) is neither crashed nor finished" in manager
-    assert "one line in your round log" in manager and "do not nudge, restart or wind them down" in manager
+    assert "one line in your round log" in manager and "do not restart or wind them down" in manager
