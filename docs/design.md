@@ -4294,7 +4294,7 @@ defaulted to the only one otherwise), `profile` (overrides the role's), **`on_ca
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` now, and the flip waits on slice 3, the mail sweep sparing a question to a closed seat, because until then a question to a manager on call whose fill was refused is lost; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's flip a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`): the tick reads `team` and the mail sweep spares a question to a closed seat (slices 2 and 3), and the flip is a step of its own, made with the seat's held briefs; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
