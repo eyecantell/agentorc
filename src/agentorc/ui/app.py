@@ -691,18 +691,26 @@ def create_app() -> FastAPI:
         home = await call("host")
         # §4.5a *Inbox row: team start* (§6 rule 8, TD-227): the home's `work_waiting` marks, each
         # with the card's own *wound down* instant
-        return rows + promote_rows(home.get("promotes")) + work_rows(home.get("work"), wound_of(fleet))
+        work = home.get("work") or {}
+        return rows + promote_rows(home.get("promotes")) + work_rows(work, wound_of(fleet) if work else None)
 
     def wound_of(fleet: list[dict[str, Any]]) -> dict[str, Any]:
         """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
         return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
 
+    work_cache: dict[str, Any] = {"at": 0.0, "work": None}
+
     async def work_marks() -> dict[str, Any]:
         """The home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8), `{}` when the agent
-        cannot give them — an older agent, a node: the card then carries no note."""
-        with contextlib.suppress(Exception):
-            return dict((await call("host")).get("work") or {})
-        return {}
+        cannot give them — an older agent, a node: the card then carries no note. Read at most once
+        in `DEFS_TTL` seconds, `identity_info`'s idiom, so a delta storm never asks per render."""
+        now = time.monotonic()
+        if work_cache["work"] is None or now - work_cache["at"] > DEFS_TTL:
+            got: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                got = dict((await call("host")).get("work") or {})
+            work_cache.update(at=now, work=got)
+        return work_cache["work"] or {}
 
     async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
