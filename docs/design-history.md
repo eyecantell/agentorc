@@ -427,6 +427,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-29 (TD-132 slice 5, grinder-ao-1): `ao team start` ends with the running build's line, once per start and never a refusal (TD-062's last line).
 - 2026-09-28 (TD-180, the designer): `ao td add`, the terminal's form of **Hand to the techlead**, a person's only.
 - 2026-09-29 (TD-233 slice 4, the client's half, grinder-ao-1): `ao gate --max-age` built, with `default` added beside `off` to clear the key back to the hour; a projected window prints the reading it held (`now 88%`) and then *· projected 96%*, and one past `max_age` with no rate to project by ends *· no rate to project by*, which §4.7 had not worded.
+- 2026-09-30 (TD-218 slice 4, grinder-ao-1): `ao td add [--repo] [--type] ["<words>"]` built — the words from the argument or standard input, the main checkout of the directory it runs in handed to `entry_add` by path (a worktree's path is not in the registry), the servicing teams from `teams.entry_teams` (moved out of `ui/repo.py`, which the form still reads it through); refused to a session before its standard input is read, and where the form's button is disabled in the form's words. It prints the id, the seat and *when it is read*.
 
 ## 4.8 Capabilities, report channels, and role presets
 

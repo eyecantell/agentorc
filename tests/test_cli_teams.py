@@ -4,8 +4,11 @@ What the agent does with `create` is tested against the agent elsewhere."""
 
 from __future__ import annotations
 
+import io
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1590,3 +1593,106 @@ def test_new_with_a_team_keeps_a_roles_deliberately_empty_controllers(world):
     assert cli.main(["new", "me", "--team", "ao-grind", "--role", "solo"]) == 0
     (made,) = creates(state)
     assert made["controllers"] == []  # nobody may act on it, as the role says
+
+
+# ── ao td add: the terminal's Hand to the techlead (design §4.7 *Entries*, TD-218 slice 4) ─────
+
+
+def _td_world(world, monkeypatch, *, seat=True):
+    """The world with a techlead seat on ao-grind and an `entry_add` that answers as the agent does."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    if seat:
+        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "agentorc"}
+    write_org(tmp_path, doc)
+    handed = []
+
+    def fake(method, **params):
+        assert method == "entry_add", method
+        handed.append(params)
+        if not params["teams"]:
+            raise cli.AgentError("no team services agentorc: there is no techlead seat to hand it to (design §4.10)")
+        if not params["teams"][0]["seat"]:
+            raise cli.AgentError("ao-grind has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
+        return {
+            "id": "m-1",
+            "to": params["teams"][0]["seat"],
+            "team": params["teams"][0]["team"],
+            "repo": Path(params["repo"]).name,
+            "type": params["type"],
+            "read_when": "fills this seat",
+        }
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    return tmp_path, handed
+
+
+def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkeypatch):
+    tmp_path, handed = _td_world(world, monkeypatch)
+    assert cli.main(["td", "add", "--repo", "agentorc", "--type", "feature", "a", "picker for the lane"]) == 0
+    assert handed == [
+        {
+            "repo": str(tmp_path / "agentorc"),
+            "type": "feature",
+            "text": "a picker for the lane",
+            "teams": [{"team": "ao-grind", "seat": "ao-agentorc-techlead-ao"}],
+        }
+    ]
+    out = capsys.readouterr().out.splitlines()
+    assert out == ["m-1 handed to techlead-ao (agentorc, feature)", "ao-agentorc-techlead-ao: fills this seat"]
+    # standard input when there are no words, the Type debt unless said, and the result under --json
+    monkeypatch.setattr(sys, "stdin", io.StringIO("  the parser drops\na trailing line\n"))
+    assert cli.main(["--json", "td", "add", "--repo", "agentorc"]) == 0
+    assert handed[1]["text"] == "the parser drops\na trailing line" and handed[1]["type"] == "debt"
+    assert json.loads(capsys.readouterr().out)["id"] == "m-1"
+
+
+def test_td_add_from_a_worktree_hands_the_main_checkout(world, capsys, monkeypatch):
+    """The repo defaults to the one the command is run in, and a worktree's path is not in the
+    registry: it is the main checkout that `entry_add` is handed."""
+    tmp_path, handed = _td_world(world, monkeypatch)
+    repo = tmp_path / "agentorc"
+    (repo / ".git").rmdir()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "first"], check=True)
+    subprocess.run([*git, "worktree", "add", "-q", str(tmp_path / "wt"), "-b", "topic"], check=True)
+    monkeypatch.chdir(tmp_path / "wt")
+    assert cli.main(["td", "add", "one line"]) == 0
+    assert handed[0]["repo"] == str(repo.resolve())
+    monkeypatch.chdir(tmp_path)  # outside every repo: said, and nothing is handed
+    assert cli.main(["td", "add", "one line"]) == 1
+    assert "not in a registered repo" in capsys.readouterr().err and len(handed) == 1
+
+
+def test_td_add_is_refused_in_words_where_the_forms_button_is_disabled(world, capsys, monkeypatch):
+    tmp_path, handed = _td_world(world, monkeypatch, seat=False)
+    assert cli.main(["td", "add", "--repo", "agentorc", "words"]) == 1
+    assert "ao-grind has no techlead seat" in capsys.readouterr().err
+    assert cli.main(["td", "add", "--repo", "ao-api", "words"]) == 1  # registered, and no team's project holds it
+    assert "no team services" in capsys.readouterr().err
+    assert cli.main(["td", "add", "--repo", "nowhere", "words"]) == 1
+    assert "no registered repo is named 'nowhere'" in capsys.readouterr().err and len(handed) == 2
+    # a seat the team defines whose home has no checkout on its host: the form's own reason
+    tmp_path, handed = _td_world(world, monkeypatch)
+    doc = org_doc(tmp_path)
+    doc["projects"]["ao"]["repos"]["far"] = {"devenv": "/workspaces/far"}
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "far"}
+    write_org(tmp_path, doc)
+    assert cli.main(["td", "add", "--repo", "agentorc", "words"]) == 1
+    assert "techlead-ao: the techlead seat has no checkout on its host" in capsys.readouterr().err and not handed
+
+
+def test_td_add_is_a_persons_only_and_a_session_is_refused_before_stdin_is_read(world, capsys, monkeypatch):
+    tmp_path, handed = _td_world(world, monkeypatch)
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-grind-1")
+
+    class Unread:
+        def read(self):
+            raise AssertionError("a session's standard input was read")
+
+    monkeypatch.setattr(sys, "stdin", Unread())
+    assert cli.main(["td", "add", "--repo", "agentorc"]) == 1
+    err = capsys.readouterr().err
+    assert "a person's own act" in err and "ao finding" in err and not handed

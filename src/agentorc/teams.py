@@ -333,6 +333,36 @@ def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> s
     return _session_id(org, team, team.manager.name, team.manager.home, host, here)
 
 
+def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
+    """The teams that service the checkout `root` on `host`, in definition order, each `{team,
+    seat, name}` — `seat` the id its techlead takes (`teams.seat_id`), empty where it defines none,
+    and `name` that seat's name — which is what `entry_add` is handed by the
+    Add entry form and `ao td add` (TD-218: the host agent does
+    not read `org.yml`). The first is the one **Hand to the techlead** hands to, as `repo_teams`
+    gives a repo its first team's badge."""
+    out = []
+    for tname, t in org.teams.items():
+        paths = {
+            str(Path(path).expanduser().resolve())
+            for pname in t.projects
+            for by in (org.projects[pname].repos.values() if pname in org.projects else ())
+            if (path := by.get(host))
+        }
+        if root in paths:
+            seat = seat_id(org, t, t.host or host, host)
+            out.append(
+                {
+                    "team": tname,
+                    "seat": seat,
+                    "name": t.techlead.name if seat and t.techlead else "",
+                    # a seat the team defines whose home has no checkout on its host: `seat_id` is ""
+                    # for it as for no seat at all, and the reason under the button tells them apart
+                    "techlead": t.techlead.name if t.techlead else "",
+                }
+            )
+    return out
+
+
 def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: str, files: Files | None) -> str:
     """Design §4.9b *Its standing context*: a techlead seat with no `context:`, or one naming a
     file its home checkout does not hold, starts cold and answers narrowly — said at the start,
