@@ -2661,3 +2661,22 @@ Both go away only when the record says who closed it.
 **Note (the designer, 2026-09-30, from TD-247's research):** `_replay` passes neither `keep_mail` nor `resume`, and `rpc_create` moves mail only for those, so a replay by rules 1, 2 or 7 keeps no mail today; the design's *the mail kept, as a replay at the same id keeps it* (§6 rule 2 *A person's restart*) is not what the code does. The build either passes `keep_mail` on the person's restart (a person may always keep a record's mail, §4.9b) or corrects the sentence; say which in the PR.
 
 **Related:** TD-246 (the design), TD-245 / TD-249 (why the row appears), TD-103 slice 5 (the row), TD-083, TD-186, TD-172 (Members…), TD-152 (`ao at`, the other person's act on a record's clock).
+
+## TD-248: A written `Pickable: no` with no blocker hides an entry from every lane, and nothing refuses it — turn on dev-cadence's `ledger.py --check`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-09-30 (Paul: *add a TD to dev-cadence to create a validate flag for our td list … then we can add a hook here to check that we are not making invalid changes*; dev-cadence TD-073 is that entry, PR eyecantell/dev-cadence#185)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved — **step 2 built 2026-10-01 (grinder-ao-1, PR #885):** the preamble's `Fields:` line declares the `Owner` and `Kind` words, `scripts/ledger.py` reads them (`--fields` says *preamble* for both, and a value outside them is a ⚠ flag), and `tests/test_ledger.py` takes `OWNERS` and `KINDS` from the line through the script's own `declared()`, a second test holding the line readable and the preamble's paragraph to the same words. **Left:** step 1. dev-cadence's TD-073 is archived and its main carries `ledger.py --check` (checked 2026-10-01); this repo's synced copy does not (`docs/cadence-sync.lock` is at `c911aaf`, 2026-09-29), so it waits on the next sync PR, then the check is turned on where that entry puts it. Step 3 is TD-228's.
+**Location:** `tests/test_ledger.py` (`HEADER`, `OWNERS`, `KINDS`, `test_every_open_entry_carries_the_header_in_order_with_known_values`), `docs/technical_debt.md` (the preamble: a `Fields:` line), `scripts/ledger.py` and `scripts/check_cadence.py` (SYNCED: they arrive by sync, never edited here)
+
+**Why:** on 2026-09-30 the anchor wrote TD-245 and TD-246 as `**Pickable:** no — design-first: …` with no `Blocked by:`. `sessionorc.ledger` reads a written *no* as blocked while TD-228's migration lasts, so neither entry matched the `design-first` lane, rule 6 told the designer nothing, and the entries waited until Paul asked why the designer was idle (PR #820 corrected the two lines). What is checked today: `tests/test_ledger.py` holds every open entry to an `Owner` and a `Kind` from its own two sets and to a Pickable line that reads `yes` or `no — <reason>`, in CI. What is not: a *no* against `Blocked by:` — a *no* whose reason is no blocker passes, which is the case above. `scripts/ledger.py` printed the disagreement as one ℹ line among 84 and exits 0; and this ledger declares no `Fields:` line (cadence §2.12), so the synced script validates none of the repo's own fields and the words live in the test alone.
+
+**Resolved:** 2026-10-01 (PR #885 step 2; the sync PR #889 step 1) — step 1 came with the sync from dev-cadence `b90272e`: `scripts/check_cadence.py`'s `ledger` row runs `ledger.py --check --since origin/<default>` on every PR that touches the ledger (`ledger_edit_check`), so nothing here had to turn it on. Checked 2026-10-01 on main: a header edit that writes `Pickable: no` on an entry with no blocker is an error naming the entry (PR #890's first draft, seven entries, refused until each carried its `Blocked by:`), a `Kind:` outside the preamble's `Fields:` words is one too, and the ledger as it stands reads *0 error(s)*, its 86 older lines counted as standing. Step 2 is the `Fields:` line and `tests/test_ledger.py` reading it. Step 3 is TD-228's slices 3 and 4, whose Fix already says the test's `HEADER` loses the line.
+
+**Done when:** a PR that writes a new `Pickable: no` on an entry with no blocker, or a `Kind:` or `Owner:` outside the declared words, fails its check with the entry named; and the ledger as it stands passes.
+
+**Related:** dev-cadence TD-073 (the flag), TD-223 and TD-228 (pickable derived, the migration), TD-118 (the three header lines), TD-198, TD-245 and TD-246 (the two entries), PR #820.
