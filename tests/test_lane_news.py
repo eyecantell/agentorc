@@ -192,6 +192,10 @@ async def test_a_lease_a_sibling_dropped_is_told_once(agent, tmp_path):
             ProgressEntry(ref="TD-002", status="dropped", why="old", at=before),
             ProgressEntry(ref="TD-004", status="dropped", why="mine now", at=after),
         ]
+        agent.sessions[sib].progress += [
+            ProgressEntry(ref="TD-002", status="dropped", why="no instant", at="yesterday"),
+            ProgressEntry(ref="TD-003", at=before),  # a lease past its twelve hours holds nothing
+        ]
         agent.sessions[far].progress = [ProgressEntry(ref="TD-003", status="dropped", why="another repo's", at=after)]
         rec.progress = [ProgressEntry(ref="TD-003", status="dropped", why="its own", at=after)]
         taker = await _finished(agent, person, tmp_path, "taker", ["free-pick"], led, out_of_work=None)
@@ -213,6 +217,11 @@ async def test_a_lease_a_sibling_dropped_is_told_once(agent, tmp_path):
         assert "gained 3 entries" in _notes(agent, sid)[1]
         assert "TD-005, TD-001 (dropped by grinder-2), TD-004 (dropped by taker) —" in _notes(agent, sid)[1]
         assert rec.lane_seen["dropped"] == {"TD-001": again, "TD-004": again}
+        # a kept instant that cannot be read is no memory of that id alone
+        rec.lane_seen["dropped"]["TD-004"] = "never"
+        await agent._lane_news(rec, now)
+        assert len(_notes(agent, sid)) == 3 and "1 entry" in _notes(agent, sid)[2]
+        assert "TD-004 (dropped by taker)" in _notes(agent, sid)[2]
         for s in (sid, sib, far, taker):
             await person.call("kill", id=s)
 

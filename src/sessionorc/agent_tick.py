@@ -808,8 +808,9 @@ class TickMixin:
 
     async def _idle_nudge(self, s: Session, now: datetime) -> None:
         """Rule 4 (design §6): a supervised member hook-confirmed `idle` for `IDLE_NUDGE` with open work
-        — a lane reference not done or dropped, a declared claim not done or dropped, or for a seat a
-        question waiting — and nothing declared, is sent one fixed line naming it, once per idle
+        — a lane reference not done or dropped, a declared claim not done or dropped, for a seat a
+        question waiting, or an outcome owed to the person (TD-258) — and nothing declared, is sent
+        one fixed line naming it, once per idle
         stretch (`nudged_at`; a stretch ends when the state changes). It spends no wake budget. The
         send needs the pane here: a node's member is not nudged yet (TD-103)."""
         if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.host != self.host:
@@ -1205,13 +1206,19 @@ class TickMixin:
         if not held:
             return []
         told = s.lane_seen.get("dropped") if isinstance((s.lane_seen or {}).get("dropped"), dict) else {}
-        try:
-            since = {i: _parse(str((s.out_of_work or {}).get("at"))) for i in held}
-            for i in held:
-                if i in told:
-                    since[i] = max(since[i], _parse(str(told[i])))
-        except (ValueError, TypeError):
+
+        def instant(v: Any) -> datetime | None:
+            try:
+                at = _parse(str(v))
+            except ValueError:
+                return None
+            return at if at.tzinfo else at.replace(tzinfo=UTC)
+
+        declared = instant((s.out_of_work or {}).get("at"))
+        if declared is None:
             return []
+        # a kept instant that cannot be read is no memory of that id's drop, and the others stand
+        since = {i: max(declared, instant(told.get(i)) or declared) for i in held}
         last: dict[str, tuple[datetime, str, str]] = {}
         leased: set[str] = set()
         now = datetime.now(UTC)
@@ -1222,9 +1229,8 @@ class TickMixin:
             for e in r.progress:
                 if e.ref not in since:
                     continue
-                try:
-                    at = _parse(e.at)
-                except (ValueError, TypeError):
+                at = instant(e.at)
+                if at is None:
                     continue
                 if e.status == "claimed" and e.source == "declared" and live and now - at < LEASE_TTL:
                     leased.add(e.ref)  # taken again since: the lease's holder is who it is news to

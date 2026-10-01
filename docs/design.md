@@ -6720,7 +6720,8 @@ code and needs no grant; a session doing the same work does.
      <id>`*, after the open reference where there is one and alone (*you have been idle 20 minutes:
      you owe …*) where there is none; several are counted and named three at most, *and n more*,
      and a seat's clause counts its own answered questions, a handed entry being the part before
-     it; a finished member is never sent to, and its debt is the Inbox's *Waiting on them*
+     it; the slot's *idle · open work* follows this nudge as it follows any other, a debt being
+     work the member left; a finished member is never sent to, and its debt is the Inbox's *Waiting on them*
      and nothing more, so the manager's chase and its board line for a debt go — and nothing a session wrote; it is recorded on `sends` as the home's
      own (`system`). A node's member is not nudged yet: the composer is read on the member's host,
      and no node act does that (TD-103). Once per idle
