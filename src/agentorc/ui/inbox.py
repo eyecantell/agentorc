@@ -13,8 +13,11 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from agentorc import review as review_mod
 from sessionorc import balance as balance_mod
 from sessionorc import board as board_mod
+from sessionorc import cadence as cadence_mod
+from sessionorc import held as held_mod
 from sessionorc import hosts
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import WRAPUP_GRACE
@@ -158,6 +161,63 @@ def idle_open_mark(v: dict[str, Any], views: Collection[dict[str, Any]], now: da
     return str(mark.get("at") or ""), words + (f", nudged {nudged}" if nudged else "")
 
 
+def _pr_parts(prs: Collection[int], directory: Any, tail: str) -> list[dict[str, str]]:
+    """A row's words as the page draws them: *PR #845 and #851 <tail>*, each `#n` a link to the pull
+    request where the checkout's origin says where it is (`review.pr_url`), bare where it does not."""
+    parts: list[dict[str, str]] = [{"text": "PR "}]
+    for i, pr in enumerate(prs):
+        if i:
+            parts.append({"text": " and " if i == len(prs) - 1 else ", "})
+        parts.append({"text": f"#{pr}", "url": review_mod.pr_url(str(directory) if directory else None, pr)})
+    return [*parts, {"text": f" {tail}"}]
+
+
+def _parts_text(parts: Collection[Mapping[str, str]]) -> str:
+    return "".join(p["text"] for p in parts)
+
+
+def cadence_marks(v: dict[str, Any], names: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+    """Design §4.5a **Inbox row: cadence check failed** (§6 rule 10, TD-258): one `{pr, at, parts}`
+    for each `checks` entry of the record carrying `row` — a PR that failed the cadence check twice,
+    or failed already merged. The words are fixed and the record's: the failed rows by the script's
+    `rule` names, never its `detail`; beside *review*, *read by <seat>* when the home saw the
+    reader's reply on the PR's `ask` and *recorded* when it did not; and when it was read. `names`
+    gives the reader's record its name, where the page holds that record; its id is said otherwise."""
+    if v.get("superseded_by") or not isinstance(v.get("checks"), list):
+        return []
+    out = []
+    for c in cadence_mod.rows([c for c in v["checks"] if isinstance(c, dict) and isinstance(c.get("pr"), int)]):
+        by = str(c.get("read_by") or "")
+        note = f"read by {(names or {}).get(by) or by}" if by else "recorded"
+        failed = [f"{r} ({note})" if r == "review" else str(r) for r in c.get("failed") or []]
+        tail = f"fails the cadence check: {', '.join(failed) or 'no row named'}"
+        if read := _clock(c.get("at")):
+            tail += f" · read {read}"
+        parts = _pr_parts([c["pr"]], v.get("repo") or v.get("dir"), tail)
+        out.append({"pr": c["pr"], "at": str(c.get("row") or c.get("at") or ""), "parts": parts})
+    return out
+
+
+def held_mark(v: dict[str, Any]) -> dict[str, Any] | None:
+    """Design §4.5a **Inbox row: merged without its read** (§6 rule 11, TD-258): `{at, parts}` for a
+    record whose `held_missed` holds two crossings the person has not dismissed (`held.row`), else
+    None — the first is a note and the member's line. The PRs and the held paths are the entries'."""
+    if v.get("superseded_by") or not isinstance(v.get("held_missed"), list):
+        return None
+    left = held_mod.row([c for c in v["held_missed"] if isinstance(c, dict) and isinstance(c.get("pr"), int)])
+    if not left:
+        return None
+    reader = str((v.get("review") or {}).get("reader") or "") if isinstance(v.get("review"), dict) else ""
+    whose = "the person's" if reader == "person" else "the techlead's"
+    paths = list(dict.fromkeys(str(p) for c in left for p in c.get("paths") or []))
+    more = f" and {len(paths) - held_mod.NAMED} more" if len(paths) > held_mod.NAMED else ""
+    tail = f"touched held paths and merged without {whose} read"
+    if paths:
+        tail += f" · {', '.join(paths[: held_mod.NAMED])}{more}"
+    parts = _pr_parts([c["pr"] for c in left], v.get("repo") or v.get("dir"), tail)
+    return {"at": max(str(c.get("at") or "") for c in left), "parts": parts}
+
+
 def state_rows(
     views: Collection[dict[str, Any]],
     *,
@@ -213,6 +273,7 @@ def state_rows(
             "find": _find_text(v.get("name"), v.get("title"), doing.get("text"), text, extra),
         }
 
+    names = {str(v.get("id")): str(v.get("name") or v.get("id")) for v in views}
     for v in sorted(views, key=lambda v: (str(v.get("since") or ""), str(v.get("id") or ""))):
         pend = v.get("pending")
         pend = pend if isinstance(pend, dict) else {}
@@ -246,6 +307,13 @@ def state_rows(
             rows.append({**base(v, "idle_open", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
         if mark := unclosed_mark(v, now):
             rows.append({**base(v, "unclosed", mark[1]), "at": mark[0], "age": ""})
+        for c in cadence_marks(v, names):
+            # one row a PR, and the PR in the row's kind: it is the snooze's key (`cadence:<pr>`)
+            row = base(v, f"cadence:{c['pr']}", _parts_text(c["parts"]))
+            rows.append({**row, **c, "at": c["at"] or row["at"], "age": "", "mark": "cadence"})
+        if held := held_mark(v):
+            row = base(v, "held", _parts_text(held["parts"]))
+            rows.append({**row, "at": held["at"] or row["at"], "age": "", "mark": "held", "parts": held["parts"]})
         if alarms := v.get("alarms"):
             row = base(v, "alarm", alarm_note(alarms))
             # an alarm row is as old as its newest alarm, not as its session: what the order is
