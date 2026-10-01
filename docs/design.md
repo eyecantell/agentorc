@@ -4278,7 +4278,7 @@ TD-259: `true` makes the manager a seat filled on §6 rule 3's `team` trigger an
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `false` until dc-grind has run on call once, then `true`, a team keeping the shape
 it was started with until its next Start; refused beside `role: person`, which starts nothing to
-fill), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
+fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
 manager means *none*, which leaves it unable to act on its own members, and is written only on
@@ -6698,8 +6698,8 @@ code and needs no grant; a session doing the same work does.
      seat*) named apart, since one already read wants its outcome and not another read: *1 entry
      the person handed you owes its outcome — `ao msg person --outcome done|blocked|dropped "…"
      --for <id>`* (TD-218 slice 3) — and, since TD-247 (designed 2026-09-30, not built — TD-258),
-     **an outcome the member owes** (§4.10 *Outcomes*: `owes` on its record, the `owed:` line
-     `ao status -v` prints) counts as open work for this rule, seat or not, named apart the same
+     **an outcome the member owes** (§4.10 *Outcomes*: the record's `owed()` reading, the `owed:` line
+     `ao status -v` prints from `mail.owed`) counts as open work for this rule, seat or not, named apart the same
      way — *you owe 1 outcome on <id> — `ao msg person --outcome done|blocked|dropped "…" --for
      <id>`*; a finished member is never sent to, and its debt is the Inbox's *Waiting on them*
      and nothing more, so the manager's chase and its board line for a debt go — and nothing a session wrote; it is recorded on `sends` as the home's
@@ -6718,11 +6718,11 @@ code and needs no grant; a session doing the same work does.
   (`check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files
   against `held:`, the reader's reply in a mailbox the home holds), the relay of
   `docs/cadence-changes.md` (a file as merged, a list of headings) and the chase of an owed
-  outcome (`owes` on the record) — and they are rules 10, 11 and 12 below and rule 4's owed
+  outcome (the record's `owed()`) — and they are rules 10, 11 and 12 below and rule 4's owed
   clause: each fixed text and a mark, an Inbox row where a second failure earns one, none typed
   by a session. What is left reads a screen or weighs words: an `ask` addressed to the manager,
-  a permission on an unattended member (rare, since an unattended launch skips them — §4.3's
-  `--dangerously-skip-permissions`; a profile's `unattended_args` may not), a `stalled?` member,
+  a permission on an unattended member (rare, since an unattended launch skips them — the Claude Code adapter's
+  `--dangerously-skip-permissions`, §4.8; a profile's `unattended_args` may not), a `stalled?` member,
   one *idle · open work* after the nudge, and the prose of an escalation — and for that a
   standing manager woke every hour to find nothing: manager-ao-1 stood at 686k of context on
   2026-09-30, its rounds reading *nothing needs a person*. So **the manager is a seat on call**
@@ -6833,7 +6833,7 @@ code and needs no grant; a session doing the same work does.
      `lane_seen` so a second look at the same drop tells nothing; an entry that came off the
      board is *has become pickable*, above, already. **An exited
      or closed member is not written to**, and its `lane_seen` is kept all the same: what its
-     lane gains while it is gone is rule 8's once its team has wound down. A finished member its manager closed while the team runs on is told by neither rule: its lane's new work waits for the team's next wind-down, or for the manager, whose second reading of the ledger it is. The ledger read is the checkout's file
+     lane gains while it is gone is rule 8's once its team has wound down. A finished member its manager closed while the team runs on is told by neither rule: its lane's new work waits for the team's next wind-down. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
   7. **Brief changed** (TD-199; designed 2026-09-28; `prompt_from` handed and kept — TD-217 slice 1;
      the replay and the record's `brief` — slice 2; the mark and the chip — slice 3; the two tellings — slice 4). A member reads its
@@ -7078,8 +7078,8 @@ code and needs no grant; a session doing the same work does.
      <n>` is the author's own read of its record's `review` against the PR's files (§4.9b *The
      reader*), and the host agent only stored the field; whether a held PR merged without the
      reader's reply was a sentence in this repo's manager supplement, and nothing checked it.
-     For a supervised member whose record carries `review`, each derived `done` whose PR is
-     **merged** (rule 10's read has it) is read once at the home: the PR's changed files
+     For a supervised member whose record carries `review`, each derived `done` — which is
+     always a **merged** PR, since `reports.derive` writes one only for a PR it read as merged — is read once at the home: the PR's changed files
      (`gh pr view --json files`, one read per merged PR, in the record's registry root at the
      home — the matching moves from `agentorc.review` into `sessionorc`, where `ao pr held` then
      reads it, since the package rule runs one way) against the record's `held:` globs; a PR
@@ -7115,11 +7115,11 @@ code and needs no grant; a session doing the same work does.
      finished (`out_of_work`: never sent to, and its next start is told at its start), the home
      keeps **`conventions_seen: {at, headings}`** (home-owned), written on the first tick after
      the create as the headings whose `landed` is at or before the record's `created` — an entry
-     with no `landed` is on no merged commit yet and is nobody's — and when a later reading holds
+     whose `landed` the script could not read (`None`: the `git log` call failed or timed out) is left for the next reading — and when a later reading holds
      a heading `conventions_seen` does not, landed after `created`, the member gets **one `note`
      from `system`**: *docs/cadence-changes.md gained 1 entry since you started: "2026-09-29 —
      a review comment's first line carries the verdict" — read it on `origin/main`, then go on*
-     — the headings as the file writes them, three at most and *and n more*, nothing a session
+     — each as the script's `date` and `title` fields give it, three at most and *and n more*, nothing a session
      wrote — and the headings join `conventions_seen`, so each is told once. It is mail: the
      doorbell wakes the member under every rule the doorbell has, one unit of the wake budget,
      and a node's member is reached as any mail reaches it. A member restarted by any rule starts
