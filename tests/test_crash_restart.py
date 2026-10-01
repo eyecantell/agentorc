@@ -205,3 +205,48 @@ async def test_a_teams_reserve_priority_holds_its_crashed_member_where_a_plain_o
         assert agent.sessions[plain] is not before[plain], "65% is under the profile's 70%: restarted"
         assert agent.sessions[teamed] is before[teamed], "65% is over ao-grind's 60%: held"
         await person.call("kill", id=plain)
+
+
+async def test_a_replays_entry_carries_what_the_run_it_replaced_reported(agent, tmp_path):
+    """TD-249 slice 1, design §4.9a *early from the record*, §6 rule 1: `done: [{ref, pr}]` since the
+    record's `created` and `left: [ref]`, its declared claims not closed — on a failed replay too,
+    and on the new record, which keeps none of the old one's `progress`."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(person, tmp_path)
+        async with LocalClient(caller=sid) as w:
+            await w.call("progress", id=sid, ref="TD-1", status="done", pr=812)
+            await w.call("progress", id=sid, ref="TD-2", status="done")
+            await w.call("progress", id=sid, ref="TD-3")
+            await w.call("progress", id=sid, ref="TD-4")
+            await w.call("progress", id=sid, ref="TD-4", status="dropped", why="too large")
+            await w.call("progress", id=sid, ref="TD-5", source="derived")
+            await w.call("progress", id=sid, ref="TD-7", status="done", pr=813, source="derived")
+        old = agent.sessions[sid]
+        # one reported before this run began is an earlier run's, and is not this one's `done`
+        old.progress.insert(0, type(old.progress[0])(ref="TD-0", status="done", pr=700, at="2026-09-01T00:00:00Z"))
+        _crash(agent, sid)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not old and new.progress == []
+        (entry,) = new.restarts
+        assert entry["why"] == "crash" and "error" not in entry
+        # a merged PR the tick derived is work done all the same; a derived claim is not the run's word
+        assert entry["done"] == [
+            {"ref": "TD-001", "pr": 812},
+            {"ref": "TD-002", "pr": None},
+            {"ref": "TD-007", "pr": 813},
+        ]
+        assert entry["left"] == ["TD-003"], "a dropped claim is closed"
+
+        # a run that reported nothing done carries `done` empty, and a failed replay carries both too
+        async with LocalClient(caller=sid) as w:
+            await w.call("progress", id=sid, ref="TD-6")
+        _crash(agent, sid)
+        (paths.launch_dir() / f"{sid}.json").unlink()
+        await agent._keep_running(now + RESTART_SETTLE + timedelta(minutes=1))
+        rec = agent.sessions[sid]
+        assert rec is new and rec.restarts[0] == entry
+        assert rec.restarts[1]["error"] and (rec.restarts[1]["done"], rec.restarts[1]["left"]) == ([], ["TD-006"])
+        await person.call("kill", id=sid)
