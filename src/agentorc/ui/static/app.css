@@ -206,6 +206,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .secinfo[hidden] { display: none; }
 /* design §4.5a the ***i*** mark's panel (TD-167): under its group, full width, pushing the rows down */
 .helppanel { flex-basis: 100%; margin: 4px 0 0; max-width: 90ch; } .helppanel[hidden] { display: none; }
+.ghead .overline { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* **over its line** (§4.5a, TD-239): amber, display only */
 .ghead .notconcluded { flex-basis: 100%; white-space: normal; }  /* its own line under the header */
 .helppanel ul.whofor { margin: 0 0 .5em; padding-left: 1.4em; }
 .helppanel p { margin: 0 0 .5em; } .helppanel p:last-child { margin-bottom: 0; }
@@ -574,6 +575,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220) */
 .setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
 .setpage .setin { width: 100%; }
+.setpage .setover { color: var(--needs-fg); font-weight: 600; }  /* **balance**: the mark that stands (§6 *Balance*) */
 .setpage .settemplate { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setline.warn, .setpage .setsaid.warn { color: var(--needs-fg); }
 .setpage .setvals { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 10px; margin: 0; }

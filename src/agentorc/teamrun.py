@@ -194,6 +194,34 @@ def balance_now(
     }
 
 
+def balance_rows(bal: dict[str, Any], now: dict[str, Any]) -> list[str]:
+    """`ao team balance`'s three lines, which the Settings page draws under **balance** (§4.5a): each
+    number as it reads now, the line it is read against where one is drawn, and *over* where it is
+    crossed."""
+    dur = balance_mod.duration
+
+    def row(what: str, value: Any, limit: Any, word: str, nothing: str, show: Callable[[Any], str]) -> str:
+        said = nothing if value is None else show(value)
+        if limit is None:
+            return f"  {what}: {said} (no line)"
+        over = " — over" if value is not None and value > limit else ""
+        return f"  {what}: {said} ({word} {show(limit)}){over}"
+
+    oldest = balance_mod.span(bal.get("oldest"))
+    return [
+        row("open PRs", now["prs"], bal.get("prs"), "line", "could not look", str),
+        row("oldest PR", now["oldest"], int(oldest.total_seconds()) if oldest else None, "line", "could not look", dur),
+        row(
+            "reader's queue",
+            now["review"],
+            now["bound"] if bal.get("review") else None,
+            "bound",
+            "nothing waiting",
+            dur,
+        ),
+    ]
+
+
 def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[dict | None, list[dict]]:
     """The lead and the members among the sessions carrying a team's badge: the lead is the session
     the definition names (a team with a `person` lead has none), the rest are members in name order."""

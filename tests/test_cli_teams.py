@@ -1849,13 +1849,13 @@ def test_balance_now_reads_the_numbers_as_the_tick_gathers_them():
     # a failed read keeps its last `open` beside the error: could not look, as the tick reads it
     stale = {"/r/a": {"prs": {"open": [{"created": "2026-09-27T12:00:00Z"}], "error": "gh failed"}}}
     assert teamrun.balance_now("t", fleet, stale, now)["prs"] is None
-    rows = cli._balance_rows({"prs": 1, "oldest": "2d", "review": True}, got)
+    rows = teamrun.balance_rows({"prs": 1, "oldest": "2d", "review": True}, got)
     assert rows == [
         "  open PRs: 2 (line 1) — over",
         "  oldest PR: 3d (line 2d) — over",
         "  reader's queue: 3h (bound 1h 30m) — over",
     ]
-    assert cli._balance_rows({"prs": 2}, {**got, "prs": None, "oldest": None}) == [
+    assert teamrun.balance_rows({"prs": 2}, {**got, "prs": None, "oldest": None}) == [
         "  open PRs: could not look (line 2)",
         "  oldest PR: could not look (no line)",
         "  reader's queue: 3h (no line)",

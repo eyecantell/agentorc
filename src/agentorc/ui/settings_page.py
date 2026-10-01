@@ -16,6 +16,7 @@ the *i* mark's words — the file's path, when it is re-read, who edits it — f
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Mapping
 from dataclasses import fields
@@ -26,7 +27,7 @@ from typing import Any
 import yaml
 
 from agentorc import profiles as profiles_mod
-from agentorc import repoconfig
+from agentorc import repoconfig, teamrun
 from sessionorc import hosts
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
@@ -238,12 +239,44 @@ def usage_cards(
     return list(groups.values())
 
 
+def balance_card(
+    name: str, bal: Any, sessions: list[dict[str, Any]] | None, repos: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """**balance** on a team's card (§4.5a *Settings page: Teams*, §6 *Balance*, TD-239): the switch,
+    the three fields as `settings.yml` holds them — a line not drawn is an empty field — and under
+    them the repo's numbers as they read now, in `ao team balance`'s lines, so a line is set against
+    what it would have done today. `was` is the value as the form would send it, which is how the
+    page tells a Save that moved it from one that did not. `mark` is the card's **over its line**
+    note while the home's mark stands."""
+    bal = {k: bal[k] for k in settings_mod.BALANCE_KEYS if k in bal} if isinstance(bal, Mapping) else {}
+    if not bal.get("review"):
+        bal.pop("review", None)  # off is no key, as the file reads
+    readings = {str(k): v for k, v in (repos or {}).items() if isinstance(v, dict)}
+    now = teamrun.balance_now(name, list(sessions or []), readings)
+    mark = teamrun.balance_marks(readings).get(name) if bal else None
+    return {
+        "on": bool(bal),
+        "prs": str(bal.get("prs") or ""),
+        "oldest": str(bal.get("oldest") or ""),
+        "review": bool(bal.get("review")),
+        "was": json.dumps(bal or None, separators=(",", ":")),
+        "live": bool(now["members"]),
+        "now": [line.strip() for line in teamrun.balance_rows(bal, now)],
+        "mark": teamrun.balance_note(mark) if mark else "",
+    }
+
+
 def team_cards(
-    defs: Mapping[str, Any], teams: Mapping[str, Any] | None, now: datetime | None = None
+    defs: Mapping[str, Any],
+    teams: Mapping[str, Any] | None,
+    now: datetime | None = None,
+    sessions: list[dict[str, Any]] | None = None,
+    repos: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """**Teams** (§4.5 screen 8): a card per team the org defines, with the settings a person
-    moves — the schedule (drawn disabled until TD-133), the stop time, the reserve priority and
-    **when work appears** (§6 rule 8) — as `settings.yml` holds them. The stop time is drawn in the
+    moves — the schedule (drawn disabled until TD-133), the stop time, the reserve priority,
+    **when work appears** (§6 rule 8) and **balance** (`balance_card`, read against `sessions` and
+    the `repos` reading) — as `settings.yml` holds them. The stop time is drawn in the
     reader's clock, as `ao team until` takes it; one already past says so. `on_work` is the picker's
     value, `ask` while the key is absent, which `on_work_set` tells apart (*ask me* is then marked
     *default*)."""
@@ -262,6 +295,7 @@ def team_cards(
                 "schedule": t.get("schedule") or None,
                 "on_work": t.get("on_work") if t.get("on_work") in settings_mod.ON_WORK else "ask",
                 "on_work_set": t.get("on_work") in settings_mod.ON_WORK,
+                "balance": balance_card(name, t.get("balance"), sessions, repos),
             }
         )
     return out

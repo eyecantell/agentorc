@@ -231,6 +231,7 @@ def team_groups(
     if not any(t != NO_TEAM for t in by_team):
         return None
     groups: list[dict[str, Any]] = []
+    marks = teamrun.balance_marks({str(k): v for k, v in (repos or {}).items() if isinstance(v, dict)})
     for team in sorted(by_team):
         members = sorted(by_team[team], key=card_order)
         manager, manager_elsewhere = None, False
@@ -307,6 +308,8 @@ def team_groups(
                 # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only
                 "work_note": work_note((work or {}).get(team)) if not live and row.get("wound_down") else None,
                 "work_started": work_started(crew) if live and team != NO_TEAM else None,
+                # §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark, display only
+                "balance_note": teamrun.balance_note(marks[team]) if live and team in marks else "",
                 # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
                 # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
                 # since a wind-down would only wake the manager to find nothing to wind down
