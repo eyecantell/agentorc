@@ -70,8 +70,8 @@ HELP: tuple[Help, ...] = (
         "who for what",
         "a team's help panel",
         (
-            "Lists whom to write to for what on this team: under this paragraph, one line for each role the "
-            "team's definition gives a message line, with the session that holds it. Read it before you press "
+            "Lists whom to write to for what on a team: in the team's help panel, under this paragraph, one line "
+            "for each role its definition gives a message line, with the session that holds it. Read it before you press "
             "Message…, to pick the session whose line fits what you have to say. It is the definition's words "
             "and nothing to press, and a team whose roles carry no line has none: Message… on a card opens with "
             "that session's own line."

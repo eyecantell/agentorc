@@ -1785,7 +1785,7 @@ def test_a_roles_message_line_is_on_the_view_the_titles_and_the_team_header(tmp_
     # TD-252: the header draws no line; the team's help panel carries the lines under their paragraph
     assert '<div class="meta whofor"' not in head and "manager-ao-1 · " not in head
     panel = head[head.index('<div class="note secinfo helppanel"') :]
-    assert "<p><b>who for what</b> — Lists whom to write to" in panel
+    assert "<p><b>who for what</b> — Lists whom to write to for what on a team" in panel
     assert f'<ul class="whofor"><li>{views[0]["message_line"]} → manager-ao-1</li>' in panel.replace("&#39;", "'")
     assert "<li>Grinder: its own card</li></ul>" in panel
     g["who"] = []  # a team whose roles carry no line: neither the paragraph nor the list

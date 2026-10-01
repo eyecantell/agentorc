@@ -2729,9 +2729,9 @@ whose consequence is least visible:
   the team left — its repo's numbers, the claims still held, what each member last said it was
   doing — to read their mail, or to Forget them. It changes nothing on any record; which teams you
   have unfolded is remembered in this browser.
-- **who for what** (a team's help panel) — Lists whom to write to for what on this team: under this
-  paragraph, one line for each role the team's definition gives a message line, with the session
-  that holds it. Read it before you press Message…, to pick the session whose line fits what you
+- **who for what** (a team's help panel) — Lists whom to write to for what on a team: in the team's
+  help panel, under this paragraph, one line for each role its definition gives a message line,
+  with the session that holds it. Read it before you press Message…, to pick the session whose line fits what you
   have to say. It is the definition's words and nothing to press, and a team whose roles carry no
   line has none: Message… on a card opens with that session's own line.
 - **not concluded** (a live team's header) — Says why this team has no Start yet: one clause for
