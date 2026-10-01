@@ -21,8 +21,9 @@ from sessionorc.agent_common import WRAPUP_GRACE
 from sessionorc.models import (
     normalize_ref,
 )
+from sessionorc.work import manager_of
 
-from .cards import _first_line, alarm_note, alarm_to_view
+from .cards import _clock, _first_line, alarm_note, alarm_to_view
 from .common import _age, _countdown, _instant, _iso, _left, host_name, templates, vscode_url
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
@@ -136,6 +137,25 @@ def unclosed_mark(v: dict[str, Any], now: datetime) -> tuple[str, str] | None:
     )
 
 
+def idle_open_mark(v: dict[str, Any], views: Collection[dict[str, Any]], now: datetime) -> tuple[str, str] | None:
+    """Design §4.5a **Inbox row: idle · open work** (§6 rule 3 `idle_open`, TD-259): `(the mark's
+    time, the row's words)` for a supervised member of a team with **no manager** that the tick
+    reads as idle with its work open — `idle_open: {at, ref}` on its record — else None. A team
+    with a manager draws no row: the reading fills a manager on call, or is a standing manager's
+    round. The words are the record's fields and nothing off its screen: *idle 40 min with TD-070
+    open, nudged 14:02*."""
+    mark = v.get("idle_open")
+    if not isinstance(mark, dict) or v.get("state") != "idle" or not v.get("supervised") or not v.get("team"):
+        return None
+    if manager_of([o for o in views if o.get("team") == v["team"]]) is not None:
+        return None
+    idle = _age(v.get("since"), now)
+    ref = str(mark.get("ref") or "").strip()
+    nudged = _clock(v.get("nudged_at"))
+    words = f"idle {idle}".strip() + (f" with {ref} open" if ref else " with its work open")
+    return str(mark.get("at") or ""), words + (f", nudged {nudged}" if nudged else "")
+
+
 def state_rows(
     views: Collection[dict[str, Any]],
     *,
@@ -220,6 +240,8 @@ def state_rows(
                     "restartable": bool(v.get("restartable")),  # never a seat: *fills exhausted* has no Restart
                 }
             )
+        if mark := idle_open_mark(v, views, now):
+            rows.append({**base(v, "idle_open", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
         if mark := unclosed_mark(v, now):
             rows.append({**base(v, "unclosed", mark[1]), "at": mark[0], "age": ""})
         if alarms := v.get("alarms"):

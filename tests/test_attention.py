@@ -173,6 +173,9 @@ async def test_a_state_rows_snooze_lives_in_the_homes_own_store(agent, tmp_path)
         with pytest.raises(AgentError, match="unknown row kind"):
             await person.call("attention_snooze", id=sid, kind="whenever", until="2026-09-21T00:00:00Z")
         await person.call("attention_snooze", id=sid, kind="stalled", until="2026-09-21T00:00:00Z")
+        # the *idle · open work* row's key (§4.5a, TD-259 slice 4): taken, and cleared with no `until`
+        await person.call("attention_snooze", id=sid, kind="idle_open", until="2026-09-21T00:00:00Z")
+        await person.call("attention_snooze", id=sid, kind="idle_open")
         snoozed = (await person.call("inbox"))["attention_snoozed"]
         assert snoozed == {f"{sid}|stalled": "2026-09-21T00:00:00Z"}  # the other rows are untouched
         # it survives a restart: the store is the home's own file, like the person inbox
@@ -229,7 +232,11 @@ async def test_a_nodes_row_is_trailed_under_its_address_and_keeps_by_you(agent, 
     `id@host` in the graph, and the act that ends its row runs **at the node** — so the home writes
     the word itself, under the same address, or every node-hosted row would read *resolved*."""
     r = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="/tmp/x", host="laptop")
-    r.state, r.pending, r.since = "needs-you", Pending(kind="permission", text="rm -r?", tool_use_id="t1"), "2026-09-20T09:00:00Z"  # noqa: E501
+    r.state, r.pending, r.since = (
+        "needs-you",
+        Pending(kind="permission", text="rm -r?", tool_use_id="t1"),
+        "2026-09-20T09:00:00Z",
+    )  # noqa: E501
     agent.remote["laptop"] = {r.id: r}
     try:
         agent._note_attention(datetime.now(UTC))

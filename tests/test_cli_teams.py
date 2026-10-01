@@ -1911,9 +1911,13 @@ def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys)
     assert row["on_call"] is True and row["manager"] == "orc-ao"
     assert cli.main(["team", "list"]) == 0
     assert "manager: orc-ao (on call)" in capsys.readouterr().out
+    # the page's seat for it (TD-259 slice 4): *on call — comes when a member needs a reading* while empty
+    empty = {"id": "m", "name": "orc-ao", "team": "ao-grind", "state": "closed"}
+    assert teamrun.seat_ids(cli._org_here(), [empty])["m"] == "comes when a member needs a reading"
 
     doc["teams"]["ao-grind"]["manager"]["on_call"] = False
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert "m" not in teamrun.seat_ids(cli._org_here(), [empty])  # a standing manager is no seat
     standing = teams.plan(cli._org_here(), "ao-grind", "kmaster").lead.create_params([])
     assert standing.get("seat") is None and standing["prompt_from"]["base"].endswith("briefs/manager.md")
     assert "ao wait --timeout" in standing["prompt"]

@@ -255,10 +255,13 @@ def concluded(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> di
 
 
 def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
-    """Every seat the definition names — the techlead and each seat with a trigger (§4.9b, TD-098) —
-    with what would make it come, in the card's words (`SeatDef.when`)."""
+    """Every seat the definition names — the techlead, each seat with a trigger (§4.9b, TD-098) and
+    a manager on call (§4.9, TD-259) — with what would make it come, in the card's words
+    (`SeatDef.when`, `org.MANAGER_WHEN`)."""
     out = {team.techlead.name: "comes on the next question"} if team.techlead is not None else {}
     out.update({s.name: s.when() for s in team.seats})
+    if team.manager.on_call and team.manager.name:  # §4.9, §6 rule 3's `team` trigger (TD-259)
+        out[team.manager.name] = orgmod.MANAGER_WHEN
     return out
 
 

@@ -13,6 +13,7 @@ from typing import Any
 
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
+from agentorc.org import MANAGER_WHEN
 from sessionorc import identity, mail
 from sessionorc.adapters import short_model
 from sessionorc.models import (
@@ -438,9 +439,13 @@ def view(
     d["not_ready"] = [name for name, ok in d["ready"] if not ok]  # what *more ▾ → Close* says it waits on
     # §6 rule 4 (TD-103): nudged once in this idle stretch and still idle another twenty minutes
     # later — the host agent is done, and it is for a person or its manager to judge
+    # `idle_open` on the record is that reading, the tick's (§6 rule 3, TD-259): the slot, the seat's
+    # trigger and the Inbox row all draw from it. A home whose tick does not write it yet leaves the
+    # page its old derivation from `nudged_at`.
     nudged, since = _iso(s.get("nudged_at")), _iso(s.get("since"))
-    d["open_work"] = bool(
-        state == "idle" and nudged and since and nudged >= since and now - nudged >= timedelta(minutes=20)
+    d["open_work"] = state == "idle" and (
+        isinstance(s.get("idle_open"), dict)
+        or bool(nudged and since and nudged >= since and now - nudged >= timedelta(minutes=20))
     )
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
@@ -579,11 +584,16 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
         # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)
         text = f"on call — {d.get('seat_when') or 'comes on the next question'}"
-        full = (
-            f"{text}: a question to it fills the seat, and it ends again once it has answered (design §4.9b)"
-            if not d.get("seat_when") or d["seat_when"] == "comes on the next question"
-            else f"{text}: the host agent fills the seat when that comes due, and it ends once it has run (§6)"
-        )
+        if d.get("seat_when") == MANAGER_WHEN:
+            # a manager on call (§4.9, §6 rule 3's `team` trigger, TD-259)
+            full = (
+                f"{text}: a question to it, a member's permission, a stalled member or one idle with its work "
+                "open fills the seat, and it ends again once it has acted (design §6)"
+            )
+        elif not d.get("seat_when") or d["seat_when"] == "comes on the next question":
+            full = f"{text}: a question to it fills the seat, and it ends again once it has answered (design §4.9b)"
+        else:
+            full = f"{text}: the host agent fills the seat when that comes due, and it ends once it has run (§6)"
     elif state == "exited" and isinstance(d.get("restart_ceiling"), dict):
         # an ending (§4.5 row 5 (b), §6 *Keeping a team running* rule 1, TD-103): the tick restarted
         # it as often as it will, and the session is a person's now
@@ -637,7 +647,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     elif d.get("seat"):
         # never *ready to close ✓*: a seat is not closed while the definition names it (§4.5)
         # *last ran* for a seat with a trigger: it runs its brief rather than answering (§4.5, TD-098)
-        came = "last came" if d.get("seat_when") in ("", "comes on the next question") else "last ran"
+        came = "last came" if d.get("seat_when") in ("", "comes on the next question", MANAGER_WHEN) else "last ran"
         caption = came + (f" · {d['came_age']} ago" if d.get("came_age") else "")
     elif d["ready_ok"] and state in ("idle", "exited"):
         caption, ccls = "ready to close ✓", "ready"
