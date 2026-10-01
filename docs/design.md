@@ -1095,7 +1095,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `closer` (TD-262, designed 2026-10-01; the build is TD-265: who asked for the close — `{by: person | <session id> | tick, why, at}` — read by `close` from its call's envelope as the acting gate reads it, §4.8: no `caller` is a person, a session's id is that session, verified as §4.8a verifies every caller; the tick's own closes write `tick` with the rule's word, *finished*, *wanted*, *brief*, *seat*, *start*; carried in the close's params to a node so the node's record holds it too, an older node writing none; distinct from `closed_for`, which is the tick's mark for its restart logic and is cleared by any later close), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — built, TD-259 slice 2), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `closer` (TD-262, designed 2026-10-01; the build is TD-265: who asked for the close — `{by: person | <session id> | tick, why, at}` — read by `close` from its call's envelope as the acting gate reads it, §4.8: no `caller` is a person, a session's id is that session, verified as §4.8a verifies every caller; the tick's own closes write `tick` with the rule's word, *finished*, *wanted*, *brief*, *seat* — its four close sites; a person's Restart (`rpc_restart`) closes as the person's; carried in the close's params to a node so the node's record holds it too, an older node writing none; distinct from `closed_for`, which is the tick's mark for its restart logic and is cleared by any later close), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — built, TD-259 slice 2), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -1720,8 +1720,8 @@ Screens:
       for a session's (`ao close`, or the per-member close of `ao team stop --close`, run inside
       one), *closed itself* for a session's own, *closed by the tick · <why>* for the home's —
       *team finished* (§6 rule 9), *for a restart* (rule 2), *brief changed* (rule 7), *seat done*
-      (rule 3), *start* (rule 8's start, and a Start's close of a concluded session is the
-      presser's) — and bare *closed* for a record with no closer (every one written before this,
+      (rule 3) — the tick's four closes; rule 8's start closes nothing, a Start's close of a
+      concluded session is the presser's, and a person's Restart closes as the person's — and bare *closed* for a record with no closer (every one written before this,
       and a node older than the field), the hover adding the time; *restarts exhausted · 3 in 2 h*
       (§6); or a
       declaration, *out of work* or *restart wanted* (an early one says *early — for a person*, a repeat
