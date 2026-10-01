@@ -82,7 +82,8 @@ def _reported(s: Session) -> dict[str, Any]:
     """What a run reported, for the `restarts` entry of the replay that replaces it (design §4.9a
     *early from the record*, §6 rule 1; TD-249): `done`, the `{ref, pr}` of each `progress` entry
     reported `done` since the record's `created`, and `left`, the references it declared a claim on
-    and neither finished nor dropped. A derived claim is the tick's reading, not the run's word."""
+    and neither finished nor dropped. A derived claim is the tick's reading, not the run's word; a
+    derived `done` is a merged pull request, and is work done whoever read it."""
     done = [{"ref": e.ref, "pr": e.pr} for e in s.progress if e.status == "done" and str(e.at) >= str(s.created)]
     left = [e.ref for e in s.progress if e.status == "claimed" and e.source == "declared"]
     return {"done": done, "left": left}

@@ -222,6 +222,7 @@ async def test_a_replays_entry_carries_what_the_run_it_replaced_reported(agent, 
             await w.call("progress", id=sid, ref="TD-4")
             await w.call("progress", id=sid, ref="TD-4", status="dropped", why="too large")
             await w.call("progress", id=sid, ref="TD-5", source="derived")
+            await w.call("progress", id=sid, ref="TD-7", status="done", pr=813, source="derived")
         old = agent.sessions[sid]
         # one reported before this run began is an earlier run's, and is not this one's `done`
         old.progress.insert(0, type(old.progress[0])(ref="TD-0", status="done", pr=700, at="2026-09-01T00:00:00Z"))
@@ -231,10 +232,15 @@ async def test_a_replays_entry_carries_what_the_run_it_replaced_reported(agent, 
         assert new is not old and new.progress == []
         (entry,) = new.restarts
         assert entry["why"] == "crash" and "error" not in entry
-        assert entry["done"] == [{"ref": "TD-001", "pr": 812}, {"ref": "TD-002", "pr": None}]
-        assert entry["left"] == ["TD-003"], "a dropped claim is closed, and a derived one is not the run's word"
+        # a merged PR the tick derived is work done all the same; a derived claim is not the run's word
+        assert entry["done"] == [
+            {"ref": "TD-001", "pr": 812},
+            {"ref": "TD-002", "pr": None},
+            {"ref": "TD-007", "pr": 813},
+        ]
+        assert entry["left"] == ["TD-003"], "a dropped claim is closed"
 
-        # a run that reported nothing carries the two lists empty, and a failed replay carries them too
+        # a run that reported nothing done carries `done` empty, and a failed replay carries both too
         async with LocalClient(caller=sid) as w:
             await w.call("progress", id=sid, ref="TD-6")
         _crash(agent, sid)
