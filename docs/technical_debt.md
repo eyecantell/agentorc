@@ -814,6 +814,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **A fourth sighting, a new shape — 2026-09-21 (grinder-ao-1, CI on PR #383, Python 3.13 only; 3.12 passed the same commit):** `tests/test_agent.py::test_send_wait_three_outcomes` at line 375, `assert (await asyncio.wait_for(task, 5))["state"] == "idle"` — `AgentError: prompt-stalled: ao-test-send-wait-three-outcomes0-w showed no activity within 0.6 s`. Not the exited-record paste of #286: the send landed and the pane was judged idle-without-activity inside the test's 0.6 s prompt-stall window, so that window is too short for a loaded 3.13 runner. Not investigated; the job was re-run (run 35666996420). If it recurs, bound the wait on the pane's own signal as TD-088 did, rather than widening 0.6 s.
 
+**A fifth sighting — 2026-10-01 (grinder-ao-1, CI on PR #859, Python 3.12 only; 3.13 passed the same commit, `c4346b2`, a tests-only change to another file):** `tests/test_agent.py::test_send_wait_three_outcomes` ended in the suite's per-test *Timeout*, not an assertion — the hang shape, on the same test. Run 36822297238; the failed job was run again.
+
 **Related:** `tests/README.md` (the fixtures' timing rules), TD-069 (where it was seen).
 
 ## TD-080: A manager's round log reads as unpushed work forever
