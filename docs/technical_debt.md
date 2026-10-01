@@ -130,6 +130,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Designed 2026-09-30 — the build is TD-255 |
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Open — pickable |
+| TD-260 | A link socket exists at the umask's mode until the chmod after the bind, and `test_link.py` reads it in that window and fails | Low | Open |
 
 
 ---
@@ -2609,3 +2610,20 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** on a scratch home, a board item's answers are buttons on its Inbox row, one with a default is decided by one press, a live look by one of two, and the board line carries `Decided:` after each; the help entries are in §4.5a's list; this repo's live looks carry the pair.
 
 **Related:** TD-254 (the design), dev-cadence TD-074 (the guidance and the pair), TD-244 (the groom), TD-142 (Reply), TD-218 / TD-219 (an entry handed to the techlead), TD-124 (the keys), TD-140 (Put on the board, the first add), TD-036 (`board_edit.py`).
+
+## TD-260: A link socket exists at the umask's mode until the chmod after the bind, and the test reads it in that window
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-09-30 (grinder-ao-1, from a CI failure on PR #852)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (the per-node link listeners: `asyncio.start_unix_server(...)` then `os.chmod(lsock, 0o600)`; the same pair for `agent.sock`), `tests/test_link.py` (`test_a_container_node_dials_the_homes_socket_with_no_ssh_and_survives_its_restart`)
+
+**Why:** `start_unix_server` binds the socket and is awaited before the `chmod`, so the file exists for a moment at whatever the umask gives (0755 on the CI runner). The test waits for `sock.exists` and at once asserts mode 0600; on PR #852's run 36818633814 (Python 3.13) it read `49645 & 0o777 == 0o755` and failed, and passed on a rerun with no change. The directory is 0700 before the bind, so nothing else can reach the socket in that window: the harm is a test that fails a run now and then and costs every PR a rerun, and a socket whose mode is not what the design says for an instant. A second hang in the same week — a docs-only PR's run 36815754454 timed out on 3.12 in a test whose name the rerun's log replaced — is not this one and is not ledgered beyond this line.
+
+**Fix:** bind under the mode it should have — `os.umask(0o177)` around the bind, restored after, or bind a socket made by hand and hand it to `start_unix_server(sock=...)` — for the link sockets and `agent.sock` alike, so no `chmod` is needed; the test then needs no change. Done when the socket never exists at another mode and the test passes a hundred runs in a row (`pytest --count` or a loop).
+
+**Related:** TD-057 (step 3c, the link sockets).
