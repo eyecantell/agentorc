@@ -2608,3 +2608,20 @@ Both go away only when the record says who closed it.
 **Done when:** a grinder following the brief word for word re-asks its reader without a refusal, and the seat's queue shows one entry for the PR.
 
 **Related:** TD-093 (the reader), TD-075 (asks and threads), TD-241 (PR #821, where it was met).
+
+## TD-260: A link socket exists at the umask's mode until the chmod after the bind, and the test reads it in that window
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-09-30 (grinder-ao-1, from a CI failure on PR #852)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (the per-node link listeners: `asyncio.start_unix_server(...)` then `os.chmod(lsock, 0o600)`; the same pair for `agent.sock`), `tests/test_link.py` (`test_a_container_node_dials_the_homes_socket_with_no_ssh_and_survives_its_restart`)
+
+**Why:** `start_unix_server` binds the socket and is awaited before the `chmod`, so the file exists for a moment at whatever the umask gives (0755 on the CI runner). The test waits for `sock.exists` and at once asserts mode 0600; on PR #852's run 36818633814 (Python 3.13) it read `49645 & 0o777 == 0o755` and failed, and passed on a rerun with no change. A link socket's directory is 0700 before the bind, so nothing else can reach it in that window (`agent.sock`'s directory is only made, never chmod'ed, so its window is as open as the home directory is): the harm is a test that fails a run now and then and costs every PR a rerun, and a socket whose mode is not what the design says for an instant. A second hang in the same week — a docs-only PR's run 36815754454 timed out on 3.12 in a test whose name the rerun's log replaced — is not this one and is not ledgered beyond this line. A third, on this entry's own docs-only PR #854 (run 36819635729, 3.12): `tests/test_mail.py::test_the_debt_has_a_bound_of_its_own_and_is_never_pruned` raised `KeyError: 'm-…'` at line 2201 inside its `pytest.raises(AgentError, match="you owe 2 outcomes")` block — a message id looked up before it was there. Whoever takes this entry reproduces that one in a loop first and files it apart if it is real.
+
+**Resolved:** 2026-10-01 (PR #865, grinder-ao-1) — `agent._bound` makes and binds each socket by hand under a umask of `0177`, with no `await` inside, and `start_unix_server` takes it as `sock=`; the `chmod` after the bind is gone for `agent.sock` and the link sockets alike. `tests/test_link.py` holds the mode and the umask's return; the container-node test passed 100 runs in a row. The third failure named above was real and a test's own: `test_the_debt_has_a_bound_of_its_own_and_is_never_pruned` left `MAIL_RETENTION` at zero, every tick sweeps mail, and a tick between its last `close` and the read after it pruned the settled question — the test now restores the retention first. Not reproduced in 40 runs; read from the code.
+
+**Related:** TD-057 (step 3c, the link sockets).
