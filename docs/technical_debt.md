@@ -129,6 +129,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Partly done — slices 1–2 built (the write-back; the buttons, Go with it, the keys, the help); slices 3–4 wait on dev-cadence TD-074's pair |
 | TD-258 | Build the manager's mechanical jobs as tick policies: rule 10 the cadence check, rule 11 merged without its read, rule 12 conventions relayed, rule 4's owed clause, rule 6's dropped lease, the two Inbox rows | Medium | Partly done — slices 1–3 (rules 10, 11 and 12) built; slices 4, 5 and 6 open |
 | TD-259 | Build the manager on call: `on_call` on `manager:`, the `team` trigger with `seat_due.by`, `idle_open` and `seat_filled`, the sweep's seat exception, the card's slot and the Inbox row, the manager brief as a seat's, the first look on dc-grind | Medium | In progress — slices 1 and 5 (the template) built, the default still `false` until slice 2 |
+| TD-262 | The grinder and hunter briefs tell a held PR's author to re-ask its reader with `--thread`, which the host agent refuses toward a seat: the design's way is `--reply-to` the findings | Low | Open |
 
 
 ---
@@ -2592,3 +2593,19 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, a team defined with `on_call: true` starts a manager that finds nothing and exits; a `steer` to it, a member's permission prompt, a member `stalled?` and a member *idle · open work* each fill it once and it closes after acting; the same standing cause does not refill it; its members' `controllers` name it across the close; a question sent to it while closed is there at the fill; the team is wound down by rule 9 with the manager closed; dc-grind's first run on call is written here.
 
 **Related:** TD-247 (the design), TD-103 (rule 3, the seat rule), TD-098 (seats with a trigger), TD-240 / TD-241 (rule 9), TD-256 (rule 9's marks on a resumed manager), TD-245 / TD-249 (the manager outside the context bound), TD-250 (mail on a replay), TD-258 (the policies), TD-118 (one model for every role — a seat's fills are the round's cost made visible).
+
+## TD-262: The grinder and hunter briefs tell a held PR's author to re-ask its reader with `--thread`, which the host agent refuses toward a seat
+
+**Priority:** Low
+**Added:** 2026-10-01 (grinder-ao-1, met on PR #878)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/briefs/grinder.md` and `src/agentorc/briefs/hunter.md` (the lane paragraph: *findings, fix and ask again on the same thread (`--thread <its id>`)*), `tests/test_cli.py` or wherever the templates' words are held; `src/sessionorc/agent_mail.py` (`rpc_msg`: *--thread follows up a question put to the person: name `person` as the addressee*) is right as it is
+
+**Why:** Design §4.9b *The reader* says the author of a held PR fixes the findings and re-asks *as a reply to the findings (`--reply-to`), whose root is the first ask's; `--thread` takes up a question put to the person and is refused toward a reader — so the queue is one entry per PR*. The package's grinder and hunter templates say `--thread <its id>` for that re-ask, and the same flag, rightly, for the escalation to the person two sentences later. A worker following its brief on findings gets the refusal, and then guesses: on 2026-10-01 grinder-ao-1 sent a second, unthreaded `ask` for #878, so the seat's queue held a new entry with nothing tying it to the read it answered but the words in its text. Nothing is lost — the seat reads the PR either way — but the brief sends every worker into a refusal on the one path where it is told to act without thinking.
+
+**Fix:** In both templates, word the re-ask as the design does: *findings — fix, then `ao msg --reply-to <the findings' id> --kind ask --pr <n> "…"`* if `rpc_msg` takes a `--reply-to` of kind `ask` and counts it in the seat's `prs_waiting` (read how `rpc_msg` takes `--reply-to` beside `--kind ask`, and `Session.prs_waiting`, first: a `reply` to a closed `ask` counts as a `note`, which fills no seat — if that is what a `--reply-to` becomes, the design's sentence is the thing to fix, in a design PR of its own, and the brief should say *a new `ask` carrying `--pr <n>` and naming the first ask's id*, which is what works today). Keep `--thread <its id>` on the escalation to the person. A test that the composed grinder brief names no `--thread` toward the techlead.
+
+**Related:** TD-093 (the reader), TD-079 (`--thread`), TD-259 (PR #878, where it was met).
