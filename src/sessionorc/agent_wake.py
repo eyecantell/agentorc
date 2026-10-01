@@ -19,6 +19,7 @@ from sessionorc import (
     adapters,
     defs,
     mail,
+    naming,
     paths,
     waits,
 )
@@ -34,6 +35,7 @@ from sessionorc.agent_common import (
     _Wait,
     log,
 )
+from sessionorc.gitinfo import work_left
 from sessionorc.models import (
     MailEntry,
     Pending,
@@ -667,6 +669,119 @@ class WakeMixin:
         ids = sorted({str(i) for v in named.values() if isinstance(v, list) for i in v})
         log.info("rule 8: %s's work waiting dismissed by the person: %s", team, ", ".join(ids))
         return {"team": team, "cleared": True, "ids": ids}
+
+    async def rpc_restart(self, id: str, caller: Any = None) -> dict[str, Any]:
+        """A person's restart (design §6 rule 2 *A person's restart*, TD-250): what the tick would not
+        do — an `early` or a `repeat` declaration, a member at its ceiling, one a person closed —
+        said in one press and then done the tick's way. The record is closed if it is still there,
+        under the tick's own test (`gitinfo.work_left`), and created again from its launch record,
+        the prompt refilled as rule 7's replay refills it. The new record starts fresh: no marks,
+        and `restarts` the one entry `{at, why: person}`, which never counts toward the ceiling.
+        **A person's own**, refused to a session as `set_settings` is, and the home's alone
+        (`modes.HOME_EDITS`); a node's member is closed and created over the link. Every refusal is
+        made before anything is touched; the reply is the new record."""
+        if not mail.is_person(caller):
+            raise RpcError("restart is a person's own: refused to a session (design §6 rule 2)")
+        if self.mode != "home":
+            raise RpcError("restart runs at the home (design §6 rule 2): this host is a node")
+        s = self._find(id)
+        now = datetime.now(UTC)
+        params = self._restart_check(s, now)
+        entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
+        read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
+        if s.state == "idle":
+            if s.host == self.host:
+                await self.rpc_close(s.id)
+            else:
+                await self._route_act("close", {"id": s.id}, None, s.host)
+        try:
+            if s.host == self.host:
+                view = await self.rpc_create(**params)
+            else:
+                view = await self._route_act("create", {**params, "host": s.host}, None, s.host)
+        except Exception as e:  # noqa: BLE001 — said to the person who pressed, whatever it was
+            log.warning("%s: the person's restart failed: %s", s.id, e)
+            raise RpcError(
+                f"the restart of {s.name} failed: {str(e) or type(e).__name__} — it is {s.state} and its "
+                "marks stand; Restart again, or Resume with changes… (design §6 rule 2)"
+            ) from None
+        rid, _h = naming.split_address(str((view or {}).get("id") or ""))
+        new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
+        if new is None or new is s:
+            return view  # a node's record the home has not been told of yet: the create's own reply
+        new.restarts = [entry]
+        new.restart_wanted = new.restart_ceiling = new.restart_blocked = None
+        new.brief = read  # the files as this restart read them (as `_replay` writes it)
+        self._save(new)
+        await self._push_changes()
+        log.info("%s restarted by the person from its launch record", self._address(new))
+        return self._view(new)
+
+    def _restart_check(self, s: Session, now: datetime) -> dict[str, Any]:
+        """`restart`'s refusals, each by name (design §6 rule 2 *A person's restart*), and the launch
+        record as `create`'s arguments when none applies. Nothing is changed here."""
+        rule = "(design §6 rule 2)"
+        if s.seat is not None:
+            raise RpcError(f"{s.name} is a seat: rule 3 fills it when it is due, and Resume is the way to it {rule}")
+        if s.suspended:
+            raise RpcError(
+                f"{s.name} is suspended over an identity alarm: only a person's Resume or Forget lifts that, "
+                f"and a restart is neither (design §4.8a)"
+            )
+        if s.superseded_by:
+            raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to restart {rule}")
+        if s.state == "scheduled":
+            raise RpcError(f"{s.name} is scheduled and has not started: `ao at {s.id} now` starts it {rule}")
+        if s.state not in ("idle", "exited", "closed"):
+            raise RpcError(
+                f"{s.name} is {s.state}: a restart is of a session that is idle, exited or closed — wait, or "
+                f"Wrap up {rule}"
+            )
+        try:
+            if not s.supervised:
+                raise RpcError("not supervised")
+            launch = self._read_launch(self._address(s))
+        except RpcError:
+            raise RpcError(
+                f"{s.name} has no launch record, so nothing says how it was started: Resume with changes… "
+                f"is the way back {rule}"
+            ) from None
+        scope = s.repo or s.dir
+        for r in self._graph().values():
+            live = r.state not in ("exited", "closed") and not r.superseded_by
+            if r is not s and live and r.host == s.host and r.name == s.name and (r.repo or r.dir) == scope:
+                raise RpcError(f"{s.name} is the name of {self._address(r)}, which is {r.state}: one of a name {rule}")
+        if s.host == self.host:
+            # the create finds what it supersedes at the name's own id: a record under a suffixed id
+            # (tmux held the base when it started) is not there, and the create would refuse after the close
+            base = naming.base_id(s.dir, s.repo, str(launch.get("name") or ""))
+            if self.sessions.get(base) is not s:
+                raise RpcError(
+                    f"{s.name} ({s.id}) does not hold its launch record's name, {launch.get('name')!r} ({base}): "
+                    f"Resume with changes… is the way back {rule}"
+                )
+        until = launch.get("run_until")
+        try:
+            passed = bool(until) and now >= _parse(str(until))
+        except ValueError:
+            passed = False
+        if passed:
+            raise RpcError(f"{s.name}: its stop time has passed — Resume with changes… {rule}")
+        profile, team = str(launch.get("profile") or ""), str(launch.get("team") or "")
+        if self._profile_gated(profile, now, team):
+            raise RpcError(
+                f"{s.name}: its profile {profile or '(default)'} is over its usage line, and the gate would pause "
+                f"what the press started — `ao gate` prints the lines {rule}"
+            )
+        if s.host != self.host and s.host not in self._link_muxes:
+            raise RpcError(f"{s.name} runs on {s.host}, whose link is down: a restart waits for it (design §4.4a)")
+        if left := work_left(s.git):
+            raise RpcError(
+                f"{s.name} has {left}: a restart closes a session only with its work committed and pushed {rule}"
+            )
+        # `keep_mail`: the new record is a new record, so its inbox and outbox move as a seat's fill moves
+        # them. Its own open questions to the person end with the close of an idle one, as at any close.
+        return {**launch, "supervised": True, "keep_mail": True}
 
     def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any) -> dict[str, Any]:
         """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file)."""

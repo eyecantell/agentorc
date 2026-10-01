@@ -35,6 +35,8 @@ from sessionorc.mail import self_decide_refusal
 # `host` record, where `work_waiting` lives; at a node both would be the replica's.
 # **`commit_defs`** (§4.9 *What is left at the home has a history*, TD-229): the tracked files and
 # their work tree are the home's; a node's `settings.yml` is a replica nobody commits.
+# **`restart`** (§6 rule 2 *A person's restart*, TD-250): the launch record it replays and the marks it
+# clears are the home's; a node's member is closed and created from the home, over the link.
 HOME_EDITS = frozenset(
     {
         "set_controllers",
@@ -50,6 +52,7 @@ HOME_EDITS = frozenset(
         "entry_add",
         "clear_work",
         "commit_defs",
+        "restart",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the

@@ -4796,7 +4796,8 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   **What counts toward the ceiling.** A wanted restart that carried new work does **not**
   count toward `RESTART_CEILING`: the ceiling guards a crash loop and a loop with manners, and
   a bound under one entry's cost (below) would otherwise reach it in an afternoon of merged
-  work. A crash, a `fill`, an early and a repeat restart count as today. The same count serves
+  work. A crash, a `fill`, an early and a repeat restart count as today; a person's Restart
+  (§6 rule 2) leaves one `person` entry, which never counts. The same count serves
   rule 8's reading of a member at its ceiling, so there too a restart with new work is left out.
 - **Not finished, so the team does not wind down.** A member that wants a restart is by its own
   word not out of work, so it never counts toward *every member is finished*; a manager that
@@ -6569,7 +6570,8 @@ code and needs no grant; a session doing the same work does.
      member that has worked for hours since (TD-186) — and rule 1 never restarts past it; a person's Resume clears `restarts` with the mark, so a
      resumed session gets three fresh restarts, where the tick's own supersede carries the list. An `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
      neither does the tick.
-     **A person's restart** (TD-246; designed 2026-09-30, not built — TD-250). What the tick
+     **A person's restart** (TD-246; the RPC is built, and the row's and the card's **Restart** and
+     `ao restart` are not — TD-250). What the tick
      would not do, a person can say in one press, and the home then does it the tick's way: the
      **`restart`** RPC — a person's alone, as `set_settings` is (§5; no controller gains it:
      an `early` or a `repeat` one is the person's by §4.9a, and a manager that could restart its
@@ -6584,8 +6586,8 @@ code and needs no grant; a session doing the same work does.
      when its launch record says so: a restart is the team's run resumed, where Resume is the
      person's own), the prompt as rule 7's replay hands it — refilled from the files it was
      made from, as merged, on the home's own host; the stored prompt for a node's member or a
-     launch record with no `prompt_from` — and the mail kept, as a replay at the same id keeps
-     it (§4.4a). **The new record starts fresh** otherwise: no `out_of_work`, `progress`,
+     launch record with no `prompt_from` — and the mail kept: the create moves the old record's
+     mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). **The new record starts fresh** otherwise: no `out_of_work`, `progress`,
      `doing` or `lane_seen` of the old run. It **clears the marks the
      person is answering** — `restart_wanted`, `restart_ceiling`, `restart_blocked` — and, as a
      person's Resume does, **clears `restarts`**: the new list holds one entry, `{at, why:
@@ -6595,7 +6597,10 @@ code and needs no grant; a session doing the same work does.
      `needs-you` one (wait, or Wrap up), a suspended one (§4.8a), a `scheduled` one (`ao at`),
      a seat (rule 3 fills it), a record whose name is held by another live record, one whose
      launch record's stop time has passed (*its stop time has passed — Resume with changes…*),
-     and one whose profile is over its usage line (the gate would pause what the press started). A member
+     and one whose profile is over its usage line (the gate would pause what the press started).
+     Every refusal is made before anything is touched. A create that fails after the close is
+     told to the person as the press's answer: the record stays `closed` with its marks, so the
+     row stands and the press can be made again. A member
      on a node is closed and created over the link as rule 1's replay is, and waits for the
      link. **Where it is pressed**: **Restart** on the Inbox row *restart* beside Resume (§4.5a,
      with the help saying which is which: *Restart puts it back in its team's run as its launch

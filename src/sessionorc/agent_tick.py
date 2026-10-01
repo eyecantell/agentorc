@@ -65,7 +65,8 @@ from sessionorc.agent_common import (
     log,
 )
 from sessionorc.agent_spend import _metered_of
-from sessionorc.gitinfo import git_info
+from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
+from sessionorc.gitinfo import git_info, work_left
 from sessionorc.models import (
     PERSON,
     SYSTEM,
@@ -647,11 +648,11 @@ class TickMixin:
             return
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
-        git = s.git or {}
-        if not isinstance(git.get("dirty"), int) or not isinstance(git.get("unpushed"), int):
+        left = work_left(s.git)  # the one test a person's Restart and a team's stop make too (TD-250)
+        if left == GIT_UNKNOWN:
             return  # an unknown git state is left alone (§6 rule 2)
-        if git["dirty"] or git["unpushed"]:
-            await self._restart_held(s, now, git["dirty"], git["unpushed"])
+        if left:
+            await self._restart_held(s, now, s.git["dirty"], s.git["unpushed"])
             return
         recent = agent_common._counted(s.restarts, now)
         if len(recent) >= RESTART_CEILING:

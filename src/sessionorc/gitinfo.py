@@ -8,6 +8,7 @@ import re
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -144,6 +145,26 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
         pushed_against=against,
         oid=oid,
     )
+
+
+UNKNOWN = "git state unknown"
+
+
+def work_left(git: Any) -> str | None:
+    """Why a checkout is not *clean and pushed*, from a record's `git` fields, or None when it is
+    (design §6 rule 2, §4.2 *One measure*). **Unknown is work left**: no fields yet, or a count
+    that is not a number, reads `UNKNOWN` — known, not merely absent. The one test the tick's
+    wanted restart, a person's Restart and `ao team stop --close` share (TD-250), so the three
+    cannot drift; `unpushed` is the host agent's one measure (TD-080) and nothing is run here."""
+    if not isinstance(git, dict) or not all(
+        isinstance(git.get(k), int) and not isinstance(git.get(k), bool) for k in ("dirty", "unpushed")
+    ):
+        return UNKNOWN
+    if git["dirty"]:
+        return f"{git['dirty']} uncommitted"
+    if git["unpushed"]:
+        return f"{git['unpushed']} unpushed (vs {git.get('pushed_against') or 'its remote'})"
+    return None
 
 
 def _git(directory: Path | str, *args: str, timeout: float) -> str | None:
