@@ -2730,9 +2730,9 @@
           $$('[data-act="resume"]', ex).forEach((b) => { b.title = hp.dataset.titleResume || ""; });
           $$('[data-act="remove"]', ex).forEach((b) => { b.title = hp.dataset.titleForget || ""; });
         }
-        // design §4.9a *One member back, today* (TD-172): a team's member comes back unattended by
-        // Resume with changes… — Resume alone starts it attended — so the banner says so
-        if (v.team) ex.insertAdjacentHTML("beforeend", `<div class="note memberback">To bring it back into ${esc(v.team)} unattended: <b>Resume with changes…</b> and tick <b>Unattended</b> — Resume alone starts it attended.</div>`);
+        // design §4.9a *One member back, today* (TD-172, TD-250): a team's member comes back into
+        // its team's run by Restart — Resume alone starts it attended — so the banner says so
+        if (v.team) ex.insertAdjacentHTML("beforeend", `<div class="note memberback">To put it back in ${esc(v.team)}'s run: <b>Restart</b> in its card's <b>more ▾</b>, or <code>ao restart</code> — Resume alone starts it attended. With no launch record: <b>Resume with changes…</b> and tick <b>Unattended</b>.</div>`);
         const mk = $("#exitedmark");
         if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");

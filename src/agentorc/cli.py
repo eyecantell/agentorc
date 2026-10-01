@@ -223,6 +223,15 @@ def _node_status_line() -> str:
     return f"offline — {where}, which is unreachable: this host's sessions only; no mail, no org"
 
 
+def status_line(s: dict[str, Any], w: int = 0) -> str:
+    """A record's one line as `ao status` prints it: id, state (`~` when scraped), age, adapter, mode
+    and what is pending. `ao restart` prints the new record with it (design §4.7)."""
+    conf = "" if s["confidence"] == "hook" else " ~"
+    pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+    mode = " [unattended]" if s.get("unattended") else ""
+    return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     sessions = call_sync("list")
     if hosts.is_node():
@@ -253,10 +262,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     sessions.sort(key=lambda s: (STATE_RANK.get(s["state"], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
     for s in sessions:
-        conf = "" if s["confidence"] == "hook" else " ~"
-        pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
-        mode = " [unattended]" if s.get("unattended") else ""
-        print(f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}")
+        print(status_line(s, w))
         if args.verbose:
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
@@ -1156,6 +1162,14 @@ def cmd_at(args: argparse.Namespace) -> int:
     when = "now" if (args.when or "").strip().lower() == "now" else stop_time(args.when or "", "ao at")
     s = call_sync("set_start", id=resolve(args.id), start_at=when)
     return emit(args, s, lambda: print(f"{s['id']}: {start_note(s) or 'starts on the next tick'}"))
+
+
+def cmd_restart(args: argparse.Namespace) -> int:
+    """`ao restart <session>` (design §4.7, §6 rule 2 *A person's restart*, TD-250): the person's
+    press in a terminal. The host agent refuses it to a session and makes every other refusal by
+    name before anything is touched; the reply is the new record, printed as `ao status` prints one."""
+    s = call_sync("restart", id=resolve(args.id))
+    return emit(args, s, lambda: print(status_line(s)))
 
 
 def cmd_until(args: argparse.Namespace) -> int:
@@ -2821,6 +2835,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("when", help="20:00 (the next one, local), +2h, an ISO time, or now")
     p.set_defaults(fn=cmd_at)
+
+    p = add("restart", help="put a supervised member back in its team's run from its launch record (design §6 rule 2)")
+    p.add_argument("id")
+    p.set_defaults(fn=cmd_restart)
 
     p = add("until", help="set or clear when an unattended session stops (design §6, TD-026)")
     p.add_argument("id")

@@ -2054,6 +2054,45 @@ def test_status_v_says_a_brief_changed_with_its_files(tmp_path, monkeypatch, cap
     assert json.loads(capsys.readouterr().out)[0]["brief_changed"] == rec["brief_changed"]
 
 
+def test_ao_restart_prints_the_new_records_line_and_a_refusal_in_the_agents_words(monkeypatch, capsys):
+    """TD-250 slice 3 (design §4.7 `ao restart <session>`, §6 rule 2 *A person's restart*): the
+    `restart` RPC from a terminal — the reply printed as `ao status` prints a record, a refusal the
+    host agent's own sentence and exit 1 — and the manager's board line names the press."""
+    new = {
+        "id": "ao-x-w",
+        "name": "w",
+        "state": "working",
+        "confidence": "hook",
+        "since": "2026-10-01T10:00:00Z",
+        "adapter": "claude-code",
+        "unattended": True,
+        "restarts": [{"at": "2026-10-01T10:00:00Z", "why": "person"}],
+    }
+    calls = []
+
+    def fake(method, **params):
+        calls.append((method, params))
+        if method == "list":
+            return [new]
+        if params["id"] == "ao-x-dirty":
+            raise AgentError("w has work left: 2 uncommitted")
+        return new
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    assert cli.main(["restart", "ao-x-w"]) == 0
+    assert calls == [("restart", {"id": "ao-x-w"})]
+    out = capsys.readouterr().out
+    assert re.fullmatch(r"ao-x-w  working\s+\S+  claude-code \[unattended\]\n", out)
+    assert cli.main(["status"]) == 0
+    assert out.split() == capsys.readouterr().out.split(), "the line `ao status` prints for it"
+    assert cli.main(["--json", "restart", "ao-x-w"]) == 0
+    assert json.loads(capsys.readouterr().out)["restarts"][0]["why"] == "person"
+    assert cli.main(["restart", "ao-x-dirty"]) == 1
+    assert "w has work left: 2 uncommitted" in capsys.readouterr().err
+    manager = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    assert "on the board once — the person's press is the Inbox row's Restart, or `ao restart <id>`." in manager
+
+
 def test_the_presets_say_what_over_its_line_means():
     """TD-239 slice 5 (design §6 *Balance*): a worker refused *over its line* takes nothing new, ends
     its turn and never declares `none`; the manager logs one line and treats nobody as crashed."""

@@ -1157,9 +1157,14 @@ def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
     ui_dir = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
     js = (ui_dir / "static" / "app.js").read_text()
-    assert "To bring it back into ${esc(v.team)} unattended: <b>Resume with changes…</b>" in js
+    # TD-250 slice 3: Restart is the way back into the team's run; Resume with changes… is for a
+    # record with no launch record
+    assert "To put it back in ${esc(v.team)}'s run: <b>Restart</b> in its card's <b>more ▾</b>" in js
+    assert "With no launch record: <b>Resume with changes…</b> and tick <b>Unattended</b>" in js
     skill = (ui_dir.parent / "team_skill.md").read_text()
     assert "**One member back**" in skill and "**Members…** on the team card" in skill
+    back = skill[skill.index("**One member back**") :]
+    assert "`ao restart <id>`" in back and back.index("**Restart**") < back.index("**Resume with changes…**")
 
 
 def test_a_metered_accounts_chip_reads_spend_over_its_amount():
