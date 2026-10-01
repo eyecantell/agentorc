@@ -2604,7 +2604,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 ## TD-262: A card says *closed by you* for every closed session, whoever closed it
 
 **Priority:** Medium
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-01 (the anchor, for Paul: *I restarted the dc team but it says it was closed by me*)
 **Owner:** designer
 **Kind:** design-first
