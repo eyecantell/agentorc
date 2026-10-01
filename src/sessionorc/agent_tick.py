@@ -1187,6 +1187,8 @@ class TickMixin:
             if first is not None:
                 firsts[team] = first
         self._finished_first = firsts
+        for team in [t for t in self._finished_owed if t not in by_team]:
+            del self._finished_owed[team]  # its records are forgotten: nothing left to announce
 
     def _finished_view(self, r: Session) -> dict[str, Any]:
         """What `work.finished` reads of a record, as this host addresses it: a node's member names

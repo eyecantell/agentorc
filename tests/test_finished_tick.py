@@ -319,12 +319,13 @@ async def test_a_person_led_teams_last_member_closed_by_a_person_is_announced_on
     await agent._finished_pass(late + timedelta(minutes=1))
     assert home.notes() == []
 
+    agent._finished_owed["forgotten"] = now  # a team whose records are gone keeps no mark
     await home._close(g2.id)  # the person's Close
     await agent._finished_pass(late + timedelta(minutes=2))
     (note,) = home.notes()
     assert "g2: g2 found nothing pickable" in note and "its manager did not announce it" not in note
     await agent._finished_pass(late + timedelta(minutes=3))
-    assert len(home.notes()) == 1, "never told twice"
+    assert len(home.notes()) == 1 and agent._finished_owed == {}, "never told twice"
 
 
 async def test_a_member_at_work_again_owes_no_note_and_one_member_alone_is_announced(agent, monkeypatch):
