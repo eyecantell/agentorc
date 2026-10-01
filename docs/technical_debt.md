@@ -126,7 +126,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-248 | A written `Pickable: no` with no blocker hides an entry from every lane and nothing refuses it: the test holds `Owner` and `Kind` to their words and the Pickable line to `yes` or `no — <reason>`, and never a *no* against `Blocked by:`; turn on dev-cadence's `ledger.py --check` and declare the words on a `Fields:` line | Medium | Open — blocked by dev-cadence#TD-073 |
 | TD-249 | Build early from the record and the repeated-work guard: `restarts` entries carry `done` and `left`, `early` and `repeat` decided from them, new work exempt from the ceiling, the row's words; the worker presets' bound to 300k, this repo's own bound after measuring, the reading rule in this repo's grinder briefs | High | Open — pickable |
 | TD-250 | Build the person's restart: the `restart` RPC (close under the safety check, replay from the launch record, the marks and `restarts` cleared, `{why: person}`), Restart on the Inbox row and the card's more menu with its help, `ao restart`, the manager brief's board line | Medium | Open — pickable |
-| TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Designed 2026-09-30 — the build is TD-255 |
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Open — pickable |
 | TD-260 | A link socket exists at the umask's mode until the chmod after the bind, and `test_link.py` reads it in that window and fails | Low | Open |
@@ -2517,25 +2516,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, a supervised member idle with an `early` `restart_wanted` is back `working`, unattended, under its manager and on its launch record's prompt after one press or one `ao restart`, with `restarts` carrying `why: person`; a dirty checkout is refused by name; a test covers both.
 
 **Related:** TD-246 (the design), TD-245 / TD-249 (why the row appears), TD-103 slice 5 (the row), TD-083, TD-186, TD-172 (Members…), TD-152 (`ao at`, the other person's act on a record's clock).
-
-## TD-251: The grinder's brief says to ask the reader again with `--thread`, which the host agent refuses
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-09-30 (grinder-ao-1, met on PR #821's second ask)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/agentorc/briefs/grinder.md` (the lane paragraph: *findings, fix and ask again on the same thread (`--thread <its id>`)*), `tests/test_cli.py` or wherever the preset's words are held; `src/sessionorc/agent_mail.py` (`rpc_msg`: *--thread follows up a question put to the person: name `person` as the addressee*; a reply's root is `replied.root`); design §4.9b *The reader* (*the author fixes and re-asks on the same thread*)
-
-**Why:** on 2026-09-30 the techlead answered the ask on PR #821 with findings. The brief's form, `ao msg --kind ask --pr 821 --thread <the ask's id> <techlead> "…"`, was refused: `--thread` takes a question to the person, and names nobody else. What put the second ask on the first one's thread was `ao msg --kind ask --pr 821 --reply-to <the findings' id> "…"`, whose root is the findings' root. A grinder that takes the refusal at its word asks the person, which closes the question at the reader and puts a held PR in front of Paul that the reader would have merged.
-
-**Fix:** the brief's clause names the form that works — *findings: fix, and ask again as a reply to them (`ao msg --kind ask --pr <n> --reply-to <the findings' id> "…"`)* — and keeps `--thread <its id>` for the person after the bound, where it is right. A test sends an `ask` with `pr` as a reply to a reader's findings and reads one thread and one entry in `prs_waiting`. If the design means `--thread` to work toward a reader too, that is a design line first, and the designer's.
-
-**Done when:** a grinder following the brief word for word re-asks its reader without a refusal, and the seat's queue shows one entry for the PR.
-
-**Related:** TD-093 (the reader), TD-075 (asks and threads), TD-241 (PR #821, where it was met).
 
 ## TD-254: A board row draws no answers at all — the answer buttons, *Go with it* as a steer has, and a live look's two answers
 

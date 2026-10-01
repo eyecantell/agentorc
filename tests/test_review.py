@@ -84,3 +84,31 @@ async def test_review_rides_the_record_and_pr_rides_an_ask(agent, tmp_path):
         async with LocalClient(caller=tl) as tc:
             await tc.call("msg", reply_to=q["id"], kind="reply", text="merged #12")
         assert (await person.call("get", id=tl))["prs_waiting"] is None
+
+
+@pytest.mark.integration
+async def test_a_second_ask_is_a_reply_to_the_readers_findings_and_the_queue_holds_one(agent, tmp_path):
+    """TD-251, design §4.9b *The reader*: findings come back on the thread, and the author asks again
+    as a **reply to them** — `--thread` names a question put to the person and is refused toward a
+    reader. The second ask's root is the first's, and the seat's queue shows the PR once."""
+    async with LocalClient() as person:
+
+        async def mk(n: str, **kw):
+            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            return (await person.call("create", **params))["id"]
+
+        w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
+        tl = await mk("tl", team="t", unattended=True)
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            first = (await wc.call("msg", to=tl, text="#12: green, reviewed", kind="ask", pr=12))["entry"]
+            found = (await tc.call("msg", reply_to=first["id"], kind="reply", text="the mark is read twice"))["entry"]
+            assert (await person.call("get", id=tl))["prs_waiting"] is None, "answered: the PR is the author's"
+            with pytest.raises(AgentError, match="name `person` as the addressee"):
+                await wc.call("msg", to=tl, text="#12: fixed", kind="ask", pr=12, thread=first["id"])
+            again = (await wc.call("msg", reply_to=found["id"], text="#12: fixed", kind="ask", pr=12))["entry"]
+            assert again["root"] == first["id"] and again["pr"] == 12 and again["to"] == [tl]
+            assert (await person.call("get", id=tl))["prs_waiting"] == {"n": 1, "oldest": again["at"]}
+            await tc.call("msg", reply_to=again["id"], kind="reply", text="merged #12")
+        assert (await person.call("get", id=tl))["prs_waiting"] is None
+        for sid in (w, tl):
+            await person.call("kill", id=sid)
