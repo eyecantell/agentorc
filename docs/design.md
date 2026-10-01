@@ -4730,8 +4730,8 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   controller reads a field, not a clock. False exhaustion's own early bound, below, is unset
   and not built (TD-053); it may take the same constant when it lands. A run that is over before
   it began did not run out of context.
-  **Early is decided from the record, not from the clock alone** (TD-245; designed
-  2026-09-30, not built — TD-249; until then the thirty minutes alone decide). A run that
+  **Early is decided from the record, not from the clock alone** (TD-245; the declaration
+  built, TD-249 slice 2; the row's and the card's words and the ceiling's count are not — TD-249). A run that
   finished an entry fast is not a run that never began: grinder-ao-2 declared on 2026-09-30
   twenty-five minutes in, two slices merged, nothing unpushed, and sat idle twenty hours as
   *early*. So a `restart` inside `RESTART_EARLY` is early only when the run did **no new

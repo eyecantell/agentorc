@@ -137,6 +137,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _recent,  # noqa: F401
     _ref,  # noqa: F401
     _reply_line,  # noqa: F401
+    _reported,  # noqa: F401
+    _restart_reading,  # noqa: F401
     _review,  # noqa: F401
     _source,  # noqa: F401
     _start_time,  # noqa: F401
@@ -1694,7 +1696,7 @@ class HostAgent(
         `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
         `out_of_work: {at, why}` on the record. `status="restart"` is the third ending (§4.9a
         *A run that ends with work left*, TD-083): the same shape, setting
-        `restart_wanted: {at, why, early?}` — *my run is over and my lane is not*. They are the
+        `restart_wanted: {at, why, early?, repeat?}` — *my run is over and my lane is not*. They are the
         two writes on this channel that are not open to everyone — only the session itself may
         make either, declared, with a reason (§9 invariant 14) — and they refuse each other.
 
@@ -1858,13 +1860,24 @@ class HostAgent(
             # `RESTART_EARLY` of this record's own start is marked, and a controller does not act
             # on it: a run that is over before it began did not run out of context. The bound is
             # applied here because the home holds the start time; the controller reads a field.
-            mark = {"at": now_iso(), "why": why.strip()}
-            with contextlib.suppress(ValueError, TypeError):
-                # a restart its changed brief asked for (§6 rule 7) is never early: the run is not over
-                # on its own account, and rule 2 is what brings the new brief
-                if datetime.now(UTC) - _parse(s.created) < RESTART_EARLY and not s.brief_changed:
-                    mark["early"] = True
+            mark: dict[str, Any] = {"at": now_iso(), "why": why.strip()}
+            # Early is read from the record, not from the clock alone (§4.9a, TD-249): a run that
+            # reported new work is not one that never began, and one that reports only what an
+            # earlier run did, or leaves a claim a third time, is the person's whenever it says so.
+            # A restart its changed brief asked for (§6 rule 7) is neither: the run is not over on
+            # its own account, and rule 2 is what brings the new brief
+            reading = agent_common._restart_reading(s, datetime.now(UTC))
+            if s.brief_changed:
+                reading = {"early": False, "repeat": None, "words": None}
+            if reading["early"]:
+                mark["early"] = True
+            if reading["repeat"]:
+                mark["repeat"] = reading["repeat"]
             s.restart_wanted = mark
+            out = await self._report(s, True, None)
+            if reading["words"]:
+                out["decided"] = reading["words"]  # the reply names what decided it; the record keeps the fields
+            return out
         return await self._report(s, True, None)
 
     async def rpc_doing(self, id: str, text: str = "", clear: bool = False, caller: Any = None) -> dict[str, Any]:
