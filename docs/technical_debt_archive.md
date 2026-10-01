@@ -2556,3 +2556,17 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-09-30 (PR #843; grinder-ao-2) — `teams.brief_ids` gives `ao new --team` (`cli._team_slots`) and the New session form (`ui.common.team_brief_ids`) the seat's id, the manager's id and the seat's primer, as `teams.plan` fills them, so both are stored in `prompt_from.slots`; design §4.9 *A person in the team* carries the rule, and `tests/test_cli_teams.py` and `tests/test_ui_teams.py` hold it (the slots equal a team start's; `none` with no seat, an undefined team or no team). The launch record under `~/.agentorc` was not read: Paul's note named the hand-run `ao new`, and the code showed that create passing no team. A record made before the promote keeps its stored `none` until it is made again — on the board.
 
 **Related:** TD-217 (rule 7's replay), TD-113 (the `{manager}` slot), TD-229 (the team's definition moving to the repo), TD-251 (the same brief's `--thread` form).
+
+## TD-256: Rule 9's marks outlive a resumed manager, and a person's Close of the last member ends a person-led team with no note
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-09-30 (grinder-ao-1, from the reviews of PR #821 and PR #831; carried out of TD-241 when it was archived)
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_finished_team`, `_finished_tell`), `src/sessionorc/work.py` (`closed_finished`, `wound_down`), `src/sessionorc/models.py` (`finished_sent_at`, `closed_for`), wherever a resume brings a record back, `src/agentorc/ui/inbox.py` (`unclosed_mark`), `src/agentorc/teamrun.py` (`rows`, `by_tick`), `tests/test_finished_tick.py`
+
+**Why:** two gaps in rule 9 (design §6) as built by TD-241. (1) **A person's Resume of a manager the tick closed keeps `finished_sent_at` and `closed_for: {why: finished}` on the record**: only a member at work removes the first and only a Close rewrites the second. The resumed manager therefore raises the Inbox row *manager did not close* at once, the tick closes it again as soon as it is idle and clean, and if it exits instead its team still reads *wound down · by the tick*. (2) **Where no manager is live to carry `finished_sent_at`, the note to the person is written only on a tick whose own close ends the last member**: a person-led team with one member left open holding work, which the person then closes by hand, ends with no note, though §6 rule 9 says a team that dissolves is never quiet.
+
+**Resolved:** 2026-09-30 (PR #844, grinder-ao-1) — (2) where no manager is live to carry `finished_sent_at` and a member is left open with work past the settle, the home keeps that the note is owed per team in memory (`_finished_owed`, beside the settle's clock) and writes it on the tick that finds the last member gone, whoever closed it; a member at work again drops it (design §6 rule 9; `tests/test_finished_tick.py`). In memory rather than a stored field, so a home restart between the settle and the person's Close loses that one note. (1) was not a gap: a resume's record is built anew by `rpc_create`, under the name or another, and a node's superseding record is taken whole (`_take_supersession`), so neither mark reaches the resumed run — held by `test_a_resumed_manager_carries_neither_of_rule_9s_marks`.
+
+**Related:** TD-241 and TD-240 (archived: rule 9), TD-237 and TD-238 (`closed_for`), TD-125 (the announcement).
