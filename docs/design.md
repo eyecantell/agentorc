@@ -6615,7 +6615,7 @@ code and needs no grant; a session doing the same work does.
      person's own), the prompt as rule 7's replay hands it — refilled from the files it was
      made from, as merged, on the home's own host; the stored prompt for a node's member or a
      launch record with no `prompt_from` — and the mail kept: the create moves the old record's
-     mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). What it asked the person follows the close, not the mail: an `idle` member is closed first, and a close ends the open `ask`s and `steer`s it put to the person (`asker_gone`, §4.10), while an `exited` or `closed` one is not closed again, so an exited member's open questions stand and their answers reach the new record. **The new record starts fresh** otherwise: no `out_of_work`, `progress`,
+     mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). What it asked the person follows the close, not the mail: an `idle` member is closed first, and a close ends the open `ask`s and `steer`s it put to the person (`asker_gone`, §4.10; one about a ledger id or a PR is orphaned instead, and the new record, holding the name, adopts it), while an `exited` or `closed` one is not closed again, so an exited member's open questions stand and their answers reach the new record. **The new record starts fresh** otherwise: no `out_of_work`, `progress`,
      `doing` or `lane_seen` of the old run. It **clears the marks the
      person is answering** — `restart_wanted`, `restart_ceiling`, `restart_blocked` — and, as a
      person's Resume does, **clears `restarts`**: the new list holds one entry, `{at, why:
