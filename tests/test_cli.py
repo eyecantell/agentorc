@@ -1097,6 +1097,9 @@ def test_the_manager_brief_names_none_of_the_four_jobs_the_tick_took():
     for gone in ("check_cadence.py", "cadence-changes.md` on", "relayed.json", "cadence_changes.py", "Chase it while"):
         assert gone not in text and gone not in supplement, gone
     assert "one `ao send --wait` naming the PR" not in text and "naming the PR and the rule" not in supplement
+    assert "gh pr list --state merged" not in supplement and "§6 rule 11: `held_missed`" in supplement
+    # rule 4 types into no node's pane, so the one line a manager still sends is to a member on another host
+    assert "except to a member on another host" in text and "for the debt alone" in text
     assert "`checks` in `--json`" in text and "`held_missed` on the member's record" in text
     assert "**The reminder is the host agent's**" in text and "as a `system` note" in text
     assert "say *recorded*, never *verified*" in text  # rule 10: the review row is self-attested

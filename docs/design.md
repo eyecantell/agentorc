@@ -719,8 +719,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   design-first entry is *design*, a claim with an **open** PR *review*, without one *grind*, and
   *add* is reserved for a hunter's filing (TD-160 and later); a claim whose PR has merged or
   closed reads *review* still, its PR marked *merged* / *closed*, until the member marks the claim
-  done or dropped — a stale claim is the member's to clear, and the manager's cadence check
-  (`briefs/manager.md`, *A round*) is what chases it. **The doing log** (§4.8): beside the record's
+  done or dropped — a stale claim is the member's to clear, and the tick's idle nudge, which
+  names the open reference (§6 rule 4), is what chases it. **The doing log** (§4.8): beside the record's
   one `doing` value, the host agent appends every `doing` call to a bounded log per team, the
   last fifty, kept in memory and in `doing.jsonl`, served by the `doing_log` RPC (the `doing` RPC
   is the write) and pushed as a `doing` event — the feed a team card and the Repo page draw. Board counts are not here: the UI
@@ -3649,7 +3649,7 @@ what was true on a day.
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep, so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; read `checks` and `held_missed` on its members' records and never run the cadence check, name a held PR, relay a convention change or chase an owed outcome itself — those are the tick's (§6 rules 10–12 and rule 4's owed clause; TD-258); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
+| `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep, so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; read `checks` and `held_missed` on its members' records and never run the cadence check, name a held PR, relay a convention change or chase an owed outcome itself — those are the tick's (§6 rules 10–12 and rule 4's owed clause; TD-258), but for a member on another host, whose pane the tick does not type into: the manager's one line to it names what it owes; never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
 | `techlead` (TD-075, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail; and a ledger entry, by PR, when the person hands it one (§4.9 *Add an entry to the ledger*, TD-180) |
 | `auditor` (TD-098, §4.9b *Seats with a trigger*) | a hunter for one seat: check one area — what the PRs its trigger counts changed (the last *n*, or those merged inside its period, read from `ao team list --json`), against the docs or the tests the repo's own brief names — file each problem with evidence and never fix it; declare nothing (a seat is not counted in a wind-down); end when the pass is done | — (the area is its brief's; a seat has no lane) | none | `findings` |
 | `plain` | — (no template) | — | none | whatever it declares |
@@ -3800,13 +3800,13 @@ never the core's; the tests and what a manager does with them are §4.9a.
 
 The relay is the third of cadence §3's three delivery paths for a convention change (the sync
 PR, the SessionStart hook, the relay) and the only one that reaches a session already running;
-the manager keeps a structured record of what it relayed to whom on its launch branch, so a
-nightly restart does not resend. The cadence check is the manager's only judgement about the
+it is the host agent's (§6 rule 12), which keeps what each member was told on its record
+(`conventions_seen`), so a restart does not resend. The cadence check is the one judgement made about the
 *work* rather than the *session*, and it is borrowed: the script is a dev-cadence SYNC file that
 the working session runs before merging (`/cadence`) and the weekly sweep runs over the window,
-so the manager adds a third caller, not a third rule set. Its `review` row is self-attested (the
-worker posted the evidence comment itself), so the manager says *recorded*, never *verified*, and
-a green check is a reason not to send, not proof of a good review.
+so the tick (§6 rule 10) adds a third caller, not a third rule set. Its `review` row is self-attested (the
+worker posted the evidence comment itself), so the home and a manager reading `checks` say *recorded*, never *verified*:
+a green check is not proof of a good review.
 
 The manager is a **session, not code**: its brief is the samscrape supervisor's rules written
 for an agent driving `ao`. Rules that prove mechanical (wrap up at the stop time, retry a stalled
@@ -6022,7 +6022,7 @@ and a settled instruction is a thread, kept as every thread is, with the `sends`
 and the run log saying who typed what. What a conflict *reveals* — a brief that contradicts a
 lane, a convention two managers read differently — goes up as a `finding` against the entry or
 the brief it concerns (`ao finding`, §4.8), never as work a manager creates (§4.8 *manager*:
-it relays conventions and never creates work). Nobody writes a board line for a conflict; the host agent
+it never creates work). Nobody writes a board line for a conflict; the host agent
 never did (board write-back, §4.4, acts at a person's press and on nobody's behalf).
 
 **A `send` is recorded on the record it lands on, so a `conflict` can say who said what.**
