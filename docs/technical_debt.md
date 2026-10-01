@@ -128,6 +128,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-247 | The manager's remaining jobs are mostly mechanical and its judgement is occasional, yet it is a standing session waking each hour: move the cadence check, the held-path check, the convention relay and the outcome chase to the tick, and make what is left a seat on call | Medium | Open — design-first |
 | TD-248 | A written `Pickable: no` with no blocker hides an entry from every lane and nothing refuses it: the test holds `Owner` and `Kind` to their words and the Pickable line to `yes` or `no — <reason>`, and never a *no* against `Blocked by:`; turn on dev-cadence's `ledger.py --check` and declare the words on a `Fields:` line | Medium | Open — blocked by dev-cadence#TD-073 |
 | TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
+| TD-252 | The team card's *TDs in motion* rows have one fixed column and the rest as wide as their text, and the header's *who for what* line is boilerplate that tells Paul nothing: lay the rows out in columns, drop the line from the header | Medium | Open — pickable |
 
 
 ---
@@ -2532,3 +2533,25 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** a grinder following the brief word for word re-asks its reader without a refusal, and the seat's queue shows one entry for the PR.
 
 **Related:** TD-093 (the reader), TD-075 (asks and threads), TD-241 (PR #821, where it was met).
+
+## TD-252: *TDs in motion* in columns, and the team header's *who for what* line dropped
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-09-30 (Paul, from the Org page: *put the "TDS IN MOTION" card data into columns. We can also drop the boilerplate "the team's work.." blurb — it does not really add good info*. TD-249 and TD-250 are the designer's, in PRs #822 and #825; TD-251 a grinder's.)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/team_summary.html` (the `fmotion` facet's `mrow`), `templates/group_head.html` (the `whofor` line), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/repo.py` (`team_groups`: `who`), `src/agentorc/ui/help.py` and design §4.5a's help list (bound by `tests/test_help.py`), design §4.5a *team card: TDs in motion* and *team groups* (**who for what**), `docs/mockups/gen.py`
+
+**Why:** two things on the team card. (1) A *TDs in motion* row is a flex line — phase, priority letter, reference, title, holders, PR and its state — in which only the priority slot is a fixed width (TD-232) and the title takes what is left; the phase, the reference, the holders and the PR are each as wide as their text. So down a list the reference starts where the phase word ends, the holder and the PR wherever that row's own widths put them, and a row with no PR ends short. The *Doing* facet beside it was given fixed-width columns by TD-232 and reads at a glance; this one does not. (2) Under every team's header sits the *who for what* line (TD-162, built by TD-171): *the team's work: what it picks, its pace, a member that is stuck or should stop → manager-ao-1 · a PR on a held path … → techlead-ao-1 (on call) · Grinder: its own card only …*. It is each role's `message:` line joined, two lines of the same words on every team, read once and then only scrolled past; it takes the header's height on a page whose job is to show state.
+
+**Fix, one PR, the design's words changed in it** (a display change to two built controls, so §4.5a first in the same PR, and screenshots for Paul, before and after, under `docs/mockups/reviews/`):
+1. **Columns.** The facet's rows in fixed-width columns, as the *Doing* list has (or one grid): phase · priority · reference · title (the one column that flexes, ellipsis, the whole title on hover) · holder(s) · PR and its state. Fixed tracks for all but the title, sized to their longest ordinary value, so a row with no PR or no priority keeps its place; High rows first within a phase, as now. On a phone the PR column wraps under the title before the holder is lost.
+2. **The *who for what* line leaves the header.** The words stay where they are used: the **Message…** dialog still opens with the addressee's role's line (`base.html`), and the team's help panel (the *i*) gains it — new work: `ui/help.py` has no entry for these words today, so one is added there and in §4.5a's help list together. `team_groups` keeps `who` for the panel; `group_head.html` stops drawing the line, and §4.5a's *team groups* row loses its **who for what** sentence.
+3. **Tests**: the row's markup carries the column classes and an empty cell where a value is absent; the header renders no `whofor`; the Message… dialog still shows the line.
+
+**Done when:** on the Org, every *TDs in motion* row's reference, title, holder and PR start at the same x down the facet at desktop and phone widths, and no team header carries the *who for what* line while Message… and the help panel still do; Paul has the two screenshots.
+
+**Related:** TD-232 (the Doing list's columns and the priority letter), TD-176 (the team card's facets), TD-162 and TD-171 (*who for what*), TD-167 (the help panel).
