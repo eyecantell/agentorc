@@ -21,18 +21,32 @@ never a fake pass):
 
     pr        the PR exists; when merged, the merge commit has one parent (squash is
               inferred from that — GitHub records no merge method)
-    review    a `cadence-review:` comment (format below) exists, its verdict is not
+    review    a `cadence-review:` comment (format below) exists, the latest one is not
               BLOCK, and — for a merged PR — it was created AND last edited before the
-              merge. Self-attested: the session that ran the review also posts the
-              comment, so this row proves the ritual was recorded, not that it was
-              honest. Weigh it accordingly.
+              merge. The row NAMES the first such comment (the review); a later one
+              (before the merge) is listed after it, never read as the review — an author's follow-up
+              `FIXED · <own model>` is not who reviewed (TD-076). A standing BLOCK is
+              the one thing a later comment decides. Self-attested: the session that
+              ran the review also posts the comment, so this row proves the ritual was
+              recorded, not that it was honest. Weigh it accordingly.
+              A merged PR whose only review comments came AFTER the merge still fails
+              — nothing a session does later changes that — but the row carries
+              `"acknowledged": true` (text: `acknowledged`): the late review is on
+              record and there is nothing left to do — as self-attested as any review
+              comment, and a late BLOCK is a plain fail, never acknowledged. A caller that acts on a repeated
+              fail skips an acknowledged one (cadence §4.9).
     ci        every check run on the head commit either succeeded or was SKIPPED by
               the workflow, and at least one actually ran. A skip never fails the row
               — a job gated off on purpose must not block a merge — but it is named
               rather than counted green, because "not red" is not "ran". (na: none
               configured; unknown: the head is gone, as it is on old merged PRs once
               the branch was auto-deleted, OR every check was skipped, which is no
-              evidence either way and must never read as a pass)
+              evidence either way and must never read as a pass). An OPEN PR with no
+              check run listed is `na` only when nothing says one is coming (TD-079):
+              a workflow run already registered for the head commit, or a PR updated
+              within CI_REGISTER_GRACE seconds in a repo with an active workflow, is
+              unknown — the seconds after a push look exactly like "no CI here", and
+              a caller that merges on exit 0 would merge ahead of CI. Re-run.
     base      the PR's base is the default branch (cadence §1, §9 "Default-branch rule").
               A PR on another branch is the wrong-base stack of §1: merged, its work
               is on that branch and not on the default — the `worktree` row sees that
@@ -42,7 +56,15 @@ never a fake pass):
               Closed unmerged: na. No clone: na (the default is read from origin);
               no origin/<default> to read: unknown, never an assumed `main`.
     ledger    a TD-NNN named in the PR TITLE means the PR touches the ledger or the
-              archive (status line, new entry, or the move to the archive)
+              archive (status line, new entry, or the move to the archive). And a PR
+              that edits the ledger — title or no title — gets `ledger.py --check
+              --since` run on that edit (TD-073): the ledger at the PR's head against
+              its merge-base with the default branch (merged: the merge commit against
+              its parent). A bad field in an entry THIS PR changed or added fails the
+              row with the flag's text; a ledger that was never clean does not. A
+              `<repo>#TD-NNN` this machine cannot resolve is named, never a fail (it is
+              a fact about the machine's roster). Commits not in this clone, or no
+              `ledger.py` beside this script: not checked, and the row says so.
     worktree  a merged PR's local worktree is gone or reapable (clean including
               untracked, and landed by the §1 scoped diff); it is normal for it to
               still exist until the anchor's next pull, so existing is not the fault
@@ -53,7 +75,13 @@ never a fake pass):
               work is invisible to every other machine)
     deploy    if the consumer ships an executable `scripts/cadence_deploy_check.sh`
               (adapt per repo, cadence §5) it is run as `<script> <pr> <sha>`; exit
-              0 pass, 1 fail, 2 na, anything else unknown. Absent: na.
+              0 pass, 1 fail, 2 na, anything else unknown. Absent: na. The hook on
+              disk is compared with origin/<default>'s (fetched): when origin has
+              changed the hook since this checkout's merge-base with it and the disk
+              copy is missing or differs, the row answers unknown, never na or a
+              stale hook's verdict (TD-076). Otherwise the checkout runs its own — a
+              branch that adds, edits or removes the hook is judged as it stands, behind
+              or not. No origin/<default> to read: the disk copy, as before.
 
 With --since, a second section audits the window's direct commits (TD-040, cadence §4
 "The carve-outs' audit"): every first-parent commit on the default branch (cadence §9
@@ -62,13 +90,14 @@ suffix, not the root — classified as
 
     stamp         only Swept:/Swept-deep: lines on docs/user_attention.md
     board-append  whole `- [ ]` items with a Due:, under a `## Needs…` heading, nothing removed
-    board-edit    one item's tick (+ Closed:), Due: or Decided: changed, under board_edit.py's fixed
+    board-edit    one item's tick (+ Closed:), Due:, Decided: or reply tails changed, under board_edit.py's fixed
                   message (BOARD_EDIT_MSG_RE — a parity pair with board_edit.py, cadence §7)
     fail          anything else: landed without review (the files it touched are named)
 
 A fail there fails the run (exit 1); a window with direct commits and no PRs is not
 empty. JSON: "direct": {"ref", "status", "detail", "commits": [{"sha", "subject",
-"class", "status", "detail"}]}, or null with no clone to read.
+"class", "status", "detail"}]}, or null with no clone to read. "acknowledged": the
+numbers of the PRs whose every fail is an acknowledged one (present when there are any).
 
 Exit: 0 every row pass or na; 1 any fail; 2 nothing could be checked (no gh, a gh
 error, no PR, or an empty window); 3 no fail, but at least one row is `unknown` (CI
@@ -83,7 +112,9 @@ pair, cadence §7) has a machine-readable first line:
 
 and the findings in prose after it. SHIP: nothing to change; FIXED: findings were
 fixed before merge; BLOCK: do not merge. Posted with `gh pr comment` by the session,
-never edited afterwards (an edit after the merge fails the row).
+never edited afterwards (an edit after the merge fails the row). A review done after
+the merge is posted the same way, and says so: it acknowledges the fail, it never
+clears it.
 
 Out of scope, deliberately: cadence §3's board rule and §4's auto-merge threshold
 are judgements git cannot settle; §2 numbering collisions surface as CI or merge
@@ -235,29 +266,123 @@ def row_review(pr):
     found.sort(key=lambda t: t[0])
     if merged_at:
         before = [f for f in found if f[0] <= merged_at]
+        if not before and found[-1][2] == "BLOCK":
+            # a late review that says BLOCK is something to act on, never "nothing to do"
+            return row(
+                "review",
+                "fail",
+                f"merged with no review, and the late one says BLOCK ({found[-1][3]})",
+            )
         if not before:
+            # Nothing a session does now can turn this row green: the merge went out
+            # unreviewed. But the late review IS what an honest author does next, and a
+            # caller counting "a second fail on the same PR" must be able to tell that
+            # author from one who did nothing (TD-076, agentorc PR #128).
+            out = row(
+                "review",
+                "fail",
+                f"acknowledged — merged with no review; a late one is on record "
+                f"({found[0][2]} · {found[0][3]}, {found[0][0].isoformat()} > merge). "
+                "Nothing clears this row; nothing more to do",
+            )
+            out["acknowledged"] = True
+            return out
+        edited = [f for f in before if f[1] and f[1] > merged_at]
+        if edited:
             return row(
                 "review",
                 "fail",
-                f"review comment posted after the merge ({found[0][0].isoformat()} > merge)",
+                f"review comment edited after the merge ({edited[0][1].isoformat()})",
             )
-        created, updated, verdict, rest = before[-1]
-        if updated and updated > merged_at:
-            return row(
-                "review",
-                "fail",
-                f"review comment edited after the merge ({updated.isoformat()})",
-            )
+        seen = before
     else:
-        created, updated, verdict, rest = found[-1]
-    if verdict == "BLOCK":
-        return row("review", "fail", f"latest review says BLOCK ({rest})")
+        seen = found
+    # The FIRST comment is the review: a second `cadence-review:` line is usually the
+    # author saying what they did about the findings, and naming that one made the row
+    # read "reviewed by <the author's own model>" (TD-076, samscrape #830/#833).
+    created, _, verdict, rest = seen[0]
+    later = seen[1:]
+    if seen[-1][2] == "BLOCK":
+        # the one thing the latest comment decides: an older SHIP never outvotes a BLOCK
+        return row("review", "fail", f"latest review says BLOCK ({seen[-1][3]})")
     when = (
         f"{(merged_at - created).total_seconds() / 60:.0f} min before merge"
         if merged_at
         else created.isoformat()
     )
-    return row("review", "pass", f"{verdict} · {rest} · {when} (self-attested)")
+    tail = ""
+    if later:
+        tail = f"; then {len(later)} later, not the review: " + "; ".join(
+            f"{v} · {r}" for _, _, v, r in later
+        )
+    return row("review", "pass", f"{verdict} · {rest} · {when}{tail} (self-attested)")
+
+
+# TD-079: how long after a PR was last updated "no check run listed" is too early to call
+# "no CI". A workflow registers its run within seconds of a push; two minutes is generous,
+# and short enough that a repo whose workflows never run on PRs waits only that long.
+CI_REGISTER_GRACE = 120
+
+
+def _ci_coming(pr, sha):
+    """Why an open PR's empty check-run list is not yet "no CI", or None. Two pieces of
+    evidence, each one gh call; a call that fails is no evidence, and the row stays na."""
+    try:
+        wr = [
+            json.loads(line)
+            for line in run(
+                [
+                    "gh",
+                    "api",
+                    f"repos/{{owner}}/{{repo}}/actions/runs?head_sha={sha}&per_page=20",
+                    "--jq",
+                    ".workflow_runs[] | {status, conclusion}",
+                ]
+            ).splitlines()
+            if line.strip()
+        ]
+    except (GhError, ValueError):
+        wr = []
+    if wr:
+        live = [w for w in wr if w.get("status") != "completed"]
+        if live:
+            return (
+                f"{len(live)} workflow run(s) registered for {sha[:7]} with no check run "
+                "listed yet — CI is starting; re-run in a moment"
+            )
+        ends = ", ".join(sorted({str(w.get("conclusion")) for w in wr}))
+        return (
+            f"{len(wr)} workflow run(s) for {sha[:7]} ended ({ends}) without a check run — "
+            "look at the run: a workflow that fails to start reads this way"
+        )
+    updated = parse_ts(pr.get("updatedAt"))
+    if updated is None:
+        return None
+    age = (dt.datetime.now(dt.timezone.utc) - updated).total_seconds()
+    if age >= CI_REGISTER_GRACE:
+        return None
+    try:
+        active = int(
+            run(
+                [
+                    "gh",
+                    "api",
+                    "repos/{owner}/{repo}/actions/workflows",
+                    "--jq",
+                    '[.workflows[] | select(.state == "active")] | length',
+                ]
+            ).strip()
+            or 0
+        )
+    except (GhError, ValueError):
+        return None
+    if not active:
+        return None
+    return (
+        f"no check run on {sha[:7]} yet, but the PR changed {age:.0f}s ago and the repo has "
+        f"{active} active workflow(s) — too early to call it no CI; re-run in "
+        f"{CI_REGISTER_GRACE - age:.0f}s"
+    )
 
 
 def row_ci(pr):
@@ -284,6 +409,9 @@ def row_ci(pr):
             f"check runs for {sha[:7]} unreadable ({e}) — a deleted head reads this way",
         )
     if not runs:
+        coming = _ci_coming(pr, sha) if pr["state"] == "OPEN" else None
+        if coming:
+            return row("ci", "unknown", coming)
         return row("ci", "na", "no check runs on the head commit")
     pending = [r["name"] for r in runs if r.get("status") != "completed"]
     if pending:
@@ -366,15 +494,70 @@ def row_base(pr, root):
     )
 
 
-def row_ledger(pr):
+def ledger_edit_check(pr, root):
+    """TD-073: `ledger.py --check --since` on this PR's ledger edit. Returns (errors, note):
+    errors is a list of flag texts that fail the row, note a clause for the row's detail
+    ("" when there is nothing to say). Reads commits, never the working tree — the check
+    may run from the anchor, from another worktree, or a week later in a --since sweep."""
+    if not root or LEDGER_FILES[0] not in {f["path"] for f in pr.get("files") or []}:
+        return [], ""
+    if pr["state"] == "MERGED":
+        new = (pr.get("mergeCommit") or {}).get("oid")
+        old = f"{new}^" if new else None
+    else:
+        new = pr.get("headRefOid")
+        old = None
+    if not new:
+        return [], "ledger fields not checked: gh gave no commit"
+    if git(["cat-file", "-e", f"{new}^{{commit}}"], cwd=root) is None:
+        fetch_once(root)
+        if git(["cat-file", "-e", f"{new}^{{commit}}"], cwd=root) is None:
+            return [], f"ledger fields not checked: {new[:7]} is not in this clone"
+    if old is None:
+        base = git(["merge-base", default_ref(root), new], cwd=root)
+        if not base:
+            return [], f"ledger fields not checked: no merge-base of {new[:7]} with {default_ref(root)}"
+        old = base.strip()
+    text = git(["show", f"{new}:{LEDGER_FILES[0]}"], cwd=root)
+    if text is None:
+        return [], ""  # the PR removes the ledger: nothing to check
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import ledger as L  # sibling SYNC script
+    except ImportError:
+        return [], "ledger fields not checked: no ledger.py beside this script"
+    recs = L.check(
+        text,
+        git(["show", f"{new}:{LEDGER_FILES[1]}"], cwd=root) or "",
+        git(["show", f"{old}:{LEDGER_FILES[0]}"], cwd=root) or "",
+    )
+    errors = [r["text"] for r in recs if r["level"] == "error" and r["kind"] != "cross-repo"]
+    xrepo = [r["text"] for r in recs if r["level"] == "error" and r["kind"] == "cross-repo"]
+    note = "ledger fields checked"
+    if xrepo:
+        note += f" ({len(xrepo)} cross-repo blocker(s) this machine cannot resolve: {xrepo[0]})"
+    return errors, note
+
+
+def row_ledger(pr, root=None):
+    errors, note = ledger_edit_check(pr, root)
+    if errors:
+        more = f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""
+        return row(
+            "ledger",
+            "fail",
+            f"this PR's ledger edit has {len(errors)} bad field(s): {errors[0]}{more} — "
+            "`ledger.py --check --since origin/<default>` lists them (cadence §2.12)",
+        )
+    note = f"; {note}" if note else ""
     tds = sorted({f"TD-{int(n):03d}" for n in TD_RE.findall(pr.get("title") or "")})
     if not tds:
-        return row("ledger", "na", "no TD named in the title")
+        return row("ledger", "na", f"no TD named in the title{note}")
     paths = {f["path"] for f in pr.get("files") or []}
     touched = [p for p in LEDGER_FILES if p in paths]
     if touched:
         return row(
-            "ledger", "pass", f"{', '.join(tds)} named; touches {', '.join(touched)}"
+            "ledger", "pass", f"{', '.join(tds)} named; touches {', '.join(touched)}{note}"
         )
     return row(
         "ledger",
@@ -442,6 +625,42 @@ def _patch_id(root, args):
     return out[0] if p.returncode == 0 and out else None
 
 
+def _main_patch_ids(root, base, ref, names):
+    """The patch-ids, over `names`, of the first-parent commits in base..ref that could carry
+    the branch's patch — or None when they cannot be had this way (a git without
+    `--no-diff-merges`), and the caller asks commit by commit. TD-078: one `git show` and one
+    `git patch-id` per commit on main was 46 of the reaper's 49 s in a repo with five old
+    branches. Two cuts: only a commit that touches EVERY one of `names` is a candidate (a
+    patch over fewer files is another patch; listing names costs no diff), and the
+    candidates' diffs go through one `git log -p | git patch-id`. Merges are left out, as
+    `git show <merge> -- <names>` gives them no patch-id either."""
+    if any("\x01" in f or f != f.strip("\n") for f in names):
+        return None  # a name the listing below cannot be split on: ask commit by commit
+    listing = git(["log", "--first-parent", "--no-diff-merges", "--name-only", "-z", "--format=%x01%H",
+                   f"{base}..{ref}", "--", *names], cwd=root)
+    if listing is None:
+        return None
+    want, cands = set(names), []
+    for chunk in listing.split("\x01")[1:]:
+        sha, _, rest = chunk.partition("\n")
+        if {f.strip("\n") for f in rest.split("\0")} - {""} == want:
+            cands.append(sha.strip("\0\n"))
+    ids = set()
+    for i in range(0, len(cands), 200):  # bounded argv
+        # an explicit format: under a user's format.pretty the message is not indented, and a
+        # diff pasted into one would be patch-id'd as the commit's own
+        log = git(["log", "--no-walk=unsorted", "--no-diff-merges", "--format=commit %H", "-p",
+                   *cands[i:i + 200], "--", *names], cwd=root)
+        if log is None:
+            return None
+        p = subprocess.run(["git", "patch-id", "--stable"], input=log, cwd=root,
+                           capture_output=True, text=True, check=False)
+        if p.returncode != 0:
+            return None
+        ids |= {line.split()[0] for line in p.stdout.splitlines() if line.split()}
+    return ids
+
+
 def landed_since_edited(root, branch, squash=None):
     """TD-059: the scoped test answers "is the branch's content on main NOW", so a branch
     whose squash later had its files edited again on main reads "not landed" forever. The
@@ -476,9 +695,13 @@ def landed_since_edited(root, branch, squash=None):
         mine = _patch_id(root, ["diff", base, branch, "--", *names])
         if mine is None:
             return False
-        commits = git(["rev-list", "--first-parent", f"{base}..{ref}", "--", *names], cwd=root) or ""
-        found = any(_patch_id(root, ["show", "--format=", c, "--", *names]) == mine
-                    for c in commits.split())
+        ids = _main_patch_ids(root, base, ref, names)
+        if ids is not None:
+            found = mine in ids
+        else:
+            commits = git(["rev-list", "--first-parent", f"{base}..{ref}", "--", *names], cwd=root) or ""
+            found = any(_patch_id(root, ["show", "--format=", c, "--", *names]) == mine
+                        for c in commits.split())
     if not found:
         return False
     undone = subprocess.run(["git", "diff", "--quiet", base, ref, "--", *names],
@@ -569,11 +792,47 @@ def row_pushed(pr, root):
     return row("pushed", "pass", f"{branch} is pushed")
 
 
+def _origin_hook(root, ref):
+    """(known, blob sha or None) of an EXECUTABLE deploy hook at `ref`; known is False
+    when `ref` cannot be read at all."""
+    out = git(["ls-tree", ref, "--", DEPLOY_HOOK.replace(os.sep, "/")], cwd=root)
+    if out is None:
+        return False, None
+    parts = out.split()
+    if len(parts) >= 3 and parts[0] == "100755":
+        return True, parts[2]
+    return True, None
+
+
 def row_deploy(pr, root):
     if not root:
         return row("deploy", "na", "no clone here")
     hook = os.path.join(root, DEPLOY_HOOK)
-    if not (os.path.isfile(hook) and os.access(hook, os.X_OK)):
+    here = os.path.isfile(hook) and os.access(hook, os.X_OK)
+    # TD-076: the hook is the consumer's, and this row used to answer from whatever the
+    # invoker's checkout held — a checkout behind its remote, where the hook had not
+    # arrived yet, turned a `fail` into `na` (samscrape #791–#796). So ask origin too.
+    fetch_once(root)
+    ref = default_ref(root)
+    known, theirs = _origin_hook(root, ref)
+    if known:
+        mine = (git(["hash-object", "--", hook], cwd=root) or "").strip() if here else None
+        # Behind = origin changed the hook after this checkout's merge-base with it. A
+        # branch that is merely behind, or that changed the hook itself while origin's
+        # stood still, runs its own: its difference is the branch's, not staleness.
+        base = (git(["merge-base", ref, "HEAD"], cwd=root) or "").strip()
+        moved = not base or _origin_hook(root, base) != (True, theirs)
+        if moved and mine != theirs:
+            what = "has none" if not here else "has a different one"
+            if not theirs:
+                what = f"has one {ref} has since removed"
+            return row(
+                "deploy",
+                "unknown",
+                f"this checkout is behind {ref} and {what}: {DEPLOY_HOOK} — "
+                f"pull, or run the check from a checkout at {ref}",
+            )
+    if not here:
         return row(
             "deploy", "na", f"no executable {DEPLOY_HOOK} (cadence §5, adapt per repo)"
         )
@@ -608,7 +867,7 @@ def row_deploy(pr, root):
 BOARD = "docs/user_attention.md"
 PR_SUBJECT_RE = re.compile(r"\(#\d+\)$|^Merge pull request #\d+ ")
 # board_edit.py's fixed message (cadence §4, tool-made board edits) — a parity pair (§7)
-BOARD_EDIT_MSG_RE = re.compile(r"^\S+: (?:snooze|done|decide) .+ \(session [^)]+\)$")
+BOARD_EDIT_MSG_RE = re.compile(r"^\S+: (?:snooze|done|decide|reply) .+ \(session [^)]+\)$")
 STAMP_LINE_RE = re.compile(r"^(?:Swept|Swept-deep):\s")
 OPEN_ITEM_RE = re.compile(r"^\s*-\s*\[ \]\s+\S")
 ANY_ITEM_RE = re.compile(r"^(\s*-\s*)\[[ xX]\]")
@@ -655,7 +914,7 @@ def _board_diff(root, sha):
 
 def _edit_key(line):
     """An item line with what a tool-made edit may change taken out: the tick, the
-    Closed:, Due: and Decided: fields — the board reader's own item_key (cadence §7),
+    Closed:, Due: and Decided: fields and the reply tails — the board reader's own item_key (cadence §7),
     imported, never re-typed."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import nudge_user_attention as N  # sibling SYNC script, as board_edit.py imports it
@@ -688,7 +947,7 @@ def classify_direct(root, sha, subject, files):
     if len(removed) == 1 and len(new) == 1 and OPEN_ITEM_RE.match(removed[0]) \
             and ANY_ITEM_RE.match(new[0]) and _edit_key(removed[0]) == _edit_key(new[0]):
         if BOARD_EDIT_MSG_RE.match(subject):
-            return "board-edit", "one item's Due:/tick/Closed:/Decided:, under board_edit.py's message"
+            return "board-edit", "one item's Due:/tick/Closed:/Decided:/reply, under board_edit.py's message"
         return "fail", "a one-item board edit without board_edit.py's fixed message"
     return "fail", f"board change outside the carve-outs (-{len(removed)} +{len(new)} lines)"
 
@@ -728,7 +987,7 @@ def direct_commits(root, when):
 
 
 PR_FIELDS = (
-    "number,url,state,title,body,baseRefName,headRefName,headRefOid,mergedAt,mergeCommit,files"
+    "number,url,state,title,body,baseRefName,headRefName,headRefOid,mergedAt,mergeCommit,files,updatedAt"
 )
 
 
@@ -740,7 +999,7 @@ def check_pr(number, root):
         ("review", lambda: row_review(pr)),
         ("ci", lambda: row_ci(pr)),
         ("base", lambda: row_base(pr, root)),
-        ("ledger", lambda: row_ledger(pr)),
+        ("ledger", lambda: row_ledger(pr, root)),
         ("worktree", lambda: row_worktree(pr, root)),
         ("pushed", lambda: row_pushed(pr, root)),
         ("deploy", lambda: row_deploy(pr, root)),
@@ -838,6 +1097,18 @@ def print_text(results):
             print(f"  {r['status'].upper():7} {r['rule']:9} {r['detail']}")
 
 
+def acknowledged(results):
+    """The PRs whose every fail is an acknowledged one (TD-076): still a fail — the verdict
+    and the exit code do not move — but nothing a session can act on, so a sweep reports
+    them apart and a caller that acts on a repeated fail leaves them alone."""
+    out = []
+    for res in results:
+        fails = [r for r in res["rows"] if r["status"] == "fail"]
+        if fails and all(r.get("acknowledged") for r in fails):
+            out.append(res["pr"])
+    return out
+
+
 def print_direct(direct):
     if direct is None:
         print("direct commits: n/a — no clone here to read")
@@ -894,12 +1165,15 @@ def main(argv=None):
         overall = "none"
     elif truncated or dstat == "unknown" or any(r["verdict"] == "unknown" for r in results):
         overall = "unknown"
+    acked = acknowledged(results)
     if args.json:
         out = {"prs": results, "verdict": overall}
         if args.since:
             out["direct"] = direct
         if truncated:
             out["truncated"] = SINCE_LIMIT
+        if acked:
+            out["acknowledged"] = acked
         print(json.dumps(out, indent=1))
     else:
         print_text(results)
@@ -907,6 +1181,12 @@ def main(argv=None):
             print("no PRs in the window")
         if args.since:
             print_direct(direct)
+        if acked:
+            nfail = sum(r["verdict"] == "fail" for r in results)
+            print(
+                f"ACKNOWLEDGED: {len(acked)} of {nfail} failing PR(s) fail only on a late review "
+                f"already on record ({', '.join(f'#{n}' for n in acked)}) — nothing to act on there"
+            )
         if truncated:
             print(
                 f"TRUNCATED: the window returned {SINCE_LIMIT} PRs, the list limit — "

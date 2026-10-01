@@ -12,6 +12,34 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-01 — a ` — <name>, <date>: …` tail on a board item is the person's reply to its session: act on it
+Do: read a reply on an item your session raised as the person's words to you — it decides and closes nothing, so answer it in the work, then close or update the item. Never type one: a tool writes it with `scripts/board_edit.py reply --text … [--by …]`, the fourth tool-made edit beside snooze, done and decide.
+See: cadence.md §3.5, §4.5; board_edit.py; `--report --json` `replies`; TD-075.
+
+## 2026-10-01 — a `ci` row that is `unknown` right after a push means CI has not registered yet: re-run
+Do: when the cadence check's `ci` row says *too early to call it no CI* or *CI is starting*, wait a minute and re-run it — never merge on that run. It clears by itself within two minutes of the PR's last update.
+See: check_cadence.py `row_ci`, `CI_REGISTER_GRACE`; the `/cadence` skill step 5; TD-079.
+
+## 2026-10-01 — which board items carry `Answers:`: a live look ends `Answers: Works | Not right: <what>.`
+Do: end a `watch` that asks the person to look at something live with exactly `Answers: Works | Not right: <what>.` (no default unless the line names evidence beyond your own tests); give every `decide` its answers, recommended first; give other `watch`, `act` and `fyi` none. Regroom your own repo's open live looks; a decided *Works* is yours to close.
+See: cadence.md §3.5 (the table); TD-074.
+
+## 2026-10-01 — a bad ledger field in your PR fails the cadence check: run `ledger.py --check --since origin/<default>`
+Do: before pushing a ledger edit, run `python3 scripts/ledger.py --check --since origin/<default>` and fix what it prints — an unknown `Type`, a value outside the `Fields:` vocabulary, an unreadable `Blocked by`, a written `Pickable:` that disagrees with the derived one. Declare a repo's own fields on the `Fields:` line to have them checked.
+See: cadence.md §2.12; check_cadence.py `ledger` row; TD-073.
+
+## 2026-10-01 — an unattended session's SessionStart line covers its own repo's board only
+Do: in an unattended agentorc session, read `docs/user_attention.md` and `gh pr list` yourself — the hook no longer prints other repos' due items, fetches, or names stale open PRs there. A launcher sets `CADENCE_ATTENTION_SCOPE=own|machine` to choose; interactive sessions and `/attention` are unchanged.
+See: cadence.md §3.9; cadence_hooks.sh header, *The attention line's scope*; TD-077.
+
+## 2026-10-01 — a PR merged with no review gets a late one, and its `review` fail reads `acknowledged`
+Do: post the late `cadence-review:` comment (say `(post-merge)`), then leave it — the row stays FAIL but `acknowledged`, and a sweep or orchestrator skips acknowledged fails instead of re-raising them. The row names the first review comment, not your follow-up; a `deploy` row `unknown` on a checkout behind origin means pull and re-run.
+See: cadence.md §4.9; check_cadence.py `row_review`, `row_deploy`; TD-076.
+
+## 2026-09-29 — a repo that does not adopt a rule says so in `docs/cadence-local.conf`
+Do: in place of a recipe that deletes synced files after each sync, write `not-adopted: §4 — <ADR>` (no pre-push guard or shim; sync-all pushes a branch instead of a PR) or `skip-seed: <path> — <ADR>` in the seeded `docs/cadence-local.conf`, then run a plain sync. `--verify` reports OPTED-OUT, not MISSING.
+See: cadence.md, Adoption checklist item 9; TD-072.
+
 ## 2026-09-28 — `Blocked by` may name another repo's entry: `<repo>#TD-NNN`
 Do: write a wait on another repo's TD as `**Blocked by:** dev-cadence#TD-036` (`owner/name#TD-NNN` if two roster repos share a basename) instead of prose; `ledger.py` lifts it once that repo archives the entry and keeps the block, flagged, when it cannot resolve it.
 See: cadence.md §2.4; ledger.py `XREPO_ITEM_RE`, `Roster`; TD-071.

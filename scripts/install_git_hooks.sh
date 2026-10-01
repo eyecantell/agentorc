@@ -26,7 +26,8 @@
 # left alone. Each such case is a WARN naming the fix. Idempotent; run by sync.sh on every
 # sync, and by hand on a clone that predates it. Exit 0 installed or already fine (WARNs
 # may print), 2 cannot install here (not a git clone, a bare repo, a separate git dir,
-# no hooks beside this script).
+# no hooks beside this script). CADENCE_HOOKS_SKIP (space-separated hook names; sync.sh sets
+# it from docs/cadence-local.conf, TD-072) names hooks that get no shim: ours is removed.
 set -u
 
 REPO="${1:-.}"
@@ -69,6 +70,15 @@ for src in "$here"/git-hooks/*; do
     case "$name" in *.sample) continue ;; esac
     found=$((found+1))
     dst="$common/hooks/$name"
+    case " ${CADENCE_HOOKS_SKIP:-} " in
+        *" $name "*)
+            if [ -f "$dst" ] && grep -qF "$MARK" "$dst" 2>/dev/null; then
+                rm -f "$dst" && echo "  hook  $name: shim removed — opted out (docs/cadence-local.conf)"
+            else
+                echo "  hook  $name: opted out (docs/cadence-local.conf) — no shim"
+            fi
+            continue ;;
+    esac
     if [ -e "$dst" ] && ! grep -qF "$MARK" "$dst" 2>/dev/null; then
         echo "  WARN  $dst is a hook of this clone's own — kept, so the cadence $name hook does not run from there."
         echo "        Fix: fold $root/$rel/$name into it by hand, or move it aside and rerun $0"
@@ -90,6 +100,17 @@ exit 0
     else
         echo "  hook  $name: shim already in place"
     fi
+done
+
+# A shim of ours whose hook neither this copy nor the MAIN checkout (what the shim runs)
+# ships — opted out in docs/cadence-local.conf (TD-072), or dropped from the payload —
+# only prints "missing" on every run: remove it. While the main checkout still has the hook
+# (a sync into a worktree, not yet merged) the shim stays; the next sync there removes it.
+for dst in "$common"/hooks/*; do
+    { [ -f "$dst" ] && grep -qF "$MARK" "$dst" 2>/dev/null; } || continue
+    name="${dst##*/}"
+    { [ -x "$here/git-hooks/$name" ] || [ -x "$root/$rel/$name" ]; } && continue
+    rm -f "$dst" && echo "  hook  $name: shim removed — no $rel/$name to run (opted out or retired)"
 done
 
 if [ "$found" -eq 0 ]; then

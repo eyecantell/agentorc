@@ -43,13 +43,17 @@ skipped check is found, not prevented.
    new comment if there is more to say. The script's `REVIEW_RE` reads this line — the two
    are a parity pair (cadence §7): change the shape in both or in neither.
 4. **Any other row fails:** fix the cause, not the row — a `ledger` fail means the TD named
-   in the title needs its status line or archive move in this PR (§2); `pushed` means
+   in the title needs its status line or archive move in this PR (§2), or — when it says *bad
+   field(s)* — that an entry this PR added or changed has a field the reader rejects: run
+   `python3 scripts/ledger.py --check --since origin/<default>` and fix what it prints (§2.12); `pushed` means
    commits exist only on this machine (§3); `worktree` after a merge means scratch or
    unlanded commits are sitting in the worktree (§1); `base` means the PR targets a branch
    other than the default — retarget it (`gh pr edit <n> --base main`), or, for a stack you
    meant, add a `cadence-stack: <why>` line to the PR body (§1).
 5. Merge only on exit 0 (`gh pr merge <n> --squash` — no `--delete-branch` from a worktree,
-   cadence §1). Exit 3 is *look*, not *merge*: wait for a running CI and re-run; for an
+   cadence §1). Exit 3 is *look*, not *merge*: wait for a running CI and re-run
+   (a `ci` row that says *too early to call it no CI* or *CI is starting* is the minute after a
+   push, before the workflow has registered its run — re-run, it clears by itself); for an
    unknown that will not clear (a rate limit, a workflow that skips everything), find out
    why before merging and say in the PR what you found. Then re-run with `--pr <n>` once merged if you want the record: the `pr`,
    `review` (created and last edited before the merge) and `worktree` (gone or reapable)
@@ -62,4 +66,14 @@ the ritual was recorded. An orchestrator that nudges or escalates on this check,
 that reports a clean week, should say "recorded", not "verified". `pr`'s squash is inferred
 from the merge commit having one parent — GitHub records no merge method. `deploy` runs the
 consumer's own `scripts/cadence_deploy_check.sh <pr> <sha>` if one exists (exit 0 pass,
-1 fail, 2 n/a; cadence §5, *adapt per repo*) and is n/a otherwise.
+1 fail, 2 n/a; cadence §5, *adapt per repo*) and is n/a otherwise; where `origin/<default>` has changed the hook since this checkout branched from it
+and the copy here is missing or different, it is `unknown` — pull (or rebase) and re-run.
+
+`review` names the **first** `cadence-review:` comment as the review. A later one — your own
+`FIXED · <model>` follow-up, before the merge — is listed after it and decides only a standing `BLOCK`.
+
+**A PR that merged with no review** fails `review` for good: do the review now, post the
+comment as usual with `(post-merge)` after the findings count, and re-run. The row still says
+FAIL, now `acknowledged` (`"acknowledged": true` in `--json`; the run's `"acknowledged"` list
+names the PRs with no other fail; a late `BLOCK` is a plain fail — act on it). That is the end state — do not edit or re-post, and do not
+treat an acknowledged fail as a second offence.

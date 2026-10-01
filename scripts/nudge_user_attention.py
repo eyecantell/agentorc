@@ -75,6 +75,18 @@ the nudge never pushes it as due, and ``--json`` carries ``answers``,
 `` (default)`` — the one the session recommends (TD-066): stripped from the answer's
 text, carried as ``default``, and shown in the reports' tag.
 
+For a tool that draws the board (TD-075) — so that it parses neither a board line nor a
+sentence of this report: each ``--json`` item carries ``session`` and ``host`` (from its
+``(session <name> on <host>)`` head; null when the head is not that shape) and ``refs`` (what
+``Context:`` names, in order: ``TD-NNN`` or ``<repo>#TD-NNN``, ``PR #N``, ``branch <name>`` —
+the branch best-effort, see ``item_refs``; empty when there is none); each board carries ``fetch_case`` — one of ``skipped | none |
+matches | behind | local | both | unrelated`` (``FETCH_CASES``), null when no fetch was asked —
+and ``fetch_why`` for a skip, beside ``fetch_note``, whose sentence is for people. The
+SessionStart line clips an item at ``MAX_ITEM_CHARS`` but prints a reply tail
+(`` — <name>, YYYY-MM-DD: …``, after the item's ``Due:``, written by ``board_edit.py reply``)
+whole after it, and each ``--json`` item carries them as ``replies`` (``by``, ``date``,
+``text``, in order; empty when there is none).
+
 Usage:
     nudge_user_attention.py [--board PATH] [--dry-run] [--force-weekly]
     nudge_user_attention.py --report [--board PATH ...] [--fetch] [--due-only] [--json]
@@ -128,6 +140,12 @@ DECIDED_RE = re.compile(r"(?:^|(?<=[.?!]\s))Decided:\s*(?P<text>(?:(?!\bDecided:
                         r"\((?P<date>\d{4}-\d{2}-\d{2})\)\.?\s*$")
 ANSWERS_RE = re.compile(r"(?:^|(?<=[.?!]\s))Answers:\s*(?P<answers>(?:(?!\bAnswers:).)*?)\.?\s*"
                         r"(?:\bDecided:.*)?$")
+# TD-075: a reply — what the person said back on the item's own line, written by
+# `board_edit.py reply` (cadence.md §4.5): ` — <name>, YYYY-MM-DD: <words>`, after the item's
+# Due: and ahead of its trailing Answers:/Decided:/Closed: fields, any number of them in a row.
+# <name> is whoever the tool signs it as (a git user.name: `Paul`, `Paul W.`, `the person`), so
+# it is any short run with no comma or dash. Parity (cadence.md §7): board_edit.py writes it.
+REPLY_TAIL_RE = re.compile(r" — (?P<by>[^\s,—][^,—]{0,39}), (?P<date>\d{4}-\d{2}-\d{2}): ")
 ANSWER_SPLIT_RE = re.compile(r"\s*(?<!\\)\|\s*")
 # TD-053: a due date written in a shape DUE_RE cannot read (2026-9-5, 2026-02-30, "Due
 # 2026-09-05" without the colon) — once silently undated, so a typo meant never due. Only a
@@ -162,6 +180,9 @@ def _trailer(text: str) -> str:
 # TD-066: at most one answer ends in " (default)" — the asker's recommendation, as a
 # steer's `default`. Parity (§7): the board's Format: lines write it.
 DEFAULT_MARK_RE = re.compile(r"\s*\(default\)$", re.IGNORECASE)
+# Parity (cadence.md §7): §3.5's table and the seed board write a live look's answers in exactly
+# these words (TD-074), so a tool can draw the same two buttons on every board.
+LIVE_LOOK_ANSWERS = ("Works", "Not right: <what>")
 
 
 def _raw_answers(text: str) -> list[str]:
@@ -193,6 +214,31 @@ def parse_decided(text: str) -> tuple[str, date] | None:
         return m.group("text"), datetime.strptime(m.group("date"), "%Y-%m-%d").date()  # noqa: DTZ007  # local civil date, as Due:
     except ValueError:
         return None
+
+
+def reply_span(text: str) -> tuple[int, int] | None:
+    """(start, end) of the item's reply tails, or None: from the first ` — <name>, <date>: `
+    after its Due: to its trailing Answers:/Decided:/Closed: fields, or the line's end. Read
+    only after the Due: — prose shaped like a reply before it (` — Merged, 2026-09-30: …`)
+    is the item's own."""
+    due = DUE_RE.search(text)  # the item's own Due: is its first, as _trailer reads it — a reply may name one
+    m = REPLY_TAIL_RE.search(text, due.end() if due else 0)
+    if m is None:
+        return None
+    ends = [f.start() for f in (r.search(text, m.end()) for r in (ANSWERS_RE, DECIDED_RE, CLOSED_RE)) if f]
+    end = min(ends) if ends else len(text)
+    return m.start(), m.start() + len(text[m.start():end].rstrip())
+
+
+def parse_replies(text: str) -> list[tuple[str, str, str]]:
+    """The item's replies in order, each (by, YYYY-MM-DD, words); [] when it has none."""
+    span = reply_span(text)
+    if span is None:
+        return []
+    tails = text[span[0]:span[1]]
+    marks = list(REPLY_TAIL_RE.finditer(tails))
+    return [(m.group("by"), m.group("date"), tails[m.end():(nxt.start() if nxt else len(tails))].strip())
+            for m, nxt in zip(marks, [*marks[1:], None])]
 
 
 @dataclass
@@ -233,8 +279,9 @@ class BoardItem:
 
 def item_key(line: str) -> str:
     """An item line with what a tool may change on it taken out — the tick, the Closed:,
-    Decided: and Due: fields (board_edit.py may also end the sentence before them) — so
-    the open and the closed copy of one item, or a snoozed one, compare equal.
+    Decided: and Due: fields (board_edit.py may also end the sentence before them) and its
+    reply tails — so the open and the closed copy of one item, or a snoozed or replied-to
+    one, compare equal.
 
     Load-bearing twice: check_cadence.py's direct-commit audit, and parse_board, where a
     match HIDES an open item — so indentation is kept (a re-indented line is not a tool
@@ -242,6 +289,9 @@ def item_key(line: str) -> str:
     line = re.sub(r"^(\s*-\s*)\[[ xX]\]", r"\1[ ]", line)
     line = re.sub(r"\s*" + CLOSED_RE.pattern, "", line)
     line = re.sub(r"\s*" + DECIDED_RE.pattern, "", line)
+    span = reply_span(line)
+    if span:
+        line = line[: span[0]] + line[span[1]:]
     line = re.sub(r"\s*(?:" + DUE_RE.pattern + r")\.?", "", line, flags=re.IGNORECASE)
     return line.rstrip(" .")
 
@@ -326,6 +376,69 @@ def kind_counts(items: list[BoardItem]) -> str:
 
 def _clip(text: str) -> str:
     return text if len(text) <= MAX_ITEM_CHARS else text[: MAX_ITEM_CHARS - 1] + "…"
+
+
+# TD-075. Parity (cadence.md §7): the board's Format: line writes the head and Context:.
+# The head: `[kind] YYYY-MM-DD (session <name> on <host>…)`, name and host optionally backticked.
+# Boards also write `(session `ab12cd34` / `worker-2` on host, branch x)`: the session is the
+# first name, the host the first word after ` on ` anywhere inside the parentheses.
+HEAD_RE = re.compile(r"^(?:[A-Za-z]+\s+)?\d{4}-\d{2}-\d{2}\s*\(session\s+`?(?P<session>[^\s`,;)]+)`?(?P<rest>[^)]*)")
+HEAD_HOST_RE = re.compile(r"\bon\s+`?([^\s`,;)]+)")
+CONTEXT_RE = re.compile(r"\bContext:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
+REF_TD_RE = re.compile(r"(?:[\w.-]+(?:/[\w.-]+)?#)?TD-\d+")
+REF_PR_RE = re.compile(r"\bPRs?\s*#\d+(?:\s*(?:/|,|&|and)\s*#\d+)*")  # PR #12 · PRs #12/#13 · PR #12, #13
+REF_BRANCH_RE = re.compile(r"^(?P<said>branch\s+)?`?(?P<name>[A-Za-z0-9][\w./-]*)`?$")
+REF_FILE_RE = re.compile(r"\.\w{1,5}$")  # docs/plans/x.md is a path, not a branch
+
+
+def item_head(text: str) -> tuple[str | None, str | None]:
+    """(session, host) from the item's `(session <name> on <host>)` head; None for what it lacks."""
+    m = HEAD_RE.match(text)
+    if not m:
+        return None, None
+    h = HEAD_HOST_RE.search(m.group("rest"))
+
+    def named(v: str | None) -> str | None:
+        return None if v is None or v.lower() == "n/a" else v  # the Format line's `or n/a`
+    return named(m.group("session")), named(h.group(1) if h else None)
+
+
+def item_refs(text: str) -> list[str]:
+    """What `Context:` names, in order, each once: `TD-NNN` (or `<repo>#TD-NNN`), `PR #N`,
+    `branch <name>`. TD ids and PR numbers are read wherever they stand (`PRs #12/#13` and
+    `PR #12, #13` give both). A branch is best-effort: a part (`/` or `,` separated) that says
+    `branch <name>`, or that is one bare token shaped like a branch name — it has a `-`, `_`
+    or `/` and no file extension — so a word, a path to a file or a session id is not one."""
+    m = CONTEXT_RE.search(text)
+    if not m:
+        return []
+    ctx = m.group("ctx")
+    found = [(x.start(), x.group(0)) for x in REF_TD_RE.finditer(ctx)]
+    spans = [x.span() for x in REF_TD_RE.finditer(ctx)]
+    for x in REF_PR_RE.finditer(ctx):
+        spans.append(x.span())
+        found += [(x.start() + n.start(), f"PR #{n.group(1)}") for n in re.finditer(r"#(\d+)", x.group(0))]
+    for p in re.finditer(r"(?:(?!\s/\s|,).)+", ctx):
+        if any(s < p.end() and e > p.start() for s, e in spans):
+            continue
+        b = REF_BRANCH_RE.match(p.group(0).strip(" /").rstrip("."))  # the scan leaves a separator's "/ " on a part
+        if b and b.group("name").lower() != "n/a" and not REF_FILE_RE.search(b.group("name")) and (b.group("said") or re.search(r"[-_/]", b.group("name"))):
+            found.append((p.start(), f"branch {b.group('name')}"))
+    refs: list[str] = []
+    for _, ref in sorted(found):
+        if ref not in refs:
+            refs.append(ref)
+    return refs
+
+
+def _clip_keep_replies(text: str) -> str:
+    """The SessionStart line's clip (TD-075): the item is cut at MAX_ITEM_CHARS as ever, but a
+    reply tail — what the person said back on the line — is printed whole after it. A reply
+    lost to the clip is an answer the session it was written for never reads."""
+    span = reply_span(text)
+    if span is None or len(text) <= MAX_ITEM_CHARS:
+        return _clip(text)
+    return _clip(text[: span[0]]) + text[span[0]:]
 
 
 def due_tag(item: BoardItem, today: date) -> str:
@@ -852,6 +965,16 @@ class FetchResult:
     note: str
     content: str | None = None
     source: str | None = None
+    # TD-075: which case the comparison found, as a word a tool can key on — the note's
+    # sentence is for people and may be reworded. One of FETCH_CASES; `why` is set for a skip.
+    case: str = "skipped"
+    why: str | None = None
+
+
+# skipped: no comparison was made (why says why) · none: origin has no board · matches ·
+# behind: only origin moved (its copy is shown) · local: only this clone moved (unpushed) ·
+# both: both moved · unrelated: no common history to tell
+FETCH_CASES = ("skipped", "none", "matches", "behind", "local", "both", "unrelated")
 
 
 def default_branch(root: Path, run=None) -> str:
@@ -943,32 +1066,36 @@ def _fetch_board(root: Path, board: Path, deadline: float | None = None) -> Fetc
                          timeout, env)
         if r.returncode != 0:
             err = r.stderr.decode("utf-8", errors="replace").strip().splitlines()
-            return FetchResult(f"fetch skipped ({err[-1] if err else 'git fetch failed'})")
+            why = err[-1] if err else "git fetch failed"
+            return FetchResult(f"fetch skipped ({why})", why=why)
         ref = f"origin/{branch}"
         rel = (board.relative_to(root) if board.is_relative_to(root) else Path("docs/user_attention.md")).as_posix()
         origin = blob(ref, rel)
         if origin is None:
-            return FetchResult(f"fetched; no board at {ref}")
+            return FetchResult(f"fetched; no board at {ref}", case="none")
         local = board.read_text(encoding="utf-8", errors="replace") if board.is_file() else ""
         if origin == local:
-            return FetchResult(f"fetched; board matches {ref}")
+            return FetchResult(f"fetched; board matches {ref}", case="matches")
         mb = git(["merge-base", "HEAD", ref], 10)
         if mb.returncode != 0:
-            return FetchResult(f"fetched; board DIFFERS from {ref} (no common history to compare) — pull/push; showing local")
+            return FetchResult(f"fetched; board DIFFERS from {ref} (no common history to compare) — pull/push; showing local",
+                               case="unrelated")
         base = blob(mb.stdout.decode().strip(), rel) or ""
         if local == base:
             return FetchResult(
                 f"fetched; local clone is behind — showing {ref}'s board (pull to catch up)",
-                content=origin, source=ref)
+                content=origin, source=ref, case="behind")
         if origin == base:
-            return FetchResult(f"fetched; board DIFFERS from {ref} (local edits not pushed) — push for the cross-machine view")
-        return FetchResult(f"fetched; board DIFFERS from {ref} (both sides changed) — pull/push; showing local")
+            return FetchResult(f"fetched; board DIFFERS from {ref} (local edits not pushed) — push for the cross-machine view",
+                               case="local")
+        return FetchResult(f"fetched; board DIFFERS from {ref} (both sides changed) — pull/push; showing local",
+                           case="both")
     except subprocess.TimeoutExpired:
         if deadline is not None and time.monotonic() >= deadline - FETCH_TERM_GRACE - 0.05:
-            return FetchResult("fetch skipped (budget exhausted)")
-        return FetchResult("fetch skipped (timeout)")
+            return FetchResult("fetch skipped (budget exhausted)", why="budget exhausted")
+        return FetchResult("fetch skipped (timeout)", why="timeout")
     except Exception as e:  # noqa: BLE001 — a dead report row beats a dead report
-        return FetchResult(f"fetch skipped ({e})")
+        return FetchResult(f"fetch skipped ({e})", why=str(e))
 
 
 # --- Remote board tier (TD-6, plan 2026-08-13) -------------------------------
@@ -1244,6 +1371,10 @@ def _item_json(item: BoardItem, today: date) -> dict:
         # TD-039
         "kind": item.kind,
         "escalate": item.escalation(today),
+        # TD-075: who raised it and what it refers to, so no tool parses the line itself
+        **dict(zip(("session", "host"), item_head(item.text))),
+        "refs": item_refs(item.text),
+        "replies": [{"by": by, "date": d, "text": t} for by, d, t in parse_replies(item.text)],
     }
 
 
@@ -1325,7 +1456,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 continue
             fr = _fetch_board(root, bpath, deadline)
             fetched[i] = fr
-            if fr.note == "fetch skipped (budget exhausted)":
+            if fr.case == "skipped" and fr.why == "budget exhausted":
                 starved.append(label)
             if board is None and fr.content is not None:
                 # Missing locally, present on origin: origin's copy IS the row.
@@ -1354,6 +1485,9 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                          "root": str(root) if root else None,
                          "source": fr.source if fr is not None and fr.source else None,
                          "note": note, "fetch_note": fr.note if fr is not None else None,
+                         # TD-075: the same outcome as a word (FETCH_CASES); null when no fetch was asked
+                         "fetch_case": fr.case if fr is not None else None,
+                         "fetch_why": fr.why if fr is not None else None,
                          # stale: same gate as the text report — only a fetched row
                          # pays for the best-effort ls-remote (None = current/unknown)
                          "stale": staleness_line(board) if fr is not None else None,
@@ -1403,7 +1537,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 if not surfaces_at_start(item, today):
                     continue
                 n_escalate += item.escalation(today) is not None
-                ln = f"  • {label}{tag}: ({item_tag(item, today)}) {_clip(item.text)}"
+                ln = f"  • {label}{tag}: ({item_tag(item, today)}) {_clip_keep_replies(item.text)}"
                 if item.decided is not None:
                     decided_lines.append(ln)
                 elif item.bad_due is not None:
