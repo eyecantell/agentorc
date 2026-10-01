@@ -122,10 +122,11 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-239 | Build the balance rule: `teams.<team>.balance` and its three lines, the home's `balance` mark, the refusal at the claim and of `ao progress none`, the notes, the team card's note, the Settings fields, `ao team balance`, the briefs | Medium | Partly done — slices 1–3 and 6 built (the setting, the mark, the refusal, the notes, the tests); slices 4–5 open |
 | TD-244 | Groom the agentorc attention board onto the Inbox's features: 58 open items and none carries `Answers:`; close what is done, give every question its answers and a `(default)`, ledger what is overdue 14 days behind `Blocked by: decision (Paul)` | High | Partly done — the pass is built (3 closed, one by its raiser; 5 with answers, 5 act, 45 watch); the archive is built (#811); left: the 45 live looks against the 15, on Paul's answer to the steer |
 | TD-245 | A member that ends its run at an entry's end, past its context bound, is marked `early` when the run was under thirty minutes, and nothing restarts it: grinder-ao-2 sat idle 20 hours on 2026-09-30 with the team's work in its package; and 200k is under what one entry in this repo costs | High | Designed 2026-09-30 — the build is TD-249 |
-| TD-246 | A person cannot restart a member unattended: the restart row says *yours now* and its one button, Resume, brings the session back attended; there is no `ao restart` | Medium | Open — design-first |
+| TD-246 | A person cannot restart a member unattended: the restart row says *yours now* and its one button, Resume, brings the session back attended; there is no `ao restart` | Medium | Designed 2026-09-30 — the build is TD-250 |
 | TD-247 | The manager's remaining jobs are mostly mechanical and its judgement is occasional, yet it is a standing session waking each hour: move the cadence check, the held-path check, the convention relay and the outcome chase to the tick, and make what is left a seat on call | Medium | Open — design-first |
 | TD-248 | A written `Pickable: no` with no blocker hides an entry from every lane and nothing refuses it: the test holds `Owner` and `Kind` to their words and the Pickable line to `yes` or `no — <reason>`, and never a *no* against `Blocked by:`; turn on dev-cadence's `ledger.py --check` and declare the words on a `Fields:` line | Medium | Open — blocked by dev-cadence#TD-073 |
 | TD-249 | Build early from the record and the repeated-work guard: `restarts` entries carry `done` and `left`, `early` and `repeat` decided from them, new work exempt from the ceiling, the row's words; the worker presets' bound to 300k, this repo's own bound after measuring, the reading rule in this repo's grinder briefs | High | Open — pickable |
+| TD-250 | Build the person's restart: the `restart` RPC (close under the safety check, replay from the launch record, the marks and `restarts` cleared, `{why: person}`), Restart on the Inbox row and the card's more menu with its help, `ao restart`, the manager brief's board line | Medium | Open — pickable |
 | TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
 | TD-253 | A restarted grinder's brief names its techlead and its manager as `none` while both exist, so its asks and its `done` lines are addressed to nobody | Medium | Open |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Open — design-first |
@@ -2434,8 +2435,9 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Added:** 2026-09-30 (the anchor, restarting grinder-ao-2 for Paul)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
-**Status:** Open
+**Pickable:** no — designed; the build is TD-250
+**Status:** Designed 2026-09-30 (the designer, PR #825, stacked on #822; the steer to Paul is `m-b2288fc944f2`, bound 2026-10-01 07:29 MDT): design §6 rule 2 *A person's restart*, §4.5a **Inbox row: restart** (Restart beside Resume) and the card's **more ▾**, §4.7 `ao restart`. The Fix as written, with the round's two decisions: the press clears `restarts` as a Resume does and never counts toward the ceiling, and a manager's board line names the control instead of asking in words. Closes with TD-250.
+**Blocked by:** TD-250
 **Location:** design §4.5a (**Inbox row: restart**, the card's ⋯), §4.9 (the CLI), §6 rule 2; `src/agentorc/ui/templates/inbox_row.html` (the `restart` row), `src/sessionorc/agent_tick.py` (`_wanted_restart`, `_replay`), `src/agentorc/cli.py`
 
 **Why:** the Inbox's restart row reads *the host agent will not restart it — yours now*, and offers Open, Resume, Snooze and Dismiss. Resume brings the session back **attended**, which takes a supervised member out of its team's run. `ao` has no `restart`, and `ao team start` refuses while the names are held. On 2026-09-30 the anchor did it by hand: `ao close` on the idle, clean record, then `ao new -d ~/agentorc -w grinder-ao-2 --unattended --supervised --role grinder --brief docs/briefs/grinder-ao-2.md --lane free-pick --team ao-grind --project agentorc -p grind grinder-ao-2` — nine flags read off the old record, any one of which, wrong, starts a different session (the record's `restarts` list and its stored prompt are lost either way). The manager's board line asked Paul to *say restart it*, and nothing reads that sentence.
@@ -2518,6 +2520,29 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** a grinder that finishes an entry and declares `restart` past its bound is restarted by the tick within a tick however short the run was; a run that declares with nothing done, or with only what its last run already reported, is the person's with the row naming it; the worker presets carry 300k and this repo's `.agentorc.yml` its measured bound; the package template and default say nothing particular to this repo; a fresh run in this repo finishes at least one entry before its bound.
 
 **Related:** TD-245 (the design), TD-189, TD-190 (the bound and its research), TD-186 (the ceiling's window), TD-083 (`restart_wanted`), TD-118 (start-up reading), TD-246 (the person's restart, designed next), TD-240 / TD-241 (the card with no Start).
+
+## TD-250: Build the person's restart — the `restart` RPC, Restart on the row and the card, `ao restart`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-30 (the designer, from TD-246's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` or `agent_wake.py` (a `rpc_restart`, person-only by the `caller` check `rpc_set_settings` makes, in `modes.HOME_EDITS`), `src/sessionorc/agent_tick.py` (`_replay` and `_refill_prompt`, the inline clean-and-pushed test of `_wanted_restart` — moved into `sessionorc` as one function that `agentorc.teamrun`'s `_unsafe_to_close` then calls, so the two cannot drift), `src/agentorc/team_skill.md` and `ui/static/app.js` (the *member back* notes that name Resume with changes…), `src/sessionorc/models.py` (`restarts`, the marks), `src/agentorc/ui/templates/inbox_row.html` (the `restart` row), `src/agentorc/ui/inbox.py` (`restart_mark`), the card's more menu (`src/agentorc/ui/templates/` and `static/app.js`), `src/agentorc/ui/app.py` (the API route), `src/agentorc/ui/help.py`, `src/agentorc/cli.py` (`ao restart`), `src/agentorc/briefs/manager.md` (the board line), `tests/`
+
+**Why:** TD-246's *Why*: the Inbox's restart row says *yours now* and offers only Resume, which brings the member back attended; the anchor restarted grinder-ao-2 by hand with nine flags read off the old record.
+
+**Fix, in slices a PR each:**
+1. **The RPC** (`sessionorc`): `restart {id}`, a person's alone (the refusal `rpc_set_settings` gives a session, in its words: *restart is a person's own: refused to a session (design §6 rule 2)*), on a supervised record with a launch record in `idle`, `exited` or `closed`: refuses by name a `working`, `needs-you`, suspended or `scheduled` record, a seat, a record with no launch record (*use Resume with changes…*), one whose name another live record holds, one whose launch record's `run_until` has passed, one whose profile `_profile_gated` says is over its line, and one the clean-and-pushed test refuses (its words); otherwise closes it if still there and creates from the launch record as `_replay` does — `_refill_prompt` included — but with `restarts = [{at, why: person}]` in place of the appended history and the marks cleared; mail as a replay at the same id keeps it; a node's record goes over the link as rule 1's replay does. The reply is the new record.
+2. **The row and the card**: **Restart** on the Inbox restart row beside Resume, its refusal the row's toast; **Restart** on the card's *more ▾* for a supervised idle, exited or closed record, confirming when no restart mark stands; the help entries for both go into §4.5a's help list and `ui/help.py` together (bound by `tests/test_help.py`; the wording is this slice's, saying which of Restart and Resume is which).
+3. **`ao restart <session>`** and the words: the command prints the new record's line; `manager.md`'s round step 1, the clause ending *on the board once*, gains *— the person's press is the Inbox row's Restart, or `ao restart <id>`*; `team_skill.md`'s *Stop it* and `app.js`'s member-back note name Restart as the way back into the team's run.
+4. **Tests**: an idle early `restart_wanted` member is back `working`, unattended as its launch record says, under its manager, on the prompt its launch record refills, with `restarts == [{why: person}]`, no marks and no `out_of_work`; a dirty checkout is refused by name and nothing changes; a session calling the RPC is refused; a record with no launch record is refused naming Resume with changes…; an exited record at its ceiling is restarted and the ceiling is gone; a seat is refused; a launch record with `unattended: false` comes back attended; a passed stop time is refused.
+
+**Done when:** on a scratch home, a supervised member idle with an `early` `restart_wanted` is back `working`, unattended, under its manager and on its launch record's prompt after one press or one `ao restart`, with `restarts` carrying `why: person`; a dirty checkout is refused by name; a test covers both.
+
+**Related:** TD-246 (the design), TD-245 / TD-249 (why the row appears), TD-103 slice 5 (the row), TD-083, TD-186, TD-172 (Members…), TD-152 (`ao at`, the other person's act on a record's clock).
 
 ## TD-251: The grinder's brief says to ask the reader again with `--thread`, which the host agent refuses
 
