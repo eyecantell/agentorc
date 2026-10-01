@@ -3815,7 +3815,8 @@ now?) stay in the brief. The grant is what makes this safe: the manager's power 
 person can see on the Focus header and revoke, not a promise in its prompt. Since TD-247
 (designed 2026-09-30; the policies and the preset's words built 2026-10-01, TD-258; the seat the default since TD-259's flip) the brief's remaining mechanical jobs are §6
 rules 10–12 and rule 4's owed clause, and what is judgement is a **seat on call** (§6 *What is
-left is judgement*): a manager whose definition does not say `on_call: false` (§4.9) is a seat of §6
+left is judgement*): a manager of the `manager` role whose definition does not say `on_call: false` (§4.9: another role
+named as manager is one only where it says `on_call: true`) is a seat of §6
 rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
 question to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it
 has acted, holding `control` on its record across the close as a seat holds its mail; a standing
@@ -6685,7 +6686,8 @@ code and needs no grant; a session doing the same work does.
      number was the manager's. (This is TD-104, folded here.)
      **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30; the trigger,
      `idle_open` and `seat_filled` built — TD-259 slice 2; the sweep's exception is slice 3's). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
-     say `on_call: false` (§4.9), and the tick sets its `seat_due` with `by` one of four words, each a
+     say `on_call: false` — the `manager` role's default alone, another role's manager being a seat only where its
+     definition says `on_call: true` (§4.9) — and the tick sets its `seat_due` with `by` one of four words, each a
      reading of the records and never of a screen: **`asks`**, as the techlead's — an open `ask`
      or `steer` addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its
      team (a supervised record listing it in `controllers`) hook-confirmed `needs-you` with a
@@ -6791,7 +6793,7 @@ code and needs no grant; a session doing the same work does.
   member's own `none --why` names what it saw and left. **On call is the default from the build** (TD-247
   step 4 asked for a proof first; Paul, 2026-10-01, on the designer's steer: *flip the default to on call at
   the build; every team goes on call at its next Start*): a definition with no `on_call` means the
-  seat, and every team takes the shape at its next Start, since the seat field is written at the
+  seat for a manager of the `manager` role (§4.9: the template with a seat's shape is that role's, so another role's manager stands unless its definition says `on_call: true`), and every team takes the shape at its next Start, since the seat field is written at the
   create; dc-grind's first run on call, whose needs are the most mechanical, is the first look, written
   in TD-259 — what the seat could not do there is a finding, not a gate. The
   wind-down is rule 9's whichever shape the manager has: a manager on call that is closed is not
