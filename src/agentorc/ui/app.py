@@ -1529,6 +1529,12 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await call("kill", id=sid)
         elif action == "close":
             await call("close", id=sid)
+        elif action == "restart":
+            # design §4.5a **Restart** on the Inbox restart row and the card's *more ▾* (§6 rule 2 *A
+            # person's restart*, TD-250): the RPC is a person's alone and makes every refusal before
+            # it touches anything, so its words are the toast and the row stands
+            s = await call("restart", id=sid)
+            return JSONResponse({"ok": True, "id": s.get("id") or sid, "unattended": bool(s.get("unattended"))})
         elif action == "send":
             await call("send", id=sid, text=body.get("text", ""))
         elif action == "wrapup":

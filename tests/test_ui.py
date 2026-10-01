@@ -1904,3 +1904,14 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
     assert client.post("/api/settings/person", json={"terminal": {"copy_on_select": True}}).json()["ok"]
     assert 'id="tcopysel" checked' in client.get(f"/focus/{sid}").text
     client.post(f"/api/sessions/{sid}/kill")
+
+
+def test_restart_from_the_page_is_the_rpc_and_its_refusal_is_the_toast(client, subprocess_agent, tmp_path):
+    """§4.5a **Restart** (§6 rule 2 *A person's restart*, TD-250 slice 2): the page's press is the
+    `restart` RPC, a person's own, and what the host agent refuses comes back in its words."""
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "plain"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    got = client.post(f"/api/sessions/{sid}/restart")
+    assert got.status_code == 400 and "no launch record" in got.json()["detail"]  # nothing supervises a shell
+    assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["state"] == "idle"  # untouched

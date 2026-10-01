@@ -734,6 +734,7 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     assert restart["ao-r"]["text"] == f"restart wanted · {again} — context full"
     html = rows("needs", [restart["ao-c"]])
     assert 'data-act="resume" data-id="ao-c"' in html and ">Open<" in html
+    assert 'data-act="restart"' not in html  # not supervised: nothing says how it was started (TD-250)
     assert 'data-act="attention_snooze"' in html and 'data-row="restart"' in html and 'data-act="allow"' not in html
     assert f'data-until="dismissed:{at}"' in html and ">Dismiss<" in html
     # **Dismiss** hides that one mark's row; a new mark (a new `at`) raises a new row
@@ -2848,3 +2849,38 @@ def test_a_mail_row_links_its_page_and_a_state_or_board_row_does_not():
     assert 'data-page="/inbox/m-1"' in mail and '<a class="pagelink st" href="/inbox/m-1"' in mail
     state = rows("needs", state_rows_of([rec("ao-p", "needs-you", pending={"kind": "permission", "text": "x"})]))
     assert "data-page=" not in state and "pagelink" not in state
+
+
+@pytest.mark.unit
+def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: restart** and **more ▾** → **Restart** (§6 rule 2 *A person's restart*,
+    TD-250 slice 2): drawn beside Resume on the row of a supervised record that is not a seat — the
+    *fills exhausted* row keeps Open, Resume and Dismiss alone — and in the card's menu for a
+    supervised idle, exited or closed record, confirming only when no restart mark stands."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    at = "2026-10-01T11:00:00Z"
+    ceiling = {"at": at, "count": 3}
+    records = [
+        rec("ao-m", "exited", supervised=True, restart_ceiling=ceiling),
+        rec("ao-s", "exited", supervised=True, seat={"trigger": "asks"}, restart_ceiling={**ceiling, "why": "fill"}),
+        rec("ao-i", "idle", supervised=True),
+        rec("ao-w", "working", supervised=True),
+        rec("ao-u", "idle"),
+        rec("ao-o", "exited", supervised=True, superseded_by="ao-p"),
+    ]
+    restart = {r["sid"]: r for r in state_rows_of(records) if r["row"] == "restart"}
+    member, seat = rows("needs", [restart["ao-m"]]), rows("needs", [restart["ao-s"]])
+    assert member.index('data-act="restart" data-id="ao-m"') < member.index('data-act="resume" data-id="ao-m"')
+    assert 'data-act="restart"' not in seat and 'data-act="resume" data-id="ao-s"' in seat and ">Dismiss<" in seat
+
+    def menu(r):
+        html = templates.get_template("card.html").render(s=view(r, records))
+        return html[html.index('class="menu"') :]
+
+    by = {r["id"]: menu(r) for r in records}
+    assert 'data-act="restart" data-id="ao-m" title=' in by["ao-m"]  # a mark stands: the press is its answer
+    assert 'data-act="restart" data-id="ao-i" data-confirm="Restart i? It is closed if still there' in by["ao-i"]
+    for sid in ("ao-s", "ao-w", "ao-u", "ao-o"):  # a seat, a working one, one nothing supervises, a superseded one
+        assert 'data-act="restart"' not in by[sid], sid

@@ -470,11 +470,13 @@
   {{ open_btn(e, 'Open') }}
   {%- elif e.row == 'restart' %}
   {#- §4.5a **Inbox row: restart** (§6 *Keeping a team running*, TD-103): what the tick could not
-      restart. **Resume** is the banner's one-press Resume — the session comes back attended, and a
-      person restarting past the ceiling is the person's word. -#}
+      restart. **Restart** (§6 rule 2 *A person's restart*, TD-250) puts it back in its team's run
+      from its launch record — never on a seat's row; a refusal is the toast and the row stands.
+      **Resume** is the banner's one-press Resume — the session comes back attended. -#}
   <span class="st">the host agent will not restart it — yours now</span>
   <span class="grow"></span>
   {{ state_snooze(e) }}
+  {% if e.restartable %}<button class="btn sm" data-act="restart" data-id="{{ e.sid }}" title="{{ help_title('restart') }}">Restart</button>{% endif %}
   <button class="btn sm" data-act="resume" data-id="{{ e.sid }}">Resume</button>
   {{ open_btn(e, 'Open') }}
   <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="restart" data-until="dismissed:{{ e.at }}" title="remove this row: the mark stays on the record and its card, and a new mark raises a new row">Dismiss</button>
