@@ -38,6 +38,20 @@
 #   - stdout of every child passes through (SessionStart output is context for the model);
 #   - the runner itself always exits 0: these are detectors, never a gate (cadence §7).
 #
+# THE ATTENTION LINE'S SCOPE (TD-077)
+# The attention child reports every roster repo's due items, fetched — the line a person
+# wants at a session start. An UNATTENDED session (an agentorc worker nobody is driving)
+# can act on none of the other repos' items and paid for them at every start and restart
+# (71 items, ~4,200 tokens on one machine), so it gets its own repo's board only, with no
+# fetch: `--report --due-only --board <project>/docs/user_attention.md`, and nothing at all
+# when that repo has no board. No fetch also means no open-PR line (TD-052 rides the fetch):
+# such a session's brief has it list PRs itself. Unattended is, in order: CADENCE_ATTENTION_SCOPE=own
+# (=machine forces the full line; any launcher can set either), else AGENTORC_SESSION
+# set and `ao status --json` saying that session's record is `"unattended": true` (5 s
+# bound). Anything else — no ao, an error, an interactive ao session, a person's
+# terminal — is the machine-wide line: when in doubt the hook says more, never less.
+# `/attention` is the machine-wide view either way. `--list` prints the machine form.
+#
 # The seeded line (byte-identical in dev-cadence files/.claude/settings.json and in
 # agentorc's CADENCE_HOOK_LINE — a parity pair):
 #   r=$(git -C "${CLAUDE_PROJECT_DIR:-.}" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi
@@ -116,12 +130,38 @@ run_child() {
     return 0
 }
 
+attention_scope() {
+    case "${CADENCE_ATTENTION_SCOPE:-}" in own|machine) echo "$CADENCE_ATTENTION_SCOPE"; return ;; esac
+    if [ -n "${AGENTORC_SESSION:-}" ] && command -v ao >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        local st
+        if [ "$have_timeout" = 1 ]; then st="$(timeout 5 ao status --json 2>/dev/null </dev/null)"; else st="$(ao status --json 2>/dev/null </dev/null)"; fi
+        if printf '%s' "$st" | python3 -c '
+import json, os, sys
+try:
+    recs = json.load(sys.stdin)
+    me = [r for r in recs if isinstance(r, dict) and r.get("id") == os.environ["AGENTORC_SESSION"]]
+    sys.exit(0 if len(me) == 1 and me[0].get("unattended") is True else 1)
+except Exception:
+    sys.exit(1)
+' 2>/dev/null; then
+            echo own; return
+        fi
+    fi
+    echo machine
+}
+
 case "${1:-}" in
     --session-start)
         run_child scripts/check_claude_memory.sh --hook
         run_child scripts/check_anchor.py --hook
         run_child scripts/hydrate_worktree.sh --hook
-        run_child scripts/nudge_user_attention.py --report --due-only --fetch
+        if [ "$(attention_scope)" = own ]; then
+            own_board="${CLAUDE_PROJECT_DIR:-.}/docs/user_attention.md"
+            # no board, nothing due: an explicit --board that is missing would print a row
+            [ -f "$own_board" ] && run_child scripts/nudge_user_attention.py --report --due-only --board "$own_board"
+        else
+            run_child scripts/nudge_user_attention.py --report --due-only --fetch
+        fi
         bound=10 run_child scripts/check_base.py --hook
         run_child scripts/cadence_changes.py --hook
         ;;

@@ -38,9 +38,23 @@ match the first word case-insensitively, and ``FIELD=`` keeps an entry without t
 ``type`` and ``priority`` match the derived value (no Type is debt). ``--counts`` counts per value.
 What to *do* with a field (lanes, routing) is the orchestrator's, never this script's.
 
+``--check`` prints only the flags and exits 1 when an error stands (TD-073) — every ⚠: an unknown
+Type, a value outside a declared vocabulary, a Blocked by item it cannot read or resolve, a
+``Fields:`` line it cannot read. ℹ lines stay information. ``--check --since REF`` judges an edit,
+not the ledger: an entry counts only when its header block differs from the one at REF (or is new),
+and a ``Fields:`` flag only when the declaration changed, so a ledger that was never clean passes
+and the edit that adds one more bad field does not. On a counted entry two more things are errors:
+a written Pickable that disagrees with the derived one, and — when the ledger declares vocabularies
+at all — a header field that is neither the cadence's nor declared. Standing flags are counted, not
+printed. ``--json``: ``{"flags": [{"level": error|info, "id", "field", "kind", "text", "standing"}],
+"errors": N}`` — key on ``kind`` and ``field``, never on the sentence. Kinds: fields-decl, below-header,
+type, vocabulary, blocked-item, cross-repo, blocked-unknown, blockers-archived, pickable-disagrees,
+undeclared-field. ``check_cadence.py``'s ``ledger`` row runs the same check on a PR's ledger edit.
+
 Defaults: ``docs/technical_debt.md`` and ``docs/technical_debt_archive.md`` at the top of
-the git work tree the command runs in. Offline, read-only. Exit 0; 2 when the ledger cannot
-be read or the arguments are unusable. A detector, never a gate (cadence.md §7).
+the git work tree the command runs in. Offline, read-only. Exit 0 (``--check``: 1 on an error);
+2 when the ledger, or ``--since``'s ref, cannot be read or the arguments are unusable. A detector,
+never a gate (cadence.md §7): ``--check`` is what lets a caller choose to gate on it.
 """
 
 from __future__ import annotations
@@ -166,7 +180,7 @@ def entries(text: str) -> list[dict]:
         blocked = fields.get("blocked by") or None  # an empty field (the template's line left blank) blocks nothing
         out.append({"id": m.group(1), "title": m.group(3).strip(),
                     "priority": prio.capitalize() if prio else None,
-                    "type_raw": type_raw.split()[0] if type_raw else None,
+                    "type_raw": (type_raw.split() or [None])[0] if type_raw else None,  # a value of only \r or NBSP is no Type
                     "blocked_raw": blocked, "fields": fields, "below": below})
     return out
 
@@ -268,14 +282,32 @@ class Roster:
         return out
 
 
-def pickable(ledger: str, archive: str, roster: Roster | None = None) -> dict:
-    """Every live entry, sorted, with its derived pickable, open blockers and raw fields; plus flags."""
+class _Flags(list):
+    """The flags as the sentences every mode prints (a list of str, as before), with a record
+    beside each for --check: level (error for ⚠, info for ℹ), entry id, field, kind."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.recs: list[dict] = []
+
+    def add(self, text: str, tid: str | None, field: str, kind: str) -> None:
+        self.append(text)
+        self.recs.append({"level": "error" if text.startswith("⚠") else "info", "id": tid,
+                          "field": field, "kind": kind, "text": text})
+
+
+def pickable(ledger: str, archive: str, roster: Roster | None = None, undeclared: bool = False) -> dict:
+    """Every live entry, sorted, with its derived pickable, open blockers and raw fields; plus flags.
+    ``undeclared`` (--check) also flags a header field with no vocabulary, when the ledger declares any."""
     live = entries(ledger)
     live_nums = {_num(e["id"]) for e in live}
     archived = _heading_nums(archive)
     rows = {int(m.group(2)): (i, m.group(4))
             for i, m in enumerate(ROW_RE.finditer(COMMENT_RE.sub("", ledger)))}
-    vocab, flags = declared(ledger)
+    vocab, decl_flags = declared(ledger)
+    flags = _Flags()
+    for text in decl_flags:
+        flags.add(text, None, "fields", "fields-decl")
     roster = roster or Roster()
     pick, blocked = [], []
     for pos, e in enumerate(live):
@@ -285,25 +317,30 @@ def pickable(ledger: str, archive: str, roster: Roster | None = None) -> dict:
         rank = PRIORITIES.index(prio.lower()) if prio.lower() in PRIORITIES else len(PRIORITIES)
         etype = (e["type_raw"] or TYPES[0]).lower()
         for key in e["below"]:
-            flags.append(f"ℹ {e['id']}: its {key.capitalize()} line is below the header block — "
-                         "read anyway; move it up (cadence.md §2.12)")
+            flags.add(f"ℹ {e['id']}: its {key.capitalize()} line is below the header block — "
+                      "read anyway; move it up (cadence.md §2.12)", e["id"], key, "below-header")
         if etype not in TYPES:
-            flags.append(f"⚠ {e['id']}: unknown Type {e['type_raw']!r} — write one of "
-                         f"{' | '.join(TYPES)}; read as {TYPES[0]}")
+            flags.add(f"⚠ {e['id']}: unknown Type {e['type_raw']!r} — write one of "
+                      f"{' | '.join(TYPES)}; read as {TYPES[0]}", e["id"], "type", "type")
             etype = TYPES[0]
         for key, allowed in vocab.items():
             v = first_word(e["fields"].get(key))
             if v and v not in allowed:
-                flags.append(f"⚠ {e['id']}: {key} {v!r} is not in the preamble's Fields: vocabulary "
-                             f"({' | '.join(allowed)})")
+                flags.add(f"⚠ {e['id']}: {key} {v!r} is not in the preamble's Fields: vocabulary "
+                          f"({' | '.join(allowed)})", e["id"], key, "vocabulary")
+        if undeclared and vocab:
+            for key in e["fields"]:
+                if key not in CADENCE_FIELDS and key not in vocab:
+                    flags.add(f"ℹ {e['id']}: field {key!r} has no vocabulary on the preamble's Fields: line — "
+                              "not validated; declare it (cadence.md §2.12)", e["id"], key, "undeclared-field")
         rec = {"id": e["id"], "title": e["title"], "priority": prio, "type": etype,
                "blocked_by": [], "cross_repo": [], "pickable": True, "fields": e["fields"],
                "_key": (rank, TYPES.index(etype), order)}
         if e["blocked_raw"] is not None:
             ids, who, bad = parse_blocked(e["blocked_raw"])
             for item in bad:
-                flags.append(f"⚠ {e['id']}: cannot read Blocked by item {item!r} — "
-                             "write TD-NNN or decision (<who>)")
+                flags.add(f"⚠ {e['id']}: cannot read Blocked by item {item!r} — "
+                          "write TD-NNN or decision (<who>)", e["id"], "blocked by", "blocked-item")
             open_ids = []
             for b in ids:
                 if "#" in b:
@@ -312,33 +349,81 @@ def pickable(ledger: str, archive: str, roster: Roster | None = None) -> dict:
                     if x["state"] == "open":
                         open_ids.append(b)
                     elif x["state"] == "unresolved":
-                        flags.append(f"⚠ {e['id']}: cannot resolve {b} — {x['why']}; the block stays")
+                        flags.add(f"⚠ {e['id']}: cannot resolve {b} — {x['why']}; the block stays",
+                                  e["id"], "blocked by", "cross-repo")
                         open_ids.append(b)  # unresolved: keep the block — the safe direction
                     continue
                 bn = _num(b)
                 if bn in live_nums:
                     open_ids.append(b)
                 elif bn not in archived:
-                    flags.append(f"⚠ {e['id']}: Blocked by {b}, which names no entry in the ledger or the archive")
+                    flags.add(f"⚠ {e['id']}: Blocked by {b}, which names no entry in the ledger or the archive",
+                              e["id"], "blocked by", "blocked-unknown")
                     open_ids.append(b)  # unknown: keep the block — the safe direction
             if not open_ids and not who and not bad:
-                flags.append(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — pickable; "
-                             "the Blocked by field can go")
+                flags.add(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — pickable; "
+                          "the Blocked by field can go", e["id"], "blocked by", "blockers-archived")
             else:
                 rec["blocked_by"] = open_ids + [f"decision ({w})" for w in who] + [repr(b) for b in bad]
                 rec["pickable"] = False
         written = first_word(e["fields"].get("pickable"))
         if written in ("yes", "no") and (written == "yes") != rec["pickable"]:
-            flags.append(f"ℹ {e['id']}: its Pickable line says {written}, the derived pickable is "
-                         f"{'yes' if rec['pickable'] else 'no'} — the line is only a field (cadence.md §2.12)")
+            flags.add(f"ℹ {e['id']}: its Pickable line says {written}, the derived pickable is "
+                      f"{'yes' if rec['pickable'] else 'no'} — the line is only a field (cadence.md §2.12)",
+                      e["id"], "pickable", "pickable-disagrees")
         (pick if rec["pickable"] else blocked).append(rec)
     for lst in (pick, blocked):
         lst.sort(key=lambda r: r["_key"])
     everything = sorted(pick + blocked, key=lambda r: r["_key"])
     for r in everything:
         del r["_key"]
-    return {"pickable": pick, "blocked": blocked, "entries": everything, "flags": flags,
-            "declared": {k: list(v) for k, v in vocab.items()}}
+    return {"pickable": pick, "blocked": blocked, "entries": everything, "flags": list(flags),
+            "flag_recs": flags.recs, "declared": {k: list(v) for k, v in vocab.items()}}
+
+
+EDIT_ERRORS = ("pickable-disagrees", "undeclared-field")  # information on a standing ledger, an error in a new edit
+
+
+def check(ledger: str, archive: str, old: str | None = None, roster: Roster | None = None) -> list[dict]:
+    """--check's flags: {level, id, field, kind, text, standing}. ``old`` is the ledger at --since's
+    ref (None: no --since, every ⚠ is an error and nothing is standing). With it, a flag on an entry
+    whose header block is unchanged — or a Fields: flag under an unchanged declaration — is standing:
+    information, whatever it was. On a changed or new entry, EDIT_ERRORS are errors too."""
+    recs = [dict(r, standing=False) for r in pickable(ledger, archive, roster, undeclared=True)["flag_recs"]]
+    if old is None:
+        return recs
+    before = {e["id"]: e["fields"] for e in entries(old)}
+    changed = {e["id"] for e in entries(ledger) if before.get(e["id"]) != e["fields"]}
+
+    def decl(text: str) -> list[str]:
+        text = COMMENT_RE.sub("", text)
+        first = HEADING_RE.search(text)
+        return FIELDS_DECL_RE.findall(text[: first.start() if first else len(text)])
+    decl_changed = decl(old) != decl(ledger)
+    for r in recs:
+        counts = decl_changed if r["id"] is None else r["id"] in changed
+        if not counts:
+            r["standing"], r["level"] = True, "info"
+        elif r["kind"] in EDIT_ERRORS:
+            r["level"] = "error"
+        r["text"] = ("⚠" if r["level"] == "error" else "ℹ") + r["text"][1:]
+    return recs
+
+
+def _at_ref(ledger: Path, ref: str) -> tuple[str | None, str]:
+    """(the ledger's text at ``ref``, why not). A ledger that did not exist at ref is "" — every entry is new."""
+    top = _git(ledger.parent, "rev-parse", "--show-toplevel")
+    if top is None:
+        return None, f"{ledger} is not in a git work tree"
+    root = Path(top.strip())
+    if _git(root, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}") is None:
+        return None, f"no commit {ref!r} in {root}"
+    try:
+        rel = ledger.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None, f"{ledger} is outside {root}"
+    # newlines as read_text() gives them for the working file, or a CRLF ledger makes every entry "changed"
+    return (_git(root, "show", f"{ref}:{rel}") or "").replace("\r\n", "\n").replace("\r", "\n"), ""
 
 
 def value_of(rec: dict, key: str) -> str:
@@ -402,6 +487,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--list", action="store_true", help="print every entry the filters keep, in pick order")
     ap.add_argument("--counts", metavar="FIELD[,FIELD]", help="count the kept entries per value of one or two fields")
     ap.add_argument("--fields", action="store_true", help="every field the entries carry, and each one's vocabulary")
+    ap.add_argument("--check", action="store_true", help="print only the flags; exit 1 when an error (⚠) stands")
+    ap.add_argument("--since", metavar="REF", help="with --check: count only entries whose header block differs "
+                                                   "from the ledger at REF (e.g. origin/<default>), or is new")
     ap.add_argument("--where", action="append", default=[], metavar="FIELD=VALUE",
                     help="keep entries whose FIELD's first word is VALUE (FIELD= : absent or empty); repeatable")
     for name in ALIASES:
@@ -411,14 +499,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
 
-    modes = [m for m in ("list", "counts", "fields") if getattr(a, m)]
+    modes = [m for m in ("list", "counts", "fields", "check") if getattr(a, m)]
     if a.pickable is not None and not modes:
         if a.pickable is not True:
             ap.error("--pickable yes|no filters --list or --counts; alone, --pickable takes no value")
         modes = ["pickable"]
     if len(modes) != 1:
-        ap.error("give exactly one of --pickable, --list, --counts, --fields")
+        ap.error("give exactly one of --pickable, --list, --counts, --fields, --check")
     mode = modes[0]
+    if a.since is not None and mode != "check":
+        ap.error("--since applies to --check only")
     want = None
     if mode in ("list", "counts") and a.pickable is not None:
         if a.pickable is True or a.pickable.lower() == "yes":
@@ -450,6 +540,25 @@ def main(argv: list[str] | None = None) -> int:
         arch = archive.read_text(encoding="utf-8", errors="replace")
     except OSError:
         arch = ""  # no archive yet: nothing is archived
+    if mode == "check":
+        old = None
+        if a.since is not None:
+            old, why = _at_ref(ledger, a.since)
+            if old is None:
+                print(f"ledger: --since: {why}", file=sys.stderr)
+                return 2
+        recs = check(text, arch, old)
+        errors = [r for r in recs if r["level"] == "error"]
+        if a.json:
+            print(json.dumps({"flags": recs, "errors": len(errors)}, indent=2, ensure_ascii=False))
+            return 1 if errors else 0
+        for r in recs:
+            if not r["standing"]:
+                print(r["text"])
+        standing = sum(r["standing"] for r in recs)
+        print(f"ledger check: {len(errors)} error(s)"
+              + (f"; {standing} standing flag(s) on entries unchanged since {a.since}, not shown" if standing else ""))
+        return 1 if errors else 0
     res = pickable(text, arch)
 
     if mode == "pickable":
