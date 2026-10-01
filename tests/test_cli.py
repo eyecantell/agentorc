@@ -1078,7 +1078,10 @@ def test_the_manager_brief_reads_the_records_each_round_and_takes_finished_from_
     assert "its record says `unattended: false` **now**" in text
     assert "**Whether the team has finished is the home's reading, not your memory**" in text
     assert "as `finished` on the reply" in text and "holds when its `why` is empty" in text
+    # the manager is `working` while it reads, so `finished.why` names it in every round of its own
+    assert "**Your own clause is expected**" in text and "when `why` names no session but you" in text
     assert "**Your round may still end the team first**" in text
+    assert "read `ao team status <your team> --json` once for any member still live" in text
     assert "".join(halves) in text  # the brief quotes it word for word
     assert "skip step (1), do steps (2) to (4) at once" in text and "*manager did not close*" in text
 
