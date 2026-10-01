@@ -1008,7 +1008,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `check_cadence.py` already accepts — made here as the other three are, in `board.py` under the
   same `ready` check, exact line text, one at a time; the person's action as every Decide is and
   refused as the others are — the line moved, a board read from origin, a dirty board — and
-  refused on a line that already carries `Decided:`. The answer is handed by the page with the
+  refused on a line that already carries `Decided:`; and an answer or a reply whose own words hold
+  a field's name (`Answers:` or `Decided:`) is refused, since the reader would read the words as
+  the field. The answer is handed by the page with the
   item's `answers` as the reader gave them, as `refs` are handed to a Reply, and the page offers
   only those: a plain answer is one of the item's `Answers:` word for word; the live look's
   second answer is `Not right: <what>` with the person's words after its colon, checked by its
