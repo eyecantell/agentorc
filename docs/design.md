@@ -3797,7 +3797,7 @@ left is judgement*): a manager whose definition says `on_call: true` (§4.9) is 
 rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
 question to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it
 has acted, holding `control` on its record across the close as a seat holds its mail; a standing
-manager is the definition's other choice, and the default until one team has run on call.
+manager is the definition's other choice (`on_call: false`); on call is the default from the build (Paul, 2026-10-01).
 
 ### 4.8a Who is calling: identity on one host (TD-077)
 
@@ -4276,8 +4276,8 @@ repo name from the team's projects — required when the projects list more than
 defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30, not built —
 TD-259: `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
-the default is `false` until dc-grind has run on call once, then `true`, a team keeping the shape
-it was started with until its next Start; refused beside `role: person`, which starts nothing to
+the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
@@ -6728,7 +6728,7 @@ code and needs no grant; a session doing the same work does.
   2026-09-30, its rounds reading *nothing needs a person*. So **the manager is a seat on call**
   when its definition says so (`on_call: true`, §4.9), filled by rule 3's `team` trigger on
   exactly those readings and closed when it has acted, as the techlead is; a standing manager
-  stays what a definition may ask for (`on_call: false`, the default until the proof below); and
+  stays what a definition may ask for (`on_call: false`); and
   `manager: {role: person}` means the readings are the person's — the Inbox's state rows for a
   permission and a `stalled?` member, and the *idle · open work* row (§4.5a), nothing started.
   **No permission allow-list joins the definition**: the tool's own settings are the allow-list,
@@ -6737,10 +6737,12 @@ code and needs no grant; a session doing the same work does.
   in two places, and the host agent matching a prompt's text is a policy acting on text (this
   section's first rule). The second reading of the ledger goes with the round: rule 6 tells a
   dropped lease and an entry that became pickable, rule 8 a team that wound down, and the
-  member's own `none --why` names what it saw and left. **The default moves on proof** (TD-247
-  step 4): one team runs on call first — dc-grind, whose needs are the most mechanical — and what
-  it could not do is written in TD-259 before `on_call` defaults to true; a team keeps the shape
-  it was started with until its next Start, since the seat field is written at the create. The
+  member's own `none --why` names what it saw and left. **On call is the default from the build** (TD-247
+  step 4 asked for a proof first; Paul, 2026-10-01, on the designer's steer: *flip the default to on call at
+  the build; every team goes on call at its next Start*): a definition with no `on_call` means the
+  seat, and every team takes the shape at its next Start, since the seat field is written at the
+  create; dc-grind's first run on call, whose needs are the most mechanical, is the first look, written
+  in TD-259 — what the seat could not do there is a finding, not a gate. The
   wind-down is rule 9's whichever shape the manager has: a manager on call that is closed is not
   live, so the reading holds without it, the home closes the members and writes the
   announcement, and the seat is not filled for a finished team — every act the manager's last

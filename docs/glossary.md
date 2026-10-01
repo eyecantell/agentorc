@@ -56,7 +56,8 @@ not mix:
   a seat of design §6 rule 3, filled when a member needs a reading no policy makes — a question
   to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it has acted;
   the lifecycle jobs are the host agent's tick (§6 rules 1–12). A **standing** manager is the
-  other shape, rounding on `ao wait`, and the default until one team has run on call.
+  other shape, rounding on `ao wait`, asked for with `on_call: false`; on call is the default from the
+  build (Paul, 2026-10-01).
 - **techlead** — the technical go-between of TD-075: a session that answers technical
   questions for a team's workers before they reach a person. Shown as *Tech Lead*. A team's
   optional `techlead:` seat; started per batch of questions, holds no grant (design §4.9b). —
