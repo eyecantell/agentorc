@@ -1901,6 +1901,10 @@ def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys)
     assert lead["name"] == "orc-ao" and lead["seat"] == {"trigger": "team"}
     assert lead["supervised"] is True and lead["capabilities"] == ["control"] and lead["controllers"] == []
     assert all(m.get("seat") is None and m["controllers"] == ["ao-agentorc-orc-ao"] for m in members)
+    # its brief is the seat's (TD-259 slice 5): one reading from its own record, then the end — no round
+    assert lead["prompt"].startswith("You are a **manager on call**") and "`seat_due`" in lead["prompt"]
+    assert "ao wait --timeout" not in lead["prompt"] and "{" not in re.sub(r"`\{[^`]*\}`", "", lead["prompt"])
+    assert lead["prompt_from"]["base"].endswith("briefs/manager_on_call.md")  # what a fill composes again (rule 7)
     assert "ao-agentorc-orc-ao  manager" in capsys.readouterr().out  # a manager on the start's own lines
     assert cli.main(["--json", "team", "list"]) == 0
     (row,) = json.loads(capsys.readouterr().out)["teams"]
@@ -1910,7 +1914,9 @@ def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys)
 
     doc["teams"]["ao-grind"]["manager"]["on_call"] = False
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
-    assert teams.plan(cli._org_here(), "ao-grind", "kmaster").lead.create_params([]).get("seat") is None
+    standing = teams.plan(cli._org_here(), "ao-grind", "kmaster").lead.create_params([])
+    assert standing.get("seat") is None and standing["prompt_from"]["base"].endswith("briefs/manager.md")
+    assert "ao wait --timeout" in standing["prompt"]
     assert cli.main(["--json", "team", "list"]) == 0
     (row,) = json.loads(capsys.readouterr().out)["teams"]
     assert row["on_call"] is False
