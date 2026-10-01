@@ -1231,6 +1231,11 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
+def _pick_key(e: dict[str, Any]) -> tuple[int, int]:
+    """Where an entry sits in cadence's pick order (§2.11): its priority, then debt before a feature."""
+    return PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)), int(e.get("type") == "feature")
+
+
 def _promote_line(name: str, r: dict[str, Any]) -> str:
     """One repo's promote readings (design §4.7 `ao promote status`): *agentorc · live 485d28b · main
     9c1e0f2, 3 ahead · checks green · auto off*, then a run in flight, a failure, or the first
@@ -1369,9 +1374,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     print(f"         {st}")
             for kind in ("pickable", "design-first"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
-                # the pick order (design §4.8 *Choosing in a free-pick lane*, TD-202): High, then
-                # Medium, then Low, then an entry with none; ties in file order (a stable sort)
-                ids.sort(key=lambda e: PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)))
+                # the pick order is cadence's (design §4.4 *Repo facts*, §4.8 *Choosing in a free-pick
+                # lane*, TD-202, TD-228): High, then Medium, then Low, then an entry with none; debt
+                # before a feature within a priority; ties in file order (a stable sort)
+                ids.sort(key=_pick_key)
                 for e in ids:
                     prio = str(e.get("priority") or "").capitalize() or "-"
                     print(f"  {kind:<12} {e['id']}  {prio:<6}  {e['title']}")
