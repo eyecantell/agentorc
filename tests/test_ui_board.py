@@ -1121,6 +1121,13 @@ def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, m
     assert "&ldquo;" not in drawn and "Go with it" not in html
     assert rows[0]["body"].endswith("Due: 2026-09-20.")
 
+    # the head and the text are a session's words: attributes, escaped, never markup
+    bad = look_item()
+    bad["text"] = bad["text"].replace("One look at the ring", 'One "look" <b>at</b>')
+    rows, html = rows_html(tmp_path, monkeypatch, bad)
+    assert rows[0]["head"] == 'One "look" <b>at</b>' and "<b>at</b>" not in html
+    assert 'data-head="One &#34;look&#34; &lt;b&gt;at&lt;/b&gt;"' in html
+
     _, html = rows_html(tmp_path, monkeypatch, look_item(default="Works"))
     assert ">Go with it: Works</span>" in html and ">Go with it<" not in html and ">default<" not in html
 
@@ -1163,6 +1170,7 @@ def test_not_right_opens_the_composer_begun_decides_then_hands_an_entry_on():
     decide, hand = block.index('action: "decide"'), block.index('fetch("/api/entry/hand"')
     assert decide < hand and 'type: "debt"' in block and "words: `${b.dataset.head} — ${answer}`" in block
     assert "no entry was handed on" in block and 'board_notright: "Not right…"' in js
+    assert "!refused);" in block and "/^not right\\s*:?\\s*/i" in block  # a refusal is not a green toast
     assert 'text: ["Go with it", "Go with it: Works"]' in js
 
 

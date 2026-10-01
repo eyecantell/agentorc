@@ -507,21 +507,22 @@
         const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.text, text: "Not right: " });
         if (!m) return;
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
-        const answer = said.startsWith("Not right:") ? said : `Not right: ${said}`;
+        // the prefix is the form's, whatever case it was retyped in
+        const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
         await act("person", "board", {
           action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text,
           answer, answers: JSON.parse(b.dataset.answers || "[]"),
         });
-        let handed = "";
+        let handed = "", refused = false;
         try {
           const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: b.dataset.repo, type: "debt", words: `${b.dataset.head} — ${answer}` }) });
           const j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.detail || r.statusText);
           handed = j.text || "handed to the techlead";
         } catch (e) {
-          handed = `no entry was handed on: ${e.message}`;
+          handed = `no entry was handed on: ${e.message}`; refused = true;
         }
-        AO.toast(`decided: ${answer} — committed on the board, not pushed · ${handed}`, true);
+        AO.toast(`decided: ${answer} — committed on the board, not pushed · ${handed}`, !refused);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
