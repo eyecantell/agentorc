@@ -19,6 +19,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import orgcheck, repoconfig, service, teamrun, teams
+from sessionorc import balance as balance_mod
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
@@ -952,6 +953,12 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             waiting[team] = len({str(i) for ids in members.values() if isinstance(ids, list) for i in ids})
     for r in rows:
         r["work_waiting"] = waiting.get(r["name"], 0) if not r["live"] and r["wound_down"] else 0
+    # the home's `balance` marks (§6 *Balance*), from the `repos` reading; an agent without it has none
+    marks: dict[str, dict[str, Any]] = {}
+    with contextlib.suppress(AgentError, AgentUnavailable):
+        marks = teamrun.balance_marks(call_sync("repos"))
+    for r in rows:
+        r["balance"] = marks.get(r["name"]) if r["live"] else None
 
     def prose() -> None:
         if not rows:
@@ -968,6 +975,8 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                 live += f", work waiting: {n} entr{'y' if n == 1 else 'ies'}"
             if r.get("concluded"):
                 live += ", concluded"
+            if r.get("balance"):  # the team card's note, in its words (§4.5a, §4.7)
+                live += f", {teamrun.balance_note(r['balance'])}"
             print(
                 f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}  "
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")
@@ -1508,6 +1517,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 print(f"  due          {it.get('due_tag') or it.get('due') or ''}  {it.get('text')}")
             for e in r.get("doing", [])[:DOING_SHOWN]:
                 print(f"  doing {_age(str(e.get('at') or '')):>4} ago  {e.get('id')}: {e.get('text')}")
+            # a team over its line in this repo, last (§4.7, §6 *Balance*): what a refused member reads here
+            for team, mark in sorted(teamrun.balance_marks({"": r}).items()):
+                print(f"  {team} is {teamrun.balance_note(mark)}")
 
     return emit(args, picked, prose)
 
@@ -1596,6 +1608,8 @@ def _team_setting_line(name: str, t: dict[str, Any]) -> str:
     ]
     if t.get("schedule"):
         parts.append(f"schedule {t['schedule']}")
+    if t.get("balance"):  # §6 *Balance*: off until a person sets it
+        parts.append(f"balance {_balance_words(t['balance'])}")
     if t.get("on_work"):  # §6 rule 8: said only where the file holds the key; absent, the team asks
         parts.append(f"when work appears: {ON_WORK_WORDS.get(t['on_work'], t['on_work'])}")
     return f"{name}: " + " · ".join(parts)
@@ -1641,6 +1655,85 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
     got = call_sync("set_settings", teams={name: {"on_work": args.what}})
     t = (got.get("teams") or {}).get(name) or {}
     return emit(args, got, lambda: print(_team_setting_line(name, t)))
+
+
+def _balance_words(bal: dict[str, Any]) -> str:
+    """A team's balance lines as the file holds them: *prs 8, oldest 2d, review*."""
+    parts = [f"{k} {bal[k]}" for k in ("prs", "oldest") if k in bal]
+    return ", ".join(parts + (["review"] if bal.get("review") else [])) or "no line"
+
+
+def _balance_rows(bal: dict[str, Any], now: dict[str, Any]) -> list[str]:
+    """`ao team balance`'s three lines: each number as it reads now, the line it is read against
+    where one is drawn, and *over* where it is crossed."""
+    dur = balance_mod.duration
+
+    def row(what: str, value: Any, limit: Any, word: str, nothing: str, show: Callable[[Any], str]) -> str:
+        said = nothing if value is None else show(value)
+        if limit is None:
+            return f"  {what}: {said} (no line)"
+        over = " — over" if value is not None and value > limit else ""
+        return f"  {what}: {said} ({word} {show(limit)}){over}"
+
+    oldest = balance_mod.span(bal.get("oldest"))
+    return [
+        row("open PRs", now["prs"], bal.get("prs"), "line", "could not look", str),
+        row("oldest PR", now["oldest"], int(oldest.total_seconds()) if oldest else None, "line", "none open", dur),
+        row(
+            "reader's queue",
+            now["review"],
+            now["bound"] if bal.get("review") else None,
+            "bound",
+            "nothing waiting",
+            dur,
+        ),
+    ]
+
+
+def cmd_team_balance(args: argparse.Namespace) -> int:
+    """`ao team balance <team> [--prs <n>] [--oldest <d>] [--review on|off] | --clear` (design §4.7,
+    §6 *Balance*, TD-239): the team's balance lines, written to `teams.<team>.balance` through
+    `set_settings` — a person's own — a line not named left as it was. With no option it prints
+    the lines and, against them, the numbers as they read now (`teamrun.balance_now`)."""
+    try:
+        name = _defined_team(args)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    named = args.prs is not None or args.oldest is not None or args.review is not None
+    if args.clear and named:
+        raise AgentError("ao team balance <team> --clear takes no line: it turns the rule off for the team")
+    got = call_sync("settings")
+    bal = dict(((got.get("teams") or {}).get(name) or {}).get("balance") or {})
+    if args.clear or named:
+        if args.prs is not None:
+            bal["prs"] = args.prs
+        if args.oldest is not None:
+            bal["oldest"] = args.oldest
+        if args.review is not None:
+            bal["review"] = args.review == "on"
+        if not bal.get("review"):
+            bal.pop("review", None)  # off is no key, as the file reads
+        if not args.clear and not bal:
+            raise AgentError(f"that leaves {name} no line: ao team balance {name} --clear turns the rule off")
+        got = call_sync("set_settings", teams={name: {"balance": None if args.clear else bal}})
+        bal = dict(((got.get("teams") or {}).get(name) or {}).get("balance") or {})
+    repos = call_sync("repos")
+    now = teamrun.balance_now(name, call_sync("list"), repos)
+    mark = teamrun.balance_marks(repos).get(name)
+
+    def prose() -> None:
+        if bal:
+            print(f"{name}: balance {_balance_words(bal)}")
+        else:
+            print(f"{name}: no balance line — its members claim whatever the numbers (ao team balance {name} --prs 10)")
+        if not now["members"]:
+            print("  no live member: a team with none is not read, and carries no mark")
+        for line in _balance_rows(bal, now):
+            print(line)
+        if mark:
+            print(f"  {teamrun.balance_note(mark)} — its members take no new claim until it clears")
+
+    return emit(args, {"team": name, "balance": bal or None, "now": now, "mark": mark}, prose)
 
 
 # Where every other configured value lives and when it is re-read (design §4.7 `ao settings --where`,
@@ -2646,6 +2739,14 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("what", choices=settings_mod.ON_WORK, help="ask: an Inbox row (the default); start: the home starts")
     q.set_defaults(fn=cmd_team_on_work)
+
+    q = add_team("balance", help="the team's balance lines: over one, its members take no new claim (§6 Balance)")
+    q.add_argument("name")
+    q.add_argument("--prs", type=int, metavar="N", help="more than N open pull requests in the team's repo")
+    q.add_argument("--oldest", metavar="D", help="the oldest open pull request older than D (12h, 2d)")
+    q.add_argument("--review", choices=("on", "off"), help="the reader's queue past its bound")
+    q.add_argument("--clear", action="store_true", help="remove every line: the rule is off for the team")
+    q.set_defaults(fn=cmd_team_balance)
 
     q = add_team("stop", help="wrap the members up, then the lead (--now kills instead of asking)")
     q.add_argument("name")

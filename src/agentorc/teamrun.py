@@ -18,11 +18,13 @@ import re
 import time
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import teams
+from sessionorc import balance as balance_mod
 from sessionorc.work import (
     closed_finished,
     finished,
@@ -102,6 +104,94 @@ def crew(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def live(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [s for s in sessions if s["state"] not in DEAD]
+
+
+def balance_marks(repos: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """The teams over their line, `{team: mark}`, from the `repos` reading (design §6 *Balance*,
+    TD-239): each checkout's reading carries the marks whose `repo` it is."""
+    out: dict[str, dict[str, Any]] = {}
+    for r in repos.values():
+        marks = r.get("balance") if isinstance(r, dict) else None
+        for team, mark in (marks if isinstance(marks, dict) else {}).items():
+            if isinstance(mark, dict):
+                out.setdefault(str(team), mark)
+    return out
+
+
+def _clock(iso: Any) -> str:
+    """An instant in this host's clock, the weekday before it when it is not today."""
+    try:
+        at = datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return ""
+    day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
+    return f"{day}{at:%H:%M}"
+
+
+def _crossed_words(c: dict[str, Any]) -> str:
+    v, lim, dur = c.get("value"), c.get("limit"), balance_mod.duration
+    if c.get("line") == "prs":
+        return f"{v} open PR{'' if v == 1 else 's'}, line {lim}"
+    if c.get("line") == "oldest":
+        return f"oldest PR {dur(v)}, line {dur(lim)}"
+    if c.get("line") == "review":
+        return f"review waiting {dur(v)}, bound {dur(lim)}"
+    return f"{c.get('line')} {v}, line {lim}"
+
+
+def balance_note(mark: dict[str, Any]) -> str:
+    """A mark in the team card's words (design §4.5a **over its line** note), which `ao team list`
+    and `ao repo` say too: *over its line since 14:02: 9 open PRs, line 8* — each crossed line in
+    the mark's own numbers."""
+    since = f" since {t}" if (t := _clock(mark.get("since"))) else ""
+    lines = ", ".join(_crossed_words(c) for c in mark.get("crossed") or [] if isinstance(c, dict))
+    return f"over its line{since}" + (f": {lines}" if lines else "")
+
+
+def balance_now(
+    team: str, sessions: list[dict[str, Any]], repos: dict[str, dict[str, Any]], now: datetime | None = None
+) -> dict[str, Any]:
+    """The numbers a team's balance lines are read against, as they read now (design §4.7 `ao team
+    balance`, §6 *Balance*), gathered as the home's tick gathers them: the registered repos the
+    team's live sessions name, the most open pull requests any of them has (`prs`) and the age of
+    the oldest in seconds (`oldest`), how long the oldest pull request has waited at the team's
+    seats (`review`) and the bound it is read against (`bound`, the shortest `review.bound` a live
+    member carries, two hours where none). A number that cannot be told is None: no live member,
+    no reading, nothing waiting."""
+    now = now or datetime.now(UTC)
+    members = [s for s in sessions if s.get("team") == team and s.get("state") not in DEAD]
+    members = [s for s in members if not s.get("superseded_by")]
+    roots = sorted({str(s["repo"]) for s in members if s.get("repo") and s["repo"] in repos})
+
+    def age(iso: Any) -> int | None:
+        try:
+            return int((now - datetime.fromisoformat(str(iso).replace("Z", "+00:00"))).total_seconds())
+        except (TypeError, ValueError):
+            return None
+
+    counts: list[int] = []
+    ages: list[int] = []
+    for root in roots:
+        prs = repos[root].get("prs")
+        if not isinstance(prs, dict) or not isinstance(prs.get("open"), list):
+            continue
+        counts.append(len(prs["open"]))
+        ages += [a for p in prs["open"] if isinstance(p, dict) and (a := age(p.get("created"))) is not None]
+    waits = [
+        a
+        for s in members
+        if s.get("seat") and isinstance(s.get("prs_waiting"), dict)
+        if (a := age(s["prs_waiting"].get("oldest"))) is not None
+    ]
+    bounds = [d for s in members if (d := balance_mod.span((s.get("review") or {}).get("bound")))]
+    return {
+        "members": len(members),
+        "repos": roots,
+        "prs": max(counts) if counts else None,
+        "oldest": max(ages) if ages else None,
+        "review": max(waits) if waits else None,
+        "bound": int((min(bounds) if bounds else balance_mod.REVIEW_BOUND).total_seconds()),
+    }
 
 
 def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[dict | None, list[dict]]:

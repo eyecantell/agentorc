@@ -1954,6 +1954,31 @@ def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, c
     capsys.readouterr()
     assert cli.main(["team", "on-work", "ao-grind", "ask"]) == 0
     assert "when work appears: ask me" in capsys.readouterr().out
+    # `ao team balance` (§6 *Balance*, TD-239 slice 4): a line not named is left as it was
+    assert cli.main(["team", "balance", "nope", "--prs", "8"]) != 0
+    assert "no team 'nope'" in capsys.readouterr().err
+    assert cli.main(["team", "balance", "ao-grind"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("ao-grind: no balance line") and "no live member" in out
+    assert "  reader's queue: nothing waiting (no line)" in out
+    assert cli.main(["team", "balance", "ao-grind", "--prs", "8", "--review", "on"]) == 0
+    assert capsys.readouterr().out.startswith("ao-grind: balance prs 8, review\n")
+    assert cli.main(["team", "balance", "ao-grind", "--oldest", "2d", "--review", "off"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("ao-grind: balance prs 8, oldest 2d\n") and "(line 2d)" in out
+    assert cli.main(["--json", "team", "balance", "ao-grind"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["balance"] == {"prs": 8, "oldest": "2d"} and got["mark"] is None and got["now"]["members"] == 0
+    assert cli.main(["settings"]) == 0
+    assert "balance prs 8, oldest 2d" in capsys.readouterr().out
+    assert cli.main(["team", "balance", "ao-grind", "--oldest", "soon"]) != 0  # the home's parser refuses it
+    assert "balance.oldest is a duration" in capsys.readouterr().err
+    assert cli.main(["team", "balance", "ao-grind", "--clear", "--prs", "3"]) != 0
+    capsys.readouterr()
+    assert cli.main(["team", "balance", "ao-grind", "--clear"]) == 0
+    assert capsys.readouterr().out.startswith("ao-grind: no balance line")
+    assert cli.main(["team", "balance", "ao-grind", "--review", "off"]) != 0  # nothing would be left
+    assert "leaves ao-grind no line" in capsys.readouterr().err
     assert cli.main(["settings", "--where"]) == 0
     where = capsys.readouterr().out
     assert "settings.yml" in where and "at the host agent's start" in where and "ao service install" in where
