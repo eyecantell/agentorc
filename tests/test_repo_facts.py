@@ -349,7 +349,20 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
                 "entries": [
                     {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "low"},
                     {"id": "TD-011", "title": "no priority", "for_page": "pickable", "priority": ""},
-                    {"id": "TD-012", "title": "a first high", "for_page": "pickable", "priority": "high"},
+                    {
+                        "id": "TD-015",
+                        "title": "a high feature",
+                        "for_page": "pickable",
+                        "priority": "high",
+                        "type": "feature",
+                    },
+                    {
+                        "id": "TD-012",
+                        "title": "a first high",
+                        "for_page": "pickable",
+                        "priority": "high",
+                        "type": "debt",
+                    },
                     {"id": "TD-013", "title": "a medium", "for_page": "pickable", "priority": "medium"},
                     {"id": "TD-014", "title": "a second high", "for_page": "pickable", "priority": "high"},
                 ],
@@ -392,12 +405,14 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("r  1 open PRs, oldest 3d · this week 4 opened, 5 closed (could not look")
-    assert "5 open entries: 1 pickable, 0 design-first" in out  # the counts are the reading's `by_kind`
+    assert "6 open entries: 1 pickable, 0 design-first" in out  # the counts are the reading's `by_kind`
     assert "#9" in out and "pickable     TD-010  Low     a build" in out
     # the pick order (§4.8 *Choosing in a free-pick lane*, TD-202): High, Medium, Low, none; ties in file order
     order = [i for i in ("TD-012", "TD-014", "TD-013", "TD-010", "TD-011") if f"pickable     {i}" in out]
     assert sorted(order, key=out.index) == ["TD-012", "TD-014", "TD-013", "TD-010", "TD-011"]
     assert "pickable     TD-011  -       no priority" in out
+    # cadence's order (§4.4 *Repo facts*, TD-228): within a priority, debt before a feature
+    assert out.index("pickable     TD-014") < out.index("pickable     TD-015") < out.index("pickable     TD-013")
     # slice 6: the reader's standing on each open PR, what members hold, the board items due
     assert "waiting on review by tl · 40m" in out and "holds        TD-010 → #9  g1" in out
     assert "due          3d overdue  decide TD-283" in out

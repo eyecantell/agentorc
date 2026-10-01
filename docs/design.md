@@ -660,7 +660,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `{entries: [...], by_priority, by_kind, at}`; an entry counts while its section is in the file.
   **Pickable is derived, never written** (TD-223, TD-198; designed 2026-09-28; the reader, the
   page's kinds and the lane words built — TD-228 slice 1; the page's lists and `ao repo`'s order
-  are slice 2's). It is cadence §2.4's
+  — slice 2). It is cadence §2.4's
   rule, the one dev-cadence's `scripts/ledger.py --pickable` applies, so a repo's own tool and
   the home give one answer: an entry is **blocked** while its `**Blocked by:**` names an entry
   that is not archived — one still open, or one found in neither the ledger nor its archive,
@@ -2421,8 +2421,9 @@ Screens:
       nobody, or a team with no techlead all read the same blank). A PR is GitHub's: no control.
    2. **Technical debt** — the ledger's open entries in four lists under one heading: **pickable**,
       **design-first**, **for you** and **other**, as §4.4 *Repo facts* sorts them (derived
-      since TD-223; not built — TD-228: until then *pickable* is `Pickable: yes` and is tested
-      first); a blocked row says *blocked by TD-n* after its owner; each row the id, title, priority and owner, *held by
+      since TD-223; built — TD-228 slices 1 and 2; a written `Pickable: no` still blocks until the
+      migration); a blocked row says *blocked by TD-n* after its owner, naming everything that
+      still blocks it as §4.4 lists it — the ids, then `decision (<who>)`; each row the id, title, priority and owner, *held by
       <name>* when a member claims it, sorted by priority then id, a list folded past four rows
       with *+n more*. The heading carries **Open ledger** through the person's `open_in` (§5) —
       an entry is edited in its file, never here — **Add entry…** beside it (TD-180; built by TD-219 slices 3 and 4, 2026-09-29: the form of §4.9 *Add
@@ -3061,7 +3062,7 @@ own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it
 **`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, built by TD-176 slices 1, 2 and 6; the reader standing is read from the techlead seat's inbox, which a session may not read, so a session's `ao repo` shows none and a person's does):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
-entries (High first, each with its priority: §4.8 *Choosing in a free-pick lane*), the board items due, and what the servicing team's members hold; `--all` prints every
+entries (in cadence's pick order — High first, debt before a feature within a priority — each with its priority: §4.8 *Choosing in a free-pick lane*, §4.4 *Repo facts*), the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
 balance rule exists (§6 *Balance*, TD-177: the rule itself is read by the home's tick, and a manager told of a crossing reads the numbers here), and what a person reads instead of the page.
 

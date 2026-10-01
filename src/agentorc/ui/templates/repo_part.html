@@ -40,7 +40,7 @@
     <div class="rlh" id="debt-{{ l.key }}">{{ l.label }} · {{ l.rows | length }}</div>
     {% for e in l.rows %}
     <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
-      {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span></div>
+      {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}</div>
     {% endfor %}
     {% if l.fold %}<button class="rrow meta mono more" type="button" data-unfold="{{ l.key }}">+{{ l.fold }} more</button>{% endif %}
   {% endif %}{% endfor %}

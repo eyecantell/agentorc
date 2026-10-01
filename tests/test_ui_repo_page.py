@@ -32,7 +32,14 @@ def reading(root: str) -> dict:
                     {"id": f"TD-3{n}", "title": f"entry {n}", "for_page": "pickable", "priority": "medium", "owner": "grinder"}
                     for n in range(10, 15)
                 ),
-                {"id": "TD-283", "title": "decide the trail rows", "for_page": "for-you", "priority": "low", "owner": "paul"},
+                {
+                    "id": "TD-283",
+                    "title": "decide the trail rows",
+                    "for_page": "for-you",
+                    "priority": "low",
+                    "owner": "paul",
+                    "blocked_by": ["TD-200", "decision (Paul)"],
+                },
             ],
             "by_priority": {"high": 1, "medium": 5, "low": 1},
             "by_kind": {"pickable": 6, "design-first": 0, "for-you": 1, "other": 0},
@@ -128,6 +135,9 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
     # Technical debt: four lists, held by, folded past four with +n more
     assert 'id="debt-pickable"' in html and "held by tdgrind-1" in html and "+2 more" in html
     assert html.count('class="rrow folded"') == 2
+    # a blocked row says what still blocks it, after its owner (TD-228); an unblocked one says nothing
+    assert '· paul</span><span class="meta">· blocked by TD-200, decision (Paul)</span>' in html
+    assert html.count("blocked by") == 1
     # Doing: the chips and the rows
     assert 'data-who="tdgrind-1"' in html and "all (2)" in html and "pushing the branch" in html
     # the part is the same content without the chrome, for the page's re-read

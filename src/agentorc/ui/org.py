@@ -116,8 +116,8 @@ MOTION_PRIORITIES = ("high", "medium", "low")  # the letters a row in motion dra
 def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
     a `claimed` progress entry, with its **phase** derived here, never declared — *design* on an
-    entry whose `Kind:` is design-first (its kind, not the page's bucket, which puts a pickable
-    design-first entry under *pickable*, TD-197), *review* with a PR (its own `pr`, the tick's
+    entry whose `Kind:` is design-first (its kind, not the page's bucket: one blocked by a decision
+    sits under *for you*, TD-197, TD-228), *review* with a PR (its own `pr`, the tick's
     `review_pr`, or else an open PR whose head branch names the reference — the tick reads only the
     branch checked out, and a grinder that asked its reader has moved on), *grind* without one; a PR
     that is no longer open keeps *review*, marked *merged* / *closed*, until the member marks the
