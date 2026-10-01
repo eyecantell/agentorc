@@ -137,6 +137,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _recent,  # noqa: F401
     _ref,  # noqa: F401
     _reply_line,  # noqa: F401
+    _reported,  # noqa: F401
+    _restart_reading,  # noqa: F401
     _review,  # noqa: F401
     _source,  # noqa: F401
     _start_time,  # noqa: F401
