@@ -398,6 +398,12 @@ class HostAgent(
         # rule 12 (TD-258): the detached read of each root's docs/cadence-changes.md, and when it last ran
         self._conventions_task: asyncio.Task[None] | None = None
         self._conventions_read_at = datetime.min.replace(tzinfo=UTC)
+        # rule 11 (TD-258): the detached read of merged PRs against `held:`, when it last ran, what
+        # was settled (address, the record's `created`, PR) and when each PR was last tried
+        self._held_task: asyncio.Task[None] | None = None
+        self._held_read_at = datetime.min.replace(tzinfo=UTC)
+        self._held_settled: set[tuple[str, str, int]] = set()
+        self._held_tried: dict[tuple[str, int], float] = {}
         # §4.9 *What is left at the home has a history*: one committer, so one git at a time
         self._defs_lock = asyncio.Lock()
         self._defs_task: asyncio.Task[None] | None = None

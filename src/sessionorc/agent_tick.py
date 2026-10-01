@@ -26,6 +26,7 @@ from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import conventions as conventions_mod
+from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
@@ -38,6 +39,7 @@ from sessionorc.agent_common import (
     FILL_CEILING,
     FILL_WINDOW,
     GIT_EVERY,
+    HELD_READS,
     IDLE_NUDGE,
     LANE_NEWS_NAMED,
     LAUNCH_KEYS,
@@ -467,6 +469,7 @@ class TickMixin:
                 await self._idle_nudge(s, now)
                 await self._context_line(s, now)
                 await self._cadence_line(s, now)
+                await self._held_line(s, now)
                 await self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
@@ -484,6 +487,9 @@ class TickMixin:
         ) and now - self._conventions_read_at > DERIVE_EVERY:
             self._conventions_read_at = now  # rule 12: the script runs git, so detached as well
             self._conventions_task = asyncio.create_task(self._conventions_pass(records))
+        if (self._held_task is None or self._held_task.done()) and now - self._held_read_at > DERIVE_EVERY:
+            self._held_read_at = now  # rule 11: one `gh pr view` a merged PR, so detached as well
+            self._held_task = asyncio.create_task(self._held_pass(records, now))
         if (self._brief_task is None or self._brief_task.done()) and now - self._brief_read_at > DERIVE_EVERY:
             self._brief_read_at = now
             self._brief_task = asyncio.create_task(self._brief_pass(now))
@@ -1014,6 +1020,87 @@ class TickMixin:
             log.exception("the conventions pass failed")
         finally:
             await self._push_changes()
+
+    @staticmethod
+    def _held_member(s: Session) -> bool:
+        """Rule 11's subject: a supervised member whose record carries `review`, on the record that
+        is its run now."""
+        return bool(s.supervised and s.review and not s.superseded_by)
+
+    async def _held_pass(self, records: list[Session], now: datetime) -> None:
+        """Rule 11's read (design §6, TD-258), detached on the reports' cadence: for each supervised
+        member whose record carries `review`, each `progress` entry `done` with a `pr` is read once
+        it has merged — its files against the record's `held:` globs, in the registry root the
+        record's `repo` names, `HELD_READS` PRs a run, the longest unread first. A PR touching no
+        held path, one merged before the record was created, and one its reader replied on (`held.
+        read_by`) are settled, in memory: a restarted home reads each once more. A held PR with no
+        reply `held.GRACE` after its merge is a **crossing**: an entry on `held_missed` and one
+        `system` note to the person. A PR not merged yet, a failed read and a root the home holds
+        no reading of write nothing and are read again."""
+        try:
+            due: list[tuple[float, Session, int]] = []
+            for s in records:
+                if not self._held_member(s) or s.repo not in self._repos:
+                    continue
+                addr = self._address(s)
+                crossed = {c.get("pr") for c in s.held_missed}
+                for pr in {e.pr for e in s.progress if e.status == "done" and isinstance(e.pr, int)}:
+                    if pr not in crossed and (addr, s.created, pr) not in self._held_settled:
+                        due.append((self._held_tried.get((addr, pr), 0.0), s, pr))
+            due.sort(key=lambda d: (d[0], d[2]))
+            for _, s, pr in due[:HELD_READS]:
+                addr = self._address(s)
+                self._held_tried[(addr, pr)] = time.monotonic()
+                try:
+                    files, merged = await asyncio.to_thread(held_mod.pr_read, pr, str(s.repo))
+                except RuntimeError:
+                    continue  # no reading: never a crossing by default
+                if merged is None or not self._is_record(s) or not self._held_member(s):
+                    continue
+                paths = held_mod.held_paths(files, s.review)
+                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr):
+                    self._held_settled.add((addr, s.created, pr))
+                    self._held_tried.pop((addr, pr), None)
+                    continue
+                if now - merged < held_mod.GRACE or any(c.get("pr") == pr for c in s.held_missed):
+                    continue  # the reader merges, then replies: looked at again
+                entry = held_mod.crossing(pr, paths, now_iso())
+                s.held_missed = [*s.held_missed, entry]
+                reader = str((s.review or {}).get("reader") or "")
+                self._system_note(PERSON, held_mod.note(entry, reader, addr))
+                log.info("%s: %s", addr, held_mod.said(entry, reader))
+                self._save(s)
+        except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
+            log.exception("the held-path pass failed")
+        finally:
+            await self._push_changes()
+
+    async def _held_line(self, s: Session, now: datetime) -> None:
+        """Rule 11's telling (design §6, TD-258), rule 5's two ways. A crossing the member has not
+        been told of is one fixed line typed into the composer of an unattended member of this host
+        that is hook-confirmed `idle` — never at a dialog, a wrap-up or a gate pause; a member that
+        is working, on a node or attended reads it as the clause on its next `ao` reply
+        (`held.clause`, which the reply marks told). `told` marks it either way."""
+        if not self._held_member(s) or not held_mod.untold(s.held_missed):
+            return
+        if not (s.host == self.host and s.unattended and not s.suspended and s.state == "idle"):
+            return
+        if s.confidence != "hook" or s.pending or s.wrapup_at or s.wrapup_sent_at:
+            return
+        if s.gated or self._profile_gated(s.profile, now, s.team):
+            return
+        reader = str((s.review or {}).get("reader") or "")
+        for pr in [c.get("pr") for c in held_mod.untold(s.held_missed)]:
+            c = next((c for c in held_mod.untold(s.held_missed) if c.get("pr") == pr), None)
+            if c is None or not await self._policy_send(s, held_mod.line(c, reader)):
+                return  # not typed: the next tick looks again
+            # the detached read may have replaced the list while the line was typed
+            for c in s.held_missed:
+                if c.get("pr") == pr:
+                    c["told"] = now_iso()
+            self._save(s)
+            await self._push_changes()
+            return  # one line a tick: the composer holds the one just typed
 
     async def _lane_news(self, s: Session, now: datetime) -> None:
         """Rule 6 (design §6, TD-195): a supervised member, not a seat, that declared out of work is

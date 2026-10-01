@@ -9,44 +9,14 @@ that directory. Nothing else is special — `[abc]` is those five characters, no
 
 from __future__ import annotations
 
-import json
 import re
 import subprocess
-from collections.abc import Iterable
 from functools import lru_cache
 from typing import Any
 
-GH_TIMEOUT = 30.0
-
-
-@lru_cache(maxsize=256)
-def _pattern(glob: str) -> re.Pattern[str]:
-    g = glob.strip().lstrip("/")
-    if g.endswith("/"):
-        g = g.rstrip("/") + "/**"  # `src/` and `src/**/` both mean everything under src
-    out, i = [], 0
-    while i < len(g):
-        if g.startswith("**/", i):
-            out.append("(?:.*/)?")  # any number of directories, none included
-            i += 3
-        elif g.startswith("**", i):
-            out.append(".*")
-            i += 2
-        elif g[i] == "*":
-            out.append("[^/]*")
-            i += 1
-        elif g[i] == "?":
-            out.append("[^/]")
-            i += 1
-        else:
-            out.append(re.escape(g[i]))
-            i += 1
-    return re.compile("".join(out))
-
-
-def matches(path: str, glob: str) -> bool:
-    """Whether a repo-relative path is named by one `held:` glob."""
-    return _pattern(glob).fullmatch(path.lstrip("/")) is not None
+# the glob match and the files read are `sessionorc`'s since §6 rule 11 reads them at the home
+# (TD-258 slice 2): the package rule runs one way, so `ao pr held` reads them from there
+from sessionorc.held import GH_TIMEOUT, held_paths, matches, pr_files  # noqa: F401
 
 
 def setting(review: Any) -> dict[str, Any] | None:
@@ -63,44 +33,6 @@ def setting(review: Any) -> dict[str, Any] | None:
     if not held or not all(isinstance(g, str) and g.strip() for g in held):
         raise ValueError(f"review: held is a list of path globs, not {held!r}")
     return {"reader": str(review["reader"]), "held": list(held), "bound": str(review.get("bound") or "2h")}
-
-
-def held_paths(files: Iterable[str], review: dict[str, Any] | None) -> list[str]:
-    """The PR's changed files that its record's `review` holds — empty when there is no `review`,
-    which is the case §4.9b says merges as the cadence does."""
-    if not review:
-        return []
-    globs = list(review.get("held") or ["**"])
-    return [f for f in files if any(matches(f, g) for g in globs)]
-
-
-def pr_files(pr: int, cwd: str | None = None) -> list[str]:
-    """The PR's changed files, from `gh` in the checkout it belongs to. A `RuntimeError` saying why
-    when `gh` cannot say: *not held* is never guessed from a failed read."""
-    try:
-        cp = subprocess.run(
-            ["gh", "pr", "view", str(pr), "--json", "files,changedFiles"],
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            timeout=GH_TIMEOUT,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        raise RuntimeError(f"gh could not read PR #{pr}: {e}") from None
-    if cp.returncode != 0:
-        why = (cp.stderr or cp.stdout).strip().splitlines()
-        raise RuntimeError(f"gh could not read PR #{pr}: {why[-1] if why else cp.returncode}")
-    try:
-        got = json.loads(cp.stdout)
-        files = [str(f["path"]) for f in got.get("files") or []]
-        total = int(got.get("changedFiles") or 0)
-    except (ValueError, KeyError, TypeError, AttributeError):
-        raise RuntimeError(f"gh gave PR #{pr}'s files in a shape this does not read") from None
-    if total > len(files):
-        # `gh` returns one page of a large PR's files: a held path past it would read as *not held*
-        raise RuntimeError(f"gh listed {len(files)} of PR #{pr}'s {total} files: too many to judge; ask the reader")
-    return files
 
 
 _REMOTE = re.compile(

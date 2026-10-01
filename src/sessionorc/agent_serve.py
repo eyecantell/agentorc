@@ -23,6 +23,7 @@ from sessionorc import (
     paths,
 )
 from sessionorc import cadence as cadence_mod
+from sessionorc import held as held_mod
 from sessionorc.agent_common import (
     BRIEF_CLAUSE,
     NODE_READS,
@@ -36,6 +37,7 @@ from sessionorc.agent_common import (
 from sessionorc.models import (
     Session,
     context_over_text,
+    now_iso,
 )
 
 
@@ -276,6 +278,14 @@ class ServeMixin:
             changed = BRIEF_CLAUSE if s is not None and s.brief_changed and not declared else ""
             # and rule 10's clause (TD-258): an open PR of its own fails the cadence check
             failing = cadence_mod.clause(s.checks) if s is not None and s.supervised and s.seat is None else ""
+            # and rule 11's (TD-258): a held PR of its own merged without its read — said once, on
+            # this reply, to a member the tick has not typed it to; it rides the same field
+            if s is not None and s.supervised and (crossed := held_mod.untold(s.held_missed)):
+                reader = str((s.review or {}).get("reader") or "")
+                failing = "; ".join(x for x in (failing, held_mod.clause(crossed, reader)) if x)
+                for c in crossed:
+                    c["told"] = now_iso()
+                self._save(s)
             if s is not None and ((n := s.unread()) or owed or over or changed or failing):
                 # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
                 # refusal is not*, and this is the cheapest thing that is neither.
