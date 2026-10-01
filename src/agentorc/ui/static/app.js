@@ -551,7 +551,10 @@
       // the refresh below puts back whatever the record actually says. **Suspend is the exception**
       // (§4.8a): it acts on the session and *leaves the row standing* — the alarm is still there to
       // be answered — so the row is refreshed in place rather than taken out from under the person.
-      if (staterow && action !== "suspend") { AO.handRing(staterow); staterow.remove(); }
+      // A **decide** leaves its row standing too (§4.4 *Decide*: a decided item is not done): the
+      // refresh redraws it reading *decided*, and the ring stays where the person pressed.
+      const stays = action === "suspend" || (action === "board" && body.action === "decide");
+      if (staterow && !stays) { AO.handRing(staterow); staterow.remove(); }
       if ((staterow || id === "person") && typeof AO.refreshInboxPage === "function") {
         // the control that was pressed is about to go with its row, and while it holds the focus
         // the refresh below would politely decline to redraw the section it sits in
@@ -3073,7 +3076,7 @@
     // the digits yield to a ringed row that has answer buttons (§4.5a **keys**: the ring, TD-255)
     const answers = page === "inbox" && /^[1-4]$/.test(name) ? AO.keyAnswers(ringed(page)) : [];
     const k = AO.keyEntry(page, name, answers.length > 0);
-    if (!k) return;
+    if (!k || (k.nth && !answers.length)) return;  // a digit on a row without answers is nobody's
     ev.preventDefault();
     if (k.nth) { const a = answers[Number(name) - 1]; if (a && !a.disabled) a.click(); return; }
     if (k.help) return keyHelp();

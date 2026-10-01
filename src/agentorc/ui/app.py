@@ -163,6 +163,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
     _civil,  # noqa: F401
+    _decided,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
@@ -173,6 +174,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _same_ref,  # noqa: F401
     _trail_rows,  # noqa: F401
     board_argv,  # noqa: F401
+    board_body,  # noqa: F401
     board_choices,  # noqa: F401
     board_due_now,  # noqa: F401
     board_horizon,  # noqa: F401

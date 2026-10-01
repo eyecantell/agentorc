@@ -72,6 +72,13 @@ console.log(JSON.stringify({
     AO.teamFolded("", "0", (k, d) => d),
   ],
   org_f: AO.keyEntry("org", "f"),
+  // a row's own answer buttons, in order — never those of a row drawn inside it (TD-255)
+  answers: (() => {
+    const row = {}, inner = {};
+    const b = (name, of) => ({ name, closest: () => of });
+    row.querySelectorAll = () => [b("first", row), b("nested", inner), b("second", row)];
+    return [AO.keyAnswers(row).map((x) => x.name), AO.keyAnswers(null)];
+  })(),
 }));
 """
 
@@ -197,16 +204,19 @@ def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     written and are the page's on any other row; `3` and `4` name nothing but an answer; `g` is the
     row's **Go with it**. Both an `ask`'s suggested answers and a board item's are `.btn.answer`."""
     got = _probe()
+    js = (UI / "static" / "app.js").read_text()
     e = got["entry"]
     assert e["inbox_1"] == "Org"
     nth = e["inbox_1_answers"]
     assert nth["nth"] and nth["ring"] and nth["sel"] == ".btn.answer" and nth["keys"] == ["1", "2", "3", "4"]
-    assert e["inbox_3"]["nth"]  # no page key: on a row without answers it presses nothing
+    assert e["inbox_3"]["nth"]  # no page key: on a row without answers the handler leaves it alone
+    assert got["answers"] == [["first", "second"], []]
+    assert "if (!k || (k.nth && !answers.length)) return;" in js
+    assert 'action === "suspend" || (action === "board" && body.action === "decide")' in js  # the row stays
     assert e["inbox_g"] == "Go with it"
     assert [k["keys"] for k in got["keys"] if k.get("nth")] == [["1", "2", "3", "4"]]
     row = (UI / "templates" / "inbox_row.html").read_text()
     assert row.count('class="btn sm answer"') == 2  # the `answers` macro and the board row's, no third shape
-    js = (UI / "static" / "app.js").read_text()
     assert "AO.keyAnswers(ringed(page))" in js and "if (a && !a.disabled) a.click()" in js
 
 
