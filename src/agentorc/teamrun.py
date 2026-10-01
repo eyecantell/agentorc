@@ -23,7 +23,11 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import teams
-from sessionorc.work import finished, wound_down  # one reading each for the card and the home (rules 8, 9)
+from sessionorc.work import (
+    closed_finished,
+    finished,
+    wound_down,
+)  # one reading each for the card and the home (rules 8, 9)
 
 Call = Callable[..., Any]
 
@@ -240,6 +244,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
                 "wound_down": None if n_live else wound_down(mine, seat_names(t, mine)),
+                # …and whether rule 9 ended it: its manager carries the tick's mark (§6, TD-241)
+                "by_tick": not n_live and any(closed_finished(s) and not s.get("superseded_by") for s in mine),
                 # …and when something is live but every live session is idle and declared (TD-099)
                 "concluded": {k: f[k] for k in ("at", "restart", "names")} if f and not f["why"] else None,
                 # …and when it is not, what keeps it from the reading, a clause per session (TD-241)

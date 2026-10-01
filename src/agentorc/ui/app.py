@@ -194,6 +194,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     row_find,  # noqa: F401
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
+    unclosed_mark,  # noqa: F401
     work_held,  # noqa: F401
     work_ids,  # noqa: F401
     work_note,  # noqa: F401
