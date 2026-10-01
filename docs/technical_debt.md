@@ -129,6 +129,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-248 | A written `Pickable: no` with no blocker hides an entry from every lane and nothing refuses it: the test holds `Owner` and `Kind` to their words and the Pickable line to `yes` or `no — <reason>`, and never a *no* against `Blocked by:`; turn on dev-cadence's `ledger.py --check` and declare the words on a `Fields:` line | Medium | Open — blocked by dev-cadence#TD-073 |
 | TD-251 | The grinder's brief says to ask the reader again with `--thread <its id>`, which the host agent refuses for any addressee but the person; the form that works is `--reply-to <the findings' id> --kind ask --pr <n>` | Low | Open |
 | TD-252 | The team card's *TDs in motion* rows have one fixed column and the rest as wide as their text, and the header's *who for what* line is boilerplate that tells Paul nothing: lay the rows out in columns, drop the line from the header | Medium | Open — pickable |
+| TD-253 | A board row with a recommended answer has no one-press way to take it, and a live look has nothing to press at all: **Go with it** on a board row, as a steer has, and the live look's two answers as buttons | Medium | Open — design-first |
 
 
 ---
@@ -2555,3 +2556,26 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Done when:** on the Org, every *TDs in motion* row's reference, title, holder and PR start at the same x down the facet at desktop and phone widths, and no team header carries the *who for what* line while Message… and the help panel still do; Paul has the two screenshots.
 
 **Related:** TD-232 (the Doing list's columns and the priority letter), TD-176 (the team card's facets), TD-162 and TD-171 (*who for what*), TD-167 (the help panel).
+
+## TD-253: *Go with it* on a board row, as a steer has, and a live look's two answers as buttons
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-30 (Paul, on the Inbox after TD-244's groom: *I see many agentorc items in the inbox that do not have recommended answers*, then: *let's add "go with it" similar to the steering entries. We should probably build some guidance on this to keep it consistent*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open
+**Location:** design §4.5a (**Inbox row: `steer`** for the shape; the board rows' controls: Snooze, Done, Reply, Open board, the answer buttons), §4.5 screen 6, §4.10; `src/agentorc/ui/templates/inbox_row.html`, `src/agentorc/ui/inbox.py`, `ui/help.py` and §4.5a's help list (bound by `tests/test_help.py`); `scripts/board_edit.py` (SYNCED: `decide`); `docs/briefs/grinder-ao-*.md` and the package briefs, where they say how a live look is written
+
+**Why:** after the groom the board holds 58 open items: 6 `decide` with `Answers:` (four with a `(default)`), 47 `watch` that are nearly all *merged, live look pending*, and 5 `act`. On the Inbox a steer shows the sender's one line and **Go with it**; a board row with a default shows its answers as buttons with the recommendation among them and no one press that means *take the recommendation*; and a live look shows Snooze, Done, Reply and Open board, so the only way to say *I looked and it works* is Done with nothing recorded, and the only way to say *it does not* is prose in a Reply. 47 rows read as a wall with nothing to press. The guidance for what a session writes is the cadence's and is dev-cadence TD-074 (the fixed pair `Answers: Works | Not right: <what>.` on a live look, when a default is allowed); this entry is the Inbox's half.
+
+**Fix — a design round, then a build entry:**
+1. ***Go with it* on a board row that carries a `(default)`**: one press, in the steer's words and place, that records the default — `board_edit.py decide --answer "<the default's text>"`, the person's action as every Decide is (cadence §4.5), never something the board or a session falls to. The row then reads *decided* as after any answer and stays until its session closes it. Say how it sits beside the answer buttons (the default's button first and marked, or *Go with it* in its place), and that a row with no default has no such button.
+2. **A live look's pair as two buttons** once boards carry it: *Works* decides at once; *Not right…* opens the Reply composer and decides with the text. Say what follows each: *Works* is the raising team's order to close the line and archive the entry (rule 4's owed-outcome shape, or a board note to the manager), *Not right* a TD handed to the techlead as Add entry does (TD-218).
+3. **This repo's existing live looks** get the pair in one pass by a grinder, as TD-244 did the kinds, once TD-074 has settled the words; and the briefs' *merged, live look pending* line is written with the pair from then on.
+4. **Keys and help**: a key for *Go with it* on the ringed row beside `x` and `r`; the help sentences for both controls.
+
+**Done when:** the design's §4.5a rows say all of it and a build entry carries the slices; on a scratch home a board item with a default is decided by one press and a live look by one of two.
+
+**Related:** dev-cadence TD-074 (the guidance and the pair), TD-244 (the groom), TD-142 (Reply on a board row), TD-218 and TD-219 (an entry handed to the techlead), TD-124 (the pages' keys); the steer's *Go with it*: §4.5a **Inbox row: `steer`**, §4.10.
