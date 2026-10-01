@@ -1067,7 +1067,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `checks`, `held_missed`, `conventions_seen`, `idle_open`, `seat_filled` (§6 rules 10–12 and rule 3's manager on call, TD-247 — not built), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed`, `idle_open`, `seat_filled` (§6 rule 11 and rule 3's manager on call, TD-247 — not built), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -7123,7 +7123,8 @@ code and needs no grant; a session doing the same work does.
      a PR whose record carries no `review` (the anchor's); a PR merged before the record
      carried `review`; a files read that failed — no reading, read again next cadence, never a
      crossing by default. A node's member is read as rule 10 reads one.
-  12. **Conventions relayed** (TD-247; designed 2026-09-30, not built — TD-258). Each entry of
+  12. **Conventions relayed** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 3,
+     `sessionorc.conventions`, the tick's `_conventions_pass`). Each entry of
      `docs/cadence-changes.md` went once, by the manager's `ao send --wait`, to every member that
      started before it landed, with a record of who was told kept by hand in a JSON file the
      supplement said to commit and the template said never to; dev-cadence's SessionStart hook
@@ -7134,10 +7135,11 @@ code and needs no grant; a session doing the same work does.
      brief's file — taking each entry's `heading` and `landed`; a root without the script, or
      whose origin has no default branch (exit 2), gives no reading. On each supervised member
      record of that root, not a seat (every fill starts cold, and the hook tells it) and not
-     finished (`out_of_work`: never sent to, and its next start is told at its start), the home
-     keeps **`conventions_seen: {at, headings}`** (home-owned), written on the first tick after
+     finished (`out_of_work`: never sent to, and its next start is told at its start) and not
+     `scheduled`, `exited` or `closed` (it runs again as a new record, which the hook tells), the home
+     keeps **`conventions_seen: {at, headings}`** (home-owned), written at the first reading after
      the create as the headings whose `landed` is at or before the record's `created` — an entry
-     whose `landed` the script could not read (`None`: the `git log` call failed or timed out) is left for the next reading — and when a later reading holds
+     whose `landed` the script could not read (`None`: the `git log` call failed or timed out) is left for the next reading — and when that reading or a later one holds
      a heading `conventions_seen` does not, landed after `created`, the member gets **one `note`
      from `system`**: *docs/cadence-changes.md gained 1 entry since you started: "2026-09-29 —
      a review comment's first line carries the verdict" — read it on `origin/main`, then go on*
