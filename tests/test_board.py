@@ -478,11 +478,16 @@ def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
     assert board.message(ASKED, "decide", answer="Lift it") == (
         "agentorc: decide Which window?: Lift it (session grinder-ao-1)"
     )
+    long = board.message(ASKED, "decide", answer="Not right: " + "the ring is amber " * 9)  # a sentence is clipped
+    assert long.endswith("… (session grinder-ao-1)") and len(long) < 140
     for bad in (
         lambda: board.edit_line(line, ASKED, "decide", answer="  "),  # no answer
         lambda: board.edit_line(got, ASKED, "decide", answer="Keep it"),  # the line moved: it is decided
         lambda: board.edit_line(got, got[6:].strip(), "decide", answer="Keep it"),  # already decided
         lambda: board.edit_line(line, ASKED, "decide", answer="No. Decided: yes"),  # the reader would misread it
+        lambda: board.edit_line(line, ASKED, "decide", answer="Not right: bad. Answers: z"),  # review of PR #861
+        lambda: board.edit_line(line, ASKED, "reply", reply="x. Decided: yes (2026-01-01)", by="t"),
+        lambda: board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "reply", reply="x. Answers: a | b", by="t"),
     ):
         with pytest.raises(board.Refused):
             bad()
@@ -572,7 +577,7 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
             with pytest.raises(AgentError, match="needs its words"):
                 await me.call("board_edit", board=path, line=10, text=LOOK, action="decide", answer=bad, answers=pair)
         got = await me.call("board_edit", board=path, line=9, text=ASKED, action="decide", answer="Keep it",
-                            answers=answers)  # fmt: skip
+                            answers=["Keep  it", "Lift it"])  # fmt: skip
         assert got["answer"] == "Keep it" and got["message"].startswith("agentorc: decide Which window?: Keep it")
         got = await me.call("board_edit", board=path, line=10, text=LOOK, action="decide",
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip

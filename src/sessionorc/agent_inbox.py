@@ -217,7 +217,7 @@ class InboxMixin:
         (design §4.4 *Decide*) — refused otherwise, since any other typed answer is a Reply."""
         if action != "decide":
             return ""
-        offered = [str(a).strip() for a in answers] if isinstance(answers, list) else []
+        offered = [" ".join(str(a).split()) for a in answers] if isinstance(answers, list) else []
         said = " ".join(str(answer or "").split())
         if any(a.startswith(board_mod.NOT_RIGHT) for a in offered) and said.startswith(board_mod.NOT_RIGHT):
             # the pair's second answer is a form, `Not right: <what>`: the words are the person's

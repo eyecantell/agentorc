@@ -39,8 +39,11 @@ DECIDED_RE = re.compile(
 ANSWERS_RE = re.compile(r"(?:^|(?<=[.?!]\s))Answers:\s*(?P<answers>(?:(?!\bAnswers:).)*?)\.?\s*(?:\bDecided:.*)?$")
 # A live look's second answer (design §4.5a **Works** / **Not right…**): the person's words follow.
 NOT_RIGHT = "Not right:"
+# A field's name inside the person's own words would be read as the field (review of PR #861).
+FIELD_NAME_RE = re.compile(r"\b(?:Answers|Decided):")
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
+ANSWER_MAX = 80  # an answer in a commit subject: a *Not right:* carries a sentence
 GIT_TIMEOUT = 20.0
 # One edit at a time on this host: each is a read, a write and a commit, and two interleaved would
 # leave a commit saying *done* over a file where the other's write undid it (review of PR #474).
@@ -104,6 +107,8 @@ def edit_line(
             # the reader and a later Snooze take a line's first `Due:`: on an undated item the
             # reply's would become the item's date (review of PR #581)
             raise Refused("this item has no Due: date, so a reply may not carry one: Snooze sets its date")
+        if FIELD_NAME_RE.search(str(reply or "")):
+            raise Refused("a reply may not carry Answers: or Decided: — the board's reader would read it as the field")
         tail = reply_tail(reply, by, today or date.today().isoformat())
         if (at := _fields_start(body)) is not None:
             # ahead of the fields the reader anchors at the line's end (§4.4 *The two compose*):
@@ -116,6 +121,8 @@ def edit_line(
         words = " ".join(str(answer or "").split())
         if not words:
             raise Refused("a decide needs its answer: one of the item's Answers:")
+        if FIELD_NAME_RE.search(words):
+            raise Refused("an answer may not carry Answers: or Decided: — say it in other words")
         if DECIDED_RE.search(body):
             raise Refused("this item is already decided: Reply says more to its session, Done closes it")
         new = f"{_sentence(body)} Decided: {words} ({today or date.today().isoformat()})."
@@ -134,19 +141,21 @@ def edit_line(
     return f"{body.rstrip()} Due: {due}.{end}"
 
 
+def _clip(words: str, most: int) -> str:
+    return words if len(words) <= most else words[: most - 1].rstrip() + "…"
+
+
 def message(text: str, action: str, due: str | None = None, *, answer: str = "") -> str:
     """The fixed commit message (design §4.4, cadence §4's carve-out): the tool, the action, the
     item's head, and the session that raised the item — what a reviewer greps for."""
     h = HEAD_RE.search(text)
-    head = (h.group("head") if h else text).strip()
-    if len(head) > HEAD_MAX:
-        head = head[: HEAD_MAX - 1].rstrip() + "…"
+    head = _clip((h.group("head") if h else text).strip(), HEAD_MAX)
     s = SESSION_RE.search(text)
     who = s.group("name") if s else "n/a"
     what = {
         "snooze": f"snooze {head} to {due}",
         "reply": f"reply on {head}",
-        "decide": f"decide {head}: {' '.join(str(answer or '').split())}",
+        "decide": f"decide {head}: {_clip(' '.join(str(answer or '').split()), ANSWER_MAX)}",
     }.get(action, f"done {head}")
     return f"agentorc: {what} (session {who})"
 
