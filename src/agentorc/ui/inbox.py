@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import balance as balance_mod
+from sessionorc import board as board_mod
 from sessionorc import hosts
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import WRAPUP_GRACE
@@ -272,7 +273,9 @@ def state_rows(
 BOARD_FILE = Path("docs") / "user_attention.md"
 BOARD_SCRIPT = Path("scripts") / "nudge_user_attention.py"
 BOARD_TTL = 60.0
-BOARD_ACTS = ("snooze", "done")  # §4.5a's two answers to a board row, the `board_edit` RPC's actions
+# §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
+# of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
+BOARD_ACTS = ("snooze", "done", "decide")
 BOARD_TIMEOUT = 20.0
 # §4.5 screen 6 *Boards are read against origin* (TD-221): the read passes the reader's own `--fetch`,
 # which fetches each repo's origin serially (30 s a repo, no aggregate bound once `--due-only` went,
@@ -639,6 +642,27 @@ def board_due_now(it: Mapping[str, Any]) -> bool:
     return bool(it.get("decided")) or bool(it.get("due_error")) or it.get("overdue_days") is not None
 
 
+def board_body(text: str, it: Mapping[str, Any]) -> str:
+    """A board row's body (§4.5a *answers*, TD-255): the item's text without its `Answers:` and
+    `Decided:` tails where the reader read them as fields — those are drawn as the row's buttons and
+    its *decided* line, so the body does not print them twice. The reader's fields decide, never the
+    prose: an item the reader gave no `answers` and no `decided` keeps its whole text."""
+    fields = (it.get("answers") and board_mod.ANSWERS_RE, it.get("decided") and board_mod.DECIDED_RE)
+    due = board_mod.DUE_RE.search(text)
+    off = due.end() if due else 0  # the reader looks for the fields after the item's `Due:`
+    starts = [m.start() for m in (f.search(text[off:]) for f in fields if f) if m]
+    return text[: off + min(starts)].rstrip() if starts else text
+
+
+def _decided(it: Mapping[str, Any]) -> dict[str, str] | None:
+    """The reader's `decided` as the row prints it — *decided: <text> · <date>* — or None."""
+    got = it.get("decided")
+    if not isinstance(got, dict) or not got.get("text"):
+        return None
+    d = _civil(got.get("date"))
+    return {"text": str(got["text"]), "date": f"{d:%b} {d.day}" if d else str(got.get("date") or "")}
+
+
 def _ahead_words(due: str, today: str, tag: str = "") -> str:
     """A not-yet-due item's due words, *due in 6 d · Oct 4*; an undated one's, *no due date*. An item
     that is not due now yet dated today or earlier — an undecided `fyi`, which the reader never
@@ -695,6 +719,14 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "line": line,
                     "team": team,
                     "text": text,
+                    # §4.5a **answers** / **Go with it** (§4.4 *Decide*, TD-255): the reader's own
+                    # fields, never read out of the prose here — the item's answers in the order
+                    # written, the one marked default, what was decided, and the body without them
+                    "body": board_body(text, it),
+                    "answers": [str(a) for a in it.get("answers") or () if str(a).strip()],
+                    "default": str(it.get("default") or ""),
+                    "decided": _decided(it),
+                    "kind": str(it.get("kind") or ""),
                     "due": str(it.get("due") or ""),
                     "due_tag": tag,
                     "at": str(it.get("due") or ""),

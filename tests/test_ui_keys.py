@@ -55,6 +55,11 @@ console.log(JSON.stringify({
     inbox_x: (AO.keyEntry("inbox", "x") || {}).control,
     focus_j: AO.keyEntry("focus", "j"),
     focus_1: (AO.keyEntry("focus", "1") || {}).control,
+    // the digits on the Inbox: the page's, and the row's when the ringed row has answer buttons
+    inbox_1: (AO.keyEntry("inbox", "1") || {}).control,
+    inbox_1_answers: AO.keyEntry("inbox", "1", true),
+    inbox_3: AO.keyEntry("inbox", "3"),
+    inbox_g: (AO.keyEntry("inbox", "g", true) || {}).control,
   },
   labels: ["Open", "▣ Focus", "Snooze ▾", "Open board", "Dismiss"].map(AO.keyLabel),
   role_line: [AO.roleLine({ line: "the team's work" }), AO.roleLine({ line: "x", reply: true }), AO.roleLine({})],
@@ -67,6 +72,13 @@ console.log(JSON.stringify({
     AO.teamFolded("", "0", (k, d) => d),
   ],
   org_f: AO.keyEntry("org", "f"),
+  // a row's own answer buttons, in order — never those of a row drawn inside it (TD-255)
+  answers: (() => {
+    const row = {}, inner = {};
+    const b = (name, of) => ({ name, closest: () => of });
+    row.querySelectorAll = () => [b("first", row), b("nested", inner), b("second", row)];
+    return [AO.keyAnswers(row).map((x) => x.name), AO.keyAnswers(null)];
+  })(),
 }));
 """
 
@@ -156,11 +168,14 @@ def test_every_key_names_a_control_the_page_draws(monkeypatch, tmp_path):
 
 @pytest.mark.unit
 def test_no_key_means_two_things_on_one_page():
+    """One exception, the design's own (§4.5a **keys**: the ring, TD-255): on a ringed Inbox row
+    that has answer buttons `1`–`4` press them, and `1` and `2` are the page's on every other row —
+    the `nth` entry, which `keyEntry` reaches only when told the row has answers."""
     got = _probe()
     for page in ("org", "inbox", "msg", "focus", "other"):
         seen = {}
         for k in got["keys"]:
-            if k["page"] not in ("all", page):
+            if k["page"] not in ("all", page) or k.get("nth"):
                 continue
             for key in k["keys"]:
                 assert key not in seen, f"{page}: {key} is both {seen[key]!r} and {k['control']!r}"
@@ -181,6 +196,28 @@ def test_a_key_fires_only_when_nothing_editable_has_focus():
     assert e["focus_j"] is None  # no ring on Focus: it shows one session (§4.5 screen 2)
     assert e["focus_1"] == "Org"  # the page keys work there
     assert got["labels"] == ["Open", "Focus", "Snooze", "Open board", "Dismiss"]
+
+
+@pytest.mark.unit
+def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
+    """§4.5a **keys**: the ring (TD-255): `1`–`4` press a ringed row's answer buttons in the order
+    written and are the page's on any other row; `3` and `4` name nothing but an answer; `g` is the
+    row's **Go with it**. Both an `ask`'s suggested answers and a board item's are `.btn.answer`."""
+    got = _probe()
+    js = (UI / "static" / "app.js").read_text()
+    e = got["entry"]
+    assert e["inbox_1"] == "Org"
+    nth = e["inbox_1_answers"]
+    assert nth["nth"] and nth["ring"] and nth["sel"] == ".btn.answer" and nth["keys"] == ["1", "2", "3", "4"]
+    assert e["inbox_3"]["nth"]  # no page key: on a row without answers the handler leaves it alone
+    assert got["answers"] == [["first", "second"], []]
+    assert "if (!k || (k.nth && !answers.length)) return;" in js
+    assert 'action === "suspend" || (action === "board" && body.action === "decide")' in js  # the row stays
+    assert e["inbox_g"] == "Go with it"
+    assert [k["keys"] for k in got["keys"] if k.get("nth")] == [["1", "2", "3", "4"]]
+    row = (UI / "templates" / "inbox_row.html").read_text()
+    assert row.count('class="btn sm answer"') == 2  # the `answers` macro and the board row's, no third shape
+    assert "AO.keyAnswers(ringed(page))" in js and "if (a && !a.disabled) a.click()" in js
 
 
 @pytest.mark.unit

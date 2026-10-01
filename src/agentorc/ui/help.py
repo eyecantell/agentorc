@@ -267,6 +267,29 @@ HELP: tuple[Help, ...] = (
             "team's manager and you are told as the line clearing."
         ),
     ),
+    Help(
+        "board-answers",
+        "answers",
+        "Inbox board row",
+        (
+            "Records the answer you press as your decision on this board item: it is written on the item's line "
+            "as Decided, with today's date, in one commit in that repo's checkout. Press the one you mean when "
+            "the item asks you to choose and its answers are offered. It does not close the item and wakes "
+            "nobody: the line stays on the board, due, as its session's work order, the commit is not pushed, and "
+            "an answer in your own words is a Reply."
+        ),
+    ),
+    Help(
+        "board-go-with-it",
+        "Go with it",
+        "Inbox board row",
+        (
+            "Records the answer marked default as your decision on this board item, in one press: the same write "
+            "as pressing that answer. Press it when the session's own recommendation is what you want. Nothing "
+            "takes the default for you — an item nobody decides stays undecided — and the item is not closed: it "
+            "stays on the board as its session's work order."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -312,7 +335,20 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     ("focus", "Focus", ("wrap-up", "kill", "resume")),
-    ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss", "work-start", "work-snooze", "work-dismiss")),
+    (
+        "inbox",
+        "Inbox",
+        (
+            "promote",
+            "promote-snooze",
+            "promote-dismiss",
+            "work-start",
+            "work-snooze",
+            "work-dismiss",
+            "board-answers",
+            "board-go-with-it",
+        ),
+    ),
     ("settings", "Settings", ("on-work", "balance")),
 )
 

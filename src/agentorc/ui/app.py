@@ -163,6 +163,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
     _civil,  # noqa: F401
+    _decided,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
@@ -173,6 +174,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _same_ref,  # noqa: F401
     _trail_rows,  # noqa: F401
     board_argv,  # noqa: F401
+    board_body,  # noqa: F401
     board_choices,  # noqa: F401
     board_due_now,  # noqa: F401
     board_horizon,  # noqa: F401
@@ -2354,7 +2356,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 await board_items(board=board)
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what not in BOARD_ACTS:
-                raise HTTPException(400, f"a board row's act is {' or '.join(BOARD_ACTS)}, not {what!r}")
+                raise HTTPException(400, f"a board row's act is {', '.join(BOARD_ACTS)}, not {what!r}")
             try:
                 line = int(body.get("line"))
             except (TypeError, ValueError):
@@ -2365,7 +2367,17 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             due = str(body.get("due") or "").strip() or None
             if what == "snooze" and not due:
                 raise HTTPException(400, "a snooze names the new date, YYYY-MM-DD")
-            got = await call("board_edit", board=board, line=line, text=text, action=what, due=due)
+            more: dict[str, Any] = {}
+            if what == "decide":
+                # §4.5a **answers** / **Go with it** (§4.4 *Decide*, TD-255): the answer pressed and
+                # the item's `answers` as the reader gave them to the row, as a Reply's `refs` are
+                # handed; the agent refuses an answer that is not one of them word for word
+                answer = str(body.get("answer") or "").strip()
+                answers = body.get("answers")
+                if not answer or not isinstance(answers, list):
+                    raise HTTPException(400, "a decide names the answer and the item's answers")
+                more = {"answer": answer, "answers": [str(a) for a in answers]}
+            got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, **more)
             await board_items(board=board)
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "dismiss":
