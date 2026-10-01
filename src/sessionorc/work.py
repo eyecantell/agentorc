@@ -1,15 +1,16 @@
-"""Rule 8's readings (design §6 *Work for a team that wound down*, TD-227): whether a team wound
-down, read once for the team card and for the home's tick alike, and what its members' lanes
+"""Rule 8's and rule 9's readings (design §6 *Work for a team that wound down*, TD-227; *Finished
+is the home's reading*, TD-241): whether a team wound down and whether a live one has finished,
+each read once for the team card and for the home's tick alike, and what its members' lanes
 gained since. Adapter-neutral and definition-free: the home reads no org file, so a seat is the
 record's `seat` field here and the definition's name on the card, and a test holds the two equal."""
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping
 from typing import Any
 
 from sessionorc import ledger as ledger_mod
-from sessionorc.models import Session
+from sessionorc.models import Session, has_control
 
 DEAD = ("exited", "closed")
 
@@ -51,6 +52,99 @@ def team_wound_down(records: Iterable[Session]) -> str | None:
         return None
     seats = {r.name for r in mine if r.seat is not None}
     return wound_down([{"name": r.name, "out_of_work": r.out_of_work} for r in mine], seats)
+
+
+def _f(r: Any, key: str) -> Any:
+    """A record's field, off the home's `Session` or off the view a client was given."""
+    return r.get(key) if isinstance(r, Mapping) else getattr(r, key, None)
+
+
+def _said(r: Any, key: str) -> str | None:
+    """The instant of a declaration on a record (`out_of_work`, `restart_wanted`), or None: a field
+    another build left in any other shape is no declaration, never a raise (review of PR #203)."""
+    d = _f(r, key)
+    return str(d["at"]) if isinstance(d, Mapping) and d.get("at") else None
+
+
+def manager_of(records: Collection[Any]) -> Any | None:
+    """The team's manager among its own records, read without a definition (§6 rule 9): the record
+    that holds `control` and that the team's other records list in `controllers`. Where a lead
+    under the manager fits too (manager → lead → worker), it is the one no other such record
+    controls; the first by name where that still leaves two. None where a person leads the team.
+    Only the team's own records are read: a manager carrying another badge, which no team start
+    produces, is not found, and a lead under it would be read as the manager."""
+    named = {str(c) for r in records for c in (_f(r, "controllers") or []) if str(c) != str(_f(r, "id"))}
+    fit = [r for r in records if has_control(_f(r, "capabilities")) and str(_f(r, "id")) in named]
+    ids = {str(_f(r, "id")) for r in fit}
+    top = [r for r in fit if not ids & ({str(c) for c in (_f(r, "controllers") or [])} - {str(_f(r, "id"))})]
+    return min(top or fit, key=lambda r: str(_f(r, "name") or _f(r, "id")), default=None)
+
+
+def finished(records: Iterable[Any], seats: Collection[str] = ()) -> dict[str, Any] | None:
+    """Whether a live team has finished, read from the records carrying its badge and nothing else
+    (design §6 rule 9, §4.9a *A team's finished is the home's reading*, TD-241) — the one reading
+    the home's tick and the page's *concluded* both take, so the two never disagree. `records` are
+    the home's `Session`s or the views a client holds; `{at, restart, names, why}`, or None for a
+    team with no unattended session live, which is `wound_down`'s to describe.
+
+    **It holds when `why` is empty.** `why` is one clause per unattended session that keeps the
+    reading from holding, in the records' order — *grinder-dc-1 working*, *grinder-dc-2 idle, not
+    declared* — which is the card's *not concluded:* line. `at` is the latest declaration counted,
+    or None where nobody declared (a team whose only live sessions are its seats and its manager
+    has finished too: nobody is working and nobody has anything to take). `restart` is whether a
+    counted member asks for one: the page reads *concluded · restart wanted* then, and rule 9
+    winds down only a team where it is false. `names` are the live sessions, which is what a
+    Start, or the tick, would close.
+
+    Who is what comes from the records: a person's session is `unattended: false` and counts for
+    nothing; a seat is a record with `seat` (a client may add the names its definition gives the
+    seats, `seats`, for a record written before the field); the manager is `manager_of`. Then:
+
+    - a **seat** or the **manager**, when live, must be `idle` — declared or not; a seat never
+      declares and the manager's word is a judgement about these same records;
+    - a live **member** must be `idle` with `out_of_work` or `restart_wanted` on its record: one
+      that declared and then took a turn is `working` with the word still there;
+    - a dead member with `out_of_work` is counted; one `exited` with its pane and no declaration
+      (rule 1's crash), or dead with `restart_wanted` (rule 2's), **blocks** the reading until that
+      rule has acted, since a team about to have a member back has not finished; any other dead
+      record, and a superseded one, is passed over.
+    """
+    mine = [r for r in records if _f(r, "unattended") is not False and not _f(r, "superseded_by")]
+    up = [r for r in mine if _f(r, "state") not in DEAD]
+    if not up:
+        return None
+    manager = manager_of(mine)
+    said: list[str] = []
+    restart = False
+    why: list[str] = []
+    for r in mine:
+        name, state = str(_f(r, "name") or _f(r, "id")), str(_f(r, "state"))
+        live = state not in DEAD
+        if r is manager or _f(r, "seat") is not None or _f(r, "name") in seats:
+            if live and state != "idle":
+                why.append(f"{name} {state}")
+            continue
+        wants, out = _said(r, "restart_wanted"), _said(r, "out_of_work")
+        if live:
+            if state != "idle":
+                why.append(f"{name} {state}")
+            elif wants is None and out is None:
+                why.append(f"{name} idle, not declared")
+            else:
+                said.append(wants or out or "")
+                restart = restart or wants is not None
+        elif wants is not None:
+            why.append(f"{name} {state}, restart wanted")
+        elif out is not None:
+            said.append(out)
+        elif state == "exited" and _f(r, "pane"):
+            why.append(f"{name} crashed")
+    return {
+        "at": max(said) if said and not why else None,
+        "restart": restart,
+        "names": sorted(str(_f(r, "name") or _f(r, "id")) for r in up),
+        "why": why,
+    }
 
 
 def gained(member: Session, entries: list[Any]) -> list[str]:

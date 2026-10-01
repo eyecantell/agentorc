@@ -716,7 +716,14 @@ def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(w
     c = teamrun.concluded([rec("grind-1", out_of_work=out), rec("techlead-ao")], seat)
     assert c and c["names"] == ["grind-1", "techlead-ao"]
     assert teamrun.concluded([rec("grind-1", out_of_work=out), rec("techlead-ao", "working")], seat) is None
-    assert teamrun.concluded([rec("techlead-ao")], seat) is None  # only a seat live: nobody said anything
+    # only a seat live: nobody is working and nobody has anything to take (§6 rule 9), with no instant to say
+    assert teamrun.concluded([rec("techlead-ao")], seat) == {"at": None, "restart": False, "names": ["techlead-ao"]}
+    # the manager — the record the others list as their controller, holding `control` — is idle, declared
+    # or not (TD-241): its own word is not asked for, and a Start closes it with the rest
+    lead = rec("orc-ao", capabilities=["control"])
+    member = rec("grind-1", out_of_work=out, controllers=["ao-orc-ao"])
+    assert teamrun.concluded([lead, member]) == {"at": out["at"], "restart": False, "names": ["grind-1", "orc-ao"]}
+    assert teamrun.concluded([{**lead, "state": "working"}, member]) is None
     # the definition's row carries it only while something is live
     org = cli._org_here()
     (row,) = teamrun.rows(org, [rec("orc-ao", out_of_work=out)])

@@ -23,7 +23,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import teams
-from sessionorc.work import wound_down  # one reading for the card and the home's rule 8 (TD-227)
+from sessionorc.work import finished, wound_down  # one reading each for the card and the home (rules 8, 9)
 
 Call = Callable[..., Any]
 
@@ -109,48 +109,26 @@ def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[d
     return lead, sorted((s for s in sessions if s is not lead), key=lambda s: s.get("name") or s["id"])
 
 
-def _declared_at(s: dict[str, Any]) -> tuple[str, bool] | None:
-    """A session's declaration — `out_of_work` or `restart_wanted` (§4.9a, TD-083) — as its instant
-    and whether it asks for a restart, or None. Either shape may be anything a different build left
-    on the record; one that is not a dict with an `at` is no declaration (review of PR #203)."""
-    for key, restart in (("restart_wanted", True), ("out_of_work", False)):
-        d = s.get(key)
-        if isinstance(d, dict) and d.get("at"):
-            return str(d["at"]), restart
-    return None
-
-
 def concluded(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> dict[str, Any] | None:
     """When a live team has said everything it has to say (design §4.5a **team groups**, §4.9a
-    *A person's Start on a concluded team*, TD-099): every live session carrying its badge is `idle`
-    and has declared — `out_of_work` or `restart_wanted` — the rest exited or closed, and its seats
-    not there or `idle`. Then `{at, restart, names}`: the latest declaration's instant (as
-    `wound_down` takes it), whether any of them asks for a restart, and the live sessions a Start
-    would close first. Else None — and None for a team with nothing live, which is `wound_down`'s.
+    *A person's Start on a concluded team*, TD-099): the home's reading of *finished* (§6 rule 9,
+    `sessionorc.work.finished`, TD-241) where it holds — every live member `idle` and declared,
+    `out_of_work` or `restart_wanted`, its seats not there or `idle`, and its manager `idle`,
+    declared or not. Then `{at, restart, names}`: the latest declaration's instant (None where only
+    seats and the manager are left), whether any of them asks for a restart, and the live sessions
+    a Start would close first. Else None — and None for a team with nothing live, which is
+    `wound_down`'s.
 
     *Concluded* is the team's word, not a member's *finished*: it takes either declaration, since
     either says the run is over. The state is part of the test because a declaration is cleared only
     by a later declared claim — a session that declared and then took a turn is `working` with the
     word still on its record, and its team is not concluded while it is. A seat never declares; one
-    that is `working` is answering somebody."""
-    up = live(sessions)
-    said: list[tuple[str, bool]] = []
-    for s in up:
-        if s["state"] != "idle":
-            return None
-        if s.get("name") in seats:
-            continue
-        d = _declared_at(s)
-        if d is None:
-            return None
-        said.append(d)
-    if not said:
-        return None  # only seats are live: nobody declared anything, so there is no instant to say
-    return {
-        "at": max(at for at, _ in said),
-        "restart": any(r for _, r in said),
-        "names": sorted(str(s.get("name") or s["id"]) for s in up),
-    }
+    that is `working` is answering somebody. `seats` are the definition's names for them, beside
+    the record's own `seat` field."""
+    f = finished(sessions, seats)
+    if f is None or f["why"]:
+        return None
+    return {"at": f["at"], "restart": f["restart"], "names": f["names"]}
 
 
 def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
