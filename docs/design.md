@@ -4543,7 +4543,10 @@ seats idle or gone, the manager idle. The manager's own declaration is a judgeme
 same records and is not asked for, because a manager judges from what it remembers (dc-grind,
 2026-09-29: a grinder believed *interactive under Paul* two days after it was restarted
 unattended). Rule 9 says what the tick does once the reading holds; the manager's round may
-still end the team first, and its brief tells it to read the records each round.
+still end the team first, and its brief tells it to read the records each round
+(`briefs/manager.md` *A round* step 1 and *Out of work*, TD-241 slice 4: the members' states and
+`finished` from `ao team status --json`, none carried from an earlier round, and the tick's
+line read as *the members are closed, make the last acts*).
 
 **The manager runs the stop itself.** The trigger is the manager's own `ao team stop <team>
 --close` (§4.9). When the session running the command is the team's manager, the sequence is the
@@ -6661,7 +6664,8 @@ code and needs no grant; a session doing the same work does.
      to check member states mechanically*; designed 2026-09-29; the reading built 2026-09-30 —
      TD-241 slice 1, `sessionorc.work.finished`, which the page's *concluded* returns; what the
      tick does with it built the same day — slice 3, `_finished_pass`; the Inbox row and the
-     card's *by the tick* built the same day — slice 2). Whether a
+     card's *by the tick* built the same day — slice 2; the manager's brief the same day —
+     slice 4). Whether a
      team had finished was the manager's judgement (§4.9a *The manager runs the stop itself*),
      and a manager judges from what it remembers: manager-dc-1 held its grinder *interactive
      under Paul* for two days after the anchor had restarted it unattended, so dc-grind never
