@@ -1885,3 +1885,34 @@ def test_a_role_with_no_context_takes_300k_and_a_seat_and_a_persons_own_session_
     lines = {line.split()[0]: line for line in out.splitlines() if line and not line.startswith(" ")}
     assert lines["manager"].endswith("context bound: 300k (default)")
     assert "context bound: 300k" in lines["grinder"] and "(default)" not in lines["grinder"]
+
+
+def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys):
+    """TD-259 slice 1, design §6 rule 3 *A manager on call is a seat of this rule*: `ao team start`
+    writes `seat: {trigger: team}` on a manager whose definition says `on_call: true` — still first,
+    still supervised, still holding its grants and its members' `controllers` — and nothing on a
+    standing one; `ao team list` says which."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["manager"]["on_call"] = True
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    lead, *members = creates(state)
+    assert lead["name"] == "orc-ao" and lead["seat"] == {"trigger": "team"}
+    assert lead["supervised"] is True and lead["capabilities"] == ["control"] and lead["controllers"] == []
+    assert all(m.get("seat") is None and m["controllers"] == ["ao-agentorc-orc-ao"] for m in members)
+    assert "ao-agentorc-orc-ao  manager" in capsys.readouterr().out  # a manager on the start's own lines
+    assert cli.main(["--json", "team", "list"]) == 0
+    (row,) = json.loads(capsys.readouterr().out)["teams"]
+    assert row["on_call"] is True and row["manager"] == "orc-ao"
+    assert cli.main(["team", "list"]) == 0
+    assert "manager: orc-ao (on call)" in capsys.readouterr().out
+
+    doc["teams"]["ao-grind"]["manager"]["on_call"] = False
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert teams.plan(cli._org_here(), "ao-grind", "kmaster").lead.create_params([]).get("seat") is None
+    assert cli.main(["--json", "team", "list"]) == 0
+    (row,) = json.loads(capsys.readouterr().out)["teams"]
+    assert row["on_call"] is False
+    assert cli.main(["team", "list"]) == 0
+    assert "(on call)" not in capsys.readouterr().out
