@@ -37,6 +37,8 @@ from sessionorc.mail import self_decide_refusal
 # their work tree are the home's; a node's `settings.yml` is a replica nobody commits.
 # **`restart`** (§6 rule 2 *A person's restart*, TD-250): the launch record it replays and the marks it
 # clears are the home's; a node's member is closed and created from the home, over the link.
+# **`clear_mark`** (§4.5a, §6 rules 10 and 11, TD-258): Dismiss on the two rows writes `checks` and
+# `held_missed`, which the home owns on every record, a node's member's too.
 HOME_EDITS = frozenset(
     {
         "set_controllers",
@@ -51,6 +53,7 @@ HOME_EDITS = frozenset(
         "set_settings",
         "entry_add",
         "clear_work",
+        "clear_mark",
         "commit_defs",
         "restart",
     }

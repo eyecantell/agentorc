@@ -11,7 +11,7 @@ import pytest
 from conftest import park_ticks, wait_for
 
 from sessionorc import held
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import PERSON, SYSTEM, MailEntry, ProgressEntry, Session
 
 REVIEW = {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
@@ -289,6 +289,51 @@ async def test_a_crossing_cleared_from_the_record_is_not_written_again(agent, mo
     gh.prs[845] = (HELD, MERGED)
     await agent._held_pass([s], LATER)
     assert len(s.held_missed) == 1
-    s.held_missed = []  # the row's Dismiss clears the entries (slice 5)
+    s.held_missed = []
     await agent._held_pass([s], LATER)
     assert s.held_missed == [] and len(_fyi(agent)) == 1 and gh.asked == [845]
+
+
+# ── the row's mark and its Dismiss (slice 5) ────────────────────────────────────────────────────
+
+
+def test_the_row_is_two_crossings_not_dismissed():
+    a, b, c = (held.crossing(n, ["src/sessionorc/x.py"], "t") for n in (845, 851, 860))
+    assert held.row([]) == [] and held.row([a]) == [], "the first is a note and a line"
+    assert held.row([a, b]) == [a, b]
+    marked, prs = held.dismiss([a, b], "t2")
+    assert prs == [845, 851] and all(m["dismissed"] == "t2" for m in marked)
+    assert held.row(marked) == [] and held.row([*marked, c]) == [], "one since the Dismiss is the first again"
+    again, prs = held.dismiss([*marked, c], "t3")
+    assert prs == [860] and [m["dismissed"] for m in again] == ["t2", "t2", "t3"], "a dismissed entry keeps its date"
+    assert held.dismiss(again, "t4") == (again, [])
+
+
+async def test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again(agent, monkeypatch):
+    """The settled set is in memory: an entry Dismiss removed would be a crossing again at a home
+    restarted inside the mail's half retention (the review of #874), so Dismiss marks and keeps."""
+    gh, s = _Gh(monkeypatch), _member(agent)
+    for pr in (845, 851):
+        _done(s, pr)
+        gh.prs[pr] = (HELD, MERGED)
+    await agent._held_pass([s], LATER)
+    assert len(held.row(s.held_missed)) == 2 and len(_fyi(agent)) == 2
+    async with LocalClient(caller=s.id) as w:
+        with pytest.raises(AgentError, match="a person's own"):
+            await w.call("clear_mark", id=s.id, kind="held")
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="unknown mark"):
+            await person.call("clear_mark", id=s.id, kind="whatever")
+        got = await person.call("clear_mark", id=s.id, kind="held")
+        assert got == {"id": s.id, "kind": "held", "cleared": [845, 851]}
+        assert (await person.call("clear_mark", id=s.id, kind="held"))["cleared"] == []
+    assert [c["pr"] for c in s.held_missed] == [845, 851] and held.row(s.held_missed) == []
+    agent._held_settled.clear()  # a restarted home
+    agent._held_tried.clear()
+    await agent._held_pass([s], LATER)
+    assert len(s.held_missed) == 2 and len(_fyi(agent)) == 2, "neither written nor told again"
+    _done(s, 860)
+    gh.prs[860] = (HELD, MERGED)
+    await agent._held_pass([s], LATER)
+    assert [c["pr"] for c in held.standing(s.held_missed)] == [860] and held.row(s.held_missed) == []
+    assert len(_fyi(agent)) == 3, "the next crossing is a note again, and no row"

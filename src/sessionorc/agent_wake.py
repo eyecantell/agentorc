@@ -23,6 +23,8 @@ from sessionorc import (
     paths,
     waits,
 )
+from sessionorc import cadence as cadence_mod
+from sessionorc import held as held_mod
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc import usage as usage_mod
@@ -669,6 +671,40 @@ class WakeMixin:
         ids = sorted({str(i) for v in named.values() if isinstance(v, list) for i in v})
         log.info("rule 8: %s's work waiting dismissed by the person: %s", team, ", ".join(ids))
         return {"team": team, "cleared": True, "ids": ids}
+
+    async def rpc_clear_mark(
+        self, id: str, kind: str = "", pr: int | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """Dismiss's half of the two rows the tick's reads raise (design §4.5a, §6 rules 10 and 11,
+        TD-258). `kind: cadence` with `pr` takes `row` off that PR's `checks` entry — the entry
+        stays as the record of the read, and a fail read later at a new head is the row again —
+        and the row's snooze with it; `kind: held` marks every standing `held_missed` entry
+        `dismissed`, kept so that its PR is never read as a crossing again. A person's own,
+        refused to a session as `clear_work` is, and the home's alone (`modes.HOME_EDITS`): both
+        fields are home-owned, a node's member's too. `{id, kind, cleared}`: `cleared` the PRs
+        whose mark went, empty when none stood."""
+        if not mail.is_person(caller):
+            raise RpcError("clear_mark is a person's own: refused to a session (design §4.5a)")
+        if self.mode != "home":
+            raise RpcError("clear_mark runs at the home (design §6 rules 10 and 11): this host is a node")
+        s = self._find(self._addr(id))
+        addr = self._address(s)
+        if kind == "cadence":
+            if isinstance(pr, bool) or not isinstance(pr, int):
+                raise RpcError("clear_mark cadence needs the PR whose row to dismiss")
+            s.checks, stood = cadence_mod.dismiss(s.checks, pr)
+            cleared = [pr] if stood else []
+            if self.attention_snoozed.pop(f"{addr}|cadence:{pr}", None) is not None:
+                self.attention_store.save(self.trail, self.attention_snoozed)
+        elif kind == "held":
+            s.held_missed, cleared = held_mod.dismiss(s.held_missed, now_iso())
+        else:
+            raise RpcError(f"unknown mark {kind!r}; the marks a person dismisses are: cadence, held")
+        if cleared:
+            self._save(s)
+            await self._push_changes()
+            log.info("%s: %s row dismissed by the person: %s", addr, kind, ", ".join(f"#{n}" for n in cleared))
+        return {"id": addr, "kind": kind, "cleared": cleared}
 
     async def rpc_restart(self, id: str, caller: Any = None) -> dict[str, Any]:
         """A person's restart (design §6 rule 2 *A person's restart*, TD-250): what the tick would not

@@ -304,6 +304,59 @@ async def test_a_nodes_member_gets_the_clause_and_no_line(agent, monkeypatch):
     assert cadence.clause(rec.checks) == "PR #842 fails the cadence check: review, ledger"
 
 
+def test_the_rows_mark_and_its_dismiss():
+    told = {"pr": 842, "at": "t1", "sha": "aaa", **FAIL, "told": "t1", "row": "t2"}
+    fine = {"pr": 843, "at": "t1", "sha": "bbb", **PASS}
+    assert cadence.rows([told, fine]) == [told] and cadence.rows([fine]) == []
+    left, stood = cadence.dismiss([told, fine], 842)
+    assert stood and cadence.rows(left) == [] and left[1] is fine
+    assert left[0] == {k: v for k, v in told.items() if k != "row"}, "the entry stays as the record of the read"
+    assert cadence.dismiss(left, 842) == (left, False) and cadence.dismiss(left, 9) == (left, False)
+    # a fail read later at a new head is the row again; the same head is not read at all
+    assert cadence.record(left[0], 842, "ccc", False, FAIL, "t3")["row"] == "t3"
+
+
+async def test_dismiss_takes_the_row_off_and_its_snooze_with_it(agent, tmp_path, monkeypatch):
+    """Design §4.5a *Inbox row: cadence check failed* (slice 5): Dismiss is the person's, at the
+    home, on one PR's entry; the row's snooze is keyed on the record and the PR."""
+    from sessionorc import modes
+    from sessionorc.client import AgentError
+
+    gh, root = _Gh(monkeypatch), _root(agent, tmp_path)
+    rec = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="", repo=root, host=agent.host)
+    rec.supervised, rec.unattended, rec.state = True, True, "working"
+    agent.sessions[rec.id] = rec
+    _done(rec, "TD-257", 842)
+    _done(rec, "TD-258", 843)
+    gh.heads = {842: ("aaa", True), 843: ("bbb", True)}
+    gh.verdicts = {842: FAIL, 843: FAIL}
+    await agent._cadence_pass([rec])
+    await agent._cadence_pass([rec])
+    assert [c["pr"] for c in cadence.rows(rec.checks)] == [842, 843], "a merged fail is the row at once"
+    until = "2026-10-02T00:00:00Z"
+    async with LocalClient(caller=rec.id) as w:
+        with pytest.raises(AgentError, match="a person's own"):
+            await w.call("clear_mark", id=rec.id, kind="cadence", pr=842)
+    async with LocalClient() as person:
+        for bad in ("cadence:", "cadence:x", "cadence:-1"):
+            with pytest.raises(AgentError, match="unknown row kind"):
+                await person.call("attention_snooze", id=rec.id, kind=bad, until=until)
+        for pr in (842, 843):
+            got = await person.call("attention_snooze", id=rec.id, kind=f"cadence:{pr}", until=until)
+            assert got["row"] == f"{rec.id}|cadence:{pr}"
+        with pytest.raises(AgentError, match="needs the PR"):
+            await person.call("clear_mark", id=rec.id, kind="cadence")
+        got = await person.call("clear_mark", id=rec.id, kind="cadence", pr=842)
+        assert got == {"id": rec.id, "kind": "cadence", "cleared": [842]}
+        assert (await person.call("clear_mark", id=rec.id, kind="cadence", pr=842))["cleared"] == []
+        assert (await person.call("inbox"))["attention_snoozed"] == {f"{rec.id}|cadence:843": until}
+    assert [c["pr"] for c in cadence.rows(rec.checks)] == [843] and len(rec.checks) == 2
+    await agent._cadence_pass([rec])
+    assert gh.ran == [842, 843] and len(cadence.rows(rec.checks)) == 1, "a merged PR's read stands: no row again"
+    assert "clear_mark" in modes.HOME_EDITS
+    del agent.sessions[rec.id]
+
+
 async def test_every_reply_to_a_member_with_a_failing_pr_carries_the_clause(agent, tmp_path):
     from sessionorc import client as clientmod
 
