@@ -557,8 +557,9 @@ class TickMixin:
 
     def _profile_over(self, profile: str, now: datetime, team: str = "") -> dict[str, Any] | None:
         """The window `profile` is over its usage line in now, or None (§6 *Usage gate*): the gate's own
-        reading — the row `settings.crossed` names, with its `resets` — for a record the gate no longer marks — it clears `gated` on an exited one — so a policy does not
-        restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates).
+        reading — the row `settings.crossed` names, with its `resets` — for a record the gate no longer
+        marks (it clears `gated` on an exited one), so a policy does not restart or fill into a pause.
+        No reading is no gate, as at the gate (a failure never gates).
         `team` is the record's: its reserve priority lowers the line exactly as it does at the gate
         (TD-146), or a teamed member would be restarted at 65% and paused on the next tick."""
         whole = settings_mod.load()
@@ -1120,7 +1121,8 @@ class TickMixin:
         for profile in dict.fromkeys(r.profile for r in replays):
             if (over := self._profile_over(profile, now, team)) is not None:
                 # the window's reset, when the reading has one, so the row can say when the hold lifts
-                return {"why": "usage", "profile": profile, **({"resets": over["resets"]} if over.get("resets") else {})}
+                resets = {"resets": over["resets"]} if over.get("resets") else {}
+                return {"why": "usage", "profile": profile, **resets}
         until = conf.get("until")
         with contextlib.suppress(TypeError, ValueError):
             if until and _parse(str(until)) <= now:
