@@ -109,6 +109,9 @@ def test_the_cards_note_and_the_started_line():
     got = work_started(crew, NOW)
     assert (got["n"], got["of"], got["failed"]) == (2, 3, ["manager-ao-1"])
     assert "failed" not in work_started(crew[:2], NOW), "every replay came up: the note is as it was"
+    # started later by a crash restart or a person: the errored entry rides its history, and it is up
+    back = {"name": "manager-ao-1", "state": "idle", "restarts": [*crew[2]["restarts"], {"at": AT, "why": "start"}]}
+    assert "failed" not in work_started([*crew, back], NOW) and "failed" not in work_started([*crew[:2], back], NOW)
 
 
 def _session(name: str, **kw) -> dict:

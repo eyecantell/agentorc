@@ -616,7 +616,11 @@ def work_started(members: Collection[Mapping[str, Any]], now: datetime | None = 
             for e in (m.get("restarts") or [])
             if isinstance(e, Mapping) and e.get("why") == "work" and e.get("start") == start
         ]
-        failed = list(dict.fromkeys(str(m.get("name") or m.get("id") or "") for m, e in same if e.get("error")))
+        # a failed replay's entry goes with the record's history onto whatever starts it later (a
+        # crash restart, a person's Start), so a name that is live now did come up, whatever it carries
+        up = {str(m.get("name") or m.get("id") or "") for m in members if m.get("state") not in ("exited", "closed")}
+        names = (str(m.get("name") or m.get("id") or "") for m, e in same if e.get("error"))
+        failed = [n for n in dict.fromkeys(names) if n not in up]
         if failed:
             out.update(n=of - len(failed), of=of, failed=failed)
     return out
