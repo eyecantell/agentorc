@@ -18,7 +18,7 @@ from importlib import resources
 from typing import Any
 
 from agentorc import org as orgmod
-from agentorc import repoconfig, service, teamrun, teams
+from agentorc import orgcheck, repoconfig, service, teamrun, teams
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
@@ -675,27 +675,96 @@ def cmd_roles(args: argparse.Namespace) -> int:
 # ── ao team (design §4.9) ─────────────────────────────────────────────────────────────────────
 
 
-def _org_here() -> orgmod.Org:
-    """The org as the clients aggregate it (design §4.9 *The org is an aggregate*, TD-229):
-    `~/.agentorc/org.yml` plus the `teams:` of every checkout in this host's repos registry — the
-    one function the pages read too (`orgmod.with_repos`), so `ao team` gives the same org from any
-    directory. A repo file that cannot be read, a name two repos define, or a team whose landing
-    cannot be told is a line on stderr; a team `place:` puts on another host has that host's
-    registry asked for its checkout (`teamrun.repos_via`).
-    Read on every use and cached nowhere.
+def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
+    """The org as the clients aggregate it (design §4.9 *The org is an aggregate*, TD-229), and the
+    aggregate's notes: `~/.agentorc/org.yml` plus the `teams:` of every checkout in this host's
+    repos registry — the one function the pages read too (`orgmod.with_repos`), so `ao team` gives
+    the same org from any directory. A team `place:` puts on another host has that host's registry
+    asked for its checkout (`teamrun.repos_via`). Read on every use and cached nowhere.
 
     On a node the org is not here (design §4.4a: `org.yml` lives on the home), and a local file
     that disagreed with the home's would start a team the home knows nothing about."""
     if hosts.is_node():
         raise ValueError(
-            f"the org lives on {hosts.home_name()} (home): run `ao team` there — "
+            f"the org lives on {hosts.home_name()} (home): run `{what}` there — "
             f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
             "(design §4.4a: decided, not built)"
         )
-    o, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
+    return orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
+
+
+def _org_here() -> orgmod.Org:
+    """`_org_notes`' org, each note — a repo file that cannot be read, a name two repos define, a
+    team whose landing cannot be told — a line on stderr."""
+    o, notes = _org_notes()
     for note in notes:
         print(note, file=sys.stderr)
     return o
+
+
+def cmd_org(args: argparse.Namespace) -> int:
+    """`ao org` and `ao org check` (design §4.7, TD-229 slice 6): the org as the clients aggregate
+    it — each team with its source file, its repo, the host it lands on and why, a shadowed or
+    twice-named team said so, then the remainder's files with their last commit — and the same
+    reading as a verdict, exit 1 when something is lacking. Reads and writes nothing; the reading
+    itself is `agentorc.orgcheck`."""
+    what = "ao org check" if args.action == "check" else "ao org"
+    try:
+        org, notes = _org_notes(what)
+    except ValueError as e:  # a node, or an org file that cannot be read: the one lack there is
+        return fail(args, str(e), 1)
+    here = hosts.local_host().name
+    if args.action == "check":
+        got = orgcheck.check(
+            org,
+            notes,
+            here,
+            hosts.local_host().repos(),
+            list(hosts.nodes()),
+            files=teamrun.files_via(call_sync),
+            settings=settings_mod.read(),
+        )
+
+        def verdict() -> None:
+            for line in got["lacks"]:
+                print(f"lacking: {line}")
+            for line in got["warnings"]:
+                print(f"warning: {line}")
+            n, w = len(got["lacks"]), len(got["warnings"])
+            warned = f", {w} warning{'' if w == 1 else 's'}" if w else ""
+            t = len(org.teams)
+            print(f"{n} lacking{warned}" if n else f"ok: {t} team{'' if t == 1 else 's'}{warned}")
+
+        emit(args, got, verdict)
+        return 0 if got["ok"] else 1
+    got = {**orgcheck.view(org, here), "notes": notes}
+
+    def prose() -> None:
+        rows = got["teams"]
+        if not rows:
+            print(f"no team defined in {org.path} or any registered checkout's {repoconfig.FILE}")
+        w = max((len(n) for n in [*(r["name"] for r in rows), *got["shadowed"], *got["refused"]]), default=0)
+        for r in rows:
+            repos = ", ".join(r["repos"]) or "none"
+            lands = f"on {r['host']} ({r['why']})" if r["host"] else "lands nowhere"
+            print(f"{r['name']:<{w}}  repo{'' if len(r['repos']) == 1 else 's'}: {repos}  {lands}  [{r['source']}]")
+        for name, files in got["shadowed"].items():
+            for f in files:
+                print(f"{name:<{w}}  shadowed by {org.path.name if org.path else 'org.yml'}  [{f}]")
+        for name, why in got["refused"].items():
+            print(f"{name:<{w}}  refused: {why}")
+        for note in notes:
+            if note not in got["refused"].values():
+                print(f"note: {note}")
+        rem = got["remainder"]
+        history = "" if rem["tree"] else "  no history yet — `ao service install` makes it a work tree"
+        print(f"{rem['home']}:{history}")
+        fw = max(len(f["name"]) for f in rem["files"])
+        for f in rem["files"]:
+            state = "not there" if not f["exists"] else (f["commit"] or ("not committed yet" if rem["tree"] else ""))
+            print(f"  {f['name']:<{fw}}  {state}".rstrip())
+
+    return emit(args, got, prose)
 
 
 def cmd_team_start(args: argparse.Namespace) -> int:
@@ -2514,6 +2583,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("roles", help="list the role presets this repo resolves: built-in and from .agentorc.yml (design §4.8)")
     p.add_argument("-d", "--dir", help="the repo or directory to read (default: cwd)")
     p.set_defaults(fn=cmd_roles)
+
+    p = add("org", help="the org as the clients aggregate it: each team, its file, its repo, where it lands (§4.9)")
+    p.add_argument(
+        "action",
+        nargs="?",
+        choices=("check",),
+        help="check: the same reading as a verdict — each lack on a line, exit 1 when something is lacking",
+    )
+    p.set_defaults(fn=cmd_org)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
     p.add_argument(

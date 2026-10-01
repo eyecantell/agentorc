@@ -3028,7 +3028,7 @@ rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` 
 a session starts with nobody able to act on it. `ao status -v` prints both directions: `under:`
 from the record, `members:` derived across the records, never stored.
 
-**`ao org`** (TD-210; designed 2026-09-28, not built — TD-229) prints the org as the clients
+**`ao org`** (TD-210; designed 2026-09-28; built 2026-09-30 — TD-229 slice 6, `agentorc.orgcheck`) prints the org as the clients
 aggregate it (§4.9 *The org is an aggregate*): each team with its source file, its repo, the host
 it lands on and why (*place*, *registered here*, *registered on devenv*), a shadowed or twice-named
 team said so; then the remainder's files with their last commit. **`ao org check`** is the same
@@ -3038,7 +3038,16 @@ brief that is not in the checkout, a name defined twice, a `place:` naming no li
 team in `settings.yml` that no definition names (a repo renamed its team); and, as warnings
 that do not fail it, a registered checkout off its default branch or holding changes. On a
 node both refuse and name the home. It
-reads and writes nothing; a session may run it.
+reads and writes nothing; a session may run it. As built: a
+team the org file defines has no landing rule, so its line says its own `host:`, or *no host: —
+where it is started*; a file of the remainder reads its last commit, *not committed yet*, or *not
+there*, and a home that is no work tree yet says so once. The check prints each lack as
+*lacking: …* and each warning as *warning: …*, then *n lacking* or *ok: n teams*; under `--json`
+it is `{ok, lacks, warnings}` with the same exit code. A team's profile, brief and checkout are
+checked by planning its start (`teams.plan`, which creates nothing), so a team is one line, the
+first thing its start would refuse, in the start's own words. Two more warnings than the list
+above: a `place:` naming a team no registered repo defines (§4.9's note), and a registered
+checkout git cannot read. The default branch is the clone's `origin/HEAD`, `main` where unset.
 
 **Teams (§4.9, TD-040).** `ao team start <name>` launches a definition from `~/.agentorc/org.yml`
 or the repo's `.agentorc.yml` — every check first, then the manager, then each member with
@@ -4024,7 +4033,7 @@ the aggregate below is built — TD-229 slice 1, one function, `org.with_repos`,
 the pages both read — as are **Members…**'s disabled state, the home's history and agentorc's own
 `.agentorc.yml`, which defines `ao-grind` and its roles' `review:` (slice 2; the org file's `ao-grind`
 shadows it until the person removes that one) and `place:` with the landing rule (slice 3; *Where a repo's
-team lands*, below); `ao org` is not — TD-229's last slice). A team that works one repo is **defined in that repo**, in
+team lands*, below) and `ao org` with `ao org check` (slice 6, §4.7)). A team that works one repo is **defined in that repo**, in
 its `.agentorc.yml` — `teams:`, the `roles:` it uses with their `review:` paths, the briefs
 beside them — so it has the repo's history, is changed by PR and is read by whoever clones the
 repo. The org a client sees is the union:
