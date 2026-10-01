@@ -7,7 +7,7 @@ re-exported from it, so a route, a template or a test reads each name from the a
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +31,7 @@ from sessionorc.models import (
     tokens_short,
 )
 
-from .common import _age, _instant, _iso, editor_link, host_name
+from .common import _age, _instant, editor_link, host_name
 
 # -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
 
@@ -440,13 +440,8 @@ def view(
     # §6 rule 4 (TD-103): nudged once in this idle stretch and still idle another twenty minutes
     # later — the host agent is done, and it is for a person or its manager to judge
     # `idle_open` on the record is that reading, the tick's (§6 rule 3, TD-259): the slot, the seat's
-    # trigger and the Inbox row all draw from it. A home whose tick does not write it yet leaves the
-    # page its old derivation from `nudged_at`.
-    nudged, since = _iso(s.get("nudged_at")), _iso(s.get("since"))
-    d["open_work"] = state == "idle" and (
-        isinstance(s.get("idle_open"), dict)
-        or bool(nudged and since and nudged >= since and now - nudged >= timedelta(minutes=20))
-    )
+    # trigger and the Inbox row all draw from it, and the page derives nothing of its own.
+    d["open_work"] = state == "idle" and isinstance(s.get("idle_open"), dict)
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d

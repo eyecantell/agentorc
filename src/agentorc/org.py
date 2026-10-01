@@ -64,12 +64,10 @@ class Project:
     repos: dict[str, dict[str, Path]] = field(default_factory=dict)  # repo name → host name → checkout
 
 
-# What a `manager:` with no `on_call` means (design §4.9). The design's default is on call *from the
-# build*, and the build is TD-259's slices: until the tick reads the `team` trigger (slice 2), a
-# manager started as a seat is closed at its first idle and never filled, so that slice flips this.
-# An `on_call: true` is honoured meanwhile, and does exactly that to its team: write it only once
-# slice 2 is live.
-ON_CALL_DEFAULT = False
+# What a `manager:` with no `on_call` means (design §4.9): a seat on call, since the tick reads the
+# `team` trigger and the mail sweep spares a question to a closed seat (TD-259 slices 2 and 3). A team
+# keeps the shape it was started with until its next Start; `on_call: false` asks for a standing one.
+ON_CALL_DEFAULT = True
 # What fills a manager on call, in the card's words (design §4.5 *The card's anatomy*, TD-259)
 MANAGER_WHEN = "comes when a member needs a reading"
 
@@ -614,9 +612,15 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         brief=_opt_str(manager_raw.get("brief"), f"{key}.manager.brief"),
         grants=_grants(manager_raw.get("grants"), f"{key}.manager.grants"),
         unattended=_flag(manager_raw.get("unattended"), f"{key}.manager.unattended", default=True),
-        # a person's team starts nothing, so it is never on call whatever the default
+        # a person's team starts nothing, so it is never on call whatever the default; and the default
+        # is the `manager` role's alone — the one whose template has a seat's shape
+        # (`repoconfig.ON_CALL_BRIEFS`): another role managing is a seat only where its definition says so
         on_call=manager_role != PERSON
-        and _flag(manager_raw.get("on_call"), f"{key}.manager.on_call", default=ON_CALL_DEFAULT),
+        and _flag(
+            manager_raw.get("on_call"),
+            f"{key}.manager.on_call",
+            default=ON_CALL_DEFAULT and manager_role == DEFAULT_MANAGER_ROLE,
+        ),
     )
     members_raw = raw.get("members")
     if members_raw is None:
