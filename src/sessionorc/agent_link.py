@@ -259,7 +259,10 @@ class LinkMixin:
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
         """What the home may ask of this node: a ping; an `act` (step 4a) — an RPC the home has
         already gated, run here through the same handler a local caller reaches, with no gate of
-        its own; and `stat`, whether a directory exists here (a team start's checkout check)."""
+        its own; `stat`, whether a directory exists here (a team start's checkout check); `files`,
+        a checkout's own files read here (a team's brief on a machine node, TD-057 step 4b.3); and
+        `repos`, this node's registry (the home's `host_repos`, §4.9, TD-229). Beside them what the
+        home hands down: `read`, `intent`, `settings`, `usage` and `usage_reading`."""
         if method == "ping":
             return "pong"
         if method == "act":

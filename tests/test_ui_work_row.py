@@ -54,10 +54,16 @@ def test_a_held_start_says_which_bound():
     early = (NOW - timedelta(minutes=12)).isoformat()
     cases = {
         "grind is over its line": {"why": "usage", "profile": "grind"},
+        "grind is over its line, resets in 3h 0m": {
+            "why": "usage",
+            "profile": "grind",
+            "resets": (NOW + timedelta(hours=3)).isoformat(),
+        },
         "its stop time has passed": {"why": "until", "until": AT},
         "started 3 times today": {"why": "day", "count": 3},
         "started 12m ago and wound down again": {"why": "early", "started": early},
         "laptop is unreachable": {"why": "link", "host": "laptop"},
+        "laptop and nas are unreachable": {"why": "link", "host": "laptop", "hosts": ["laptop", "nas"]},
         "no record to start": {"why": "nothing"},
     }
     for words, held in cases.items():
@@ -66,6 +72,8 @@ def test_a_held_start_says_which_bound():
     said = work_held({"why": "balance", "repo": "/r", "crossed": crossed}, NOW)
     assert said.startswith("its repo is over its line") and "the line is 8" in said
     assert work_held(None, NOW) == "" and work_held("junk", NOW) == ""
+    past = {"why": "usage", "profile": "grind", "resets": AT}  # a reset already past names no time
+    assert work_held(past, NOW) == "grind is over its line"
     (r,) = work_rows({"g": mark(held={"why": "nothing"})}, now=NOW)
     assert r["held"] == "no record to start" and r["text"].endswith("not started: no record to start")
 
@@ -91,6 +99,19 @@ def test_the_cards_note_and_the_started_line():
     assert got == {"at": newer["at"], "age": "30m", "first": "TD-213", "more": 2}
     assert work_started([{"state": "idle", "restarts": [{"at": AT, "why": "crash"}]}]) is None
     assert work_started([{"state": "idle", "restarts": [{"at": AT, "why": "work", "error": "x"}]}]) is None
+    # a start whose replays partly failed says how many came up and which did not (TD-227)
+    one = {"why": "work", "ids": ["TD-213"], "start": AT, "of": 3}
+    crew = [
+        {"name": "grinder-ao-1", "state": "working", "restarts": [{**one, "at": AT}]},
+        {"name": "grinder-ao-2", "state": "idle", "restarts": [{**one, "at": AT}]},
+        {"name": "manager-ao-1", "state": "exited", "restarts": [{**one, "at": AT, "error": "no launch record"}]},
+    ]
+    got = work_started(crew, NOW)
+    assert (got["n"], got["of"], got["failed"]) == (2, 3, ["manager-ao-1"])
+    assert "failed" not in work_started(crew[:2], NOW), "every replay came up: the note is as it was"
+    # started later by a crash restart or a person: the errored entry rides its history, and it is up
+    back = {"name": "manager-ao-1", "state": "idle", "restarts": [*crew[2]["restarts"], {"at": AT, "why": "start"}]}
+    assert "failed" not in work_started([*crew, back], NOW) and "failed" not in work_started([*crew[:2], back], NOW)
 
 
 def _session(name: str, **kw) -> dict:
