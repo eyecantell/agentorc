@@ -677,7 +677,7 @@ class WakeMixin:
     ) -> dict[str, Any]:
         """Dismiss's half of the two rows the tick's reads raise (design §4.5a, §6 rules 10 and 11,
         TD-258). `kind: cadence` with `pr` takes `row` off that PR's `checks` entry — the entry
-        stays as the record of the read, and a fail read later at a new head is the row again —
+        stays as the record of the read, and a fail read later, at a new head or after a new `done`, is the row again —
         and the row's snooze with it; `kind: held` marks every standing `held_missed` entry
         `dismissed`, kept so that its PR is never read as a crossing again. A person's own,
         refused to a session as `clear_work` is, and the home's alone (`modes.HOME_EDITS`): both

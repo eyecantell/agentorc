@@ -312,7 +312,7 @@ def test_the_rows_mark_and_its_dismiss():
     assert stood and cadence.rows(left) == [] and left[1] is fine
     assert left[0] == {k: v for k, v in told.items() if k != "row"}, "the entry stays as the record of the read"
     assert cadence.dismiss(left, 842) == (left, False) and cadence.dismiss(left, 9) == (left, False)
-    # a fail read later at a new head is the row again; the same head is not read at all
+    # a fail read later — a new head, or a new `done` naming the PR — is the row again
     assert cadence.record(left[0], 842, "ccc", False, FAIL, "t3")["row"] == "t3"
 
 
@@ -338,7 +338,7 @@ async def test_dismiss_takes_the_row_off_and_its_snooze_with_it(agent, tmp_path,
         with pytest.raises(AgentError, match="a person's own"):
             await w.call("clear_mark", id=rec.id, kind="cadence", pr=842)
     async with LocalClient() as person:
-        for bad in ("cadence:", "cadence:x", "cadence:-1"):
+        for bad in ("cadence:", "cadence:x", "cadence:-1", "cadence:0842"):
             with pytest.raises(AgentError, match="unknown row kind"):
                 await person.call("attention_snooze", id=rec.id, kind=bad, until=until)
         for pr in (842, 843):

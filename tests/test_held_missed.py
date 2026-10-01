@@ -304,6 +304,7 @@ def test_the_row_is_two_crossings_not_dismissed():
     marked, prs = held.dismiss([a, b], "t2")
     assert prs == [845, 851] and all(m["dismissed"] == "t2" for m in marked)
     assert held.row(marked) == [] and held.row([*marked, c]) == [], "one since the Dismiss is the first again"
+    assert held.untold(marked) == marked, "a Dismiss is the person's: the member is still told once"
     again, prs = held.dismiss([*marked, c], "t3")
     assert prs == [860] and [m["dismissed"] for m in again] == ["t2", "t2", "t3"], "a dismissed entry keeps its date"
     assert held.dismiss(again, "t4") == (again, [])
