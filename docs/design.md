@@ -2425,7 +2425,8 @@ Screens:
       migration); a blocked row says *blocked by TD-n* after its owner, naming everything that
       still blocks it as §4.4 lists it — the ids, then `decision (<who>)`; each row the id, title, priority and owner, *held by
       <name>* when a member claims it, sorted by priority then id, a list folded past four rows
-      with *+n more*. The heading carries **Open ledger** through the person's `open_in` (§5) —
+      with *+n more*. A page opened on an entry's id (`/repo/<name>#TD-227`, the Inbox's team start row) unfolds
+      the list that holds it and scrolls to the row (TD-227). The heading carries **Open ledger** through the person's `open_in` (§5) —
       an entry is edited in its file, never here — **Add entry…** beside it (TD-180; built by TD-219 slices 3 and 4, 2026-09-29: the form of §4.9 *Add
       an entry to the ledger*, which writes no file itself), and
       the count line the card's kind bar has.
