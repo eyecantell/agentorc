@@ -2526,3 +2526,16 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-09-30 (PR #838; grinder-ao-2) — design §4.5a *team card: TDs in motion* (**Columns**) and the ***i*** mark row (**who for what**) carry what was built; `tests/test_ui_team_summary.py` (the six cells, the widths) and `tests/test_ui.py` (no line on the header, the panel's list) hold it. The holders column is one ordinary name wide (14 characters), a longer list cut and whole on hover. Screenshots: `docs/mockups/reviews/2026-09-30-td252-*.png`; the live look is on the board.
 
 **Related:** TD-232 (the Doing list's columns and the priority letter), TD-176 (the team card's facets), TD-162 and TD-171 (*who for what*), TD-167 (the help panel).
+
+## TD-257: `test_usage_unknown_is_said_once_a_day_while_a_session_works` fails across 00:00 UTC
+
+**Priority:** Low
+**Added:** 2026-09-30 (grinder-ao-1, from manager-ao-1's board line of that day, which Paul answered *take it*)
+**Status:** Resolved
+**Location:** `tests/test_usage_projection.py` (`test_usage_unknown_is_said_once_a_day_while_a_session_works`)
+
+**Why:** the CI job on PR #807 failed at 23:59:47Z with `assert (2 == 1)` at `tests/test_usage_projection.py:163` and passed on a re-run. The test took `datetime.now(UTC)` and ran the gate again at that instant plus five minutes, and the *usage unknown* note is keyed on the UTC date (`agent_tick.py`, `_unknown_noted`), so a run in the five minutes before midnight UTC said it twice; any PR's CI could fail there. The same class as TD-242.
+
+**Resolved:** 2026-09-30 (PR #842, grinder-ao-1) — the test's instant is noon UTC of the day it runs, so its minutes cross no date; forcing 23:58 before the change fails the same assertion. The test also runs the gate a day later and reads a second note, which holds *once a day* from both sides.
+
+**Related:** TD-242 (`test_spend`, local midnight), TD-233 (the projection and the note).
