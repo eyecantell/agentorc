@@ -434,7 +434,7 @@
    the row kind, because a session's permission and its stalled row are two rows. A permission, a
    question and `limited` are never offered one: something is waiting on the tool's own clock. #}
 {% macro state_snooze(e) -%}
-{%- if e.row in ('stalled', 'unpushed', 'restart') %}
+{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="1h">in 1 hour</button>
@@ -480,6 +480,14 @@
   <button class="btn sm" data-act="resume" data-id="{{ e.sid }}">Resume</button>
   {{ open_btn(e, 'Open') }}
   <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="restart" data-until="dismissed:{{ e.at }}" title="remove this row: the mark stays on the record and its card, and a new mark raises a new row">Dismiss</button>
+  {%- elif e.row == 'idle_open' %}
+  {#- §4.5a **Inbox row: idle · open work** (§6 rule 3 `idle_open`, TD-259): a member of a team with
+      no manager, nudged once and still idle with its work open. Nobody else reads it, so it is
+      the person's: **Open** is where Send and Wrap up are. -#}
+  <span class="st" title="{{ help_title('idle-open') }}">idle · open work — its team has no manager, so it is yours to judge</span>
+  <span class="grow"></span>
+  {{ state_snooze(e) }}
+  {{ open_btn(e, 'Open') }}
   {%- elif e.row == 'unclosed' %}
   {#- §4.5a **Inbox row: manager did not close** (§6 rule 9, TD-241): the tick told the manager its
       team had finished and could not close it. **Open** alone: nothing is stored for the row, so

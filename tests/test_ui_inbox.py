@@ -2852,6 +2852,49 @@ def test_a_mail_row_links_its_page_and_a_state_or_board_row_does_not():
 
 
 @pytest.mark.unit
+def test_idle_open_work_is_a_row_for_a_team_with_no_manager(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: idle · open work** (§6 rule 3 `idle_open`, TD-259 slice 4): a supervised
+    member carrying `idle_open` in a team whose records hold no manager is a counted row with Open
+    and Snooze, its words the record's fields; a managed team's member draws none."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import inbox_sections
+
+    mark = {"at": "2026-10-01T10:40:00Z", "ref": "TD-070"}
+    nudged = {"since": "2026-10-01T10:00:00Z", "nudged_at": "2026-10-01T10:20:00Z", "supervised": True}
+    records = [
+        rec("ao-p", "idle", team="dc", idle_open=mark, **nudged),  # person-led: nobody else reads it
+        rec("ao-q", "working", team="dc", idle_open=mark, **nudged),  # the state changed: the mark is stale
+        rec("ao-n", "idle", team="dc", **nudged),  # no mark: the slot's fallback is not a row
+        rec("ao-u", "idle", team="dc", idle_open=mark, since=nudged["since"]),  # nothing supervises it
+        rec("ao-l", "idle", idle_open=mark, **nudged),  # no team at all
+        rec("ao-mgr", "idle", team="ao", capabilities=["control"]),
+        rec("ao-g", "idle", team="ao", controllers=["ao-mgr"], idle_open=mark, **nudged),  # its manager's
+        # a manager on call between fills: the seat is empty, its record closed, and the team is still
+        # managed — the reading fills the seat (`seat_due.by: open`), so the person gets no row
+        rec("ao-oc", "closed", team="oc", capabilities=["control"], seat={"trigger": "team"}, pane=False),
+        rec("ao-h", "idle", team="oc", controllers=["ao-oc"], idle_open=mark, **nudged),
+    ]
+    got = [r for r in state_rows_of(records) if r["row"] == "idle_open"]
+    assert [r["sid"] for r in got] == ["ao-p"]
+    (row,) = got
+    assert re.fullmatch(r"idle \S+( \S+)? with TD-070 open, nudged (\w{3} )?\d\d:\d\d", row["text"]), row["text"]
+    assert row["at"] == mark["at"] and row["id"] == "ao-p:idle_open"
+    bare = rec("ao-p", "idle", team="dc", idle_open={"ref": "TD-070"}, **nudged)  # a mark with no time
+    assert state_rows_of([bare])[0]["at"] == nudged["since"]
+    assert state_rows_of([rec("ao-p", "idle", team="dc", idle_open={"at": mark["at"]}, supervised=True)])[0][
+        "text"
+    ].endswith("with its work open")
+    html = rows("needs", [row])
+    assert "idle · open work — its team has no manager, so it is yours to judge" in html
+    assert 'data-act="attention_snooze" data-id="person" data-sid="ao-p" data-row="idle_open" data-when="1h"' in html
+    assert 'href="/focus/ao-p"' in html and ">Open</a>" in html and 'data-act="resume"' not in html
+    # counted under Needs you, and set aside by its own snooze key
+    now = datetime(2026, 10, 1, 11, 0, tzinfo=UTC)
+    assert [r["sid"] for r in inbox_sections([], states=got, now=now)["needs"]] == ["ao-p"]
+    later = inbox_sections([], states=got, now=now, attention_snoozed={"ao-p|idle_open": "2026-10-01T12:00:00Z"})
+    assert later["needs"] == [] and [r["sid"] for r in later["snoozed"]] == ["ao-p"]
+
+
 def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tmp_path, monkeypatch):
     """§4.5a **Inbox row: restart** and **more ▾** → **Restart** (§6 rule 2 *A person's restart*,
     TD-250 slice 2): drawn beside Resume on the row of a supervised record that is not a seat — the

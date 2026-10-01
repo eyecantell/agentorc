@@ -184,6 +184,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     find_words,  # noqa: F401
     handed_rows,  # noqa: F401
     horizon_of,  # noqa: F401
+    idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     origin_case,  # noqa: F401
     origin_firsts,  # noqa: F401

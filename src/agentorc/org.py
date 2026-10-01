@@ -70,6 +70,8 @@ class Project:
 # An `on_call: true` is honoured meanwhile, and does exactly that to its team: write it only once
 # slice 2 is live.
 ON_CALL_DEFAULT = False
+# What fills a manager on call, in the card's words (design §4.5 *The card's anatomy*, TD-259)
+MANAGER_WHEN = "comes when a member needs a reading"
 
 
 @dataclass

@@ -169,6 +169,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "idle-open",
+        "idle · open work",
+        "an Inbox row, a card's slot",
+        (
+            "A member that the host agent nudged once and that is still idle with its work open, in a team "
+            "with no manager to read it. Open it to see what stopped it, then Send it a line or Wrap it up; "
+            "Snooze sets the row aside and changes nothing on the session. The row leaves by itself when the "
+            "session's state changes. A team with a manager shows no such row: the reading goes to the "
+            "manager, and the card's slot says idle · open work either way."
+        ),
+    ),
+    Help(
         "message",
         "Message…",
         "a seat's card, *more ▾*, Focus header",
@@ -361,6 +373,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "board-answers",
             "board-go-with-it",
             "restart",
+            "idle-open",
         ),
     ),
     ("settings", "Settings", ("on-work", "balance")),
