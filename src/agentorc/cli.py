@@ -24,6 +24,7 @@ from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
 from sessionorc import settings as settings_mod
 from sessionorc.adapters import short_model
+from sessionorc.cadence import said as cadence_said
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import (
@@ -289,6 +290,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      spend:  {line}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
+            if checks := s.get("checks"):  # design §6 rule 10 (TD-258): the last check per PR
+                print(f"{'':<{w}}      checks: {'; '.join(cadence_said(c) for c in checks)}")
             if s.get("findings"):
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
             if ow := s.get("out_of_work"):
@@ -3161,12 +3164,14 @@ def unread_line(args: argparse.Namespace) -> None:
     goes to stderr, so a caller parsing stdout never meets it. A command that never reached the
     agent (`ao --skill`, `ao roles`) has no response to read and prints nothing."""
     m = clientmod.last_mail
-    if not m or not (m.get("unread") or m.get("owed") or m.get("context") or m.get("brief")):
+    if not m or not (m.get("unread") or m.get("owed") or m.get("context") or m.get("brief") or m.get("cadence")):
         return
     lines = []
     over = str(m.get("context") or "")  # §6 rule 5 (TD-190): past the role's context bound
     # §6 rule 7 (TD-217): the brief it was started on changed, as merged — rides as the context clause does
-    over = "; ".join(x for x in (over, str(m.get("brief") or "")) if x)
+    # §6 rule 10 (TD-258): an open PR of its own fails the cadence check — rides as they do
+    declare = "; ".join(x for x in (over, str(m.get("brief") or "")) if x)
+    over = "; ".join(x for x in (declare, str(m.get("cadence") or "")) if x)
     if n := int(m.get("unread") or 0):
         lines.append(mailmod.unread_line(n))
         if m.get("wake_budget_spent"):
@@ -3174,7 +3179,7 @@ def unread_line(args: argparse.Namespace) -> None:
         if over:
             lines[-1] += f" ({over})"
     elif over:
-        lines.append(f"[agentorc] ({over}) — finish the entry in hand, then declare")
+        lines.append(f"[agentorc] ({over})" + (" — finish the entry in hand, then declare" if declare else ""))
     # Design §4.10 *Outcomes*: the person answered and is waiting to hear what came of it. One line
     # each settles them — `ao msg person --outcome done|blocked|dropped "<line>" --for <id>`.
     if owed := [str(x) for x in (m.get("owed") or [])]:

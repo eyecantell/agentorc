@@ -108,6 +108,7 @@ HOME_OWNED = frozenset(
         "seat",
         "seat_due",
         "seat_count",
+        "checks",
         "review",
         "context_bound",
         "wrapup_prompt",
@@ -962,6 +963,12 @@ class Session:
     # reading and never reads as zero. Both the home's, computed at the home.
     seat_due: dict[str, Any] | None = None
     seat_count: dict[str, Any] | None = None
+    # What the home read of this member's PRs with `scripts/check_cadence.py` (design §6 rule 10,
+    # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
+    # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`
+    # when the member was told of a fail, `row` while the Inbox row stands, and `read_by` once a
+    # reader's reply on the PR's `ask` was seen. The home's, written by the tick alone.
+    checks: list[dict[str, Any]] = field(default_factory=list)
     # Who reads this session's PRs before they merge (design §4.9b *The reader*, TD-093):
     # `{reader, held, bound}` from its role preset's `review:`, written at start. The home stores
     # it and times nothing; the author's own `ao` reads it to decide whether a PR is held.

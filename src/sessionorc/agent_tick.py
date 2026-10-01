@@ -24,6 +24,7 @@ from sessionorc import (
 )
 from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
+from sessionorc import cadence as cadence_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
@@ -464,6 +465,7 @@ class TickMixin:
                 await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
                 await self._idle_nudge(s, now)
                 await self._context_line(s, now)
+                await self._cadence_line(s, now)
                 await self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
@@ -473,6 +475,9 @@ class TickMixin:
             # detached, as the reports are: `gh` talks to the network, and the tick must not wait on it
             self._seat_counted_at = now
             self._seat_count_task = asyncio.create_task(self._count_seats(records))
+        if (self._cadence_task is None or self._cadence_task.done()) and now - self._cadence_read_at > DERIVE_EVERY:
+            self._cadence_read_at = now  # rule 10: the script talks to GitHub, so detached as well
+            self._cadence_task = asyncio.create_task(self._cadence_pass(records))
         if (self._brief_task is None or self._brief_task.done()) and now - self._brief_read_at > DERIVE_EVERY:
             self._brief_read_at = now
             self._brief_task = asyncio.create_task(self._brief_pass(now))
@@ -843,6 +848,103 @@ class TickMixin:
         if await self._policy_send(s, line):
             s.context_sent_at = now_iso()
             log.info("%s: %s — told", s.id, over)
+            self._save(s)
+            await self._push_changes()
+
+    @staticmethod
+    def _cadence_member(s: Session) -> bool:
+        """Rule 10's subject: a supervised member, not a seat, on the record that is its run now."""
+        return bool(s.supervised and s.seat is None and not s.superseded_by)
+
+    def _is_record(self, s: Session) -> bool:
+        """Whether `s` is still the record under its address — not forgotten, replaced by a
+        restart, or a node's replica read anew — so a read made off the loop is saved to it."""
+        held = self.sessions if s.host == self.host else self.remote.get(s.host, {})
+        return held.get(s.id) is s
+
+    async def _cadence_pass(self, records: list[Session]) -> None:
+        """Rule 10's read (design §6, TD-258), detached on the reports' cadence: for each supervised
+        member, not a seat, each `progress` entry `done` with a `pr` — declared or derived — whose
+        `checks` entry is missing, `unknown`, older than the `done`, or read at another head, the
+        script is run in the registry root the record's `repo` names, **one PR per run**, the one
+        longest unread first. A root the home holds no reading of or that carries no script, a
+        head `gh` cannot give and a run with no reading write nothing."""
+        try:
+            due: list[tuple[str, Session, int, str]] = []
+            for s in records:
+                if not self._cadence_member(s) or s.repo not in self._repos:
+                    continue
+                dones: dict[int, str] = {}
+                for e in s.progress:
+                    if e.status == "done" and isinstance(e.pr, int):
+                        dones[e.pr] = max(dones.get(e.pr, ""), e.at)
+                for pr, done_at in dones.items():
+                    old = cadence_mod.entry_of(s.checks, pr)
+                    if old and old.get("merged") and not cadence_mod.stale(old, done_at):
+                        continue  # a merged PR's head no longer moves: the read stands
+                    due.append((str((old or {}).get("at") or ""), s, pr, done_at))
+            due.sort(key=lambda d: (d[0], d[2]))
+            scripted: dict[str, bool] = {}
+            for _, s, pr, done_at in due:
+                root = str(s.repo)
+                if root not in scripted:
+                    scripted[root] = await asyncio.to_thread(cadence_mod.has_script, root)
+                if not scripted[root]:
+                    continue
+                head = await asyncio.to_thread(cadence_mod.head, root, pr)
+                if head is None:
+                    continue
+                sha, merged = head
+                old = cadence_mod.entry_of(s.checks, pr)
+                if (
+                    old
+                    and not cadence_mod.stale(old, done_at)
+                    and old.get("sha") == sha
+                    and bool(old.get("merged")) == merged
+                ):
+                    continue
+                got = await asyncio.to_thread(cadence_mod.check, root, pr)
+                if got is None or not self._is_record(s):
+                    continue
+                old = cadence_mod.entry_of(s.checks, pr)
+                new = cadence_mod.record(old, pr, sha, merged, got, now_iso())
+                s.checks = [*(c for c in s.checks if c.get("pr") != pr), new]
+                log.info("%s: PR #%s read by the cadence check: %s", self._address(s), pr, cadence_mod.said(new))
+                self._save(s)
+                break  # one PR per run
+        except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
+            log.exception("the cadence check's pass failed")
+        finally:
+            await self._push_changes()
+
+    async def _cadence_line(self, s: Session, now: datetime) -> None:
+        """Rule 10's telling (design §6, TD-258), rule 5's two ways. A first fail of an open PR is
+        one fixed line typed into the composer of an unattended member of this host that is
+        hook-confirmed `idle` — never at a dialog, a wrap-up or a gate pause — and for a member
+        that is working, on a node or attended it is the clause every `ao` reply carries
+        (`cadence.clause`, read at the home); either way `told` marks it. `read_by` is written the
+        first time a reader's reply on the PR's `ask` is seen in the record's mail, and kept."""
+        if not self._cadence_member(s) or not s.checks:
+            return
+        dirty = False
+        for c in s.checks:
+            if not c.get("read_by") and (who := cadence_mod.read_by(s, int(c["pr"]))):
+                c["read_by"], dirty = who, True
+            if not cadence_mod.untold(c):
+                continue
+            typed = s.host == self.host and s.unattended and not s.suspended
+            if typed and s.state == "idle":
+                if s.confidence != "hook" or s.pending or s.wrapup_at or s.wrapup_sent_at:
+                    continue
+                if s.gated or self._profile_gated(s.profile, now, s.team):
+                    continue
+                ref = next((e.ref for e in reversed(s.progress) if e.status == "done" and e.pr == c["pr"]), "")
+                if not await self._policy_send(s, cadence_mod.line(c, ref)):
+                    continue  # not typed: the next tick looks again
+            elif typed and s.state != "working":
+                continue  # exited, closed or at a dialog: nobody reads a reply now
+            c["told"], dirty = now_iso(), True
+        if dirty:
             self._save(s)
             await self._push_changes()
 

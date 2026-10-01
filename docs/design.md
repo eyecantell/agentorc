@@ -1067,7 +1067,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `checks`, `held_missed`, `conventions_seen`, `idle_open`, `seat_filled` (§6 rules 10–12 and rule 3's manager on call, TD-247 — not built), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `checks`, `held_missed`, `conventions_seen`, `idle_open`, `seat_filled` (§6 rules 10–12 and rule 3's manager on call, TD-247 — not built), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -7044,21 +7044,26 @@ code and needs no grant; a session doing the same work does.
      (`ao team status --json`, §4.9) and never an earlier round's; what it may no longer do is
      keep a finished team live by not saying so.
 
-  10. **The cadence check** (TD-247; designed 2026-09-30, not built — TD-258). The manager ran
+  10. **The cadence check** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 1,
+     `sessionorc.cadence`; its Inbox row is slice 5's, not built). The manager ran
      `scripts/check_cadence.py --pr <n> --json` on every `done` with a `pr` and read the rows;
      the script's verdict needs no reader. For a supervised member, not a seat, each `progress`
      entry `done` carrying `pr` — declared or derived, so a PR merged from the member's branch
      is one too (§4.4 *Repo facts*, `reports.derive`) — that the record's **`checks: [{pr, at,
-     sha, verdict, failed, told, row}]`** (home-owned) does not hold at that head is checked
+     sha, verdict, failed, told, row, merged, read_by}]`** (home-owned) does not hold at that head is checked
      **at the home** on the reports' five-minute cadence, detached as `seat_count`'s read is:
      the script run `--json` in the registry root the record's `repo` names, at the home (a
      node's member's checkout is at the same absolute path, §4.4a; a path the home cannot see,
      or a root without the script — a repo not on dev-cadence — gives no reading), one PR per
      run; its exit of 2 (no such PR) ends the reading, and an `unknown` verdict is kept and read
      again on the next cadence, nothing told. The entry keeps the head it was read at, so a PR
-     whose head moved is read again. **`pass`** writes the entry and nothing else. **`fail`**
+     whose head moved is read again: the head and whether the PR is merged are one `gh pr view`
+     before the script, and a head `gh` cannot give is no reading. A merged PR's head no longer
+     moves, so its entry carries `merged` and a settled read of it stands with nothing asked,
+     until a new `done` names the PR. Of the PRs waiting, the one longest unread is the run's. **`pass`** writes the entry and nothing else. **`fail`**
      the first time for that PR — `told` empty — is one fixed line to the member, rule 5's two
-     ways: typed into an idle composer on the home's own host, *[agentorc] PR #842 failed the
+     ways: typed into the idle composer of an unattended member on the home's own host (never
+     into an attended session, invariant 5: it is told by the clause), *[agentorc] PR #842 failed the
      cadence check: review, ledger — fix it, then report `ao progress done TD-257 --pr 842`
      again*, the row names from the script's `rule` field and never its `detail`, and on a
      working member the clause at the end of every `ao` reply, *(PR #842 fails the cadence
@@ -7071,7 +7076,8 @@ code and needs no grant; a session doing the same work does.
      script proves the comment was posted before the merge, not that it was honest, and the
      home adds beside the verdict what it alone knows — *read by techlead-ao-1* when a mailbox it
      holds has an `ask` carrying `pr: 842` with a reply from the seat on its thread (§4.9b *The
-     reader*), *recorded* otherwise — and never says *verified*. `ao status -v` prints the
+     reader*), *recorded* otherwise — and never says *verified*; the reader is kept on the entry
+     as `read_by` the first time the reply is seen, since mail is pruned and the read is not. `ao status -v` prints the
      record's last check per PR; a member on a node is checked as any (the script runs at the
      home) and told by the clause alone, as rule 5 tells it. **Not this rule's**: a PR from a
      session with no `progress` entry naming it (a person's anchor — the cadence is theirs to
