@@ -1086,6 +1086,34 @@ def test_the_manager_brief_reads_the_records_each_round_and_takes_finished_from_
     assert "skip step (1), do steps (2) to (4) at once" in text and "*manager did not close*" in text
 
 
+def test_the_manager_brief_names_none_of_the_four_jobs_the_tick_took():
+    """TD-258 slice 6, design §6 *What is left is judgement* and rules 10–12: the cadence check, the
+    merged-held-PR check, the relay of a convention change and the chase of an owed outcome are the
+    tick's, so the preset and this repo's supplement tell a manager to do none of them — a member
+    told by both hears each thing twice — and to read the marks the policies leave instead."""
+    root = pathlib.Path(__file__).parents[1]
+    text = (root / "src/agentorc/briefs/manager.md").read_text()
+    supplement = (root / "docs/briefs/manager-ao-1.md").read_text()
+    for gone in (
+        "check_cadence.py",
+        "cadence-changes.md` on",
+        "relayed.json",
+        "cadence_changes.py",
+        "Chase it while",
+        "Put those ids on",
+    ):
+        assert gone not in text and gone not in supplement, gone
+    assert "one `ao send --wait` naming the PR" not in text and "naming the PR and the rule" not in supplement
+    assert "gh pr list --state merged" not in supplement and "§6 rule 11: `held_missed`" in supplement
+    # rule 4 types into no node's pane, so the one line a manager still sends is to a member on another host
+    assert "except to a member on another host" in text and "for the debt alone" in text
+    assert "`checks` in `--json`" in text and "`held_missed` on the member's record" in text
+    assert "**The reminder is the host agent's**" in text and "as a `system` note" in text
+    assert "say *recorded*, never *verified*" in text  # rule 10: the review row is self-attested
+    steps = [ln[:2] for ln in text.splitlines() if ln[:1].isdigit() and ln[1:3] == ". "]
+    assert steps == ["1.", "2.", "3.", "4.", "5."]  # the relay step went, the round's end is step 5
+
+
 def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
     """TD-113 (0), design §6 *Keeping a team running* rule 1: a supervised member that exits with no
     declaration is restarted by the host agent's tick, so the preset must not send its manager down

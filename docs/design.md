@@ -719,8 +719,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   design-first entry is *design*, a claim with an **open** PR *review*, without one *grind*, and
   *add* is reserved for a hunter's filing (TD-160 and later); a claim whose PR has merged or
   closed reads *review* still, its PR marked *merged* / *closed*, until the member marks the claim
-  done or dropped — a stale claim is the member's to clear, and the manager's cadence check
-  (`briefs/manager.md`, *A round*) is what chases it. **The doing log** (§4.8): beside the record's
+  done or dropped — a stale claim is the member's to clear, and the tick's idle nudge, which
+  names the open reference (§6 rule 4), is what chases it. **The doing log** (§4.8): beside the record's
   one `doing` value, the host agent appends every `doing` call to a bounded log per team, the
   last fifty, kept in memory and in `doing.jsonl`, served by the `doing_log` RPC (the `doing` RPC
   is the write) and pushed as a `doing` event — the feed a team card and the Repo page draw. Board counts are not here: the UI
@@ -3649,7 +3649,7 @@ what was true on a day.
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep, so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
+| `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep, so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; read `checks` and `held_missed` on its members' records and never run the cadence check, name a held PR, relay a convention change or chase an owed outcome itself — those are the tick's (§6 rules 10–12 and rule 4's owed clause; TD-258), but for a member on another host, whose pane the tick does not type into: the manager's one line to it names what it owes; never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
 | `techlead` (TD-075, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail; and a ledger entry, by PR, when the person hands it one (§4.9 *Add an entry to the ledger*, TD-180) |
 | `auditor` (TD-098, §4.9b *Seats with a trigger*) | a hunter for one seat: check one area — what the PRs its trigger counts changed (the last *n*, or those merged inside its period, read from `ao team list --json`), against the docs or the tests the repo's own brief names — file each problem with evidence and never fix it; declare nothing (a seat is not counted in a wind-down); end when the pass is done | — (the area is its brief's; a seat has no lane) | none | `findings` |
 | `plain` | — (no template) | — | none | whatever it declares |
@@ -3800,20 +3800,20 @@ never the core's; the tests and what a manager does with them are §4.9a.
 
 The relay is the third of cadence §3's three delivery paths for a convention change (the sync
 PR, the SessionStart hook, the relay) and the only one that reaches a session already running;
-the manager keeps a structured record of what it relayed to whom on its launch branch, so a
-nightly restart does not resend. The cadence check is the manager's only judgement about the
+it is the host agent's (§6 rule 12), which keeps what each member was told on its record
+(`conventions_seen`), so a restart does not resend. The cadence check is the one judgement made about the
 *work* rather than the *session*, and it is borrowed: the script is a dev-cadence SYNC file that
 the working session runs before merging (`/cadence`) and the weekly sweep runs over the window,
-so the manager adds a third caller, not a third rule set. Its `review` row is self-attested (the
-worker posted the evidence comment itself), so the manager says *recorded*, never *verified*, and
-a green check is a reason not to send, not proof of a good review.
+so the tick (§6 rule 10) adds a third caller, not a third rule set. Its `review` row is self-attested (the
+worker posted the evidence comment itself), so the home and a manager reading `checks` say *recorded*, never *verified*:
+a green check is not proof of a good review.
 
 The manager is a **session, not code**: its brief is the samscrape supervisor's rules written
 for an agent driving `ao`. Rules that prove mechanical (wrap up at the stop time, retry a stalled
 send) move into the tick as §6 policies; those that need judgement (stuck or thinking? interrupt
 now?) stay in the brief. The grant is what makes this safe: the manager's power is a field the
 person can see on the Focus header and revoke, not a promise in its prompt. Since TD-247
-(designed 2026-09-30, not built — TD-258, TD-259) the brief's remaining mechanical jobs are §6
+(designed 2026-09-30; the policies and the preset's words built 2026-10-01, TD-258; the seat's default waits on TD-259's flip) the brief's remaining mechanical jobs are §6
 rules 10–12 and rule 4's owed clause, and what is judgement is a **seat on call** (§6 *What is
 left is judgement*): a manager whose definition does not say `on_call: false` (§4.9) is a seat of §6
 rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
@@ -6022,7 +6022,7 @@ and a settled instruction is a thread, kept as every thread is, with the `sends`
 and the run log saying who typed what. What a conflict *reveals* — a brief that contradicts a
 lane, a convention two managers read differently — goes up as a `finding` against the entry or
 the brief it concerns (`ao finding`, §4.8), never as work a manager creates (§4.8 *manager*:
-it relays conventions and never creates work). Nobody writes a board line for a conflict; the host agent
+it never creates work). Nobody writes a board line for a conflict; the host agent
 never did (board write-back, §4.4, acts at a person's press and on nobody's behalf).
 
 **A `send` is recorded on the record it lands on, so a `conflict` can say who said what.**
@@ -6763,7 +6763,7 @@ code and needs no grant; a session doing the same work does.
      `IDLE_NUDGE` later reads *idle · open work* in the slot for a person or its manager to judge.
   **What is left is judgement, and a seat holds it** (TD-247; Paul, 2026-09-30: *ideally we
   would not need [a manager] and all of its required jobs could be scripted or given to the agent
-  host*; designed 2026-09-30, not built — TD-258 the policies, TD-259 the seat). The manager's
+  host*; designed 2026-09-30; the policies built 2026-10-01, TD-258, the manager preset's round naming none of the four since slice 6; the seat is TD-259, its default not yet flipped). The manager's
   round kept six jobs because they read as judgement; a read of the brief against the code
   found four of them read fields and scripts and no screen — the cadence check
   (`check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files
@@ -7099,7 +7099,7 @@ code and needs no grant; a session doing the same work does.
      keep a finished team live by not saying so.
 
   10. **The cadence check** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 1,
-     `sessionorc.cadence`; its Inbox row is slice 5's, not built). The manager ran
+     `sessionorc.cadence`; its Inbox row slice 5, `ui/inbox.py` `cadence_marks`). The manager ran
      `scripts/check_cadence.py --pr <n> --json` on every `done` with a `pr` and read the rows;
      the script's verdict needs no reader. For a supervised member, not a seat, each `progress`
      entry `done` carrying `pr` — declared or derived, so a PR merged from the member's branch
@@ -7139,7 +7139,7 @@ code and needs no grant; a session doing the same work does.
      session with no `progress` entry naming it (a person's anchor — the cadence is theirs to
      run), and a repo whose checkout holds no `scripts/check_cadence.py`.
   11. **Merged without its read** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 2,
-     `sessionorc.held`, the tick's `_held_pass` and `_held_line`; the Inbox row is slice 5's). `ao pr held
+     `sessionorc.held`, the tick's `_held_pass` and `_held_line`; the Inbox row slice 5, `ui/inbox.py` `held_mark`). `ao pr held
      <n>` is the author's own read of its record's `review` against the PR's files (§4.9b *The
      reader*), and the host agent only stored the field; whether a held PR merged without the
      reader's reply was a sentence in this repo's manager supplement, and nothing checked it.
@@ -7200,8 +7200,8 @@ code and needs no grant; a session doing the same work does.
      doorbell wakes the member under every rule the doorbell has, one unit of the wake budget,
      and a node's member is reached as any mail reaches it. A member restarted by any rule starts
      with no `conventions_seen`, is written afresh at its create, and the hook has told it.
-     **The manager's `relayed.json` goes**: nothing reads it, and this repo's supplement drops
-     the step with the round.
+     **The manager's `relayed.json` goes**: nothing reads it, and neither the preset nor this repo's supplement
+     names the step (TD-258 slice 6).
 - **Promote** (TD-120 step 2; designed 2026-09-24; the readings and the policy built — TD-132 slice 1,
   `sessionorc.promote`; the press — `promote`, `clear_promote`, `ao promote` — slice 2; the Inbox
   row slice 3; this repo's block slice 4, `.agentorc.yml`): a repo's live copy — the
