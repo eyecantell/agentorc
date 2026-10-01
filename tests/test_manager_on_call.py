@@ -84,7 +84,8 @@ async def test_idle_open_is_written_after_the_nudge_and_cleared_with_the_stretch
         assert rec.idle_open is None, "a nudge before this stretch is not this stretch's"
         # a seat, an unsupervised member and one that declared are never marked
         rec.since = _iso(now - 2 * IDLE_NUDGE)
-        for field, value in (("seat", {"trigger": "asks"}), ("supervised", False), ("out_of_work", {"at": "x", "why": "y"})):
+        never = (("seat", {"trigger": "asks"}), ("supervised", False), ("out_of_work", {"at": "x", "why": "y"}))
+        for field, value in never:
             old = getattr(rec, field)
             setattr(rec, field, value)
             await agent._idle_open(rec, now)
@@ -241,7 +242,7 @@ async def test_the_fill_ceilings_groups(agent, tmp_path):
         recs[p1].restarts = list(spent)
         await agent._keep_running(now)
         assert agent.sessions[mgr] is not recs[mgr], "the manager seat is a group of one"
-        assert agent.sessions[tl] is recs[tl] and agent.sessions[aud] is recs[aud], "the techlead's fills hold the auditor"
+        assert agent.sessions[tl] is recs[tl] and agent.sessions[aud] is recs[aud], "one group: both held"
         assert agent.sessions[p1] is recs[p1] and recs[p1].restart_ceiling
         assert agent.sessions[p2] is not recs[p2], "a person-led team's seat has six of its own"
         for sid in (mgr, tl, aud, p1, p2, w):

@@ -6668,8 +6668,8 @@ code and needs no grant; a session doing the same work does.
      count toward `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from
      `seat_count` (*on call — runs after 10 PRs · 4 of 10*), which §4.9b could not while the
      number was the manager's. (This is TD-104, folded here.)
-     **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30, not built —
-     TD-259). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
+     **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30; the trigger,
+     `idle_open` and `seat_filled` built — TD-259 slice 2; the sweep's exception is slice 3's). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
      say `on_call: false` (§4.9), and the tick sets its `seat_due` with `by` one of four words, each a
      reading of the records and never of a screen: **`asks`**, as the techlead's — an open `ask`
      or `steer` addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its
@@ -6678,14 +6678,25 @@ code and needs no grant; a session doing the same work does.
      state row has it); **`stalled`** — a member `stalled?`; **`open`** — a member *idle · open
      work*: `nudged_at` set and the member still hook-confirmed idle `IDLE_NUDGE` after it with
      the same work open, which the tick writes as **`idle_open: {at, ref}`** on the member's
-     record (home-owned, cleared when its state changes), the one reading the card's slot, this
+     record (home-owned; a member's alone, never a seat's; `ref` the first open reference when it was
+     written, and none where the open work is an outcome owed alone, rule 4's owed clause; cleared
+     when its state changes, the work closes or the member declares), the one reading the card's slot, this
      trigger and the person-led team's Inbox row (§4.5a *Inbox row: idle · open work*) draw;
      the page reads it from the record, and derives the slot from `nudged_at` as it did only where the record carries no `idle_open` (a home whose tick does not write it yet). `seat_due` carries the cause — `{at, by,
      member}` — and **a cause fills once per stretch**: the home keeps **`seat_filled:
      [{member, by, at}]`** on the seat's record, an entry dropped when its cause has gone (the
      state changed, the question closed), and a cause still standing after a fill raises no
      second `seat_due` until then, so a manager that chose to leave a member as it was is not
-     refilled into the same reading two minutes later; the fill ceiling guards the rest. The
+     refilled into the same reading two minutes later; the fill ceiling guards the rest. **A
+     question is a cause by its id**: for `asks` the due and the entry carry `ask`, the
+     question's id, in `member`'s place, so a question the manager left standing does not fill
+     it again and a second question does. The causes are read in that order — questions, then
+     each member's permission, `stalled?`, *idle · open work* — and the first one no fill was
+     made for is the due; one whose cause goes before the fill is cleared, as `asks` is. **A
+     reading that comes while the seat is filled is the next fill's**: a fill starts cold on the
+     one reading its `seat_due` names, so a manager on call that is idle past `SEAT_IDLE_GRACE`
+     with a member's reading due — never a question, which an idle seat reads as the techlead
+     does — is closed as one with nothing due is, and filled for it on the next tick. The
      fill and the close are this rule's as for any seat — `create` with `keep_mail`, the launch
      record, `restarts: [{why: fill}]`; closed once idle with no `seat_due` for
      `SEAT_IDLE_GRACE` with nothing dirty or unpushed. Its `control` grant and its place in its
