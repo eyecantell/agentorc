@@ -125,7 +125,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-245 | A member that ends its run at an entry's end, past its context bound, is marked `early` when the run was under thirty minutes, and nothing restarts it: grinder-ao-2 sat idle 20 hours on 2026-09-30 with the team's work in its package; and 200k is under what one entry in this repo costs | High | Designed 2026-09-30 — the build is TD-249 |
 | TD-246 | A person cannot restart a member unattended: the restart row says *yours now* and its one button, Resume, brings the session back attended; there is no `ao restart` | Medium | Designed 2026-09-30 — the build is TD-250 |
 | TD-247 | The manager's remaining jobs are mostly mechanical and its judgement is occasional, yet it is a standing session waking each hour: move the cadence check, the held-path check, the convention relay and the outcome chase to the tick, and make what is left a seat on call | Medium | Designed 2026-09-30 — the build is TD-258 (the policies) and TD-259 (the seat) |
-| TD-248 | A written `Pickable: no` with no blocker hides an entry from every lane and nothing refuses it: the test holds `Owner` and `Kind` to their words and the Pickable line to `yes` or `no — <reason>`, and never a *no* against `Blocked by:`; turn on dev-cadence's `ledger.py --check` and declare the words on a `Fields:` line | Medium | Partly done — step 2 built (the `Fields:` line, PR #885); step 1 waits on the sync that brings `ledger.py --check` |
 | TD-249 | Build early from the record and the repeated-work guard: `restarts` entries carry `done` and `left`, `early` and `repeat` decided from them, new work exempt from the ceiling, the row's words; the worker presets' bound to 300k, this repo's own bound after measuring, the reading rule in this repo's grinder briefs | High | Open — pickable |
 | TD-254 | An Inbox board row draws no answers at all, so the `Answers:` and defaults the groom wrote are invisible and nothing on the page records a decision: the answer buttons, **Go with it** as a steer has, and a live look's two answers | High | Designed 2026-09-30 — the build is TD-255 |
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Partly done — slices 1–2 built (the write-back; the buttons, Go with it, the keys, the help); slices 3–4 open: dev-cadence TD-074's pair is synced here (2026-10-01) |
@@ -2458,28 +2457,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** the design says, for each line of the manager brief's round, which tick policy or which seat trigger has it; TD-103's *done when* (a night with the brief silent) holds because the brief no longer lists those jobs; and a build entry carries the slices.
 
 **Related:** TD-103 (the first move of policy to the tick: built, live check pending), TD-240 and TD-241 (finished as the home's reading), TD-214 and TD-227 (rule 8), TD-239 (balance), TD-245 and TD-246 (the early restart, the person's restart), TD-098 (seats with triggers), TD-118 (one model for every role, the round's cost).
-
-## TD-248: A written `Pickable: no` with no blocker hides an entry from every lane, and nothing refuses it — turn on dev-cadence's `ledger.py --check`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-09-30 (Paul: *add a TD to dev-cadence to create a validate flag for our td list … then we can add a hook here to check that we are not making invalid changes*; dev-cadence TD-073 is that entry, PR eyecantell/dev-cadence#185)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** no — step 1 waits on the sync that brings `ledger.py --check` here
-**Status:** Partly done — **step 2 built 2026-10-01 (grinder-ao-1, PR #885):** the preamble's `Fields:` line declares the `Owner` and `Kind` words, `scripts/ledger.py` reads them (`--fields` says *preamble* for both, and a value outside them is a ⚠ flag), and `tests/test_ledger.py` takes `OWNERS` and `KINDS` from the line through the script's own `declared()`, a second test holding the line readable and the preamble's paragraph to the same words. **Left:** step 1. dev-cadence's TD-073 is archived and its main carries `ledger.py --check` (checked 2026-10-01); this repo's synced copy does not (`docs/cadence-sync.lock` is at `c911aaf`, 2026-09-29), so it waits on the next sync PR, then the check is turned on where that entry puts it. Step 3 is TD-228's.
-**Location:** `tests/test_ledger.py` (`HEADER`, `OWNERS`, `KINDS`, `test_every_open_entry_carries_the_header_in_order_with_known_values`), `docs/technical_debt.md` (the preamble: a `Fields:` line), `scripts/ledger.py` and `scripts/check_cadence.py` (SYNCED: they arrive by sync, never edited here)
-
-**Why:** on 2026-09-30 the anchor wrote TD-245 and TD-246 as `**Pickable:** no — design-first: …` with no `Blocked by:`. `sessionorc.ledger` reads a written *no* as blocked while TD-228's migration lasts, so neither entry matched the `design-first` lane, rule 6 told the designer nothing, and the entries waited until Paul asked why the designer was idle (PR #820 corrected the two lines). What is checked today: `tests/test_ledger.py` holds every open entry to an `Owner` and a `Kind` from its own two sets and to a Pickable line that reads `yes` or `no — <reason>`, in CI. What is not: a *no* against `Blocked by:` — a *no* whose reason is no blocker passes, which is the case above. `scripts/ledger.py` printed the disagreement as one ℹ line among 84 and exits 0; and this ledger declares no `Fields:` line (cadence §2.12), so the synced script validates none of the repo's own fields and the words live in the test alone.
-
-**Fix:**
-1. **Turn the check on** when dev-cadence TD-073 has synced: `ledger.py --check --since origin/main` wherever that entry puts it (the cadence check's `ledger` row, or pre-push), so a PR that adds a written *no* the derived reading calls *yes* is refused with the entry named, and the 84 standing lines are not.
-2. **One list of words, not two**: a `Fields:` line in the preamble for `Owner` and `Kind`, and the test reads its sets from it (or is dropped for those two once `--check` runs in CI), so the script and the test cannot disagree.
-3. **The durable cure is TD-228's slices 3 and 4**: the `Pickable:` line goes, and with it the way to write a *no* that hides an entry; the test's demand for the line has to go with it (TD-228 does not say so yet). Slice 3 waits on Paul's owner words in `org.yml` (the board, the designer's 2026-09-28 line). If those slices land first, this entry is (2) alone.
-
-**Done when:** a PR that writes a new `Pickable: no` on an entry with no blocker, or a `Kind:` or `Owner:` outside the declared words, fails its check with the entry named; and the ledger as it stands passes.
-
-**Related:** dev-cadence TD-073 (the flag), TD-223 and TD-228 (pickable derived, the migration), TD-118 (the three header lines), TD-198, TD-245 and TD-246 (the two entries), PR #820.
 
 ## TD-249: Build early from the record, the repeated-work guard, and the bound's two layers
 
