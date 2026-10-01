@@ -122,6 +122,12 @@ def _lines(mark: dict[str, Any]) -> str:
     return "; ".join(_line_words(c) for c in mark.get("crossed") or [] if isinstance(c, dict))
 
 
+def crossed_words(mark: dict[str, Any]) -> str:
+    """A mark's crossed lines in the refusal's own numbers — *9 open PRs, the line is 8* — for the
+    Inbox's team start row, which says why rule 8's start was held back (§4.5a, §6 rule 8)."""
+    return _lines(mark)
+
+
 def crossing(team: str, mark: dict[str, Any]) -> str:
     """The `system` note a crossing sends the team's manager and the person (design §6 *Balance*):
     what crossed, in the mark's numbers, and what it means — neither crashed nor finished."""

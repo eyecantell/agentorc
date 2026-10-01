@@ -680,6 +680,14 @@ def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, ca
     out = capsys.readouterr().out
     assert "ao-grind" in out and "wound down" in out
     assert "repo-team" in out and "stopped" in out  # one that never ran is not wound down
+    # *work waiting: n entries* beside *wound down*, from the home's `work_waiting` (§6 rule 8, TD-227)
+    assert "work waiting" not in out
+    state["host"] = {"work": {"ao-grind": {"at": "t", "repo": "/r", "members": {"a": ["TD-1", "TD-2"], "b": ["TD-2"]}}}}
+    assert cli.main(["team", "list"]) == 0
+    assert "wound down, work waiting: 2 entries" in capsys.readouterr().out
+    assert cli.main(["--json", "team", "list"]) == 0
+    listed = {r["name"]: r["work_waiting"] for r in json.loads(capsys.readouterr().out)["teams"]}
+    assert listed == {"ao-grind": 2, "repo-team": 0}
     # live, and every live session idle and declared: *concluded*, said beside the live count (TD-099)
     for s in state["sessions"]:
         if s.get("team") == "ao-grind":

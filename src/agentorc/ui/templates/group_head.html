@@ -30,6 +30,8 @@
 <span class="grow"></span>
 {% if g.team and g.concluded %}<span class="meta" title="every session still here is idle and has declared its run over ({{ 'one asks for a restart' if g.concluded.restart else 'out of work' }}) — Start closes them and starts the team again">concluded{% if g.concluded_age %} {{ g.concluded_age }} ago{% endif %} · {{ 'restart wanted' if g.concluded.restart else 'out of work' }}</span>
 {% elif g.team and not g.live %}{% if g.wound_down %}<span class="meta" title="every session that carried this team's badge declared it was out of work — Start is the restart">wound down{% if g.wound_down_age %} {{ g.wound_down_age }} ago{% endif %}</span>
+{#- design §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only — the press is Start, here or on the Inbox row #}
+{% if g.work_note %}<span class="meta workwaiting" title="{{ g.work_note.title }}">· {{ g.work_note.n }} entr{{ 'y' if g.work_note.n == 1 else 'ies' }} waiting since <span class="localtime" data-at="{{ g.work_note.at }}">{{ g.work_note.age ~ ' ago' if g.work_note.age else g.work_note.at }}</span></span>{% endif %}
 {% else %}<span class="meta">stopped</span>{% endif %}{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
    control sits on the thing it acts on, and only a team with a definition has either. #}
@@ -70,5 +72,7 @@
 {#- design §4.5a *team groups* **who for what** (§4.8, TD-162, built by TD-171): a second line, whom to
     write to by role, from each role's `message:` line — the definition's words, display only, and
     drawn only when a role carries one #}
+{#- …and on a live team the start the rule made (§4.5a **work waiting** note): the header's second line #}
+{% if g.work_started %}<div class="meta workstarted" title="the home started this team because its lanes gained work while it was wound down (design §6 rule 8, on_work: start)">started <span class="localtime" data-at="{{ g.work_started.at }}">{{ g.work_started.age ~ ' ago' if g.work_started.age else g.work_started.at }}</span>{% if g.work_started.first %} for {{ g.work_started.first }}{% if g.work_started.more %} and {{ g.work_started.more }} more{% endif %}{% endif %}</div>{% endif %}
 {% if g.who %}<div class="meta whofor" title="who for what: each role's message: line (design §4.8) — write to the one whose line fits">{{ g.who | join(' · ') }}</div>{% endif %}
 {% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{{ hm2.panel('team', 'team-' ~ g.team) }}{% endif %}

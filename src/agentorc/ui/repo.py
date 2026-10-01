@@ -20,6 +20,7 @@ from sessionorc.models import (
 
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
 from .common import _age
+from .inbox import work_note, work_started
 from .org import compact_line, team_summary
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
@@ -194,6 +195,7 @@ def team_groups(
     rows: Collection[dict[str, Any]] = (),
     repos: Mapping[str, Any] | None = None,
     doing: Mapping[str, Any] | None = None,
+    work: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -217,7 +219,11 @@ def team_groups(
     A team carries its **summary** (TD-176 slice 3, §4.5a *team card: summary*) from `repos` (the
     home's repo facts) and `doing` (its doing log), live or not — a team with nothing live shows what
     it left once unfolded (TD-192) — and its members are marked compact; its header then drops the
-    state counts, which the member cards say, but for the fold."""
+    state counts, which the member cards say, but for the fold.
+
+    `work` is the home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8): a wound-down
+    team's header says *n entries waiting since <t>* from its mark, and a live one *started <t> for
+    …* from its records' `restarts` (§4.5a team card **work waiting** note)."""
     defs = {str(r["name"]): r for r in rows}
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
@@ -297,6 +303,9 @@ def team_groups(
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
+                # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only
+                "work_note": work_note((work or {}).get(team)) if not live and row.get("wound_down") else None,
+                "work_started": work_started(crew) if live and team != NO_TEAM else None,
                 # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
                 # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
                 # since a wind-down would only wake the manager to find nothing to wind down

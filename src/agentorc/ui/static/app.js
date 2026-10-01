@@ -418,6 +418,19 @@
       // design §4.5a **Inbox row: promote** (TD-132 slice 3, TD-226 slice 3): **Promote** and a failure
       // or held row's **Dismiss**, the person's own, to `/api/person/<action>` with the repo alone
       if (action === "promote" || action === "clear_promote") body = { repo: b.dataset.repo };
+      // design §4.5a **Inbox row: team start** (§6 rule 8, TD-227): **Dismiss** is `clear_work` with the
+      // team alone; **Start** is the team card's Start — the same route, its refusal in its own words
+      if (action === "clear_work") body = { team: b.dataset.team };
+      if (action === "work_start") {
+        const team = b.dataset.team;
+        const r = await fetch(`/api/teams/${encodeURIComponent(team)}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+        let o = {}; try { o = await r.json(); } catch (e) {}
+        if (!r.ok) throw new Error(o.detail || r.statusText);
+        AO.toast(o.text || `${team}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
+        (o.notes || []).forEach((w) => AO.toast(`${team}: ${w}`));
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
@@ -524,6 +537,7 @@
       if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "promote") AO.toast(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
       if (action === "clear_promote") AO.toast(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
+      if (action === "clear_work") AO.toast(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);

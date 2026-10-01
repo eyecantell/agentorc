@@ -13,6 +13,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from sessionorc import balance as balance_mod
 from sessionorc import hosts
 from sessionorc import settings as settings_mod
 from sessionorc.models import (
@@ -457,6 +458,128 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
             }
         )
     return out
+
+
+WORK_IDS = 5  # §4.5a *Inbox row: team start*: five ids at most, then *and n more*
+
+
+def work_ids(mark: Mapping[str, Any]) -> list[str]:
+    """The ids of one `work_waiting` mark, each once, in its members' order (§6 rule 8)."""
+    members = mark.get("members") if isinstance(mark.get("members"), Mapping) else {}
+    return list(dict.fromkeys(str(i) for ids in members.values() if isinstance(ids, list) for i in ids))
+
+
+def work_held(held: Any, now: datetime) -> str:
+    """Why rule 8's start was held back, in the row's words (§4.5a *Inbox row: team start*), from the
+    mark's `held: {why, …}` — or "" for no hold, which is `on_work: ask`'s row."""
+    if not isinstance(held, Mapping):
+        return ""
+    why = held.get("why")
+    if why == "usage":
+        return f"{held.get('profile') or 'its profile'} is over its line"
+    if why == "until":
+        return "its stop time has passed"
+    if why == "day":
+        n = held.get("count")
+        return f"started {n} time{'' if n == 1 else 's'} today"
+    if why == "early":
+        ago = _age(held.get("started"), now)
+        return f"started {ago + ' ago' if ago else 'just now'} and wound down again"
+    if why == "link":
+        return f"{held.get('host') or 'a host'} is unreachable"
+    if why == "nothing":
+        return "no record to start"
+    if why == "balance":
+        lines = balance_mod.crossed_words(dict(held))
+        return "its repo is over its line" + (f": {lines}" if lines else "")
+    return str(why or "held")
+
+
+def work_rows(
+    work: Mapping[str, Any] | None, wound: Mapping[str, Any] | None = None, now: datetime | None = None
+) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3): one row per wound-down
+    team whose lanes gained work, from the home's `work_waiting` (`work` on the `host` read) —
+    *`<team>` · wound down <t> · its lanes gained n entries: TD-213, TD-214, TD-223*, five ids at
+    most and *and n more*, each a link to the Repo page's entry made with the mark's `repo`. Every
+    part is a structured reading, never text a session wrote. `wound` is `{team: instant}`, the
+    card's own *wound down* reading; a team it does not name is drawn without the time. Under
+    *Needs you*, counted, aged from the mark's `at`; under `on_work: start` the home keeps the mark
+    only while a bound holds the start back, and the row says which (`held`). Keyed `work:<team>`
+    in the attention store, so Snooze is by time alone."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    for team, mark in sorted((work or {}).items()):
+        if not isinstance(mark, Mapping):
+            continue
+        ids = work_ids(mark)
+        if not ids:
+            continue
+        down = (wound or {}).get(team)
+        repo = Path(str(mark.get("repo") or "")).name
+        held = work_held(mark.get("held"), at)
+        n = len(ids)
+        said = f"its lanes gained {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}"
+        if n > WORK_IDS:
+            said += f" and {n - WORK_IDS} more"
+        out.append(
+            {
+                "row": "work",
+                "sid": f"work:{team}",
+                "id": f"work:{team}",
+                "name": str(team),
+                "team": str(team),
+                "at": str(mark.get("at") or ""),
+                "age": _age(mark.get("at"), at),
+                "wound_down": str(down) if down else "",
+                "repo": repo,
+                "ids": ids[:WORK_IDS],
+                "more": max(0, n - WORK_IDS),
+                "n": n,
+                "held": held,
+                "text": f"{team} · wound down · {said}" + (f" · not started: {held}" if held else ""),
+                "find": " ".join(x for x in (str(team), "team start", "wound down", said, held) if x),
+            }
+        )
+    return out
+
+
+def work_note(mark: Any, now: datetime | None = None) -> dict[str, Any] | None:
+    """design §4.5a team card **work waiting** note (§6 rule 8): *n entries waiting since <t>* beside
+    *wound down <t>*, its tooltip the ids by member — `{n, at, age, title}`, or None for no mark."""
+    if not isinstance(mark, Mapping) or not (ids := work_ids(mark)):
+        return None
+    members = mark.get("members") if isinstance(mark.get("members"), Mapping) else {}
+    by = "; ".join(f"{m}: {', '.join(str(i) for i in got)}" for m, got in members.items() if isinstance(got, list))
+    return {
+        "n": len(ids),
+        "at": str(mark.get("at") or ""),
+        "age": _age(mark.get("at"), now or datetime.now(UTC)),
+        "title": by,
+    }
+
+
+def work_started(members: Collection[Mapping[str, Any]], now: datetime | None = None) -> dict[str, Any] | None:
+    """design §4.5a team card **work waiting** note on a live team: *started <t> for TD-213 and 2
+    more*, from the newest `restarts` entry `why: work` on the team's live records (rule 8's start
+    writes one on every record it replays) — `{at, age, first, more}`, or None."""
+    marks = [
+        e
+        for m in members
+        if m.get("state") not in ("exited", "closed")
+        for e in (m.get("restarts") or [])
+        if isinstance(e, Mapping) and e.get("why") == "work" and e.get("at") and not e.get("error")
+    ]
+    if not marks:
+        return None
+    last = max(marks, key=lambda e: str(e["at"]))
+    ids = [str(i) for i in last.get("ids") or []]
+    return {
+        "at": str(last["at"]),
+        "age": _age(last["at"], now or datetime.now(UTC)),
+        "first": ids[0] if ids else "",
+        "more": max(0, len(ids) - 1),
+    }
 
 
 def board_due_now(it: Mapping[str, Any]) -> bool:

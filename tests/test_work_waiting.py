@@ -171,10 +171,17 @@ async def test_dismiss_adds_the_ids_to_lane_seen_and_a_later_entry_asks_again(ag
         with pytest.raises(AgentError, match="a person's own"):
             await worker.call("clear_work", team="g")
     async with LocalClient() as person:
+        # the reading the clients draw the row and the card's note from (TD-227 slice 3), and the
+        # row's Snooze, keyed `work:<team>` in the attention store
+        assert (await person.call("host"))["work"] == {"g": agent._host_rec["teams"]["g"]["work_waiting"]}
+        snoozed = await person.call("attention_snooze", id="work:g", kind="work", until="2099-01-01T00:00:00Z")
+        assert snoozed["row"] == "work:g|work" and snoozed["snoozed_until"] == "2099-01-01T00:00:00Z"
+        assert (await person.call("attention_snooze", id="work:g", kind="work"))["snoozed_until"] is None
         got = await person.call("clear_work", team="g")
         assert got == {"team": "g", "cleared": True, "ids": ["TD-002"]}
         assert member.lane_seen["ids"] == ["TD-001", "TD-002"] and "g" not in agent._host_rec.get("teams", {})
         assert (await person.call("clear_work", team="g"))["cleared"] is False
+        assert (await person.call("host"))["work"] == {}
     await agent._work_marks(now + 2 * WORK_SETTLE)
     assert "g" not in agent._host_rec.get("teams", {}), "a dismissed entry does not ask again"
     agent._repos[repo]["ledger"]["entries"].append(_e("TD-003"))
