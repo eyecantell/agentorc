@@ -2501,7 +2501,7 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open
+**Status:** Partly done — **slice 1 built 2026-09-30 (grinder-ao-1, PR #846):** `_replay` writes `done: [{ref, pr}]` and `left: [ref]` on every `restarts` entry, a failed replay's too (`agent_tick._reported`: `done` since the record's `created`; `left` its declared claims not closed, a derived claim left out); nothing reads them yet. Its test is `tests/test_crash_restart.py` (slice 7's last two cases). Slices 2–6 open.
 **Location:** `src/sessionorc/agent.py` (the `restart` declaration: where `early` is written from `created` and `RESTART_EARLY`), `src/sessionorc/agent_tick.py` (`_replay`: the `restarts` entry; `_wanted_restart`; `_window_full` and the inline ceiling counts), `src/sessionorc/models.py` (`restart_wanted`, `restarts`, `ProgressEntry`), `src/agentorc/ui/inbox.py` (`restart_mark`), `src/agentorc/ui/cards.py` (the *restart wanted · early* texts and the view's `early`), `ui/templates/focus.html` and `ui/static/app.js` (the chip), `src/agentorc/repoconfig.py` (`WORKER_CONTEXT`), `src/agentorc/briefs/grinder.md` line 16 (the early sentence), this repo's `.agentorc.yml` (`roles.grinder.context`) and `docs/briefs/grinder-ao-1.md`, `grinder-ao-2.md` (held path: that PR waits for the techlead's read), `tests/`
 
 **Why:** TD-245's *Why*: a run that finished its entry fast was marked `early` and sat idle twenty hours, and a 200k bound under one entry's cost in this repo restarts a grinder after every entry.
