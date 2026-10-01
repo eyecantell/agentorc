@@ -157,7 +157,7 @@ def balance_now(
     the oldest in seconds (`oldest`), how long the oldest pull request has waited at the team's
     seats (`review`) and the bound it is read against (`bound`, the shortest `review.bound` a live
     member carries, two hours where none). A number that cannot be told is None: no live member,
-    no reading, nothing waiting."""
+    no reading, nothing waiting; `oldest` is 0 where the reading holds no open pull request."""
     now = now or datetime.now(UTC)
     members = [s for s in sessions if s.get("team") == team and s.get("state") not in DEAD]
     members = [s for s in members if not s.get("superseded_by")]
@@ -173,8 +173,8 @@ def balance_now(
     ages: list[int] = []
     for root in roots:
         prs = repos[root].get("prs")
-        if not isinstance(prs, dict) or not isinstance(prs.get("open"), list):
-            continue
+        if not isinstance(prs, dict) or "error" in prs or not isinstance(prs.get("open"), list):
+            continue  # could not look, as `balance.crossed` reads a failed reading
         counts.append(len(prs["open"]))
         ages += [a for p in prs["open"] if isinstance(p, dict) and (a := age(p.get("created"))) is not None]
     waits = [
@@ -188,7 +188,7 @@ def balance_now(
         "members": len(members),
         "repos": roots,
         "prs": max(counts) if counts else None,
-        "oldest": max(ages) if ages else None,
+        "oldest": max(ages) if ages else (0 if counts else None),
         "review": max(waits) if waits else None,
         "bound": int((min(bounds) if bounds else balance_mod.REVIEW_BOUND).total_seconds()),
     }

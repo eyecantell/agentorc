@@ -1960,7 +1960,7 @@ def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, c
     assert cli.main(["team", "balance", "ao-grind"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("ao-grind: no balance line") and "no live member" in out
-    assert "  reader's queue: nothing waiting (no line)" in out
+    assert "  reader's queue: nothing waiting (no line)" in out and "over its line" not in out
     assert cli.main(["team", "balance", "ao-grind", "--prs", "8", "--review", "on"]) == 0
     assert capsys.readouterr().out.startswith("ao-grind: balance prs 8, review\n")
     assert cli.main(["team", "balance", "ao-grind", "--oldest", "2d", "--review", "off"]) == 0

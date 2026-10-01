@@ -1678,7 +1678,7 @@ def _balance_rows(bal: dict[str, Any], now: dict[str, Any]) -> list[str]:
     oldest = balance_mod.span(bal.get("oldest"))
     return [
         row("open PRs", now["prs"], bal.get("prs"), "line", "could not look", str),
-        row("oldest PR", now["oldest"], int(oldest.total_seconds()) if oldest else None, "line", "none open", dur),
+        row("oldest PR", now["oldest"], int(oldest.total_seconds()) if oldest else None, "line", "could not look", dur),
         row(
             "reader's queue",
             now["review"],
@@ -1695,10 +1695,7 @@ def cmd_team_balance(args: argparse.Namespace) -> int:
     §6 *Balance*, TD-239): the team's balance lines, written to `teams.<team>.balance` through
     `set_settings` — a person's own — a line not named left as it was. With no option it prints
     the lines and, against them, the numbers as they read now (`teamrun.balance_now`)."""
-    try:
-        name = _defined_team(args)
-    except ValueError as e:
-        return fail(args, str(e), 1)
+    name = _defined_team(args)
     named = args.prs is not None or args.oldest is not None or args.review is not None
     if args.clear and named:
         raise AgentError("ao team balance <team> --clear takes no line: it turns the rule off for the team")
@@ -1719,7 +1716,8 @@ def cmd_team_balance(args: argparse.Namespace) -> int:
         bal = dict(((got.get("teams") or {}).get(name) or {}).get("balance") or {})
     repos = call_sync("repos")
     now = teamrun.balance_now(name, call_sync("list"), repos)
-    mark = teamrun.balance_marks(repos).get(name)
+    # the mark is the tick's, written on its next pass: said only while the team still has a line
+    mark = teamrun.balance_marks(repos).get(name) if bal else None
 
     def prose() -> None:
         if bal:
