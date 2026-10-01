@@ -361,3 +361,35 @@ async def test_a_close_that_fails_before_marking_the_record_leaves_no_mark(agent
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["wanted", "wanted"]
         await person.call("kill", id=sid)
+
+
+async def test_a_restart_twenty_minutes_in_is_replayed_with_new_work_and_early_without(agent, composerstubs, tmp_path):
+    """TD-249 slice 7, design §4.9a *Early is decided from the record*: declared twenty minutes into
+    the run, a `restart` whose run reported a new `done` is rule 2's within a tick, and one that
+    reported nothing is early — the person's, and no tick replays it, however long it waits."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        for name, worked in (("busy", True), ("bare", False)):
+            sid = await _member(agent, person, tmp_path, name=name, lane=["TD-1", "TD-2"])
+            first = agent.sessions[sid]
+            first.created = _iso(now - timedelta(minutes=20))
+            async with LocalClient(caller=sid) as w:
+                if worked:
+                    await w.call("progress", id=sid, ref="TD-1", status="done", pr=812)
+                got = await w.call("progress", id=sid, status="restart", why="context bound")
+            assert bool(got["restart_wanted"].get("early")) is not worked, name
+            await _idle_for(agent, sid, now, timedelta(minutes=1))
+            first.git = dict(CLEAN)
+            await agent._keep_running(now)
+            if worked:
+                new = agent.sessions[sid]
+                assert new is not first and first.state == "closed", "replayed by the very next tick"
+                assert new.restarts[-1]["why"] == "wanted" and new.restarts[-1]["done"] == [
+                    {"ref": "TD-001", "pr": 812}
+                ]
+                assert new.restart_wanted is None
+            else:
+                await agent._keep_running(now + timedelta(hours=3))
+                assert agent.sessions[sid] is first and first.restart_wanted["early"], "early is the person's"
+            await person.call("kill", id=sid)
