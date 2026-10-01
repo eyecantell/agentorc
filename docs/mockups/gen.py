@@ -1640,7 +1640,7 @@ def settings_page():
         '<div class="txt muted" style="opacity: .6;">' + field("schedule", "at the reset of grind’s week", "not built — TD-133", 220) + '</div>',
         b("Save", "primary") + b("Clear stop time") + gap + '<span class="muted" style="font-size: 12px;">defined in org.yml — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     repos = card("agentorc", "repo · /home/kmaster/agentorc",
-        '<div class="txt">' + field("promote auto", "off", "the Inbox row offers the press; on: the home promotes 10 min after main moves", 60) + '</div>'
+        '<div class="txt">' + field("promote auto", "off", "the Inbox row offers the press; on: the home promotes 10 min after main moves", 60) + field("pull", "on", "the home fast-forwards this checkout when git allows and the anchor is idle · last pulled 4m ago · 3 commits", 60) + '</div>'
         + ro("ledger", "docs/technical_debt.md") + ro("roles", "grinder, techlead, manager, designer · review: techlead reads src/sessionorc/**, docs/briefs/**") + ro("promote.run", "pip install --upgrade … && ao service install") + ro("promote.check", "sessionorc.build.info()[\"commit\"]"),
         b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">.agentorc.yml · read per call · by PR — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     you = card("yours everywhere", "",
