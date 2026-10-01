@@ -43,7 +43,9 @@ from sessionorc.agent_common import (
     IDLE_NUDGE,
     LANE_NEWS_NAMED,
     LAUNCH_KEYS,
+    LEASE_TTL,
     MODEL_EVERY,
+    OWED_NAMED,
     PRUNE_EVERY,
     REMOVED_GUARD_SECONDS,
     REPOS_EVERY,
@@ -1169,7 +1171,8 @@ class TickMixin:
             # and on: an entry merged since the declaration is told on this tick
         seen = set(s.lane_seen.get("ids") or [])
         new = [i for i in ids if i not in seen]
-        if not new or s.state in ("exited", "closed") or s.suspended:
+        drops = self._lane_drops(s, [i for i in ids if i in seen])
+        if not (new or drops) or s.state in ("exited", "closed") or s.suspended:
             return
         if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
             return
@@ -1177,11 +1180,14 @@ class TickMixin:
             return
         if s.balance_refused and self._balance_of(s):
             return  # its claims are refused while its team is over its line (§6 *Balance*): told once it clears
-        s.lane_seen = {"at": now_iso(), "ids": [*s.lane_seen.get("ids", []), *new]}
-        named = ", ".join(new[:LANE_NEWS_NAMED]) + (
-            f" and {len(new) - LANE_NEWS_NAMED} more" if len(new) > LANE_NEWS_NAMED else ""
+        s.lane_seen = {**s.lane_seen, "at": now_iso(), "ids": [*s.lane_seen.get("ids", []), *new]}
+        if drops:
+            s.lane_seen["dropped"] = {**(s.lane_seen.get("dropped") or {}), **{i: at for i, _, at in drops}}
+        told = [*new, *(f"{i} (dropped by {who})" for i, who, _ in drops)]
+        named = ", ".join(told[:LANE_NEWS_NAMED]) + (
+            f" and {len(told) - LANE_NEWS_NAMED} more" if len(told) > LANE_NEWS_NAMED else ""
         )
-        count = f"{len(new)} entr{'y' if len(new) == 1 else 'ies'}"
+        count = f"{len(told)} entr{'y' if len(told) == 1 else 'ies'}"
         self._system_note(
             self._address(s),
             f"your lane gained {count} since you declared out of work: {named} — read the ledger on "
@@ -1189,6 +1195,42 @@ class TickMixin:
         )
         self._save(s)
         log.info("%s: told of %s new in its lane", self._address(s), count)
+
+    def _lane_drops(self, s: Session, held: list[str]) -> list[tuple[str, str, str]]:
+        """Rule 6's dropped lease (design §6, TD-258): of the ids `s` has seen and its lane still
+        matches, each one a record of the same repo let go — a `dropped` entry in its `progress`
+        later than `s`'s declaration and than the drop `lane_seen` holds for the id — and that no
+        live record holds a lease on now, as `(id, the dropper's name, the drop's instant)`, the
+        latest drop of each. An instant that cannot be read is no drop."""
+        if not held:
+            return []
+        told = s.lane_seen.get("dropped") if isinstance((s.lane_seen or {}).get("dropped"), dict) else {}
+        try:
+            since = {i: _parse(str((s.out_of_work or {}).get("at"))) for i in held}
+            for i in held:
+                if i in told:
+                    since[i] = max(since[i], _parse(str(told[i])))
+        except (ValueError, TypeError):
+            return []
+        last: dict[str, tuple[datetime, str, str]] = {}
+        leased: set[str] = set()
+        now = datetime.now(UTC)
+        for r in (*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())):
+            if r is s or not r.repo or r.repo != s.repo:
+                continue
+            live = r.state not in ("exited", "closed", "scheduled")
+            for e in r.progress:
+                if e.ref not in since:
+                    continue
+                try:
+                    at = _parse(e.at)
+                except (ValueError, TypeError):
+                    continue
+                if e.status == "claimed" and e.source == "declared" and live and now - at < LEASE_TTL:
+                    leased.add(e.ref)  # taken again since: the lease's holder is who it is news to
+                elif e.status == "dropped" and at > since[e.ref] and (e.ref not in last or at > last[e.ref][0]):
+                    last[e.ref] = (at, r.name, e.at)
+        return [(i, last[i][1], last[i][2]) for i in held if i in last and i not in leased]
 
     async def _work_marks(self, now: datetime) -> None:
         """Rule 8 (design §6 *Work for a team that wound down*, TD-227): on every tick at the home,
@@ -1630,13 +1672,23 @@ class TickMixin:
         self._system_note(PERSON, "\n".join(lines))
         log.info("rule 9: %s wound down by the tick — the person told", team)
 
+    @staticmethod
+    def _owed_part(ids: list[str]) -> str | None:
+        """Rule 4's owed clause (design §6, TD-258): the outcomes a record owes the person, named
+        apart from its open work — the ids from the record's own `owed()` reading, three at most."""
+        if not ids:
+            return None
+        named = ", ".join(ids[:OWED_NAMED]) + (f" and {len(ids) - OWED_NAMED} more" if len(ids) > OWED_NAMED else "")
+        return (
+            f"you owe {len(ids)} outcome{'' if len(ids) == 1 else 's'} on {named} — "
+            f'`ao msg person --outcome done|blocked|dropped "…" --for {ids[0] if len(ids) == 1 else "<id>"}`'
+        )
+
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
             n = s.asks_waiting(home=self.host) if s.seat_due else 0
-            if not n:
-                return None
             # an entry the person handed the seat owes its outcome, read or not: named apart from the questions (TD-218)
-            h = s.asks_waiting(home=self.host, handed_only=True)
+            h = s.asks_waiting(home=self.host, handed_only=True) if n else 0
             parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []
             if h:
                 parts.append(
@@ -1644,16 +1696,21 @@ class TickMixin:
                     f"{'owes its' if h == 1 else 'owe their'} outcome — "
                     '`ao msg person --outcome done|blocked|dropped "…" --for <id>`'
                 )
-            return "[agentorc] " + "; ".join(parts)
+            # the seat's own questions the person answered (TD-258): a handed entry is the part above
+            owed = self._owed_part([e.id for e in s.outbox if e.owes_for(session_inbox=False)])
+            parts += [owed] if owed else []
+            return "[agentorc] " + "; ".join(parts) if parts else None
         ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
         claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
         ref = next((r for r in [*lane_refs(s.lane), *claimed] if r not in ended), None)
+        owed = self._owed_part(s.owed())
+        minutes = int(IDLE_NUDGE.total_seconds() // 60)
         if ref is None:
-            return None
+            return f"[agentorc] you have been idle {minutes} minutes: {owed}" if owed else None
         return (
-            f"[agentorc] you have been idle {int(IDLE_NUDGE.total_seconds() // 60)} minutes with `{ref}` open "
+            f"[agentorc] you have been idle {minutes} minutes with `{ref}` open "
             f"— end the run with one of `ao progress done {ref} --pr N`, `ao progress drop {ref} --why`, "
-            "`ao progress none --why` or `ao progress restart --why`"
+            "`ao progress none --why` or `ao progress restart --why`" + (f"; {owed}" if owed else "")
         )
 
     async def _policy_send(self, s: Session, text: str) -> bool:

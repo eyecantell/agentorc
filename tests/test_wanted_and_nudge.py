@@ -12,7 +12,7 @@ from conftest import park_ticks, wait_for
 
 from sessionorc.agent import IDLE_NUDGE, RESTART_CEILING
 from sessionorc.client import LocalClient
-from sessionorc.models import ProgressEntry
+from sessionorc.models import MailEntry, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -111,6 +111,75 @@ async def test_what_the_nudge_leaves_alone(agent, composerstubs, tmp_path):
             await person.call("kill", id=sid)
         assert await _submitted(agent, typed) == [] and agent.sessions[typed].nudged_at is None, "words typed"
         await person.call("kill", id=typed)
+
+
+def _answered(mid: str, at: str) -> MailEntry:
+    """The member's own copy of a question the person answered: it owes an outcome (§4.10)."""
+    return MailEntry(id=mid, from_="w", to=["person"], at=at, kind="ask", text="which?", closed_reason="replied")
+
+
+async def test_an_owed_outcome_is_open_work_and_named_apart(agent, composerstubs, tmp_path):
+    """Rule 4's owed clause (TD-258 slice 4): a member with nothing in its lane and an outcome owed
+    is nudged about the outcome alone; one with both reads both, the debt after its reference; four
+    owed are three named and one counted; a finished member is never sent to."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    long = IDLE_NUDGE + timedelta(minutes=1)
+    async with LocalClient() as person:
+        alone = await _member(agent, person, tmp_path, name="alone")
+        rec = agent.sessions[alone]
+        rec.outbox = [_answered("m-1", _iso(now))]
+        assert rec.owed() == ["m-1"]
+        await _idle_for(agent, alone, now, long)
+        await agent._keep_running(now)
+        lines = await _submitted(agent, alone)
+        assert len(lines) == 1 and "open" not in lines[0]
+        assert "idle 20 minutes: you owe 1 outcome on m-1 — `ao msg person --outcome" in lines[0]
+        assert lines[0].endswith("--for m-1`") and rec.nudged_at
+        await agent._keep_running(now + timedelta(minutes=30))
+        assert len(await _submitted(agent, alone)) == 1, "once per stretch"
+
+        both = await _member(agent, person, tmp_path, name="both", lane=["TD-1"])
+        agent.sessions[both].outbox = [_answered(f"m-{i}", _iso(now)) for i in range(4)]
+        await _idle_for(agent, both, now, long)
+        await agent._keep_running(now)
+        lines = await _submitted(agent, both)
+        assert len(lines) == 1 and "`TD-001` open" in lines[0]
+        assert lines[0].endswith("; you owe 4 outcomes on m-0, m-1, m-2 and 1 more — "
+                                 '`ao msg person --outcome done|blocked|dropped "…" --for <id>`')  # fmt: skip
+
+        settled = await _member(agent, person, tmp_path, name="settled")
+        e = _answered("m-9", _iso(now))
+        e.outcome = {"status": "done", "text": "PR #1", "at": _iso(now)}
+        agent.sessions[settled].outbox = [e]
+        finished = await _member(agent, person, tmp_path, name="finished")
+        agent.sessions[finished].outbox = [_answered("m-8", _iso(now))]
+        agent.sessions[finished].out_of_work = {"at": _iso(now), "why": "declared before the answer"}
+        for sid in (settled, finished):
+            await _idle_for(agent, sid, now, long)
+        await agent._keep_running(now)
+        for sid in (settled, finished):
+            assert await _submitted(agent, sid) == [] and agent.sessions[sid].nudged_at is None
+        for sid in (alone, both, settled, finished):
+            await person.call("kill", id=sid)
+
+
+async def test_a_seat_owing_an_outcome_is_nudged_with_no_question_waiting(agent, composerstubs, tmp_path):
+    """Seat or not: a seat's own question the person answered is named, with nothing in its inbox."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path, name="tl")
+        rec = agent.sessions[sid]
+        rec.seat = {"role": "techlead"}
+        rec.outbox = [_answered("m-5", _iso(now))]
+        await _idle_for(agent, sid, now, IDLE_NUDGE + timedelta(minutes=1))
+        assert agent._nudge_line(rec) == (
+            '[agentorc] you owe 1 outcome on m-5 — `ao msg person --outcome done|blocked|dropped "…" --for m-5`'
+        )
+        rec.outbox = []
+        assert agent._nudge_line(rec) is None
+        await person.call("kill", id=sid)
 
 
 async def test_a_wanted_restart_with_its_work_pushed_is_closed_and_restarted(agent, composerstubs, tmp_path):

@@ -63,6 +63,7 @@ DERIVE_EVERY = timedelta(minutes=5)
 MODEL_EVERY = timedelta(seconds=30)
 CONTEXT_EVERY = timedelta(minutes=1)  # the context reading, unattended records only (§6 rule 5, TD-190)
 LANE_NEWS_NAMED = 5  # rule 6's note names this many new entries, then *and n more* (§6, TD-195)
+OWED_NAMED = 3  # rule 4's owed clause names this many owed outcomes, then *and n more* (§6, TD-258)
 # Rule 8 (§6, TD-227): a wound-down team's lanes' news is written as `work_waiting` once this long has
 # passed since the home first read the newest of its entries, so entries filed together are one event
 WORK_SETTLE = timedelta(minutes=10)

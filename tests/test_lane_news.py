@@ -14,7 +14,7 @@ from conftest import park_ticks
 from sessionorc.agent_common import RpcError, _lane
 from sessionorc.client import LocalClient
 from sessionorc.ledger import entries_before, lane_matches
-from sessionorc.models import lane_refs, report_line
+from sessionorc.models import ProgressEntry, lane_refs, report_line
 
 pytestmark = pytest.mark.integration
 
@@ -169,6 +169,52 @@ async def test_an_entry_filed_after_the_declaration_is_told_once(agent, tmp_path
         await person.call("progress", id=sid, ref="TD-2", status="claimed", caller=sid)
         assert rec.out_of_work is None and rec.lane_seen is None
         await person.call("kill", id=sid)
+
+
+async def test_a_lease_a_sibling_dropped_is_told_once(agent, tmp_path):
+    """Rule 6's dropped lease (TD-258 slice 4): an id the member saw at its declaration, dropped
+    since by another record of its repo, is told once with the dropper's name; a drop before the
+    declaration, one in another repo, the member's own, and one taken again by a live record are
+    not; a second drop of the same id, later, is told again."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        led = [_e("TD-001"), _e("TD-002"), _e("TD-003"), _e("TD-004")]
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], led)
+        rec = agent.sessions[sid]
+        sib = await _finished(agent, person, tmp_path, "grinder-2", ["free-pick"], led, out_of_work=None)
+        other = tmp_path / "elsewhere"
+        other.mkdir()
+        far = await _finished(agent, person, other, "far", ["free-pick"], led, out_of_work=None)
+        before, after = "2026-09-27T19:00:00Z", "2026-09-27T21:00:00Z"
+        agent.sessions[sib].progress = [
+            ProgressEntry(ref="TD-001", status="dropped", why="needs a live look", at=after),
+            ProgressEntry(ref="TD-002", status="dropped", why="old", at=before),
+            ProgressEntry(ref="TD-004", status="dropped", why="mine now", at=after),
+        ]
+        agent.sessions[far].progress = [ProgressEntry(ref="TD-003", status="dropped", why="another repo's", at=after)]
+        rec.progress = [ProgressEntry(ref="TD-003", status="dropped", why="its own", at=after)]
+        taker = await _finished(agent, person, tmp_path, "taker", ["free-pick"], led, out_of_work=None)
+        agent.sessions[taker].progress = [ProgressEntry(ref="TD-004")]  # a live lease, claimed now
+        await agent._lane_news(rec, now)
+        notes = _notes(agent, sid)
+        assert len(notes) == 1
+        assert "your lane gained 1 entry since you declared out of work: TD-001 (dropped by grinder-2) —" in notes[0]
+        assert rec.lane_seen["ids"] == ["TD-001", "TD-002", "TD-003", "TD-004"]
+        assert rec.lane_seen["dropped"] == {"TD-001": after}
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        assert len(_notes(agent, sid)) == 1, "a second look at the same drop tells nothing"
+        # a new entry and a later drop of the same id, in one note; the taker let go as well
+        again = "2026-09-27T22:00:00Z"
+        agent.sessions[sib].progress.append(ProgressEntry(ref="TD-001", status="dropped", why="again", at=again))
+        agent.sessions[taker].progress = [ProgressEntry(ref="TD-004", status="dropped", why="no", at=again)]
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [*led, _e("TD-005")]
+        await agent._lane_news(rec, now)
+        assert "gained 3 entries" in _notes(agent, sid)[1]
+        assert "TD-005, TD-001 (dropped by grinder-2), TD-004 (dropped by taker) —" in _notes(agent, sid)[1]
+        assert rec.lane_seen["dropped"] == {"TD-001": again, "TD-004": again}
+        for s in (sid, sib, far, taker):
+            await person.call("kill", id=s)
 
 
 async def test_what_rule_six_leaves_alone(agent, tmp_path):
