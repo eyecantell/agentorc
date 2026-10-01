@@ -1312,7 +1312,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
             review=review,  # who reads its PRs (design §4.9b *The reader*): the role's, else the team's
-            context_bound=preset.context_bound if preset else None,  # §4.8 *A role has a context bound*
+            # §4.8 *A role has a context bound*: a default one only for an unattended session (TD-249)
+            context_bound=preset.bound_for(unattended == "on") if preset else None,
             **({"prompt_from": made_from} if made_from else {}),
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
@@ -1466,7 +1467,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             lane=[],
             role=preset.name,
             review=review,
-            context_bound=preset.context_bound,
+            context_bound=preset.bound_for(False),
             ledger=cfg.ledger,
             controllers=[plan["manager"]] if plan["manager"] else [],
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team

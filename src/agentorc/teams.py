@@ -490,7 +490,8 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         ledger=cfg.ledger,
         host=host if host != here else "",
         review=dict(role.review) if role.review else None,
-        context_bound=role.context_bound,
+        # a seat takes no default bound (§4.8 *The bound has two layers*): only one its role's definition wrote
+        context_bound=None if seat and role.context_default else role.context_bound,
         prompt_from=prompt_from,
     )
 

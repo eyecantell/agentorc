@@ -901,6 +901,16 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
     sid = r.headers["location"].rsplit("/", 1)[-1]
     got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert "control" in (got.get("capabilities") or [])
+    # attended, so the default bound of a role that sets none is not written (§4.8, TD-249): the
+    # worker presets' own is, and so is the default on an unattended start
+    assert got["context_bound"] == ""  # the card's text: no bound
+    for name, role, extra, bound in (("g4", "grinder", {}, "300k"), ("g5", "manager", {"unattended": "on"}, "300k")):
+        form = {"name": name, "dir": str(tmp_path / name), "adapter": "hookstub", "role": role, **extra}
+        (tmp_path / name).mkdir()
+        made = client.post("/new", data=form, follow_redirects=False)
+        assert made.status_code == 303, made.text
+        sid = made.headers["location"].rsplit("/", 1)[-1]
+        assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["context_bound"] == bound
 
     # unticked on a `manager` preset: the person's decision stands over the preset's grants.
     # A second directory, since one agent session per directory is refused (§9 invariant 2).

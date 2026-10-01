@@ -1862,3 +1862,25 @@ def test_balance_now_reads_the_numbers_as_the_tick_gathers_them():
     ]
     none = teamrun.balance_now("nobody", fleet, repos, now)
     assert (none["members"], none["prs"], none["oldest"], none["review"], none["bound"]) == (0, None, None, None, 7200)
+
+
+def test_a_role_with_no_context_takes_300k_and_a_seat_and_a_persons_own_session_none(world, capsys):
+    """TD-249 slice 4, design §4.8 *The bound has two layers*: 300k is the default of every role that
+    sets no `context:` — the manager's and an attended member's included in a team start — while a
+    seat's record takes none, and neither does a session a person starts for themselves."""
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    planned = teams.plan(orgmod.load(), "ao-grind", HOST)
+    assert planned.lead.context_bound == 300_000 and planned.techlead.context_bound is None
+    assert {m.context_bound for m in planned.members} == {300_000}
+    assert cli.main(["new", "me", "--team", "ao-grind", "--unattended"]) == 0  # no role, so no role's bound
+    assert cli.main(["new", "mine", "--team", "ao-grind", "--role", "plain"]) == 0  # attended: a person's own
+    assert cli.main(["new", "bot", "--team", "ao-grind", "--role", "plain", "--unattended"]) == 0
+    assert cli.main(["new", "g", "--team", "ao-grind", "--role", "grinder"]) == 0  # the preset's own bound
+    assert [m["context_bound"] for m in creates(state)] == [None, None, 300_000, 300_000]
+    capsys.readouterr()
+    assert cli.main(["roles", "-d", str(tmp_path / "agentorc")]) == 0
+    out = capsys.readouterr().out
+    lines = {line.split()[0]: line for line in out.splitlines() if line and not line.startswith(" ")}
+    assert lines["manager"].endswith("context bound: 300k (default)")
+    assert "context bound: 300k" in lines["grinder"] and "(default)" not in lines["grinder"]
