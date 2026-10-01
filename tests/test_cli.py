@@ -1060,6 +1060,29 @@ def test_the_manager_brief_announces_a_wind_down_as_a_note_and_boards_only_what_
     assert "for each member what it looked for" not in text  # the old board line is gone
 
 
+def test_the_manager_brief_reads_the_records_each_round_and_takes_finished_from_the_home():
+    """TD-241 slice 4, design §6 rule 9 and §4.9a *A team's finished is the home's reading*: a
+    manager's round reads its members' states from the records and carries none over (manager-dc-1
+    held a grinder *interactive under Paul* for two days), the team's finished is `finished` on
+    `ao team status --json`, and the tick's line means the members are closed and the last acts are due."""
+    root = pathlib.Path(__file__).parents[1]
+    halves = (
+        "[agentorc] your team is finished: every member has declared. Make your last acts — ",
+        "`ao progress none`, the note to the person — then `ao close` yourself",
+    )
+    tick = (root / "src/sessionorc/agent_tick.py").read_text()
+    assert all(f'"{h}"' in tick for h in halves)  # the line as the tick types it
+    text = (root / "src/agentorc/briefs/manager.md").read_text()
+    assert "`ao team status <your team> --json` (or `ao status --json`)" in text
+    assert "every round, and never carried from an earlier round" in text
+    assert "its record says `unattended: false` **now**" in text
+    assert "**Whether the team has finished is the home's reading, not your memory**" in text
+    assert "as `finished` on the reply" in text and "holds when its `why` is empty" in text
+    assert "**Your round may still end the team first**" in text
+    assert "".join(halves) in text  # the brief quotes it word for word
+    assert "skip step (1), do steps (2) to (4) at once" in text and "*manager did not close*" in text
+
+
 def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
     """TD-113 (0), design §6 *Keeping a team running* rule 1: a supervised member that exits with no
     declaration is restarted by the host agent's tick, so the preset must not send its manager down
