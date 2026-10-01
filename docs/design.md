@@ -5105,7 +5105,9 @@ team has one, the techlead answers it or passes it up, and the person is the top
   `gh` act on the repo — not a session act, so no grant covers it and none is needed) and replies
   so; for an ask from an **`interactive`** session the reply is a **recommendation**, *merge* or
   findings, and the person merges or overrules. Findings go
-  back on the thread; the author fixes and re-asks on the same thread, so the queue is one entry
+  back on the thread; the author fixes and re-asks on the same thread — as a reply to the
+  findings (`--reply-to`), whose root is the first ask's; `--thread` takes up a question put to
+  the person and is refused toward a reader — so the queue is one entry
   per PR. **The queue is the seat's inbox**: a held PR waiting is an unanswered `ask` with `pr`
   set — counted in `asks_waiting`, and in a second structured field on the seat's view,
   **`prs_waiting: {n, oldest}`** (a number and a time, never their text, §4.10), which the team's
