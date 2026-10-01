@@ -7197,7 +7197,7 @@ teams:
 - **Balance: a team over its line takes no new work** (TD-177; Paul, 2026-09-25: *if I want to
   make sure the team is balanced, I can make sure the PR count is not growing too much — the
   grinders outpacing the techlead*; designed 2026-09-29; the setting and the mark built — TD-239
-  slice 1 — the refusal, slice 2, the notes, slice 3, rule 8's fifth bound, and `ao team balance` with the terminal's lines, the card's note and the Settings page's fields, slice 4). The numbers came
+  slice 1 — the refusal, slice 2, the notes, slice 3, rule 8's fifth bound, and `ao team balance` with the terminal's lines, the card's note and the Settings page's fields, slice 4, and the presets' words, slice 5). The numbers came
   first (§4.4 *Repo facts*, the team card and the Repo page, TD-176), and the rule keys on
   exactly those, so what trips it is what a person has been watching. It is **off until a
   person sets it**: `teams.<team>.balance` (§5 `settings.yml`; the Settings page and `ao team
@@ -7286,7 +7286,11 @@ teams:
   member on a node has no doorbell yet (§4.4a *The doorbell is the forwarded `wait`*), so it
   learns of the clearing when something else has it read its inbox — its manager, told of the
   clearing, is the one to look (TD-057). A node cut off from the home refuses every report,
-  so nothing is claimed unchecked.
+  so nothing is claimed unchecked. **The presets say it** (built — TD-239 slice 5): `grinder`,
+  `hunter` and `auditor` say what a refusal *over its line* means — nothing new, finish what is
+  held, end the turn, never `none`, and no branch cut for a new entry as a way round — and
+  `manager` says such a team is neither crashed nor finished, that its part is one log line, and
+  that an idle member on another host is told of the clearing with one send.
 
 ## 7. Phases
 

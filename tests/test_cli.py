@@ -2052,3 +2052,19 @@ def test_status_v_says_a_brief_changed_with_its_files(tmp_path, monkeypatch, cap
     assert re.search(r"brief:  changed \S+ ago \(m\.md, manager\.md\)", capsys.readouterr().out)
     assert cli.main(["--json", "status"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["brief_changed"] == rec["brief_changed"]
+
+
+def test_the_presets_say_what_over_its_line_means():
+    """TD-239 slice 5 (design §6 *Balance*): a worker refused *over its line* takes nothing new, ends
+    its turn and never declares `none`; the manager logs one line and treats nobody as crashed."""
+    briefs = pathlib.Path(__file__).parents[1] / "src/agentorc/briefs"
+    grinder = (briefs / "grinder.md").read_text()
+    assert "**Over its line** (design §6 *Balance*)" in grinder and "`--force` does not pass it" in grinder
+    assert "a branch cut for a new entry is no way round it" in grinder and "Never declare `none` on it" in grinder
+    assert grinder.index("A claim is a lease") < grinder.index("**Over its line**") < grinder.index("**Out of work**")
+    for name in ("hunter.md", "auditor.md"):
+        text = (briefs / name).read_text()
+        assert "**Over its line** (design §6 *Balance*)" in text and "you are not out of work" in text
+    manager = (briefs / "manager.md").read_text()
+    assert "**A team over its line** (design §6 *Balance*) is neither crashed nor finished" in manager
+    assert "one line in your round log" in manager and "do not nudge, restart or wind them down" in manager
