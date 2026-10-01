@@ -3682,24 +3682,31 @@ higher one was passed over, why. The page can then show whether a High was passe
 Nothing checks the pick: it is the worker's judgement, said where it can be read.
 
 **A role has a context bound (TD-188; built — TD-190).** A preset or a
-`roles:` entry may carry **`context: {bound: 200k}`** — a token count written as the reading is
-(`200k`, `1M`, `1.5M`), or a plain integer — the reading past which §6 rule 5 tells a
+`roles:` entry may carry **`context: {bound: 300k}`** — a token count written as the reading is
+(`300k`, `1M`, `1.5M`), or a plain integer — the reading past which §6 rule 5 tells a
 supervised member to end its run: the built-in worker presets (`grinder`, `hunter`, `auditor`) carry
-200k, Paul's number from grinder-ao-1's 462k run, and `manager`, `techlead` and `plain` carry none
-(a manager restarts on its own rules, a seat is short, a plain session is often a person's).
-**The bound has two layers** (TD-245; designed 2026-09-30, not built — TD-249). The package
+300k, and so does every role that sets none, a seat's record and a person's own session excepted
+(below).
+**The bound has two layers** (TD-245; the package default built, TD-249 slice 4; this repo's measured
+number not yet set — TD-249). The package
 default is every repo's and moves only on evidence that is every repo's: TD-189's research put
 a fresh run's start-up cost, weighted, at a median 342k and the cost break-even *around 300k*,
 and recommended 200–250k for a grinder; the default takes the break-even, since a bound under
-start-up plus one entry restarts after every entry, so the worker presets carry **300k** once
-TD-249 lands, and 200k stays the number here until it does. **300k is also the default for
+start-up plus one entry restarts after every entry, so the worker presets carry **300k**
+(200k until TD-249, Paul's number from grinder-ao-1's 462k run). **300k is also the default for
 every role that sets none** (Paul, 2026-09-30: designer-ao-1 had reached 352k and manager-ao-1
 756k untold, since only the three worker presets carried a bound and a role an org defines, or
 the manager, carried none): a supervised member whose role has no `context:` takes 300k; a
 **seat** takes none, as today (it is short, and on call); and `context: none` written on a role
 still switches the bound off. So `manager` and `plain` members and every org-defined role are
 bounded unless their definition says otherwise, and `ao roles` prints *context bound: 300k
-(default)* for them. **The manager's restart at the bound** is its own round's ending, not an
+(default)* for them. **A person's own session takes no default**: `ao new --role <role>`, the
+New session form and Add entry's *Open a session* write a default bound only on an unattended
+session, or one `ao new --supervised` makes a member (`Role.bound_for`) — a bound a role's definition wrote is written either way — and a
+session started with no role has none to take one from; a team start writes the default on
+every member, attended or not, and on no seat. The bound is written at the start and stays:
+`ao mode` moves no bound either way.
+**The manager's restart at the bound** is its own round's ending, not an
 entry's: it holds no claim, so rule 5's idle line rarely finds it (a manager blocks in `ao
 wait`, which is a turn), and what it reads is the reply clause on its `ao` calls; its brief says
 that a round in which that clause appears ends with `ao progress restart --why "context
@@ -3720,7 +3727,7 @@ repo's `docs/briefs/grinder-ao-*.md`), never in the package template every repo'
 Layered as every preset key is; `none` removes it. A definition, not a setting: it is part of what
 the role is, as `review:` is, and changes by PR or by hand in `org.yml`. It is checked when the file is
 read (a typo is a line naming the key), and the start writes it onto the record as **`context_bound`**,
-in tokens, as it writes `review`; `ao roles` prints *context bound: 200k*.
+in tokens, as it writes `review`; `ao roles` prints *context bound: 300k*.
 
 **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** (one line,
 40 characters at most, checked when the file is read) — *Manager*, *Tech Lead*, *Grinder*,
@@ -6637,10 +6644,9 @@ code and needs no grant; a session doing the same work does.
   5. **Context bound** (TD-188; built — TD-190). A supervised member whose
      **context reading** (§4.3 `context`, on the record as `context: {tokens, at, window}` — the window
      kept beside the tokens, since the model may change mid-run) is over its role's
-     **bound** (§4.8 `context: {bound}`; 200k for every built-in worker preset — grinder, hunter,
-     auditor; 300k once TD-249 lands, for them and for every role that sets none, a seat excepted,
-     and a repo's own number under its `.agentorc.yml`, §4.8 *The bound has two layers* — until
-     then none for `manager`, `techlead` and `plain`) is told so **once it is hook-confirmed
+     **bound** (§4.8 `context: {bound}`; 300k for every built-in worker preset — grinder, hunter,
+     auditor — and for every role that sets none, a seat excepted,
+     and a repo's own number under its `.agentorc.yml`, §4.8 *The bound has two layers*) is told so **once it is hook-confirmed
      `idle` and holds no claim in progress** — between entries, never mid-turn — by **one fixed line**
      through `send`'s path, as rule 4's is: *[agentorc] context 231k, over your 200k bound — take
      nothing new: push, ledger, then `ao progress restart --why "context bound"`*; `context_sent_at`

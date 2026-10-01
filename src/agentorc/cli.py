@@ -500,7 +500,10 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         "role": role.name,
         "ledger": cfg.ledger if cfg.root else None,  # None for a shell: there is no repo file behind it
         "review": role.review,  # who reads its PRs (design §4.9b *The reader*); None is none
-        "context_bound": role.context_bound,  # §4.8 *A role has a context bound* (TD-190); None is none
+        # §4.8 *A role has a context bound* (TD-190); None is none. The default of a role that sets none
+        # (*The bound has two layers*, TD-249) is an unattended session's: a person's own is never told
+        # `--supervised` is a member in the making (§6): it takes the default as a team start's does
+        "context_bound": role.bound_for(bool(getattr(args, "unattended", False) or getattr(args, "supervised", False))),
     }
 
 
@@ -680,7 +683,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
             if r.review:  # who reads its PRs (design §4.9b *The reader*)
                 bits.append(f"review: {r.review['reader']} on {', '.join(r.review['held'])}, {r.review['bound']}")
             if r.context_bound:  # the reading past which §6 rule 5 tells it to end its run (§4.8)
-                bits.append(f"context bound: {tokens_short(r.context_bound)}")
+                default = " (default)" if r.context_default else ""  # no layer set it (§4.8, TD-249)
+                bits.append(f"context bound: {tokens_short(r.context_bound)}{default}")
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
             if r.message:  # when to message it (design §4.8, TD-171): its own line, since it is a sentence
                 print(f"{'':<{w}}  message: {r.message}")

@@ -50,9 +50,14 @@ DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
 ROLE_KEYS = (
     "brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "context", "message", "prompts",
 )  # fmt: skip
-# The built-in worker presets' context bound (design §4.8 *A role has a context bound*, TD-190): Paul's
-# number from grinder-ao-1's 462k run. `manager`, `techlead` and `plain` carry none.
-WORKER_CONTEXT = {"bound": "200k"}
+# The built-in worker presets' context bound (design §4.8 *A role has a context bound*, *The bound
+# has two layers*; TD-190, TD-249): the cost break-even TD-189's research found, since a bound under
+# start-up plus one entry restarts after every entry. A repo's own number goes in its `.agentorc.yml`.
+WORKER_CONTEXT = {"bound": "300k"}
+# And the bound of every role that sets no `context:` (Paul, 2026-09-30): `manager`, `plain` and a
+# role an org defines are bounded unless their definition says `context: none`. A seat's record
+# takes no default (`teams`): it is short, and on call.
+DEFAULT_CONTEXT = WORKER_CONTEXT
 # A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
 # ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
 # label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
@@ -224,6 +229,7 @@ class Role:
     controllers: list[str] = field(default_factory=list)
     review: dict[str, Any] | None = None  # who reads its PRs (design §4.9b *The reader*, TD-093)
     context_bound: int | None = None  # tokens past which §6 rule 5 tells it to end its run (§4.8, TD-190)
+    context_default: bool = False  # no layer said `context:`: the bound is `DEFAULT_CONTEXT`'s (TD-249)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
     # deliberately, and the repo's default is not fallen back to (review of PR #116)
     sources: list[str] = field(default_factory=list)  # `built-in`, `org`, `repo`: which layers spoke
@@ -336,6 +342,13 @@ class Role:
             slots[slot] = {"text": value}
         return text, {"base": base, "slots": slots}
 
+    def bound_for(self, unattended: bool) -> int | None:
+        """The bound a session started by hand in this role is given (design §4.8 *The bound has two
+        layers*, TD-249): what the role's definition wrote, always; the default of a role that wrote
+        none only for an unattended session — a person's own is never told it is over a bound nobody
+        set. One rule for `ao new`, the New session form and Add entry's *Open a session*."""
+        return None if self.context_default and not unattended else self.context_bound
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
@@ -348,6 +361,7 @@ class Role:
             "message": self.message,
             "prompts": [dict(p) for p in self.prompts],
             "context_bound": self.context_bound,
+            "context_default": self.context_default,
             "controllers": list(self.controllers),
             "source": self.source,
         }
@@ -651,6 +665,9 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
                 raise ValueError(f"{src} roles.{name}.{e}") from None
         if "controllers" in block:
             role.controllers, role.controllers_set = list(block["controllers"]), True
+    if not any("context" in block for _, block in spoke):
+        # no layer spoke: the default (§4.8 *The bound has two layers*); `context: none` is a layer speaking
+        role.context_bound, role.context_default = normalize_context(DEFAULT_CONTEXT), True
     return role
 
 

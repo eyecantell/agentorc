@@ -96,6 +96,7 @@ def test_open_a_session_starts_the_types_role_interactive_in_a_new_worktree_with
     )
     assert kw["unattended"] is False and kw["prompt"] == "" and kw["role"] == "designer" and kw["team"] == "sam-grind"
     assert kw["controllers"] == ["ao-samscrape-manager-sam"]
+    assert kw["context_bound"] is None  # a person's own session takes no default bound (§4.8, TD-249)
     # the composer's text: entry.md's lines with the repo, the type and the ledger, then the words
     text = r.json()["text"]
     assert text.startswith(

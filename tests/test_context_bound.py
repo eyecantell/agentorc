@@ -36,20 +36,26 @@ def test_over_is_past_the_bound_and_never_without_one():
     assert not context_over({**s, "context_bound": None}) and not context_over({"context_bound": 200_000})
 
 
-def test_the_worker_presets_carry_200k_and_a_layer_can_change_or_remove_it(tmp_path):
+def test_the_worker_presets_carry_300k_and_a_layer_can_change_or_remove_it(tmp_path):
     cfg = repoconfig.load(tmp_path)
-    got = {n: repoconfig.resolve_role(cfg, n).context_bound for n in repoconfig.PRESETS}
-    assert got == {
-        "grinder": 200_000, "hunter": 200_000, "auditor": 200_000,
-        "manager": None, "techlead": None, "plain": None,
-    }  # fmt: skip
+    got = {n: repoconfig.resolve_role(cfg, n) for n in repoconfig.PRESETS}
+    # 300k is the worker presets' own, and the default of every role that sets none (TD-249)
+    assert {r.context_bound for r in got.values()} == {300_000}
+    assert {n for n, r in got.items() if r.context_default} == {"manager", "techlead", "plain"}
     (tmp_path / ".agentorc.yml").write_text(
-        "roles:\n  grinder:\n    context: {bound: 300k}\n  hunter:\n    context: none\n"
+        "roles:\n  grinder:\n    context: {bound: 400k}\n  hunter:\n    context: none\n"
+        "  manager:\n    context: none\n  scribe:\n    brief: docs/scribe.md\n"
     )
     cfg = repoconfig.load(tmp_path)
-    assert repoconfig.resolve_role(cfg, "grinder").context_bound == 300_000
-    assert repoconfig.resolve_role(cfg, "hunter").context_bound is None
-    assert repoconfig.resolve_role(cfg, "grinder").to_dict()["context_bound"] == 300_000
+    grinder = repoconfig.resolve_role(cfg, "grinder")
+    assert grinder.context_bound == 400_000 and not grinder.context_default
+    # `context: none` is a layer speaking: it clears a preset's bound and the default alike
+    for name in ("hunter", "manager"):
+        role = repoconfig.resolve_role(cfg, name)
+        assert role.context_bound is None and not role.context_default, name
+    scribe = repoconfig.resolve_role(cfg, "scribe")  # a role a repo defines, with no `context:`
+    assert scribe.context_bound == 300_000 and scribe.context_default
+    assert grinder.to_dict()["context_bound"] == 400_000 and scribe.to_dict()["context_default"] is True
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    context: {bound: lots}\n")
     with pytest.raises(ValueError, match=r"grinder\.context: bound is a token count"):
         repoconfig.load(tmp_path)
