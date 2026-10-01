@@ -6713,11 +6713,15 @@ code and needs no grant; a session doing the same work does.
      waiting — run `ao inbox`*, and an entry the person handed it (§4.10 *An entry handed to a
      seat*) named apart, since one already read wants its outcome and not another read: *1 entry
      the person handed you owes its outcome — `ao msg person --outcome done|blocked|dropped "…"
-     --for <id>`* (TD-218 slice 3) — and, since TD-247 (designed 2026-09-30, not built — TD-258),
+     --for <id>`* (TD-218 slice 3) — and, since TD-247 (designed 2026-09-30, built — TD-258 slice 4),
      **an outcome the member owes** (§4.10 *Outcomes*: the record's `owed()` reading, the `owed:` line
      `ao status -v` prints from `mail.owed`) counts as open work for this rule, seat or not, named apart the same
      way — *you owe 1 outcome on <id> — `ao msg person --outcome done|blocked|dropped "…" --for
-     <id>`*; a finished member is never sent to, and its debt is the Inbox's *Waiting on them*
+     <id>`*, after the open reference where there is one and alone (*you have been idle 20 minutes:
+     you owe …*) where there is none; several are counted and named three at most, *and n more*,
+     and a seat's clause counts its own answered questions, a handed entry being the part before
+     it; the slot's *idle · open work* follows this nudge as it follows any other, a debt being
+     work the member left; a finished member is never sent to, and its debt is the Inbox's *Waiting on them*
      and nothing more, so the manager's chase and its board line for a debt go — and nothing a session wrote; it is recorded on `sends` as the home's
      own (`system`). A node's member is not nudged yet: the composer is read on the member's host,
      and no node act does that (TD-103). Once per idle
@@ -6844,11 +6848,14 @@ code and needs no grant; a session doing the same work does.
      **Not covered, on purpose**: an entry that was in the ledger when the member declared —
      one a sibling held and dropped, one that came off the board — is not new by this rule; that
      reading was the manager's second reading of the ledger, and since TD-247 (designed 2026-09-30,
-     not built — TD-258) the one case that is a fact on the records is this rule's: an id in
-     `lane_seen` whose lease a sibling released — a `dropped` entry in the `progress` of any
-     record of the same repo, its `at` later than the member's `out_of_work.at` — is told once as
-     a new id is (*TD-108, dropped by grinder-ao-2*), the release's instant kept beside the id in
-     `lane_seen` so a second look at the same drop tells nothing; an entry that came off the
+     built — TD-258 slice 4) the one case that is a fact on the records is this rule's: an id in
+     `lane_seen` that still matches the lane and whose lease a sibling released — a `dropped` entry
+     in the `progress` of any other record of the same repo, its `at` later than the member's
+     `out_of_work.at` — is told once, in the note a new id is told in and counted with them
+     (*TD-108 (dropped by grinder-ao-2)*), the release's instant kept beside the id in
+     `lane_seen` (`dropped: {id: at}`) so a second look at the same drop tells nothing and a later
+     drop of the same id is told again; an id a live record has claimed since, its lease unexpired,
+     is not told while that lease holds — the entry is its holder's; an entry that came off the
      board is *has become pickable*, above, already. **An exited
      or closed member is not written to**, and its `lane_seen` is kept all the same: what its
      lane gains while it is gone is rule 8's once its team has wound down. A finished member its manager closed while the team runs on is told by neither rule: its lane's new work waits for the team's next wind-down. The ledger read is the checkout's file

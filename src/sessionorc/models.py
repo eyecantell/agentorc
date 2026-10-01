@@ -845,7 +845,9 @@ class Session:
     # `{at, ids}` while `out_of_work` stands: the ledger entries matching the session's lane that it
     # has been told of — at first the ones its repo's reading held when the tick first saw the
     # declaration, then each new one as a `system` note names it (design §6 rule 6, TD-195), so an
-    # entry is told once. The home's; cleared wherever `out_of_work` is set or cleared.
+    # entry is told once — and `dropped: {id: at}`, the instant of the last drop of a seen id by
+    # another record of the repo that was told (TD-258), so a released lease is told once too. The
+    # home's; cleared wherever `out_of_work` is set or cleared.
     lane_seen: dict[str, Any] | None = None
     # `{at, ref}` once a claim of this record's was refused because its team is over its line
     # (design §6 *Balance*, TD-239) — `ref` None for a refused `ao progress none` — so the mark's

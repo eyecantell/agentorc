@@ -656,7 +656,7 @@ class WakeMixin:
                 continue
             held = list(r.lane_seen.get("ids") or [])
             if add := [str(i) for i in ids if str(i) not in held]:
-                r.lane_seen = {"at": now_iso(), "ids": [*held, *add]}
+                r.lane_seen = {**r.lane_seen, "at": now_iso(), "ids": [*held, *add]}
                 self._save(r)
         rec.pop("work_waiting", None)
         if not rec:
