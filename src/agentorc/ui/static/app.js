@@ -519,7 +519,7 @@
       const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "restart") {
-        AO.toast(`restarted from its launch record — back in its team's run, ${res.unattended ? "unattended" : "attended"}`, true);
+        AO.toast(`restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       }
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
