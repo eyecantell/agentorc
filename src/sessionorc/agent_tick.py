@@ -39,7 +39,6 @@ from sessionorc.agent_common import (
     FILL_CEILING,
     FILL_WINDOW,
     GIT_EVERY,
-    HELD_READS,
     IDLE_NUDGE,
     LANE_NEWS_NAMED,
     LAUNCH_KEYS,
@@ -1031,7 +1030,7 @@ class TickMixin:
         """Rule 11's read (design §6, TD-258), detached on the reports' cadence: for each supervised
         member whose record carries `review`, each `progress` entry `done` with a `pr` is read once
         it has merged — its files against the record's `held:` globs, in the registry root the
-        record's `repo` names, `HELD_READS` PRs a run, the longest unread first. A PR touching no
+        record's `repo` names, `held.READS` PRs a run, the longest unread first. A PR touching no
         held path, one merged before the record was created, and one its reader replied on (`held.
         read_by`) are settled, in memory: a restarted home reads each once more. A held PR with no
         reply `held.GRACE` after its merge is a **crossing**: an entry on `held_missed` and one
@@ -1048,7 +1047,7 @@ class TickMixin:
                     if pr not in crossed and (addr, s.created, pr) not in self._held_settled:
                         due.append((self._held_tried.get((addr, pr), 0.0), s, pr))
             due.sort(key=lambda d: (d[0], d[2]))
-            for _, s, pr in due[:HELD_READS]:
+            for _, s, pr in due[: held_mod.READS]:
                 addr = self._address(s)
                 self._held_tried[(addr, pr)] = time.monotonic()
                 try:

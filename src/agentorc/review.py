@@ -1,6 +1,6 @@
 """Whether a PR waits for its reader (design §4.9b *The reader*, TD-093): the author's own `ao`
-reads its record's `review` and checks the PR's changed files against `held:`. The host agent only
-stores the setting; this is the one place it is applied.
+reads its record's `review` and checks the PR's changed files against `held:`. For that read the host agent only
+stores the setting; once the PR has merged, the home checks the same thing itself (§6 rule 11).
 
 `held:` is a list of path globs: a pattern names paths from the repo root, `**` spans any number
 of directories, `*` and `?` stay inside one, and a pattern ending in `/` names everything under

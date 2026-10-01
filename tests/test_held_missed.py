@@ -204,15 +204,13 @@ async def test_what_is_not_a_crossing(agent, monkeypatch):
 
 
 async def test_a_pass_reads_a_handful_the_longest_unread_first(agent, monkeypatch):
-    from sessionorc.agent_common import HELD_READS
-
     gh, s = _Gh(monkeypatch), _member(agent)
-    for pr in range(1, HELD_READS + 3):
+    for pr in range(1, held.READS + 3):
         _done(s, pr)  # gh fails on each: read again every pass
     await agent._held_pass([s], LATER)
-    assert gh.asked == list(range(1, HELD_READS + 1))
+    assert gh.asked == list(range(1, held.READS + 1))
     await agent._held_pass([s], LATER)
-    assert gh.asked[HELD_READS:] == [HELD_READS + 1, HELD_READS + 2, 1, 2, 3]
+    assert gh.asked[held.READS :] == [held.READS + 1, held.READS + 2, 1, 2, 3]
 
 
 async def test_a_working_member_reads_the_clause_once_on_its_next_reply(agent, tmp_path):

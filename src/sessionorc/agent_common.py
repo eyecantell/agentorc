@@ -59,7 +59,6 @@ GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cach
 # Derived report entries per session (design §4.8, TD-028 step 3): a `gh` call and a little git, so
 # a slow cadence. Nothing waits on it and a failure derives nothing (`sessionorc.reports`).
 DERIVE_EVERY = timedelta(minutes=5)
-HELD_READS = 5  # the PRs rule 11 reads against `held:` in one pass (§6, TD-258): one `gh pr view` each
 # The model in use per live agent session (TD-031): a local file's tail, so cheap, but not per tick.
 MODEL_EVERY = timedelta(seconds=30)
 CONTEXT_EVERY = timedelta(minutes=1)  # the context reading, unattended records only (§6 rule 5, TD-190)

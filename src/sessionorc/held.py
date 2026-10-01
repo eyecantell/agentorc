@@ -27,6 +27,7 @@ GH_TIMEOUT = 30.0
 # How long after the merge a held PR may go without its reader's reply before it is a crossing: the
 # reader merges first and replies after, and the home may read in between.
 GRACE = timedelta(minutes=15)
+READS = 5  # the PRs one pass of the tick reads: one `gh pr view` each
 NAMED = 3  # the paths one line names; the rest are *and n more*
 
 
