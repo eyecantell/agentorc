@@ -7099,7 +7099,7 @@ code and needs no grant; a session doing the same work does.
      keep a finished team live by not saying so.
 
   10. **The cadence check** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 1,
-     `sessionorc.cadence`; its Inbox row is slice 5's, not built). The manager ran
+     `sessionorc.cadence`; its Inbox row slice 5, `ui/inbox.py` `cadence_marks`). The manager ran
      `scripts/check_cadence.py --pr <n> --json` on every `done` with a `pr` and read the rows;
      the script's verdict needs no reader. For a supervised member, not a seat, each `progress`
      entry `done` carrying `pr` — declared or derived, so a PR merged from the member's branch
@@ -7139,7 +7139,7 @@ code and needs no grant; a session doing the same work does.
      session with no `progress` entry naming it (a person's anchor — the cadence is theirs to
      run), and a repo whose checkout holds no `scripts/check_cadence.py`.
   11. **Merged without its read** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 2,
-     `sessionorc.held`, the tick's `_held_pass` and `_held_line`; the Inbox row is slice 5's). `ao pr held
+     `sessionorc.held`, the tick's `_held_pass` and `_held_line`; the Inbox row slice 5, `ui/inbox.py` `held_mark`). `ao pr held
      <n>` is the author's own read of its record's `review` against the PR's files (§4.9b *The
      reader*), and the host agent only stored the field; whether a held PR merged without the
      reader's reply was a sentence in this repo's manager supplement, and nothing checked it.
