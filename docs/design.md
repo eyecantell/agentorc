@@ -3793,7 +3793,7 @@ now?) stay in the brief. The grant is what makes this safe: the manager's power 
 person can see on the Focus header and revoke, not a promise in its prompt. Since TD-247
 (designed 2026-09-30, not built — TD-258, TD-259) the brief's remaining mechanical jobs are §6
 rules 10–12 and rule 4's owed clause, and what is judgement is a **seat on call** (§6 *What is
-left is judgement*): a manager whose definition says `on_call: true` (§4.9) is a seat of §6
+left is judgement*): a manager whose definition does not say `on_call: false` (§4.9) is a seat of §6
 rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
 question to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it
 has acted, holding `control` on its record across the close as a seat holds its mail; a standing
@@ -4920,7 +4920,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
   `keep_mail`, so a question that was waiting is still there), the ceiling of six fills an hour
   (`FILL_CEILING`) is over all seats sharing a controller, and a seat that is `idle` with no
   `seat_due` is closed as the techlead is. A fourth trigger, **`team`**, is the manager's alone,
-  written by `on_call: true` on `manager:` and refused under `seats:` (§6 rule 3 *A manager on
+  written by `on_call` on `manager:` (the default) and refused under `seats:` (§6 rule 3 *A manager on
   call is a seat of this rule*, TD-247; designed 2026-09-30, not built — TD-259). A seat runs its brief and ends on
   its own — it declares nothing (§4.9a), holds **no grants** (it files and opens PRs with `gh`,
   which is not an act on a session), and is not counted in a wind-down. `ao team start` starts
@@ -6653,8 +6653,8 @@ code and needs no grant; a session doing the same work does.
      `seat_count` (*on call — runs after 10 PRs · 4 of 10*), which §4.9b could not while the
      number was the manager's. (This is TD-104, folded here.)
      **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30, not built —
-     TD-259). `ao team start` writes `seat: {trigger: team}` on a manager whose definition says
-     `on_call: true` (§4.9), and the tick sets its `seat_due` with `by` one of four words, each a
+     TD-259). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
+     say `on_call: false` (§4.9), and the tick sets its `seat_due` with `by` one of four words, each a
      reading of the records and never of a screen: **`asks`**, as the techlead's — an open `ask`
      or `steer` addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its
      team (a supervised record listing it in `controllers`) hook-confirmed `needs-you` with a
@@ -6726,7 +6726,7 @@ code and needs no grant; a session doing the same work does.
   one *idle · open work* after the nudge, and the prose of an escalation — and for that a
   standing manager woke every hour to find nothing: manager-ao-1 stood at 686k of context on
   2026-09-30, its rounds reading *nothing needs a person*. So **the manager is a seat on call**
-  when its definition says so (`on_call: true`, §4.9), filled by rule 3's `team` trigger on
+  unless its definition says otherwise (`on_call`, §4.9), filled by rule 3's `team` trigger on
   exactly those readings and closed when it has acted, as the techlead is; a standing manager
   stays what a definition may ask for (`on_call: false`); and
   `manager: {role: person}` means the readings are the person's — the Inbox's state rows for a

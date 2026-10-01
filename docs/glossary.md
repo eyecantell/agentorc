@@ -52,7 +52,7 @@ not mix:
   **lead** from 2026-09-16 to 2026-09-20 and `orchestrator` before that; neither old role name
   resolves any more (TD-107). *Not:* lead, orchestrator, orc, supervisor.
   — **decided** 2026-09-19 (Paul), confirmed 2026-09-20 (TD-076, design §4.8 *The names*). Since
-  2026-09-30 (TD-247, designed) a manager may be **on call** (`on_call: true` in its definition):
+  2026-09-30 (TD-247, designed) a manager is **on call** (`on_call` in its definition, `true` by default):
   a seat of design §6 rule 3, filled when a member needs a reading no policy makes — a question
   to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it has acted;
   the lifecycle jobs are the host agent's tick (§6 rules 1–12). A **standing** manager is the
