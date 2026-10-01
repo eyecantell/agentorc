@@ -2519,7 +2519,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     q = add_team("on-work", help="what a wound-down team does when its lanes gain work: ask, start or off (§6 rule 8)")
     q.add_argument("name")
-    q.add_argument("what", choices=settings_mod.ON_WORK, help="ask: an Inbox row (the default); start: the home starts it")
+    q.add_argument("what", choices=settings_mod.ON_WORK, help="ask: an Inbox row (the default); start: the home starts")
     q.set_defaults(fn=cmd_team_on_work)
 
     q = add_team("stop", help="wrap the members up, then the lead (--now kills instead of asking)")
