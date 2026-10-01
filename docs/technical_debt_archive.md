@@ -2589,3 +2589,22 @@ Both go away only when the record says who closed it.
 **Done when:** the board has 15 or fewer open items; every open `decide` item carries `Answers:` with at most one `(default)`; none is overdue 14 days or more; every ledgered item's entry is listed by `python3 scripts/ledger.py --pickable` as blocked on `decision (Paul)` or its TD, or is `Owner: paul`; the PR body carries one table row per item the board held at the start — the line's first words, what was done (closed / answers / ledgered TD-NNN / kind and due / duplicate / answers unclear), and the evidence or the default — so Paul can check the groom from the PR alone; and, once 10 or more lines are closed, §3.4's archive PR has moved them.
 
 **Related:** cadence §3.3–§3.5 (`Answers:` and the default: dev-cadence#TD-036, dev-cadence#TD-066), cadence §2.4 (`Blocked by:`: dev-cadence#TD-064), TD-223 and TD-228 (pickable derived), TD-218 and TD-219 (the Inbox's handed entries), PR #693 (the ledger's groom).
+
+## TD-251: The grinder's brief says to ask the reader again with `--thread`, which the host agent refuses
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-09-30 (grinder-ao-1, met on PR #821's second ask)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved
+**Location:** `src/agentorc/briefs/grinder.md` (the lane paragraph: *findings, fix and ask again on the same thread (`--thread <its id>`)*), `tests/test_cli.py` or wherever the preset's words are held; `src/sessionorc/agent_mail.py` (`rpc_msg`: *--thread follows up a question put to the person: name `person` as the addressee*; a reply's root is `replied.root`); design §4.9b *The reader* (*the author fixes and re-asks on the same thread*)
+
+**Why:** on 2026-09-30 the techlead answered the ask on PR #821 with findings. The brief's form, `ao msg --kind ask --pr 821 --thread <the ask's id> <techlead> "…"`, was refused: `--thread` takes a question to the person, and names nobody else. What put the second ask on the first one's thread was `ao msg --kind ask --pr 821 --reply-to <the findings' id> "…"`, whose root is the findings' root. A grinder that takes the refusal at its word asks the person, which closes the question at the reader and puts a held PR in front of Paul that the reader would have merged.
+
+**Resolved:** 2026-10-01 (PR #860, grinder-ao-1) — the grinder template's clause names the form that works, *ask again as a reply to them* (`ao msg --kind ask --pr <n> --reply-to <the findings' id>`), and keeps `--thread` for the person after the bound; design §4.9b *The reader* says how the re-ask stays on the thread; `tests/test_review.py` holds the refusal of `--thread` toward a reader, the second ask's root and the seat's one `prs_waiting` entry.
+
+**Done when:** a grinder following the brief word for word re-asks its reader without a refusal, and the seat's queue shows one entry for the PR.
+
+**Related:** TD-093 (the reader), TD-075 (asks and threads), TD-241 (PR #821, where it was met).
