@@ -677,6 +677,23 @@ def test_start_with_a_team_badges_the_session_and_fills_the_teams_reader(world, 
     assert made["review"] == {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
 
 
+def test_start_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_brief(world, client):
+    """TD-253: the form's Team pick fills the brief's `{techlead}` and `{manager}` slots, stored in
+    `prompt_from`; with no team each reads `none`."""
+    tmp_path, fleet = world
+    _reader_org(tmp_path)
+    data = {"name": "grind-9", "dir": str(tmp_path / "agentorc"), "role": "grinder", "team": "ao-grind"}
+    assert client.post("/new", data=data, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    slots = made["prompt_from"]["slots"]
+    assert slots["{techlead}"] == {"text": "ao-agentorc-tl-ao"} and slots["{manager}"] == {"text": "ao-agentorc-orc-ao"}
+    assert "Your team's techlead is `ao-agentorc-tl-ao`" in made["prompt"]
+    fleet.calls.clear()
+    assert client.post("/new", data={**data, "team": ""}, follow_redirects=False).status_code == 303
+    slots = fleet.creates()[0]["prompt_from"]["slots"]
+    assert slots["{techlead}"] == {"text": "none"} and slots["{manager}"] == {"text": "none"}
+
+
 def test_start_with_a_role_hands_create_what_its_brief_was_made_from(world, client):
     """TD-217 slice 1 (design §6 rule 7): the form's preset brief goes with `prompt_from`, which filled
     again gives the prompt; a prompt the person typed fills nothing and sends none."""

@@ -405,6 +405,22 @@ def _project_block(project: str | None, cfg: repoconfig.RepoConfig, directory: p
     return block
 
 
+def _team_slots(args: argparse.Namespace) -> dict[str, str]:
+    """`ao new --team` with a role's brief (TD-253): the team's seat, its manager and the seat's
+    primer for the brief's `{techlead}`, `{manager}` and `{context}` slots, as a team start fills
+    them (`teams.brief_ids`) — stored in `prompt_from`, so every replay of the record names them
+    too (design §6 rule 7). Nothing for no team, an undefined one, or an org that cannot be read:
+    `_team_defaults` says which on stderr, and each slot then reads `none`."""
+    name = getattr(args, "team", None) or ""
+    if not name:
+        return {}
+    try:
+        org, _notes = _org_notes()
+    except ValueError:
+        return {}
+    return teams.brief_ids(org, name, hosts.local_host().name)
+
+
 def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     """What the repo's `.agentorc.yml` and the `--role` preset fill in for `ao new` (design §4.8,
     §5): the brief from the role's template with `{lane}` filled, its lane, its grants (plus any
@@ -438,7 +454,9 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         # the shell's cwd: `ao new --dir` from elsewhere must read the same file (review of PR #463)
         supplement = brief or None
         # what the brief was made from goes with it (design §6 rule 7); a typed --prompt fills nothing
-        prompt, prompt_from = (args.prompt, None) if args.prompt else role.compose(lane, supplement=supplement)
+        prompt, prompt_from = (
+            (args.prompt, None) if args.prompt else role.compose(lane, supplement=supplement, **_team_slots(args))
+        )
         # TD-114's transition (design §4.8): a whole brief given as a supplement repeats the template
         for heading in repoconfig.repeated_headings(prompt or "") if supplement else []:
             print(

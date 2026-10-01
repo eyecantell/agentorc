@@ -124,6 +124,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     static_url,  # noqa: F401
     stop_fields,  # noqa: F401
     suggested_answers,  # noqa: F401
+    team_brief_ids,
     team_reader,  # noqa: F401
     teams_for_form,  # noqa: F401
     teams_view,  # noqa: F401
@@ -1267,7 +1268,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 ledger = cfg.ledger
                 if role.strip():
                     preset = repoconfig.resolve_role(cfg, role.strip())
-                    brief, made_from = preset.compose(refs or None)
+                    # a Team pick names the team's seat and manager in the brief, as a team start
+                    # does for its members (`teams.brief_ids`, TD-253); `none` each without one
+                    ids = await asyncio.to_thread(team_brief_ids, team.strip()) if team.strip() else {}
+                    brief, made_from = preset.compose(refs or None, **ids)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
         # design §4.5a New session **Project** picker (§4.9 "Home and reach"): the same block

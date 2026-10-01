@@ -333,6 +333,23 @@ def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> s
     return _session_id(org, team, team.manager.name, team.manager.home, host, here)
 
 
+def brief_ids(org: orgmod.Org, name: str, here: str) -> dict[str, str]:
+    """What a brief's `{techlead}`, `{manager}` and `{context}` slots take for a session started
+    into the team `name` outside a team start — `ao new --team` and the New session form's Team
+    pick (design §4.9 *A person in the team*, TD-253) — as `plan` fills them for its members: the
+    ids the seat and the manager take (`seat_id`, `manager_id`) and the seat's primer. Empty for a
+    team the org does not define, which stays a badge, so each slot reads `none`."""
+    team = org.teams.get(name)
+    if team is None:
+        return {}
+    host = team.host or here
+    return {
+        "techlead": seat_id(org, team, host, here),
+        "manager": manager_id(org, team, host, here),
+        "context": (team.techlead.context or "") if team.techlead is not None else "",
+    }
+
+
 def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
     """The teams that service the checkout `root` on `host`, in definition order, each `{team,
     seat, name}` — `seat` the id its techlead takes (`teams.seat_id`), empty where it defines none,
