@@ -1876,10 +1876,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_view(request: Request):
         agent_down, got, usage, info, why = False, {}, {}, {}, ""
+        fleet: list[dict[str, Any]] = []
+        readings: dict[str, Any] = {}
         try:
             got = await call("settings")
             usage = await call("usage")
             info = await call("host")
+            # **balance**'s numbers as they read now (§4.5a, §6 *Balance*): the fleet and the repo readings
+            fleet, readings = await call("list"), await call("repos")
         except HTTPException as e:
             if e.status_code != 503:
                 why = str(e.detail)  # an agent that refuses the read: its words, the files still drawn
@@ -1904,7 +1908,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 "profiles_file": str(profiles_mod.profiles_file()),
-                "teams": setmod.team_cards(org.teams, got.get("teams")),
+                "teams": setmod.team_cards(org.teams, got.get("teams"), sessions=fleet, repos=readings),
                 "repos": setmod.repo_cards(local.repos(), got.get("repos")),
                 "you": term,
                 "browser_keys": setmod.BROWSER_KEYS,
@@ -1969,10 +1973,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/teams")
     async def settings_teams(request: Request):
-        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?, on_work?}` —
+        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?, on_work?, balance?}` —
         `until` in the CLI's forms (`06:00`, `+8h`, ISO) read in this host's clock and handed over as
         an instant, `null` to clear; `reserve` a whole percent, `0` or empty clearing it; `on_work`
-        (**when work appears**, §6 rule 8) one of `ask`, `start`, `off`, as `ao team on-work`. A team the
+        (**when work appears**, §6 rule 8) one of `ask`, `start`, `off`, as `ao team on-work`; `balance`
+        (§6 *Balance*) the lines whole, `{prs?, oldest?, review?}`, or `null` for the switch off — a
+        line left out is a line not drawn, and the agent's refusal names what is wrong. A team the
         org does not define is refused, naming the defined ones, as `ao team until` refuses it."""
         body = await body_of(request)
         team = str(body.get("team") or "")
@@ -1997,8 +2003,22 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if body.get("on_work") not in setmod.settings_mod.ON_WORK:
                 raise HTTPException(400, f"when work appears is ask, start or off, not {body.get('on_work')!r}")
             change["on_work"] = body["on_work"]
+        if "balance" in body:
+            bal = body.get("balance")
+            if bal is not None and not isinstance(bal, dict):
+                raise HTTPException(400, "balance is its lines, {prs, oldest, review}, or null for off")
+            if bal is not None:
+                bal = {k: v for k, v in bal.items() if v not in ("", None, False)}
+                if str(bal.get("prs", "")).strip().isdigit():
+                    bal["prs"] = int(str(bal["prs"]).strip())  # a field's text; anything else the agent refuses
+                if not bal:
+                    raise HTTPException(
+                        400,
+                        "balance draws at least one line: open PRs, the oldest or the reader's queue — or turn it off",
+                    )
+            change["balance"] = bal
         if not change:
-            raise HTTPException(400, "teams: send until, reserve or on_work")
+            raise HTTPException(400, "teams: send until, reserve, on_work or balance")
         return answer(await call("set_settings", teams={team: change}))
 
     @app.post("/api/settings/repos")

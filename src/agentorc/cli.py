@@ -19,7 +19,6 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import orgcheck, repoconfig, service, teamrun, teams
-from sessionorc import balance as balance_mod
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
@@ -1663,33 +1662,6 @@ def _balance_words(bal: dict[str, Any]) -> str:
     return ", ".join(parts + (["review"] if bal.get("review") else [])) or "no line"
 
 
-def _balance_rows(bal: dict[str, Any], now: dict[str, Any]) -> list[str]:
-    """`ao team balance`'s three lines: each number as it reads now, the line it is read against
-    where one is drawn, and *over* where it is crossed."""
-    dur = balance_mod.duration
-
-    def row(what: str, value: Any, limit: Any, word: str, nothing: str, show: Callable[[Any], str]) -> str:
-        said = nothing if value is None else show(value)
-        if limit is None:
-            return f"  {what}: {said} (no line)"
-        over = " — over" if value is not None and value > limit else ""
-        return f"  {what}: {said} ({word} {show(limit)}){over}"
-
-    oldest = balance_mod.span(bal.get("oldest"))
-    return [
-        row("open PRs", now["prs"], bal.get("prs"), "line", "could not look", str),
-        row("oldest PR", now["oldest"], int(oldest.total_seconds()) if oldest else None, "line", "could not look", dur),
-        row(
-            "reader's queue",
-            now["review"],
-            now["bound"] if bal.get("review") else None,
-            "bound",
-            "nothing waiting",
-            dur,
-        ),
-    ]
-
-
 def cmd_team_balance(args: argparse.Namespace) -> int:
     """`ao team balance <team> [--prs <n>] [--oldest <d>] [--review on|off] | --clear` (design §4.7,
     §6 *Balance*, TD-239): the team's balance lines, written to `teams.<team>.balance` through
@@ -1726,7 +1698,7 @@ def cmd_team_balance(args: argparse.Namespace) -> int:
             print(f"{name}: no balance line — its members claim whatever the numbers (ao team balance {name} --prs 10)")
         if not now["members"]:
             print("  no live member: a team with none is not read, and carries no mark")
-        for line in _balance_rows(bal, now):
+        for line in teamrun.balance_rows(bal, now):
             print(line)
         if mark:
             print(f"  {teamrun.balance_note(mark)} — its members take no new claim until it clears")

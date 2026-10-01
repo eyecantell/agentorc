@@ -313,3 +313,63 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
     finally:
         org.unlink()
         call_sync("set_settings", teams={"sett-team": None})
+
+
+def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess_agent):
+    """**balance** (§4.5a *Settings page: Teams*, §6 *Balance*, TD-239 slice 4): off, the key is absent
+    and the fields are disabled; a Save writes the lines whole; a field left out is a line not drawn;
+    a switch on with no line is refused in place; off removes the key."""
+    from sessionorc.client import call_sync
+
+    org = subprocess_agent.home / "org.yml"
+    org.write_text(
+        f"projects:\n  sp:\n    repos:\n      sp: {{kmaster: {subprocess_agent.home}}}\n"
+        "teams:\n  bal-team:\n    projects: [sp]\n    manager: {role: manager}\n"
+        "    members: [{role: grinder, count: 2}]\n"
+    )
+    post = lambda body: client.post("/api/settings/teams", json={"team": "bal-team", **body})  # noqa: E731
+    try:
+        page = client.get("/settings").text
+        assert 'class="setrow setbalance" data-was="null"' in page
+        assert re.search(r'name="balance_prs" value=""[^>]* disabled', page)
+        assert "no live member: a team with none is not read" in page and "open PRs: could not look (no line)" in page
+        assert post({"balance": {"prs": "8", "oldest": "2d", "review": True}}).json()["ok"]
+        assert call_sync("settings")["teams"]["bal-team"] == {"balance": {"prs": 8, "oldest": "2d", "review": True}}
+        page = client.get("/settings").text
+        assert 'data-was="{&#34;prs&#34;:8,&#34;oldest&#34;:&#34;2d&#34;,&#34;review&#34;:true}"' in page
+        assert 'name="balance_prs" value="8"' in page and "open PRs: could not look (line 8)" in page
+        assert not re.search(r'name="balance_prs"[^>]* disabled', page)
+        # an empty field and an unticked box are lines not drawn
+        assert post({"balance": {"prs": 3, "oldest": "", "review": False}}).json()["ok"]
+        assert call_sync("settings")["teams"]["bal-team"] == {"balance": {"prs": 3}}
+        refused = (({}, "at least one line"), ({"prs": "many"}, "balance.prs"), ({"oldest": "soon"}, "12h or 2d"))
+        for bad, said in refused:
+            got = post({"balance": bad})
+            assert got.status_code == 400 and said in got.json()["detail"], got.json()
+        assert post({"balance": "on"}).status_code == 400
+        assert call_sync("settings")["teams"]["bal-team"] == {"balance": {"prs": 3}}
+        assert post({"balance": None}).json()["ok"]
+        assert "bal-team" not in (call_sync("settings")["teams"] or {})
+    finally:
+        org.unlink()
+        call_sync("set_settings", teams={"bal-team": None})
+
+
+def test_balance_card_reads_the_numbers_and_the_mark():
+    """The card's own reading (`balance_card`): the form's `was`, the three lines against the repo's
+    numbers, and the mark while one stands."""
+    now = datetime.now(UTC)
+    fleet = [{"id": "g", "team": "t", "state": "idle", "repo": "/r"}]
+    open_ = [{"number": n, "created": (now - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")} for n in (1, 2, 3)]
+    mark = {"since": "", "repo": "/r", "crossed": [{"line": "prs", "value": 3, "limit": 2}]}
+    repos = {"/r": {"prs": {"open": open_}, "balance": {"t": mark}}}
+    card = setmod.balance_card("t", {"prs": 2, "review": False}, fleet, repos)
+    assert card["on"] and card["was"] == '{"prs":2}' and card["prs"] == "2" and not card["review"]
+    assert card["live"] and card["now"][0] == "open PRs: 3 (line 2) — over"
+    assert card["now"][1].startswith("oldest PR: 5h") and card["now"][1].endswith("(no line)")
+    assert card["mark"] == "over its line: 3 open PRs, line 2"
+    off = setmod.balance_card("t", None, fleet, repos)
+    assert not off["on"] and off["was"] == "null" and off["mark"] == "" and off["now"][0] == "open PRs: 3 (no line)"
+    assert setmod.team_cards({"t": object()}, {"t": {"balance": {"prs": 2}}}, sessions=fleet, repos=repos)[0][
+        "balance"
+    ]["mark"]

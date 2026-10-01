@@ -77,7 +77,7 @@
   </section>
 
   {# **Teams** (§4.5a *Settings page: Teams*) #}
-  {% set info_teams = "What you move for a team without redefining it: its schedule, its stop time — every live member and seat stops there, and the ones a start creates — its reserve priority, an extra reserve on top of the profile's for this team's sessions, so two teams on one profile pause at different lines, and what happens when it has wound down and its lanes gain entries. The stop time takes 06:00, +8h or an ISO time, in this host's clock. Written to settings.yml's teams: through set_settings; the team itself is org.yml's, by hand." %}
+  {% set info_teams = "What you move for a team without redefining it: its schedule, its stop time — every live member and seat stops there, and the ones a start creates — its reserve priority, an extra reserve on top of the profile's for this team's sessions, so two teams on one profile pause at different lines, what happens when it has wound down and its lanes gain entries, and its balance: the lines over which its members take no new claim. The stop time takes 06:00, +8h or an ISO time, in this host's clock. Written to settings.yml's teams: through set_settings; the team itself is org.yml's, by hand." %}
   <section class="isec" id="sec-teams">
     <div class="row gap sechead"><span class="h2">Teams</span>{{ imark("teams", "Teams", info_teams) }}</div>
     {{ panel("teams", info_teams) }}
@@ -98,6 +98,18 @@
           <option value="off"{% if t.on_work == "off" %} selected{% endif %}>do nothing</option>
         </select>
         <span class="note">{% if t.on_work == "start" %}wound down, the home starts it when its lanes gain entries{% elif t.on_work == "off" %}wound down, it waits for Start or its schedule{% else %}wound down, an Inbox row asks when its lanes gain entries{% endif %}</span></label>
+      {# **balance** (§4.5a, §6 *Balance*, TD-239): `teams.<team>.balance`, whole, written only when it moved;
+         off, the key is absent; a field left empty is a line not drawn #}
+      <div class="setrow setbalance" data-was="{{ t.balance.was }}">
+        <span class="setlabel">balance</span>
+        <span class="setpicks">
+          <label title="{{ help_title('balance') }}"><input type="checkbox" name="balance_on"{% if t.balance.on %} checked{% endif %}> no new claim over a line</label>
+          <label>open PRs above <input class="input setnum" name="balance_prs" value="{{ t.balance.prs }}" inputmode="numeric" autocomplete="off"{% if not t.balance.on %} disabled{% endif %}></label>
+          <label>oldest open longer than <input class="input setnum" name="balance_oldest" value="{{ t.balance.oldest }}" placeholder="2d" autocomplete="off" spellcheck="false"{% if not t.balance.on %} disabled{% endif %}></label>
+          <label><input type="checkbox" name="balance_review"{% if t.balance.review %} checked{% endif %}{% if not t.balance.on %} disabled{% endif %}> the reader's queue past its bound</label>
+        </span>
+        <span class="note setnow">{% if t.balance.mark %}<span class="setover">{{ t.balance.mark }}</span><br>{% endif %}{% if not t.balance.live %}no live member: a team with none is not read<br>{% endif %}now — {% for line in t.balance.now %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</span>
+      </div>
       <label class="setrow"><span class="setlabel">schedule</span>
         <input class="input setin" value="{{ t.schedule | tojson if t.schedule else '' }}" placeholder="at a reset" disabled>
         <span class="note">not built — TD-133</span></label>

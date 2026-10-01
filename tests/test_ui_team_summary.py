@@ -452,3 +452,23 @@ def test_an_ended_member_keeps_its_last_reference_with_the_prs_mark():
     lead = {**member("m", role_label="Manager"), "rank": 1}
     kid = {**m, "controllers": ["m"]}
     assert ui.view(lead, [lead, kid], repos=readings)["members"][0]["report"] == "TD-066 → #158 merged · 1/1 done"
+
+
+def test_a_team_over_its_line_says_so_on_its_header_and_only_while_live():
+    """§4.5a team card **over its line** note (§6 *Balance*, TD-239 slice 4): the home's mark, from the
+    `repos` reading, in its own numbers on the header's second line; display only, and gone with the mark."""
+    ms = [member("g1", role_label="Grinder"), member("g2", state="exited")]
+    for m in ms:
+        m.update(rank=1, slot={"text": "", "caption": ""}, place="kmaster / samscrape")
+    mark = {"since": "", "repo": "/r/samscrape", "crossed": [{"line": "prs", "value": 9, "limit": 8}]}
+    over = {"/r/samscrape": {**reading("/r/samscrape"), "balance": {ms[0]["team"]: mark}}}
+    (g,) = ui.team_groups(ms, (), over, {})
+    assert g["balance_note"] == "over its line: 9 open PRs, line 8"
+    head = ui.templates.get_template("group_head.html").render(g=g)
+    assert '<div class="meta overline" title="its members take no new claim until it clears · Settings">' in head
+    assert "over its line: 9 open PRs, line 8</div>" in head
+    (clear,) = ui.team_groups(ms, (), {"/r/samscrape": reading("/r/samscrape")}, {})
+    assert clear["balance_note"] == ""
+    assert "overline" not in ui.templates.get_template("group_head.html").render(g=clear)
+    (dead,) = ui.team_groups([{**m, "state": "exited"} for m in ms], (), over, {})
+    assert dead["balance_note"] == ""

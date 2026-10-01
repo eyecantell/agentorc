@@ -3189,6 +3189,23 @@
       if (pick) pick.checked = true;
       if (inp.name === "board_days") { const d = inp.value.trim() || "7"; $(".setdayswords", row).textContent = d === "7" ? "due this week" : `due within ${d} days`; }
     }));
+    // **balance** (§4.5a): turned on with nothing drawn, the fields start at 10, 2d and ticked; off, they are not the person's to type in
+    $$(".setbalance", page).forEach((row) => {
+      const f = row.closest("form"), on = f.elements.balance_on, parts = [f.elements.balance_prs, f.elements.balance_oldest, f.elements.balance_review];
+      on.addEventListener("change", () => {
+        parts.forEach((p) => { p.disabled = !on.checked; });
+        if (on.checked && !parts[0].value.trim() && !parts[1].value.trim() && !parts[2].checked) { parts[0].value = "10"; parts[1].value = "2d"; parts[2].checked = true; }
+      });
+    });
+    // the form's balance as `set_settings` takes it, keys in the file's order: null off, a whole number where prs is one
+    AO.balanceOf = (f) => {
+      if (!f.elements.balance_on.checked) return null;
+      const bal = {}, prs = f.elements.balance_prs.value.trim(), oldest = f.elements.balance_oldest.value.trim();
+      if (prs) bal.prs = /^[0-9]+$/.test(prs) ? Number(prs) : prs;
+      if (oldest) bal.oldest = oldest;
+      if (f.elements.balance_review.checked) bal.review = true;
+      return bal;
+    };
     const forms = {
       usage: (f) => ["usage", { profile: f.dataset.profile, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
       max_age: (f) => ["max_age", { max_age: f.elements.max_age.value.trim() }],  // **trust a reading for** (TD-233)
@@ -3197,6 +3214,9 @@
         if (f.elements.until.value.trim()) body.until = f.elements.until.value.trim();
         // **when work appears** (§6 rule 8): written only when the pick moved, so *ask me (default)* leaves the key absent
         const ow = f.elements.on_work; if (ow && ow.value !== ow.dataset.was) body.on_work = ow.value;
+        // **balance** (§6 *Balance*): the lines whole, written only when they moved; off is null, an empty field no line
+        const row = $(".setbalance", f);
+        if (row) { const bal = AO.balanceOf(f); if (JSON.stringify(bal) !== row.dataset.was) body.balance = bal; }
         return ["teams", body];
       },
       you: (f) => {

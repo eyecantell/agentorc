@@ -254,6 +254,19 @@ HELP: tuple[Help, ...] = (
             "minutes, or the team's balance line."
         ),
     ),
+    Help(
+        "balance",
+        "balance",
+        "Settings page: Teams",
+        (
+            "Stops this team's unattended members taking a new claim while its repo is over a line you draw: more "
+            "open pull requests than a number, the oldest open longer than a time, or the reader's queue past its "
+            "bound. Turn it on when the team opens pull requests faster than they are read and merged, and set "
+            "each line against the numbers under it, which are today's; a field left empty draws no line. Work in "
+            "hand goes on and nothing is paused or closed, and turning it off removes a standing mark, which the "
+            "team's manager and you are told as the line clearing."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -300,7 +313,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     ("focus", "Focus", ("wrap-up", "kill", "resume")),
     ("inbox", "Inbox", ("promote", "promote-snooze", "promote-dismiss", "work-start", "work-snooze", "work-dismiss")),
-    ("settings", "Settings", ("on-work",)),
+    ("settings", "Settings", ("on-work", "balance")),
 )
 
 
