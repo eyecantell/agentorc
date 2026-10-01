@@ -342,7 +342,13 @@ def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess
         # an empty field and an unticked box are lines not drawn
         assert post({"balance": {"prs": 3, "oldest": "", "review": False}}).json()["ok"]
         assert call_sync("settings")["teams"]["bal-team"] == {"balance": {"prs": 3}}
-        refused = (({}, "at least one line"), ({"prs": "many"}, "balance.prs"), ({"oldest": "soon"}, "12h or 2d"))
+        refused = (
+            ({}, "at least one line"),
+            ({"prs": 0}, "1 or more"),
+            ({"prs": "²"}, "balance.prs"),
+            ({"prs": "many"}, "balance.prs"),
+            ({"oldest": "soon"}, "12h or 2d"),
+        )
         for bad, said in refused:
             got = post({"balance": bad})
             assert got.status_code == 400 and said in got.json()["detail"], got.json()

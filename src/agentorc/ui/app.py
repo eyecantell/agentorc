@@ -10,6 +10,7 @@ import contextlib
 import html
 import json
 import os
+import re
 import subprocess
 import time
 from collections.abc import Callable, Mapping
@@ -1882,13 +1883,16 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await call("settings")
             usage = await call("usage")
             info = await call("host")
-            # **balance**'s numbers as they read now (§4.5a, §6 *Balance*): the fleet and the repo readings
-            fleet, readings = await call("list"), await call("repos")
         except HTTPException as e:
             if e.status_code != 503:
                 why = str(e.detail)  # an agent that refuses the read: its words, the files still drawn
             else:
                 agent_down = True
+        # **balance**'s numbers as they read now (§4.5a, §6 *Balance*): the fleet and the repo readings,
+        # which an older agent or a down link may refuse — the settings are still drawn
+        with contextlib.suppress(HTTPException):
+            fleet = await call("list")
+            readings = await call("repos")
         notes: list[str] = [why] if why else []
         try:
             profiles, default = profiles_mod.load()
@@ -2008,8 +2012,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if bal is not None and not isinstance(bal, dict):
                 raise HTTPException(400, "balance is its lines, {prs, oldest, review}, or null for off")
             if bal is not None:
-                bal = {k: v for k, v in bal.items() if v not in ("", None, False)}
-                if str(bal.get("prs", "")).strip().isdigit():
+                bal = {k: v for k, v in bal.items() if not (v is None or v is False or v == "")}
+                if re.fullmatch(r"[0-9]+", str(bal.get("prs", "")).strip()):
                     bal["prs"] = int(str(bal["prs"]).strip())  # a field's text; anything else the agent refuses
                 if not bal:
                     raise HTTPException(
