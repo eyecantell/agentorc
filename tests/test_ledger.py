@@ -8,8 +8,10 @@ two files together. A concurrent fleet re-reads a resolved entry's number all th
 tests are the check the prose asked for.
 """
 
+import importlib.util
 import pathlib
 import re
+import sys
 from collections import Counter
 
 from sessionorc import ledger
@@ -138,13 +140,42 @@ def test_the_open_file_holds_open_work_only():
     assert not done, f"finished entries still in the open file (move them to the archive, cadence §2): {done}"
 
 
-OWNERS = {"anchor", "designer", "grinder", "paul", "dev-cadence"}
-KINDS = {"build", "design-first", "live-check", "evaluation", "decision"}
+def _script():
+    """dev-cadence's `scripts/ledger.py`, loaded from its file: the reader of the preamble's `Fields:` line."""
+    spec = importlib.util.spec_from_file_location("cadence_ledger", DOCS.parent / "scripts" / "ledger.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod  # its dataclasses look their module up by name
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# TD-248: one list of words, not two. The ledger's preamble declares them (cadence §2.12) and the
+# synced script reads them, so the test and the script cannot disagree about what an Owner is.
+DECLARED, DECLARED_FLAGS = _script().declared(OPEN.read_text())
+OWNERS = set(DECLARED.get("owner", ()))
+KINDS = set(DECLARED.get("kind", ()))
 HEADER = re.compile(
     r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)\n"
     r"\*\*Pickable:\*\* (?P<pick>yes|no — \S[^\n]*)\n",
     re.M,
 )
+
+
+def test_the_preamble_declares_the_owner_and_kind_words():
+    """TD-248: the `Fields:` line is read whole, and it is where both sets come from.
+
+    A line the script cannot read is a flag there and an empty set here, which would fail every
+    entry below with *unknown Owner* and hide the cause; this says it first. The words of the
+    paragraph above the line are prose, so they are held to the line too.
+    """
+    assert not DECLARED_FLAGS, DECLARED_FLAGS
+    assert OWNERS and KINDS, f"the preamble's Fields: line declares Owner and Kind, read as {DECLARED}"
+    pre = OPEN.read_text().split("\n## ", 1)[0]
+    prose = {"Owner": OWNERS, "Kind": KINDS}
+    for name, words in prose.items():
+        said = re.search(rf"\*\*{name}\*\* — [^(]*\(([^)]*)\)", pre)
+        assert said, f"the preamble's paragraph names the {name} words in brackets"
+        assert set(re.findall(r"`([^`]+)`", said[1])) == words, f"{name}: the paragraph and the Fields: line differ"
 
 
 def test_every_open_entry_carries_the_header_in_order_with_known_values():
