@@ -828,8 +828,8 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     if inside and not new:
         return {"early": True, "repeat": None, "words": "early: nothing reported done this run"}
     if inside:
-        said = ", ".join(d["ref"] + (f" #{d['pr']}" if d["pr"] else "") for d in new)
-        return {"early": False, "repeat": None, "words": f"not early: {said} reported done this run"}
+        named = ", ".join(d["ref"] + (f" #{d['pr']}" if d["pr"] else "") for d in new)
+        return {"early": False, "repeat": None, "words": f"not early: {named} reported done this run"}
     return {"early": False, "repeat": None, "words": None}
 
 
