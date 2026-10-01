@@ -108,6 +108,8 @@ HOME_OWNED = frozenset(
         "seat",
         "seat_due",
         "seat_count",
+        "seat_filled",
+        "idle_open",
         "checks",
         "conventions_seen",
         "held_missed",
@@ -967,6 +969,18 @@ class Session:
     # reading and never reads as zero. Both the home's, computed at the home.
     seat_due: dict[str, Any] | None = None
     seat_count: dict[str, Any] | None = None
+    # A manager on call's memory of what it was filled for (§6 rule 3 *A manager on call is a seat
+    # of this rule*, TD-259): `[{by, member, at}]`, `member` the address of the member the reading
+    # was of and, for `asks`, `ask` the question's id in its place — one entry per cause a fill was
+    # made for, carried across the fill and dropped when the cause has gone, so a cause still
+    # standing fills once. The home's.
+    seat_filled: list[dict[str, Any]] = field(default_factory=list)
+    # `{at, ref}` on a supervised member, not a seat, still hook-confirmed idle `IDLE_NUDGE` after
+    # rule 4's nudge with work open (§6 rule 3, TD-259): *idle · open work*, the one reading the
+    # card's slot, a manager on call's `open` trigger and the person-led team's Inbox row draw.
+    # `ref` is the first open reference when it was written. The home's; cleared when the stretch
+    # ends, the work closes or the member declares.
+    idle_open: dict[str, Any] | None = None
     # What the home read of this member's PRs with `scripts/check_cadence.py` (design §6 rule 10,
     # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
     # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`
@@ -1073,6 +1087,14 @@ class Session:
         says which, else the record's own host, which is the same thing for a record of this host.
         `handed_only` counts the handed entries among them alone: the nudge names those apart, since
         one already read wants its outcome, not another `ao inbox` (TD-218 slice 3)."""
+        return len(self._asks(home, handed_only))
+
+    def asks_ids(self, *, home: str | None = None) -> list[str]:
+        """The ids `asks_waiting` counts, in the inbox's order: what a manager on call's `asks`
+        trigger keys a fill on (§6 rule 3, TD-259), so a question it left standing fills it once."""
+        return self._asks(home, False)
+
+    def _asks(self, home: str | None, handed_only: bool) -> list[str]:
         storing = home or self.host
         mine = (self.id, self.host or storing)
 
@@ -1085,8 +1107,8 @@ class Session:
         # while a question of the record's own to the person on its thread is open: the seat waits
         # on the person then, and the person's answer closes that question and counts it again
         asking = {e.root for e in self.outbox if e.open and e.kind == "ask" and PERSON in e.to}
-        return sum(
-            1
+        return [
+            e.id
             for e in self.inbox
             if (
                 (e.owes and e.id not in asking)
@@ -1095,7 +1117,7 @@ class Session:
             )  # passed up: the person's to answer now (§4.9b), no seat need be filled for it
             and any(where(x) == mine for x in e.to)
             and (not handed_only or e.handed_entry)
-        )
+        ]
 
     def prs_waiting(self, *, home: str | None = None) -> dict[str, Any] | None:
         """Design §4.9b *The reader* (TD-093): of `asks_waiting`, the `ask`s that carry a `pr` —
