@@ -2869,12 +2869,18 @@ def test_idle_open_work_is_a_row_for_a_team_with_no_manager(tmp_path, monkeypatc
         rec("ao-l", "idle", idle_open=mark, **nudged),  # no team at all
         rec("ao-mgr", "idle", team="ao", capabilities=["control"]),
         rec("ao-g", "idle", team="ao", controllers=["ao-mgr"], idle_open=mark, **nudged),  # its manager's
+        # a manager on call between fills: the seat is empty, its record closed, and the team is still
+        # managed — the reading fills the seat (`seat_due.by: open`), so the person gets no row
+        rec("ao-oc", "closed", team="oc", capabilities=["control"], seat={"trigger": "team"}, pane=False),
+        rec("ao-h", "idle", team="oc", controllers=["ao-oc"], idle_open=mark, **nudged),
     ]
     got = [r for r in state_rows_of(records) if r["row"] == "idle_open"]
     assert [r["sid"] for r in got] == ["ao-p"]
     (row,) = got
     assert re.fullmatch(r"idle \S+( \S+)? with TD-070 open, nudged (\w{3} )?\d\d:\d\d", row["text"]), row["text"]
     assert row["at"] == mark["at"] and row["id"] == "ao-p:idle_open"
+    bare = rec("ao-p", "idle", team="dc", idle_open={"ref": "TD-070"}, **nudged)  # a mark with no time
+    assert state_rows_of([bare])[0]["at"] == nudged["since"]
     assert state_rows_of([rec("ao-p", "idle", team="dc", idle_open={"at": mark["at"]}, supervised=True)])[0][
         "text"
     ].endswith("with its work open")

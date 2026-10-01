@@ -142,8 +142,10 @@ def idle_open_mark(v: dict[str, Any], views: Collection[dict[str, Any]], now: da
     time, the row's words)` for a supervised member of a team with **no manager** that the tick
     reads as idle with its work open — `idle_open: {at, ref}` on its record — else None. A team
     with a manager draws no row: the reading fills a manager on call, or is a standing manager's
-    round. The words are the record's fields and nothing off its screen: *idle 40 min with TD-070
-    open, nudged 14:02*."""
+    round. The manager is read from the team's records whatever their state (`work.manager_of`), so
+    a manager on call whose seat is empty — its record closed between fills — still manages.
+    The words are the record's fields and nothing off its screen: *idle 40m with TD-070 open, nudged
+    14:02*."""
     mark = v.get("idle_open")
     if not isinstance(mark, dict) or v.get("state") != "idle" or not v.get("supervised") or not v.get("team"):
         return None
