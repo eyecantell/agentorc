@@ -4016,8 +4016,8 @@ org.yml actually be an aggregate of each of the repos that support a team?*; des
 the aggregate below is built — TD-229 slice 1, one function, `org.with_repos`, that `ao team` and
 the pages both read — as are **Members…**'s disabled state, the home's history and agentorc's own
 `.agentorc.yml`, which defines `ao-grind` and its roles' `review:` (slice 2; the org file's `ao-grind`
-shadows it until the person removes that one); `place:`, the landing rule (a node's registry is asked over the link, below) and `ao org` are not —
-TD-229's later slices). A team that works one repo is **defined in that repo**, in
+shadows it until the person removes that one) and `place:` with the landing rule (slice 3; *Where a repo's
+team lands*, below); `ao org` is not — TD-229's last slice). A team that works one repo is **defined in that repo**, in
 its `.agentorc.yml` — `teams:`, the `roles:` it uses with their `review:` paths, the briefs
 beside them — so it has the repo's history, is changed by PR and is read by whoever clones the
 repo. The org a client sees is the union:
@@ -4042,7 +4042,20 @@ repo. The org a client sees is the union:
   registry holds the repo; else the one linked node whose registry does (asked over the link:
   the home's `host_repos {host}` RPC, a read like `host_dir` that returns the registry's paths
   through the node's `repos` link method — built, TD-229 slice 3's host-agent half);
-  with the repo on several nodes and no `place:`, the start is refused, naming them.
+  with the repo on several nodes and no `place:`, the start is refused, naming them. A node
+  whose registry cannot be read is *unknown*, never *holds no repo*, and refuses the start too.
+  As built (`org.landing`, applied by `org.with_repos`): a definition is read from a checkout
+  in this host's registry, so a team no `place:` names lands here, and the third clause is the
+  rule's own, reached by no client until a definition is read from a node. A team `place:`
+  puts on another host takes that host as its `host:`, and the repo's path there is the one
+  entry of that host's registry with the checkout's name (the CLI asks at each read, the pages
+  keep the answer five seconds and wait two for it, a slower host reading as unknown until it
+  answers); where the org file has a project of the repo's name, its paths are used and
+  nothing is asked, and one with no path on that host is the reason given. A `place:` naming
+  a team no registered repo defines is a note. A registry that cannot be read, or that holds the name
+  not once, leaves the team listed on its host with the reason as a note, and its start
+  refused in those words. `place:` naming a team the org file defines is refused when the file
+  is read: that team's own `host:` places it.
 - **Names are the org's.** Two repos that define one team name are both refused, each naming
   the other, since a team's name keys its settings (§5 `teams.<team>`) and its badge. The org
   file still wins a name over a repo, which is how an install overrides a repo's team without

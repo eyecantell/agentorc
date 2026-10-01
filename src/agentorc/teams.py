@@ -528,6 +528,8 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
     member asks for something this phase does not build. Raises `TeamError` on the first thing
     that would have stopped the start — nothing is created here (§4.9: never half a team)."""
     team = find(org, name)
+    if name in org.unlanded:  # a repo's team whose landing cannot be told (§4.9 *Where a repo's team lands*)
+        raise TeamError(org.unlanded[name])
     here, host = host, team.host or host  # the team lands on its `host:`, else where the start runs (§4.4a)
     p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))

@@ -12,6 +12,7 @@ import hashlib
 import logging
 import math
 import os
+import threading
 import time
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
@@ -595,11 +596,51 @@ def identity_note(info: dict[str, Any] | None) -> str:
     )
 
 
+PLACE_TTL = 5.0  # seconds a host's registry, or the reason it could not be read, is kept (the `DEFS_TTL` idiom)
+PLACE_WAIT = 2.0  # seconds a page waits for a host's registry before reading it as unknown
+_place_cache: dict[str, tuple[float, list[str] | OSError]] = {}
+_place_asking: set[str] = set()  # hosts being asked right now: never two calls to one host at once
+
+
+def repos_of(host: str) -> list[str]:
+    """Another host's registered checkouts, for a team `place:` puts there (design §4.9 *Where a
+    repo's team lands*): the home's `host_repos`, kept for `PLACE_TTL` — `org_here` is read on every
+    use and the answer is a node's registry file. Asked on a thread of its own, since `org_here` is
+    called on the event loop as well as off it and the blocking client (`_call_sync`, what `rpc`
+    is) opens its own loop; the caller waits `PLACE_WAIT` for it and no longer, so a node that hangs
+    holds a page two seconds and not the call's whole timeout — the registry is then *unknown* until
+    the call ends, and its answer is kept when it does. A refusal is kept as long as an answer."""
+    now = time.monotonic()
+    at, kept = _place_cache.get(host, (0.0, None))
+    if kept is None or now - at > PLACE_TTL:
+        if host not in _place_asking:
+            _place_asking.add(host)
+
+            def ask() -> None:
+                try:
+                    got: list[str] | OSError = teamrun.repos_via(_call_sync)(host)
+                except OSError as e:
+                    got = e
+                _place_cache[host] = (time.monotonic(), got)
+                _place_asking.discard(host)
+
+            t = threading.Thread(target=ask, daemon=True)
+            t.start()
+            t.join(PLACE_WAIT)
+        if host in _place_asking:  # still out: unknown for now, and not asked again while it is
+            raise OSError(f"{host} has not answered for its registry yet")
+        kept = _place_cache[host][1]
+    if isinstance(kept, OSError):
+        raise kept
+    return list(kept)
+
+
 def org_here() -> tuple[orgmod.Org, list[str]]:
     """The definitions the Org page acts on (design §4.9 *The org is an aggregate*, TD-229):
     `~/.agentorc/org.yml`, plus the `teams:` of every repo in this host's registry, by the one
     function `ao team` reads too. The org file wins a name collision, and a name two repos define
-    is refused in both, a note. Read on every use and cached nowhere; a malformed file is a note
+    is refused in both, a note; so is a team whose landing cannot be told. Read on every use and cached
+    nowhere (but a placed team's host registry, `repos_of`); a malformed file is a note
     beside the strip, never a 500 — the rest of the page is still the fleet. On a node the org is
     not here (design §4.4a: `org.yml` lives on the home), which is a note too."""
     if hosts.is_node():
@@ -608,7 +649,7 @@ def org_here() -> tuple[orgmod.Org, list[str]]:
         org = orgmod.load()
     except ValueError as e:
         return orgmod.Org(path=orgmod.org_file()), [str(e)]
-    return orgmod.with_repos(org, hosts.local_host().repos())
+    return orgmod.with_repos(org, hosts.local_host().repos(), repos_of=repos_of)
 
 
 def projects_view() -> list[dict[str, Any]]:

@@ -118,9 +118,10 @@ A team whose only project is one repo can live in **that repo's** `.agentorc.yml
 instead, and travels with the checkout. The org file wins a name collision. **Which file:** the
 repo's, when the team works that one repo from its checkout on the machine you start it from —
 its `projects:` defaults to the repo, and the project is made from the checkout it was read in;
-`org.yml`, when the team spans repos, runs on another host (`host:`) or in a container node, or
-its repo's checkout is not where you start it, because only `org.yml` says where a checkout is
-on a host.
+`org.yml`, when the team spans repos or nests another, because only `org.yml` says where a
+checkout is on a host. A repo's team that should run on a node stays in the repo: `org.yml` places
+it with `place: {<team>: <host>}`, and its checkout there is that host's registry entry of the
+repo's name (a repo's file never names a host).
 
 `.agentorc.yml` takes these keys and refuses any other: `ledger`, `roles`, `controllers`,
 `teams` and `promote` (read by the home's promote, design §6), and `unattended`, `ready_when` and

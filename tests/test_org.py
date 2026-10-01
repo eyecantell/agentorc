@@ -603,3 +603,139 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
     shadowing, _ = org.with_repos(org.load(write(tmp_path, ORG)), [repo])
     assert shadowing.teams["ao-grind"].source == tmp_path / "org.yml"
     assert shadowing.shadowed == {"ao-grind": [repo.resolve() / ".agentorc.yml"]}
+
+
+# ── `place:` and where a repo's team lands (design §4.9 *Where a repo's team lands*, TD-229 slice 3) ──
+
+
+def _repo(tmp_path: Path, name: str, team: str) -> Path:
+    repo = tmp_path / name
+    repo.mkdir(parents=True)
+    (repo / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {team: {"members": [{"role": "grinder"}]}}}))
+    return repo
+
+
+def _here(monkeypatch, tmp_path: Path) -> str:
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))  # no hosts.yml: the short hostname
+    from sessionorc.hosts import local_host
+
+    return local_host().name
+
+
+def test_place_is_read_and_is_for_a_repos_team_only(tmp_path):
+    assert org.load(write(tmp_path, dict(ORG, place={"sam-grind": "devenv"}))).place == {"sam-grind": "devenv"}
+    assert org.load(write(tmp_path, ORG)).place == {}
+    with pytest.raises(ValueError, match=r"place\.ao-grind: 'ao-grind' is defined in this file"):
+        org.load(write(tmp_path, dict(ORG, place={"ao-grind": "devenv"})))
+    with pytest.raises(ValueError, match=r"place\.sam-grind: name the host"):
+        org.load(write(tmp_path, dict(ORG, place={"sam-grind": ""})))
+    with pytest.raises(ValueError, match="place must be a mapping"):
+        org.load(write(tmp_path, dict(ORG, place=["sam-grind"])))
+
+
+def test_the_landing_rule_place_then_here_then_the_one_node(tmp_path):
+    reg = {"devenv": ["/workspaces/sam"], "lab": ["/srv/other"], "box": ["/w/sam"]}
+    asked: list[str] = []
+
+    def repos_of(host: str) -> list[str]:
+        asked.append(host)
+        if host == "down":
+            raise OSError("down did not answer")
+        return reg[host]
+
+    # `place:` wins, and nothing is asked; so does this host's own registry
+    assert org.landing("t", "sam", {"t": "lab"}, "kmaster", True, ["devenv"], repos_of) == ("lab", "place")
+    assert org.landing("t", "sam", {}, "kmaster", True, ["devenv"], repos_of) == ("kmaster", "registered here")
+    assert asked == []
+    # else the one linked node whose registry holds the repo
+    assert org.landing("t", "sam", {}, "kmaster", False, ["devenv", "lab"], repos_of) == (
+        "devenv",
+        "registered on devenv",
+    )
+    # on several nodes and no `place:`: refused, naming them
+    with pytest.raises(ValueError, match=r"several nodes \(devenv, box\) and `place:` names none"):
+        org.landing("t", "sam", {}, "kmaster", False, ["devenv", "lab", "box"], repos_of)
+    with pytest.raises(ValueError, match="no linked host's registry holds its repo sam"):
+        org.landing("t", "sam", {}, "kmaster", False, ["lab"], repos_of)
+    # a registry that cannot be told is unknown, never *no repos*: devenv holding it does not decide
+    with pytest.raises(ValueError, match=r"cannot be told .* down \(down did not answer\)"):
+        org.landing("t", "sam", {}, "kmaster", False, ["devenv", "down"], repos_of)
+
+
+def test_a_repos_team_lands_here_unless_place_names_it(tmp_path, monkeypatch):
+    here = _here(monkeypatch, tmp_path)
+    repo = _repo(tmp_path, "sam", "sam-grind")
+    asked: list[str] = []
+
+    def repos_of(host: str) -> list[str]:
+        asked.append(host)
+        return ["/workspaces/other", "/workspaces/sam"]
+
+    agg, notes = org.with_repos(org.load(write(tmp_path, ORG)), [repo], repos_of=repos_of)
+    assert agg.landed == {"sam-grind": (here, "registered here")} and agg.teams["sam-grind"].host == ""
+    assert asked == [] and notes == []  # no node is asked for a team that lands here
+    # the org file's own teams are placed by their `host:`, and are not in `landed`
+    assert "ao-grind" not in agg.landed
+
+    base = org.load(write(tmp_path, dict(ORG, place={"sam-grind": "devenv"})))
+    agg, notes = org.with_repos(base, [repo], repos_of=repos_of)
+    assert agg.landed == {"sam-grind": ("devenv", "place")} and agg.teams["sam-grind"].host == "devenv"
+    # the repo's path there is that host's registry entry of the checkout's name
+    assert agg.checkout("sam", "sam", "devenv") == Path("/workspaces/sam")
+    assert agg.checkout("sam", "sam", here) == repo.resolve()
+    assert asked == ["devenv"] and notes == [] and agg.unlanded == {}
+    assert base.projects.keys() == ORG["projects"].keys() and base.landed == {}  # the input is untouched
+
+    # placed on this host: it lands here and nothing is asked
+    agg, _ = org.with_repos(org.load(write(tmp_path, dict(ORG, place={"sam-grind": here}))), [repo])
+    assert agg.landed == {"sam-grind": (here, "place")} and agg.teams["sam-grind"].host == ""
+
+
+def test_a_placed_team_whose_checkout_there_cannot_be_told_is_listed_and_not_started(tmp_path, monkeypatch):
+    from agentorc import teams
+
+    here = _here(monkeypatch, tmp_path)
+    repo = _repo(tmp_path, "sam", "sam-grind")
+    base = org.load(write(tmp_path, dict(ORG, place={"sam-grind": "devenv"})))
+
+    def down(host: str) -> list[str]:
+        raise OSError("devenv did not answer: the link dropped")
+
+    for repos_of, why in (
+        (down, r"registry could not be read \(devenv did not answer"),
+        (None, "registry could not be read"),
+        (lambda h: ["/workspaces/other"], "holds no checkout named sam"),
+        (lambda h: ["/a/sam", "/b/sam"], r"holds sam 2 times \(/a/sam, /b/sam\)"),
+    ):
+        agg, notes = org.with_repos(base, [repo], repos_of=repos_of)
+        assert "sam-grind" in agg.teams and agg.teams["sam-grind"].host == "devenv"  # still listed, on its host
+        assert list(agg.unlanded) == ["sam-grind"] and notes == [agg.unlanded["sam-grind"]]
+        with pytest.raises(teams.TeamError, match=why):
+            teams.plan(agg, "sam-grind", host=here)
+
+    # an org project of the repo's name is used as it stands: its path there, and no registry asked
+    doc = dict(ORG, place={"sam-grind": "devenv"})
+    doc["projects"] = {**ORG["projects"], "sam": {"repos": {"sam": {here: str(repo), "devenv": "/w/sam"}}}}
+    agg, notes = org.with_repos(org.load(write(tmp_path, doc)), [repo], repos_of=down)
+    assert agg.unlanded == {} and notes == [] and agg.checkout("sam", "sam", "devenv") == Path("/w/sam")
+    # …and where it names no path on that host, that is the reason, and still nothing is asked
+    doc["projects"] = {**ORG["projects"], "sam": {"repos": {"sam": {here: str(repo)}}}}
+    agg, notes = org.with_repos(org.load(write(tmp_path, doc)), [repo], repos_of=down)
+    assert "org.yml's project sam names no checkout there" in agg.unlanded["sam-grind"] and len(notes) == 1
+    # a `place:` naming a team no repo defines is a note, never silence
+    agg, notes = org.with_repos(org.load(write(tmp_path, dict(ORG, place={"sam-grnd": "devenv"}))), [repo])
+    assert notes == ["place.sam-grnd: no registered repo defines a team 'sam-grnd' — nothing is placed on devenv"]
+
+
+def test_a_placed_team_starts_on_its_host_from_that_hosts_checkout(tmp_path, monkeypatch):
+    from agentorc import teams
+
+    here = _here(monkeypatch, tmp_path)
+    repo = _repo(tmp_path, "sam", "sam-grind")
+    base = org.load(write(tmp_path, dict(ORG, place={"sam-grind": "devenv"}, roles={})))
+    # a container node shares the path, so the node's registry names the directory this host reads
+    agg, _ = org.with_repos(base, [repo], repos_of=lambda h: [str(repo)])
+    p = teams.plan(agg, "sam-grind", host=here)
+    assert p.host == "devenv" and [x.host for x in p.launches] == ["devenv"] * len(p.launches)
+    assert {str(x.dir) for x in p.launches} == {str(repo)}
+    assert p.manager_id.endswith("@devenv")

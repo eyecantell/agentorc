@@ -679,7 +679,9 @@ def _org_here() -> orgmod.Org:
     """The org as the clients aggregate it (design §4.9 *The org is an aggregate*, TD-229):
     `~/.agentorc/org.yml` plus the `teams:` of every checkout in this host's repos registry — the
     one function the pages read too (`orgmod.with_repos`), so `ao team` gives the same org from any
-    directory. A repo file that cannot be read, or a name two repos define, is a line on stderr.
+    directory. A repo file that cannot be read, a name two repos define, or a team whose landing
+    cannot be told is a line on stderr; a team `place:` puts on another host has that host's
+    registry asked for its checkout (`teamrun.repos_via`).
     Read on every use and cached nowhere.
 
     On a node the org is not here (design §4.4a: `org.yml` lives on the home), and a local file
@@ -690,7 +692,7 @@ def _org_here() -> orgmod.Org:
             f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
             "(design §4.4a: decided, not built)"
         )
-    o, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos())
+    o, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
     for note in notes:
         print(note, file=sys.stderr)
     return o
