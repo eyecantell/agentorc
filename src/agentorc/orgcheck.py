@@ -151,6 +151,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
         else:
             lack(note)  # an unreadable repo file, a name twice, a landing that cannot be told
     for team, host in org.place.items():
+        if team in org.unlanded:
+            continue  # its landing's own note says the host could not be asked: one cause, one line
         if host != here and host not in linked:
             lack(
                 f"place.{team}: {host} is no linked host of {here} ({', '.join(sorted(linked)) or 'none linked'}) — "

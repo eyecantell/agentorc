@@ -742,7 +742,7 @@ def cmd_org(args: argparse.Namespace) -> int:
     def prose() -> None:
         rows = got["teams"]
         if not rows:
-            print(f"no team defined in {org.path} or any registered checkout's {repoconfig.FILE}")
+            print(f"no team defined in {org.path or 'org.yml'} or any registered checkout's {repoconfig.FILE}")
         w = max((len(n) for n in [*(r["name"] for r in rows), *got["shadowed"], *got["refused"]]), default=0)
         for r in rows:
             repos = ", ".join(r["repos"]) or "none"

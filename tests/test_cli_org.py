@@ -233,3 +233,12 @@ def test_neither_writes_a_file_or_calls_anything_that_changes_a_record(world, ca
     after = {p: p.stat().st_mtime_ns for p in tmp_path.rglob("*") if p.is_file() and ".git" not in p.parts}
     assert after == before
     assert set(calls) <= {"host_repos", "host_files", "host_dir"}  # reads, when anything is asked at all
+
+
+def test_a_place_on_a_host_whose_registry_cannot_be_asked_is_one_lack_not_two(world, capsys):
+    """The review of #833: the landing's own note already says the host could not be read."""
+    _, home, org = world
+    (home / "org.yml").write_text(yaml.safe_dump({**org, "place": {"alpha-grind": "mars"}}))
+    code, got = check(capsys)
+    assert code == 1 and len(got["lacks"]) == 1
+    assert "`place:` puts it on mars, whose registry could not be read" in got["lacks"][0]
