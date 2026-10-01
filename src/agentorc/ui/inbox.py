@@ -212,7 +212,14 @@ def state_rows(
         if mark := restart_mark(v):
             # its own row beside any state row, as an alarm is: a crashed record at its ceiling can
             # also be exited with unpushed work, and the two are answered differently
-            rows.append({**base(v, "restart", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
+            rows.append(
+                {
+                    **base(v, "restart", mark[1]),
+                    "at": mark[0] or v.get("since") or "",
+                    "age": "",
+                    "restartable": bool(v.get("restartable")),  # never a seat: *fills exhausted* has no Restart
+                }
+            )
         if mark := unclosed_mark(v, now):
             rows.append({**base(v, "unclosed", mark[1]), "at": mark[0], "age": ""})
         if alarms := v.get("alarms"):

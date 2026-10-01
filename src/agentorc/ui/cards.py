@@ -166,6 +166,13 @@ def view(
     # card behaving exactly as designed looked like the one that had failed.
     seats = seats or {}
     d["seat"] = state in DEAD and s.get("id") in seats
+    # design §4.5a **Restart** (§6 rule 2 *A person's restart*, TD-250): where the control is drawn — a
+    # supervised record that is idle, exited or closed and is not a seat (rule 3 fills one); the
+    # host agent makes every other refusal, in its own words. A press with no restart mark confirms.
+    marks = ("restart_wanted", "restart_ceiling", "restart_blocked")
+    d["restartable"] = bool(s.get("supervised")) and state in ("idle", "exited", "closed")
+    d["restartable"] = d["restartable"] and not s.get("seat") and not s.get("superseded_by")
+    d["restart_marked"] = any(isinstance(s.get(k), dict) for k in marks)
     d["seat_when"] = seats.get(s.get("id") or "", "") if d["seat"] else ""
     trig, counted = s.get("seat") or {}, (s.get("seat_count") or {}).get("prs")
     if d["seat_when"] and trig.get("trigger") == "prs" and isinstance(counted, int) and not s.get("seat_due"):

@@ -156,6 +156,19 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "restart",
+        "Restart",
+        "the Inbox restart row, a card's *more ▾*",
+        (
+            "Puts this session back in its team's run as its launch record started it: closed if it is still "
+            "there, then started again under the same name, team, lane and brief, unattended if it was "
+            "started so, on a fresh prompt and with its mail. Press it when the host agent will not restart a "
+            "member by itself and you want it working again. It is not Resume, which brings the conversation "
+            "back attended, under you. It is refused, saying what is left, while its checkout holds "
+            "uncommitted or unpushed work."
+        ),
+    ),
+    Help(
         "message",
         "Message…",
         "a seat's card, *more ▾*, Focus header",
@@ -347,6 +360,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "work-dismiss",
             "board-answers",
             "board-go-with-it",
+            "restart",
         ),
     ),
     ("settings", "Settings", ("on-work", "balance")),
