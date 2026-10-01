@@ -154,7 +154,8 @@ async def test_usage_unknown_is_said_once_a_day_while_a_session_works(agent, tmp
         sid = await _worker(person, tmp_path)
         rec = agent.sessions[sid]
         rec.state = "working"
-        now = datetime.now(UTC)
+        # noon: the note is keyed on the UTC date, so the minutes below must not cross 00:00 (TD-257)
+        now = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
         agent._usage[""] = _reading(window(80, now - 2 * H, None, resets=now + 3 * 24 * H))
         await person.call("set_settings", profile="", reserves={"wk": 5})
         await agent._enforce_usage_gate(now)
@@ -162,11 +163,14 @@ async def test_usage_unknown_is_said_once_a_day_while_a_session_works(agent, tmp
         got = _notes(agent, "usage unknown for 2h: Claude · paul wk")
         assert len(got) == 1 and "1 unattended session working" in got[0]
         assert rec.gated is None
+        # and again the day after
+        await agent._enforce_usage_gate(now + 24 * H)
+        assert len(_notes(agent, "usage unknown for")) == 2
         # under `off` nothing is said
         agent._unknown_noted.clear()
         await person.call("set_settings", usage={"max_age": "off"})
         await agent._enforce_usage_gate(now + timedelta(minutes=10))
-        assert len(_notes(agent, "usage unknown")) == 1
+        assert len(_notes(agent, "usage unknown")) == 2
         with pytest.raises(AgentError, match="usage.max_age"):
             await person.call("set_settings", usage={"max_age": "soon"})
         with pytest.raises(AgentError, match="unknown key"):
