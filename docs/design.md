@@ -3813,7 +3813,7 @@ for an agent driving `ao`. Rules that prove mechanical (wrap up at the stop time
 send) move into the tick as §6 policies; those that need judgement (stuck or thinking? interrupt
 now?) stay in the brief. The grant is what makes this safe: the manager's power is a field the
 person can see on the Focus header and revoke, not a promise in its prompt. Since TD-247
-(designed 2026-09-30; the policies and the preset's words built 2026-10-01, TD-258; the seat's default waits on TD-259's flip) the brief's remaining mechanical jobs are §6
+(designed 2026-09-30; the policies and the preset's words built 2026-10-01, TD-258; the seat the default since TD-259's flip) the brief's remaining mechanical jobs are §6
 rules 10–12 and rule 4's owed clause, and what is judgement is a **seat on call** (§6 *What is
 left is judgement*): a manager whose definition does not say `on_call: false` (§4.9) is a seat of §6
 rule 3 with the `team` trigger, filled when a member needs a reading no policy makes — a
@@ -6763,7 +6763,7 @@ code and needs no grant; a session doing the same work does.
      `IDLE_NUDGE` later reads *idle · open work* in the slot for a person or its manager to judge.
   **What is left is judgement, and a seat holds it** (TD-247; Paul, 2026-09-30: *ideally we
   would not need [a manager] and all of its required jobs could be scripted or given to the agent
-  host*; designed 2026-09-30; the policies built 2026-10-01, TD-258, the manager preset's round naming none of the four since slice 6; the seat is TD-259, its default not yet flipped). The manager's
+  host*; designed 2026-09-30; the policies built 2026-10-01, TD-258, the manager preset's round naming none of the four since slice 6; the seat is TD-259, the default since its flip). The manager's
   round kept six jobs because they read as judgement; a read of the brief against the code
   found four of them read fields and scripts and no screen — the cadence check
   (`check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files
