@@ -739,6 +739,63 @@ def _recent(at: Any, now: datetime, window: timedelta) -> bool:
         return False
 
 
+def _reported(s: Session) -> dict[str, Any]:
+    """What a run reported, for the `restarts` entry of the replay that replaces it (design §4.9a
+    *early from the record*, §6 rule 1; TD-249): `done`, the `{ref, pr}` of each `progress` entry
+    reported `done` since the record's `created`, and `left`, the references it declared a claim on
+    and neither finished nor dropped. A derived claim is the tick's reading, not the run's word; a
+    derived `done` is a merged pull request, and is work done whoever read it."""
+    done = [{"ref": e.ref, "pr": e.pr} for e in s.progress if e.status == "done" and str(e.at) >= str(s.created)]
+    left = [e.ref for e in s.progress if e.status == "claimed" and e.source == "declared"]
+    return {"done": done, "left": left}
+
+
+def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
+    """What a `restart` declared now is, read from the record (design §4.9a *Early is decided from
+    the record*, *Repeated work is the person's at once*; TD-249 slice 2): `{early, repeat, words}`.
+
+    `new` is this run's `done` that no `restarts` entry inside `RESTART_WINDOW` holds — the same
+    `{ref, pr}`, a `done` with no `pr` matching on `ref` alone. Inside `RESTART_EARLY` of the
+    record's start the word is **early** only when `new` is empty. It is a **repeat** — `{ref}`,
+    and early whenever it is declared — when the run reported `done` and none of it is new, or
+    when a claim it leaves is in the `left` of both of the last two `restarts` entries: the third
+    run on it. An entry with no `done` or `left` (one written before the fields, or by a close that
+    failed) says nothing either way. `words` is what decided it, for the reply."""
+    run = _reported(s)
+    entries = [r for r in s.restarts if isinstance(r, dict)]
+    earlier = [
+        d
+        for r in entries
+        if _recent(r.get("at"), now, RESTART_WINDOW)
+        for d in (r.get("done") or [])
+        if isinstance(d, dict)
+    ]
+
+    def seen(d: dict[str, Any]) -> bool:
+        return any(e.get("ref") == d["ref"] and (d["pr"] is None or e.get("pr") == d["pr"]) for e in earlier)
+
+    new = [d for d in run["done"] if not seen(d)]
+    last = entries[-2:]
+    both = len(last) == 2
+    thrice = next((ref for ref in run["left"] if both and all(ref in (r.get("left") or []) for r in last)), None)
+    if run["done"] and not new:
+        ref = run["done"][0]["ref"]
+        return {"early": True, "repeat": {"ref": ref}, "words": f"repeats {ref}: reported done by an earlier run too"}
+    if thrice is not None:
+        words = f"repeats {thrice}: claimed and left three runs running"
+        return {"early": True, "repeat": {"ref": thrice}, "words": words}
+    try:
+        inside = now - _parse(s.created) < RESTART_EARLY
+    except (TypeError, ValueError):
+        inside = False
+    if inside and not new:
+        return {"early": True, "repeat": None, "words": "early: nothing reported done this run"}
+    if inside:
+        said = ", ".join(d["ref"] + (f" #{d['pr']}" if d["pr"] else "") for d in new)
+        return {"early": False, "repeat": None, "words": f"not early: {said} reported done this run"}
+    return {"early": False, "repeat": None, "words": None}
+
+
 def _parse(iso: str) -> datetime:
     return datetime.fromisoformat(iso.replace("Z", "+00:00"))
 

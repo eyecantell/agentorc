@@ -1684,7 +1684,7 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     out = capsys.readouterr().out.strip()
     assert out == (
         f"{sid}: restart wanted (early — your controller will put it on the board, not act on it) "
-        "— context is long; the ledger still has work"
+        "— context is long; the ledger still has work\n  early: nothing reported done this run"
     )
     rec = call_sync("get", id=sid)
     assert rec["restart_wanted"]["why"] == "context is long; the ledger still has work"

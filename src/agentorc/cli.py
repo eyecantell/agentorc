@@ -1893,7 +1893,8 @@ def cmd_progress(args: argparse.Namespace) -> int:
             return emit(args, s, lambda: print(f"{s['id']}: out of work — {s['out_of_work']['why']}"))
         want = s["restart_wanted"]
         early = " (early — your controller will put it on the board, not act on it)" if want.get("early") else ""
-        return emit(args, s, lambda: print(f"{s['id']}: restart wanted{early} — {want['why']}"))
+        decided = f"\n  {s['decided']}" if s.get("decided") else ""  # what the record made of it (§4.9a)
+        return emit(args, s, lambda: print(f"{s['id']}: restart wanted{early} — {want['why']}{decided}"))
     if not args.ref:
         return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]

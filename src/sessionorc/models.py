@@ -849,12 +849,14 @@ class Session:
     # clearing can ring it; while the mark stands, the idle nudge and rule 6's telling pass it by.
     # The home's; a later claim that is taken removes it.
     balance_refused: dict[str, Any] | None = None
-    # `{at, why, early?}` once the session has declared that **its run is over and its lane is
+    # `{at, why, early?, repeat?}` once the session has declared that **its run is over and its lane is
     # not** (`ao progress restart --why`, design §4.9a *A run that ends with work left*, TD-083):
     # start me again, under this name and this brief, with nothing of this conversation. A fact,
     # not a state — the record still reads `idle` or `exited` — written only by the session it is
     # about (§9 invariant 14) and cleared by a later declared claim, which means it went on after
-    # all. `early` marks one declared inside `RESTART_EARLY` of the record's own start: the word
+    # all. `early` marks one declared inside `RESTART_EARLY` of the record's own start by a run that
+    # reported nothing new, and `repeat: {ref}` beside it one whose `done` an earlier run reported
+    # or that leaves a claim a third time (`agent_common._restart_reading`, TD-249): the word
     # stands, and a controller does not act on it. It and `out_of_work` refuse each other: a
     # session is out of work or it wants another run at it, never both.
     restart_wanted: dict[str, Any] | None = None
