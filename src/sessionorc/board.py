@@ -39,6 +39,8 @@ DECIDED_RE = re.compile(
 ANSWERS_RE = re.compile(r"(?:^|(?<=[.?!]\s))Answers:\s*(?P<answers>(?:(?!\bAnswers:).)*?)\.?\s*(?:\bDecided:.*)?$")
 # A live look's second answer (design §4.5a **Works** / **Not right…**): the person's words follow.
 NOT_RIGHT = "Not right:"
+# The form itself, as cadence §3.5 writes it: `Not right: <what>` — a slot in angle brackets, or nothing.
+NOT_RIGHT_FORM = re.compile(r"Not right:\s*(<[^<>]*>)?")
 # A field's name inside the person's own words would be read as the field (review of PR #861).
 FIELD_NAME_RE = re.compile(r"\b(?:Answers|Decided):")
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")

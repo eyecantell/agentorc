@@ -225,12 +225,15 @@ class InboxMixin:
             return ""
         offered = [" ".join(str(a).split()) for a in answers] if isinstance(answers, list) else []
         said = " ".join(str(answer or "").split())
-        if any(a.startswith(board_mod.NOT_RIGHT) for a in offered) and said.startswith(board_mod.NOT_RIGHT):
-            # the pair's second answer is a form, `Not right: <what>`: the words are the person's
-            if said in offered or not said[len(board_mod.NOT_RIGHT) :].strip():
-                raise board_mod.Refused("Not right needs its words: say what is off")
+        # an offered answer word for word comes first, so an item's own complete *Not right: wrong
+        # repo* is an answer like any other; the pair's second answer is a form, `Not right: <what>`,
+        # whose slot is the person's words, and pressed as written it says nothing
+        form = [a for a in offered if board_mod.NOT_RIGHT_FORM.fullmatch(a)]
+        if said and said in offered and said not in form:
             return said
-        if said and said in offered:
+        if form and said.startswith(board_mod.NOT_RIGHT):
+            if said in form or not said[len(board_mod.NOT_RIGHT) :].strip():
+                raise board_mod.Refused("Not right needs its words: say what is off")
             return said
         raise board_mod.Refused(
             "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"

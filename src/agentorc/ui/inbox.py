@@ -380,6 +380,7 @@ BOARD_TTL = 60.0
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
 BOARD_ACTS = ("snooze", "done", "decide")
+WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is `board.NOT_RIGHT`'s form)
 BOARD_TIMEOUT = 20.0
 # §4.5 screen 6 *Boards are read against origin* (TD-221): the read passes the reader's own `--fetch`,
 # which fetches each repo's origin serially (30 s a repo, no aggregate bound once `--due-only` went,
@@ -758,6 +759,28 @@ def board_body(text: str, it: Mapping[str, Any]) -> str:
     return text[: off + min(starts)].rstrip() if starts else text
 
 
+def live_look(it: Mapping[str, Any]) -> bool:
+    """Whether a board item's answers are cadence's fixed pair for a live look (§3.5, design §4.5a
+    **Works** / **Not right…**): a `watch` whose two answers are *Works* and the form *Not right:
+    <what>*. Anything else — a third answer, another kind, a complete *Not right: wrong repo* — is
+    ordinary answer buttons."""
+    answers = [" ".join(str(a).split()) for a in it.get("answers") or ()]
+    return (
+        str(it.get("kind") or "") == "watch"
+        and len(answers) == 2
+        and answers[0] == WORKS
+        and bool(board_mod.NOT_RIGHT_FORM.fullmatch(answers[1]))
+    )
+
+
+def board_head(text: str) -> str:
+    """A board item's head, as the write-back's commit message names it: its first bold run, else
+    the line, clipped."""
+    h = board_mod.HEAD_RE.search(text)
+    words = " ".join((h.group("head") if h else text).split())
+    return words if len(words) <= board_mod.HEAD_MAX else words[: board_mod.HEAD_MAX - 1].rstrip() + "…"
+
+
 def _decided(it: Mapping[str, Any]) -> dict[str, str] | None:
     """The reader's `decided` as the row prints it — *decided: <text> · <date>* — or None."""
     got = it.get("decided")
@@ -831,6 +854,11 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "default": str(it.get("default") or ""),
                     "decided": _decided(it),
                     "kind": str(it.get("kind") or ""),
+                    # §4.5a **Works** / **Not right…** (TD-255 slice 3): a live look's pair, known
+                    # by its words; `head` and `name` are what the *Not right* hand-off sends
+                    "pair": live_look(it),
+                    "head": board_head(text),
+                    "name": Path(root).name if root else "",
                     "due": str(it.get("due") or ""),
                     "due_tag": tag,
                     "at": str(it.get("due") or ""),

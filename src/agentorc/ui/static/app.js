@@ -263,7 +263,7 @@
     const rl = $("#mailrole");
     if (rl) { rl.textContent = AO.roleLine(o); rl.hidden = !rl.textContent; }
     $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
-    $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = "";  // an ask by default (§4.5a **Message**, 2026-09-25)
+    $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = o.text || "";  // an ask by default (§4.5a **Message**, 2026-09-25)
     // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
     // request; a reply reads as a note does, and switching the kind swaps the sentence
     const when = $("#mailwhen");
@@ -498,6 +498,34 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // design §4.5a **Works** / **Not right…** (§4.4 *Decide*, TD-255 slice 3): a live look's second
+      // answer. The Reply composer opens with *Not right:* begun; what is sent is the `decide`, one
+      // write. Then the page's second call hands an entry to the repo's techlead, as **Add entry…**
+      // does (`entry_add`), its first line the item's head and the person's words — after the
+      // decide has committed, and a refusal there is toasted: the decision stands.
+      if (action === "board_notright") {
+        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.text, text: "Not right: " });
+        if (!m) return;
+        const said = m.text.split(/\s+/).filter(Boolean).join(" ");
+        // the prefix is the form's, whatever case it was retyped in
+        const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
+        await act("person", "board", {
+          action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text,
+          answer, answers: JSON.parse(b.dataset.answers || "[]"),
+        });
+        let handed = "", refused = false;
+        try {
+          const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: b.dataset.repo, type: "debt", words: `${b.dataset.head} — ${answer}` }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.detail || r.statusText);
+          handed = j.text || "handed to the techlead";
+        } catch (e) {
+          handed = `no entry was handed on: ${e.message}`; refused = true;
+        }
+        AO.toast(`decided: ${answer} — committed on the board, not pushed · ${handed}`, !refused);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       if (action === "board_add") {
         const res = await AO.boardAdd(b);
         if (!res) return;
@@ -586,7 +614,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…" };
       AO.toast(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
@@ -2993,7 +3021,7 @@
     // **Go with it** on a `steer` row and on a board row with a default; and a row's answer buttons
     // — an `ask`'s suggested answers, a board item's answers — in the order written (TD-254, TD-255).
     // `1` and `2` are the page's on any row without them: `AO.keyAnswers` is where they yield.
-    { keys: ["g"], page: "inbox", ring: true, control: "Go with it", sel: "button", text: ["Go with it"] },
+    { keys: ["g"], page: "inbox", ring: true, control: "Go with it", sel: "button", text: ["Go with it", "Go with it: Works"] },
     { keys: ["1", "2", "3", "4"], page: "inbox", ring: true, control: "its answers, in the order written (a row without any: 1 Org, 2 Inbox)", sel: ".btn.answer", nth: true },
   ];
   AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/inbox/") ? "msg" : path.startsWith("/focus/") ? "focus" : "other");
