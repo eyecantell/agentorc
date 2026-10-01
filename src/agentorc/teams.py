@@ -486,7 +486,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         unattended=member.unattended if member is not None else True,  # a lead may ask to be watched
         lead=lead,
         seat=seat,
-        trigger=_trigger(member) if seat else None,
+        trigger=_trigger(member) if seat or (lead and member.on_call) else None,
         ledger=cfg.ledger,
         host=host if host != here else "",
         review=dict(role.review) if role.review else None,
@@ -533,7 +533,10 @@ def team_roles(team: orgmod.TeamDef, cfg: repoconfig.RepoConfig, overlay: dict[s
 
 def _trigger(member: Spec) -> dict[str, str]:
     """A seat's trigger as its record carries it (design §4.9b, §6 rule 3): a seat with a trigger
-    gives its own, `{trigger, after}`; the techlead's is a question landing, `asks`."""
+    gives its own, `{trigger, after}`; the techlead's is a question landing, `asks`; a manager on
+    call's is `team`, a member needing a reading no policy makes (§6 *A manager on call*, TD-247)."""
+    if isinstance(member, orgmod.ManagerDef):
+        return {"trigger": "team"}
     if isinstance(member, orgmod.SeatDef):
         return {"trigger": member.trigger, **({"after": member.after} if member.after else {})}
     return {"trigger": "asks"}

@@ -64,6 +64,13 @@ class Project:
     repos: dict[str, dict[str, Path]] = field(default_factory=dict)  # repo name → host name → checkout
 
 
+# What a `manager:` with no `on_call` means (design §4.9). The design's default is on call *from the
+# build*, and the build is TD-259's slices: until the tick reads the `team` trigger (slice 2) and the
+# manager's brief is a seat's (slice 5), a manager started as a seat would be closed idle and never
+# filled, so the slice that lands last of those flips this — an `on_call: true` is honoured meanwhile.
+ON_CALL_DEFAULT = False
+
+
 @dataclass
 class ManagerDef:
     role: str = DEFAULT_MANAGER_ROLE
@@ -74,6 +81,8 @@ class ManagerDef:
     brief: str | None = None  # overrides the role's template — the manager brief a repo keeps
     grants: list[str] | None = None  # None: the role's (`control` for `manager`)
     unattended: bool = True
+    # a seat filled on §6 rule 3's `team` trigger and closed when it has acted, or a standing session (§4.9, TD-247)
+    on_call: bool = ON_CALL_DEFAULT
 
 
 @dataclass
@@ -533,8 +542,9 @@ def _grants(raw: Any, key: str) -> list[str] | None:
     return grants
 
 
-MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
-MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
+MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended", "on_call")
+# a member is never on call (§4.9): the key is the manager's alone, so on a member it is a stray one
+MEMBER_KEYS = (*(k for k in MANAGER_KEYS if k != "on_call"), "count", "team")
 TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host", "entries")
 # the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
 ENTRY_TYPES = ("debt", "feature")
@@ -589,8 +599,11 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         raise ValueError(f"{key}.projects must be a list of project names")
     manager_raw = _mapping(raw.get("manager"), f"{key}.manager")
     _no_stray(manager_raw, MANAGER_KEYS, f"{key}.manager")
+    manager_role = _str(manager_raw.get("role"), f"{key}.manager.role", default=DEFAULT_MANAGER_ROLE)
+    if manager_role == PERSON and "on_call" in manager_raw:
+        raise ValueError(f"{key}.manager.on_call: a person manages this team, so no session is started to fill")
     manager = ManagerDef(
-        role=_str(manager_raw.get("role"), f"{key}.manager.role", default=DEFAULT_MANAGER_ROLE),
+        role=manager_role,
         name=_str(manager_raw.get("name"), f"{key}.manager.name", default=f"{name}-lead"),
         home=_str(manager_raw.get("home"), f"{key}.manager.home"),
         profile=_opt_str(manager_raw.get("profile"), f"{key}.manager.profile"),
@@ -598,6 +611,9 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         brief=_opt_str(manager_raw.get("brief"), f"{key}.manager.brief"),
         grants=_grants(manager_raw.get("grants"), f"{key}.manager.grants"),
         unattended=_flag(manager_raw.get("unattended"), f"{key}.manager.unattended", default=True),
+        # a person's team starts nothing, so it is never on call whatever the default
+        on_call=manager_role != PERSON
+        and _flag(manager_raw.get("on_call"), f"{key}.manager.on_call", default=ON_CALL_DEFAULT),
     )
     members_raw = raw.get("members")
     if members_raw is None:

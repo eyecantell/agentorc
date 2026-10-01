@@ -351,6 +351,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "in_org": bool(t.source and org.path and Path(t.source) == Path(org.path)),
                 "projects": list(t.projects),
                 "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
+                # a seat on call, filled when a member needs a reading, or a standing session (§4.9, TD-247)
+                "on_call": t.manager.on_call,
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
                 # the role Add entry's **Open a session** starts, per Type (§4.9, TD-219), each said
                 "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},

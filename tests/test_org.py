@@ -739,3 +739,30 @@ def test_a_placed_team_starts_on_its_host_from_that_hosts_checkout(tmp_path, mon
     assert p.host == "devenv" and [x.host for x in p.launches] == ["devenv"] * len(p.launches)
     assert {str(x.dir) for x in p.launches} == {str(repo)}
     assert p.manager_id.endswith("@devenv")
+
+
+def test_a_manager_is_on_call_when_its_definition_says_so(tmp_path):
+    """TD-259 slice 1, design §4.9 `on_call`: `true` makes the manager a seat, `false` a standing
+    session; unsaid is `ON_CALL_DEFAULT`; anything but a flag, the key beside `role: person` (which
+    starts nothing to fill) and the key on a member are each an error naming it."""
+    base = {"projects": {"p": {"repos": {"r": {"kmaster": str(tmp_path)}}}}}
+    f = tmp_path / "org.yml"
+
+    def team(block):
+        f.write_text(yaml.safe_dump({**base, "teams": {"t": {"projects": ["p"], **block}}}))
+        return org.load(f).teams["t"]
+
+    assert team({"manager": {"on_call": True}}).manager.on_call is True
+    assert team({"manager": {"on_call": False}}).manager.on_call is False
+    assert team({"manager": {}}).manager.on_call is org.ON_CALL_DEFAULT
+    assert team({"manager": {"role": "person"}}).manager.on_call is False  # nothing is started, whatever the default
+    assert "on_call" in org.MANAGER_KEYS and "on_call" not in org.MEMBER_KEYS
+    for block, why in (
+        ({"manager": {"on_call": "yes"}}, r"t\.manager\.on_call must be true or false"),
+        ({"manager": {"on_call": 1}}, r"t\.manager\.on_call must be true or false"),
+        ({"manager": {"role": "person", "on_call": True}}, r"t\.manager\.on_call: a person manages"),
+        ({"manager": {"role": "person", "on_call": False}}, r"t\.manager\.on_call: a person manages"),
+        ({"members": [{"role": "grinder", "on_call": True}]}, r"unknown key\(s\) \['on_call'\]"),
+    ):
+        with pytest.raises(ValueError, match=why):
+            team(block)

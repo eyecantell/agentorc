@@ -3104,7 +3104,7 @@ or the repo's `.agentorc.yml` — every check first, then the manager, then each
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up
 before the manager (`--now` kills; `--close` also closes each member that settled clean and
 pushed, §4.9a); `ao team status <name>` prints the manager's Members view; `ao team list` the
-definitions, their source and whether each is live; `ao new --project <name>` gives a
+definitions, their source and whether each is live, a manager on call as *manager: <name> (on call)* and `on_call` in `--json`; `ao new --project <name>` gives a
 hand-started session the project's reach block. A nested `{team: …}` member is
 refused with its name (the nested case itself is not built). A start ends with the running host
 agent's build line (§4.4 *What is running says which commit it is*), once and not per member: a
@@ -4273,11 +4273,11 @@ entry of the home — default the host the start runs on. Checkouts are resolved
 (default `manager`; **`person`** means the person manages — no session is started and members
 get an empty `controllers` list plus the team badge), `name` (default `<team>-lead`), `home` (a
 repo name from the team's projects — required when the projects list more than one repo,
-defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30, not built —
-TD-259: `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
+defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key and the launch built 2026-10-01 — TD-259 slice 1, the tick's `team` trigger, the slot and the seat's brief not built:
+`true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's trigger and brief slices land a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`), because a manager started as a seat before the tick reads `team` is closed idle and never filled; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
@@ -4921,7 +4921,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
   (`FILL_CEILING`) is over all seats sharing a controller, and a seat that is `idle` with no
   `seat_due` is closed as the techlead is. A fourth trigger, **`team`**, is the manager's alone,
   written by `on_call` on `manager:` (the default) and refused under `seats:` (§6 rule 3 *A manager on
-  call is a seat of this rule*, TD-247; designed 2026-09-30, not built — TD-259). A seat runs its brief and ends on
+  call is a seat of this rule*, TD-247; designed 2026-09-30; the field is written since 2026-10-01, the tick does not read it yet — TD-259). A seat runs its brief and ends on
   its own — it declares nothing (§4.9a), holds **no grants** (it files and opens PRs with `gh`,
   which is not an act on a session), and is not counted in a wind-down. `ao team start` starts
   each seat after the techlead with the manager as its controller and no grants;
