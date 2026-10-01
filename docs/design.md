@@ -4049,8 +4049,10 @@ repo. The org a client sees is the union:
   rule's own, reached by no client until a definition is read from a node. A team `place:`
   puts on another host takes that host as its `host:`, and the repo's path there is the one
   entry of that host's registry with the checkout's name (the CLI asks at each read, the pages
-  keep the answer five seconds); where the org file has a project of the repo's name, its
-  paths are used and nothing is asked. A registry that cannot be read, or that holds the name
+  keep the answer five seconds and wait two for it, a slower host reading as unknown until it
+  answers); where the org file has a project of the repo's name, its paths are used and
+  nothing is asked, and one with no path on that host is the reason given. A `place:` naming
+  a team no registered repo defines is a note. A registry that cannot be read, or that holds the name
   not once, leaves the team listed on its host with the reason as a note, and its start
   refused in those words. `place:` naming a team the org file defines is refused when the file
   is read: that team's own `host:` places it.

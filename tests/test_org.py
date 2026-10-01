@@ -718,6 +718,13 @@ def test_a_placed_team_whose_checkout_there_cannot_be_told_is_listed_and_not_sta
     doc["projects"] = {**ORG["projects"], "sam": {"repos": {"sam": {here: str(repo), "devenv": "/w/sam"}}}}
     agg, notes = org.with_repos(org.load(write(tmp_path, doc)), [repo], repos_of=down)
     assert agg.unlanded == {} and notes == [] and agg.checkout("sam", "sam", "devenv") == Path("/w/sam")
+    # …and where it names no path on that host, that is the reason, and still nothing is asked
+    doc["projects"] = {**ORG["projects"], "sam": {"repos": {"sam": {here: str(repo)}}}}
+    agg, notes = org.with_repos(org.load(write(tmp_path, doc)), [repo], repos_of=down)
+    assert "org.yml's project sam names no checkout there" in agg.unlanded["sam-grind"] and len(notes) == 1
+    # a `place:` naming a team no repo defines is a note, never silence
+    agg, notes = org.with_repos(org.load(write(tmp_path, dict(ORG, place={"sam-grnd": "devenv"}))), [repo])
+    assert notes == ["place.sam-grnd: no registered repo defines a team 'sam-grnd' — nothing is placed on devenv"]
 
 
 def test_a_placed_team_starts_on_its_host_from_that_hosts_checkout(tmp_path, monkeypatch):

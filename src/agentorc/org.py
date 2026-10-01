@@ -359,7 +359,13 @@ def _land(org: Org, base: Collection[str], here: str, repos_of: ReposOf | None) 
         if host == here:
             continue
         team.host = host
-        if repo in base or host in org.projects[repo].repos.get(repo, {}):
+        if host in org.projects[repo].repos.get(repo, {}):
+            continue
+        if repo in base:  # the org file's project, as it stands: it says no path there, and nothing is asked
+            org.unlanded[team.name] = (
+                f"team {team.name}: `place:` puts it on {host}, and org.yml's project {repo} names no checkout "
+                f"there — add `{host}: <path>` under `projects.{repo}.repos.{repo}`"
+            )
             continue
         try:
             if repos_of is None:
@@ -450,6 +456,9 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
             notes.append(org.refused[n])
     _land(org, base, hosts.local_host().name, repos_of)
     notes.extend(org.unlanded.values())
+    for tname, host in org.place.items():  # a mistyped name would otherwise place nothing, silently
+        if tname not in org.teams and tname not in org.refused:
+            notes.append(f"place.{tname}: no registered repo defines a team {tname!r} — nothing is placed on {host}")
     return org, notes
 
 

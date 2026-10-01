@@ -693,6 +693,7 @@ def test_a_placed_teams_host_registry_is_asked_once_per_ttl_and_a_refusal_is_unk
 
     monkeypatch.setattr(common, "_call_sync", rpc)
     monkeypatch.setattr(common, "_place_cache", {})
+    monkeypatch.setattr(common, "_place_asking", set())
 
     async def on_the_loop() -> list[str]:
         return common.repos_of("devenv")  # `org_here` is called on the event loop too
@@ -708,3 +709,26 @@ def test_a_placed_teams_host_registry_is_asked_once_per_ttl_and_a_refusal_is_unk
     monkeypatch.setattr(common, "PLACE_TTL", -1.0)  # past its time: asked again
     common.repos_of("devenv")
     assert len(calls) == 4
+
+    # a node that hangs holds a page `PLACE_WAIT` and no longer: unknown, one call out, its answer kept
+    import threading
+
+    gate = threading.Event()
+
+    def slow(method: str, **params):
+        calls.append((method, params))
+        gate.wait(5)
+        return {"host": params["host"], "repos": ["/w/sam"]}
+
+    monkeypatch.setattr(common, "_call_sync", slow)
+    monkeypatch.setattr(common, "PLACE_TTL", 5.0)
+    monkeypatch.setattr(common, "PLACE_WAIT", 0.05)
+    for _ in range(2):
+        with pytest.raises(OSError, match="hung has not answered"):
+            common.repos_of("hung")
+    assert [p["host"] for _, p in calls].count("hung") == 1
+    gate.set()
+    deadline = time.monotonic() + 5
+    while "hung" in common._place_asking and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert common.repos_of("hung") == ["/w/sam"]
