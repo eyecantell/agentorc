@@ -181,6 +181,31 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "cadence-failed",
+        "cadence check failed",
+        "an Inbox row",
+        (
+            "A member's pull request that fails the repo's cadence check after the host agent told the member "
+            "once, or that failed when it was already merged, which no new report cures. The row names the failed"
+            " checks, and beside review says whether the reader's reply was seen or the review is only recorded. "
+            "Open the member to see what it is doing about it. Snooze sets the row aside. Dismiss removes it and "
+            "keeps the reading on the record; a later failing read brings it back. The row leaves by itself when "
+            "a later read passes."
+        ),
+    ),
+    Help(
+        "held-missed",
+        "merged without its read",
+        "an Inbox row",
+        (
+            "Two pull requests of one member that touched held paths and merged with no reply from the reader "
+            "they wait for. The first such merge is a note under FYI and one line to the member; this row is the "
+            "second. The host agent undoes nothing: read what merged, and revert it if it should not stand. Open "
+            "the member to tell it so. Dismiss removes the row and keeps the two on the record, so the next such "
+            "merge is a note again."
+        ),
+    ),
+    Help(
         "message",
         "Message…",
         "a seat's card, *more ▾*, Focus header",
@@ -374,6 +399,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "board-go-with-it",
             "restart",
             "idle-open",
+            "cadence-failed",
+            "held-missed",
         ),
     ),
     ("settings", "Settings", ("on-work", "balance")),

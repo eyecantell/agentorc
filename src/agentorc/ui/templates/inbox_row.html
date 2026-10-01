@@ -434,7 +434,7 @@
    the row kind, because a session's permission and its stalled row are two rows. A permission, a
    question and `limited` are never offered one: something is waiting on the tool's own clock. #}
 {% macro state_snooze(e) -%}
-{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') %}
+{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') or e.mark == 'cadence' %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="1h">in 1 hour</button>
@@ -451,7 +451,9 @@
 
 {% macro state(e, section) -%}
 {{ state_head(e) }}
-<div class="body">{{ e.text }}</div>
+{#- a row that names pull requests draws each `#n` as a link (§4.5a, TD-258): the words are the
+    record's fields, and `e.text` is the same words unlinked, which Find reads -#}
+<div class="body">{% if e.parts %}{% for p in e.parts %}{% if p.url %}<a class="ref" href="{{ p.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">{{ p.text }}</a>{% else %}{{ p.text }}{% endif %}{% endfor %}{% else %}{{ e.text }}{% endif %}</div>
 {{ doing_line(e) }}
 <div class="row gap wrap mfoot">
   {%- if e.row == 'permission' %}
@@ -488,6 +490,24 @@
   <span class="grow"></span>
   {{ state_snooze(e) }}
   {{ open_btn(e, 'Open') }}
+  {%- elif e.mark == 'cadence' %}
+  {#- §4.5a **Inbox row: cadence check failed** (§6 rule 10, TD-258): the member was told once and
+      the PR still fails, or it failed already merged, which no re-report cures. **Dismiss** takes
+      the mark off (`clear_mark`); the read stays on the record, and a later failing read is a row
+      again. It leaves by itself when a later read passes. -#}
+  <span class="st" title="{{ help_title('cadence-failed') }}">cadence check failed — the host agent told the member once; what is left is yours to judge</span>
+  <span class="grow"></span>
+  {{ state_snooze(e) }}
+  {{ open_btn(e, 'Open') }}
+  <button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="cadence" data-pr="{{ e.pr }}" title="{{ help_title('cadence-failed') }}">Dismiss</button>
+  {%- elif e.mark == 'held' %}
+  {#- §4.5a **Inbox row: merged without its read** (§6 rule 11, TD-258): the member's second held
+      PR merged with no reply from its reader. No Snooze: a merge is done, and the row is read or
+      dismissed. **Dismiss** marks the crossings dismissed (`clear_mark`); the next one is a note. -#}
+  <span class="st" title="{{ help_title('held-missed') }}">merged without its read — the host agent undoes nothing: a revert is your word</span>
+  <span class="grow"></span>
+  {{ open_btn(e, 'Open') }}
+  <button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="held" title="{{ help_title('held-missed') }}">Dismiss</button>
   {%- elif e.row == 'unclosed' %}
   {#- §4.5a **Inbox row: manager did not close** (§6 rule 9, TD-241): the tick told the manager its
       team had finished and could not close it. **Open** alone: nothing is stored for the row, so

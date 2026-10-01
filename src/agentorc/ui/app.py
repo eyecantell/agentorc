@@ -171,6 +171,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _orphan_held,  # noqa: F401
     _outcome_of,  # noqa: F401
     _owing,  # noqa: F401
+    _parts_text,  # noqa: F401
+    _pr_parts,  # noqa: F401
     _same_ref,  # noqa: F401
     _trail_rows,  # noqa: F401
     board_argv,  # noqa: F401
@@ -180,9 +182,11 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_horizon,  # noqa: F401
     board_line,  # noqa: F401
     board_rows,  # noqa: F401
+    cadence_marks,  # noqa: F401
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
     handed_rows,  # noqa: F401
+    held_mark,  # noqa: F401
     horizon_of,  # noqa: F401
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
@@ -2426,6 +2430,18 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not team:
                 raise HTTPException(400, "clear_work names the team")
             got = await call("clear_work", team=team)
+            return JSONResponse({"ok": True, **got})
+        if action == "clear_mark":
+            # design §4.5a **Inbox row: cadence check failed** and **merged without its read** (§6
+            # rules 10 and 11, TD-258): **Dismiss** — `clear_mark`, the person's own, on the
+            # member's record: `cadence` with the PR whose row it is, `held` for its crossings
+            sid, kind = str(body.get("sid") or "").strip(), str(body.get("kind") or "").strip()
+            pr = body.get("pr")
+            if not sid or kind not in ("cadence", "held"):
+                raise HTTPException(400, "clear_mark names the session and the mark: cadence or held")
+            if kind == "cadence" and (isinstance(pr, bool) or not isinstance(pr, int)):
+                raise HTTPException(400, "clear_mark cadence names the PR")
+            got = await call("clear_mark", id=sid, kind=kind, pr=pr if kind == "cadence" else None)
             return JSONResponse({"ok": True, **got})
         if action == "suspend":
             # design §4.8a *An alarm's answers* (TD-077 a2): **Suspend** — a person's own act, and

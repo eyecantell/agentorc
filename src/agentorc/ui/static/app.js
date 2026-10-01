@@ -421,6 +421,9 @@
       // design §4.5a **Inbox row: team start** (§6 rule 8, TD-227): **Dismiss** is `clear_work` with the
       // team alone; **Start** is the team card's Start — the same route, its refusal in its own words
       if (action === "clear_work") body = { team: b.dataset.team };
+      // §4.5a **Inbox row: cadence check failed** / **merged without its read** (TD-258): **Dismiss**
+      // is `clear_mark` on the member's record — the PR for the first, every standing crossing for the second
+      if (action === "clear_mark") body = { sid: b.dataset.sid, kind: b.dataset.kind, pr: b.dataset.pr ? Number(b.dataset.pr) : null };
       if (action === "work_start") {
         const team = b.dataset.team;
         const r = await fetch(`/api/teams/${encodeURIComponent(team)}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
@@ -545,6 +548,7 @@
       if (action === "promote") AO.toast(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
       if (action === "clear_promote") AO.toast(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
       if (action === "clear_work") AO.toast(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
+      if (action === "clear_mark") AO.toast(!(res.cleared || []).length ? "nothing was standing any more" : res.kind === "held" ? "dismissed — the crossings stay on the record; the next one is a note again" : "dismissed — the read stays on the record; a later failing read is a row again", true);
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "board" && body.action === "decide") AO.toast(`decided: ${body.answer} — committed on the board, not pushed; the item stays, as its session's work order`, true);
       else if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
