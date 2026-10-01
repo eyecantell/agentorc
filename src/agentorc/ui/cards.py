@@ -309,7 +309,9 @@ def view(
     # marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller
     # **does not act on it** — a run that was over before it began did not run out of context. So
     # an early one must not read as an ordinary one: a person seeing the same chip would expect the
-    # same thing to happen next, and nothing will.
+    # same thing to happen next, and nothing will. What made it early is the home's reading too
+    # (§4.9a *Early is decided from the record*, TD-249 slice 6): `repeat`, the entry a run reported
+    # again or left a third time, and `decided`, the words — nothing here reads a clock.
     rw = s.get("restart_wanted")
     rw = rw if isinstance(rw, dict) else {}
     d["restart_wanted"] = (
@@ -317,6 +319,8 @@ def view(
             "why": str(rw.get("why") or "").strip(),
             "age": _age(rw.get("at"), now),
             "early": bool(rw.get("early")),
+            "repeat": str(rp.get("ref") or "") if isinstance(rp := rw.get("repeat"), dict) else "",
+            "decided": str(rw.get("decided") or "").strip(),
             "at": str(rw.get("at")),  # the Inbox's restart row is keyed on it (§4.5a, TD-103)
         }
         if rw.get("at")
@@ -594,13 +598,13 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         said = d["out_of_work"] or d["restart_wanted"]
         words = "out of work" if d["out_of_work"] else "restart wanted"
         if not d["out_of_work"] and said["early"]:
-            words += " · early — for a person"
+            words += (f" · repeats {said['repeat']}" if said["repeat"] else " · early") + " — for a person"
         why = said["why"]
         text = words + (f" — {_first_line(why)}" if why else "")
         when = f" {said['age']} ago" if said["age"] else ""
         full = f"{words}{when} — {why or 'no reason recorded'}"
         if not d["out_of_work"] and said["early"]:
-            full += " — asked inside its own first half hour, so a controller does not act on it (design §4.9a)"
+            full += f" — {said['decided'] or 'early'}, so a controller does not act on it (design §4.9a)"
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (

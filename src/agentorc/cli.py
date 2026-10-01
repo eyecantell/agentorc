@@ -296,7 +296,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             # the third ending (§4.9a, TD-083): what a controller reads to decide a restart, and
             # `early` is why it would not — the field, never a clock of the controller's own
             if rw := s.get("restart_wanted"):
-                early = " (early)" if rw.get("early") else ""
+                early = f" ({rw.get('decided') or 'early'})" if rw.get("early") else ""  # the row's words
                 print(f"{'':<{w}}      restart wanted{early} {_age(rw['at'])}: {rw['why']}")
             # rule 7's mark (§6, TD-217): a file the brief was made from reads otherwise, as merged
             if (bc := s.get("brief_changed")) and isinstance(bc, dict) and bc.get("at"):

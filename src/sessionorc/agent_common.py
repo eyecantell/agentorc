@@ -795,15 +795,28 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     and early whenever it is declared — when the run reported `done` and none of it is new, or
     when a claim it leaves is in the `left` of both of the last two `restarts` entries: the third
     run on it. An entry with no `done` or `left` (one written before the fields, or by a close that
-    failed) says nothing either way. `words` is what decided it, for the reply."""
+    failed) says nothing either way. `words` is what decided it, for the reply, and for the mark
+    of an early one (`restart_wanted.decided`), which the row, the card and `ao status -v` print.
+
+    The repeat test reads what the run **declared** `done`, never what the tick derived (slice 6):
+    after a replay the new record sits on the old branch, so the tick's first derivation writes a
+    `done {ref, pr}` the last `restarts` entry already holds, and a run that then did nothing
+    would read as a repeat of work it never reported. A derived `done` with a new pair is still
+    new work — a merged pull request is work done whoever read it."""
     run = _reported(s)
     entries = [r for r in s.restarts if isinstance(r, dict)]
-    new = _new_done(run["done"], [r for r in entries if _recent(r.get("at"), now, RESTART_WINDOW)])
+    window = [r for r in entries if _recent(r.get("at"), now, RESTART_WINDOW)]
+    new = _new_done(run["done"], window)
+    said = [
+        {"ref": e.ref, "pr": e.pr}
+        for e in s.progress
+        if e.status == "done" and e.source == "declared" and str(e.at) >= str(s.created)
+    ]
     last = entries[-2:]
     both = len(last) == 2
     thrice = next((ref for ref in run["left"] if both and all(ref in (r.get("left") or []) for r in last)), None)
-    if run["done"] and not new:
-        ref = run["done"][0]["ref"]
+    if said and not new:
+        ref = said[0]["ref"]
         return {"early": True, "repeat": {"ref": ref}, "words": f"repeats {ref}: reported done by an earlier run too"}
     if thrice is not None:
         words = f"repeats {thrice}: claimed and left three runs running"

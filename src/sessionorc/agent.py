@@ -1698,7 +1698,7 @@ class HostAgent(
         `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
         `out_of_work: {at, why}` on the record. `status="restart"` is the third ending (§4.9a
         *A run that ends with work left*, TD-083): the same shape, setting
-        `restart_wanted: {at, why, early?, repeat?}` — *my run is over and my lane is not*. They are the
+        `restart_wanted: {at, why, early?, repeat?, decided?}` — *my run is over and my lane is not*. They are the
         two writes on this channel that are not open to everyone — only the session itself may
         make either, declared, with a reason (§9 invariant 14) — and they refuse each other.
 
@@ -1873,6 +1873,7 @@ class HostAgent(
                 reading = {"early": False, "repeat": None, "words": None}
             if reading["early"]:
                 mark["early"] = True
+                mark["decided"] = reading["words"]  # the row's, the card's and `ao status -v`'s words
             if reading["repeat"]:
                 mark["repeat"] = reading["repeat"]
             s.restart_wanted = mark

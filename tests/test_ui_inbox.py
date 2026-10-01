@@ -704,6 +704,8 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     has — with **Resume**, **Open** and **Snooze**. A superseded record raises none."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     at = "2026-09-19T11:00:00Z"
+    early = {"at": at, "why": "context full\nmore", "early": True}
+    again = "repeats TD-229: reported done by an earlier run too"
     records = [
         rec("ao-c", "exited", exit_code=1, git=_ahead3, restart_ceiling={"at": at, "count": 3}),
         rec("ao-f", "exited", restart_ceiling={"at": at, "count": 6, "why": "fill"}),
@@ -713,18 +715,23 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
             restart_wanted={"at": at, "why": "long"},
             restart_blocked={"at": at, "dirty": 2, "unpushed": 1},
         ),
-        rec("ao-e", "idle", restart_wanted={"at": at, "why": "context full\nmore", "early": True}),
+        rec("ao-e", "idle", restart_wanted=early),  # a mark older than `decided`
         rec("ao-x", "exited", restart_ceiling={"at": at, "count": 3}, superseded_by="ao-y"),
         rec("ao-n", "idle", restart_wanted={"at": at, "why": "long"}),  # not early: the tick's to act on
+        rec("ao-d", "idle", restart_wanted={**early, "decided": "early: nothing reported done this run"}),
+        rec("ao-r", "exited", restart_wanted={**early, "repeat": {"ref": "TD-229"}, "decided": again}),
     ]
     got = state_rows_of(records)
     restart = {r["sid"]: r for r in got if r["row"] == "restart"}
-    assert sorted(restart) == ["ao-c", "ao-e", "ao-f", "ao-h"]
+    assert sorted(restart) == ["ao-c", "ao-d", "ao-e", "ao-f", "ao-h", "ao-r"]
     assert {r["row"] for r in got if r["sid"] == "ao-c"} == {"restart", "unpushed"}, "beside its state row"
     assert restart["ao-c"]["text"].startswith("restarts exhausted · 3 in 2 h") and restart["ao-c"]["at"] == at
     assert restart["ao-f"]["text"].startswith("fills exhausted · 6 in 1 h")
     assert "2 uncommitted and 1 unpushed" in restart["ao-h"]["text"]
-    assert restart["ao-e"]["text"] == "restart wanted · early — asked inside its first half hour: context full"
+    # an early one says what decided it, the home's words on the mark (§4.9a, TD-249 slice 6)
+    assert restart["ao-e"]["text"] == "restart wanted · early — context full"
+    assert restart["ao-d"]["text"] == "restart wanted · early: nothing reported done this run — context full"
+    assert restart["ao-r"]["text"] == f"restart wanted · {again} — context full"
     html = rows("needs", [restart["ao-c"]])
     assert 'data-act="resume" data-id="ao-c"' in html and ">Open<" in html
     assert 'data-act="attention_snooze"' in html and 'data-row="restart"' in html and 'data-act="allow"' not in html

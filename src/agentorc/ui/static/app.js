@@ -2669,8 +2669,9 @@
         rw.classList.toggle("hidden", !r);
         rw.classList.toggle("early", early);
         rw.title = ((r && r.why) || "no reason recorded")
-          + (early ? " — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a)" : "");
-        rw.textContent = "restart wanted" + (early ? " · early" : "") + (r && r.age ? ` ${r.age}` : "");
+          + (early ? ` — ${r.decided || "early"}, so a controller does not act on it: this one is for a person (design §4.9a)` : "");
+        rw.textContent = "restart wanted" + (early ? (r.repeat ? ` · repeats ${r.repeat}` : " · early") : "")
+          + (r && r.age ? ` ${r.age}` : "");
       }
       const bc = $("#fbc");
       if (bc) {
