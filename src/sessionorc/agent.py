@@ -395,6 +395,9 @@ class HostAgent(
         # rule 10 (TD-258): the detached run of the cadence check, one PR a run, and when it last ran
         self._cadence_task: asyncio.Task[None] | None = None
         self._cadence_read_at = datetime.min.replace(tzinfo=UTC)
+        # rule 12 (TD-258): the detached read of each root's docs/cadence-changes.md, and when it last ran
+        self._conventions_task: asyncio.Task[None] | None = None
+        self._conventions_read_at = datetime.min.replace(tzinfo=UTC)
         # §4.9 *What is left at the home has a history*: one committer, so one git at a time
         self._defs_lock = asyncio.Lock()
         self._defs_task: asyncio.Task[None] | None = None

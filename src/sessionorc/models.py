@@ -109,6 +109,7 @@ HOME_OWNED = frozenset(
         "seat_due",
         "seat_count",
         "checks",
+        "conventions_seen",
         "review",
         "context_bound",
         "wrapup_prompt",
@@ -969,6 +970,11 @@ class Session:
     # when the member was told of a fail, `row` while the Inbox row stands, and `read_by` once a
     # reader's reply on the PR's `ask` was seen. The home's, written by the tick alone.
     checks: list[dict[str, Any]] = field(default_factory=list)
+    # The entries of `docs/cadence-changes.md` this member has been told of or started with (design
+    # §6 rule 12, TD-258): `{at, headings}` — written at the first reading after the create as the
+    # headings landed at or before `created`, a later one landed after it joining as its `system`
+    # note is sent. A restart's record starts without it. The home's, written by the tick alone.
+    conventions_seen: dict[str, Any] | None = None
     # Who reads this session's PRs before they merge (design §4.9b *The reader*, TD-093):
     # `{reader, held, bound}` from its role preset's `review:`, written at start. The home stores
     # it and times nothing; the author's own `ao` reads it to decide whether a PR is held.

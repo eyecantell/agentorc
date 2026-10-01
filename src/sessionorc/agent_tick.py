@@ -25,6 +25,7 @@ from sessionorc import (
 from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
 from sessionorc import cadence as cadence_mod
+from sessionorc import conventions as conventions_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
@@ -478,6 +479,11 @@ class TickMixin:
         if (self._cadence_task is None or self._cadence_task.done()) and now - self._cadence_read_at > DERIVE_EVERY:
             self._cadence_read_at = now  # rule 10: the script talks to GitHub, so detached as well
             self._cadence_task = asyncio.create_task(self._cadence_pass(records))
+        if (
+            self._conventions_task is None or self._conventions_task.done()
+        ) and now - self._conventions_read_at > DERIVE_EVERY:
+            self._conventions_read_at = now  # rule 12: the script runs git, so detached as well
+            self._conventions_task = asyncio.create_task(self._conventions_pass(records))
         if (self._brief_task is None or self._brief_task.done()) and now - self._brief_read_at > DERIVE_EVERY:
             self._brief_read_at = now
             self._brief_task = asyncio.create_task(self._brief_pass(now))
@@ -955,6 +961,52 @@ class TickMixin:
             c["told"], dirty = now_iso(), True
         if dirty:
             self._save(s)
+            await self._push_changes()
+
+    @staticmethod
+    def _conventions_member(s: Session) -> bool:
+        """Rule 12's subject: a supervised member, not a seat (every fill starts cold, and the hook
+        tells it), not finished (never sent to; its next start is told at its start), on the record
+        that is its run now."""
+        return bool(s.supervised and s.seat is None and not s.out_of_work and not s.superseded_by)
+
+    async def _conventions_pass(self, records: list[Session]) -> None:
+        """Rule 12 (design §6, TD-258), detached on the reports' cadence: `scripts/cadence_changes.py
+        --json` is run once in each registry root that carries it and holds a member to tell, and
+        each such member's `conventions_seen` is written from the reading — at the first one after
+        its create, the headings landed at or before `created`; later, a heading it does not hold
+        that landed after `created` is one `note` from `system` and joins it. The doorbell does
+        the waking; nothing is typed here. A root with no script, or a run with no reading,
+        writes nothing."""
+        try:
+            by_root: dict[str, list[Session]] = {}
+            for s in records:
+                if self._conventions_member(s) and s.repo and s.repo in self._repos:
+                    by_root.setdefault(str(s.repo), []).append(s)
+            for root, members in by_root.items():
+                got = await asyncio.to_thread(conventions_mod.read, root)
+                if got is None:
+                    continue
+                for s in members:
+                    if not self._is_record(s) or not self._conventions_member(s):
+                        continue  # replaced, or declared out of work, while the script ran
+                    first = s.conventions_seen is None
+                    sorted_ = conventions_mod.sort(
+                        got["entries"], (s.conventions_seen or {}).get("headings"), s.created
+                    )
+                    if sorted_ is None:
+                        continue
+                    seen, told = sorted_
+                    if not first and seen == (s.conventions_seen or {}).get("headings"):
+                        continue
+                    s.conventions_seen = {"at": now_iso(), "headings": seen}
+                    if told:
+                        self._system_note(self._address(s), conventions_mod.note(told, got["ref"]))
+                        log.info("%s: told of %d new in docs/cadence-changes.md", self._address(s), len(told))
+                    self._save(s)
+        except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
+            log.exception("the conventions pass failed")
+        finally:
             await self._push_changes()
 
     async def _lane_news(self, s: Session, now: datetime) -> None:
