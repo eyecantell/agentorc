@@ -165,9 +165,11 @@ class InboxMixin:
         action: str = "",
         due: str | None = None,
         entry: str | None = None,
+        answer: str = "",
+        answers: list[str] | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
-        """**Snooze** or **Done** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
+        """**Snooze**, **Done** or **Decide** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
         the one line edited in the repo's main checkout and committed there with the fixed message,
         never pushed. `board` must be the board of a checkout this host's repos registry names;
         `line` and `text` are what dev-cadence's reader gave the Inbox, and the edit is refused
@@ -177,7 +179,13 @@ class InboxMixin:
         Inbox — a `note`, a closed question, a trail row, never an open `ask` or `steer` — and
         `text` and `due` the form's; one new line at the top of the board's open items naming the
         entry's sender and its `about`, committed, and only then the entry dismissed as Dismiss
-        does, so a refused or failed commit leaves the row where it was."""
+        does, so a refused or failed commit leaves the row where it was.
+
+        `action: decide` is the fourth edit (§4.4 *Decide*, TD-255): `answer` written as the
+        line's `Decided:` field. `answers` is the item's own list as the reader gave it to the
+        page, handed as a Reply's `refs` are, and the answer is one of them word for word — or,
+        where the live look's pair is among them, `Not right:` and the person's words. Anything
+        else typed is a Reply."""
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot edit the board: Snooze and Done are the person's own (design §4.4)")
         root, want = self._board_root(board)
@@ -188,11 +196,39 @@ class InboxMixin:
         if line is None:
             raise RpcError(f"a board {action or 'edit'} names the item's line (design §4.4)")
         try:
-            done = await asyncio.to_thread(board_mod.write_back, root, line, text, action, due)
+            said = self._board_answer(action, answer, answers)
+            done = await asyncio.to_thread(board_mod.write_back, root, line, text, action, due, answer=said)
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
-        return {"board": str(want), "line": line, "action": action, "due": due, **done}
+        return {
+            "board": str(want),
+            "line": line,
+            "action": action,
+            "due": due,
+            **({"answer": said} if said else {}),
+            **done,
+        }
+
+    @staticmethod
+    def _board_answer(action: str, answer: Any, answers: Any) -> str:
+        """The answer a `decide` writes, or "" for every other edit: one of the item's `answers`
+        word for word, or `Not right: <what>` where the pair's second answer is among them
+        (design §4.4 *Decide*) — refused otherwise, since any other typed answer is a Reply."""
+        if action != "decide":
+            return ""
+        offered = [str(a).strip() for a in answers] if isinstance(answers, list) else []
+        said = " ".join(str(answer or "").split())
+        if any(a.startswith(board_mod.NOT_RIGHT) for a in offered) and said.startswith(board_mod.NOT_RIGHT):
+            # the pair's second answer is a form, `Not right: <what>`: the words are the person's
+            if said in offered or not said[len(board_mod.NOT_RIGHT) :].strip():
+                raise board_mod.Refused("Not right needs its words: say what is off")
+            return said
+        if said and said in offered:
+            return said
+        raise board_mod.Refused(
+            "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"
+        )
 
     @staticmethod
     def _board_root(board: str) -> tuple[Path, Path]:

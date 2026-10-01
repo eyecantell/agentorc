@@ -1,6 +1,7 @@
-"""Board write-back (design §4.4, TD-069 step 3): **Snooze**, **Done** and **Reply** (TD-142) on
-one item of a repo's `docs/user_attention.md`, made by the host agent and committed in that repo's
-main checkout — and its one **add**, *Put on the board* (TD-140), the only line this system ever adds to a board.
+"""Board write-back (design §4.4, TD-069 step 3): **Snooze**, **Done**, **Reply** (TD-142) and
+**Decide** (TD-255) on one item of a repo's `docs/user_attention.md`, made by the host agent and
+committed in that repo's main checkout — and its one **add**, *Put on the board* (TD-140), the
+only line this system ever adds to a board.
 
 A board is dev-cadence's file and its items are read by dev-cadence's reader
 (`nudge_user_attention.py --report --json`), which gives each item's line number and text; this
@@ -21,7 +22,7 @@ from datetime import date
 from pathlib import Path
 
 BOARD = Path("docs") / "user_attention.md"
-ACTIONS = ("snooze", "done", "reply")
+ACTIONS = ("snooze", "done", "reply", "decide")
 # Any item, open or done: the add goes above the first of them, the top of the open items (§4.4).
 ANY_ITEM_RE = re.compile(r"^\s*-\s*\[[ xX]\]\s")
 NEEDS_RE = re.compile(r"^##\s+Needs the user\b")
@@ -29,6 +30,15 @@ NEEDS_RE = re.compile(r"^##\s+Needs the user\b")
 ITEM_RE = re.compile(r"^(?P<lead>\s*-\s*)\[ \](?P<gap>\s+)(?P<text>.+)$")
 DUE_RE = re.compile(r"\b(?P<key>Due:\s*)(?P<due>\d{4}-\d{2}-\d{2})\b", re.IGNORECASE)
 SESSION_RE = re.compile(r"\(session `?(?P<name>[^`\s,)]+)")
+# The reader's own field (`DECIDED_RE` in dev-cadence's `nudge_user_attention.py`): a sentence of
+# its own, anchored at the line's end. Kept the same shape here so a line this module calls
+# decided is one the reader reads as decided.
+DECIDED_RE = re.compile(
+    r"(?:^|(?<=[.?!]\s))Decided:\s*(?P<text>(?:(?!\bDecided:).)+?)\s*\((?P<date>\d{4}-\d{2}-\d{2})\)\.?\s*$"
+)
+ANSWERS_RE = re.compile(r"(?:^|(?<=[.?!]\s))Answers:\s*(?P<answers>(?:(?!\bAnswers:).)*?)\.?\s*(?:\bDecided:.*)?$")
+# A live look's second answer (design §4.5a **Works** / **Not right…**): the person's words follow.
+NOT_RIGHT = "Not right:"
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
 GIT_TIMEOUT = 20.0
@@ -52,12 +62,36 @@ def reply_tail(reply: str, by: str, today: str) -> str:
     return f" — {by}, {today}: {words}"
 
 
+def _sentence(body: str) -> str:
+    """`body` ending a sentence, so a field written after it starts one (the reader's rule)."""
+    head = body.rstrip()
+    return head if head.endswith((".", "?", "!")) else f"{head}."
+
+
+def _fields_start(body: str) -> int | None:
+    """Where the line's trailing `Answers:` / `Decided:` fields begin, as the reader finds them
+    (after the item's `Due:`), or None: what a reply is written ahead of, since words after
+    `Answers:` would be read as part of its last answer."""
+    due = DUE_RE.search(body)
+    off = due.end() if due else 0
+    starts = [m.start() for m in (ANSWERS_RE.search(body[off:]), DECIDED_RE.search(body[off:])) if m]
+    return off + min(starts) if starts else None
+
+
 def edit_line(
-    line: str, text: str, action: str, due: str | None = None, *, reply: str = "", by: str = "", today: str = ""
+    line: str,
+    text: str,
+    action: str,
+    due: str | None = None,
+    *,
+    reply: str = "",
+    by: str = "",
+    today: str = "",
+    answer: str = "",
 ) -> str:
-    """`line` with the item done, snoozed to `due`, or replied to (`reply`, by `by` on `today`).
-    Refused unless `line` is an open item whose text is exactly `text` — the item the person was
-    shown, not whatever moved onto that line."""
+    """`line` with the item done, snoozed to `due`, replied to (`reply`, by `by` on `today`) or
+    decided (`answer`, on `today`). Refused unless `line` is an open item whose text is exactly
+    `text` — the item the person was shown, not whatever moved onto that line."""
     m = ITEM_RE.match(line.rstrip("\n"))
     if m is None or m.group("text").strip() != text.strip():
         raise Refused("that line of the board no longer holds this item: reload the Inbox and try again")
@@ -70,7 +104,25 @@ def edit_line(
             # the reader and a later Snooze take a line's first `Due:`: on an undated item the
             # reply's would become the item's date (review of PR #581)
             raise Refused("this item has no Due: date, so a reply may not carry one: Snooze sets its date")
-        return f"{body.rstrip()}{reply_tail(reply, by, today or date.today().isoformat())}{end}"
+        tail = reply_tail(reply, by, today or date.today().isoformat())
+        if (at := _fields_start(body)) is not None:
+            # ahead of the fields the reader anchors at the line's end (§4.4 *The two compose*):
+            # a reply never un-decides an item, and never becomes part of its last answer
+            return f"{_sentence(body[:at].rstrip() + tail)} {body[at:].rstrip()}{end}"
+        return f"{body.rstrip()}{tail}{end}"
+    if action == "decide":
+        # the edit `board_edit.py decide` makes (cadence §4.5), with one difference: a line
+        # already decided is refused here, never rewritten (§4.4 *Decide*)
+        words = " ".join(str(answer or "").split())
+        if not words:
+            raise Refused("a decide needs its answer: one of the item's Answers:")
+        if DECIDED_RE.search(body):
+            raise Refused("this item is already decided: Reply says more to its session, Done closes it")
+        new = f"{_sentence(body)} Decided: {words} ({today or date.today().isoformat()})."
+        d = DECIDED_RE.search(new)
+        if d is None or d.group("text") != words:
+            raise Refused(f"the board's reader would not read back 'Decided: {words}': say it in other words")
+        return new + end
     if action != "snooze":
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     try:
@@ -82,7 +134,7 @@ def edit_line(
     return f"{body.rstrip()} Due: {due}.{end}"
 
 
-def message(text: str, action: str, due: str | None = None) -> str:
+def message(text: str, action: str, due: str | None = None, *, answer: str = "") -> str:
     """The fixed commit message (design §4.4, cadence §4's carve-out): the tool, the action, the
     item's head, and the session that raised the item — what a reviewer greps for."""
     h = HEAD_RE.search(text)
@@ -91,7 +143,11 @@ def message(text: str, action: str, due: str | None = None) -> str:
         head = head[: HEAD_MAX - 1].rstrip() + "…"
     s = SESSION_RE.search(text)
     who = s.group("name") if s else "n/a"
-    what = {"snooze": f"snooze {head} to {due}", "reply": f"reply on {head}"}.get(action, f"done {head}")
+    what = {
+        "snooze": f"snooze {head} to {due}",
+        "reply": f"reply on {head}",
+        "decide": f"decide {head}: {' '.join(str(answer or '').split())}",
+    }.get(action, f"done {head}")
     return f"agentorc: {what} (session {who})"
 
 
@@ -150,18 +206,20 @@ def author(root: Path) -> str:
 
 
 def write_back(
-    root: str | Path, line: int, text: str, action: str, due: str | None = None, *, reply: str = ""
+    root: str | Path, line: int, text: str, action: str, due: str | None = None, *, reply: str = "", answer: str = ""
 ) -> dict[str, str]:
-    """Make one Snooze, Done or Reply on the board of the checkout `root` and commit it there
+    """Make one Snooze, Done, Reply or Decide on the board of the checkout `root` and commit it there
     (§4.4). Returns `{commit, message}`; raises `Refused` with nothing changed."""
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     with _EDIT:
-        return _write_back(root, line, text, action, due, reply)
+        return _write_back(root, line, text, action, due, reply, answer)
 
 
-def _write_back(root: Path, line: int, text: str, action: str, due: str | None, reply: str = "") -> dict[str, str]:
+def _write_back(
+    root: Path, line: int, text: str, action: str, due: str | None, reply: str = "", answer: str = ""
+) -> dict[str, str]:
     ready(root)
     path = root / BOARD
     try:
@@ -172,8 +230,8 @@ def _write_back(root: Path, line: int, text: str, action: str, due: str | None, 
         raise Refused("that line of the board no longer holds this item: reload the Inbox and try again")
     was = "".join(lines)
     by = author(root) if action == "reply" else ""
-    lines[line - 1] = edit_line(lines[line - 1], text, action, due, reply=reply, by=by)
-    msg = message(text, action, due)
+    lines[line - 1] = edit_line(lines[line - 1], text, action, due, reply=reply, by=by, answer=answer)
+    msg = message(text, action, due, answer=answer)
     path.write_text("".join(lines), encoding="utf-8")
     try:
         cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))
