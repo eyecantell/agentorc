@@ -131,6 +131,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-255 | Build a board row's answers: the `decide` write-back, the answer buttons and Go with it, a live look's Works / Not right… and what follows each, the keys, the help; this repo's live looks regroomed and the briefs' line | High | Partly done — slices 1–2 built (the write-back; the buttons, Go with it, the keys, the help); slices 3–4 wait on dev-cadence TD-074's pair |
 | TD-258 | Build the manager's mechanical jobs as tick policies: rule 10 the cadence check, rule 11 merged without its read, rule 12 conventions relayed, rule 4's owed clause, rule 6's dropped lease, the two Inbox rows | Medium | Partly done — every slice built; the live look of slice 5's rows is left |
 | TD-259 | Build the manager on call: `on_call` on `manager:`, the `team` trigger with `seat_due.by`, `idle_open` and `seat_filled`, the sweep's seat exception, the card's slot and the Inbox row, the manager brief as a seat's, the first look on dc-grind | Medium | In progress — slices 1–5 built and the default flipped to on call; slice 6, the first look on dc-grind after a promote, is left |
+| TD-262 | A card says *closed by you* for every closed session, whoever closed it: dc-grind's manager wound its own team down 40 s after a start and all three cards named the person | Medium | Open — design first |
 
 
 ---
@@ -2593,3 +2594,22 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, a team defined with `on_call: true` starts a manager that finds nothing and exits; a `steer` to it, a member's permission prompt, a member `stalled?` and a member *idle · open work* each fill it once and it closes after acting; the same standing cause does not refill it; its members' `controllers` name it across the close; a question sent to it while closed is there at the fill; the team is wound down by rule 9 with the manager closed; dc-grind's first run on call is written here.
 
 **Related:** TD-247 (the design), TD-103 (rule 3, the seat rule), TD-098 (seats with a trigger), TD-240 / TD-241 (rule 9), TD-256 (rule 9's marks on a resumed manager), TD-245 / TD-249 (the manager outside the context bound), TD-250 (mail on a replay), TD-258 (the policies), TD-118 (one model for every role — a seat's fills are the round's cost made visible).
+
+## TD-262: A card says *closed by you* for every closed session, whoever closed it
+
+**Priority:** Medium
+**Type:** bug
+**Added:** 2026-10-01 (the anchor, for Paul: *I restarted the dc team but it says it was closed by me*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open — design first: the words are §4.5's and §4.5a's, and the record keeps no closer
+**Location:** `src/agentorc/ui/cards.py` (the slot: `state == "closed"` → *closed by you*, and its hover *closed by you at …*), `src/sessionorc/agent.py` (`rpc_close`: writes `closed_at` and clears `closed_for`, and takes no caller), design §4.5 *The card's anatomy* row 5 (b) and §4.5a's **doing** row (the ending *closed by you*), the team stop that closes members (`ao team stop --close`)
+
+**Why:** Paul started dc-grind on 2026-10-01 at 22:05:19Z. Forty seconds later `manager-dc-1` ran `ao team stop dc-grind --close --timeout 90`, because `grinder-dc-1` had found nothing pickable on dev-cadence's ledger, and the two members closed at 22:05:59Z and the manager, by its own `ao close`, at 22:06:00Z (its run log, `~/.agentorc/runs/ao-dev-cadence-manager-dc-1-20261001T220519Z.log`). Every card then read *closed by you*, so the page told the person he had closed a team he had just started, and nothing on it said the manager had, or why. The slot's text is fixed for the state: `rpc_close` records when and not who, the same RPC serves a person's Close, a manager's `ao team stop --close` and the tick's close, and only some of the tick's closes leave a mark of their own (`closed_for`: a restart under rule 2 or 7, rule 9's manager), so its other closes read *closed by you* as well.
+
+**Fix:** design first. (1) **The record names the closer**: the close RPC takes who asked — the person (the UI, or `ao` outside a session), a session by name (`ao` inside one, as `ao msg` knows its sender), or the tick with its rule — and a team stop hands its caller to each member's close; a manager's own `ao close` after the stop names itself. (2) **The slot says it**: *closed by you*, *closed by manager-dc-1*, *closed by the tick*, with the time in the hover; a record with no closer (every one written before this) reads *closed*. (3) **A team stopped by its own manager says why where the person looks**: the reason it gave (`ao progress none --why …`, or the wind-down report) on the team card or the manager's slot, so a start that ends in under a minute explains itself; decide whether a start of a team with nothing pickable should say so before it starts anything (§6 rule 8 already reads the lanes for a wound-down team). The design PR words §4.5 row 5 (b) and §4.5a's **doing** row, and files the build entry.
+
+**Done when:** the design names the closer field and the slot's words, and a build entry exists; built, a team closed by its manager reads *closed by <manager>* on each card and a person's Close reads *closed by you*.
+
+**Related:** TD-241 (the card's *by the tick* on a wound-down team), TD-256 (rule 9 announces a team whose last member a person closed — it reads the same missing fact), TD-259 (the manager on call, whose first look is on dc-grind), TD-095 (the card's anatomy), TD-156 (an unattended member is closed by its team).
