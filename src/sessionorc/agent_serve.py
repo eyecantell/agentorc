@@ -22,6 +22,7 @@ from sessionorc import (
     naming,
     paths,
 )
+from sessionorc import cadence as cadence_mod
 from sessionorc.agent_common import (
     BRIEF_CLAUSE,
     NODE_READS,
@@ -273,7 +274,9 @@ class ServeMixin:
             # and rule 7's clause (TD-217 slice 4): a member whose brief changed is not interrupted either
             declared = s is not None and (s.restart_wanted or s.out_of_work or s.seat is not None)
             changed = BRIEF_CLAUSE if s is not None and s.brief_changed and not declared else ""
-            if s is not None and ((n := s.unread()) or owed or over or changed):
+            # and rule 10's clause (TD-258): an open PR of its own fails the cadence check
+            failing = cadence_mod.clause(s.checks) if s is not None and s.supervised and s.seat is None else ""
+            if s is not None and ((n := s.unread()) or owed or over or changed or failing):
                 # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
                 # refusal is not*, and this is the cheapest thing that is neither.
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
@@ -283,6 +286,8 @@ class ServeMixin:
                     resp["mail"]["context"] = over
                 if changed:
                     resp["mail"]["brief"] = changed
+                if failing:
+                    resp["mail"]["cadence"] = failing
         return resp
 
     def _caller_address(self, caller: Any, link_host: str | None) -> str:
