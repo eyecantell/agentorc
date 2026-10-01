@@ -399,7 +399,8 @@ just before the paste, not after the submit: the tool reports this prompt's own 
 Enter lands, often while the composer is still being checked, so a turn that began, or began and
 ended, during the typing counts as this prompt's (TD-204). It fails with `prompt-stalled` when nothing
 starts within a few seconds of the moment it could, `timeout` after the caller's limit, and
-`removed` if the record goes away — so a policy's wrap-up request (§6) is known to have landed,
+`removed` if the record goes away — the record it typed into, so an id that another record takes
+in the meantime ends the wait the same way (TD-261) — so a policy's wrap-up request (§6) is known to have landed,
 and no text is ever re-sent on a guess (TD-016).
 
 Liveness cross-check: the host agent also watches the pipe-pane log's mtime; a `working` state

@@ -12,7 +12,7 @@ from conftest import FAST_TICK, derived, park_ticks, wait_for, wait_state
 from sessionorc import adapters, naming, paths, reports
 from sessionorc.agent import WRAPUP_GRACE
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import FindingEntry, Pending, ProgressEntry
+from sessionorc.models import FindingEntry, Pending, ProgressEntry, Session
 
 pytestmark = pytest.mark.integration
 
@@ -500,6 +500,30 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         with pytest.raises(AgentError, match="removed: .* went away"):
             await task
         agent.tmux.kill_session(s["id"])
+
+
+async def test_send_wait_ends_when_its_id_is_taken_by_another_record(agent, hookstub, tmp_path):
+    """TD-261: a `send --wait` with no timeout ends as `removed` when the record it typed into is
+    forgotten and its id is another record's before the wait's next poll — what the tick does to a
+    forgotten record's live pane (it adopts it as a shell), and what hung the test above on CI."""
+    async with LocalClient() as c, LocalClient() as feeder:
+        s = await feeder.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(feeder, s["id"], "idle")
+        mark = _last_send(agent, s["id"])
+        task = asyncio.create_task(c.call("send", id=s["id"], text="gone", wait=True))
+        await _typed(agent, s["id"], mark)
+        await feeder.call("hook", session=s["id"], state="working")
+        await asyncio.sleep(0.2)
+        agent._forget(s["id"])
+        # no await between the two: the wait never sees the id empty
+        agent.sessions[s["id"]] = Session(id=s["id"], name="w", kind="interactive", adapter="shell", dir="")
+        try:
+            with pytest.raises(AgentError, match="removed: .* went away"):
+                await asyncio.wait_for(task, 5)
+        finally:
+            agent.sessions.pop(s["id"], None)
+            agent.tmux.kill_session(s["id"])
 
 
 async def test_send_wait_hook_lands_while_typing(agent, hookstub, tmp_path, monkeypatch):
