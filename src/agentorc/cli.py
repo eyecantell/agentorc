@@ -797,7 +797,9 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
 def cmd_team_status(args: argparse.Namespace) -> int:
     """`ao team status <name>` (design §4.9): the lead's Members view for a terminal — each session
     carrying the badge with its state, lane and report line, the lead first, and every name the
-    definition expects that is not running said to be so."""
+    definition expects that is not running said to be so. Under `--json` each row also carries
+    `unattended`, `seat`, `out_of_work` and `restart_wanted` as the record has them, and the reply
+    `finished`, the home's reading of the team (§6 rule 9, TD-241)."""
     org, expected = orgmod.Org(), []
     try:
         org = _org_here()
@@ -810,12 +812,23 @@ def cmd_team_status(args: argparse.Namespace) -> int:
             print(str(e), file=sys.stderr)
     found = teamrun.badged(args.name, call_sync("list"))
     lead, members = teamrun.split(args.name, found, org)
+    # what the home's reading reads, as the record has it (§6 rule 9, TD-241): a manager's round
+    # takes these from here every round, never from an earlier one
+    record = ("unattended", "seat", "out_of_work", "restart_wanted")
     rows = [
-        {**{k: s.get(k) for k in ("id", "name", "state", "lane", "role")}, "report": report_line(s), "running": True}
+        {
+            **{k: s.get(k) for k in ("id", "name", "state", "lane", "role")},
+            "report": report_line(s),
+            "running": True,
+            **{k: s.get(k) for k in record},
+        }
         for s in ([lead] if lead else []) + members
     ]
     rows += [
-        {"id": None, "name": n, "state": "not started", "lane": [], "role": "", "report": "", "running": False}
+        {
+            **{"id": None, "name": n, "state": "not started", "lane": [], "role": "", "report": "", "running": False},
+            **dict.fromkeys(record),
+        }
         for n in expected
         if n not in {s.get("name") for s in found}
     ]
@@ -829,7 +842,10 @@ def cmd_team_status(args: argparse.Namespace) -> int:
             report = f"  report: {r['report']}" if r["report"] else ""
             print(f"{str(r['id'] or r['name']):<{w}}  {r['state']:<11}{lane}{report}")
 
-    return emit(args, {"team": args.name, "sessions": rows}, prose)
+    # the home's reading of the team, the one the tick and the page take: it holds when `why` is empty
+    team = org.teams.get(args.name)
+    finished = teamrun.finished(found, teamrun.seat_names(team, found) if team is not None else ())
+    return emit(args, {"team": args.name, "sessions": rows, "finished": finished}, prose)
 
 
 def cmd_team_list(args: argparse.Namespace) -> int:

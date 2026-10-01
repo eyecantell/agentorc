@@ -206,7 +206,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .secinfo[hidden] { display: none; }
 /* design §4.5a the ***i*** mark's panel (TD-167): under its group, full width, pushing the rows down */
 .helppanel { flex-basis: 100%; margin: 4px 0 0; max-width: 90ch; } .helppanel[hidden] { display: none; }
-.ghead .whofor { flex-basis: 100%; white-space: normal; }  /* who for what (TD-171): its own line under the header */
+.ghead .whofor, .ghead .notconcluded { flex-basis: 100%; white-space: normal; }  /* who for what (TD-171): its own line under the header */
 .helppanel p { margin: 0 0 .5em; } .helppanel p:last-child { margin-bottom: 0; }
 /* §4.5 screen 10 *Help*: one column, a heading per control, nothing pressable but the page's own links */
 .helppage { max-width: 760px; width: 100%; margin: 0 auto; }

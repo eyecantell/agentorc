@@ -206,7 +206,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
     the name, the file it came from, its projects, how many sessions it starts, how many carrying
     its badge are live, and — when none are and every one of them said why — when it wound down;
-    when some are and every one is idle and declared, when it concluded (TD-099).
+    when some are and every one is idle and declared, when it concluded (TD-099), or else why it
+    has not (`not_concluded`, the reading's `why`; TD-241).
     There is no team record — a team that is stopped is only its definition, so both are counted
     across the fleet on every call."""
     # a team's own facts read its **unattended** sessions: a person's session in the team keeps
@@ -217,6 +218,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
     for t in org.teams.values():
         mine = badged(t.name, crew)
         n_live = len(badged(t.name, up))
+        # the home's reading (§6 rule 9), asked once: it holds when `why` is empty
+        f = finished(mine, seat_names(t, mine)) if n_live else None
         rows_out.append(
             {
                 "name": t.name,
@@ -238,7 +241,9 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 # only when nothing is live: a team still running is described by what it is doing
                 "wound_down": None if n_live else wound_down(mine, seat_names(t, mine)),
                 # …and when something is live but every live session is idle and declared (TD-099)
-                "concluded": concluded(mine, seat_names(t, mine)) if n_live else None,
+                "concluded": {k: f[k] for k in ("at", "restart", "names")} if f and not f["why"] else None,
+                # …and when it is not, what keeps it from the reading, a clause per session (TD-241)
+                "not_concluded": list(f["why"]) if f else [],
             }
         )
     return rows_out
