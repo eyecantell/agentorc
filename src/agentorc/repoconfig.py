@@ -105,6 +105,9 @@ NO_REPO = "none"
 # opening lines of the composer a person's entry session starts with, the slots filled from the form.
 ENTRY_TEMPLATE = "entry.md"
 ENTRY_PLACEHOLDER = "{entry}"
+# A template's shape for a seat on call (design §6 *What is left is judgement, and a seat holds it*,
+# TD-247): the manager's, which reads one `seat_due` and ends, where `manager.md` rounds on `ao wait`.
+ON_CALL_BRIEFS = {"manager.md": "manager_on_call.md"}
 ENTRY_SLOTS = ("{repo}", "{type}", "{ledger}")
 HANDED_ENTRY = {
     "{repo}": "the repo its `entry` names",
@@ -293,6 +296,7 @@ class Role:
         context: str | None = None,
         manager: str | None = None,
         supplement: str | None = None,
+        on_call: bool = False,
     ) -> tuple[str | None, dict[str, Any] | None]:
         """The opening prompt this role gives a session: its template with `{repo}` filled from the
         repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114) — `supplement`, a path,
@@ -303,7 +307,8 @@ class Role:
         A role the package ships no template for takes the repo's brief as the whole brief; None
         for one with neither (`plain`). `read` reads a repo's file — this host's disk by default, or
         another host's checkout across the link (design §4.4a "Teams across hosts", TD-057 step
-        4b.3); a template is always the package's own.
+        4b.3); a template is always the package's own. `on_call` takes the template's seat shape
+        where the package ships one (`ON_CALL_BRIEFS`: a manager on call, design §6 rule 3, TD-259).
 
         Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
         `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
@@ -314,13 +319,14 @@ class Role:
         own = self.brief if self.brief and self.brief_source not in ("", "built-in") else None
         extra = supplement or own
         slots: dict[str, dict[str, str]] = {}
-        if self.template is None:
+        template = ON_CALL_BRIEFS.get(self.template, self.template) if on_call and self.template else self.template
+        if template is None:
             if not extra:
                 return None, None
             text = self._read(extra, read)
             base = str(self._path(extra))
         else:
-            src = resources.files("agentorc").joinpath("briefs", self.template)
+            src = resources.files("agentorc").joinpath("briefs", template)
             text = src.read_text(encoding="utf-8")
             base = str(src)
             added = self._read(extra, read).strip() if extra else ""

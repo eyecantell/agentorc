@@ -3798,6 +3798,12 @@ rule 3 with the `team` trigger, filled when a member needs a reading no policy m
 question to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it
 has acted, holding `control` on its record across the close as a seat holds its mail; a standing
 manager is the definition's other choice (`on_call: false`); on call is the default from the build (Paul, 2026-10-01).
+The two shapes are two templates of the package (built 2026-10-01 — TD-259 slice 5): `briefs/manager.md` rounds on `ao wait`;
+`briefs/manager_on_call.md`, which `ao team start` composes for a manager on call (`repoconfig.ON_CALL_BRIEFS`), reads
+`seat_due.by` and `member` from its own record, makes that one reading — answers the `ask`, allows or denies the
+permission, one send to a `stalled?` or *idle · open work* member or a `steer` to the person — logs one line with
+`ao log` and exits as the techlead does: no round, no `ao wait`, no board line, no declaration. A repo's `brief:`
+fills either one's `{repo}` slot.
 
 ### 4.8a Who is calling: identity on one host (TD-077)
 
@@ -4273,11 +4279,11 @@ entry of the home — default the host the start runs on. Checkouts are resolved
 (default `manager`; **`person`** means the person manages — no session is started and members
 get an empty `controllers` list plus the team badge), `name` (default `<team>-lead`), `home` (a
 repo name from the team's projects — required when the projects list more than one repo,
-defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key and the launch built 2026-10-01 — TD-259 slice 1, the tick's `team` trigger, the slot and the seat's brief not built:
+defaulted to the only one otherwise), `profile` (overrides the role's), **`on_call`** (TD-247; designed 2026-09-30; the key, the launch and the seat's brief built 2026-10-01 — TD-259 slices 1 and 5, the tick's `team` trigger and the slot not built:
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's trigger and brief slices land a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`), because a manager started as a seat before the tick reads `team` is closed idle and never filled; refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start — and until TD-259's trigger slice lands a definition that does not say reads `false` (`org.ON_CALL_DEFAULT`), because a manager started as a seat before the tick reads `team` is closed idle and never filled; refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a

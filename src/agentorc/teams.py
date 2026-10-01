@@ -298,9 +298,18 @@ def _brief(
     """The role's template with the member's `brief:` in its `{repo}` slot — in place of the role's
     own `roles.<name>.brief`, never beside it (design §4.8, TD-114) — and `{lane}`, `{techlead}`,
     `{manager}` and `{context}` filled. The `brief:` is read from the home checkout, where `role`
-    was resolved. Beside it, what it was made from (`Role.compose`, §6 rule 7)."""
+    was resolved. A manager on call takes the template's seat shape (§6 rule 3, TD-259). Beside it,
+    what it was made from (`Role.compose`, §6 rule 7)."""
     supplement = member.brief if member is not None and member.brief else None
-    return role.compose(lane, read=read, techlead=techlead, context=context, manager=manager, supplement=supplement)
+    return role.compose(
+        lane,
+        read=read,
+        techlead=techlead,
+        context=context,
+        manager=manager,
+        supplement=supplement,
+        on_call=isinstance(member, orgmod.ManagerDef) and member.on_call,
+    )
 
 
 def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, home: str, host: str, here: str) -> str:
