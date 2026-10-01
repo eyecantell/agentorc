@@ -4530,8 +4530,8 @@ between readings.
      badge.
 - **The mail way goes to the techlead whatever the Type.** Only a seat is filled by a question
   (§4.9a *One member back, today*): mail to an exited designer waits for a person's Resume. And
-  a feature's entry is the short one — its header says `Kind: design-first` and `Pickable: yes`,
-  and the design round does the fleshing out: a member whose lane is `design-first` and that
+  a feature's entry is the short one — its header says `Kind: design-first` and names nothing in
+  `Blocked by:`, and the design round does the fleshing out: a member whose lane is `design-first` and that
   declared itself out of work is told by the tick when the entry lands (§6 rule 6).
 - **How it lands: as every ledger change does.** A branch, a PR, the docs fact-check, the
   cadence check, a squash merge (cadence §4); the entry's Summary row in the same PR. The number
