@@ -2429,7 +2429,7 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Added:** 2026-09-30 (Paul, on grinder-ao-2's 20 idle hours: *would it make the most sense to have the grinder restart on a TD boundary after 200K (or larger if that is determined) instead of during a TD? That handles both the large case (restarts after single TD) and small case (restarts after n TDs)*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no — design-first: §4.9a's `early` rule and §6 rule 5's bound change
+**Pickable:** yes
 **Status:** Open
 **Location:** design §4.9a (*Inside the ceiling*: `RESTART_EARLY`, `restart_wanted.early`), §6 rule 2 and rule 5; `src/sessionorc/agent_common.py` (`RESTART_EARLY`), `agent_tick.py` (`_wanted_restart`), where `ao progress restart` writes `early`; `src/agentorc/repoconfig.py` (`WORKER_CONTEXT = {"bound": "200k"}`); this repo's own part: `docs/briefs/grinder-ao-1.md` and `grinder-ao-2.md` (the reading rule) and `.agentorc.yml` `roles.grinder.context` (this repo's bound) — the package template `src/agentorc/briefs/grinder.md` is not where either goes
 
@@ -2453,7 +2453,7 @@ Rules: the board is append-only (§3.4): close, never delete, and never reword a
 **Added:** 2026-09-30 (the anchor, restarting grinder-ao-2 for Paul)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no — design-first: a new control, so §4.5a's table first
+**Pickable:** yes
 **Status:** Open
 **Location:** design §4.5a (**Inbox row: restart**, the card's ⋯), §4.9 (the CLI), §6 rule 2; `src/agentorc/ui/templates/inbox_row.html` (the `restart` row), `src/sessionorc/agent_tick.py` (`_wanted_restart`, `_replay`), `src/agentorc/cli.py`
 
