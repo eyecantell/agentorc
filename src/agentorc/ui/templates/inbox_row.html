@@ -627,11 +627,16 @@
 <div class="row gap wrap sugg" role="group" aria-label="this item's answers">
   <span class="st sugglabel">its answers</span>
   {%- for a in e.answers %}
-  <button class="btn sm answer" {% if ro %}disabled title="{{ ORIGIN_READONLY }}"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" title="{{ a }}"{% endif %}><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {#- §4.5a **Works** / **Not right…** (TD-255 slice 3): a live look's pair, drawn by its words.
+      *Works* decides at once, as any answer; the form opens the Reply composer with *Not right:*
+      begun and decides with the text typed, then hands an entry to the repo's techlead. -#}
+  {%- set form = e.pair and loop.index0 == 1 %}
+  <button class="btn sm answer" {% if ro %}disabled title="{{ ORIGIN_READONLY }}"{% elif form %}data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ e.repo }}'s board" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo }}'s techlead as an entry"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
-{%- set gwi = e.default and e.answers and not e.decided %}
+{#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
+{%- set gwi = e.default and e.answers and not e.decided and not e.pair %}
 <div class="row gap wrap mfoot">
   {%- if ro %}
   <span class="st">{{ ORIGIN_READONLY }}</span>

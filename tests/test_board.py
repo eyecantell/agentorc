@@ -585,3 +585,23 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
     lines = (repo / board.BOARD).read_text().splitlines()
     assert board.DECIDED_RE.search(lines[8]).group("text") == "Keep it"
     assert board.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber"
+
+
+@pytest.mark.unit
+def test_an_offered_answer_word_for_word_comes_before_the_not_right_form():
+    """Review of PR #863: an item whose own answer is a complete *Not right: wrong repo* is decided
+    by it word for word; the form is only `Not right: <what>` (or the bare prefix), pressed as
+    written it is refused, and typed words pass only where the form is offered."""
+    from sessionorc.agent_inbox import InboxMixin as A
+
+    own = ["Right repo", "Not right: wrong repo"]
+    assert A._board_answer("decide", "Not right:  wrong repo", own) == "Not right: wrong repo"
+    with pytest.raises(board.Refused, match="word for word"):
+        A._board_answer("decide", "Not right: something else", own)  # no form offered: a Reply
+    both = ["Works", "Not right: <what>", "Not right: wrong repo"]
+    assert A._board_answer("decide", "Not right: wrong repo", both) == "Not right: wrong repo"
+    assert A._board_answer("decide", "Not right: the ring is amber", both) == "Not right: the ring is amber"
+    for bad in ("Not right: <what>", "Not right:"):
+        with pytest.raises(board.Refused, match="needs its words"):
+            A._board_answer("decide", bad, both)
+    assert A._board_answer("snooze", "anything", both) == ""

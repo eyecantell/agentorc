@@ -1086,6 +1086,86 @@ def test_a_board_items_answers_are_buttons_in_the_order_written_and_go_with_it_i
     assert html.count('data-board-act="decide"') == 4
 
 
+def look_item(default="", kind="watch", answers=("Works", "Not right: <what>")):
+    tail = " | ".join(a + (" (default)" if a == default else "") for a in answers)
+    text = f"**One look at the ring** after the promote (TD-9, #12). Due: 2026-09-20. Answers: {tail}."
+    return {
+        **item(7, text, "2026-09-20", "2d overdue"),
+        "answers": list(answers),
+        "default": default or None,
+        "decided": None,
+        "kind": kind,
+    }
+
+
+@pytest.mark.unit
+def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, monkeypatch):
+    """§4.5a **Works** / **Not right…** (TD-255 slice 3): a `watch` whose answers are the pair draws
+    two `.btn.answer` — **Works**, the `decide` with *Works*, and **Not right…**, the composer's
+    act carrying the reader's list, the repo's name and the item's head for the hand-off — and no
+    quoted answer text. A default on *Works* is that button, *Go with it: Works*, with none in the
+    foot. Read from origin both are disabled."""
+    import json
+    import re
+
+    rows, html = rows_html(tmp_path, monkeypatch, look_item())
+    assert rows[0]["pair"] and rows[0]["head"] == "One look at the ring" and rows[0]["name"] == "samscrape"
+    btns = re.findall(r'<button class="btn sm answer" ([^>]*)><span class="alabel">(.*?)</span></button>', html, re.S)
+    assert [label for _, label in btns] == ["Works", "Not right…"]
+    works, form = btns[0][0], btns[1][0]
+    assert 'data-act="board"' in works and 'data-board-act="decide"' in works and 'data-answer="Works"' in works
+    assert 'data-act="board_notright"' in form and "data-answer=" not in form and "data-board-act" not in form
+    assert 'data-repo="samscrape"' in form and 'data-head="One look at the ring"' in form and 'data-line="7"' in form
+    assert json.loads(re.search(r"data-answers='([^']*)'", form).group(1)) == ["Works", "Not right: <what>"]
+    drawn = html.split('class="row gap wrap mfoot"')[0].split("its answers")[1]
+    assert "&ldquo;" not in drawn and "Go with it" not in html
+    assert rows[0]["body"].endswith("Due: 2026-09-20.")
+
+    _, html = rows_html(tmp_path, monkeypatch, look_item(default="Works"))
+    assert ">Go with it: Works</span>" in html and ">Go with it<" not in html and ">default<" not in html
+
+    _, html = rows_html(tmp_path, monkeypatch, look_item(), source="origin/main")
+    btns = re.findall(r'<button class="btn sm answer" ([^>]*)>', html)
+    assert len(btns) == 2 and all("disabled" in a and "data-act" not in a for a in btns)
+
+
+@pytest.mark.unit
+def test_only_a_watch_with_exactly_the_pair_is_a_live_look(tmp_path, monkeypatch):
+    """Else they are ordinary answer buttons: another kind, a third answer, a complete *Not right:
+    wrong repo*, or the words in another order."""
+    from agentorc.ui.inbox import board_head, live_look
+
+    for it in (
+        look_item(kind="decide"),
+        look_item(answers=("Works", "Not right: <what>", "Later")),
+        look_item(answers=("Works", "Not right: wrong repo")),
+        look_item(answers=("Not right: <what>", "Works")),
+        look_item(answers=("works", "Not right: <what>")),
+    ):
+        assert not live_look(it)
+        rows, html = rows_html(tmp_path, monkeypatch, it)
+        assert not rows[0]["pair"] and "board_notright" not in html and "&ldquo;" in html
+    assert live_look(look_item()) and live_look(look_item(answers=("Works", "Not right:")))
+    assert board_head("no bold here, just a long line " * 4).endswith("…") and len(board_head("x " * 90)) == 60
+
+
+@pytest.mark.unit
+def test_not_right_opens_the_composer_begun_decides_then_hands_an_entry_on():
+    """The page's half, read from its source: the composer opens with *Not right:* begun, one
+    `decide` carries the typed text, and only then the second call hands a `debt` entry to the
+    techlead, its words the item's head and the answer; a refusal there is toasted and returns."""
+    import pathlib
+
+    js = (pathlib.Path(__file__).parent.parent / "src/agentorc/ui/static/app.js").read_text()
+    at = js.index('if (action === "board_notright") {')
+    block = js[at : js.index('if (action === "board_add") {', at)]
+    assert 'text: "Not right: "' in block and '$("#mailtext").value = o.text || "";' in js
+    decide, hand = block.index('action: "decide"'), block.index('fetch("/api/entry/hand"')
+    assert decide < hand and 'type: "debt"' in block and "words: `${b.dataset.head} — ${answer}`" in block
+    assert "no entry was handed on" in block and 'board_notright: "Not right…"' in js
+    assert 'text: ["Go with it", "Go with it: Works"]' in js
+
+
 @pytest.mark.unit
 def test_a_row_with_no_default_has_no_go_with_it_and_one_with_no_answers_no_buttons(tmp_path, monkeypatch):
     _, html = rows_html(tmp_path, monkeypatch, decide_item(default=""))
