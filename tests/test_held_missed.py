@@ -268,3 +268,27 @@ def test_the_field_is_the_homes_and_the_match_is_one():
 
     assert "held_missed" in models.HOME_OWNED
     assert review.held_paths is held.held_paths and review.pr_files is held.pr_files and review.matches is held.matches
+
+
+async def test_a_pr_merged_longer_ago_than_the_mail_is_kept_is_not_judged(agent, monkeypatch):
+    """A restarted home reads each PR once more, and by then the reader's reply may be pruned."""
+    from sessionorc import mail
+
+    gh, s = _Gh(monkeypatch), _member(agent)
+    _done(s, 845)
+    gh.prs[845] = (HELD, MERGED)
+    await agent._held_pass([s], MERGED + mail.MAIL_RETENTION / 2 + timedelta(minutes=1))
+    assert s.held_missed == [] and _fyi(agent) == []
+    await agent._held_pass([s], LATER)
+    assert gh.asked == [845], "settled, not read again"
+
+
+async def test_a_crossing_cleared_from_the_record_is_not_written_again(agent, monkeypatch):
+    gh, s = _Gh(monkeypatch), _member(agent)
+    _done(s, 845)
+    gh.prs[845] = (HELD, MERGED)
+    await agent._held_pass([s], LATER)
+    assert len(s.held_missed) == 1
+    s.held_missed = []  # the row's Dismiss clears the entries (slice 5)
+    await agent._held_pass([s], LATER)
+    assert s.held_missed == [] and len(_fyi(agent)) == 1 and gh.asked == [845]

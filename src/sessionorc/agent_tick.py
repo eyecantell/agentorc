@@ -18,6 +18,7 @@ from sessionorc import (
     adapters,
     agent_common,
     hosts,
+    mail,
     naming,
     paths,
     reports,
@@ -1032,8 +1033,9 @@ class TickMixin:
         it has merged — its files against the record's `held:` globs, in the registry root the
         record's `repo` names, `held.READS` PRs a run, the longest unread first. A PR touching no
         held path, one merged before the record was created, and one its reader replied on (`held.
-        read_by`) are settled, in memory: a restarted home reads each once more. A held PR with no
-        reply `held.GRACE` after its merge is a **crossing**: an entry on `held_missed` and one
+        read_by`) are settled, in memory: a restarted home reads each once more, and since mail
+        is pruned, a PR merged longer ago than half `mail.MAIL_RETENTION` is settled unjudged. A
+        held PR with no reply `held.GRACE` after its merge is a **crossing**: an entry on `held_missed` and one
         `system` note to the person. A PR not merged yet, a failed read and a root the home holds
         no reading of write nothing and are read again."""
         try:
@@ -1057,12 +1059,17 @@ class TickMixin:
                 if merged is None or not self._is_record(s) or not self._held_member(s):
                     continue
                 paths = held_mod.held_paths(files, s.review)
-                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr):
+                # mail is pruned: past half its retention the reply that would clear a PR may be
+                # gone (a restarted home, a first promote), and that is no reading, never a crossing
+                old = mail.MAIL_RETENTION is not None and now - merged > mail.MAIL_RETENTION / 2
+                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr) or old:
                     self._held_settled.add((addr, s.created, pr))
                     self._held_tried.pop((addr, pr), None)
                     continue
                 if now - merged < held_mod.GRACE or any(c.get("pr") == pr for c in s.held_missed):
                     continue  # the reader merges, then replies: looked at again
+                self._held_settled.add((addr, s.created, pr))  # told once, whatever clears the entry
+                self._held_tried.pop((addr, pr), None)
                 entry = held_mod.crossing(pr, paths, now_iso())
                 s.held_missed = [*s.held_missed, entry]
                 reader = str((s.review or {}).get("reader") or "")
