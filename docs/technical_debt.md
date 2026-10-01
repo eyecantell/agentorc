@@ -8,7 +8,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 Three header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`anchor`, `designer`, `grinder`, `paul`, `dev-cadence`); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`); **Pickable** — `yes`, or `no — ` and the one clause that says why. Every open entry carries them; keep them true when the Status changes. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the three lines' shape, so a new word is added there and nowhere else.
 
-Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build | design-first | live-check | evaluation | decision
+Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build | design-first | live-check | evaluation | decision; Pickable = yes | no
 
 ---
 
