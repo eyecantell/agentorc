@@ -75,6 +75,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     NEAR_CAP,  # noqa: F401
     NO_CONTROLLERS,  # noqa: F401
     NO_GRANTS,  # noqa: F401
+    PLACE_TTL,  # noqa: F401
     UNDESCRIBED_GRANT,  # noqa: F401
     USAGE_AGED,  # noqa: F401
     USAGE_FRESH,  # noqa: F401
@@ -93,6 +94,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _look_for,  # noqa: F401
     _metered_chip,  # noqa: F401
     _money,  # noqa: F401
+    _place_cache,  # noqa: F401
     _projected,  # noqa: F401
     _reserve_why,  # noqa: F401
     _short_age,  # noqa: F401
@@ -110,6 +112,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     org_here,  # noqa: F401
     page_origin,  # noqa: F401
     projects_view,  # noqa: F401
+    repos_of,  # noqa: F401
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
     role_prompts,  # noqa: F401

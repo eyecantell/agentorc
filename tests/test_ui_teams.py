@@ -671,3 +671,40 @@ def test_start_with_a_role_hands_create_what_its_brief_was_made_from(world, clie
     assert client.post("/new", data={**data, "prompt": "typed"}, follow_redirects=False).status_code == 303
     (made,) = fleet.creates()
     assert made["prompt"] == "typed" and "prompt_from" not in made
+
+
+def test_a_placed_teams_host_registry_is_asked_once_per_ttl_and_a_refusal_is_unknown(monkeypatch):
+    """Design §4.9 *Where a repo's team lands* (TD-229 slice 3): the page asks the home's `host_repos`
+    for a placed team's checkout on its host — on a thread of its own, kept for `PLACE_TTL`, and a
+    refusal is `OSError` (the landing's *unknown*), kept as long as an answer."""
+    import asyncio
+
+    from agentorc.ui import common
+
+    calls: list[tuple[str, dict]] = []
+
+    def rpc(method: str, **params):
+        calls.append((method, params))
+        if params["host"] == "down":
+            raise RuntimeError("down did not answer: the link dropped")
+        if params["host"] == "old":
+            return {"host": "old"}  # no list: never read as *holds no repo*
+        return {"host": params["host"], "repos": ["/workspaces/sam"]}
+
+    monkeypatch.setattr(common, "_call_sync", rpc)
+    monkeypatch.setattr(common, "_place_cache", {})
+
+    async def on_the_loop() -> list[str]:
+        return common.repos_of("devenv")  # `org_here` is called on the event loop too
+
+    assert asyncio.run(on_the_loop()) == ["/workspaces/sam"]
+    assert common.repos_of("devenv") == ["/workspaces/sam"]
+    assert calls == [("host_repos", {"host": "devenv"})]
+    for host, why in (("down", "the link dropped"), ("old", "no list of checkouts")):
+        for _ in range(2):
+            with pytest.raises(OSError, match=why):
+                common.repos_of(host)
+    assert [p["host"] for _, p in calls] == ["devenv", "down", "old"]
+    monkeypatch.setattr(common, "PLACE_TTL", -1.0)  # past its time: asked again
+    common.repos_of("devenv")
+    assert len(calls) == 4

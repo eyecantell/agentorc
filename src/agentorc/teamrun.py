@@ -263,6 +263,25 @@ def files_via(call: Call) -> teams.Files:
     return files
 
 
+def repos_via(call: Call) -> orgmod.ReposOf:
+    """How the aggregate asks another host for its registered checkouts (design §4.9 *Where a
+    repo's team lands*, TD-229 slice 3): the home's `host_repos`. Any refusal — the host
+    unreachable, a node on a build without the `repos` link method — is `OSError`, which the
+    landing reads as *unknown*, never as *holds no repo*."""
+
+    def repos_of(host: str) -> list[str]:
+        try:
+            got = call("host_repos", host=host)
+        except Exception as e:  # noqa: BLE001 — whatever the transport raised, the registry is unknown
+            raise OSError(str(e)) from e
+        repos = (got or {}).get("repos")
+        if not isinstance(repos, list):
+            raise OSError(f"{host} answered its registry with no list of checkouts")
+        return [str(r) for r in repos]
+
+    return repos_of
+
+
 def start(
     call: Call, org: orgmod.Org, name: str, host: str, *, profile: str | None = None
 ) -> tuple[teams.Plan, dict[str, Any]]:

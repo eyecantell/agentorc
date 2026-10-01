@@ -22,12 +22,15 @@ teams:
     members: [{role: grinder}]
 roles:
   grinder: {profile: grind}
+place:
+  sam-grind: devenv                   # a repo-defined team that lands on a node (§4.9 *Where a repo's team lands*)
 ```
 
 A repo's `.agentorc.yml` may carry `teams:` of its own (teams whose only project is that repo), and
 the org a client sees is the aggregate (§4.9 *The org is an aggregate*, TD-229): `with_repos` folds
 in the teams of every checkout in the host's registry, the org file winning a name collision (the
-repo's reads *shadowed*) and a name two repos define refused in both. The file is read by the
+repo's reads *shadowed*) and a name two repos define refused in both, and says where each of a
+repo's teams lands (`landing`: the org file's `place:`, else this host). The file is read by the
 clients (`ao team`, `ao new`, the UI) on every use and cached nowhere; the host agent never reads
 it — it stores `team` and `project` as two plain strings on the record and nothing keys on them
 (§9 invariant 9). With no file the org is empty.
@@ -36,7 +39,7 @@ it — it stores `team` and `project` as two plain strings on the record and not
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -49,6 +52,10 @@ from sessionorc.models import GRANTS
 
 DEFAULT_MANAGER_ROLE = "manager"
 PERSON = "person"  # a manager role meaning the person manages: no manager session is started (§4.9)
+
+# A host's registered checkouts, in its registry's order (the home's `host_repos`). Raises `OSError`
+# when they cannot be told — an unreachable node, an older build — which is never *holds no repo*.
+ReposOf = Callable[[str], list[str]]
 
 
 @dataclass
@@ -162,6 +169,12 @@ class Org:
     shadowed: dict[str, list[Path]] = field(default_factory=dict)
     # a name two repos define, refused in both (§4.9 *Names are the org's*): team → why, naming each
     refused: dict[str, str] = field(default_factory=dict)
+    # where a repo-defined team lands when no repo may say (§4.9 *Where a repo's team lands*): team → host
+    place: dict[str, str] = field(default_factory=dict)
+    # where each repo-defined team lands and why: team → (host, *place* | *registered here* | *registered on <node>*)
+    landed: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # a repo-defined team whose landing cannot be told, which no start goes past: team → why
+    unlanded: dict[str, str] = field(default_factory=dict)
 
     def checkout(self, project: str, repo: str, host: str) -> Path | None:
         """Where `repo` of `project` is checked out on `host`; None when any of the three is unknown."""
@@ -202,6 +215,16 @@ def load(path: Path | None = None) -> Org:
         # checked per key as a repo's `roles:` is (TD-149 (4)): a typo is a line naming the key when
         # the file is read, never a preset that silently gains a key nothing reads
         org.roles[str(rname)] = repoconfig._role_block(str(rname), raw, f"{label}: roles")
+    for tname, raw in _mapping(data.get("place"), f"{label}: place").items():
+        host = _str(raw, f"{label}: place.{tname}").strip()
+        if not host:
+            raise ValueError(f"{label}: place.{tname}: name the host the team lands on")
+        if str(tname) in org.teams:
+            raise ValueError(
+                f"{label}: place.{tname}: {tname!r} is defined in this file, where its own `host:` places it — "
+                "`place:` is for a team a repo defines (design §4.9 *Where a repo's team lands*)"
+            )
+        org.place[str(tname)] = host
     _validate(org, label)
     for team in org.teams.values():
         _entries_resolve(org, team, f"{label}: teams.{team.name}.entries", ())
@@ -230,6 +253,9 @@ def merge_repo_teams(
         path=org.path,
         shadowed={k: list(v) for k, v in org.shadowed.items()},
         refused=dict(org.refused),
+        place=dict(org.place),
+        landed=dict(org.landed),
+        unlanded=dict(org.unlanded),
     )
     source = repo_root / ".agentorc.yml"
     label = f"{source}"
@@ -267,7 +293,101 @@ def merge_repo_teams(
     return merged
 
 
-def with_repos(org: Org, roots: Collection[Path | str]) -> tuple[Org, list[str]]:
+def landing(  # noqa: PLR0913 — the rule's own inputs, each one a clause of it
+    team: str,
+    repo: str,
+    place: dict[str, str],
+    here: str,
+    here_holds: bool,
+    nodes: Collection[str] = (),
+    repos_of: ReposOf | None = None,
+) -> tuple[str, str]:
+    """Where a repo-defined team lands, and why (design §4.9 *Where a repo's team lands*): `place:`
+    when it names the team; else this host when its registry holds the repo; else the one linked
+    node whose registry does. `(host, why)`, the why in `ao org`'s words.
+
+    Raises `ValueError` where the start is refused: the repo on several nodes and no `place:`
+    (naming them), on none, or a node whose registry cannot be told — that is *unknown*, never
+    *no repos*, since reading it as empty would land the team on another node."""
+    if place.get(team):
+        return place[team], "place"
+    if here_holds:
+        return here, "registered here"
+    on: list[str] = []
+    unknown: list[str] = []
+    for node in nodes:
+        try:
+            if repos_of is None:
+                raise OSError("nothing here asks a node for its registry")
+            if _named(repos_of(node), repo):
+                on.append(node)
+        except OSError as e:
+            unknown.append(f"{node} ({e})")
+    if unknown:
+        raise ValueError(
+            f"team {team}: where it lands cannot be told — {here}'s registry does not hold {repo}, and the "
+            f"registry of {', '.join(unknown)} could not be read; name its host under `place:` in org.yml"
+        )
+    if len(on) == 1:
+        return on[0], f"registered on {on[0]}"
+    if not on:
+        raise ValueError(f"team {team}: no linked host's registry holds its repo {repo} — nothing to land on")
+    raise ValueError(
+        f"team {team}: its repo {repo} is registered on several nodes ({', '.join(on)}) and `place:` names "
+        f"none — add `place: {{{team}: <host>}}` to org.yml (design §4.9 *Where a repo's team lands*)"
+    )
+
+
+def _named(repos: Collection[str], repo: str) -> list[str]:
+    """The registry entries that are `repo`: a checkout is its directory's name (§4.9)."""
+    return [str(r) for r in repos if Path(str(r)).name == repo]
+
+
+def _land(org: Org, base: Collection[str], here: str, repos_of: ReposOf | None) -> None:
+    """Give each repo-defined team of `org` its landing, in place (`org` is `with_repos`' own copy):
+    `landed`, and for one that lands on another host its `host` and the repo's path there — that
+    host's registry entry (§4.9 *The repo is the team's project*), asked through `repos_of`. A
+    project the org file defines (`base`) is used as it stands and nothing is asked. A landing that
+    cannot be told is `unlanded`, with the reason a start gives."""
+    for team in org.teams.values():
+        if team.source is None or team.source == org.path or len(team.projects) != 1:
+            continue  # the org file's own: its `host:` places it
+        repo = team.projects[0]
+        # the definition was read from a checkout in this host's registry, so this host holds it
+        host, why = landing(team.name, repo, org.place, here, here_holds=True)
+        org.landed[team.name] = (host, why)
+        if host == here:
+            continue
+        team.host = host
+        if repo in base or host in org.projects[repo].repos.get(repo, {}):
+            continue
+        try:
+            if repos_of is None:
+                raise OSError("nothing here asks a host for its registry")
+            found = _named(repos_of(host), repo)
+        except OSError as e:
+            org.unlanded[team.name] = (
+                f"team {team.name}: `place:` puts it on {host}, whose registry could not be read ({e}) — "
+                "nothing was started"
+            )
+            continue
+        if len(found) != 1:
+            org.unlanded[team.name] = (
+                f"team {team.name}: `place:` puts it on {host}, whose registry "
+                + (
+                    f"holds {repo} {len(found)} times ({', '.join(found)})"
+                    if found
+                    else f"holds no checkout named {repo}"
+                )
+                + f" — register the one checkout there, or name its path under `projects.{repo}` in org.yml"
+            )
+            continue
+        by_host = dict(org.projects[repo].repos.get(repo, {}))
+        by_host[host] = Path(found[0])
+        org.projects[repo] = Project(repo, {**org.projects[repo].repos, repo: by_host})
+
+
+def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | None = None) -> tuple[Org, list[str]]:
     """The org a client sees (design §4.9 *The org is an aggregate*, TD-229): `org` — the org file —
     plus the `teams:` of every checkout in `roots` (the host's repos registry), as each is checked
     out. `ao team` and the pages both read this one function, so they cannot disagree.
@@ -276,8 +396,14 @@ def with_repos(org: Org, roots: Collection[Path | str]) -> tuple[Org, list[str]]
     team's name keys its settings and its badge, and the later repo winning silently is how a start
     would run the wrong team. The org file still wins a name over any repo (`shadowed`). A repo
     whose `.agentorc.yml` cannot be read, or whose teams are refused, is skipped and named in the
-    returned notes — one broken file must not empty the page or `ao team list`."""
+    returned notes — one broken file must not empty the page or `ao team list`.
+
+    Each repo's team is then given where it lands (`landing`, `_land`): the org file's `place:`,
+    else this host, whose registry is what `roots` is. `repos_of` asks another host for its
+    registry — the path of a placed team's checkout there — and is only called for a team that
+    `place:` puts on another host. One that cannot be landed stays listed, `unlanded` saying why."""
     notes: list[str] = []
+    base, file_org = set(org.projects), org
     found: list[tuple[repoconfig.RepoConfig, dict[str, Any]]] = []
     seen: set[Path] = set()
     for root in roots:
@@ -303,21 +429,27 @@ def with_repos(org: Org, roots: Collection[Path | str]) -> tuple[Org, list[str]]
             org = merge_repo_teams(org, Path(cfg.root), mine, cfg.roles) if mine else org
         except (OSError, ValueError) as e:
             notes.append(f"{cfg.root}: {str(e).strip(chr(34))}")
-    if twice:
+    if twice or org is file_org:  # a copy of our own before anything is written on it
         org = Org(
-            projects=org.projects,
+            projects=dict(org.projects),
             teams=dict(org.teams),
             roles=org.roles,
             path=org.path,
             shadowed=org.shadowed,
             refused=dict(org.refused),
+            place=dict(org.place),
+            landed=dict(org.landed),
+            unlanded=dict(org.unlanded),
         )
+    if twice:
         for n, files in twice.items():
             org.refused[n] = (
                 f"team {n!r} is defined twice — in {' and in '.join(map(str, files))} — so neither starts: "
                 "a team's name is the org's; rename one (design §4.9 *Names are the org's*)"
             )
             notes.append(org.refused[n])
+    _land(org, base, hosts.local_host().name, repos_of)
+    notes.extend(org.unlanded.values())
     return org, notes
 
 
