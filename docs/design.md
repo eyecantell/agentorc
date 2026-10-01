@@ -1067,7 +1067,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed`, `idle_open`, `seat_filled` (§6 rule 11 and rule 3's manager on call, TD-247 — not built), `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `checks` (§6 rule 10), `conventions_seen` (§6 rule 12), `review` (§4.9b *The reader*), `context_bound` (§4.8), `restarts`, `restart_ceiling`, `closed_for` (§6 rule 2, TD-237, TD-238), `finished_sent_at` (§6 rule 9, TD-240), `held_missed` (§6 rule 11), `idle_open`, `seat_filled` (§6 rule 3's manager on call, TD-247 — not built), `restart_blocked`,
   `lane_seen` (§6 rule 6, TD-187, TD-195), `context_sent_at` (§6 rule 5), `brief` (§6 rule 7, TD-217 slice 2) and `brief_changed` (slice 3),
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
@@ -7100,22 +7100,32 @@ code and needs no grant; a session doing the same work does.
      home) and told by the clause alone, as rule 5 tells it. **Not this rule's**: a PR from a
      session with no `progress` entry naming it (a person's anchor — the cadence is theirs to
      run), and a repo whose checkout holds no `scripts/check_cadence.py`.
-  11. **Merged without its read** (TD-247; designed 2026-09-30, not built — TD-258). `ao pr held
+  11. **Merged without its read** (TD-247; designed 2026-09-30; built 2026-10-01 — TD-258 slice 2,
+     `sessionorc.held`, the tick's `_held_pass` and `_held_line`; the Inbox row is slice 5's). `ao pr held
      <n>` is the author's own read of its record's `review` against the PR's files (§4.9b *The
      reader*), and the host agent only stored the field; whether a held PR merged without the
      reader's reply was a sentence in this repo's manager supplement, and nothing checked it.
-     For a supervised member whose record carries `review`, each derived `done` — which is
-     always a **merged** PR, since `reports.derive` writes one only for a PR it read as merged — is read once at the home: the PR's changed files
-     (`gh pr view --json files`, one read per merged PR, in the record's registry root at the
+     For a supervised member whose record carries `review`, each `done` with a PR — the member's
+     own word or a derived one, since a declared `done` stands in a derived one's place (§9
+     invariant 10) — is read at the home once the PR has **merged**: the PR's changed files and
+     its merge time (`gh pr view --json files,changedFiles,mergedAt`, five PRs a pass on the
+     reports' cadence, the longest unread first; a PR not merged yet is read again, a settled one
+     no more — kept in memory, so a restarted home reads each once more, and a PR merged longer ago
+     than half the mail's retention is settled unjudged, since the reply that would clear it may be pruned — in the record's registry root at the
      home — the matching moves from `agentorc.review` into `sessionorc`, where `ao pr held` then
      reads it, since the package rule runs one way) against the record's `held:` globs; a PR
      touching none is not held, and the reading ends. A held one looks for its read **in the
      mail the home holds**: for `reader: techlead`, an `ask` carrying `pr: <n>` addressed to the
      team's seat with a reply from that seat on its thread — the reply is the read, whatever it
-     says, since the seat merges or sends findings and never stays silent (§4.9b); for `reader:
-     person`, the same `ask` in the person inbox, replied. Neither found is a crossing, written
-     to the record as **`held_missed: [{pr, at, paths}]`** (home-owned): the member gets one
-     fixed line, rule 5's two ways — *[agentorc] PR #845 touched held paths
+     says, since the seat merges or sends findings and never stays silent (§4.9b), and so is the
+     person's reply on that thread, where the seat left the ask past its bound and it went up; for `reader:
+     person`, the same `ask` to the person, replied by the person alone. The mail read is the record's own —
+     its `ask` in its outbox, the reply in its inbox — and, since mail is pruned, the `read_by`
+     rule 10 kept on the PR's `checks` entry. Neither found, **fifteen minutes after the merge**
+     (`held.GRACE`: the reader merges first and replies after, and the home may read in between), is a crossing, written
+     to the record as **`held_missed: [{pr, at, paths, told}]`** (home-owned): the member gets one
+     fixed line, rule 5's two ways — typed into the idle composer of an unattended member on the
+     home's host, else the clause on its next `ao` reply, said once, `told` marking either — *[agentorc] PR #845 touched held paths
      (`src/sessionorc/agent_tick.py`) and merged without the techlead's read — a held PR waits
      for `ao msg --kind ask --pr <n> <seat> "…"` and the reply before the merge* — and the
      person gets one `system` note, FYI and uncounted, naming the PR, the paths and the member,

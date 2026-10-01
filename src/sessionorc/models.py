@@ -110,6 +110,7 @@ HOME_OWNED = frozenset(
         "seat_count",
         "checks",
         "conventions_seen",
+        "held_missed",
         "review",
         "context_bound",
         "wrapup_prompt",
@@ -975,6 +976,10 @@ class Session:
     # headings landed at or before `created`, a later one landed after it joining as its `system`
     # note is sent. A restart's record starts without it. The home's, written by the tick alone.
     conventions_seen: dict[str, Any] | None = None
+    # The held PRs of this member that merged without their reader's reply (design §6 rule 11,
+    # TD-258): one entry per crossing, `{pr, at, paths}` — the held paths it touched — with `told`
+    # once the member was. Two entries are the Inbox row. The home's, written by the tick alone.
+    held_missed: list[dict[str, Any]] = field(default_factory=list)
     # Who reads this session's PRs before they merge (design §4.9b *The reader*, TD-093):
     # `{reader, held, bound}` from its role preset's `review:`, written at start. The home stores
     # it and times nothing; the author's own `ao` reads it to decide whether a PR is held.
