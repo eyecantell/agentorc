@@ -985,10 +985,20 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `~/.agentorc/boards/<repo>/tree` (made as the rollback's tree is, §6 *A rollback*), fetches
   `origin/<default>`, resets that tree to it, finds the item there — by its text, the line number
   the reader gave a hint, since the reader may have read the checkout's file and origin's lines
-  may sit elsewhere — makes the one-line edit, commits it with the fixed message, and pushes it
-  (`git push origin HEAD:<default>`, under `ALLOW_MAIN_PUSH=1`, the pre-push hook's deliberate
-  override, cadence §4): a push origin refuses because it moved in between is made once more
-  from the new head, the item found again by its text, and refused after that. The person's
+  may sit elsewhere — makes the one-line edit, commits it with the fixed message, and lands it on `origin/<default>`
+  **by the one road the forge's rule allows**: the commit is pushed on a branch of the host
+  agent's own (`board/<repo>/<stamp>`), and a pull request the host agent opens and squash-merges
+  at once through the forge's API (`gh pr create`, then `gh pr merge --squash --delete-branch`;
+  the fixed message is the PR's title and so the squash's) carries it onto the default branch.
+  Not a direct push: the repo's ruleset (*a PR required, 0 approvals*, cadence §4.7's teeth)
+  refuses one from anybody — `ALLOW_MAIN_PUSH=1` passes only the repo's own pre-push hook, never
+  the forge (found 2026-10-01: the anchor's push of two steer replies was *declined due to
+  repository rule violations*) — and a repo without the rule takes the same road, so there is one
+  road and nothing to probe. The commit is authored as the tree's git identity, the checkout's,
+  which the forge attributes. A squash merge is a merge: origin moving in between refuses
+  nothing unless the board line itself moved, and then the PR is closed, its branch deleted, and
+  the press refused as a moved line is. Cadence §4.6's audit reads the same fixed message on the
+  squash and classifies the commit as it does today. The person's
   checkout is never written by a board edit; it catches up by the pull (§6 *Pull*), and until it
   has, the SessionStart hook and `ao repo` read the line as it was there. The host agent is the
   only writer to those files from this system, and its own tree is the only place it writes
@@ -1006,14 +1016,14 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   second parser here; the Inbox, the Due strip and the edits all key on that line number, **and on
   the item's text**: the edit is refused unless that line still holds that item, open, word for word
   — a board edited since the read has moved its lines. **It is refused, touching nothing, when origin
-  cannot be reached** — the fetch or the push fails, and the refusal names it: *origin could not be
+  cannot be reached** — the fetch, the push, the PR's open or its merge fails (`gh` absent or signed out counts), and the refusal names it: *origin could not be
   reached (<why>): the edit was not made* (the board is read against origin already, §4.5 screen 6,
   so an edit made offline would be written where nothing reads it) — **when the item is not on
   origin** (a line the checkout alone holds, unpushed: *this line is not on origin yet: push the
   checkout first*), and when origin's line no longer holds that item, open, word for word. The
   state of the person's checkout — its branch, a dirty file, a rebase under way — refuses nothing:
   the edit does not touch it. The commit takes the board file alone (`--only`); one that fails (a
-  hook, say) or does not finish inside twenty seconds, push included, leaves the tree reset at
+  hook, say) or does not finish inside forty seconds, the merge included, leaves the tree reset at
   origin's head, and edits on one host are made one at a time, so two presses never interleave a
   read and a write. Each refusal says why and what to do, in words the Inbox shows. A row the page
   read from origin is as actionable as any other (TD-208's disabled row ends here: the write-back
