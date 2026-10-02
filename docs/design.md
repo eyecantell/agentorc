@@ -701,7 +701,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   nothing (cadence §2.12), so the home and the script differ by no entry. What nothing blocks
   and a grinder still cannot build — *built, the live look is left*, *needs an attended run*,
   *a synced file* — is said by the entry's `Kind:` or its `Owner:`, and the lanes carry their
-  owner words (§6 rule 6), so an unblocked entry of the anchor's is in no grinder's lane. **Opened and closed in a window** come from the ledger file's git history in the same
+  owner words (§6 rule 6), so an unblocked entry of the anchor's is in no lane that names another owner. **Opened and closed in a window** come from the ledger file's git history in the same
   checkout (one `git log --first-parent -p --unified=0 -- <ledger>`, the headings its diffs add and remove): an
   entry is *opened* at the first commit whose file holds its section and *closed* at the first
   commit whose file no longer does (archived, or done and removed); a file rewritten without a
