@@ -978,30 +978,64 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   reader gave the row, handed back as the line and text are, since the host agent does not run the
   reader) — the write-back, then the mail to whoever still holds the context (§4.5a *Inbox board row
   → Reply*) — the person's alone (refused to every session, as `inbox_delete` is), served by the
-  host whose checkout it is, on a board of a checkout in that host's repos registry and no other
-  file. The host agent is the only writer to those files from this system; it never pushes. A
-  bounded carve-out from cadence §4's branch → PR rule (cadence §4, *tool-made board edits*). The
+  host whose repos registry holds the repo, on that repo's board and no other file. **The edit is
+  made on origin's head, and landed there** (TD-222, designed 2026-10-01; the build is TD-264 — until it
+  lands the edit is committed in the main checkout, never pushed, and the anchor's next push
+  carries it): the host agent keeps a detached worktree of its own per repo,
+  `~/.agentorc/boards/<repo>/tree` (made as the rollback's tree is, §6 *A rollback*), fetches
+  `origin/<default>`, resets that tree to it, finds the item there — by its text, the line number
+  the reader gave a hint, since the reader may have read the checkout's file and origin's lines
+  may sit elsewhere — makes the one-line edit, commits it with the fixed message, and lands it on `origin/<default>`
+  **by the one road the forge's rule allows**: the commit is pushed on a branch of the host
+  agent's own (`board/<repo>/<stamp>`), and a pull request the host agent opens and squash-merges
+  at once through the forge's API (`gh pr create`, then `gh pr merge --squash --delete-branch`;
+  the fixed message is the PR's title and so the squash's) carries it onto the default branch.
+  Not a direct push: the repo's ruleset (*a PR required, 0 approvals*, cadence §4.7's teeth)
+  refuses one from anybody — `ALLOW_MAIN_PUSH=1` passes only the repo's own pre-push hook, never
+  the forge (found 2026-10-01: the anchor's push of two steer replies was *declined due to
+  repository rule violations*) — and a repo without the rule takes the same road, so there is one
+  road and nothing to probe. The commit is authored as the tree's git identity, the checkout's,
+  which must be one the forge links to an account: the ruleset asks an extra approval of an unattributed change, which nobody can give a PR of their own (TD-264 verifies this on the first live press). A squash merge is a merge: origin moving in between refuses
+  nothing unless the board line itself moved, and then the PR is closed, its branch deleted, and
+  the press refused as a moved line is. Cadence §4.6's audit (`check_cadence.py --since`) skips a PR's squash by its `(#n)` subject and
+  reads it as a merged PR, which fails for want of a review comment: the tool-made board PR is
+  dev-cadence's to recognise — by its subject, the fixed message, and its one-file, one-line diff —
+  as the board-edit carve-out it is, with §4.5's sentence, on the board for Paul. The person's
+  checkout is never written by a board edit; it catches up by the pull (§6 *Pull*), and until it
+  has, the SessionStart hook and `ao repo` read the line as it was there. The host agent is the
+  only writer to those files from this system, and its own tree is the only place it writes
+  them. A bounded carve-out from cadence §4's branch → PR rule (cadence §4.5, *tool-made board
+  edits*; its sentence that has the tool commit in the main checkout and never push changes with
+  this — dev-cadence's rule, on the board for Paul). Why origin and not the checkout: a commit
+  made in the checkout sat there until the anchor pushed, so every write-back left the checkout
+  ahead, the next merge that touched the board made the two differ both ways, and a row the page
+  had read from origin could not be acted on at all (TD-208); on origin's head the edit is where
+  every host and the reader's `--fetch` read it, and the checkout is only ever behind, which the
+  pull cures. The
   items, with the board line each sits on, come from `nudge_user_attention.py --report --json` —
   and, asked of dev-cadence 2026-09-24 (TD-126), each item's `session`, `host` and `refs` (its
   `Context:` references) as fields of that JSON, so the standing and the reply's addressee need no
   second parser here; the Inbox, the Due strip and the edits all key on that line number, **and on
   the item's text**: the edit is refused unless that line still holds that item, open, word for word
-  — a board edited since the read has moved its lines. **It is refused, touching nothing, whenever
-  the checkout cannot take the commit cleanly**: the checkout on any branch but `origin`'s default
-  (a board edit is committed on the default branch only, never onto someone's feature branch), the
-  board file already carrying uncommitted changes, or a merge, rebase, cherry-pick or index lock
-  under way. The commit takes the board file alone (`--only`), so what else the checkout has staged
-  or edited is left as it was; a commit that fails (a hook, say) or does not finish inside twenty
-  seconds puts the board back as it was, and edits on one host are made one at a time, so two
-  presses never interleave a read and a write. Each refusal says why and what to do, in words the
-  Inbox shows. A row the page read from origin offers no edit (TD-208; §4.5 screen 6 *Boards are read
-  against origin*): the write-back is asked only for a line the checkout holds. **Decide** (TD-254;
+  — a board edited since the read has moved its lines. **It is refused, touching nothing, when origin
+  cannot be reached** — the fetch, the push, the PR's open or its merge fails (`gh` absent or signed out counts), and the refusal names it: *origin could not be
+  reached (<why>): the edit was not made* (the board is read against origin already, §4.5 screen 6,
+  so an edit made offline would be written where nothing reads it) — **when the item is not on
+  origin** (a line the checkout alone holds, unpushed: *this line is not on origin yet: push the
+  checkout first*), and when origin's line no longer holds that item, open, word for word. The
+  state of the person's checkout — its branch, a dirty file, a rebase under way — refuses nothing:
+  the edit does not touch it. The commit takes the board file alone (`--only`); one that fails (a
+  hook, say) or does not finish inside forty seconds, the merge included, leaves the tree reset at
+  origin's head, and edits on one host are made one at a time, so two presses never interleave a
+  read and a write. Each refusal says why and what to do, in words the Inbox shows. A row the page
+  read from origin is as actionable as any other (TD-208's disabled row ends here: the write-back
+  works on origin's line, so which file the page read no longer matters; §4.5 screen 6). **Decide** (TD-254;
   built — TD-255: the write-back, and the row's answer buttons and *Go with it*) is the fourth edit and the one cadence §4.5 always
   allowed a tool: the edit `board_edit.py decide` makes — `Decided: <text> (<date>)` at the end of
   the item's line, committed as `agentorc: decide <head>: <answer> (session <name>)`, the form
   `check_cadence.py` already accepts — made here as the other three are, in `board.py` under the
   same `ready` check, exact line text, one at a time; the person's action as every Decide is and
-  refused as the others are — the line moved, a board read from origin, a dirty board — and
+  refused as the others are — the line moved, origin unreachable — and
   refused on a line that already carries `Decided:`; and an answer or a reply whose own words hold
   a field's name (`Answers:` or `Decided:`) is refused, since the reader would read the words as
   the field. The answer is handed by the page with the
@@ -2162,15 +2196,21 @@ Screens:
    an `ls-remote` and, within its own allowance, a `gh` call a repo), and a read that is stopped or fails
    is followed at once by a plain read without `--fetch`, so a dead remote costs the origin
    view and never the board: the rows are the checkouts', under the note *origin could not be
-   reached*. (3) *The read after a press* — Snooze, Done, Reply — is a plain read of that one
-   board, laid over the last reading, so a press never waits on the network and the other
-   repos' rows do not move.
+   reached*. (3) *The read after a press* — Snooze, Done, Reply, Decide — is a read of that one board
+   alone, laid over the last reading, so the other repos' rows do not move: a fetching one once
+   the write-back lands on origin's head (TD-264; the edit is there and not yet in the checkout,
+   §4.4), bounded as every fetching read is and, stopped, showing the line as the write-back's
+   result reported it — a plain one until then.
    What the reader found is said, by board, in **one note above that repo's first board row**
    in each list the page draws (*Needs you*, *Board, coming up*, the *not shown* fold, the Repo
    page's *Waiting on you*), drawn as text; the phrases are one table in the code, and a test
    fails on a phrase in the reader that the table does not know:
    - *matches origin*, or *no board on origin*: no note.
-   - *behind*: *read from origin/main: this checkout has not pulled it yet* — nothing is hidden.
+   - *behind*: *read from origin/main: this checkout has not pulled it yet* — nothing is hidden;
+     the note's tail is the pull's standing (§6 *Pull*, TD-222): *— the host agent pulls it once
+     `<name>` is idle* (the occupant it waits on; *once it is idle* when it cannot read the
+     occupant's state), *— it could not be pulled: <git's reason>*, *— pulling is off for this
+     repo*, or no tail when the pass has not reached the repo yet.
    - *local edits not pushed*: *board edits made here are not on origin* — nothing is hidden;
      the rows are the checkout's.
    - *both sides changed*, or no common history: *this checkout's board and origin's have both
@@ -2178,18 +2218,18 @@ Screens:
      warning colour, since rows are hidden and the page must not look clear when it is not.
    - *fetch skipped*, or the read stopped at its bound: *origin could not be reached (<the
      reason>): showing the checkout's board as of its last pull*.
-   **A row read from origin is read-only until the checkout is pulled.** The write-back edits
-   the checkout's file on the line and the text it is given (§4.4), and that file does not hold
-   origin's line yet; so on a board whose `source` is origin, Snooze, Done and Reply are drawn
-   disabled, their reason beside them — *on origin, not in this checkout yet: pull to act on
-   it* — and **Open board** stays; a press that reaches the UI anyway is refused in the same
-   words and never sent to the write-back, unless a plain read of that one board finds the
-   checkout now holds the line (pulled since the reading), when it goes through. **The host agent does not pull**: the main checkout is the
-   person's (§4.9 *Home and reach*; §6 *Promote*: *the tree is a person's*), a fast-forward moves
-   tracked files under a live anchor session, and the reader's *behind* is about the board file
-   and not the branch, so a fast-forward would be refused on any checkout with a commit of its
-   own. Whether the host agent may ever move that tree, and how a write-back reaches origin, is
-   one decision of the person's (TD-222). **Not covered**: a board that exists on origin and
+   **Every row is actionable, whichever file its board was read from** (TD-222, designed
+   2026-10-01; until TD-264 lands, a row read from origin is drawn as TD-208 designed and TD-221
+   built: Snooze, Done, Reply and the answers disabled with *on origin, not in this checkout yet:
+   pull to act on it*, **Open board** staying, and a press that reaches the UI anyway refused in
+   the same words). The write-back edits origin's line and not the checkout's (§4.4), so a board
+   read from origin is exactly the file it will edit, and a board read from the checkout holds
+   the same lines unless the checkout is ahead — then a line origin lacks is refused by the
+   write-back, which says so. **The host agent pulls** (Paul, 2026-10-01, reversing *the host
+   agent does not pull* of TD-208): a checkout merely behind is fast-forwarded by the home's tick
+   when git allows and the anchor session is idle (§6 *Pull*), so *behind* is a passing state and
+   its note says when it will pass; a checkout ahead, or on another branch, is the person's as it
+   was, and the note says that too. **Not covered**: a board that exists on origin and
    not in the checkout at all (the read names the boards it finds on disk), and `ao repo`'s
    due count (§4.7), which stays a read of the checkout.
 
@@ -2600,7 +2640,7 @@ noted). If a control is not in this table it does not exist.
 | Due strip / Inbox board row | **Works** / **Not right…** | designed 2026-09-30 (TD-254; built — TD-255 slice 3; §4.4 *Decide*): a live look's answers are cadence's fixed pair `Answers: Works \| Not right: <what>.`, and the page draws that pair by its words, not as two of the buttons above — the item's `kind` is `watch` and its two answers are *Works* and the form *Not right: <what>*, else they are ordinary answer buttons (a third answer, or a complete *Not right: wrong repo*, is one): **Works** decides at once with *Works* (a `(default)` on it makes that button *Go with it: Works*, which `g` presses, and the row draws no second Go with it in its foot); **Not right…** opens the Reply composer with *Not right:* begun and decides with the text typed, one write (`Decided: Not right: <what>`). What follows each is the raising team's: a *Works* is the order to close the line and archive the entry it checked, which the manager's round reads from `decided` on its repo's board items (`ao repo --json`, §4.9), and a *Not right* is an entry handed to the repo's techlead as **Add entry…** hands one (§4.9 *Add an entry to the ledger*, TD-218: the page's second call, `entry_add` with type `debt` — cadence §2.11's word for something wrong now — the repo's teams as the page knows them, after the decide has committed; its first line the item's head and the person's words, so the person types once; a refusal — no team with a techlead seat — is shown and the decision stands). This repo's existing live looks get the pair in one pass by a grinder once TD-074's words are settled, and the briefs' *merged, live look pending* line is written with the pair from then on (TD-255 slice 4) |
 | Inbox, Repo page: board rows | **Board, coming up (n)** · **not shown (n)** fold · **show** · *Settings* | designed 2026-09-28 (TD-207; built 2026-09-28 — TD-220 slice 3; §4.5 screen 6 *The board's horizon*). Under the due board rows, the items the person's mode (`person.inbox.board_show`) draws before they are due, soonest first, each the board row with its own Snooze, Done, Reply and Open board and its due words *due in 6 d · Oct 4*, drawn quieter and counted in no number but the rail's *board items*, which counts the board rows on the page. Under them the fold **not shown (n)** holds what the mode hides, closed. One line says the mode and what it hides — *showing the next 10 board items per team · 14 not shown, the next due Oct 12 — show · Settings*: **show** opens the fold for this page view and writes nothing; *Settings* links to the Settings page's **You**. The line is drawn whenever a board is read, with no fold when nothing is hidden. Display and two links: nothing here is built from a session's words |
 | Settings page | **You**: **board items shown** | designed 2026-09-28 (TD-207; built 2026-09-28 — TD-220 slice 4): a pick of four — *the next* `n` *per team* · *only what is past due* · *due this week* (*due within* `n` *days* when n is not 7) · *all* — the two numbers fields beside their choice (10 and 7 until typed), written to `person.inbox.board_show` (`next:10`, `due`, `7d`, `all`; §5) through `set_settings`, which refuses an n outside 1 to 50 for `next:` and 1 to 365 for days; the default is `next:10`. An item that is due is shown and counted under every choice. Its *i* text: *which board items the Inbox shows before they are due; they are listed under "Board, coming up" and are not counted; what this hides is under "not shown"* |
-| Inbox, Repo page: board rows | **origin note** | display only (TD-208; designed 2026-09-28, built 2026-09-29 — TD-221; §4.5 screen 6 *Boards are read against origin*): one line above a repo's first board row saying where its board was read and what that hides — *read from origin/main: this checkout has not pulled it yet*; *board edits made here are not on origin*; *this checkout's board and origin's have both changed: showing the checkout's, and what origin added is not shown — pull* (the warning colour); *origin could not be reached (timeout): showing the checkout's board as of its last pull*. No note when the board matches origin or origin has none. The words are ours, chosen by the reader's per-board `source` (read from origin or not) and the fixed phrases of its `fetch_note`, which carry no count, so the note gives none. On a board read from origin the rows' **Snooze ▾**, **Done** and **Reply** are disabled with *on origin, not in this checkout yet: pull to act on it*; **Open board** stays |
+| Inbox, Repo page: board rows | **origin note** | display only (TD-208; designed 2026-09-28, built 2026-09-29 — TD-221; §4.5 screen 6 *Boards are read against origin*): one line above a repo's first board row saying where its board was read and what that hides — *read from origin/main: this checkout has not pulled it yet*; *board edits made here are not on origin*; *this checkout's board and origin's have both changed: showing the checkout's, and what origin added is not shown — pull* (the warning colour); *origin could not be reached (timeout): showing the checkout's board as of its last pull*. No note when the board matches origin or origin has none. The words are ours, chosen by the reader's per-board `source` (read from origin or not) and the fixed phrases of its `fetch_note`, which carry no count, so the note gives none. The *behind* note ends with the pull's standing — *— the host agent pulls it once `<name>` is idle*, *— it could not be pulled: <why>*, *— pulling is off for this repo* — from the home's `pulls` reading (§6 *Pull*, TD-222). A row read from origin is as actionable as any (TD-222; until TD-264 lands, its **Snooze ▾**, **Done**, **Reply** and answers are disabled with *on origin, not in this checkout yet: pull to act on it*, as TD-221 built); **Open board** stays |
 | Due strip / Inbox board row | **Reply** | designed 2026-09-24 (TD-126, Paul's shape); the file half built (TD-142 slice 1: the button, the composer, `board_reply` writing and committing), the mail half and the standing not yet. Opens the one dialog Reply and Message share, the line's head quoted; **Send** calls `board_reply {board, line, text, reply, refs}` (§4.4 *Board write-back*; `refs` as the reader gave them), the person's alone. What it does, in order: **always writes the reply on the board** — appended to the item's own line as ` — Paul, <date>: <reply>`, one commit — so the line, still due, carries the instruction to the next session that reads the board (through the Inbox row now; through the SessionStart hook once the reader prints a line's reply tails after the head it clips at 200 characters, §4.4); **and mails it as well only when a live session still holds the context**: every live record with an unexpired declared lease (§4.8, `LEASE_TTL`) on one of the line's `refs` gets a `note` from the person, `about` that reference, marked `handed` (§4.8a; it owes an outcome, which shows under *Waiting on them*, §4.10 *Outcomes*), its text the line's head and the reply. A sender that has moved on or exited is not written to (Paul: *will it have moved on and the reply is a distraction, or will it already have the context?* — the lease answers that). The row **says where a reply will go before the press**, beside the sender's name: *still on TD-122 — grinder-ao-2 holds it* (a live lease on one of the line's refs; the reply reaches that session, which need not be the line's author), *moved on* (the named session is live and holds no lease on them), *gone* (no live session by that name and no holder); the result after the press repeats it — *written on the board* / *written on the board · sent to grinder-ao-2 (holds TD-122)* — and the trail says the same. **A reply is not Done**: the line stays counted until the instruction is carried out, and whoever carries it out closes the line as any board line is closed. The file half is written before the mail half, and a mail failure is said in the result with the file half done. `session`, `host` and `refs` are fields of dev-cadence's reader (§4.4), never parsed here; until the reader carries them the row draws no standing and Reply writes on the board alone, saying so |
 | Inbox board row | **standing** | display only (TD-126): *still on <ref> — <session> holds it*, *moved on* or *gone*, as the Reply row defines them, computed by the page from the records it already holds — a live record with a declared `claimed` on one of the item's `refs` younger than `LEASE_TTL`, else whether a live record carries the item's `session` name — and refreshed with the poll. A word, never a control |
 | Due strip | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
@@ -2646,7 +2686,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; built 2026-09-25 — TD-136): one mail entry whole, reached from the row's text and its *whole entry ›* link, and from `Enter` on the ringed row (a trail row's *re* is not a link yet). **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
 | Settings page | **Usage**: a reserve field per profile per window, **Save** per profile card | §4.5 screen 8 (TD-100 (4); built — TD-148). Each field takes what `ao gate` takes — `30`, `10/day`, empty to clear — and shows the line it makes today beside it before the press lands; **Save** calls `set_settings {profile, reserves}` for that card, the person's alone, and the card says *applies on the next tick*. A label the adapter has not reported is refused with the reported ones named, in place, as the CLI does. Cards are grouped under their account as the chip is (TD-122); a profile absent from the file shows empty fields, not zeros. A **metered** profile's card (§4.2a; TD-128, reconciled 2026-09-25; built — TD-151 slice 5) carries the same fields for `day`, `week` and `month` — the home's labels — each taking an **amount** as `ao gate` does (`$5`, `20M tok`, empty to clear) and refusing a percent by naming the billing, with the account's spend beside it as the chip draws it, *spent $3.20 · 64% · resets 00:00*; its badge reads *account <account> · <tool> · metered · $3 in / $15 out per M*, a priceless profile's *· metered · tokens*, and its foot names `profiles.yml`, by hand, with **Open file**, as a definition's card does. Cards on one metered account share the spend and keep their own amounts, as subscription cards share a reading and keep their own reserves. **The reading's age** (TD-230; built — TD-233 slices 1 and 4): beside each window's reading on a profile's card, under its line, its age and source as the chip's hover gives them — *58% · read 7m ago, asked of the endpoint*, *unknown since 22:21 (was 88%)* past three hours or the window's reset — and, after the line, what the gate reads when the reading is past `max_age` while unattended sessions work, *→ line 95% · projected 96%*, or *· no rate to project by*; and one field above the accounts' cards, since the setting is one for every account, **trust a reading for** (`usage.max_age`: an age such as `90m`, `off` to never project, empty for the default `1h`), written through `set_settings` and refused in place out of its bounds |
 | Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **when work appears**, **balance**, **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **balance** (TD-177; designed 2026-09-29, built 2026-09-30 — TD-239 slice 4) is a switch and three fields — *open PRs above* `n`, *oldest open longer than* `d`, *the reader's queue past its bound* (a tick box) — written to `teams.<team>.balance` (§6 *Balance*); off, the key is absent; turned on, the fields start at 10, `2d` and ticked, and a field left empty is a line not drawn; under them, the repo's numbers as they read now, so the line is set against what it would have done today — `ao team balance`'s three lines (`teamrun.balance_rows`), and above them the mark while one stands, and *no live member: a team with none is not read* where that is so; the lines are written whole, and only when a Save moved them, a switch on with no line drawn refused in place. **when work appears** (TD-214; designed 2026-09-28, built — TD-227 slice 3) is a picker of three, *ask me · start the team · do nothing*, written to `teams.<team>.on_work` (§6 rule 8) when the pick moves, *ask me* marked *default* while the key is absent. **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
-| Settings page | **Repos**: the promote's **auto** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no switch and says why |
+| Settings page | **Repos**: the promote's **auto** switch, the **pull** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no auto switch and says why. **pull** (§6 *Pull*; TD-222, designed 2026-10-01; the build is TD-263) on every card, `promote:` block or not: on when `repos.<repo>.pull` is absent, written through `set_settings`, and beside it the last pass's reading for the checkout — *current*, *last pulled <age> · n commits*, *waiting: <name> is mid-turn*, *refused: <why>*, *off* — so a checkout that is not following origin says why here |
 | Settings page | **You**: `open_in` (preset, template or none), terminal **size** and **face**; **Reset this browser** | *yours everywhere*, written to `person:` through `set_settings`: `open_in` as §5 defines it (`vscode`, `none`, or `{label, url}`, the same refusals, a bad template named in place and the default kept); the terminal's **size** (a number of pixels, bounded 8–32 as `set_settings` bounds it) and **face** (a typed or picked `font-family` name; `monospace` is always appended and ligatures stay off — goal 12), applied to every open terminal without a reload. *this browser*: the theme, *mine* and the folds as they stand, display with their own controls where they already have one, and **Reset this browser**, which clears every `ao.*` key of this browser's `localStorage` after a confirm and reloads — a new control, browser-local, writing nothing anywhere else |
 | Settings page | **Open file** | the editor button with a file's path in place of a session directory (§5 `person.open_in`): `{path}` the file, `{remote}` the host as before; drawn on every file card (hosts, profiles, org, each repo's `.agentorc.yml`, and the home's `settings.yml` itself, read-only there) and absent under `open_in: none` |
 | Settings page | read-only values and the ***i*** mark | display only: every value of `hosts.yml`, `profiles.yml`, `org.yml` and a repo's `.agentorc.yml` as the client reads it, and beside each file's heading an *i* mark whose paragraph names the file's path, when it is re-read (per request, per tick, or at the agent's start — a host's name, `home:` and identity mode are start-only, and the mark says *restart the host agent to apply*), and who edits it (by hand; by PR). A value the file does not set shows its default, marked *default*. Nothing here is a control |
@@ -4546,9 +4586,9 @@ between readings.
   is the first free over the ledger and the archive on `origin/main` **and the open PRs**, read
   again before the merge and changed when another PR took it. The entry's `**Added:**` line
   names both hands: *<date> (<the person>, through Add entry; drafted by <session>)*. **The
-  board write-back's committed add is not the path** (§4.4): it commits on the default branch
-  of one checkout and never pushes, which suits a line the person reads on that host and would
-  leave an entry where no team reads it.
+  board write-back's committed add is not the path** (§4.4): it writes one line of one file with
+  no PR, which suits a board line and would leave an entry with no Summary row, no number check
+  and no review.
 - **The person does not approve the entry before it is filed.** The outcome — `ao msg person
   --outcome done "TD-NNN <title> — PR #n" --for <id>` — names the entry and the PR, and lands
   under the person's words; an entry that reads wrong is a line's edit in its file or a reply on
@@ -6317,7 +6357,7 @@ teams:                                        # per team, by the name org.yml or
     on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
-  agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
+  agentorc: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .agentorc.yml); §6 *Pull*: the checkout follows origin, on when absent (TD-222)
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
@@ -6326,7 +6366,7 @@ person:                                       # the person's own — nothing her
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it (the gate reads amounts since TD-151 slice 3; `set_settings`, `ao gate` and the Settings page take them since slice 5). A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
-  no schedule, no stop time and no priority, and asks when work appears (`on_work: ask`); a repo absent under `repos:` promotes by hand.
+  no schedule, no stop time and no priority, and asks when work appears (`on_work: ask`); a repo absent under `repos:` promotes by hand and is pulled (§6 *Pull*: `pull: false` is the opt-out).
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
   reads that, offline included — *policies that stop run on the node, from its replica* — so the
@@ -7326,6 +7366,54 @@ code and needs no grant; a session doing the same work does.
     `ao` that runs. A live copy that does not start is below it: the person makes the worktree
     and starts the repo's `run` in it by hand, and this repo's CLAUDE.md says so beside the
     promote's own pair.
+- **Pull: the main checkout follows origin** (TD-222; decided by Paul 2026-10-01 — *should we have
+  our host agent pull it routinely if no session is running on the anchor? … lets have it do when
+  git allows and the anchor session is idle*; designed 2026-10-01; the build is TD-263): the
+  registry's main checkouts move only when someone pulls, so on 2026-10-01 the anchor's `main`
+  stood nineteen commits behind origin with every board row read from origin disabled, and the
+  promote's precondition (1) fails on any checkout no one has pulled since the merge. So the
+  home's tick pulls them. It runs **at the home** (§4.4a: policies that act run at the home), in
+  the promote's pass and on its cadence (five minutes, the full readings, detached from the tick
+  as the `gh` reads are), over **every checkout in the home's registry**, `promote:` block or not —
+  one `git fetch origin <default>` per repo per pass (the promote's own fetch where the repo has
+  one, never a second), then `git merge --ff-only origin/<default>` when two things hold.
+  **(1) Git allows**: the checkout is on its default branch (`origin/HEAD`'s); no merge, rebase,
+  cherry-pick or index lock is under way (the list `board.ready` keeps); the repo has no promote
+  run in flight (`run` installs from this tree, §6 *Promote*); and the fast-forward itself goes
+  through — git refuses one that would overwrite a locally changed tracked file, so a dirty file
+  elsewhere (an unsaved memory note under `docs/claude-memory/`) stops nothing and nothing of the
+  person's is overwritten, and a checkout with a commit of its own is left alone, `--ff-only`
+  refusing it. The policy makes no checkout, no reset, no rebase and no stash: nothing beyond the
+  fetch and the fast-forward, and it never pushes — a checkout ahead of origin is the person's to
+  push (the write-back's commit no longer sits there: §4.4 *Board write-back* lands on origin's
+  head). **(2) The anchor session is idle**: no session in the checkout's root is mid-turn. The
+  home reads it from what the anchor rule reads (`occupants`, §9 invariant 2), with shells
+  counted too: every record of ours whose `dir` is that root, and a container node's record over
+  the same path while its link is up, is at rest — `idle`, `exited` or `closed`; `working`,
+  `needs-you`, `stalled?`, `limited` and `unreachable` are not rest, since a turn may be under
+  way or about to resume — and every live session the adapters see there outside agentorc (a
+  plain `claude` in a terminal, `external_sessions`, §4.3) reports `idle` from the tool's own
+  registry (`status`: busy | idle | shell). One the home cannot read the state of is taken as
+  mid-turn, and the pass waits (the anchor's recommendation in the entry: no pull, and the note
+  stays). No session at all is idle. A `shell` record running a foreground command is `working`
+  and counts: it may be `git` itself. So tracked files move under the anchor only while it sits
+  at the composer, which is where a person's own `git pull --ff-only` (cadence §1.10) finds it.
+  **It says nothing**: a pull is routine, so no mail, no state change and no trail line; the
+  outcome is a reading on `host` under `pulls`, one per registered checkout, kept beside
+  `promotes` — `{at, outcome, why, from, to, commits, occupant}`, `outcome` one of *current*
+  (already at origin's head), *pulled* (with `from`, `to` and `commits`), *waiting* (with the
+  `occupant` it waits on, or *unreadable*), *refused* (with git's reason, or *on <branch>*, *a
+  promote in flight*, *a git operation under way*) and *off* — drawn by the Inbox's origin note
+  (§4.5 screen 6 *Boards are read against origin*: the *behind* note's tail) and by the Settings
+  page's Repos card (§4.5a), never pushed to anyone. **The switch** is `repos.<repo>.pull` in
+  `settings.yml` (§5; the Repos card's **pull**), `true` when absent — Paul's rule is the default
+  — and `false` leaves the checkout to the person, the reading *off*. What it is not: it does not
+  move the live copy (the promote stays its own press or policy; that a pull makes precondition
+  (1) hold more often is all), it never touches a worktree (a member's home is its own, §4.9
+  *Home and reach*), and it never moves a checkout to a branch or a commit (that is the person's,
+  and a rollback's tree is the host agent's own, §6 *A rollback*). *The tree is a person's* (§6
+  *Promote*) stands as it was for the promote, which reads the tree and never makes it; the pull
+  is the one move the host agent makes in a person's checkout, and only ever a fast-forward.
 - **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general
