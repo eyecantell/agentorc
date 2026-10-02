@@ -128,6 +128,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-259 | Build the manager on call: `on_call` on `manager:`, the `team` trigger with `seat_due.by`, `idle_open` and `seat_filled`, the sweep's seat exception, the card's slot and the Inbox row, the manager brief as a seat's, the first look on dc-grind | Medium | In progress — slices 1–5 built and the default flipped to on call; slice 6, the first look on dc-grind after a promote, is left |
 | TD-262 | A card says *closed by you* for every closed session, whoever closed it: dc-grind's manager wound its own team down 40 s after a start and all three cards named the person | Medium | Open — design first |
 | TD-266 | A closed session's card does not say how it is removed: Forget is behind Details, and its *more ⋯* offers Wrap up, Kill and Close, which do nothing for it | Medium | Open — design first |
+| TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Open |
+| TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Open — design first |
+| TD-270 | Hover texts that hold more than one thing are one run-on paragraph: the usage chip's windows and profiles, and Message…'s *when it is read* on a seat | Low | Open |
 
 
 ---
@@ -2404,3 +2407,57 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a person removes a closed session from its card on the Org, and a closed card's menu holds no control that does nothing.
 
 **Related:** TD-095 (the card's anatomy), TD-156 (the end of a session — Paul's UI review, which covers Focus after Wrap up), TD-262 / TD-265 (who closed it, the same slot), TD-097 (a seat's card).
+
+## TD-268: Members… → Add member writes a duplicate name: nothing refuses it, nothing starts, and Remove would wind down the live member
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: TD-172's live look, *this does not appear to be working correctly … note name similarity and not shown on team card*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`openMembers`: `fill` sets the name box to the **existing** member's name for the picked role), `src/agentorc/org.py` (`edit_members`: appends `- {role, name}` with no check against the team's names), `src/agentorc/teamrun.py` (`add_member`: `new` is the names not there before, so a duplicate makes it empty and nothing is created, with no error; `remove_member`: winds down the live session holding the removed entry's name), `tests/` (the members tests)
+
+**Why:** Paul pressed **Members…** on dc-grind while it ran and **Add member** with the form as it opened: role `grinder`, name `grinder-dc-1` — the name of the grinder already there, which is what the form prefills. `org.yml` gained `- {role: grinder, name: grinder-dc-1}` (the home's commit `d3ac743`, *org: dc-grind added grinder-dc-1 (grinder)*), no session started, no card appeared, and the toast said nothing was wrong. The dialog then listed two rows, *grinder · grinder-dc-1 · free-pick · 1* and *grinder · grinder-dc-1 · — · 1*, each showing the one live session as its holder and each with **Remove** — and Remove on either sends that live grinder the wrap-up, since the removed entry's name is its name. The team's definition now names one session twice, which the next Start has to make something of.
+
+**Fix:** (1) **The form offers the next free name**: for the picked role, the team's pattern with the first number no member holds (`grinder-dc-2`), never an existing name. (2) **A duplicate is refused before anything is written**: `edit_members` (or `add_member` ahead of it) refuses a name the team's definition already holds, in the page's words — *dc-grind already has grinder-dc-1* — and the file and the home's history are untouched. (3) **A definition that already holds a duplicate** is said by `ao org check` and on the Members dialog, and Remove on a duplicated entry removes the line without winding down a session another entry still names. (4) Tests: the prefill, the refusal leaving the file byte-identical, Remove on a duplicate. The duplicate line in this home's `org.yml` is Paul's or the anchor's to take out by hand (a revert of `d3ac743`); the anchor's attempt on 2026-10-01 was refused by its permissions.
+
+**Done when:** Add member with the form as it opens on a running team starts a new, differently named member whose card appears, and a typed duplicate is refused with the file unchanged.
+
+**Related:** TD-172 (Members…, whose live look this was), TD-229 (a repo-defined team's Members… is disabled), TD-210 (the home's definition history).
+
+## TD-269: The New session form's Team pick ticks no controller when the team's manager is on call
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: TD-173's live look — after picking **Team: ao-grind** and a directory, Controllers still read *No session holds the control grant yet, so nothing could act on this one…*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first: §4.5a's New session **Controllers** row meets §6 rule 3's manager on call
+**Location:** `src/agentorc/ui/app.py` (the New session page: `control_holders` are sessions holding `control` whose state is not `closed` or `exited`), `src/agentorc/ui/templates/new.html` (the Controllers picker and its empty note), design §4.5a New session **Team** and **Controllers**, §6 rule 3 *A manager on call is a seat of this rule* (TD-259)
+
+**Why:** TD-173 built: pick a team and its manager is ticked under Controllers, so a person's own session in a team is the manager's to stop and steer. Since TD-259 every manager is on call by default — closed until something fills its seat — and the picker lists live holders only, so on a team started today the list is empty and the form says no session holds the grant. A person's session joined that way has no controller, and the manager that fills its seat later does not gain it.
+
+**Fix:** design first. Say what the Controllers picker shows for a team whose manager is a seat on call: the seat by name (*manager-ao-1 · on call*), ticked, with the controller recorded by the name the seat fills under, so the manager that comes holds the session — or say that a person's own session in such a team has no controller and what the form tells the person. The empty note's words change either way: today's tell the person to grant control from a Focus header, which is not what is missing.
+
+**Done when:** the design says which, the form says it, and a session started from the form in a team with an on-call manager is controlled as the design says once the seat fills.
+
+**Related:** TD-173 (the Team field), TD-259 (the manager on call), TD-160 (a person's own session inside a team), TD-097 (a seat's card).
+
+## TD-270: Hover texts that hold more than one thing are one run-on paragraph
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: on the usage chip, *the mouseover text is one big paragraph which is hard to read — it should get formatted*; on a seat's Message…, *the mouseover message should be formatted better*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/` — the usage chip's hover (every window, then *profiles on this account:*; TD-122, TD-233, TD-151), the card's **Message…** `title` on a seat (the *When it is read* lines, TD-168), and any other `title` built by joining sentences; `src/agentorc/ui/help.py` (`help_title`)
+
+**Why:** both hovers are right in what they say and hard to read: the chip's lists several windows, their ages and each profile in one wrapped block, and the seat's Message… runs its *when it is read* sentences together. A `title` shows line breaks, so a list can be a list.
+
+**Fix:** one item per line in a hover that lists — the chip's windows one per line, a blank line, then the profiles one per line; Message…'s lines for `ask` and `note` each on its own — by a newline in the `title` (and the same text, unbroken, wherever it doubles as an `aria` description). Sweep the other joined titles on the Org and the Inbox in the same PR and name them in it. If a hover needs more than line breaks, that is a design question (§4.5a) and goes to the designer, not into this entry.
+
+**Done when:** the usage chip's hover and a seat's Message… hover read as short lines, and the PR lists every title it changed.
+
+**Related:** TD-122, TD-233, TD-151 (the chip), TD-168 and TD-097 (the seat's Message…), TD-167 (the *i* panels, where longer help already lives).
