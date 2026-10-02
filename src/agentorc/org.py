@@ -192,7 +192,8 @@ class TeamDef:
         of that role (the `count:` an add bumps), else the team's pattern for it — the last entry of
         the role, its trailing number dropped — with the first number no name of the team holds
         (`grinder-dc-1` → `grinder-dc-2`); a role the team has no entry of, the role itself while
-        free. Never a name the definition already holds (TD-268)."""
+        free. Otherwise never a name the definition already holds (TD-268); a counted entry's next is
+        what its bump makes whatever the box says, and Add refuses it when another entry holds it."""
         taken = set(self.session_names())
         same = [m for m in self.members if m.team is None and m.role == role]
         counted = next((m for m in same if m.count > 1), None)

@@ -163,10 +163,9 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
         team = org.teams[name]
         for twice in team.twice_named():
             src = team.source.name if team.source else "its definition"
-            lack(
-                f"team {name} names {twice} twice — take one of its lines out of {src} "
-                "(Members… → Remove keeps the session)"
-            )
+            # Members… edits the org file only; a repo's team is changed by PR (TD-229)
+            hint = " (Members… → Remove keeps the session)" if org.path and team.source == org.path else ""
+            lack(f"team {name} names {twice} twice — take one of its lines out of {src}{hint}")
         if name in org.unlanded:
             continue  # said above, in the landing's own words
         try:

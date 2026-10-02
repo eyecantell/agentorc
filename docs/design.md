@@ -4521,7 +4521,8 @@ its §2 called the org file *a team editor in waiting*, and this is the first ke
   count*, with the session holding it and its state, or *not live* — and two controls: **Add
   member** (a role from the org's roles, the name defaulted to the team's pattern with the first
   number no name of the team holds — `grinder-dc-2` beside `grinder-dc-1`, the next of a counted
-  entry's numbers, the role itself for a role the team has none of — never an existing name; the lane from the role's default, editable before the
+  entry's numbers, the role itself for a role the team has none of — never an existing name, save a counted
+  entry's next when another entry already holds it, which Add then refuses; the lane from the role's default, editable before the
   press) and **Remove** on each member entry, whose confirm names the consequence: *edits
   `org.yml` (count: 2 → 1) and winds down grinder-ao-2; its card stays until Forget*. A definition
   that already names one session twice (an add before TD-268 could write one) says so under the
