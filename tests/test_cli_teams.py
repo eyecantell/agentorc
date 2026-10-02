@@ -1532,6 +1532,31 @@ def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(wo
     assert not [m for m, _ in state["calls"] if m == "kill"]
 
 
+def test_members_default_to_a_free_name_and_remove_of_a_duplicate_keeps_the_live_session(world):
+    """TD-268: the dialog offers the next free name; a definition that already names a live member
+    twice says so, and Remove on either line takes the line out without winding the session down."""
+    tmp_path, state = world
+    path = _flow_org(tmp_path)
+    v = teamrun.members_view(orgmod.load(path), "ao-grind", [], ["grinder", "auditor"])
+    assert v["next"] == {"grinder": "grind-3", "auditor": "auditor", "hunter": "hunt-2"} and v["twice"] == []
+    started(state)
+    with pytest.raises(ValueError, match="ao-grind already has hunt$"):
+        teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="hunter", member="hunt")
+    assert not creates(state)
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"].append(dict(doc["teams"]["ao-grind"]["members"][1]))
+    path.write_text(yaml.safe_dump(doc, default_flow_style=None))  # as the duplicate add of 2026-10-01 left it
+    org = orgmod.load(path)
+    assert [m.name for m in org.teams["ao-grind"].members] == ["grind", "hunt", "hunt"]
+    v = teamrun.members_view(org, "ao-grind", state["sessions"])
+    assert v["twice"] == ["hunt"] and [e["twice"] for e in v["members"]] == [False, True, True]
+    state["calls"].clear()
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=2, role="hunter")
+    assert got["wound_down"] is None and "another entry still names hunt, so it runs on" in got["text"]
+    assert not [m for m, _ in state["calls"] if m in ("send", "kill")]
+    assert orgmod.load(path).teams["ao-grind"].twice_named() == []
+
+
 def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
     tmp_path, state = world
     path = _flow_org(tmp_path)

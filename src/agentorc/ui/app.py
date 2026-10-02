@@ -1778,11 +1778,12 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
+        roles = [r.name for r in repoconfig.roles(repoconfig.RepoConfig(), org.roles)]
         try:
-            v = teamrun.members_view(org, name, await call("list"))
+            v = teamrun.members_view(org, name, await call("list"), roles)
         except (teams.TeamError, ValueError) as e:
             raise _team_http(e) from None
-        v["roles"] = [r.name for r in repoconfig.roles(repoconfig.RepoConfig(), org.roles)]
+        v["roles"] = roles
         return v
 
     @app.post("/api/teams/{name}/members")

@@ -1912,7 +1912,8 @@
     const last = (e.sessions || [])[e.sessions.length - 1] || {};
     const edit = e.count > 1 ? `count: ${e.count} → ${e.count - 1}` : `removes the ${e.name || e.role} line`;
     const live = last.id && !["exited", "closed", "not live"].includes(last.state);
-    return `Remove from ${team}? It edits org.yml (${edit})` + (live ? ` and winds down ${last.name} — Wrap up's prompt, never a kill; its card stays until Forget.` : ".");
+    if (e.twice) return `Remove from ${team}? It edits org.yml (${edit}); another entry still names ${last.name}, so it runs on.`;  // TD-268
+    return `Remove from ${team}? It edits org.yml (${edit})` + (live ?` and winds down ${last.name} — Wrap up's prompt, never a kill; its card stays until Forget.` : ".");
   };
   async function openMembers(team) {
     const dlg = $("#membersdlg"); if (!dlg) return;
@@ -1935,12 +1936,15 @@
         const rm = v.editable ? ` <span class="grow"></span><button class="btn sm ghost" type="button" data-mremove="${e.index}">Remove</button>` : "";
         rows.push(`<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} · ${e.count}</span><span class="meta">${held}</span>${rm}</div>`);
       });
+      // a definition that already names one session twice says so (TD-268): Remove on either line keeps the session
+      if ((v.twice || []).length) rows.push(`<div class="row gap"><span class="meta">named twice: ${v.twice.map(esc).join(", ")} — Remove one line; the session runs on</span></div>`);
       $("#memberslist").innerHTML = rows.join("");
       $("#membersadd").hidden = !v.editable;
       const sel = $("#maddrole");
       sel.innerHTML = (v.roles || []).filter((x) => x !== "plain").map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
       if ([...sel.options].some((o) => o.value === "grinder")) sel.value = "grinder";
-      const fill = () => { const e = v.members.find((m) => m.role === sel.value); $("#maddname").value = e ? e.name : sel.value; };
+      // the next free name of the team's pattern, never an existing member's (TD-268)
+      const fill = () => { $("#maddname").value = (v.next || {})[sel.value] || sel.value; };
       sel.onchange = fill; fill();
     }
     say(""); await load();

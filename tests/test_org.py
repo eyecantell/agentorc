@@ -513,6 +513,47 @@ def test_a_count_is_edited_as_the_field_never_as_text_that_looks_like_it(tmp_pat
     assert p.read_text() == before
 
 
+def test_add_member_defaults_to_the_next_free_name_never_an_existing_one(tmp_path):
+    """TD-268: the form offered the existing grinder's name, and Add wrote it again. The default is
+    the team's pattern with the first number no name of the team holds."""
+    p = _members(tmp_path)
+    t = org.load(p).teams["ao-grind"]
+    assert t.next_name("grinder") == "grinder-ao-3"  # a counted entry: the name its bump makes
+    assert t.next_name("hunter") == "hunter-ao-2"  # an unnumbered name: its pattern from 2
+    assert t.next_name("auditor") == "auditor"  # a role the team has no entry of: the role, while free
+    p.write_text(MEMBERS_YML.replace("count: 2, name: grinder-ao,", "name: grinder-ao-1,"))
+    t = org.load(p).teams["ao-grind"]
+    assert t.next_name("grinder") == "grinder-ao-2" and t.twice_named() == []
+    assert "manager-ao-1" in t.session_names()
+
+
+def test_add_member_refuses_a_name_the_team_holds_and_leaves_the_file_byte_identical(tmp_path):
+    """TD-268: a duplicate is refused before anything is written, in the page's words."""
+    p = _members(tmp_path)
+    p.write_text(MEMBERS_YML.replace("count: 2, name: grinder-ao,", "name: grinder-dc-1,"))
+    before = p.read_bytes()
+    for name in ("grinder-dc-1", "hunter-ao", "manager-ao-1"):
+        with pytest.raises(ValueError, match=f"ao-grind already has {name}$"):
+            org.edit_members(p, "ao-grind", add={"role": "grinder", "name": name})
+        assert p.read_bytes() == before
+    # a bump that would name a session another entry holds is refused the same way
+    p.write_text(MEMBERS_YML.replace("{role: hunter, name: hunter-ao,", "{role: hunter, name: grinder-ao-3,"))
+    before = p.read_bytes()
+    with pytest.raises(ValueError, match="ao-grind already has grinder-ao-3$"):
+        org.edit_members(p, "ao-grind", add={"role": "grinder"})
+    assert p.read_bytes() == before
+    assert (
+        org.edit_members(p, "ao-grind", add={"role": "auditor", "name": "grinder-ao-4"})
+        == "added grinder-ao-4 (auditor)"
+    )
+
+
+def test_a_definition_holding_a_name_twice_says_it(tmp_path):
+    p = _members(tmp_path)
+    p.write_text(MEMBERS_YML.replace("count: 2, name: grinder-ao,", "name: hunter-ao,"))
+    assert org.load(p).teams["ao-grind"].twice_named() == ["hunter-ao"]
+
+
 def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path, monkeypatch):
     """TD-219 slice 2, design §4.9 *Add an entry to the ledger*: `entries: {feature: <role>, debt:
     <role>}` on a team, either key optional and read as `techlead` where unsaid; an unknown key, or a
