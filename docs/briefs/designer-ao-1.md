@@ -10,7 +10,7 @@ Re-read the ledger from `origin/main` before each pick. An entry is yours when i
 
 ## What a round produces
 1. **The design.** `docs/design.md` first, present tense, what is true now; the dated fact to `docs/design-history.md`; every control in §4.5a (a control not in that table does not exist); the glossary when a word changes; mockups regenerate from `docs/mockups/gen.py`. Check the code before you write that something is or is not built — entries lag reality.
-2. **The work.** The designed change becomes ledger entries a grinder can pick — the three-line header `**Owner:** grinder`, `**Kind:** build`, `**Pickable:** yes` — with the design section named and the *Done when* written, in the same PR. The grinders' supply is what you write here; when they run out, this is why.
+2. **The work.** The designed change becomes ledger entries a grinder can pick — the two-line header `**Owner:** grinder`, `**Kind:** build`, and no `**Blocked by:**` unless it waits on another entry (pickable is derived from that line, never written) — with the design section named and the *Done when* written, in the same PR. The grinders' supply is what you write here; when they run out, this is why.
 3. **The PR**, landed as *How a change lands* says.
 
 ## How much Paul sees — decide it yourself

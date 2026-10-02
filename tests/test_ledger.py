@@ -155,8 +155,7 @@ DECLARED, DECLARED_FLAGS = _script().declared(OPEN.read_text())
 OWNERS = set(DECLARED.get("owner", ()))
 KINDS = set(DECLARED.get("kind", ()))
 HEADER = re.compile(
-    r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)\n"
-    r"\*\*Pickable:\*\* (?P<pick>yes|no — \S[^\n]*)\n",
+    r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)\n",
     re.M,
 )
 
@@ -179,13 +178,25 @@ def test_the_preamble_declares_the_owner_and_kind_words():
 
 
 def test_every_open_entry_carries_the_header_in_order_with_known_values():
-    """TD-118: `Owner`, `Kind` and `Pickable` after `Added`, so an out-of-work search filters on them.
+    """TD-118: `Owner` and `Kind` after `Added`, so an out-of-work search filters on them.
 
-    Every open entry has all three, right after `Added`, with a value from the preamble's list — a
+    Every open entry has both, right after `Added`, with a value from the preamble's list — a
     missing header or a typo'd owner would drop an entry out of every filter silently.
     """
     for id_, body in entries(OPEN):
         m = HEADER.search(body)
-        assert m, f"{id_}: Owner, Kind and Pickable go together, in that order, right after Added"
+        assert m, f"{id_}: Owner and Kind go together, in that order, right after Added"
         assert m["owner"] in OWNERS, f"{id_}: unknown Owner {m['owner']!r} (one of {sorted(OWNERS)})"
         assert m["kind"] in KINDS, f"{id_}: unknown Kind {m['kind']!r} (one of {sorted(KINDS)})"
+
+
+def test_no_entry_writes_a_pickable_line():
+    """TD-228 slice 3: pickable is derived from `Blocked by:` (cadence §2.4), never written.
+
+    A written `**Pickable:** no` with no blocker hid two entries from every lane (TD-248); a line
+    that cannot be written cannot disagree with the derived reading. The template in the preamble's
+    comment is held to it too, since a new entry is copied from there.
+    """
+    lines = [ln for ln in OPEN.read_text().splitlines() if ln.startswith("**Pickable:**")]
+    assert not lines, f"the ledger writes Pickable on {len(lines)} line(s): say what blocks it as Blocked by"
+    assert "pickable" not in DECLARED, "the preamble's Fields: line declares no Pickable words"
