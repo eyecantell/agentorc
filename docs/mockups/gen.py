@@ -457,7 +457,7 @@ def team_desktop(team_first=False):
         elif state == "exited":
             first, rest = '<span class="next">Forget</span>', details
         elif state == "done":
-            first, rest = '<span class="next">Details</span>', ""
+            first, rest = '<span class="next">Forget</span>', details  # TD-266: nothing left to close; the record goes in a day
         elif ready and state == "idle":
             first, rest = '<span class="next">Close session</span>', focus
         else:
