@@ -979,7 +979,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   reader) — the write-back, then the mail to whoever still holds the context (§4.5a *Inbox board row
   → Reply*) — the person's alone (refused to every session, as `inbox_delete` is), served by the
   host whose repos registry holds the repo, on that repo's board and no other file. **The edit is
-  made on origin's head, and pushed** (TD-222, designed 2026-10-01; the build is TD-264 — until it
+  made on origin's head, and landed there** (TD-222, designed 2026-10-01; the build is TD-264 — until it
   lands the edit is committed in the main checkout, never pushed, and the anchor's next push
   carries it): the host agent keeps a detached worktree of its own per repo,
   `~/.agentorc/boards/<repo>/tree` (made as the rollback's tree is, §6 *A rollback*), fetches
@@ -995,10 +995,12 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   the forge (found 2026-10-01: the anchor's push of two steer replies was *declined due to
   repository rule violations*) — and a repo without the rule takes the same road, so there is one
   road and nothing to probe. The commit is authored as the tree's git identity, the checkout's,
-  which the forge attributes. A squash merge is a merge: origin moving in between refuses
+  which must be one the forge links to an account: the ruleset asks an extra approval of an unattributed change, which nobody can give a PR of their own (TD-264 verifies this on the first live press). A squash merge is a merge: origin moving in between refuses
   nothing unless the board line itself moved, and then the PR is closed, its branch deleted, and
-  the press refused as a moved line is. Cadence §4.6's audit reads the same fixed message on the
-  squash and classifies the commit as it does today. The person's
+  the press refused as a moved line is. Cadence §4.6's audit (`check_cadence.py --since`) skips a PR's squash by its `(#n)` subject and
+  reads it as a merged PR, which fails for want of a review comment: the tool-made board PR is
+  dev-cadence's to recognise — by its subject, the fixed message, and its one-file, one-line diff —
+  as the board-edit carve-out it is, with §4.5's sentence, on the board for Paul. The person's
   checkout is never written by a board edit; it catches up by the pull (§6 *Pull*), and until it
   has, the SessionStart hook and `ao repo` read the line as it was there. The host agent is the
   only writer to those files from this system, and its own tree is the only place it writes
