@@ -2753,3 +2753,21 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-10-01 (PR #898, TD-228 slice 3) — the line is gone from every open entry, the preamble, the `Fields:` line and `tests/test_ledger.py`'s `HEADER`; `test_no_entry_writes_a_pickable_line` holds it gone; the briefs (`src/agentorc/briefs/grinder.md`, `entry.md`, `docs/briefs/designer-ao-1.md`) pick from `ao repo` or `scripts/ledger.py --list --pickable yes --owner … --kind …` and name no written line. Paul's word of 2026-10-01 is in the Status.
 
 **Related:** TD-118 (the three header lines), TD-198 (the kind bar's pickable bucket), TD-195 (lane news reads the header fields), dev-cadence TD-064 (the Blocked by field), cadence §2.4, §2.11.
+
+## TD-270: Hover texts that hold more than one thing are one run-on paragraph
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: on the usage chip, *the mouseover text is one big paragraph which is hard to read — it should get formatted*; on a seat's Message…, *the mouseover message should be formatted better*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** the usage chip's hover — `src/agentorc/ui/common.py` (`usage_chip`: the title joined with `. ` and ` · `, the profiles with `; `), `src/agentorc/ui/static/app.js` (`usageProfiles`; `el.title = c.title`), `base.html` (TD-122, TD-233, TD-151); the card's **Message…** `title` — `card.html`, the role's `message_line` (`cards.py`) and the help's first sentence joined with ` — ` (`help.first_sentence`, registered as `help_title` in `common.py`); and any other `title` built by joining sentences
+
+**Why:** both hovers are right in what they say and hard to read: the chip's lists several windows, their ages and each profile in one wrapped block, and Message… on a seat's card runs the role's *who for what* line and the control's help sentence together as *for … — …*. A `title` shows line breaks, so a list can be a list.
+
+**Resolved:** 2026-10-02 (PR #909) — the usage chip's hover (`common.usage_chip`, `AO.usageChip`), Message…'s title (`card.html`, `focus.html`) and the rollup's PR-errors hover put one item per line; design §4.5a's usage chip and Message rows say so, and `tests/test_ui_org.py`, `tests/test_ui.py`, `tests/test_ui_team_summary.py` hold the titles.
+
+**Done when:** the usage chip's hover and a seat's Message… hover read as short lines, and the PR lists every title it changed.
+
+**Related:** TD-122, TD-233, TD-151 (the chip), TD-162 / TD-171 (the role's line) and TD-097 (the seat's Message…), TD-167 (the *i* panels, where longer help already lives).

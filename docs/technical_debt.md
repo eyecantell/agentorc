@@ -134,10 +134,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-267 | Build the closed card: Forget first in its foot, a menu of Message… · Restart · Forget on a closed or pane-less card, the slot's hover and the Details banner naming the day the record goes | Medium | Open |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Built (#907); live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Open — design first |
-| TD-270 | Hover texts that hold more than one thing are one run-on paragraph: the usage chip's windows and profiles, and Message… on a seat's card | Low | Open |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
 | TD-272 | Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card: label it **Close session** | Low | Open |
 | TD-273 | A drag in the Focus terminal copies on release and says nothing: give the copy a sign | Low | Open |
+| TD-275 | A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set | Low | Open |
 
 
 ---
@@ -2525,24 +2525,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-173 (the Team field), TD-259 (the manager on call), TD-160 (a person's own session inside a team), TD-097 (a seat's card).
 
-## TD-270: Hover texts that hold more than one thing are one run-on paragraph
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: on the usage chip, *the mouseover text is one big paragraph which is hard to read — it should get formatted*; on a seat's Message…, *the mouseover message should be formatted better*)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** the usage chip's hover — `src/agentorc/ui/common.py` (`usage_chip`: the title joined with `. ` and ` · `, the profiles with `; `), `src/agentorc/ui/static/app.js` (`usageProfiles`; `el.title = c.title`), `base.html` (TD-122, TD-233, TD-151); the card's **Message…** `title` — `card.html`, the role's `message_line` (`cards.py`) and the help's first sentence joined with ` — ` (`help.first_sentence`, registered as `help_title` in `common.py`); and any other `title` built by joining sentences
-
-**Why:** both hovers are right in what they say and hard to read: the chip's lists several windows, their ages and each profile in one wrapped block, and Message… on a seat's card runs the role's *who for what* line and the control's help sentence together as *for … — …*. A `title` shows line breaks, so a list can be a list.
-
-**Fix:** one item per line in a hover that lists — the chip's windows one per line, a blank line, then the profiles one per line; Message…'s role line and its help sentence each on its own — by a newline in the `title` (and the same text, unbroken, wherever it doubles as an `aria` description). Sweep the other joined titles on the Org and the Inbox in the same PR and name them in it. If a hover needs more than line breaks, that is a design question (§4.5a) and goes to the designer, not into this entry.
-
-**Done when:** the usage chip's hover and a seat's Message… hover read as short lines, and the PR lists every title it changed.
-
-**Related:** TD-122, TD-233, TD-151 (the chip), TD-162 / TD-171 (the role's line) and TD-097 (the seat's Message…), TD-167 (the *i* panels, where longer help already lives).
-
 ## TD-271: A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer
 
 **Priority:** High
@@ -2599,3 +2581,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a drag-and-release in the terminal shows that the text was copied, and a refused copy says so.
 
 **Related:** TD-174 (selection and copy in the terminal), TD-046 (Pop out, the same terminal).
+
+## TD-275: A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (grinder-ao-2, met while building TD-270)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/uiconf.py` (`_read`, the person's settings as last read, module-level), `tests/test_ui.py` (whichever test leaves `_read["person"]` holding an `open_in` that draws no editor link), `tests/test_ui_org.py` (`test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one`: asserts **Open file**, drawn only through `editor_link`)
+
+**Why:** `pytest tests/test_ui.py tests/test_ui_org.py` fails that one test on main as on a branch; alone, or in `pdm run test`'s order, it passes. A test whose result depends on which file ran first is one a future reorder or a `-k` run turns red for nothing, and the next session spends its time proving the failure is not its own (TD-270's did).
+
+**Fix:** an autouse fixture in `tests/conftest.py` (or the UI tests' own) that resets `uiconf._read` before each test — or the test that sets it restores it; then the pair above passes in either order.
+
+**Done when:** `pytest tests/test_ui.py tests/test_ui_org.py` and the reverse order both pass.
+
+**Related:** TD-270 (where it was met), TD-229 slice 4 (the Open file link).

@@ -26,7 +26,7 @@
       <div class="blocks"><a class="blk opened" href="{{ ro.prs_url or '#' }}" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ ro.prs_url or '#' }}" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
     </div>
     {% endfor %}
-    <div class="meta"{% if ro.prs_errors %} title="{{ ro.prs_errors | join('; ') }}"{% endif %}>{{ ro.prs_open }} open{% if ro.waiting %} · {{ ro.waiting }} waiting on review{% endif %}{% if ro.prs_errors %} · a read failed{% endif %}</div>
+    <div class="meta"{% if ro.prs_errors %} title="{{ ro.prs_errors | join('\n') }}"{% endif %}>{{ ro.prs_open }} open{% if ro.waiting %} · {{ ro.waiting }} waiting on review{% endif %}{% if ro.prs_errors %} · a read failed{% endif %}</div>
     {% else %}<div class="meta">no live team's repo is registered here</div>{% endif %}
   </div>
   <div class="facet fneeds{% if ro.answer_needed %} answering{% endif %}">

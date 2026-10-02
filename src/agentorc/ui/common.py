@@ -243,7 +243,8 @@ def _usage_profiles(u: dict[str, Any]) -> str:
         if names:
             part += f": {', '.join(names)}"
         parts.append(part)
-    return f"profiles on this account: {'; '.join(parts)}" if parts else ""
+    # one profile per line under its heading: a hover that lists is a list (TD-270)
+    return "profiles on this account:\n" + "\n".join(parts) if parts else ""
 
 
 def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
@@ -340,13 +341,13 @@ def _metered_chip(prof: str, u: dict[str, Any], windows: list[dict[str, Any]]) -
         if amount(w):
             part += f" / {amount(w)} ({pct(w) if pct(w) is not None else '?'}%)"
         parts.append(f"{part} — {kinds} (resets {w.get('resets') or '?'})")
-    title = " · ".join(parts)
+    title = "\n".join(parts)  # one window per line (TD-270)
     reason = str(u.get("reason") or "ok")
     if reason != "ok":
         text += " · spend unknown"
-        title = f"spend unknown: {USAGE_WHY.get(reason, reason)}. {title}"
+        title = f"spend unknown: {USAGE_WHY.get(reason, reason)}\n{title}"
     if sharing := _usage_profiles(u):
-        title += f". {sharing}"
+        title += f"\n\n{sharing}"
     near = n >= NEAR_CAP
     return {"text": text, "title": title, "pct": n, "cls": "cap" if n >= 100 else "near" if near else "", "near": near}
 
@@ -400,7 +401,7 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
     if not windows:
         title = f"no usage reading for {prof} yet — {why}"
         if sharing:
-            title += f". {sharing}"
+            title += f"\n\n{sharing}"
         return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "unknown", "near": False}
     now = now or datetime.now(UTC)
     read = usage_read(u, now)
@@ -424,9 +425,10 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
         else:
             parts.append(_usage_hover(w, r))
     head = [f"read at {read['clock']}, {read['age']} ago, {read['source']}"] if read else []
-    title = ". ".join([*head, *([why] if why else []), " · ".join(parts)])
+    # the reading, why it is held, then each window on its own line; a blank line; the profiles (TD-270)
+    title = "\n".join([*head, *([why] if why else []), *parts])
     if sharing:
-        title += f". {sharing}"
+        title += f"\n\n{sharing}"
     # a projection is what the chip shows past USAGE_UNKNOWN too (§4.5a *The age*): the gate reads it
     unknown = id(worst) in gone or (projected is None and read is not None and read["secs"] > USAGE_UNKNOWN)
     if unknown:
