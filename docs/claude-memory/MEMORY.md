@@ -27,7 +27,7 @@
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — run a branch's tests with `PYTHONPATH=$PWD/src` and the main venv
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit --base` fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
 - [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — one row per id after a rebase, never both sides; `ao --json` goes before the subcommand
-- [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer is refused when the person inbox is full (board line instead); reviewer agents need explicit refs in a shared worktree; re-read main for the next TD number before a design PR
+- [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer, and a techlead reply with `--source`, is refused when the person inbox is full (board line / `Source:` first line instead); reviewer agents need explicit refs in a shared worktree; re-read main for the next TD number before a design PR
 - [An interactive UI/UX review makes the change visible](ui-review-screenshots.md) — significant UI changes reviewed with Paul always come with something to look at: screenshots, renderings or a design page (one per compared shape), kept under docs/mockups/reviews/ and sent into the chat
 - [Design help text is bound to help.py](design-help-text-is-bound-to-help-py.md) — a design PR never rewords §4.5a's help list; the wording goes in the build entry; run the doc-bound tests before pushing
 - [Delete only your own branches, by name](delete-only-your-own-branches-by-name.md) — `git branch` is every session's; never loop a delete over it (2026-09-27 incident, refs/recovered)
@@ -35,3 +35,4 @@
 - [Gate everything after a merge on its state](gate-everything-after-a-merge-on-its-state.md) — check `MERGED` before deleting the branch or reporting; a deleted branch closes the PR for good (2026-09-28, #727 → #730)
 - [The primer is a held path](primer-is-a-held-path.md) — docs/briefs/techlead-context.md is under docs/briefs/**; a design PR leaves it to the build entry's briefs slice
 - [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exits 2; put options first, and never pipe a send through `tail`
+- [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — `ledger.py --check` derives pickable from Blocked by; name the build entries or the PR fails the cadence check (2026-10-01)
