@@ -386,6 +386,9 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
     assert "if (!el.id) el.id = `tgrid-${team}`" in js
     assert "Agents (3)" in html and "TDs in motion (3)" in html and "PRs in motion (1)" in html
+    # the repos whose PRs could not be read, one per line on the hover (TD-270)
+    bad = ui.templates.get_template("rollup.html").render(ro={**ro, "prs_errors": ["a: x", "b: y"]}, person_needs=4)
+    assert 'title="a: x\nb: y"' in bad
     assert ui.rollup(None) is None and ui.rollup([g for g in groups if not g["team"]]) is None
     # a wound-down team beside them carries a summary now (TD-192), and adds nothing to the sums
     gone = [{**member("z1", state="exited", progress=[claim("TD-290")]), "team": "gone", "rank": 1, "slot": {}}]

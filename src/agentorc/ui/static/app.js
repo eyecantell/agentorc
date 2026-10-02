@@ -919,7 +919,7 @@
       if (names.length) part += `: ${names.join(", ")}`;
       parts.push(part);
     }
-    return parts.length ? `profiles on this account: ${parts.join("; ")}` : "";
+    return parts.length ? `profiles on this account:\n${parts.join("\n")}` : "";  // one per line (TD-270)
   }
   // A token count as the server says it (`tokens_short`): `231k`, `1.2M`; under a thousand, as it is.
   // Half to even, as Python's `round` and format are, so a tie reads the same in both homes.
@@ -954,11 +954,11 @@
       let part = `${w.label} ${spend(w)}`;
       if (amount(w)) part += ` / ${amount(w)} (${pct(w) !== null ? pct(w) : "?"}%)`;
       return `${part} — ${kinds} (resets ${w.resets || "?"})`;
-    }).join(" · ");
+    }).join("\n");  // one window per line (TD-270)
     const reason = String(u.reason || "ok");
-    if (reason !== "ok") { text += " · spend unknown"; title = `spend unknown: ${USAGE_WHY[reason] || reason}. ${title}`; }
+    if (reason !== "ok") { text += " · spend unknown"; title = `spend unknown: ${USAGE_WHY[reason] || reason}\n${title}`; }
     const sharing = usageProfiles(u);
-    if (sharing) title += `. ${sharing}`;
+    if (sharing) title += `\n\n${sharing}`;
     const near = n >= NEAR_CAP;
     return { text, title, pct: n, cls: n >= 100 ? "cap" : near ? "near" : "", near };
   }
@@ -993,7 +993,7 @@
       if (typeof u.retry_after === "number") why += `, which asked to be left ${Math.max(1, Math.ceil(u.retry_after / 60))} min`;
     }
     const sharing = usageProfiles(u);
-    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}` + (sharing ? `. ${sharing}` : ""), pct: 0, cls: "unknown", near: false };
+    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}` + (sharing ? `\n\n${sharing}` : ""), pct: 0, cls: "unknown", near: false };
     now = typeof now === "number" ? now : Date.now();
     const at = instant(u.fetched), secs = at === null ? null : Math.max(0, (now - at) / 1000);
     const read = at === null ? null : { secs, age: usageAge(secs), clock: usageClock(at, now), source: USAGE_SOURCE[String(u.source || "asked")] || String(u.source) };
@@ -1007,8 +1007,9 @@
     const [worst, row] = ws[0];
     const projected = gone.has(worst) ? null : projectedOf(row);
     const parts = ws.map(([w, r]) => gone.has(w) ? `${w.label} unknown since its reset at ${usageClock(instant(w.resets), now)} (was ${w.pct}%)` : usageHover(w, r));
-    let title = [...(read ? [`read at ${read.clock}, ${read.age} ago, ${read.source}`] : []), ...(why ? [why] : []), parts.join(" · ")].join(". ");
-    if (sharing) title += `. ${sharing}`;
+    // the reading, why it is held, then each window on its own line; a blank line; the profiles (TD-270)
+    let title = [...(read ? [`read at ${read.clock}, ${read.age} ago, ${read.source}`] : []), ...(why ? [why] : []), ...parts].join("\n");
+    if (sharing) title += `\n\n${sharing}`;
     if (gone.has(worst) || (projected === null && read && read.secs > USAGE_UNKNOWN)) {
       // the number is no longer offered as the account's (§4.5a *The age*); it stays on the hover
       const since = gone.has(worst) ? instant(worst.resets) : at;

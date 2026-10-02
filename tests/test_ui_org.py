@@ -383,7 +383,7 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     # the reading the chip was drawn from rides on it, so `app.js` can draw it again as it ages (TD-233)
     assert 'data-account="grind" data-usage=\'{' in html
     wk, fh = usage["grind"]["windows"][1]["resets"], usage["grind"]["windows"][0]["resets"]
-    assert f"week 88% (resets {wk}) · 5h 19% (resets {fh})" in html
+    assert f"week 88% (resets {wk})\n5h 19% (resets {fh})" in html
     assert 'data-pct="100" data-near="1" class="cap"' in html and "openai · day 100%" in html
     assert 'data-account="quietly"' not in html  # no windows, no chip
     assert "five_hour" not in html and "weekly" not in html
@@ -497,12 +497,12 @@ def test_a_refused_usage_poll_keeps_the_held_reading_and_its_age_says_how_old_it
 
     got = {k: usage_chip("grind", u, USAGE_NOW) for k, u in USAGE_CASES.items()}
     read = f"read at {_clock('2026-09-20T20:00:00Z')}, 3m ago, asked of the endpoint"
-    assert got["fresh"] == {"text": "grind · week 88%", "title": f"{read}. week 88% (resets ?) · 5h 19% (resets r1)",
+    assert got["fresh"] == {"text": "grind · week 88%", "title": f"{read}\nweek 88% (resets ?)\n5h 19% (resets r1)",
                             "pct": 88, "cls": "near", "near": True}  # fmt: skip
     assert got["legacy"]["text"] == "grind · day 40%" and got["legacy"]["cls"] == ""  # no time on it: no age
     held = got["held_429"]  # three minutes old and refused since: no mark, the why on hover
     assert held["text"] == "grind · week 49%" and held["cls"] == "" and held["pct"] == 49
-    assert held["title"].startswith(f"{read}. the last poll was refused: ")
+    assert held["title"].startswith(f"{read}\nthe last poll was refused: ")
     assert "rate-limited by the usage endpoint, which asked to be left 30 min" in held["title"]
     assert held["title"].endswith("week 49% (resets r3)")  # every window is still on hover
     assert got["held_cap"]["cls"] == "cap" and "could not be read" in got["held_cap"]["title"]
@@ -520,8 +520,8 @@ def test_a_refused_usage_poll_keeps_the_held_reading_and_its_age_says_how_old_it
     # past three hours the number is no longer the account's; it stays on the hover
     assert got["aged_4h"] == {
         "text": f"grind · week unknown since {_clock('2026-09-20T16:00:00Z')} (was 88%)",
-        "title": f"read at {_clock('2026-09-20T16:00:00Z')}, 4h ago, asked of the endpoint. the last poll was"
-        " refused: rate-limited by the usage endpoint. week 88% (resets 2026-09-25T00:00:00Z)",
+        "title": f"read at {_clock('2026-09-20T16:00:00Z')}, 4h ago, asked of the endpoint\nthe last poll was"
+        " refused: rate-limited by the usage endpoint\nweek 88% (resets 2026-09-25T00:00:00Z)",
         "pct": 0, "cls": "unknown", "near": False,
     }  # fmt: skip
     days = datetime(2026, 9, 18, 16, tzinfo=UTC).astimezone().strftime("%a %H:%M")
@@ -552,7 +552,7 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
     assert lined["near"] is True and lined["cls"] == "near"  # 9 points under its line
     assert lined["title"] == (
         "week 61% / line 70% (reserve 10% a day, 3 days left; line moves 2026-09-24T07:00:00Z; resets r6)"
-        " · 5h 40% (resets r5)"
+        "\n5h 40% (resets r5)"
     )
     assert got["unreserved_outranks"]["text"] == "grind · 5h 97%" and got["unreserved_outranks"]["cls"] == "near"
     assert "week 40% / line 70% (reserve 30%; line moves ?; resets ?)" in got["unreserved_outranks"]["title"]
@@ -621,14 +621,14 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
     c = usage_chip("Claude · paul", acc)
     assert c["text"] == "Claude · paul · week 24% / 60%"
     assert c["title"].endswith(
-        ". profiles on this account: grind [week line 70% (reserve 30%; line moves ?)]: grinder-ao-1, grinder-ao-2;"
-        " grind-sonnet [week line 60% (reserve 40%; line moves ?)]; default: paul"
+        "\n\nprofiles on this account:\ngrind [week line 70% (reserve 30%; line moves ?)]: grinder-ao-1, grinder-ao-2"
+        "\ngrind-sonnet [week line 60% (reserve 40%; line moves ?)]\ndefault: paul"
     )
     assert "grind" not in c["text"]  # never a profile's name in the chip
     # a per-day reserve on a fractional line: the days left are whole in the page as in `app.js`
     assert usage_chip("Claude · paul", USAGE_CASES["shared"])["title"].endswith(
         "grind [week line 70.5% (reserve 10% a day, 2 days left; line moves n1),"
-        " 5h line 50% (reserve ?; line moves ?)]: grinder-ao-1, grinder-ao-2; default"
+        " 5h line 50% (reserve ?; line moves ?)]: grinder-ao-1, grinder-ao-2\ndefault"
     )
     assert usage_chip("old", got["old"])["text"] == "old · 5h 3%"
     assert usage_accounts(None) == {}
@@ -1195,7 +1195,7 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     got = usage_chip("Claude · key", USAGE_CASES["metered"])
     assert got["text"] == "Claude · key · month 12.3M tok / 10M tok" and got["cls"] == "cap" and got["pct"] == 100
     assert got["title"].startswith("day $4.10 / $5 (82%) — 4.1M in, 2k out, 0 cache read, 0 cache write (resets d1)")
-    assert " · week $1,234.50 — 12.3M in" in got["title"]
+    assert "\nweek $1,234.50 — 12.3M in" in got["title"]
     u = usage_chip("Claude · key", USAGE_CASES["metered_unpriced"])
     assert u["text"] == "Claude · key · day 900 tok · spend unknown" and u["cls"] == "" and u["pct"] == 0
     # two profiles on one key: one sum, the chip over the smaller amount (the higher pct)
@@ -1211,13 +1211,13 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     chip = usage_chip("Claude · key", acc)
     assert chip["text"] == "Claude · key · day $4.10 / $5"
     # the hover names each profile's own amount (TD-151): the chip alone hid which profile had which
-    assert chip["title"].endswith(". profiles on this account: api2 [day amount $10]; api [day amount $5]")
+    assert chip["title"].endswith("\n\nprofiles on this account:\napi2 [day amount $10]\napi [day amount $5]")
     # what is not a number is not an amount, as in `amountSays` (the review of #900)
     odd = [{"label": "day", "amount": {"value": v, "unit": "tok"}} for v in (float("inf"), float("nan"))]
     assert usage_chip("k", USAGE_CASES["metered"] | {"profiles": [{"name": "api", "amounts": odd}]})["title"].endswith(
-        "profiles on this account: api"
+        "profiles on this account:\napi"
     )
     bare = usage_accounts({"p": {"reason": "ok", "windows": [day | {"amount": None}]}})
     assert "amounts" not in bare["p"]["profiles"][0]
     shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
-    assert shared.endswith(": api [day amount $5, week amount 2M tok]: w1; api2 [day amount $10]")
+    assert shared.endswith(":\napi [day amount $5, week amount 2M tok]: w1\napi2 [day amount $10]")

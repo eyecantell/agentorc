@@ -1776,7 +1776,7 @@ def test_a_roles_message_line_is_on_the_view_the_titles_and_the_team_header(tmp_
     assert views[0]["message_line"].startswith("the team's work") and views[1]["message_line"] == "its own card"
     assert views[3]["message_line"] == ""  # plain: none
     card = uiapp.templates.get_template("card.html").render(s=views[1])
-    assert 'data-line="its own card" title="for its own card — Mails a question' in card
+    assert 'data-line="its own card" title="for its own card&#10;Mails a question' in card
     assert 'data-line="" title="Mails a question' in uiapp.templates.get_template("card.html").render(s=views[3])
     roles = [
         {"role": "manager", "names": ["manager-ao-1"], "seat": False},
