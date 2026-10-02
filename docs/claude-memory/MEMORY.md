@@ -35,4 +35,4 @@
 - [Gate everything after a merge on its state](gate-everything-after-a-merge-on-its-state.md) — check `MERGED` before deleting the branch or reporting; a deleted branch closes the PR for good (2026-09-28, #727 → #730)
 - [The primer is a held path](primer-is-a-held-path.md) — docs/briefs/techlead-context.md is under docs/briefs/**; a design PR leaves it to the build entry's briefs slice
 - [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exits 2; put options first, and never pipe a send through `tail`
-- [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — `ledger.py --check` derives pickable from Blocked by; name the build entries or the PR fails the cadence check (2026-10-01)
+- [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — pickable is derived from Blocked by and no Pickable line is written; name the build entries (2026-10-01)
