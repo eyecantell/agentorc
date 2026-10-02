@@ -133,11 +133,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-266 | A closed session's card does not say how it is removed: Forget is behind Details, and its *more ⋯* offers Wrap up, Kill and Close, which do nothing for it | Medium | Designed 2026-10-01 — Forget leads a closed card's foot, the menu draws what applies, the hover says when the record goes; the build is TD-267 |
 | TD-267 | Build the closed card: Forget first in its foot, a menu of Message… · Restart · Forget on a closed or pane-less card, the slot's hover and the Details banner naming the day the record goes | Medium | Open |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Built (#907); live look pending |
-| TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Open — design first |
+| TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
 | TD-272 | Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card: label it **Close session** | Low | Open |
 | TD-273 | A drag in the Focus terminal copies on release and says nothing: give the copy a sign | Low | Open |
 | TD-275 | A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set | Low | Open |
+| TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Open |
 
 
 ---
@@ -2514,7 +2515,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: TD-173's live look — after picking **Team: ao-grind** and a directory, Controllers still read *No session holds the control grant yet, so nothing could act on this one…*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design first: §4.5a's New session **Controllers** row meets §6 rule 3's manager on call
+**Blocked by:** TD-276
+**Status:** **Designed 2026-10-02** (the designer, PR #911; obvious from §6 rule 3 — a seat's grant and id survive its close, a fill supersedes it at the same id — so landed with a note to Paul). Design: §4.5a New session **Controllers** picker (a seat on call holding `control` is a candidate beside the live holders, drawn *manager-ao-1 · on call*, the recorded controller its id; the empty note's new words name a team start) and **Team** picker (ticks the manager live or on call), §4.9 *A person in the team*, §4.7 *A person in the team* (`ao new --team`), §6 rule 3 (the cross-reference). Settled: a person's session in such a team has a controller from the start — the seat — and the manager that fills it holds the session without any later grant; no new field, no new RPC. The build is TD-276.
 **Location:** `src/agentorc/ui/app.py` (the New session page: `control_holders` are sessions holding `control` whose state is not `closed` or `exited`), `src/agentorc/ui/templates/new.html` (the Controllers picker and its empty note), design §4.5a New session **Team** and **Controllers**, §6 rule 3 *A manager on call is a seat of this rule* (TD-259)
 
 **Why:** TD-173 built: pick a team and its manager is ticked under Controllers, so a person's own session in a team is the manager's to stop and steer. Since TD-259 every manager is on call by default — closed until something fills its seat — and the picker lists live holders only, so on a team started today the list is empty and the form says no session holds the grant. A person's session joined that way has no controller, and the manager that fills its seat later does not gain it.
@@ -2599,3 +2601,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** `pytest tests/test_ui.py tests/test_ui_org.py` and the reverse order both pass.
 
 **Related:** TD-270 (where it was met), TD-229 slice 4 (the Open file link).
+
+## TD-276: Build the on-call controller: the New session form and `ao new --team` name a seat on call, and the empty note's words
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-02 (the designer, TD-269's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`new`: `control_holders` keeps live holders and adds a record with `seat` that is `exited` or `closed` and holds `control`, marked `on_call`), `src/agentorc/ui/common.py` (`teams_for_form`: `"manager": mid if mid in up else ""` blanks the manager whose record is not live — the fix site for the Team pick), `src/agentorc/ui/templates/new.html` (the picker's label with the grey *◇ on call* pill; the empty note's words), `src/agentorc/ui/static/app.js` (`applyTeam`: ticks `data-manager` — unchanged once the id is handed), `src/agentorc/cli.py` (`_team_defaults`, called by `cmd_new` for `--team`: the `teamrun.live(...)` test on the manager's id is what drops a seat on call), design §4.5a New session **Controllers** and **Team** rows (the note's words are written there; this entry makes them true)
+
+**Why:** design §4.5a New session **Controllers** picker, **Team** picker, §4.9 *A person in the team*, §6 rule 3 (TD-269): since TD-259 every manager is a seat on call — closed until a reading fills it — and the form lists live holders only, so on a team started today Paul picked Team ao-grind and read *No session holds the control grant yet*; a person's session joined that way had no controller, and the manager that filled the seat later did not gain it. A seat's grant and its id survive the close (rule 3), so the seat's id is the right controller from the start.
+
+**Fix:** (1) `control_holders` adds every record carrying `seat` that holds `control` and is `exited` or `closed`, with `on_call: true`; the template draws the pill after the name; `teams_for_form` (`ui/common.py`) hands the team's manager id when its record is live **or** carries `seat`, where today it hands it only for a live one, so `applyTeam` ticks it. (2) `_team_defaults` (`cli.py`) takes the manager's id when its record is live or a seat on call, where today `teamrun.live` drops it, and prints the controller's name with *· on call* in its one line. (3) The empty note reads as §4.5a's row says — *No session holds the `control` grant and no seat is on call…* — and the picker's note gains *a seat on call holds it for whoever fills it*. (4) Tests: a team whose manager record is `closed` with `seat` and `control` lists it, ticked on the team pick; a form with no holders and no seat shows the new words; `ao new --team` on such a team records the seat's id. No change to the records or the RPCs: `set_controllers` takes the id as any.
+
+**Done when:** on a team started today, picking it under Team ticks *manager-ao-1 · on call*, the session starts with the seat's id in `controllers`, and the manager that next fills the seat can act on it (`ao status -v` shows it under `members:`).
+
+**Related:** TD-269 (the design), TD-173 (the Team field), TD-259 (the manager on call), TD-160 (a person's own session inside a team), TD-097 (a seat's card), TD-036 (membership).
