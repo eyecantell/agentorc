@@ -657,11 +657,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `None`, never `[]`). **The ledger**: the repo's `ledger:` file (`.agentorc.yml`, default
   `docs/technical_debt.md`) read when its mtime moves, its history every five minutes, by `sessionorc.ledger` — the one reader of
   the entry's header fields (`## TD-NNN: title`, `**Priority:**`, `**Owner:**`, `**Kind:**`,
-  `**Type:**`, `**Blocked by:**`, and `**Pickable:**` while the fallback below lasts), kept as
+  `**Type:**`, `**Blocked by:**`), kept as
   `{entries: [...], by_priority, by_kind, at}`; an entry counts while its section is in the file.
   **Pickable is derived, never written** (TD-223, TD-198; designed 2026-09-28; the reader, the
   page's kinds and the lane words built — TD-228 slice 1; the page's lists and `ao repo`'s order
-  — slice 2). It is cadence §2.4's
+  — slice 2; the written line gone from this repo's ledger and from the reader — slices 3 and 4). It is cadence §2.4's
   rule, the one dev-cadence's `scripts/ledger.py --pickable` applies, so a repo's own tool and
   the home give one answer: an entry is **blocked** while its `**Blocked by:**` names an entry
   that is not archived — one still open, or one found in neither the ledger nor its archive,
@@ -696,19 +696,12 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   *design-first* (`Kind: design-first`, blocked by another entry or not: it is the designer's
   list, less what waits on the person, which the first test took),
   *pickable* (pickable, `Kind: build` or none: work a grinder can start), else *other* (a
-  build that is blocked, a live check, an evaluation). **While a ledger still writes the
-  line**, a written `Pickable: no` reads as blocked whatever is derived, so nothing a person
-  marked *no* is offered before its reason has been moved; a written `yes` adds nothing. The
-  script reads the line as a field that overrides nothing (cadence §2.12), so while the
-  fallback lasts the home differs from it by exactly the entries written *no*. The
-  migration of this repo's ledger removes the lines, and the fallback goes with TD-228's last
-  slice. **The migration moves no entry into a lane**: a written *no* whose reason is no
-  blocker — *built, the live look is left*, *needs an attended run*, *a synced file* — becomes
-  the `Kind:` or the `Owner:` that says so before its line goes, the lanes carry their owner
-  words first (§6 rule 6), and the PR shows that what each lane matches after it is what was
-  written `yes` before it, naming every difference. Otherwise thirty entries would turn
-  pickable at once, the anchor's among them, and rule 6 would tell every finished member of
-  all of them. **Opened and closed in a window** come from the ledger file's git history in the same
+  build that is blocked, a live check, an evaluation). **A written `Pickable:` line is not read**: a ledger that still
+  carries one is read as if it did not, as the script reads the line as a field that overrides
+  nothing (cadence §2.12), so the home and the script differ by no entry. What nothing blocks
+  and a grinder still cannot build — *built, the live look is left*, *needs an attended run*,
+  *a synced file* — is said by the entry's `Kind:` or its `Owner:`, and the lanes carry their
+  owner words (§6 rule 6), so an unblocked entry of the anchor's is in no grinder's lane. **Opened and closed in a window** come from the ledger file's git history in the same
   checkout (one `git log --first-parent -p --unified=0 -- <ledger>`, the headings its diffs add and remove): an
   entry is *opened* at the first commit whose file holds its section and *closed* at the first
   commit whose file no longer does (archived, or done and removed); a file rewritten without a
@@ -2444,8 +2437,7 @@ Screens:
       nobody, or a team with no techlead all read the same blank). A PR is GitHub's: no control.
    2. **Technical debt** — the ledger's open entries in four lists under one heading: **pickable**,
       **design-first**, **for you** and **other**, as §4.4 *Repo facts* sorts them (derived
-      since TD-223; built — TD-228 slices 1 and 2; a written `Pickable: no` still blocks until the
-      migration); a blocked row says *blocked by TD-n* after its owner, naming everything that
+      since TD-223; built — TD-228 slices 1 and 2); a blocked row says *blocked by TD-n* after its owner, naming everything that
       still blocks it as §4.4 lists it — the ids, then `decision (<who>)`; each row the id, title, priority and owner, *held by
       <name>* when a member claims it, sorted by priority then id, a list folded past four rows
       with *+n more*. A page opened on an entry's id (`/repo/<name>#TD-227`, the Inbox's team start row) unfolds
@@ -3713,7 +3705,7 @@ gave as its example, *questions → manager-ao-1*, are not derivable from them).
 **Choosing in a free-pick lane (TD-202).** A `free-pick` worker chooses by priority: High, then
 Medium, then Low (the ledger has no Critical), ties in the ledger's order. It chooses among the
 entries the ledger reading calls pickable (§4.4 *Repo facts*: derived from `Blocked by:`, TD-223,
-built — TD-228 slice 1; a written `Pickable: no` still blocks until the migration) and that match its lane,
+built — TD-228 slice 1) and that match its lane,
 less what its brief excludes and what a live
 sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities, beside what
 each live member holds, read from the main checkout, which the worker confirms on `origin` before

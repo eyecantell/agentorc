@@ -29,7 +29,7 @@ def _script(cwd: Path, reg_dir: Path, *args: str) -> dict:
 
 
 def _home(text: str, archive: str | None, roots: list[str]) -> dict[str, dict]:
-    return {e["id"]: e for e in ledger.entries(text, archive, ledger.Registry(roots), fallback=False)}
+    return {e["id"]: e for e in ledger.entries(text, archive, ledger.Registry(roots))}
 
 
 def _same(script: dict, home: dict[str, dict]) -> None:
@@ -41,7 +41,7 @@ def _same(script: dict, home: dict[str, dict]) -> None:
 
 
 def test_the_home_derives_what_the_script_derives_on_this_ledger(tmp_path):
-    """The equality test, with the fallback off: the whole record, not only the ids. Neither reader
+    """The equality test: the whole record, not only the ids. Neither reader
     has a roster, so a `<repo>#TD-NNN` item keeps its block in both."""
     text = (ROOT / "docs" / "technical_debt.md").read_text(encoding="utf-8")
     archive = (ROOT / "docs" / "technical_debt_archive.md").read_text(encoding="utf-8")
@@ -166,10 +166,13 @@ def test_a_name_two_checkouts_share_keeps_the_block(tmp_path):
     assert ledger.Registry([str(a)])("other#TD-009") == "unresolved", "an id in neither file"
 
 
-def test_a_written_no_still_blocks_while_the_line_lasts():
+def test_a_written_pickable_line_is_not_read():
+    """TD-228 slice 4: the fallback is gone, so a ledger that still writes the line is read as if
+    it did not — in the header block or below it."""
     text = "## TD-020: marked\n\n**Priority:** Low\n**Pickable:** no — the live look is left\n"
-    assert ledger.entries(text)[0]["pickable"] == "no"
-    assert ledger.entries(text, fallback=False)[0]["pickable"] == "yes"
+    assert ledger.entries(text)[0]["pickable"] == "yes"
+    below = "## TD-022: marked below\n\n**Priority:** Low\n\n**Pickable:** no\n"
+    assert ledger.entries(below)[0]["pickable"] == "yes"
     yes = "## TD-021: blocked\n\n**Blocked by:** TD-020\n**Pickable:** yes\n\n## TD-020: open\n"
     assert ledger.entries(yes)[0]["pickable"] == "no", "a written yes adds nothing"
 

@@ -6,8 +6,8 @@ entries, each `## TD-NNN: title` followed by header fields — `**Priority:**`, 
 Org's Repo facet and the Repo page count what it returns, and `tests/test_ledger.py` holds the
 repo's own ledger to its rules through the same regexes. **Pickable is derived** from `Blocked by:`
 by cadence §2.4's rule (TD-228), the rule dev-cadence's `scripts/ledger.py` applies, and
-`tests/test_ledger_derived.py` holds the two readers equal; a written `**Pickable:** no` still
-blocks until the ledger's migration removes the line.
+`tests/test_ledger_derived.py` holds the two readers equal; a `**Pickable:**` line a ledger still
+writes is not read.
 
 Two reads. `entries` parses one version of the file: an entry counts while its section is in it.
 `history` reads the file's git history in the checkout, so *opened* and *closed* in a window mean
@@ -41,7 +41,7 @@ FIELD = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one li
 # the fields read further down the body when the header block lacks them: the script's three by their
 # exact spelling, as it reads them, and ours by any spelling
 BELOW_EXACT = ("Priority", "Type", "Blocked by")
-BELOW = ("owner", "kind", "pickable")
+BELOW = ("owner", "kind")
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 ID_ITEM = re.compile(r"^TD-(\d+)$")
 XREPO_ITEM = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")  # cadence §2.4's `<repo>#TD-NNN`
@@ -63,7 +63,7 @@ def strip_comments(text: str) -> str:
 
 
 def _word(value: str) -> str:
-    """A field's first word, lower-cased: `**Pickable:** no — …` is `no`, `**Owner:** paul (…)` is
+    """A field's first word, lower-cased: `**Kind:** build — …` is `build`, `**Owner:** paul (…)` is
     `paul`. The prose after the word is the entry's, and no count reads it."""
     m = WORD.search(value or "")
     return m.group(0).strip("*_`").rstrip(".:").lower() if m else ""
@@ -171,18 +171,16 @@ def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     return False
 
 
-def entries(
-    text: str, archive: str | None = None, resolve: Resolve | None = None, *, fallback: bool = True
-) -> list[dict[str, Any]]:
+def entries(text: str, archive: str | None = None, resolve: Resolve | None = None) -> list[dict[str, Any]]:
     """Every entry of one version of the file, in file order: `id`, `title`, the header fields
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
     unknown), `blocked_by` — what still blocks, as the script lists it: open ids, `decision (<who>)`,
     an unread item quoted — and `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
     *Repo facts*, TD-228): blocked while `Blocked by:` names an id not in `archive` (open, or in
     neither file), a decision, or an item it cannot read. A `<repo>#TD-NNN` item asks `resolve`, and
-    anything but `archived` keeps the block; with no `resolve` it is unresolved. `fallback`: a
-    written `Pickable: no` still reads as blocked (the migration's, TD-228 slice 3; the equality
-    test turns it off). `for_page` is the page's kind. A field is read only from the entry's own
+    anything but `archived` keeps the block; with no `resolve` it is unresolved. A
+    written `**Pickable:**` line is not read (TD-228 slice 4): what blocks an entry is said in
+    `Blocked by:`. `for_page` is the page's kind. A field is read only from the entry's own
     section."""
     t = strip_comments(text)
     heads = list(HEADING.finditer(t))
@@ -204,7 +202,6 @@ def entries(
                 elif _norm(b) in live or _norm(b) not in archived:
                     blocked_by.append(b)
             blocked_by += [f"decision ({w})" for w in who] + [repr(b) for b in bad]
-        written = _word(fields.get("pickable", ""))
         e = {
             "id": m.group(1),
             "title": m.group(2).strip(),
@@ -213,7 +210,7 @@ def entries(
             "kind": _word(fields.get("kind", "")),
             "type": etype if etype in TYPES else TYPES[0],
             "blocked_by": blocked_by,
-            "pickable": "no" if blocked_by or (fallback and written == "no") else "yes",
+            "pickable": "no" if blocked_by else "yes",
         }
         e["for_page"] = kind_of(e)
         out.append(e)
