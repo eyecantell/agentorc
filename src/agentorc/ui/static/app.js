@@ -1074,7 +1074,7 @@
       const s = droppable.shift(); s.classList.add("hidden"); hidden.push(s);
       more.textContent = `+${hidden.length}`; more.classList.remove("hidden");
     }
-    if (hidden.length) more.title = hidden.map((s) => `${s.textContent} — ${s.title}`).join("\n");
+    if (hidden.length) more.title = hidden.map((s) => `${s.textContent} — ${s.title}`).join("\n\n");  // a chip's title is lines now: a blank line between chips (TD-270)
   }
   function setDown(down) {
     const dot = $("#hostdot"); if (dot) dot.classList.toggle("down", down);
