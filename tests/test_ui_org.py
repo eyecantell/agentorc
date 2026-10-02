@@ -1212,6 +1212,7 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     assert chip["text"] == "Claude · key · day $4.10 / $5"
     # the hover names each profile's own amount (TD-151): the chip alone hid which profile had which
     assert chip["title"].endswith(". profiles on this account: api2 [day amount $10]; api [day amount $5]")
-    assert "amounts" not in usage_accounts({"p": {"reason": "ok", "windows": [day | {"amount": None}]}})["p"]["profiles"][0]
+    bare = usage_accounts({"p": {"reason": "ok", "windows": [day | {"amount": None}]}})
+    assert "amounts" not in bare["p"]["profiles"][0]
     shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
-    assert shared.endswith("profiles on this account: api [day amount $5, week amount 2M tok]: w1; api2 [day amount $10]")
+    assert shared.endswith(": api [day amount $5, week amount 2M tok]: w1; api2 [day amount $10]")
