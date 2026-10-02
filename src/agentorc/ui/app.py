@@ -59,6 +59,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     brief_changed_view,  # noqa: F401
     card_order,  # noqa: F401
     card_slot,  # noqa: F401
+    closed_keep,  # noqa: F401
     gated_view,  # noqa: F401
     group_place,  # noqa: F401
     next_act,  # noqa: F401

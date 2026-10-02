@@ -7,7 +7,7 @@ re-exported from it, so a route, a template or a test reads each name from the a
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,7 @@ from agentorc import repoconfig
 from agentorc.org import MANAGER_WHEN
 from sessionorc import identity, mail
 from sessionorc.adapters import short_model
+from sessionorc.agent_common import CLOSED_KEEP
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
@@ -442,6 +443,8 @@ def view(
     # `idle_open` on the record is that reading, the tick's (§6 rule 3, TD-259): the slot, the seat's
     # trigger and the Inbox row all draw from it, and the page derives nothing of its own.
     d["open_work"] = state == "idle" and isinstance(s.get("idle_open"), dict)
+    # how long a closed card stays (§4.5 row 6, TD-266): said only where the reap's own clock is set
+    d["closed_keep"] = closed_keep() if state == "closed" and s.get("closed_at") else ""
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d
@@ -603,7 +606,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
     elif state == "closed":
         kind, text = "ok", "closed by you"
-        full = f"closed by you at {d['closed_at']}" if d.get("closed_at") else ""
+        full = f"closed by you at {d['closed_at']} · {d['closed_keep']}" if d.get("closed_at") else ""
     elif d["out_of_work"] or d["restart_wanted"]:
         # a declaration (§4.9a): the fixed words, then the first line of its reason
         # (§4.9a); the whole reason and when it was said are the hover — a card holds one clock
@@ -651,11 +654,19 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     return {"kind": kind, "text": text, "full": full or text, "caption": caption, "ccls": ccls}
 
 
+def closed_keep() -> str:
+    """*forgotten by itself a day after the close* — the fixed words of a closed card's hover and the
+    Details banner (§4.5 row 6, TD-266), the day read from `CLOSED_KEEP`, the reap's one source."""
+    days = CLOSED_KEEP / timedelta(days=1)
+    span = "a day" if days == 1 else f"{days:g} days"
+    return f"forgotten by itself {span} after the close"
+
+
 def next_act(d: dict[str, Any]) -> str:
     """The foot's first button, by state (design §4.5 *The card's anatomy*, row 6, TD-095): what a
     person would press next. `allow` (with Deny beside it) for a hook permission; `forget` for an
-    exited session, ready to close or not — there is no process left to close; `close` for an idle
-    session the checklist passes **when it is the person's own** (§4.5 *Whose session it is*,
+    exited or a closed session, ready to close or not — there is no process left to close (TD-266);
+    `close` for an idle session the checklist passes **when it is the person's own** (§4.5 *Whose session it is*,
     TD-156: an unattended team member is closed by its team, and its Close stays in *more ▾*);
     `details` when the pane is gone; else `focus`. A `limited`
     session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus. A seat on call
@@ -665,11 +676,11 @@ def next_act(d: dict[str, Any]) -> str:
         return "allow"
     if d.get("seat"):
         return "message"
-    if state == "exited":
-        return "forget"
+    if state in ("exited", "closed"):
+        return "forget"  # nothing is left to close on either (TD-266)
     if state == "idle" and d["ready_ok"] and d.get("own", True):
         return "close"
-    if state == "closed" or d.get("pane") is False:
+    if d.get("pane") is False:
         return "details"
     return "focus"
 

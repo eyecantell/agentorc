@@ -885,7 +885,8 @@ def test_ready_to_close_is_the_caption_and_the_next_act_is_the_foots_first_butto
     # exited reads ready to close too, and its first button is still Forget: nothing left to close
     ex = view(_card(state="exited", exit_code=0, git=clean))
     assert ex["slot"]["caption"] == "ready to close ✓" and ex["next_act"] == "forget"
-    assert view(_card(state="closed", pane=False))["next_act"] == "details"
+    assert view(_card(state="closed", pane=False))["next_act"] == "forget"  # nothing to close there either (TD-266)
+    assert view(_card(state="idle", pane=False))["next_act"] == "details"  # a gone pane on any other state
     assert view(_card(state="working"))["next_act"] == "focus"
     perm = {"kind": "permission", "text": "Bash: ls", "tool_use_id": "tu"}
     assert view(_card(state="needs-you", pending=perm))["next_act"] == "allow"
@@ -893,6 +894,47 @@ def test_ready_to_close_is_the_caption_and_the_next_act_is_the_foots_first_butto
     foot = html.split('class="sc-foot"')[1]
     assert foot.index('data-act="close"') < foot.index("/focus/ao-w")  # the next act comes first
     assert 'data-act="close"' not in html.split('class="sc-foot"')[0]  # and nothing is left in the slot
+
+
+def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hover_says_when_it_goes(
+    tmp_path, monkeypatch
+):
+    """§4.5 row 6 and §4.5a **Forget** / **Details** / **more ▾** (TD-266, built by TD-267)."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    gone = ('data-act="wrapup"', 'data-act="kill"', 'data-act="close"', 'data-act="mode"',
+            'data-act="shell-here"', 'data-act="popout"', "data-copy=")  # fmt: skip
+
+    def menu(html: str) -> str:
+        return html.split('<div class="menu">')[1].split("</div>")[0]
+
+    def acts(html: str) -> list[str]:
+        return [x.split('"')[0] for x in menu(html).split('data-act="')[1:]]
+
+    card = templates.get_template("card.html")
+    closed = view(_card(state="closed", closed_at="2026-09-21T01:00:00Z", pane=False))
+    assert closed["next_act"] == "forget"
+    html = card.render(s=closed)
+    foot = html.split('class="sc-foot"')[1].split('<details class="more">')[0]
+    assert foot.index('data-act="remove"') < foot.index("/focus/ao-w") and "▣ Details" in foot
+    assert acts(html) == ["message", "remove"] and not any(g in menu(html) for g in gone)
+    assert acts(card.render(s={**closed, "restartable": True})) == ["message", "restart", "remove"]
+    # the hover: the time, then the fixed words, the day read from the reap's own constant
+    assert closed["slot"]["full"] == (
+        "closed by you at 2026-09-21T01:00:00Z · forgotten by itself a day after the close"
+    )
+    assert closed["closed_keep"] == "forgotten by itself a day after the close"
+    # a closed record with no `closed_at` is never reaped, so nothing says it will be
+    bare = view(_card(state="closed", pane=False))
+    assert bare["closed_keep"] == "" and "forgotten" not in bare["slot"]["full"]
+    # an exited card with its pane keeps the whole menu; one whose pane is gone gets the short one
+    kept = card.render(s=view(_card(state="exited", exit_code=0)))
+    assert all(g in menu(kept) for g in gone) and 'data-act="remove"' not in menu(kept)
+    assert acts(card.render(s=view(_card(state="exited", exit_code=0, pane=False)))) == ["message", "remove"]
+    # the Details banner says the same beside its Forget, from the view's field
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert "v.closed_keep ? ` <span class=\"meta\">${esc(v.closed_keep)}</span>`" in js
 
 
 def test_row_three_says_where_once_and_the_group_hides_what_it_already_says(tmp_path, monkeypatch):
