@@ -211,7 +211,8 @@ def _reserve_why(row: dict[str, Any]) -> str:
 def _amount_says(a: Any) -> str:
     """A metered profile's amount for a window as the chip writes it — *$5*, *2M tok* — or "" for
     what is not one."""
-    if not isinstance(a, dict) or not isinstance(a.get("value"), int | float) or isinstance(a.get("value"), bool):
+    v = a.get("value") if isinstance(a, dict) else None
+    if not isinstance(v, int | float) or isinstance(v, bool) or not math.isfinite(v):
         return ""
     return _money(a["value"]) if a.get("unit") == "$" else f"{tokens_short(int(a['value']))} tok"
 

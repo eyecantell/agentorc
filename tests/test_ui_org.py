@@ -1212,6 +1212,11 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     assert chip["text"] == "Claude · key · day $4.10 / $5"
     # the hover names each profile's own amount (TD-151): the chip alone hid which profile had which
     assert chip["title"].endswith(". profiles on this account: api2 [day amount $10]; api [day amount $5]")
+    # what is not a number is not an amount, as in `amountSays` (the review of #900)
+    odd = [{"label": "day", "amount": {"value": v, "unit": "tok"}} for v in (float("inf"), float("nan"))]
+    assert usage_chip("k", USAGE_CASES["metered"] | {"profiles": [{"name": "api", "amounts": odd}]})["title"].endswith(
+        "profiles on this account: api"
+    )
     bare = usage_accounts({"p": {"reason": "ok", "windows": [day | {"amount": None}]}})
     assert "amounts" not in bare["p"]["profiles"][0]
     shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
