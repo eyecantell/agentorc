@@ -129,6 +129,13 @@
         <button data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free." title="forget the scheduled record: nothing ran">Cancel</button>
         {%- endif %}
         <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
+        {%- if nopane %}
+        {#- §4.5 row 6 *The menu draws what applies to the state* (TD-266): the process or the pane is
+            gone, so Message…, Restart where restartable, and Forget — the rest are left out, not dimmed -#}
+        {% if s.restartable %}<button data-act="restart" data-id="{{ s.id }}"{% if not s.restart_marked %} data-confirm="Restart {{ s.name }}? It is closed if still there and started again from its launch record, in its team."{% endif %} title="{{ help_title('restart') }}">Restart</button>{% endif %}
+        {#- never Forget on a seat while the definition names it (§4.5 *A seat*, TD-097) -#}
+        {% if not s.seat %}<button data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>{% endif %}
+        {%- else %}
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
         {#- design §4.5a **more ▾** → **Restart** (§6 rule 2, TD-250): the Inbox row's RPC; confirms with no restart mark -#}
@@ -141,6 +148,7 @@
         {# design §4.5a **Pop out** (TD-046): client-side, nothing is written to the record #}
         <button data-act="popout" data-id="{{ s.id }}" title="open its Focus in its own browser window, for alt-tab — a second press raises it">Pop out</button>
         <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
+        {%- endif %}
       </div>
     </details>
   </div>

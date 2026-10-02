@@ -2765,7 +2765,9 @@
             ? `<button class="btn sm primary" data-act="resume" data-id="${id}">Resume</button> `
               + `<button class="btn sm" data-act="resume-form" data-id="${id}">Resume with changes…</button> `
             : "")
-          + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`;
+          + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`
+          // how long a closed record stays, beside its Forget (§4.5 row 6, TD-266): the view's fixed words
+          + (v.closed_keep ? ` <span class="meta">${esc(v.closed_keep)}</span>` : "");
         // §4.5a *The help text* (TD-167): Resume's and Forget's titles and the banner's *i* mark, all
         // from the page's own fixed text (`#help-exited`, `#exitedmark`), never composed here
         const hp = $("#help-exited");
