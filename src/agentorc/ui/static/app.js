@@ -908,6 +908,11 @@
     for (const p of Array.isArray(u.profiles) ? u.profiles : []) {
       if (!p || typeof p !== "object") continue;
       const lines = (Array.isArray(p.lines) ? p.lines : []).filter((r) => r && typeof r === "object" && typeof r.line === "number").map((r) => `${r.label} line ${r.line}% (${reserveWhy(r)})`);
+      // a metered profile's own amounts (TD-151): the chip prints the smallest, the hover each
+      for (const a of Array.isArray(p.amounts) ? p.amounts : []) {
+        const said = a && typeof a === "object" ? amountSays(a.amount) : "";
+        if (said) lines.push(`${a.label} amount ${said}`);
+      }
       const names = (Array.isArray(p.sessions) ? p.sessions : []).map(String);
       let part = String(p.name);
       if (lines.length) part += ` [${lines.join(", ")}]`;
@@ -921,6 +926,11 @@
   const halfEven = (x) => { const f = Math.floor(x), d = x - f; return d > 0.5 || (d === 0.5 && f % 2 !== 0) ? f + 1 : f; };
   const tokShort = (n) => n >= 1e6 ? String(halfEven(n / 1e5) / 10) + "M" : n >= 1e3 ? `${halfEven(n / 1e3)}k` : String(n);
   const money = (v) => "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\.00$/, "");
+  // A metered profile's amount for a window as the chip writes it — `_amount_says` in common.py.
+  function amountSays(a) {
+    if (!a || typeof a !== "object" || typeof a.value !== "number" || !Number.isFinite(a.value)) return "";
+    return a.unit === "$" ? money(a.value) : `${tokShort(Math.trunc(a.value))} tok`;
+  }
   const METERED_KINDS = [["input", "in"], ["output", "out"], ["cache_read", "cache read"], ["cache_write", "cache write"]];
   // A **metered** account's chip (§4.5a **usage**, TD-151 slice 5) — `_metered_chip` in app.py is
   // the same rule: the account's spend over the window's amount, worst the one nearest its amount,
@@ -931,11 +941,7 @@
       const s = w.spent, a = w.amount && typeof w.amount === "object" ? w.amount : {};
       return a.unit === "tok" || !isNum(s.cost) ? `${tokShort(Math.trunc(s.total || 0))} tok` : money(s.cost);
     };
-    const amount = (w) => {
-      const a = w.amount && typeof w.amount === "object" ? w.amount : null;
-      if (!a || !isNum(a.value)) return "";
-      return a.unit === "$" ? money(a.value) : `${tokShort(Math.trunc(a.value))} tok`;
-    };
+    const amount = (w) => amountSays(w.amount);
     const pct = (w) => Number.isInteger(w.pct) ? w.pct : null;
     let worst = windows[0];
     for (const w of windows) if (pct(w) !== null && (pct(worst) === null || pct(w) > pct(worst))) worst = w;
