@@ -62,7 +62,7 @@ def _git(root, *args: str, when: str | None = None) -> str:
 
 
 def _ledger(ids: list[str]) -> str:
-    return "".join(f"## {i}: {i}\n\n**Pickable:** yes\n**Kind:** build\n\n" for i in ids)
+    return "".join(f"## {i}: {i}\n\n**Kind:** build\n\n" for i in ids)
 
 
 def _commit(root, ids: list[str], when: str) -> None:

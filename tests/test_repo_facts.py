@@ -28,28 +28,25 @@ LEDGER = """# Technical debt
 **Priority:** High
 **Owner:** grinder
 **Kind:** build
-**Pickable:** yes — slice 1 first
 
 ## TD-011: a design question
 
 **Priority:** Medium
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no
+**Blocked by:** TD-014
 
 ## TD-012: waiting on the person
 
 **Priority:** Low
 **Owner:** paul (the call is his)
 **Kind:** evaluation
-**Pickable:** no
 
 ## TD-013: a decision
 
 **Priority:** Medium
 **Owner:** anchor
 **Kind:** decision
-**Pickable:** no
 
 ## TD-014: the rest
 
@@ -74,8 +71,9 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "for_page": "pickable",
     }
     assert [got[t]["for_page"] for t in got] == ["pickable", "design-first", "for-you", "for-you", "other"]
-    # derived (TD-228): no Blocked by is pickable; a written `no` still reads as blocked while the line lasts
+    # derived (TD-228): no Blocked by is pickable, and an open blocker is not
     assert got["TD-014"]["pickable"] == "yes" and got["TD-011"]["pickable"] == "no"
+    assert got["TD-011"]["blocked_by"] == ["TD-014"]
 
 
 def test_the_repos_own_ledger_parses_every_entry_the_heading_regex_finds():
@@ -115,7 +113,7 @@ def _commit(root: Path, text: str, when: datetime) -> None:
 
 
 def _entry(tid: str, title: str) -> str:
-    return f"## {tid}: {title}\n\n**Priority:** Medium\n**Pickable:** no\n\n"
+    return f"## {tid}: {title}\n\n**Priority:** Medium\n**Kind:** live-check\n\n"
 
 
 @pytest.fixture
