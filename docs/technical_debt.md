@@ -131,6 +131,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Open |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Open — design first |
 | TD-270 | Hover texts that hold more than one thing are one run-on paragraph: the usage chip's windows and profiles, and Message… on a seat's card | Low | Open |
+| TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
+| TD-272 | Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card: label it **Close session** | Low | Open |
+| TD-273 | A drag in the Focus terminal copies on release and says nothing: give the copy a sign | Low | Open |
 
 
 ---
@@ -2461,3 +2464,60 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** the usage chip's hover and a seat's Message… hover read as short lines, and the PR lists every title it changed.
 
 **Related:** TD-122, TD-233, TD-151 (the chip), TD-162 / TD-171 (the role's line) and TD-097 (the seat's Message…), TD-167 (the *i* panels, where longer help already lives).
+
+## TD-271: A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus, on the designer's closed page: *it seems odd that TD-262 would be "claimed" but the worker would have wound down/closed — do we need a "waiting" state for workers when they are waiting on a steer? Also, my inbox shows zero steers — is this waiting on a reviewer/other?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first: §4.9a (out of work), §6 rules 8 and 9 (a team's start and its finish), §4.10 (a steer's bound, an orphaned steer)
+**Location:** design §4.9a *Out of work*, §6 rule 9 (*a team's finished is the home's reading*), rule 8 (`on_work`), §4.10 *An orphaned `steer` does not lapse* and *The name coming back adopts it*, §4.5 screen 6 (*Steering*, *Needs you*); `src/agentorc/ui/inbox.py` (`_orphan_held`), `src/sessionorc/agent_tick.py` (rules 8 and 9), the designer's brief (*it merges at the bound*)
+
+**Why:** on 2026-10-02 at about 04:00Z designer-ao-1 had three design PRs open and green — #892 (TD-222), #895 (TD-262, stacked on it) and #903 (TD-266) — each waiting on a steer to Paul whose default *merges at the bound*, that morning. It said so (*waiting on three steer bounds*), declared out of work, and the team wound down with every member finished: by rule 9's reading a member with nothing to pick is done, whatever it waits on. Eighteen hours later the three PRs are still open. Nothing fails, and nothing moves:
+- **The bound passes with nobody to take the default.** The steers were orphaned at the close and the home cleared their bounds (§4.10), so they wait on Paul as questions — though each had told him *nothing to do if the default is right*.
+- **The page reads as if nothing waits.** The Inbox's *Steering* line said 0 of 0 — right by its rule, since an orphaned steer is a *Needs you* row — and Paul read it as no steers; the designer's Focus says *closed · out of work* over three claims, *TD-262 claimed* among them, with no word that it waits or on what.
+- **An answer wakes nobody.** Paul's replies to the first two steers were written to the board, since no live session held the references; the team's lanes gained nothing, so rule 8 has nothing to start it for. The designer's next run found them only because the anchor started the team by hand.
+
+**Fix:** design first. Settle: (1) **whether waiting on a person is a state** — a member that holds an open steer or ask with work that follows the answer is *waiting*, not *out of work*: said on its card and Focus with what it waits on and until when, and read by rule 9 so a team with a waiting member is not finished, or is finished and says what it left waiting; (2) **what happens at the bound when the sender is closed** — the home brings the member back (a restart from its launch record, as rule 2 makes one) to take the default, in place of clearing the bound and turning a *nothing to do* into a question; (3) **what an answer does** — a reply to an orphaned steer starts its asker, or its team, as a lane's new work does under rule 8, within the same bounds; (4) **what the Inbox says** — a steer whose sender is closed and whose default will be taken at a time reads so, and one that has become the person's question says why it did.
+
+**Done when:** a designer that opens a design PR, steers and has nothing else to pick is back at the bound or at the answer without a person starting its team, and until then its card and the Inbox say what it waits on.
+
+**Related:** TD-213 / TD-216 (the orphaned question), TD-214 / TD-227 (rule 8, the start on work), TD-240 / TD-241 (rule 9, finished), TD-187 (a member out of work is never woken when its lane gains entries), TD-262 (who closed a session — the same card slot), memory `steer-replies-land-on-the-board`.
+
+## TD-272: Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus: *the "close" button looks like it is for closing the "ready to close" card, maybe relabel it "close session"?*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/focus.html` (the side panel's *Ready to close* card: its summary's button `#closebtn`, labelled **Close**; the header's own is already **Close session**), design §4.5a's Focus rows for **Close session** (TD-156), `src/agentorc/ui/help.py` if the label is bound there
+
+**Why:** the button sits on the card's summary line, at its right, where a panel's own close or fold control usually is; it ends the session. The header's button for the same act already reads **Close session**.
+
+**Fix:** label it **Close session**, as the header's is, in the template and wherever §4.5a's row or the help list names the side card's button (the doc-bound tests say which); no change to when it is shown or enabled.
+
+**Done when:** both buttons for the act carry the same words.
+
+**Related:** TD-156 (the end of a session on Focus), TD-095 (*Close session* on a card).
+
+## TD-273: A drag in the Focus terminal copies on release and says nothing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus, TD-174's live look: *we should probably give some sort of indicator when text is copied*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the terminal's selection handling: the copy on release catches its failure and is otherwise silent — *silent, as the copy is*; `copySel`, the menu's Copy, toasts *copied*), design §4.5a's Focus terminal row (TD-174)
+
+**Why:** a plain drag selects and the release copies, which works; nothing says it happened, so the first time a person cannot tell a copy from a selection, and a blocked clipboard is silent too.
+
+**Fix:** a short sign on a copy that happened — the toast *copied* the menu's Copy already shows, or a quieter mark by the terminal if a toast on every drag is too much (the §4.5a row says which; a one-line design change if it is the mark) — and the *clipboard blocked* toast when it did not.
+
+**Done when:** a drag-and-release in the terminal shows that the text was copied, and a refused copy says so.
+
+**Related:** TD-174 (selection and copy in the terminal), TD-046 (Pop out, the same terminal).
