@@ -345,7 +345,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
             },
             "ledger": {
                 "entries": [
-                    {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "low"},
+                    {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "low", "owner": "grinder"},
                     {"id": "TD-011", "title": "no priority", "for_page": "pickable", "priority": ""},
                     {
                         "id": "TD-015",
@@ -404,11 +404,12 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     out = capsys.readouterr().out
     assert out.startswith("r  1 open PRs, oldest 3d · this week 4 opened, 5 closed (could not look")
     assert "6 open entries: 1 pickable, 0 design-first" in out  # the counts are the reading's `by_kind`
-    assert "#9" in out and "pickable     TD-010  Low     a build" in out
+    assert "#9" in out and "pickable     TD-010  Low     grinder      a build" in out
     # the pick order (§4.8 *Choosing in a free-pick lane*, TD-202): High, Medium, Low, none; ties in file order
     order = [i for i in ("TD-012", "TD-014", "TD-013", "TD-010", "TD-011") if f"pickable     {i}" in out]
     assert sorted(order, key=out.index) == ["TD-012", "TD-014", "TD-013", "TD-010", "TD-011"]
-    assert "pickable     TD-011  -       no priority" in out
+    # each line names the entry's owner, `-` where its header has none (TD-228): pickable reads no owner
+    assert "pickable     TD-011  -       -            no priority" in out
     # cadence's order (§4.4 *Repo facts*, TD-228): within a priority, debt before a feature
     assert out.index("pickable     TD-014") < out.index("pickable     TD-015") < out.index("pickable     TD-013")
     # slice 6: the reader's standing on each open PR, what members hold, the board items due

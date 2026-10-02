@@ -1526,7 +1526,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 ids.sort(key=_pick_key)
                 for e in ids:
                     prio = str(e.get("priority") or "").capitalize() or "-"
-                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {e['title']}")
+                    # whose it is (TD-228): pickable reads no owner, so the line says the entry's
+                    # `Owner:` and a lane's reader passes over what is not its own
+                    owner = str(e.get("owner") or "") or "-"
+                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")

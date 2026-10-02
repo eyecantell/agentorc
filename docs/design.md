@@ -3162,7 +3162,7 @@ own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it
 **`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, built by TD-176 slices 1, 2 and 6; the reader standing is read from the techlead seat's inbox, which a session may not read, so a session's `ao repo` shows none and a person's does):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
-entries (in cadence's pick order — High first, debt before a feature within a priority — each with its priority: §4.8 *Choosing in a free-pick lane*, §4.4 *Repo facts*), the board items due, and what the servicing team's members hold; `--all` prints every
+entries (in cadence's pick order — High first, debt before a feature within a priority — each with its priority and its `Owner:`, `-` where it has none, since pickable reads no owner and an entry that is not the reader's lane's is listed all the same: §4.8 *Choosing in a free-pick lane*, §4.4 *Repo facts*), the board items due, and what the servicing team's members hold; `--all` prints every
 registered repo's line. A read, never a write: it is what a manager reads in its round when a
 balance rule exists (§6 *Balance*, TD-177: the rule itself is read by the home's tick, and a manager told of a crossing reads the numbers here), and what a person reads instead of the page.
 
@@ -3707,7 +3707,7 @@ Medium, then Low (the ledger has no Critical), ties in the ledger's order. It ch
 entries the ledger reading calls pickable (§4.4 *Repo facts*: derived from `Blocked by:`, TD-223,
 built — TD-228 slice 1) and that match its lane,
 less what its brief excludes and what a live
-sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities, beside what
+sibling's lease holds. `ao repo` (§4.7) lists them in that order with their priorities and owners, beside what
 each live member holds, read from the main checkout, which the worker confirms on `origin` before
 it claims. Passing over a higher entry needs a reason: a lease, an exclusion, a `Blocked by:`, or
 the entry's own status. The claim's first `ao doing` line names the entry's priority and, where a
