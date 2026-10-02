@@ -127,6 +127,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-258 | Build the manager's mechanical jobs as tick policies: rule 10 the cadence check, rule 11 merged without its read, rule 12 conventions relayed, rule 4's owed clause, rule 6's dropped lease, the two Inbox rows | Medium | Partly done — every slice built; the live look of slice 5's rows is left |
 | TD-259 | Build the manager on call: `on_call` on `manager:`, the `team` trigger with `seat_due.by`, `idle_open` and `seat_filled`, the sweep's seat exception, the card's slot and the Inbox row, the manager brief as a seat's, the first look on dc-grind | Medium | In progress — slices 1–5 built and the default flipped to on call; slice 6, the first look on dc-grind after a promote, is left |
 | TD-262 | A card says *closed by you* for every closed session, whoever closed it: dc-grind's manager wound its own team down 40 s after a start and all three cards named the person | Medium | Open — design first |
+| TD-266 | A closed session's card cannot be removed from the Org: its *more ⋯* offers Wrap up, Kill and Close, which do nothing for it, and no Forget | Medium | Open — design first |
 
 
 ---
@@ -2385,3 +2386,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** the design names the closer field and the slot's words, and a build entry exists; built, a team closed by its manager reads *closed by <manager>* on each card and a person's Close reads *closed by you*.
 
 **Related:** TD-241 (the card's *by the tick* on a wound-down team), TD-256 (rule 9 announces a team whose last member a person closed — it reads the same missing fact), TD-259 (the manager on call, whose first look is on dc-grind), TD-095 (the card's anatomy), TD-156 (an unattended member is closed by its team).
+
+## TD-266: A closed session's card cannot be removed from the Org — its menu offers what no longer applies, and no Forget
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, for Paul, with a screenshot of the Org: *there is a closed session in the No team section that I do not see how to remove — is this an oversight?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first: the card's controls are §4.5a's rows
+**Location:** `src/agentorc/ui/cards.py` (`next_act`: `forget` for `exited` only; `closed` or a gone pane → `details`), `src/agentorc/ui/templates/card.html` (the foot; the *more ⋯* menu, drawn the same for every state but `scheduled`), design §4.5 *The card's anatomy* row 6 and §4.5a's **more ▾** and **Forget** rows, `src/sessionorc/agent_tick.py` (the reap after `CLOSED_KEEP`, one day)
+
+**Why:** `error_examine`, a person's own interactive session in samscrape, was closed and sat under *No team* reading *closed by you*. Its foot is **Details** and VS Code. Its *more ⋯* menu is Message…, Switch to unattended, Wrap up, Kill, Close, Open shell here, Pop out and Copy tmux command: three that act on a process that is gone, one that copies a command for a tmux session that no longer exists, and no **Forget**. An `exited` card leads with Forget; a closed one has no way off the page but `ao forget <id>` in a terminal or the tick's reap a day after the close (`CLOSED_KEEP`), and nothing on the card says either. A team's closed members have **Forget all** on the team's header; a closed session in no team has nothing.
+
+**Fix:** design first — §4.5a's rows, then the card. (1) **A closed card can be forgotten from the page**: Forget in its *more ⋯* (or as its foot's second button — the design round says which; row 6 keeps one lead). (2) **The menu draws what applies to the state**: for a `closed` record, and for any record whose pane is gone, no Wrap up, Kill, Close, Pop out or Copy tmux command; say whether they are left out or drawn disabled with the reason (§4.5: *dimmed means disabled and nothing else*). (3) **The card says how long it stays**: the slot's hover, or a note, that a closed record is removed a day after its close. Whether **Resume** belongs on a closed card of a person's own session is the round's to say (Focus's exited banner has it).
+
+**Done when:** a person removes a closed session from the Org without a terminal, and a closed card's menu holds no control that does nothing.
+
+**Related:** TD-095 (the card's anatomy), TD-156 (the end of a session — Paul's UI review, which covers Focus after Wrap up), TD-262 / TD-265 (who closed it, the same slot), TD-097 (a seat's card).
