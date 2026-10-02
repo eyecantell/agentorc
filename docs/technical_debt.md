@@ -2475,8 +2475,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Status:** Open — design first: §4.9a (out of work), §6 rules 8 and 9 (a team's start and its finish), §4.10 (a steer's bound, an orphaned steer)
 **Location:** design §4.9a *Out of work*, §6 rule 9 (*a team's finished is the home's reading*), rule 8 (`on_work`), §4.10 *An orphaned `steer` does not lapse* and *The name coming back adopts it*, §4.5 screen 6 (*Steering*, *Needs you*); `src/agentorc/ui/inbox.py` (`_orphan_held`), `src/sessionorc/agent_tick.py` (rules 8 and 9), the designer's brief (*it merges at the bound*)
 
-**Why:** on 2026-10-02 at about 04:00Z designer-ao-1 had three design PRs open and green — #892 (TD-222), #895 (TD-262, stacked on it) and #903 (TD-266) — each waiting on a steer to Paul whose default *merges at the bound*, that morning. It said so (*waiting on three steer bounds*), declared out of work, and the team wound down with every member finished: by rule 9's reading a member with nothing to pick is done, whatever it waits on. Eighteen hours later the three PRs are still open. Nothing fails, and nothing moves:
-- **The bound passes with nobody to take the default.** The steers were orphaned at the close and the home cleared their bounds (§4.10), so they wait on Paul as questions — though each had told him *nothing to do if the default is right*.
+**Why:** on 2026-10-02 at about 04:00Z designer-ao-1 had three design PRs open and green — #892 (TD-222), #895 (TD-262, stacked on it) and #903 (TD-266). Two waited on a steer to Paul whose default *merges at the bound*, that morning (#892 and #903); #895, its steer already answered, waited on #892. It said so (*waiting on three steer bounds*), declared out of work, and the team wound down with every member finished: by rule 9's reading a member with nothing to pick is done, whatever it waits on. Eighteen hours later the three PRs are still open. Nothing fails, and nothing moves:
+- **The bound passes with nobody to take the default.** The two steers were orphaned at the close; at each bound the home cleared it rather than take the default (§4.10, `_lapse_or_expire`), so they wait on Paul as questions — though each had told him *nothing to do if the default is right*.
 - **The page reads as if nothing waits.** The Inbox's *Steering* line said 0 of 0 — right by its rule, since an orphaned steer is a *Needs you* row — and Paul read it as no steers; the designer's Focus says *closed · out of work* over three claims, *TD-262 claimed* among them, with no word that it waits or on what.
 - **An answer wakes nobody.** Paul's replies to the first two steers were written to the board, since no live session held the references; the team's lanes gained nothing, so rule 8 has nothing to start it for. The designer's next run found them only because the anchor started the team by hand.
 
@@ -2498,7 +2498,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Why:** the button sits on the card's summary line, at its right, where a panel's own close or fold control usually is; it ends the session. The header's button for the same act already reads **Close session**.
 
-**Fix:** label it **Close session**, as the header's is, in the template and wherever §4.5a's row or the help list names the side card's button (the doc-bound tests say which); no change to when it is shown or enabled.
+**Fix:** label it **Close session**, as the header's is, in the template and in §4.5a's Focus side panel row, which names it **Close** (the help entry already says *Close session*); no change to when it is shown or enabled.
 
 **Done when:** both buttons for the act carry the same words.
 
