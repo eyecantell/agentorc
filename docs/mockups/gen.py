@@ -923,7 +923,7 @@ def legend():
         ("unseen", "Still <span class=\"mono\">idle</span> in every payload, drawn in idle's blue with its own glyph and words: an <b>interactive</b> session finished and nobody has looked since — never an unattended one, whose manager read the result. A declaration is not a state — how it ended is said in the slot, <i>ready to close ✓</i> in its caption."),
         ("stalled", "Reported working, but no output for longer than the adapter's stall_after. How a credential lapse shows up."),
         ("exited", "Grey, like everything over or out of reach. Process ended or tmux session gone. Run log kept; the slot says <i>exited · code N</i>, and the foot's first button is Forget."),
-        ("done", "Grey. You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. Only you close a session; the checklist just says when it is ready. The slot says <i>closed by you</i>, in the text colour — no longer green."),
+        ("done", "Grey. You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. The checklist just says when it is ready; the slot names who closed it — <i>closed by you</i>, <i>closed by manager-dc-1</i>, <i>closed by the tick · team finished</i> — in the text colour, no longer green, with a declaration after the ending."),
         ("unreachable", "Grey, and the card is dimmed. The host stopped answering, so every card on it flips at once and keeps its last known state. Sorts with idle on a volatile host (asleep laptop), after stalled? on one that should be up."),
     ]
     def lpill(s):
