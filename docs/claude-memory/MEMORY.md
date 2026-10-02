@@ -36,3 +36,5 @@
 - [The primer is a held path](primer-is-a-held-path.md) — docs/briefs/techlead-context.md is under docs/briefs/**; a design PR leaves it to the build entry's briefs slice
 - [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exits 2; put options first, and never pipe a send through `tail`
 - [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — pickable is derived from Blocked by and no Pickable line is written; name the build entries (2026-10-01)
+- [Steer replies land on the board](steer-replies-land-on-the-board.md) — Paul's Reply to a steer reaches main's board via the anchor, not a new run's inbox; grep the board for each open steer id before merging at a bound
+- [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write; never chain `git commit` after an edit script
