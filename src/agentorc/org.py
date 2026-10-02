@@ -168,6 +168,45 @@ class TeamDef:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
         return self.entries.get(type_, TECHLEAD_ROLE)
 
+    def session_names(self) -> list[str]:
+        """Every session name the definition names, as often as it names it: the manager (when a
+        session manages), the techlead seat, then each member entry's (design §4.9 *Add or remove a
+        member from the team card*: a name the definition holds is never added again, TD-268)."""
+        out = [self.manager.name] if self.manager.role != PERSON and self.manager.name else []
+        if self.techlead is not None:
+            out.append(self.techlead.name)
+        return out + [n for m in self.members if m.team is None for n in m.names()]
+
+    def twice_named(self) -> list[str]:
+        """The names the definition holds more than once, in order — what `ao org check` and the
+        Members dialog say (TD-268)."""
+        seen: list[str] = []
+        names = self.session_names()
+        for n in names:
+            if names.count(n) > 1 and n not in seen:
+                seen.append(n)
+        return seen
+
+    def next_name(self, role: str) -> str:
+        """The name **Add member** defaults to for `role` (design §4.9): the next of a counted entry
+        of that role (the `count:` an add bumps), else the team's pattern for it — the last entry of
+        the role, its trailing number dropped — with the first number no name of the team holds
+        (`grinder-dc-1` → `grinder-dc-2`); a role the team has no entry of, the role itself while
+        free. Never a name the definition already holds (TD-268)."""
+        taken = set(self.session_names())
+        same = [m for m in self.members if m.team is None and m.role == role]
+        counted = next((m for m in same if m.count > 1), None)
+        if counted is not None:
+            return f"{counted.name}-{counted.count + 1}"
+        base = same[-1].name if same else role
+        stem = re.sub(r"-\d+$", "", base)
+        if not same and base not in taken:
+            return base
+        n = 1 if stem != base else 2
+        while f"{stem}-{n}" in taken:
+            n += 1
+        return f"{stem}-{n}"
+
 
 @dataclass
 class Org:
@@ -922,6 +961,10 @@ def edit_members(
         want = str(add.get("role") or "")
         if not want:
             raise ValueError("a member needs a role")
+        try:
+            held = load(path).teams[team].session_names()
+        except Exception:  # an unreadable file is refused by the re-parse below, in its words
+            held = []
         hit = next(
             (
                 x
@@ -933,12 +976,16 @@ def edit_members(
         if hit is not None:
             i, body, _ = hit
             n = body["count"]
+            if f"{body.get('name') or want}-{n + 1}" in held:  # the bump would name a session twice (TD-268)
+                raise ValueError(f"{team} already has {body.get('name') or want}-{n + 1}")
             lines[i] = _set_count(lines[i], body, n + 1)
             did = f"{body.get('name') or want} count: {n} → {n + 1}"
         else:
             entry = {"role": want}
             if add.get("name"):
                 entry["name"] = str(add["name"])
+            if entry.get("name", want) in held:  # refused before anything is written (TD-268)
+                raise ValueError(f"{team} already has {entry.get('name', want)}")
             lane = [str(x) for x in add.get("lane") or [] if str(x).strip()]
             if lane:
                 entry["lane"] = lane

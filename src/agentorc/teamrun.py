@@ -678,12 +678,17 @@ def wait_settled(call: Call, ids: list[str], timeout: float) -> dict[str, str]:
 # ── Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ──
 
 
-def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> dict[str, Any]:
+def members_view(
+    org: orgmod.Org, name: str, sessions: list[dict[str, Any]], roles: list[str] | None = None
+) -> dict[str, Any]:
     """The Members dialog's listing: the manager, the techlead seat, and each member entry as the
     definition writes it — role · name · lane · count — with the sessions holding it and their
     states. `editable` is whether the page may edit it: a team `org.yml` defines, never one a
-    repo's `.agentorc.yml` does (*edit it in the repo; this card only reads it*)."""
+    repo's `.agentorc.yml` does (*edit it in the repo; this card only reads it*). `next` is Add
+    member's default name for each of `roles` (and the members' own), `twice` the names the
+    definition holds more than once, each entry holding one marked `twice` (TD-268)."""
     team = teams.find(org, name)
+    twice = team.twice_named()
     by_name = {str(s.get("name") or ""): s for s in crew(name, sessions)}
 
     def held(n: str) -> dict[str, Any]:
@@ -705,6 +710,7 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
                 "lane": list(m.lane),
                 "count": m.count,
                 "sessions": [held(n) for n in m.names()],
+                "twice": m.names()[-1] in twice,  # its Remove leaves the session to the other entry
             }
         )
     out: dict[str, Any] = {
@@ -717,6 +723,8 @@ def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> 
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,
         "members": entries,
+        "twice": twice,
+        "next": {r: team.next_name(r) for r in [*(roles or []), *(m.role for m in team.members if m.team is None)]},
     }
     return out
 
@@ -778,6 +786,10 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str) -
     did = orgmod.edit_members(path, name, remove=index, role=role)
     _commit(call, f"org: {name} {did}")
     out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}
+    if gone and gone in teams.find(orgmod.load(path), name).session_names():
+        # a name the definition held twice: another entry still names the session, so it runs on (TD-268)
+        out["text"] += f" — another entry still names {gone}, so it runs on"
+        return out
     s = next((s for s in live(crew(name, call("list"))) if s.get("name") == gone), None)
     if s is not None:
         out["wound_down"] = _stop_one(call, s, "member", now=False)

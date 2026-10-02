@@ -128,7 +128,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     A lack, each on its own line: a registered checkout that is not there; a team a start would
     refuse — its role's profile not in `profiles.yml`, a brief not in the checkout, a checkout
     missing, each in the start's own words (`teams.plan`, which creates nothing); a name defined
-    twice; a `place:` naming no linked host; a team in `settings.yml` no definition names. A
+    twice; a team whose definition names one session twice (TD-268); a `place:` naming no linked
+    host; a team in `settings.yml` no definition names. A
     warning, which does not fail it: a registered checkout off its default branch or holding
     changes, and a `place:` naming a team no registered repo defines."""
     lacks: list[str] = []
@@ -159,6 +160,13 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
                 "name a node under `nodes:` in hosts.yml, or this host"
             )
     for name in sorted(org.teams):
+        team = org.teams[name]
+        for twice in team.twice_named():
+            src = team.source.name if team.source else "its definition"
+            lack(
+                f"team {name} names {twice} twice — take one of its lines out of {src} "
+                "(Members… → Remove keeps the session)"
+            )
         if name in org.unlanded:
             continue  # said above, in the landing's own words
         try:

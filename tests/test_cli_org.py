@@ -186,6 +186,18 @@ def test_a_name_defined_twice_is_lacking_once(world, capsys):
     assert code == 1 and len(got["lacks"]) == 1 and "defined twice" in got["lacks"][0]
 
 
+def test_a_team_naming_one_session_twice_is_lacking(world, capsys):
+    """TD-268: Add member once wrote a member's name a second time; the check says a definition that holds one."""
+    _, home, org = world
+    org["teams"]["span"]["members"] = [{"role": "hunter"}, {"role": "grinder", "name": "hunter"}]
+    (home / "org.yml").write_text(yaml.safe_dump(org))
+    code, got = check(capsys)
+    assert code == 1
+    assert [x for x in got["lacks"] if "twice" in x] == [
+        "team span names hunter twice — take one of its lines out of org.yml (Members… → Remove keeps the session)"
+    ]
+
+
 def test_a_checkout_off_its_default_branch_or_holding_changes_warns_and_does_not_fail(world, capsys):
     tmp_path, home, org = world
     git(tmp_path / "beta", "checkout", "-q", "-b", "topic")
