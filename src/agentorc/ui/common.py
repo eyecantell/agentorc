@@ -208,10 +208,19 @@ def _reserve_why(row: dict[str, Any]) -> str:
     return f"{why}; line moves {row.get('next') or '?'}"
 
 
+def _amount_says(a: Any) -> str:
+    """A metered profile's amount for a window as the chip writes it — *$5*, *2M tok* — or "" for
+    what is not one."""
+    v = a.get("value") if isinstance(a, dict) else None
+    if not isinstance(v, int | float) or isinstance(v, bool) or not math.isfinite(v):
+        return ""
+    return _money(a["value"]) if a.get("unit") == "$" else f"{tokens_short(int(a['value']))} tok"
+
+
 def _usage_profiles(u: dict[str, Any]) -> str:
     """The profiles sharing an account, for its chip's hover (§4.5a **usage**, TD-122): each with
-    the lines its reserves make — each with its reserve, the days left and when it next moves — and
-    the live sessions running under it."""
+    the lines its reserves make — each with its reserve, the days left and when it next moves — a
+    metered one with its own amount per window (TD-151), and the live sessions running under it."""
     parts = []
     for p in u.get("profiles") or []:
         if not isinstance(p, dict):
@@ -220,6 +229,12 @@ def _usage_profiles(u: dict[str, Any]) -> str:
             f"{r.get('label')} line {r['line']:g}% ({_reserve_why(r)})"
             for r in p.get("lines") or []
             if isinstance(r, dict) and isinstance(r.get("line"), int | float) and not isinstance(r.get("line"), bool)
+        ]
+        # a metered profile's own amounts (TD-151): the chip prints the smallest, the hover each
+        lines += [
+            f"{a.get('label')} amount {said}"
+            for a in p.get("amounts") or []
+            if isinstance(a, dict) and (said := _amount_says(a.get("amount")))
         ]
         names = [str(x) for x in p.get("sessions") or []]
         part = str(p.get("name"))
@@ -264,7 +279,15 @@ def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
                 for w in acc.get("windows") or []
             ]
         lines = [r for r in u.get("lines") or [] if isinstance(r, dict)]
-        acc["profiles"].append({"name": prof, "lines": lines, "sessions": live.get(prof, [])})
+        # a metered profile's amounts are its own, as a reserve is (§4.2a): kept for the hover
+        amounts = [
+            {"label": w.get("label"), "amount": w["amount"]}
+            for w in u.get("windows") or []
+            if isinstance(w, dict) and isinstance(w.get("spent"), dict) and isinstance(w.get("amount"), dict)
+        ]
+        acc["profiles"].append(
+            {"name": prof, "lines": lines, "sessions": live.get(prof, [])} | ({"amounts": amounts} if amounts else {})
+        )
         for row in lines:
             ln = row.get("line")
             if not isinstance(ln, int | float) or isinstance(ln, bool):
@@ -295,10 +318,7 @@ def _metered_chip(prof: str, u: dict[str, Any], windows: list[dict[str, Any]]) -
         return _money(s["cost"])
 
     def amount(w: dict[str, Any]) -> str:
-        a = w.get("amount") if isinstance(w.get("amount"), dict) else None
-        if not a or not isinstance(a.get("value"), int | float):
-            return ""
-        return _money(a["value"]) if a.get("unit") == "$" else f"{tokens_short(int(a['value']))} tok"
+        return _amount_says(w.get("amount"))
 
     def pct(w: dict[str, Any]) -> int | None:
         p = w.get("pct")

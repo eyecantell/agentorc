@@ -431,6 +431,16 @@ USAGE_CASES = {
          "spent": {"tokens": {"input": 12_300_000}, "total": 12_300_000, "cost": 1234.5}},
         {"label": "month", "pct": 100, "resets": "m1", "amount": {"value": 10_000_000, "unit": "tok"},
          "spent": {"tokens": {}, "total": 12_300_000, "cost": 1234.5}}]},
+    # each profile's own amount on the hover (TD-151): the chip is over the smallest
+    "metered_shared": {"reason": "ok", "tool": "Claude", "account": "key", "windows": [
+        {"label": "day", "pct": 82, "resets": "d1", "amount": {"value": 5.0, "unit": "$"},
+         "spent": {"tokens": {"input": 4_100_000}, "total": 4_100_000, "cost": 4.1}}],
+        "profiles": [{"name": "api", "lines": [], "sessions": ["w1"], "amounts": [
+                         {"label": "day", "amount": {"value": 5.0, "unit": "$"}},
+                         {"label": "week", "amount": {"value": 2_000_000, "unit": "tok"}}, "junk",
+                         {"label": "month", "amount": {"value": True, "unit": "$"}}]},
+                     {"name": "api2", "lines": [], "sessions": [], "amounts": [
+                         {"label": "day", "amount": {"value": 10.0, "unit": "$"}}]}]},
     "metered_ties": {"reason": "ok", "windows": [  # half to even in both homes: 2k and 1.2M
         {"label": "day", "pct": 3, "resets": "d", "amount": {"value": 1_250_000, "unit": "tok"},
          "spent": {"tokens": {"input": 2_500, "output": 3_500}, "total": 1_250_000, "cost": None}}]},
@@ -1198,4 +1208,16 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     }
     b = {"tool": "Claude", "account": "key", "reason": "ok", "windows": [day]}
     acc = usage_accounts({"api2": a, "api": b})["Claude · key"]
-    assert usage_chip("Claude · key", acc)["text"] == "Claude · key · day $4.10 / $5"
+    chip = usage_chip("Claude · key", acc)
+    assert chip["text"] == "Claude · key · day $4.10 / $5"
+    # the hover names each profile's own amount (TD-151): the chip alone hid which profile had which
+    assert chip["title"].endswith(". profiles on this account: api2 [day amount $10]; api [day amount $5]")
+    # what is not a number is not an amount, as in `amountSays` (the review of #900)
+    odd = [{"label": "day", "amount": {"value": v, "unit": "tok"}} for v in (float("inf"), float("nan"))]
+    assert usage_chip("k", USAGE_CASES["metered"] | {"profiles": [{"name": "api", "amounts": odd}]})["title"].endswith(
+        "profiles on this account: api"
+    )
+    bare = usage_accounts({"p": {"reason": "ok", "windows": [day | {"amount": None}]}})
+    assert "amounts" not in bare["p"]["profiles"][0]
+    shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
+    assert shared.endswith(": api [day amount $5, week amount 2M tok]: w1; api2 [day amount $10]")

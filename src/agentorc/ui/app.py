@@ -87,6 +87,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     WRAPUP_PROMPT,  # noqa: F401
     _age,  # noqa: F401
     _aged,  # noqa: F401
+    _amount_says,  # noqa: F401
     _as_session_id,  # noqa: F401
     _countdown,  # noqa: F401
     _icon_cache,  # noqa: F401
