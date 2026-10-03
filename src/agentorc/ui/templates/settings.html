@@ -20,6 +20,20 @@
 <div class="row gap wrap setfoot"><span class="note"><span class="mono">{{ path }}</span> · read {{ read }} · {{ who }}</span><span class="grow"></span>
 {%- set ed = editor_link(path) %}{% if ed and path %}<a class="btn sm ghost" href="{{ ed.url }}" title="open {{ path }} in {{ ed.label }}">Open file</a>{% endif %}</div>
 {%- endmacro %}
+{% macro filehead(path, what) -%}
+{#- a card whose values are set here but whose definition is a file's (TD-286): the file named at the
+    card's head as its source, beside the card's name, so **Open file** is not read as one more setting -#}
+<span class="grow"></span><span class="note" title="{{ path }}">{{ what }} <span class="mono">{{ path.rsplit("/", 1)[-1] }}</span></span>
+{%- set ed = editor_link(path) %}{% if ed and path %}<a class="btn sm ghost" href="{{ ed.url }}" title="open {{ path }} in {{ ed.label }}">Open file</a>{% endif %}
+{%- endmacro %}
+{% macro saverow(said) -%}
+{#- a card's Save row (§4.5a *Settings page*, TD-286): Save stays disabled, and Cancel hidden, until a
+    field differs from what was drawn; Cancel puts the drawn values back; the values live in settings.yml -#}
+<div class="row gap wrap"><span class="note setsaid">{{ said }}</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}
+{%- if caller is defined %}{{ caller() }}{% endif %}
+<span class="note" title="{{ files.settings or 'settings.yml' }}">saved to <span class="mono">settings.yml</span></span>
+<button class="btn sm ghost setcancel" type="button" hidden>Cancel</button><button class="btn sm primary setsave" type="submit" disabled>Save</button></div>
+{%- endmacro %}
 {% macro rows(list) -%}
 <dl class="setvals">{% for r in list %}<dt>{{ r.key }}</dt><dd class="mono">{{ r.value }}{% if r.default %} <span class="badge defmark" title="the file does not set this: its default">default</span>{% endif %}</dd>{% endfor %}</dl>
 {%- endmacro %}
@@ -42,21 +56,20 @@
       <label class="setrow"><span class="setlabel">trust a reading for</span>
         <input class="input setin" name="max_age" value="{{ max_age }}" placeholder="1h" autocomplete="off" spellcheck="false">
         <span class="note">{% if max_age == "off" %}never project: an old reading is read as it is{% else %}past it, the gate projects each account's reading while unattended sessions work{% endif %}</span></label>
-      <div class="row gap wrap"><span class="note setsaid">an age, 90m or 2h · off never projects · empty for the hour · applies on the next tick</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+      {{ saverow("an age, 90m or 2h · off never projects · empty for the hour · applies on the next tick") }}
     </form>
     {% for g in usage_groups %}
       <div class="note setgroup">{{ g.account }}</div>
       {% for c in g.cards %}
       <form class="card pad setcard" data-section="usage" data-profile="{{ c.profile }}">
-        <div class="row gap wrap"><span class="h2 mono">{{ c.profile or "(default)" }}</span><span class="note">{{ c.badge }}</span></div>
+        <div class="row gap wrap"><span class="h2 mono">{{ c.profile or "(default)" }}</span><span class="note">{{ c.badge }}</span>{% if c.metered %}{{ filehead(profiles_file, "billing and prices in") }}{% endif %}</div>
         {% if c.metered %}
           {% for w in c.rows %}
           <label class="setrow"><span class="setlabel">{{ w.label }} amount</span>
             <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no amount" data-metered="1" autocomplete="off" spellcheck="false">
             <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span></label>
           {% endfor %}
-          <div class="row gap wrap"><span class="note setsaid">an amount is the window's 100 — $5, 20M tok — against the account's spend · applies on the next tick</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
-          {{ filefoot(profiles_file, "at each start", "the billing and prices, by hand") }}
+          {{ saverow("an amount is the window's 100 — $5, 20M tok — against the account's spend · applies on the next tick") }}
         {% else %}
           {% for w in c.rows %}
           <label class="setrow"><span class="setlabel">{{ w.label }} reserve</span>
@@ -66,7 +79,7 @@
           <div class="note">No window reported yet: the adapter has not read this profile's usage. A reserve can be set with <span class="mono">ao gate</span>, which says the labels were not checked.</div>
           {% endfor %}
           {% if c.rows %}
-          <div class="row gap wrap"><span class="note setsaid">applies on the next tick · the chip shows the line{% if c.unchecked %} · no reading yet, so the labels are not checked{% endif %}</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+          {{ saverow("applies on the next tick · the chip shows the line" ~ (" · no reading yet, so the labels are not checked" if c.unchecked else "")) }}
           {% endif %}
         {% endif %}
       </form>
@@ -83,7 +96,7 @@
     {{ panel("teams", info_teams) }}
     {% for t in teams %}
     <form class="card pad setcard" data-section="teams" data-team="{{ t.name }}">
-      <div class="row gap wrap"><span class="h2 mono">{{ t.name }}</span><span class="note">team</span></div>
+      <div class="row gap wrap"><span class="h2 mono">{{ t.name }}</span><span class="note">team</span>{% if t.source %}{{ filehead(t.source, "defined in") }}{% endif %}</div>
       <label class="setrow"><span class="setlabel">stop time</span>
         <input class="input setin" name="until" value="" placeholder="06:00, +8h or ISO" autocomplete="off" spellcheck="false">
         <span class="note">{% if t.until %}{{ t.until }}{% if t.passed %} (passed){% endif %} · every member and seat{% else %}none{% endif %}</span></label>
@@ -97,7 +110,9 @@
           <option value="start"{% if t.on_work == "start" %} selected{% endif %}>start the team</option>
           <option value="off"{% if t.on_work == "off" %} selected{% endif %}>do nothing</option>
         </select>
-        <span class="note">{% if t.on_work == "start" %}wound down, the home starts it when its lanes gain entries{% elif t.on_work == "off" %}wound down, it waits for Start or its schedule{% else %}wound down, an Inbox row asks when its lanes gain entries{% endif %}</span></label>
+        {#- the note says all three, the picked one first (TD-286) -#}
+        {%- set says = {"ask": "ask me: an Inbox row asks when its lanes gain entries", "start": "start the team: the home starts it", "off": "do nothing: it waits for Start or its schedule"} %}
+        <span class="note setonwork">wound down — {{ says[t.on_work] if t.on_work in says else says.ask }}{% for k in ["ask", "start", "off"] if k != (t.on_work if t.on_work in says else "ask") %} · {{ says[k] }}{% endfor %}</span></label>
       {# **balance** (§4.5a, §6 *Balance*, TD-239): `teams.<team>.balance`, whole, written only when it moved;
          off, the key is absent; a field left empty is a line not drawn #}
       <div class="setrow setbalance" data-was="{{ t.balance.was }}">
@@ -113,10 +128,7 @@
       <label class="setrow"><span class="setlabel">schedule</span>
         <input class="input setin" value="{{ t.schedule | tojson if t.schedule else '' }}" placeholder="at a reset" disabled>
         <span class="note">not built — TD-133</span></label>
-      <div class="row gap wrap"><span class="note setsaid">applies on the next tick</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}
-        {% if t.until %}<button class="btn sm ghost" type="button" data-clear="until">Clear stop time</button>{% endif %}
-        <button class="btn sm primary" type="submit">Save</button></div>
-      {% if t.source %}{{ filefoot(t.source, reads.org[0], "defined " ~ reads.org[1]) }}{% endif %}
+      {% call saverow("applies on the next tick") %}{% if t.until %}<button class="btn sm ghost" type="button" data-clear="until">Clear stop time</button>{% endif %}{% endcall %}
     </form>
     {% else %}
       <div class="note">The org defines no teams.</div>
@@ -189,7 +201,7 @@
         <span class="note">what is due is always shown and counted</span></div>
       {{ panel("boardshow", info_board) }}
       <datalist id="setfaces"><option value="JetBrains Mono"><option value="Cascadia Code"><option value="Fira Code"><option value="Menlo"><option value="Consolas"><option value="DejaVu Sans Mono"></datalist>
-      <div class="row gap wrap"><span class="note setsaid">every open terminal takes the size and face at once</span><span class="grow"></span>{% if set_at %}<span class="note" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}<button class="btn sm primary" type="submit">Save</button></div>
+      {{ saverow("every open terminal takes the size and face at once") }}
     </form>
     <div class="card pad setcard" id="setbrowser">
       <div class="row gap wrap"><span class="h2">this browser</span></div>

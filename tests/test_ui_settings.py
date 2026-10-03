@@ -329,12 +329,37 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         page = client.get("/settings").text
         assert 'data-was="start"' in page and '<option value="start" selected>' in page
         assert "ask me (default)" not in page and "the home starts it" in page
+        # the note says all three choices, the picked one first (TD-286)
+        note = re.search(r'<span class="note setonwork">([^<]*)</span>', page)[1]
+        assert note.startswith("wound down — start the team: the home starts it · ask me: an Inbox row")
+        assert note.endswith("do nothing: it waits for Start or its schedule")
+        # the definition's file at the card's head, not a foot under Save (TD-286)
+        card = page[page.index('data-team="sett-team"') :]
+        card = card[: card.index("</form>")]
+        assert card.index("defined in <span class=\"mono\">org.yml</span>") < card.index("stop time")
+        assert "setfoot" not in card
         bad = client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "maybe"})
         assert bad.status_code == 400 and "ask, start or off" in bad.json()["detail"]
         assert call_sync("settings")["teams"]["sett-team"] == {"on_work": "start"}
     finally:
         org.unlink()
         call_sync("set_settings", teams={"sett-team": None})
+
+
+def test_every_card_saves_only_a_change_and_cancels_back(client, subprocess_agent):
+    """design §4.5a *Settings page* **Save** / **Cancel** (TD-286): every card with fields draws Save
+    disabled and Cancel hidden until a field moves, and says the file its values live in; the page's
+    script settles them from the form's drawn state and puts the defaults back on Cancel."""
+    page = client.get("/settings").text
+    forms = re.findall(r'<form class="card pad setcard".*?</form>', page, re.S)
+    forms = [f for f in forms if "<input" in f]  # a usage card with no window reported has no field
+    assert len(forms) >= 2  # trust a reading for, and You, at the least
+    for f in forms:
+        assert '<button class="btn sm primary setsave" type="submit" disabled>Save</button>' in f
+        assert '<button class="btn sm ghost setcancel" type="button" hidden>Cancel</button>' in f
+        assert 'saved to <span class="mono">settings.yml</span>' in f
+    js = (UI / "static" / "app.js").read_text()
+    assert "f.reset();" in js and "f.dataset.drawn = state(f); settle(f);" in js
 
 
 def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess_agent):

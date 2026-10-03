@@ -143,7 +143,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
 | TD-284 | Build the reworked New session form: the order, the Host pick, Profile as the one tool pick, the Repo pick and the worktree-first Where, the Role pick that retires the Unattended switch, warnings only when Start is disabled | Medium | Built (#945, #948–#952, #953); live look pending |
-| TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Open |
+| TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Built (#PRNUM), live look pending |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
@@ -2722,7 +2722,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of Settings, TD-148's look: *the save button should be disabled unless a change is actually made to a value. Should we have a cancel button?*; *the "open file" is present but it's not clear what setting it is next to*; *Lets make sure the "start the team" setting is described as an option then the user is asked*)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #PRNUM; merged, live look pending
 **Location:** `src/agentorc/ui/templates/settings.html` (each card's form and Save; the file card's foot, *§4.5a Open file*; the team card's `on_work` select and its note), `src/agentorc/ui/static/app.js` (the page's forms), design §4.5a *Settings page*
 
 **Why:** (1) every card's **Save** is pressable on a card nobody touched, so the person cannot tell from the button whether anything is unsaved, and a typo has no way back but retyping. (2) A team card ends with a row reading */home/kmaster/.agentorc/org.yml · read by the clients on every use; never the host agent · defined by hand* and **Open file**, below the Save row: it reads as one more setting, not as *where this card's values live*. (3) *when work appears* offers three choices, *ask me* (*(default)* while unset), *start the team* and *do nothing*, and its note follows the pick (for *ask me*: *wound down, an Inbox row asks when its lanes gain entries*), so the person reads what the other two would do only by picking them.
