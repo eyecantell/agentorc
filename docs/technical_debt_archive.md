@@ -2877,3 +2877,23 @@ Both go away only when the record says who closed it.
 **Related:** TD-057 (the home and node split, where the reach comes from), TD-132 (the promote's check on main).
 
 **Resolved:** 2026-10-02 (PR #941) — reproduced: `_remote_user` reads the node's own generated definition (`nodes/cm/.devcontainer/devcontainer.json`), which the `agent` fixture's supervisor writes during its provision; read before that write landed, it raised and the user fell back to `root`. Deleting the file before the read gives the CI assertion exactly, and a 1 s delay on the write fails the old test and passes the new. The test now waits until the supervisor has stood down and the definition exists. No product change: a node that dials in has been provisioned.
+
+## TD-289: A seat test fails on CI now and then: a second ask expires beside the one expected
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, at PR #937's CI: attempt 2 failed on this test alone, attempt 1 and 3 on TD-285's; it also failed run 37090936027 on a branch)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_seat_closed.py` (`test_a_question_to_a_closed_seat_survives_a_refused_fill_and_is_there_at_the_fill`, the assertion `mail["expired"] == [lost["id"]]`), the home's expiry of asks to closed records
+
+**Why:** `assert mail["expired"] == [lost["id"]], "a closed record that is no seat expires its ask, as ever"` failed with a second id in the list (`['m-07d2f728a44c', 'm-4fe2fb1334fa']`): an ask the test expects to survive, the seat's, expired too, or a tick ran an expiry the test did not plan. It passes locally and on reruns, so it is timing: a red check stops the promote policy and makes every PR's author rerun CI.
+
+**Fix:** reproduce under a slowed tick or a loop, find which ask the second id is and what expired it, and make the test own the timing (or fix the expiry if a seat's ask can expire). As TD-285 was (#941): show the cause before the fix.
+
+**Done when:** the cause is shown, and the test passes fifty runs in a row.
+
+**Related:** TD-285 (the container test's race, the same shape), TD-097 (a seat), TD-259 (the manager on call).
+
+**Resolved:** 2026-10-02 (PR #943) — reproduced: the test's `short` ask carries `bound=1`, a second of wall clock from its send, and the first sweep's `now` was read only after two closes; on a slow runner they outlast the second, so that sweep expired `short` beside `lost` (a 1.2 s sleep before `now` fails it exactly as CI did, the extra id being `short`'s). The test now takes `now` from the short ask's own `at`; with the sleep left in it passes, and without it fifty runs in a row. No product change: a seat's ask did not expire wrongly.
