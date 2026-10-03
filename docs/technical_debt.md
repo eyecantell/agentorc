@@ -143,6 +143,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
 | TD-284 | Build the reworked New session form: the order, the Host pick, Profile as the one tool pick, the Repo pick and the worktree-first Where, the Role pick that retires the Unattended switch, warnings only when Start is disabled | Medium | Open |
+| TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Open |
+| TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
+| TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Open |
 
 
 ---
@@ -2709,3 +2712,56 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-277 (the design), TD-269 / TD-276 (a seat on call as controller), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume with changes…), TD-160 (a person's own session inside a team).
 
+## TD-286: The Settings page's cards: Save with nothing changed, no Cancel, an unlabelled Open file, a *when work appears* that explains one choice
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Settings, TD-148's look: *the save button should be disabled unless a change is actually made to a value. Should we have a cancel button?*; *the "open file" is present but it's not clear what setting it is next to*; *Lets make sure the "start the team" setting is described as an option then the user is asked*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/settings.html` (each card's form and Save; the file card's foot, *§4.5a Open file*; the team card's `on_work` select and its note), `src/agentorc/ui/static/app.js` (the page's forms), design §4.5a *Settings page*
+
+**Why:** (1) every card's **Save** is pressable on a card nobody touched, so the person cannot tell from the button whether anything is unsaved, and a typo has no way back but retyping. (2) A team card ends with a row reading */home/kmaster/.agentorc/org.yml · read by the clients on every use; never the host agent · defined by hand* and **Open file**, below the Save row: it reads as one more setting, not as *where this card's values live*. (3) *when work appears* offers three choices, *ask me* (*(default)* while unset), *start the team* and *do nothing*, and its note follows the pick (for *ask me*: *wound down, an Inbox row asks when its lanes gain entries*), so the person reads what the other two would do only by picking them.
+
+**Fix:** (1) Save disabled until a field differs from what was drawn, and a **Cancel** beside it, shown with Save, that puts the drawn values back; both settle again after a Save. (2) The file named at the card's head as its source (*from org.yml · Open file*), or the foot worded *these values live in org.yml*. (3) The note says all three: *ask me: an Inbox row asks when its lanes gain entries · start the team: the home starts it · do nothing: it waits for Start or its schedule*, the picked one first.
+
+**Done when:** a card shows Save and Cancel only once a value changes, each card says which file its values live in, and *when work appears* describes all three choices.
+
+**Related:** TD-148 (the Settings page), TD-227 (*when work appears*), TD-277 (the New session form's rework, the same habit of fields that explain one case).
+
+## TD-287: The Settings page draws no usage chip in the top bar
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Settings: *I noticed the usage line is not shown in the settings header — is that on purpose?*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (the Settings page's context passes `"usage": {}` to `base.html`'s `usage_chip`; three other pages pass the same), `src/agentorc/ui/templates/base.html` (`#usagechip`)
+
+**Why:** the top bar is the same bar on every page, and the chip is how a person sees the account's window at a glance; on Settings, where the reserves are set against that reading, it is gone. Nothing in the design says Settings drops it; the empty `usage` reads as a page that never asked.
+
+**Fix:** pass the `usage` reading on Settings as the Org does (or say in §4.5a why a page draws no chip); check the other pages that pass `{}` and give each the chip or a reason.
+
+**Done when:** Settings' top bar carries the usage chip as the Org's does, and every page that omits it has a stated reason.
+
+**Related:** TD-122 (the usage chip), TD-233 (its age), TD-148 (the Settings page).
+
+## TD-288: A terminal size saved on Settings showed no change in Focus
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Settings, TD-148's look: *No apparent change when changing font size to 17*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.setTermLook`, the `ao-term` BroadcastChannel, `AO.TERM_OPTS`, the terminal's creation with `...AO.TERM_OPTS`, `AO.termFont`, the WebGL addon), `src/agentorc/ui/templates/base.html` (`data-term-size`)
+
+**Why:** the save landed (`person.terminal.size: 17` in `settings.yml`), and the Focus and Settings pages both draw `<body data-term-size="17">`, so the server side holds. What the person saw in Focus was the old size. Unknown which half failed: the open tab's live change (the BroadcastChannel to `setTermLook`, which sets `term.options.fontSize` and refits; with the WebGL renderer the glyph atlas may need clearing), or a fresh load. A fresh load is settled: Playwright (Chromium, 2026-10-02) opened Focus on `entry-1` after the save, and the terminal drew at 17 (`AO.terms[0].term.options.fontSize` 17, the text visibly larger). Left is the open tab's live change, or the tab Paul looked at was not reloaded.
+
+**Fix:** reproduce the live half: change the size with Focus open in another tab and watch the open terminal. Fix it if it fails (a test of `setTermLook` with the renderer in place if it is the live half).
+
+**Done when:** a size saved on Settings shows in an open Focus without a reload, and in a freshly loaded one.
+
+**Related:** TD-148 (the Settings page's terminal look), TD-038 (the terminal's face and WebGL).
