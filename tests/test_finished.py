@@ -143,3 +143,38 @@ def test_a_declaration_in_any_other_shape_is_none_and_never_a_raise():
         for key in ("out_of_work", "restart_wanted"):
             view = {"id": "ao-t-g1", "name": "g1", "team": "g", "state": "idle", key: junk}
             assert work.finished([view])["why"] == ["g1 idle, not declared"]
+
+
+# ── TD-274 slice 1, design §4.9a *Waiting is read, never declared* ────────────────────────────
+
+
+def _q(sender: str, about: str | None, kind: str = "steer", bound: str | None = "2026-10-02T09:57:00Z", **kw):
+    return {"id": f"m-{sender}-{about}", "from": sender, "kind": kind, "about": about, "bound": bound, **kw}
+
+
+def test_a_member_with_an_open_question_about_a_reference_is_waiting_whatever_it_declared():
+    team = [_manager(), _rec("g1", out_of_work=OUT), _rec("g2", out_of_work=LATER)]
+    assert work.finished(team)["why"] == []
+    waiting = work.waiting_of([_q("ao-t-g2", "td-222")])
+    assert waiting == {"ao-t-g2": [{"id": "m-ao-t-g2-td-222", "ref": "TD-222", "bound": "2026-10-02T09:57:00Z"}]}
+    (clause,) = work.finished(team, waiting=waiting)["why"]
+    assert clause.startswith("g2 waiting on the person: TD-222, until ")
+    # an ask has no bound; two questions name the sooner bound and how many more
+    asks = work.waiting_of([_q("ao-t-g2", "#895", kind="ask", bound=None), _q("ao-t-g2", "TD-222")])
+    assert [q["ref"] for q in asks["ao-t-g2"]] == ["TD-222", "#895"]
+    assert work.finished(team, waiting=asks)["why"][0].endswith(" and 1 more")
+    only_ask = work.waiting_of([_q("ao-t-g2", "#895", kind="ask", bound=None)])
+    assert work.finished(team, waiting=only_ask)["why"] == ["g2 waiting on the person: #895"]
+
+
+def test_prose_a_closed_question_a_note_and_a_dead_asker_hold_nothing():
+    team = [_manager(), _rec("g1", out_of_work=OUT), _rec("g2", "closed", out_of_work=LATER)]
+    for entries in (
+        [_q("ao-t-g1", "the menu question")],  # prose: dies with its asker
+        [_q("ao-t-g1", "TD-222", closed_reason="replied")],
+        [_q("ao-t-g1", "TD-222", kind="note")],
+        [_q("ao-t-g2", "TD-222")],  # a closed member's question is orphaned, not a wait
+    ):
+        assert work.finished(team, waiting=work.waiting_of(entries))["why"] == []
+    # the manager's or a seat's question is not a member's wait
+    assert work.finished(team, waiting=work.waiting_of([_q(LEAD, "TD-222")]))["why"] == []

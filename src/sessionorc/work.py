@@ -7,10 +7,11 @@ record's `seat` field here and the definition's name on the card, and a test hol
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Mapping
+from datetime import datetime
 from typing import Any
 
 from sessionorc import ledger as ledger_mod
-from sessionorc.models import Session, has_control
+from sessionorc.models import Session, has_control, reference_of
 
 DEAD = ("exited", "closed")
 
@@ -93,7 +94,48 @@ def manager_of(records: Collection[Any]) -> Any | None:
     return min(top or fit, key=lambda r: str(_f(r, "name") or _f(r, "id")), default=None)
 
 
-def finished(records: Iterable[Any], seats: Collection[str] = ()) -> dict[str, Any] | None:
+WAITING_KINDS = ("ask", "steer")  # the questions a member can wait on the person's answer to (§4.9a)
+
+
+def waiting_of(entries: Iterable[Any]) -> dict[str, list[dict[str, Any]]]:
+    """What each session waits on (design §4.9a *Waiting is read, never declared*, TD-274): from the
+    person inbox's entries — the home's `MailEntry`s or a client's dicts — the open `ask`s and
+    `steer`s whose `about` names a reference (`reference_of`'s two shapes; prose holds nothing), keyed
+    by the sender as the inbox names it, each `{id, ref, bound}`, the sooner bound first and an
+    `ask`'s, which has none, last. Read on every call and never stored."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    for e in entries:
+        if _f(e, "kind") not in WAITING_KINDS:
+            continue
+        closed = _f(e, "closed_reason") or _f(e, "closed_by") or _f(e, "expired_at")
+        ref = reference_of(_f(e, "about"))
+        sender = _f(e, "from_") if not isinstance(e, Mapping) else e.get("from")
+        if closed or ref is None or not sender:
+            continue
+        out.setdefault(str(sender), []).append({"id": _f(e, "id"), "ref": ref, "bound": _f(e, "bound")})
+    for qs in out.values():
+        qs.sort(key=lambda q: (q["bound"] is None, str(q["bound"] or "")))
+    return out
+
+
+def waiting_clause(name: str, questions: list[dict[str, Any]]) -> str:
+    """A waiting member's clause in `finished`'s `why`: *designer-ao-1 waiting on the person: TD-222,
+    until 09:57* — the sooner bound's question, in this host's clock, *and n more* for the rest; an
+    `ask` has no bound and says none."""
+    q = questions[0]
+    until = ""
+    if q.get("bound"):
+        try:
+            until = f", until {datetime.fromisoformat(str(q['bound'])).astimezone().strftime('%H:%M')}"
+        except ValueError:
+            until = ""
+    more = f" and {len(questions) - 1} more" if len(questions) > 1 else ""
+    return f"{name} waiting on the person: {q['ref']}{until}{more}"
+
+
+def finished(
+    records: Iterable[Any], seats: Collection[str] = (), waiting: Mapping[str, list[dict[str, Any]]] | None = None
+) -> dict[str, Any] | None:
     """Whether a live team has finished, read from the records carrying its badge and nothing else
     (design §6 rule 9, §4.9a *A team's finished is the home's reading*, TD-241) — the one reading
     the home's tick and the page's *concluded* both take, so the two never disagree. `records` are
@@ -120,7 +162,11 @@ def finished(records: Iterable[Any], seats: Collection[str] = ()) -> dict[str, A
     - a dead member with `out_of_work` is counted; one `exited` with its pane and no declaration
       (rule 1's crash), or dead with `restart_wanted` (rule 2's), **blocks** the reading until that
       rule has acted, since a team about to have a member back has not finished; any other dead
-      record, and a superseded one, is passed over.
+      record, and a superseded one, is passed over;
+    - a live member **waiting** on the person — `waiting` (`waiting_of` over the person inbox) holds
+      a question from it, keyed by its `id` — blocks the reading whatever it declared, its clause
+      naming the reference and the bound (§4.9a *Waiting is read, never declared*, TD-274). A
+      caller that passes no `waiting` reads nobody as waiting.
     """
     mine = [r for r in records if _f(r, "unattended") is not False and not _f(r, "superseded_by")]
     up = [r for r in mine if _f(r, "state") not in DEAD]
@@ -138,6 +184,10 @@ def finished(records: Iterable[Any], seats: Collection[str] = ()) -> dict[str, A
                 why.append(f"{name} {state}")
             continue
         wants, out = _said(r, "restart_wanted"), _said(r, "out_of_work")
+        asked = (waiting or {}).get(str(_f(r, "id"))) if live else None
+        if asked:
+            why.append(waiting_clause(name, asked))
+            continue
         if live:
             if state != "idle":
                 why.append(f"{name} {state}")
