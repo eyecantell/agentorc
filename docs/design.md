@@ -6278,6 +6278,10 @@ The evidence to re-read is the same: the records of a night's team.
    **resume carries mail forward** (below): a worker that crashed and is resumed inside the window
    still receives the note its manager sent. An open `ask`, `steer` or `conflict` is untouched — it
    keeps the lifecycle it has, pending while the record is only exited and expired when it closes.
+   One that lands **after** the record ended — a lapsed orphan's note or an orphan's answer, left
+   in a closed asker's mailbox for the name's next create (§4.10 *An orphaned `steer` lapses to
+   its default*, TD-271) — runs its window from its own arrival, not the record's end, or a team
+   wound down a day before the bound would lose it at the next sweep.
    **A seat is the exception** (§6 rule 3, TD-259): a record carrying `seat` is closed whenever the
    seat is empty, so an `ask` addressed to it stays open and pending across the close, as across
    an exit, and is there at the fill — whichever seat, and however long a ceiling, a gate or a

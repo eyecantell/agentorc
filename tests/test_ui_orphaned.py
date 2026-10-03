@@ -167,7 +167,7 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
             r = c.post("/api/person/reply", json={"reply_to": q, "text": "the DIU one"})
             assert r.status_code == 200, r.text
             got = r.json()
-            assert got["note"] == "written on the board" and got["board"] and got["closed"] == q
+            assert got["note"].startswith("written on the board") and got["board"] and got["closed"] == q
         assert ": the DIU one. Context: TD-149." in (repo / "docs" / "user_attention.md").read_text()
         # `ao msg --reply-to` by a person takes the same road, and says where the answer went
         w = call_sync("create", name="asker", dir=str(repo), adapter="shell", argv=["bash", "--norc"])["id"]
@@ -175,6 +175,6 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
         call_sync("close", id=w)
         assert cli.main(["msg", "--reply-to", q2, "drop it"]) == 0
         out = capsys.readouterr().out
-        assert out.startswith("written on the board\ncommitted ")
+        assert out.startswith("written on the board · left in asker's mailbox for its next run\ncommitted ")
     finally:
         (home / "hosts.yml").unlink()

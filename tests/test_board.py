@@ -356,7 +356,11 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
             me, repo, tmp_path, "Which fetcher first?\n\nThe reading, for the record.", "TD-149", kind="ask"
         )
         got = await me.call("msg", text="the DIU one", kind="reply", reply_to=q)
-        assert got["sent"] == [] and got["closed"] == q and got["note"] == "written on the board"
+        assert got["sent"] == [] and got["closed"] == q
+        assert got["note"] == "written on the board · left in asker's mailbox for its next run"
+        # the closed asker's own record keeps the handed note for the name's next create (TD-271)
+        left = [e for e in (await me.call("inbox", id=got["asker"]))["entries"] if e["from"] == "person"]
+        assert len(left) == 1 and left[0]["handed"] and left[0]["text"].startswith("the DIU one")
         assert got["message"].startswith("agentorc: answer Which fetcher first?") and got["message"].endswith(
             f"(from {q})"
         )
@@ -383,6 +387,30 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         assert handed[0]["text"].startswith("go with the default: drop it")
         assert handed[0]["outcome"] is None  # handed and unsettled: the holder owes an outcome (§4.10)
         assert agent.sessions[h].inbox[-1].owes_for(session_inbox=True)
+        await me.call("kill", id=h)
+
+
+async def test_a_full_closed_askers_mailbox_never_keeps_the_answer_from_the_holder(agent, repo, tmp_path, monkeypatch):
+    """TD-274 slice 3 (review of the slice): the holder's note and the closed asker's are two
+    sends, so an asker whose mailbox is at depth is said beside the press and the holder is still
+    mailed."""
+    from sessionorc import mail
+
+    _registry(tmp_path, repo)
+    async with LocalClient() as me:
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=h) as s:
+            await s.call("progress", id=h, ref="TD-149")
+        q = await _orphan(me, repo, tmp_path, "Which?", "TD-149", kind="ask")
+        asker = next(r.id for r in agent.sessions.values() if r.name == "asker")
+        monkeypatch.setattr(mail, "MAILBOX_DEPTH", 1)
+        agent._system_note(asker, "filler")  # the asker's mailbox at depth
+        got = await me.call("msg", text="this one", kind="reply", reply_to=q)
+        assert got["sent"] == [h] and "asker" not in got and got["asker_refused"]
+        assert "not left in asker's mailbox" in got["note"]
+        assert [e["text"] for e in (await me.call("inbox", id=h))["entries"] if e["from"] == "person"][0].startswith(
+            "this one"
+        )
         await me.call("kill", id=h)
 
 
