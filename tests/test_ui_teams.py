@@ -423,6 +423,9 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
     assert (got["line"], got["empty"]) == ("grinder: 0", True)
     r = client.post("/api/teams/ao-grind/start", json={})
     assert r.status_code == 409 and r.json()["detail"].startswith("nothing to pick") and not fleet.creates()
+    bad = client.post("/api/teams/ao-grind/start", content=b"not json", headers={"content-type": "application/json"})
+    assert bad.status_code == 409 and not fleet.creates()  # a body that is not JSON is none: asked, never a 500
+    assert client.post("/api/teams/ao-grind/start", json=[1]).status_code == 409
     assert client.post("/api/teams/ao-grind/start", json={"anyway": True}).status_code == 200 and fleet.creates()
     # unreadable: unknown, never empty — no dialog
     fleet.repos = {checkout: {"ledger": {"error": "gone"}}}

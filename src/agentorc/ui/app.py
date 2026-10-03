@@ -1793,7 +1793,11 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/teams/{name}/start")
     async def api_team_start(name: str, request: Request):
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        body: Any = {}
+        if request.headers.get("content-type", "").startswith("application/json"):
+            with contextlib.suppress(ValueError):  # a body that is not JSON reads as none, never a 500
+                body = await request.json()
+        body = body if isinstance(body, dict) else {}
         if hosts.is_node():
             raise HTTPException(409, node_org_note())  # the strip's note, as the toast (§4.4a)
         org, _notes = org_here()

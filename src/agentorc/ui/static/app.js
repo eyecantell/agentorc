@@ -1321,11 +1321,16 @@
   // carries the lane line, and the start's toast says it. A ledger that cannot be read opens nothing.
   async function startPress(b) {
     const name = b.dataset.team;
+    if (pendingTeams.has(name) || b.dataset.reading) return;  // one press at a time, the read included
+    b.dataset.reading = "1";
     let picks = null;
     try {
       const r = await fetch(`/api/teams/${encodeURIComponent(name)}/lanes`);
       if (r.ok) picks = await r.json();
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      delete b.dataset.reading;
+    }
     const line = (picks && picks.line) || "";
     if (picks && picks.empty) {
       const dlg = $("#startdlg");
@@ -1334,6 +1339,7 @@
       $("#startcloses").textContent = b.dataset.closes ? `It first closes ${b.dataset.closes}.` : "";
       $("#startcloses").hidden = !b.dataset.closes;
       $("#startlanes").textContent = line;
+      if (dlg.open) return;
       dlg.returnValue = "";
       dlg.addEventListener("close", () => { if (dlg.returnValue === "go") teamAct(name, "start", b, true, line); }, { once: true });
       return dlg.showModal();
