@@ -410,3 +410,17 @@ async def test_a_member_waiting_on_the_persons_answer_keeps_the_team_live(agent,
     await agent._finished_pass(later)
     await agent._finished_pass(later + FINISHED_SETTLE)
     assert sorted(home.closed) == ["designer", "g1"]
+
+
+async def test_a_member_waiting_after_the_line_takes_the_wind_down_back(agent, monkeypatch):
+    """TD-274 slice 1: once the manager has been told the team is finished, a member that now waits
+    on the person takes the wind-down back."""
+    await park_ticks(agent)
+    g1, manager = _rec("g1"), _manager()
+    _Home(agent, monkeypatch, g1, manager)
+    manager.finished_sent_at = _iso(datetime.now(UTC))
+    agent.person_inbox.append(
+        MailEntry(id="m-w", from_=g1.id, to=[PERSON], at=START, kind="ask", text="?", about="TD-9")
+    )
+    await agent._finished_pass(datetime.now(UTC))
+    assert manager.finished_sent_at is None, "a member waiting on the person is a member at work again"
