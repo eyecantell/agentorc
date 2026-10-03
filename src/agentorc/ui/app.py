@@ -1509,6 +1509,34 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         ok = bool(d) and await asyncio.to_thread(lambda: Path(d).expanduser().is_dir())
         return {"dir": d, "exists": ok, "why": "" if ok or not d else f"no such directory on {host_name()}"}
 
+    @app.get("/api/worktrees")
+    async def api_worktrees(repo: str = ""):
+        """**Where**'s *or one nobody is in:* (§4.5a **the reworked form**, TD-284 slice 4): the repo's
+        worktrees under its main checkout's `.claude/worktrees/` that hold no live session and no agent
+        the adapters can see — the occupancy check's reading of each — by name, for the chips."""
+        if not repo.strip():
+            return {"repo": "", "worktrees": []}
+        try:
+            root = await asyncio.to_thread(gitinfo.worktree_path, Path(repo.strip()).expanduser(), "")
+        except gitinfo.WorktreeError:
+            return {"repo": repo, "worktrees": []}
+
+        def listed() -> list[Path]:
+            try:
+                return sorted(p for p in root.iterdir() if (p / ".git").exists()) if root.is_dir() else []
+            except OSError:
+                return []
+
+        found = await asyncio.to_thread(listed)
+        # one worktree the agent cannot read is left out, not the list (review of #951)
+        held = await asyncio.gather(*(call("occupancy", dir=str(p)) for p in found), return_exceptions=True)
+        free = [
+            {"name": p.name, "path": str(p)}
+            for p, o in zip(found, held, strict=True)
+            if isinstance(o, dict) and not o.get("occupants")
+        ]
+        return {"repo": repo, "worktrees": free}
+
     @app.get("/api/occupancy")
     async def api_occupancy(dir: str = ""):
         if not dir.strip():

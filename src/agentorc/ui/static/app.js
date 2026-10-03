@@ -2349,6 +2349,8 @@
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
     let nameBlocked = false, dirBlocked = false, missingDir = false;
+    // **Where** follows the Repo and the Profile until the person picks it, or the form came filled in
+    let whereTouched = !!document.querySelector("form[data-prefilled]");
     // …or a host it cannot reach: a record's host with no live link stays picked and refuses Start
     const hostBlocked = () => !!hostSel && !!hostSel.selectedOptions[0] && hostSel.selectedOptions[0].disabled;
     const gate = () => {
@@ -2409,8 +2411,54 @@
       repoSel.value = hit ? hit.value : "";
       applyRepo(false);
     }
-    if (repoSel) repoSel.addEventListener("change", () => { applyRepo(true); if (other()) dir.focus(); });
+    if (repoSel) repoSel.addEventListener("change", () => { applyRepo(true); loadWorktrees(); if (other()) dir.focus(); });
     dir.addEventListener("input", () => { clearTimeout(dir._d); dir._d = setTimeout(dirCheck, 250); });
+    // **Where** is worktree-first (§4.5a **the reworked form**, TD-284 slice 4): a new worktree for a
+    // registered git checkout, the checkout itself for *another directory…* and a shell; Name names
+    // the worktree, and the repo's worktrees nobody is in are chips whose press takes its name
+    const wtIn = $("[name=worktree]"), chips = $("#wtchips"), chipList = $("#wtchiplist");
+    let free = [];
+    function defaultWhere(git) {
+      if (whereTouched) return;
+      const want = !other() && !isShell() && git ? wt : here;
+      if (!want.checked && !want.disabled) { want.checked = true; nameCheck(); }
+    }
+    // the worktree a Name makes is the server's `naming.slug` of it (`[a-z0-9-]`, 32 at most), so the
+    // line shows that and the reuse is read on it; a chip's or a Resume's own name goes as it is
+    const slugOf = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32).replace(/-+$/, "") || "x";
+    function wtName() {
+      const n = (wtIn && wtIn.value.trim()) || (nm.value.trim() ? slugOf(nm.value.trim()) : "<name>");
+      $$("#wtname, .wtn").forEach((el) => { el.textContent = n; });
+      const reuse = free.some((w) => w.name === n);
+      const line = $("#wtline");
+      if (line) line.dataset.reuse = reuse ? "1" : "";
+      const r = $("#wtreuse");
+      if (r) r.remove();
+      if (reuse && line) line.insertAdjacentHTML("beforeend", `<span id="wtreuse"> · reuses the worktree <code>${esc(n)}</code></span>`);
+    }
+    let wseq = 0;
+    async function loadWorktrees() {
+      const my = ++wseq;
+      if (other() || away() || !dir.value.trim()) { free = []; chips.hidden = true; wtName(); return; }
+      try {
+        const o = await (await fetch(`/api/worktrees?repo=${encodeURIComponent(dir.value.trim())}`)).json();
+        if (my !== wseq) return;
+        free = o.worktrees || [];
+      } catch (e) { free = []; }
+      chipList.innerHTML = free.map((w) => `<button type="button" class="btn sm ghost mono" data-wt="${esc(w.name)}" title="${esc(w.path)}">${esc(w.name)}</button>`).join("");
+      chips.hidden = !free.length;
+      wtName();
+    }
+    if (chipList) chipList.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-wt]"); if (!b) return;
+      nm.value = b.dataset.wt; if (wtIn) wtIn.value = b.dataset.wt;  // reused as it is named, never re-slugged
+      wt.checked = true; whereTouched = true;
+      nm.dispatchEvent(new Event("change"));
+    });
+    nm.addEventListener("input", () => { if (wtIn) wtIn.value = ""; wtName(); });
+    nm.addEventListener("change", wtName);
+    for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", () => { whereTouched = true; });
+    dir.addEventListener("change", loadWorktrees);
     // a shell has no role, lane or brief: picking it hides them, and the occupancy rule exempts it (§9)
     function applyShell() {
       const sh = isShell();
@@ -2427,13 +2475,15 @@
         // an occupied checkout is the Where choice greyed with who is in it, never a warning (TD-277):
         // the form has already picked the worktree; ⚠ only where Start is refused — an occupied
         // directory that is not a git repo has no worktree to go to (shells are exempt, §9)
-        const taken = !!(o.occupants && o.occupants.length);
+        // …and a shell may share it (§9: shells never hold the slot), so for one it is only said
+        const held = !!(o.occupants && o.occupants.length), taken = held && !isShell();
         here.disabled = taken; herechoice.classList.toggle("taken", taken);
-        inuse.hidden = !taken; inuse.textContent = taken ? `in use by ${o.occupants.join(", ")}` : "";
+        inuse.hidden = !held; inuse.textContent = held ? `in use by ${o.occupants.join(", ")}` : "";
         if (taken && o.git) { wt.checked = true; nameCheck(); }  // the scope moved to the repo
-        dirBlocked = taken && !o.git && !isShell();
+        else defaultWhere(o.git);
+        dirBlocked = taken && !o.git;
         if (dirBlocked) note.innerHTML = `⚠ <b>in use</b> by ${esc(o.occupants.join(", "))} and not a git repo, so there is no worktree to start in — one agent session per directory (§9)`;
-        else note.textContent = taken ? "a git repo: a new worktree is selected" : o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
+        else note.textContent = taken ? "a git repo: a new worktree is selected" : held ? "a shell may share the checkout" : o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
         gate();
       } catch (e) { note.textContent = ""; here.disabled = false; dirBlocked = false; gate(); }
     }
@@ -2602,6 +2652,7 @@
 
     applyShell();  // a Resume with changes… of a shell lands with the shell picked
     applyRepo(false);  // the page drew the pick; the typed path is checked once if it is the one
+    loadWorktrees();
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
     applyProject();
