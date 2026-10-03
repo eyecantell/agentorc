@@ -94,7 +94,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .input { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); font-family: inherit; display: flex; align-items: center; }
 input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
 /* Put on the board's *what's needed* (TD-281): four rows that grow with the text, then scroll */
-#batext { display: block; padding: 8px 10px; min-height: 6.5em; max-height: 40vh; field-sizing: content; overflow-y: auto; resize: vertical; font-family: inherit; line-height: var(--lh); }
+#batext { display: block; height: auto; padding: 8px 10px; min-height: 6.5em; max-height: 40vh; field-sizing: content; overflow-y: auto; resize: vertical; font-family: inherit; line-height: var(--lh); }
 /* Deny's optional reason (§4.5a, TD-117): button-height, and it gives way before a button does */
 input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-family: inherit; flex: 0 1 11em; min-width: 5em; width: 11em; }
 .field { display: flex; flex-direction: column; gap: 5px; } .field label { font-size: var(--t-cap); font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
