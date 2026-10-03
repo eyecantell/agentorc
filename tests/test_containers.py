@@ -609,11 +609,16 @@ def volatile_home(container_home, tmp_path):
 async def test_the_home_derives_a_container_nodes_reach_when_it_dials_in(container_home, agent):
     """3c.5: one docker look per hello, kept on the link state, so every card of the node carries
     `host_link.reach` — and a look that fails, or a node not running, leaves no reach."""
+    from conftest import wait_for
     from test_link import record
 
     container_home["make"] = lambda: Fake(pid="9\n")
     agent._take_records("cm", [record("ao-cm-w", host="cm")], whole=True)
     agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
+    # The user comes from the node's own definition, which the supervisor's provision writes: a node
+    # that dials in has one. Read before that write lands (a slow CI runner) the user was `root` (TD-285).
+    node = containers.container_nodes()["cm"]
+    assert await wait_for(lambda: "cm" not in agent.supervision and node.config.is_file(), timeout=5.0, step=0.05)
     await agent._note_reach("cm")
     reach = agent.links["cm"]["reach"]
     assert reach["container"] == "abc123def456" and reach["user"] == "developer"

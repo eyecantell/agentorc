@@ -142,7 +142,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Built (#939), live look pending |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
-| TD-285 | `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` failed three CI runs in a short window, all on 3.12: the reach read reports user `root`, not `developer` — main went red on 7cca6af and passed on a rerun | Medium | Open |
+| TD-289 | `test_seat_closed.py::test_a_question_to_a_closed_seat_survives_a_refused_fill_and_is_there_at_the_fill` fails on CI now and then: a second ask expires beside the one the test expects | Medium | Open |
 
 
 ---
@@ -2690,20 +2690,20 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-219 (Add entry), TD-155 (Resume reads idle, never working, within a tick), TD-047 (the composer's Steer).
 
-## TD-285: A container test fails on CI now and then: the reach it reads says `root`
+## TD-289: A seat test fails on CI now and then: a second ask expires beside the one expected
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-02 (the anchor, at the promote of 7cca6af: main's CI failed on this test alone, and passed on a rerun of the failed job)
+**Added:** 2026-10-02 (the anchor, at PR #937's CI: attempt 2 failed on this test alone, attempt 1 and 3 on TD-285's; it also failed run 37090936027 on a branch)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, the `container_home` and `agent` fixtures, `Fake`), `src/sessionorc/agent*.py` (`_note_reach`, and the tick that may call it too)
+**Location:** `tests/test_seat_closed.py` (`test_a_question_to_a_closed_seat_survives_a_refused_fill_and_is_there_at_the_fill`, the assertion `mail["expired"] == [lost["id"]]`), the home's expiry of asks to closed records
 
-**Why:** `assert reach["container"] == "abc123def456" and reach["user"] == "developer"` failed with `'root' == 'developer'` on main's run of 7cca6af (#930, which touched no container code), and the same test failed on two other recent runs; reruns pass. A red main stops the promote policy (*not now: checks on main are failed*) and a hand promote presses through it, so a flake costs either a stall or a promote over a red check. `root` is the code's fallback, not the `Fake`'s answer (its `user` is `developer`): `src/sessionorc/containers.py` takes the user from the node's devcontainer definition's `remoteUser`, else `root`, and `root` too when the read raises (`_remote_user`). The likely cause, unverified: that read sometimes finds no `remoteUser` or fails — the `agent` fixture's own tick racing the test's `_note_reach`, or the definition read before the fixture has written it.
+**Why:** `assert mail["expired"] == [lost["id"]], "a closed record that is no seat expires its ask, as ever"` failed with a second id in the list (`['m-07d2f728a44c', 'm-4fe2fb1334fa']`): an ask the test expects to survive, the seat's, expired too, or a tick ran an expiry the test did not plan. It passes locally and on reruns, so it is timing: a red check stops the promote policy and makes every PR's author rerun CI.
 
-**Fix:** reproduce under load (`pytest -p no:randomly --count 50` or a loop), confirm the race, and make the test own the reach (the definition written, and the tick kept out, before `_note_reach`), rather than retrying the assertion; if the fallback itself is the fault, the code says so.
+**Fix:** reproduce under a slowed tick or a loop, find which ask the second id is and what expired it, and make the test own the timing (or fix the expiry if a seat's ask can expire). As TD-285 was (#941): show the cause before the fix.
 
-**Done when:** the test passes fifty runs in a row locally and is not seen failing on CI for a week.
+**Done when:** the cause is shown, and the test passes fifty runs in a row.
 
-**Related:** TD-057 (the home and node split, where the reach comes from), TD-132 (the promote's check on main).
+**Related:** TD-285 (the container test's race, the same shape), TD-097 (a seat), TD-259 (the manager on call).
