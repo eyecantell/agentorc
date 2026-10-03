@@ -356,7 +356,11 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
             me, repo, tmp_path, "Which fetcher first?\n\nThe reading, for the record.", "TD-149", kind="ask"
         )
         got = await me.call("msg", text="the DIU one", kind="reply", reply_to=q)
-        assert got["sent"] == [] and got["closed"] == q and got["note"] == "written on the board"
+        assert got["sent"] == [] and got["closed"] == q
+        assert got["note"] == "written on the board · left in asker's mailbox for its next run"
+        # the closed asker's own record keeps the handed note for the name's next create (TD-271)
+        left = [e for e in (await me.call("inbox", id=got["asker"]))["entries"] if e["from"] == "person"]
+        assert len(left) == 1 and left[0]["handed"] and left[0]["text"].startswith("the DIU one")
         assert got["message"].startswith("agentorc: answer Which fetcher first?") and got["message"].endswith(
             f"(from {q})"
         )

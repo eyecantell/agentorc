@@ -433,9 +433,11 @@ class InboxMixin:
         repo's board — the question's first paragraph and the answer — by the write-back's second
         add (§4.4); a refused write refuses the press and touches nothing. **The holders**: a
         `note` from the person, `about` the reference and marked `handed`, to every live record
-        with a lease on it, which owes an outcome as a handed board reply does; with none, nothing
-        is mailed and nothing is owed. Then the entry closes `replied` or `go_with_it`. One press
-        per entry at a time, as *Put on the board*."""
+        with a lease on it, which owes an outcome as a handed board reply does — and to **the closed
+        asker's own record** (TD-271), where it waits for the record the name's next create puts
+        there, which keeps the mail; with neither (the asker forgotten, nobody holding), nothing is
+        mailed and nothing is owed. Then the entry closes `replied` or `go_with_it`. One press per
+        entry at a time, as *Put on the board*."""
         if not e.open:
             raise RpcError(f"{e.id} is already closed ({e.closed_reason})")
         if e.id in self._board_adding:
@@ -473,9 +475,13 @@ class InboxMixin:
             raise RpcError(str(err)) from None
         log.info("board %s: %s", root, done["message"])
         holders = self._lease_holders(ref) if ref else []
+        # the asker's own name is a holder too (TD-271): its closed record keeps the note for the
+        # next create under the name; a forgotten one is gone, and one a holder already is gets one
+        asker = e.from_ if e.from_ in self._graph() and e.from_ not in holders else ""
+        to = [*holders, *([asker] if asker else [])]
         sent: list[str] = []
         mail_refused = ""
-        if holders:
+        if to:
             how = str(o.get("how") or "closed")
             text = (
                 f"{answer}\n\nThe person's answer to {e.id}, which {o.get('name') or e.from_} asked about {ref} "
@@ -485,7 +491,7 @@ class InboxMixin:
             if len(text.encode()) > mail.TEXT_CAP:  # the answer alone is within the cap; the quote is not counted
                 text = text.encode()[: mail.TEXT_CAP - 3].decode(errors="ignore") + "…"
             try:
-                got = await self._msg(PERSON, text, holders, "note", ref, None, None, None)
+                got = await self._msg(PERSON, text, to, "note", ref, None, None, None)
             except RpcError as err:
                 # The line is committed, so the press succeeded: the refusal is said beside it, never
                 # raised, or a second press would write the line twice (as `_board_add_one`)
@@ -493,16 +499,20 @@ class InboxMixin:
             else:
                 if mid := (got.get("entry") or {}).get("id"):
                     self._mark(mid, handed=True)  # it owes an outcome, as a handed board reply does (§4.10)
-                sent = list(got.get("delivered") or holders)
+                sent = [s for s in (got.get("delivered") or to) if s != asker]
         at = now_iso()
         self._close_entry(e.id, reason, at)
         # Nobody is left to report what became of it: the entry's own debt is settled here, and the
         # handed note carries it on to whoever holds the work (§4.10 *Outcomes*).
         settled = "answered on the board" + (f", sent to {', '.join(sent)}" if sent else "")
         toast = "written on the board" + (f" · sent to {', '.join(sent)} (holds {ref})" if sent else "")
+        if asker and not mail_refused:
+            name = o.get("name") or asker
+            settled += f", left in {name}'s mailbox"
+            toast += f" · left in {name}'s mailbox for its next run"
         if mail_refused:
-            settled += f"; not sent to {', '.join(holders)}: {mail_refused}"
-            toast += f" · not sent to {', '.join(holders)} (holds {ref}): {mail_refused}"
+            settled += f"; not sent to {', '.join(to)}: {mail_refused}"
+            toast += f" · not sent to {', '.join(to)}: {mail_refused}"
         self._mark(e.id, outcome={"state": "asker_gone", "text": settled, "at": at, "by": ""}, answer=picked)
         await self._push_changes()
         return {
@@ -514,6 +524,7 @@ class InboxMixin:
             **done,
             "sent": sent,
             "delivered": sent,
+            **({"asker": asker} if asker and not mail_refused else {}),
             "note": toast,
             **({"mail_refused": mail_refused} if mail_refused else {}),
         }
@@ -633,16 +644,17 @@ class InboxMixin:
         wakes it **uncharged**, so a spent budget cannot hold it past the bound it set itself. An
         `ask` or a `conflict` expires, as it always has.
 
-        **An orphaned `steer` does not lapse** (§4.10 *A question about a reference outlives its
-        asker*): nobody is left to take the default, so its `bound` is cleared and it stays open —
-        from then on an `ask` for this sweep — and nothing is told. One **adopted** by a successor
-        lapses as any does, but the successor did not write it, so the note names the default."""
-        if e.kind == "steer" and e.orphaned:
-            self._mark(e.id, bound=None)
-        elif e.kind == "steer":
+        **An orphaned `steer` lapses to its default too** (§4.10 *An orphaned `steer` lapses to its
+        default*, TD-271): the bound is the person's answer whoever is left to hear it, so the entry
+        closes `lapsed` and the note is written into the **closed asker's mailbox**, where the
+        record the name's next create puts there finds it. One **adopted** by a successor lapses as
+        any does; neither wrote what the note reads, so both name the default. (From TD-213 until
+        then the bound was cleared instead; an entry that happened to stays a question with no
+        clock, which this sweep never reaches.)"""
+        if e.kind == "steer":
             self._close_entry(e.id, "lapsed", stamp)
             text = f"steer {e.id} lapsed: go with your default"
-            if e.adopted_at:
+            if e.adopted_at or e.orphaned:
                 text = f'steer {e.id} about {e.about} lapsed: the default was "{e.default}"'
             self._system_note(e.from_, text, wake="uncharged")
         else:
@@ -660,7 +672,10 @@ class InboxMixin:
         record became `exited` or `closed`: the run it was addressed to is over, and an unread
         `note` or `reply` ages out on the same window from then (TD-072, TD-141) — the window, not
         the exit itself, because a resume carries mail forward and a worker resumed inside it still
-        gets the note. An open `ask`, `steer` or `conflict` is untouched (`e.open`, above)."""
+        gets the note. One written **after** the record ended — a lapse's note or an orphan's answer
+        left in a closed asker's mailbox (§4.10, TD-271) — runs from its own arrival instead, or a
+        team wound down a day before the bound would lose it at the next sweep. An open `ask`,
+        `steer` or `conflict` is untouched (`e.open`, above)."""
         if e.open or e.owes_for(session_inbox=inbox and not person) or mail.MAIL_RETENTION is None:
             # `owes`: a question that was answered and not reported back is kept until it is
             # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's
@@ -668,7 +683,11 @@ class InboxMixin:
             return True
         if not inbox and e.source and _parse(e.at) + mail.SOURCED_RETENTION > now:
             return True  # a sourced reply, in its sender's outbox (§4.9b): what `inbox --sent` reads
-        since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at) or (dead_since if inbox else None)
+        since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at)
+        if since is None and inbox and dead_since:
+            # from the later of the death and the arrival: a note written to a closed record — a
+            # lapse, an orphan's answer (TD-271) — waits its window for the name's next create
+            since = max(dead_since, e.at, key=_parse) if e.at else dead_since
         if since is None:
             return True
         return _parse(since) + mail.MAIL_RETENTION > now

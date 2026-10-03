@@ -1250,9 +1250,11 @@ async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
         assert (await held(ask))["closed_reason"] == "declined"
 
 
-async def test_an_orphaned_steer_loses_its_bound_instead_of_lapsing(agent, tmp_path):
-    """Design §4.10: at an orphaned `steer`'s bound nobody is left to take the default, so the home
-    clears `bound` and leaves it open — an `ask` for the sweep from then on — and nothing is told."""
+async def test_an_orphaned_steer_lapses_to_its_default_into_the_closed_askers_mailbox(agent, tmp_path):
+    """Design §4.10 *An orphaned `steer` lapses to its default* (TD-271, TD-274 slice 3): at the
+    bound the entry closes `lapsed` as a live asker's would, and the note naming the default is
+    written into the closed asker's mailbox, uncharged — where a team wound down longer ago than
+    the retention window still keeps it, since it runs from the note's own arrival."""
     async with LocalClient() as person:
         w = await _mk(person, tmp_path)("w", unattended=True)
         async with LocalClient(caller=w) as s:
@@ -1261,11 +1263,14 @@ async def test_an_orphaned_steer_loses_its_bound_instead_of_lapsing(agent, tmp_p
             ]["id"]
         await person.call("close", id=w)
         await asyncio.sleep(0.3)
+        agent.sessions[w].since = "2026-01-01T00:00:00Z"  # closed long before the bound
         await agent._sweep_mail(datetime.now(UTC))
         await agent._sweep_mail(datetime.now(UTC))
         e = [e for e in (await person.call("inbox"))["entries"] if e["id"] == steer][0]
-        assert (e["closed_reason"], e["bound"], e["orphaned"]["how"]) == (None, None, "closed")
-        assert (await person.call("inbox", id=w))["entries"] == []  # nothing told: no lapse note
+        assert (e["closed_reason"], e["orphaned"]["how"]) == ("lapsed", "closed")
+        notes = (await person.call("inbox", id=w))["entries"]
+        assert [n["text"] for n in notes] == [f'steer {steer} about TD-5 lapsed: the default was "x"']
+        assert notes[0]["from"] == "system" and agent.sessions[w].inbox[0].uncharged
 
 
 async def test_a_create_under_the_askers_name_adopts_its_orphaned_questions(agent, tmp_path):
