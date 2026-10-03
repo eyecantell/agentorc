@@ -141,7 +141,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Open |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Open |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
-| TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Open |
+| TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
 | TD-285 | `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` failed three CI runs in a short window, all on 3.12: the reach read reports user `root`, not `developer` — main went red on 7cca6af and passed on a rerun | Medium | Open |
 
 
@@ -2679,7 +2679,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of the Repo page, TD-219 slice 3's look: *the prompt we inject shows in the text input box. I am torn whether this is good for transparency or just in the way. Also, the "working" pill is probably misleading on an interactive session — it should be idle, then working only while it is actually doing something*)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Part (1) built — PR #938 (a launch with no prompt sets `AGENTORC_AT_COMPOSER=1` and its `SessionStart` `startup` reads `idle`; design §4.2); merged, live look pending on `docs/user_attention.md`. Part (2), the composer holding only the person's words with the brief shown elsewhere, waits on its design round: the Fix's recommendation is for the design to confirm.
 **Location:** `src/agentorc/ui/app.py` (Add entry → **Open a session**, TD-219 slice 3: an interactive session `entry-<n>` with the words in its composer, unsent), the Claude Code adapter's state from hooks, design §4.5a *Add entry form*
 
 **Why:** (1) `entry-1`, started this way and never sent a turn, read `working (hook)` in `ao explain` and on its Focus header, its composer offering **→ Steer** (*this session is working, and Claude Code queues what you type*), while the pane showed Claude Code at its empty prompt. A person's own session that has not run a turn is idle; a `working` pill there sends the person to wait for nothing. (2) The words go into Focus's composer with the entry brief in front of them, so the person sees a long brief above their two sentences. It is transparent, and it is in the way: the brief is the session's instructions, not the person's text.

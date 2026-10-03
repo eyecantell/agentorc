@@ -333,6 +333,12 @@ def usage_report(payload: dict) -> dict | None:
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
 
 
+# A launch with no prompt (`ao new` without one, Add entry's **Open a session**) lands at the composer:
+# its SessionStart `startup` is no turn, and read as `working` the person's own session sat `working`
+# with **→ Steer** in its composer until a first turn's Stop (TD-283). The launch says so in the pane's
+# environment, since the payload cannot; a launch with a prompt still reports `working` on its start,
+# because its prompt runs at once and its `UserPromptSubmit` may lag the SessionStart hooks.
+AT_COMPOSER_ENV = "AGENTORC_AT_COMPOSER"
 COMPOSER_GLYPH = "❯"  # the composer's prompt glyph; submitted prompts repeat it above, the composer is the last
 
 # The tool's terminal title (design §4.5a **title**, §4.3 `title()`, TD-074). Claude Code writes the
@@ -432,6 +438,8 @@ class ClaudeCodeAdapter:
                 argv.append("--")  # a pasted brief that starts with '-' is a prompt, not an option
             argv.append(prompt)
         env = {"AGENTORC_PERMISSION_WAIT": str(prof.permission_wait)}
+        if not prompt and not resume:
+            env[AT_COMPOSER_ENV] = "1"  # no turn follows the start: `startup` reads idle (TD-283)
         if prof.config_dir:
             env["CLAUDE_CONFIG_DIR"] = str(prof.config_dir)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id)
