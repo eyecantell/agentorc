@@ -51,6 +51,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     NO_TEAM,  # noqa: F401
     _clock,  # noqa: F401
     _count,  # noqa: F401
+    _declared,  # noqa: F401
     _first_line,  # noqa: F401
     _middle,  # noqa: F401
     alarm_note,  # noqa: F401

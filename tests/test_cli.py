@@ -2135,3 +2135,28 @@ def test_the_presets_say_what_over_its_line_means():
     manager = (briefs / "manager.md").read_text()
     assert "**A team over its line** (design §6 *Balance*) is neither crashed nor finished" in manager
     assert "one line in your round log" in manager and "do not restart or wind them down" in manager
+
+
+def test_status_v_says_who_closed_a_record_in_the_cards_words(monkeypatch, capsys):
+    """design §4.7 (TD-262, built by TD-265): `ao status -v` prints a closed record's closer in the
+    card's words — one function, `ending.closer_words`, for both — and a session by its name."""
+    at = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)).isoformat()
+
+    def rec(sid, name, **kw):
+        base = {"id": sid, "name": name, "state": "closed", "confidence": "hook", "since": at, "adapter": "shell"}
+        return {**base, "closed_at": at, **kw}
+
+    records = [
+        rec("ao-r-manager-1", "manager-1", closer={"by": "ao-r-manager-1", "at": at}),
+        rec("ao-r-grinder-1", "grinder-1", closer={"by": "ao-r-manager-1", "at": at}),
+        rec("ao-r-grinder-2", "grinder-2", closer={"by": "tick", "why": "finished", "at": at}),
+        rec("ao-r-old", "old"),
+        {**rec("ao-r-live", "live"), "state": "idle", "closer": None},
+    ]
+    monkeypatch.setattr(cli, "call_sync", lambda method, **_: records if method == "list" else {})
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    assert "closed itself 5m ago" in out and "closed by manager-1 5m ago" in out
+    assert "closed by the tick · team finished 5m ago" in out
+    assert re.search(r"^\s+closed 5m ago$", out, re.M)  # no closer: bare *closed*
+    assert len(re.findall(r"^\s+closed.* ago$", out, re.M)) == 4  # the idle record has no such line

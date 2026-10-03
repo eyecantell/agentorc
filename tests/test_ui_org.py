@@ -921,9 +921,7 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     assert acts(html) == ["message", "remove"] and not any(g in menu(html) for g in gone)
     assert acts(card.render(s={**closed, "restartable": True})) == ["message", "restart", "remove"]
     # the hover: the time, then the fixed words, the day read from the reap's own constant
-    assert closed["slot"]["full"] == (
-        "closed by you at 2026-09-21T01:00:00Z · forgotten by itself a day after the close"
-    )
+    assert closed["slot"]["full"] == ("closed at 2026-09-21T01:00:00Z · forgotten by itself a day after the close")
     assert closed["closed_keep"] == "forgotten by itself a day after the close"
     # a closed record with no `closed_at` is never reaped, so nothing says it will be
     bare = view(_card(state="closed", pane=False))
@@ -934,7 +932,47 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     assert acts(card.render(s=view(_card(state="exited", exit_code=0, pane=False)))) == ["message", "remove"]
     # the Details banner says the same beside its Forget, from the view's field
     js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
-    assert "v.closed_keep ? ` <span class=\"meta\">${esc(v.closed_keep)}</span>`" in js
+    assert 'v.closed_keep ? ` <span class="meta">${esc(v.closed_keep)}</span>`' in js
+
+
+def test_a_closed_card_says_who_closed_it_and_keeps_the_declaration_after_the_ending(tmp_path, monkeypatch):
+    """§4.5 row 5 (b) and §4.5a **doing** (TD-262, built by TD-265): the record's `closer` in the
+    card's words — a person's, a session's by its name, the session's own, the tick's four — bare
+    *closed* with none, and a closed or exited record that declared keeps the declaration after."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import view
+
+    at = "2026-10-01T10:00:00Z"
+    mgr = _card(id="ao-r-manager-dc-1", name="manager-dc-1", state="closed", pane=False)
+
+    def text(closer, **kw):
+        closer = {**closer, "at": at} if isinstance(closer, dict) else closer
+        rec = _card(state="closed", pane=False, closed_at=at, closer=closer, **kw)
+        return view(rec, [rec, mgr])["slot"]["text"]
+
+    assert text({"by": "person", "why": None}) == "closed by you"
+    assert text({"by": "ao-r-manager-dc-1", "why": None}) == "closed by manager-dc-1"
+    assert text({"by": "ao-gone-1", "why": None}) == "closed by ao-gone-1"  # not in the fleet: its id
+    assert text({"by": "ao-w", "why": None}) == "closed itself"
+    for why, words in (("finished", "team finished"), ("wanted", "for a restart"), ("brief", "brief changed"),
+                       ("seat", "seat done")):  # fmt: skip
+        assert text({"by": "tick", "why": why}) == f"closed by the tick · {words}"
+    assert text(None) == "closed"
+    assert text({"by": "tick", "why": "nonsense"}) == "closed by the tick"
+    assert text("not a dict") == "closed"  # a malformed field costs the words, never the card
+    # the hover: the words, the time and the day the record goes
+    full = view(_card(state="closed", pane=False, closed_at=at, closer={"by": "person", "at": at}))["slot"]["full"]
+    assert full == f"closed by you at {at} · forgotten by itself a day after the close"
+    # the declaration after the ending, its reason's first line; the hover holds both in full
+    oow = {"at": at, "why": "nothing pickable on dev-cadence's ledger\nTD-1 is design-first"}
+    slot = view(_card(state="closed", pane=False, closed_at=at, closer={"by": "ao-r-manager-dc-1", "at": at},
+                      out_of_work=oow), [mgr])["slot"]  # fmt: skip
+    assert slot["text"] == "closed by manager-dc-1 — out of work — nothing pickable on dev-cadence's ledger"
+    assert slot["full"].startswith(f"closed by manager-dc-1 at {at} · ")
+    assert slot["full"].endswith("TD-1 is design-first")
+    ex = view(_card(state="exited", exit_code=0, restart_wanted={"at": at, "why": "context bound"}))["slot"]
+    assert ex["text"] == "exited · code 0 — restart wanted — context bound"
+    assert view(_card(state="exited", exit_code=0))["slot"]["text"] == "exited · code 0"
 
 
 def test_ready_to_close_on_focus_says_close_session_as_the_header_does(tmp_path, monkeypatch):
