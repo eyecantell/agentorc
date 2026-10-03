@@ -476,43 +476,49 @@ class InboxMixin:
         log.info("board %s: %s", root, done["message"])
         holders = self._lease_holders(ref) if ref else []
         # the asker's own name is a holder too (TD-271): its closed record keeps the note for the
-        # next create under the name; a forgotten one is gone, and one a holder already is gets one
-        asker = e.from_ if e.from_ in self._graph() and e.from_ not in holders else ""
-        to = [*holders, *([asker] if asker else [])]
-        sent: list[str] = []
-        mail_refused = ""
-        if to:
-            how = str(o.get("how") or "closed")
-            text = (
-                f"{answer}\n\nThe person's answer to {e.id}, which {o.get('name') or e.from_} asked about {ref} "
-                f'before its session was {how}: "{first[:600]}". It is on {root.name}\'s board too — close that line '
-                "when you have carried it out."
-            )
-            if len(text.encode()) > mail.TEXT_CAP:  # the answer alone is within the cap; the quote is not counted
-                text = text.encode()[: mail.TEXT_CAP - 3].decode(errors="ignore") + "…"
+        # next create under the name. A forgotten one is gone, one a holder already is gets one, and
+        # a superseded one was never orphaned (its questions moved with the conversation)
+        r = self._graph().get(e.from_)
+        asker = e.from_ if r is not None and not r.superseded_by and e.from_ not in holders else ""
+        how = str(o.get("how") or "closed")
+        text = (
+            f"{answer}\n\nThe person's answer to {e.id}, which {o.get('name') or e.from_} asked about {ref} "
+            f'before its session was {how}: "{first[:600]}". It is on {root.name}\'s board too — close that line '
+            "when you have carried it out."
+        )
+        if len(text.encode()) > mail.TEXT_CAP:  # the answer alone is within the cap; the quote is not counted
+            text = text.encode()[: mail.TEXT_CAP - 3].decode(errors="ignore") + "…"
+
+        async def hand(to: list[str]) -> tuple[list[str], str]:
+            """One `handed` note; a refusal is said beside the press, never raised: the line is
+            committed, so a second press would write it twice (as `_board_add_one`)."""
             try:
                 got = await self._msg(PERSON, text, to, "note", ref, None, None, None)
             except RpcError as err:
-                # The line is committed, so the press succeeded: the refusal is said beside it, never
-                # raised, or a second press would write the line twice (as `_board_add_one`)
-                mail_refused = str(err)
-            else:
-                if mid := (got.get("entry") or {}).get("id"):
-                    self._mark(mid, handed=True)  # it owes an outcome, as a handed board reply does (§4.10)
-                sent = [s for s in (got.get("delivered") or to) if s != asker]
+                return [], str(err)
+            if mid := (got.get("entry") or {}).get("id"):
+                self._mark(mid, handed=True)  # it owes an outcome, as a handed board reply does (§4.10)
+            return list(got.get("delivered") or to), ""
+
+        # two sends, so the asker's mailbox filled to depth never keeps the note from the holders
+        sent, mail_refused = await hand(holders) if holders else ([], "")
+        left, asker_refused = await hand([asker]) if asker else ([], "")
         at = now_iso()
         self._close_entry(e.id, reason, at)
         # Nobody is left to report what became of it: the entry's own debt is settled here, and the
         # handed note carries it on to whoever holds the work (§4.10 *Outcomes*).
         settled = "answered on the board" + (f", sent to {', '.join(sent)}" if sent else "")
         toast = "written on the board" + (f" · sent to {', '.join(sent)} (holds {ref})" if sent else "")
-        if asker and not mail_refused:
-            name = o.get("name") or asker
+        if mail_refused:
+            settled += f"; not sent to {', '.join(holders)}: {mail_refused}"
+            toast += f" · not sent to {', '.join(holders)} (holds {ref}): {mail_refused}"
+        name = o.get("name") or asker
+        if left:
             settled += f", left in {name}'s mailbox"
             toast += f" · left in {name}'s mailbox for its next run"
-        if mail_refused:
-            settled += f"; not sent to {', '.join(to)}: {mail_refused}"
-            toast += f" · not sent to {', '.join(to)}: {mail_refused}"
+        elif asker_refused:
+            settled += f"; not left in {name}'s mailbox: {asker_refused}"
+            toast += f" · not left in {name}'s mailbox: {asker_refused}"
         self._mark(e.id, outcome={"state": "asker_gone", "text": settled, "at": at, "by": ""}, answer=picked)
         await self._push_changes()
         return {
@@ -524,9 +530,10 @@ class InboxMixin:
             **done,
             "sent": sent,
             "delivered": sent,
-            **({"asker": asker} if asker and not mail_refused else {}),
+            **({"asker": asker} if left else {}),
             "note": toast,
             **({"mail_refused": mail_refused} if mail_refused else {}),
+            **({"asker_refused": asker_refused} if asker_refused else {}),
         }
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:

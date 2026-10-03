@@ -175,6 +175,6 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
         call_sync("close", id=w)
         assert cli.main(["msg", "--reply-to", q2, "drop it"]) == 0
         out = capsys.readouterr().out
-        assert out.startswith("written on the board\ncommitted ")
+        assert out.startswith("written on the board · left in asker's mailbox for its next run\ncommitted ")
     finally:
         (home / "hosts.yml").unlink()

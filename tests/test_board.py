@@ -390,6 +390,30 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         await me.call("kill", id=h)
 
 
+async def test_a_full_closed_askers_mailbox_never_keeps_the_answer_from_the_holder(agent, repo, tmp_path, monkeypatch):
+    """TD-274 slice 3 (review of the slice): the holder's note and the closed asker's are two
+    sends, so an asker whose mailbox is at depth is said beside the press and the holder is still
+    mailed."""
+    from sessionorc import mail
+
+    _registry(tmp_path, repo)
+    async with LocalClient() as me:
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=h) as s:
+            await s.call("progress", id=h, ref="TD-149")
+        q = await _orphan(me, repo, tmp_path, "Which?", "TD-149", kind="ask")
+        asker = next(r.id for r in agent.sessions.values() if r.name == "asker")
+        monkeypatch.setattr(mail, "MAILBOX_DEPTH", 1)
+        agent._system_note(asker, "filler")  # the asker's mailbox at depth
+        got = await me.call("msg", text="this one", kind="reply", reply_to=q)
+        assert got["sent"] == [h] and "asker" not in got and got["asker_refused"]
+        assert "not left in asker's mailbox" in got["note"]
+        assert [e["text"] for e in (await me.call("inbox", id=h))["entries"] if e["from"] == "person"][0].startswith(
+            "this one"
+        )
+        await me.call("kill", id=h)
+
+
 async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_when_the_board_cannot_take_it(
     agent, repo, tmp_path
 ):
