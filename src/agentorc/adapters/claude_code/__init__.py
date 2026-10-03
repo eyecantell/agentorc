@@ -359,9 +359,10 @@ def context_file(sid: str) -> Path:
 
 def _instant(at: object) -> datetime | None:
     try:
-        return datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+        t = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
     except ValueError:
         return None
+    return t if t.tzinfo else None  # a naive time cannot be compared with an aware one
 
 
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
