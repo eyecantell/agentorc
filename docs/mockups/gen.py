@@ -321,9 +321,10 @@ EXTRA = {
     "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2},
     # declared itself out of work: plain `idle` — *unseen* is drawn only on an interactive session
     # (§4.2, TD-095 f), its manager read the result; the ending is said once, in the slot, and
-    # *ready to close ✓* is its caption
+    # *ready to close ✓* is its caption; it holds a steer to the person about #809, so the slot
+    # carries the wait after the declaration (§4.5a *waiting* mark, TD-271) and the team is not finished
     "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
-                  "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
+                  "ready": True, "ending": "out of work · waiting on you: #809 until 09:57"},
     # the team's seat (§4.9b), ended between questions as designed: `exited` in every payload, drawn
     # *on call* (◇) with what would make it come, and Message… first (§4.5, TD-097)
     "techlead-1": {"team": "samscrape-grind", "role": "techlead", "under": "orc-1", "report": "3 answered", "seat": True},
@@ -1401,7 +1402,7 @@ def inbox_rows():
               '<div class="sugg"><span class="lbl">suggested by orchestrator-ao-1</span>' + b("“Restart it once” · default") + b("“Stop the team”") + '</div>',
               b("Reply") + b("Go with it", "primary") + b("Pause") + gap + b(ICON["focus"] + "Open", "ghost")),
         # TD-213: an orphaned steer — its asker was closed by the wind-down, the question stands
-        mcard(BAR["exited"], "steer", "grinder-ao-1", "ao-grind", "7h ago · about TD-149 · <b>5h left, then it waits on you</b>",
+        mcard(BAR["exited"], "steer", "grinder-ao-1", "ao-grind", "7h ago · about TD-149 · <b>5h left, then its default stands and ao-grind is asked to start</b>",
               '<div class="txt"><span class="muted">its session was closed · <b style="color: #374151;">nobody holds TD-149 — your answer is written on agentorc’s board</b></span></div>'
               '<div class="txt">Six keys of <span class="mono">.agentorc.yml</span> are read by nothing. <b>Remove them and refuse them at load, or keep reading them with a warning?</b></div>'
               '<div class="meta">its asker would have gone with: <b style="color: #374151;">Remove and refuse</b></div>'
