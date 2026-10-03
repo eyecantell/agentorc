@@ -1375,6 +1375,9 @@ def inbox_rows():
     """The rows every Inbox artboard draws (needs, steering, waiting, fyi), in the page's order."""
     b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
     gap = '<span style="flex-grow: 1;"></span>'
+    # TD-290: a look's screenshots, drawn from the paths its line names under docs/mockups/reviews/ — a thumbnail each, the file's name under it
+    shot = lambda f: f'<span style="display: inline-flex; flex-direction: column; gap: 3px; margin-right: 10px;"><span style="width: 168px; height: 96px; border: 1px solid #d5d9df; border-radius: 4px; background: linear-gradient(135deg, #eef0f3, #dfe3e8);"></span><span class="mono muted" style="font-size: 11px;">{f}</span></span>'
+    shots = lambda *fs: '<div style="margin: 8px 0 4px;">' + "".join(shot(f) for f in fs) + '</div>'
     needs = [
         mcard(BAR["needs"], "", "tdgrind-ao-2", "ao-grind", "asked 40s ago · 4m 20s left",
               '<div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>',
@@ -1390,11 +1393,13 @@ def inbox_rows():
         mcard(BAR["needs"], "promote", "agentorc", "", "main moved 12m ago",
               '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
               b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
-        mcard(BAR["needs"], "board", "agentorc", "ao-grind", "1d overdue",
-              '<div class="txt"><span class="muted">grinder-ao-2 on kmaster · <b style="color: #374151;">still on TD-122 — grinder-ao-2 holds it</b></span></div>'
-              '<div class="txt">Live look pending once #517 is merged and promoted: the usage chip is one per account (TD-122). On the Org the top bar should read <i>Claude · paul · week n%</i> once, not once per profile.</div>'
-              '<div class="meta">on the board — Reply writes under your name on this line and, while a session holds TD-122, mails it there too; Snooze moves its Due: date; Done checks it off</div>',
-              b("Reply", "primary") + b("Snooze ▾") + b("Done") + gap + b("Open board", "ghost")),
+        # TD-290: a `look` nobody could settle — no default, so it is counted here; Send to reviewer hands it to the techlead seat
+        mcard(BAR["needs"], "board · look", "agentorc", "ao-grind", "due today",
+              '<div class="txt"><span class="muted">grinder-ao-2 on kmaster · <b style="color: #374151;">moved on</b></span></div>'
+              '<div class="txt"><b>Yours to judge: is the usage chip readable at a glance in the dark theme? (TD-122, #517)</b> Checked by grinder-ao-2 on a scratch home: one chip per account, the hover lists every window, both themes drawn.</div>'
+              + shots("2026-10-03-td122-chip-dark.png", "2026-10-03-td122-chip-hover.png")
+              + '<div class="meta">on the board — an answer is your decision on this line; Send to reviewer asks techlead-ao-1 to read it against the design first</div>',
+              b("Works") + b("Not right…") + b("Send to reviewer") + b("Reply") + b("Snooze ▾") + b("Done") + gap + b("Open board", "ghost")),
         mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
@@ -1411,6 +1416,13 @@ def inbox_rows():
               '<div class="meta">its asker would have gone with: <b style="color: #374151;">Remove and refuse</b></div>'
               '<div class="sugg"><span class="lbl">suggested by grinder-ao-1</span>' + b("“Remove and refuse” · default") + b("“Keep, with a warning”") + '</div>',
               b("Reply") + b("Go with it", "primary") + gap + b("Delete", "ghost danger")),
+        # TD-290: a `look` with a default — the techlead read the screenshots and leans Works; closed at its date unless the person says otherwise
+        mcard(BAR["working"], "board · look", "agentorc", "ao-grind", "written 3h ago · <b>until Oct 4, then closed as Works</b>",
+              '<div class="txt"><span class="muted">grinder-ao-1 on kmaster · <b style="color: #374151;">moved on</b></span></div>'
+              '<div class="txt"><b>Yours to judge: Save and Cancel sit under each Settings card, not at its head (TD-286, #955).</b> Checked by grinder-ao-1 on a scratch home: Save greyed until a field changes, Cancel restores it, both settle after a save. techlead-ao-1 read the screenshots: the design names no place for them, and under the card matches the New session form.</div>'
+              + shots("2026-10-03-td286-settings-save.png", "2026-10-03-td286-settings-cancel.png")
+              + '<div class="meta">will go with: <b style="color: #374151;">Works</b> — doing nothing is a valid answer</div>',
+              b("Go with it: Works", "primary") + b("Not right…") + b("Reply") + b("Snooze ▾") + gap + b("Open board", "ghost")),
     ]
     waiting = [
         mcard("#cbd0d6", "answered · waiting for the outcome", "tdgrind-ao-1", "ao-grind", "answered 52m ago",
@@ -1441,7 +1453,7 @@ def inbox(picks=False):
     needs, steering, waiting, answered, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
-        secs = [("Needs you", 6, False), ("Steering", 2, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
+        secs = [("Needs you", 6, False), ("Steering", 3, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
         teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
         kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 1, False), ("notes", 3, False), ("trail", 6, False)]
         b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
@@ -1450,7 +1462,7 @@ def inbox(picks=False):
                     '<div class="txt" style="color: #4b5563;">Decide whether the sweep reads worktrees of a repo that is not in the roster.</div>',
                     b("Reply") + b("Snooze ▾") + b("Done") + b("Open board", "ghost"))
             + '<div class="muted" style="padding: 2px 2px 8px; font-size: 12px;"><span style="font-size: 10px;">▸</span> not shown (14)</div><div class="muted" style="padding: 2px 2px 8px; font-size: 12px;">showing the next 10 board items per team · 14 not shown, the next due Oct 12 — <a href="#">show</a> · <a href="#">Settings</a></div>')
-        body = (isec("Needs you", 6, opened=True) + "".join(needs) + later + isec("Steering", 2) + "".join(steering)
+        body = (isec("Needs you", 6, opened=True) + "".join(needs) + later + isec("Steering", 3) + "".join(steering)
                 + isec("Waiting on them", 1) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
         summary, title = "", "Inbox"
@@ -1465,7 +1477,7 @@ def inbox(picks=False):
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 6</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
                 "Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).")
-    return head(title) + f'''<div style="width: 1440px; min-height: {2140 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
+    return head(title) + f'''<div style="width: 1440px; min-height: {2480 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Inbox 6 · 2")}
 <div style="padding: 16px 20px 28px;">
 <div style="max-width: 1324px; margin: 0 auto 12px;">{page_head(title, summary)}</div>

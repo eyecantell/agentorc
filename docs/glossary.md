@@ -95,6 +95,15 @@ not mix:
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile. Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `manager`,
   `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; neither old name resolves, TD-107). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
+- **look** — a board item of kind `look`: the person's look at a merged change, for the one
+  thing its builder and the techlead could not settle. With `Works (default)` it is drawn under
+  *Steering* and closed at its `Due:` unless the person says otherwise; without, under *Needs
+  you*. Not a `watch`, which is a check a session makes again before acting. — *proposed*
+  2026-10-03 (design §4.9b *A UI change is verified by its builder*, TD-290; the kind is
+  dev-cadence TD-082).
+- **scratch home** — a host agent and a UI run from a worktree on an `AGENTORC_HOME`, a tmux
+  server and a port of their own, where a builder looks at its own UI change and a press is
+  safe; never the live home. — *proposed* 2026-10-03 (TD-290; `scripts/look_home.py`, TD-291).
 - **seat** — a place in a team definition that one session fills at a time, named by what it
   does rather than by who is in it: the team's `techlead:` seat. A seat is *empty* or *filled*
   — the session in it may end and another be started into it (`ao new --keep-mail`, so the
