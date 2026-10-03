@@ -2126,7 +2126,11 @@ Screens:
    permission answered here leaves at once. **Board items** (TD-069 step 3) are read by
    dev-cadence's own `nudge_user_attention.py --report --json` (every open item since TD-220 slice 2;
    the page sorts what is due, *The board's horizon* below) over the boards of the
-   repos in this host's registry — never a second parser — at most once a minute and off the page's
+   repos in this host's registry — never a second parser — **with the copy picked by what it can do**
+   (TD-278): dev-cadence's own source (`files/scripts/`) where its checkout is registered, else the copy
+   whose repo synced last by its `docs/cadence-sync.lock`, since synced copies differ while a repo lags;
+   a copy that gives no field the page draws (an item's `answers`) is named in the board note, the rows
+   still drawn — at most once a minute and off the page's
    loop, and read again at once after a Snooze, Done or Reply; each due item is a counted *Needs you* row
    (its repo, the team whose projects hold it, its due words, the whole text as text, **Open board**
    at its line, and its sender's standing — *still on TD-122*, *moved on*, *gone* — so a reply's

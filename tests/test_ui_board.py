@@ -54,7 +54,8 @@ def report(root, *items):
 
 
 def item(line, text, due, tag):
-    return {"line": line, "text": text, "due": due, "overdue_days": 1, "due_tag": tag}
+    # `answers` as a current reader gives it (dev-cadence TD-036): one without it is named (TD-278)
+    return {"line": line, "text": text, "due": due, "overdue_days": 1, "due_tag": tag, "answers": []}
 
 
 @pytest.mark.unit
@@ -73,6 +74,56 @@ def test_the_reader_runs_over_every_board_here_with_the_first_script_found(tmp_p
     assert note == "" and argv[1] == str(b / "scripts" / "nudge_user_attention.py")
     assert argv[2:4] == ["--report", "--json"]  # every open item: the page sorts what is due (TD-220)
     assert argv[4:] == ["--board", str(a / "docs/user_attention.md"), "--board", str(b / "docs/user_attention.md")]
+
+
+@pytest.mark.unit
+def test_the_reader_is_picked_by_what_it_can_do_never_by_registry_order(tmp_path):
+    """TD-278, §4.5 screen 6: dev-cadence's own source when its checkout is registered; else the copy
+    whose repo synced last (`docs/cadence-sync.lock`), the registry's order deciding a tie — samscrape,
+    first in the registry and two weeks behind, ran for every board and drew no row's answers."""
+    from agentorc.ui.app import board_argv, board_reader
+
+    def lock(root, when):
+        (root / "docs" / "cadence-sync.lock").write_text(f"source: x\ncommit: abc\nsynced: {when}\n")
+
+    old = repo(tmp_path, "samscrape", "- [ ] x\n")
+    new = repo(tmp_path, "agentorc", "- [ ] y\n")
+    lock(old, "2026-09-17T10:00:00Z")
+    lock(new, "2026-10-01T23:06:28Z")
+    assert board_reader([old, new]) == new / "scripts" / "nudge_user_attention.py"
+    assert board_argv([old, new])[0][1] == str(new / "scripts" / "nudge_user_attention.py")
+    bare = repo(tmp_path, "nolock", "- [ ] z\n")  # no lock: never newer than one that has it
+    assert board_reader([bare, old]) == old / "scripts" / "nudge_user_attention.py"
+    assert board_reader([bare]) == bare / "scripts" / "nudge_user_attention.py"  # the only copy
+    dc = repo(tmp_path, "dev-cadence", reader=False)
+    (dc / "files" / "scripts").mkdir(parents=True)
+    shutil.copy(READER, dc / "files" / "scripts" / "nudge_user_attention.py")
+    assert board_reader([old, new, dc]) == dc / "files" / "scripts" / "nudge_user_attention.py"
+
+
+@pytest.mark.unit
+def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypatch):
+    """TD-278: a copy older than a field the Inbox draws is said in the board note, the rows still
+    drawn — never a board that silently has no answers. A current reader, or no item, says nothing."""
+    from agentorc.ui.app import reader_lacks
+
+    root = tmp_path / "r"
+    stale = report(root, {"line": 3, "text": "a. Due: 2026-09-20.", "due": "2026-09-20"})
+    note = reader_lacks(stale, "/r/scripts/nudge_user_attention.py")
+    assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)") and "/r/scripts" in note
+    assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue")), "/x") == ""
+    assert reader_lacks(report(root), "/x") == "" and reader_lacks("junk") == ""
+    # through the read: the rows drawn, the note beside them
+    real = repo(tmp_path, "proj", "# Board\n")
+    host(tmp_path, monkeypatch, [real])
+    from agentorc.ui import app as uiapp
+
+    class Done:
+        returncode, stderr = 0, ""
+        stdout = __import__("json").dumps(stale)
+
+    rows, note = uiapp.read_boards(run=lambda argv, **kw: Done())
+    assert len(rows) == 1 and "without `answers`" in note
 
 
 @pytest.mark.unit

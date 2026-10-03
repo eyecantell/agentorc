@@ -146,8 +146,10 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
     BOARD_FETCH_TIMEOUT,  # noqa: F401
+    BOARD_FIELDS,  # noqa: F401
     BOARD_FILE,  # noqa: F401
     BOARD_SCRIPT,  # noqa: F401
+    BOARD_SOURCE,  # noqa: F401
     BOARD_TIMEOUT,  # noqa: F401
     BOARD_TTL,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
@@ -164,6 +166,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
     RAIL_UNDER,  # noqa: F401
+    SYNC_LOCK,  # noqa: F401
     WORK_IDS,  # noqa: F401
     WORKS,  # noqa: F401
     _ahead_words,  # noqa: F401
@@ -180,6 +183,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
     _same_ref,  # noqa: F401
+    _synced,  # noqa: F401
     _trail_rows,  # noqa: F401
     board_argv,  # noqa: F401
     board_body,  # noqa: F401
@@ -188,6 +192,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_head,  # noqa: F401
     board_horizon,  # noqa: F401
     board_line,  # noqa: F401
+    board_reader,  # noqa: F401
     board_rows,  # noqa: F401
     cadence_marks,  # noqa: F401
     find_matches,  # noqa: F401
@@ -207,6 +212,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     rail_kind,  # noqa: F401
     rail_picks,  # noqa: F401
     rail_rows,  # noqa: F401
+    reader_lacks,  # noqa: F401
     restart_mark,  # noqa: F401
     review_pr,  # noqa: F401
     row_find,  # noqa: F401
@@ -316,7 +322,8 @@ def read_boards(run: Any = subprocess.run, *, fetch: bool = False, board: str = 
                     # the reader's words for a fetch it stopped: *fetch skipped (timeout)*
                     b.update(source=None, fetch_note=f"fetch skipped ({'timeout' if 'timeout' in why else why})")
     org, _ = org_here()
-    return board_rows(report, repo_teams(org, host_name())), ""
+    script = next((a for a in argv if a.endswith(".py")), "")
+    return board_rows(report, repo_teams(org, host_name())), reader_lacks(report, script)
 
 
 def _run_reader(run: Any, argv: list[str], timeout: float) -> tuple[dict[str, Any] | None, str]:
