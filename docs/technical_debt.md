@@ -148,7 +148,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
 | TD-293 | New session on another host reads this host's disk for the Repo list, the roles and the brief, ledger and reader a role resolves, and draws no directory check, occupancy or worktree chips | Medium | Designed 2026-10-03 — the build is TD-294 |
-| TD-294 | Build the New session form's reads on the picked host: `host_occupancy`, `host_worktrees`, `stat`'s `root`, the page's endpoints taking `host`, the role resolved from the node's files | Medium | Open |
+| TD-294 | Build the New session form's reads on the picked host: `host_occupancy`, `host_worktrees`, `stat`'s `root`, the page's endpoints taking `host`, the role resolved from the node's files | Medium | Slices 1–2 built (#957, #PRNUM); 3 open |
 
 
 ---
@@ -2813,7 +2813,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the designer, TD-293's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 built — PR #957 (the link methods `occupancy` and `worktrees`, `stat`'s `root`, the home's `host_occupancy` and `host_worktrees`, both in `modes.HOME_ONLY`; `tests/test_link.py`). Slices 2 (the page) and 3 (Start) open.
+**Status:** Slice 1 built — PR #957 (the link methods `occupancy` and `worktrees`, `stat`'s `root`, the home's `host_occupancy` and `host_worktrees`, both in `modes.HOME_ONLY`; `tests/test_link.py`). Slice 2 built — PR #PRNUM (the page reads the picked host: `/api/repos`, `host` on `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles` and `/api/team_review`; `app.js` passes it, `away()`'s skips gone, a Host change re-reads every reading). Open: slice 3 (Start).
 **Location:** `src/sessionorc/agent_link.py` (the node's link methods beside `stat`, `repos`, `files`), `src/sessionorc/agent_remote.py` (`rpc_host_dir`, `rpc_host_repos`, `rpc_host_files`: the two new reads beside them), `src/agentorc/ui/app.py` (`new_form`, `_roles_for`, `new_submit`, `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()`), `src/agentorc/teamrun.py` (how a team start reads a node's config and briefs: the model); design §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*)
 
 **Why:** design §4.4a *The New session form on another host* (TD-293): a pick of another host is right today only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.

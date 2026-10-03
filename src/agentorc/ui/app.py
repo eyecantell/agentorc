@@ -1279,6 +1279,47 @@ def form_repos(repos: list[str]) -> list[dict[str, str]]:
     return out
 
 
+def remote_repos(repos: list[str]) -> list[dict[str, str]]:
+    """The Repo pick for another host (§4.4a *The New session form on another host*, TD-294): its
+    registry's checkouts as `host_repos` gives them, as they are — whether each is there is that
+    host's to say, and its create says it."""
+    return [{"name": Path(r).name, "path": str(r)} for r in repos if str(r).strip()]
+
+
+def silent(host: str, e: HTTPException) -> str:
+    """What the form says where a read of `host` failed: the home's words when they name the host
+    (*node1 did not answer: …*, *runs on node1: unreachable since …*), else *<host> did not answer*."""
+    detail = str(e.detail)
+    return detail if host in detail else f"{host} did not answer: {detail}"
+
+
+class HostSilent(ValueError):
+    """The picked host did not answer a read the form needs: said in the note's place (§4.5a)."""
+
+
+def away_host(host: str) -> str:
+    """The picked host when it is not this one, else "" — the form reads this host as it always has."""
+    h = host.strip()
+    return h if h and h != host_name() else ""
+
+
+async def config_on(call: Any, host: str, directory: str) -> repoconfig.RepoConfig:
+    """`directory`'s repo config on another host (§4.4a *The New session form on another host*,
+    TD-294): `host_dir` gives the checkout's top level (`root`), `host_files` its `.agentorc.yml`,
+    and `repoconfig.load_text` parses it here — a team start's loader, so the two cannot disagree.
+    Outside a checkout, the defaults for the directory. A host that does not answer is
+    `HostSilent`; a malformed file is `ValueError` in the loader's words."""
+    try:
+        seen = await call("host_dir", host=host, dir=directory)
+        root = str((seen or {}).get("root") or "")
+        if not root:
+            return repoconfig.RepoConfig(root=Path(directory))
+        got = await call("host_files", host=host, dir=root, paths=[repoconfig.FILE])
+    except HTTPException as e:
+        raise HostSilent(silent(host, e)) from None
+    return repoconfig.load_text(((got or {}).get("files") or {}).get(repoconfig.FILE), root)
+
+
 def repo_of(choices: list[dict[str, str]], directory: str) -> str:
     """The Repo choice a prefilled directory is (its path), or "" for *another directory…*."""
     if not directory.strip():
@@ -1320,6 +1361,11 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # then recent directories; phase 1 reads the local host's file directly
         repos = hosts.local_host().repos()
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
+        # a form filled in for another host (Resume with changes…) reads that host's registry (TD-294)
+        picks, repo_why = form_repos(repos), ""
+        if elsewhere_host := away_host(host):
+            got = await repos_on(elsewhere_host)
+            picks, repo_why, recent = got["repos"], got["why"], [r["path"] for r in got["repos"]]
         # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
         # holding `control` — nothing else could act on the new session anyway — live, or a seat on
         # call, whose id and grant survive the close for whoever fills it (TD-269, built by TD-276)
@@ -1331,7 +1377,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         ]
         # design §4.5a New session **Role** pick: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
-        roles = _roles_for(dir)
+        roles = await roles_view(dir, host)
         return templates.TemplateResponse(
             request,
             "new.html",
@@ -1342,8 +1388,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
-                "form_repos": (picks := form_repos(repos)),
+                "form_repos": picks,
                 "repo_pick": repo_of(picks, dir),
+                "repo_host": elsewhere_host or host_name(),
+                "repo_why": repo_why,
                 "form_hosts": form_hosts(await call("host")),
                 # the Profile pick's last choice (§4.5a New session **the form**, TD-284 slice 2)
                 "shell_pick": SHELL_PICK,
@@ -1404,15 +1452,54 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"roles": [r.to_dict() for r in repoconfig.roles(repoconfig.RepoConfig())], "error": str(e)}
         return {"roles": found, "controllers": cfg.controllers, "file": str(cfg.path) if cfg.path else None}
 
+    async def roles_view(dir: str, host: str = "") -> dict[str, Any]:
+        """`_roles_for` on the picked host (§4.4a *The New session form on another host*, TD-294):
+        another host's repo config read there, the built-ins with the reason when it cannot be."""
+        if not (h := away_host(host)):
+            return _roles_for(dir)
+        builtins = [r.to_dict() for r in repoconfig.roles(repoconfig.RepoConfig())]
+        if not dir.strip():
+            return {"roles": builtins}
+        try:
+            cfg = await config_on(call, h, dir.strip())
+            found = [r.to_dict() for r in repoconfig.roles(cfg)]
+        except ValueError as e:  # HostSilent among them: said where the note is
+            return {"roles": builtins, "error": str(e)}
+        return {"roles": found, "controllers": cfg.controllers, "file": f"{h}:{cfg.path}" if cfg.path else None}
+
+    async def repos_on(host: str) -> dict[str, Any]:
+        """The Repo pick's choices on `host` (TD-294): this host's registry checked on this disk, another
+        host's from `host_repos`; a host that does not answer gives none and says so."""
+        if not (h := away_host(host)):
+            return {"host": host_name(), "repos": form_repos(hosts.local_host().repos()), "why": ""}
+        try:
+            got = await call("host_repos", host=h)
+        except HTTPException as e:
+            return {"host": h, "repos": [], "why": silent(h, e)}
+        return {"host": h, "repos": remote_repos([str(r) for r in (got or {}).get("repos") or []]), "why": ""}
+
+    @app.get("/api/repos")
+    async def api_repos(host: str = ""):
+        """**Repo**'s choices on the picked host, re-read when Host changes (§4.5a, TD-294)."""
+        return await repos_on(host)
+
     @app.get("/api/team_review")
-    async def api_team_review(team: str = "", dir: str = ""):
+    async def api_team_review(team: str = "", dir: str = "", host: str = ""):
         """The line under New session's **Team** picker (design §4.5a): the reader a session started
-        in `team` from `dir` gets when its role has none."""
-        return await asyncio.to_thread(team_reader, team, dir) if team else {"review": None, "line": ""}
+        in `team` from `dir` gets when its role has none — `dir`'s repo read on the picked host."""
+        if not team:
+            return {"review": None, "line": ""}
+        if (h := away_host(host)) and dir.strip():
+            try:
+                cfg = await config_on(call, h, dir.strip())
+            except ValueError as e:
+                return {"review": None, "line": f"⚠ {e}"}
+            return await asyncio.to_thread(team_reader, team, dir, cfg)
+        return await asyncio.to_thread(team_reader, team, dir)
 
     @app.get("/api/roles")
-    async def api_roles(dir: str = ""):
-        return _roles_for(dir)
+    async def api_roles(dir: str = "", host: str = ""):
+        return await roles_view(dir, host)
 
     @app.post("/new")
     async def new_submit(
@@ -1522,20 +1609,37 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
     @app.get("/api/dir_check")
-    async def api_dir_check(dir: str = ""):
+    async def api_dir_check(dir: str = "", host: str = ""):
         """*another directory…*'s check as it is typed (§4.5a New session **the form**, TD-284 slice 4):
-        whether the directory is there on this host, in the words the form prints."""
+        whether the directory is there on the picked host (`host_dir` for another, TD-294), in the
+        words the form prints. A host that does not answer is `exists: null`: said, never a refusal."""
         d = dir.strip()
+        if (h := away_host(host)) and d:
+            try:
+                ok = bool((await call("host_dir", host=h, dir=d) or {}).get("exists"))
+            except HTTPException as e:
+                return {"dir": d, "exists": None, "why": silent(h, e)}
+            return {"dir": d, "exists": ok, "why": "" if ok else f"no such directory on {h}"}
         ok = bool(d) and await asyncio.to_thread(lambda: Path(d).expanduser().is_dir())
         return {"dir": d, "exists": ok, "why": "" if ok or not d else f"no such directory on {host_name()}"}
 
     @app.get("/api/worktrees")
-    async def api_worktrees(repo: str = ""):
+    async def api_worktrees(repo: str = "", host: str = ""):
         """**Where**'s *or one nobody is in:* (§4.5a New session **the form**, TD-284 slice 4): the repo's
         worktrees under its main checkout's `.claude/worktrees/` that hold no live session and no agent
         the adapters can see — the occupancy check's reading of each — by name, for the chips."""
         if not repo.strip():
             return {"repo": "", "worktrees": []}
+        if h := away_host(host):  # listed and their occupancy read where they are (§4.4a, TD-294)
+            try:
+                got = await call("host_worktrees", host=h, repo=repo.strip())
+            except HTTPException as e:
+                return {"repo": repo, "worktrees": [], "why": silent(h, e)}
+            listed = (got or {}).get("worktrees") or []
+            return {
+                "repo": repo,
+                "worktrees": [{"name": w["name"], "path": w["path"]} for w in listed if not w["occupied"]],
+            }
         try:
             root = await asyncio.to_thread(gitinfo.worktree_path, Path(repo.strip()).expanduser(), "")
         except gitinfo.WorktreeError:
@@ -1558,9 +1662,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return {"repo": repo, "worktrees": free}
 
     @app.get("/api/occupancy")
-    async def api_occupancy(dir: str = ""):
+    async def api_occupancy(dir: str = "", host: str = ""):
         if not dir.strip():
             return {"dir": "", "occupants": [], "git": False}
+        if h := away_host(host):  # the picked host's reading (§4.4a, TD-294): who holds the slot there
+            try:
+                return await call("host_occupancy", host=h, dir=dir.strip())
+            except HTTPException as e:
+                return {"dir": dir.strip(), "occupants": [], "git": False, "why": silent(h, e)}
         return await call("occupancy", dir=dir.strip())
 
     @app.get("/api/name_check")
