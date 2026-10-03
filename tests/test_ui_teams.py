@@ -252,6 +252,45 @@ def test_a_stopped_team_is_a_card_with_start_and_none_defined_is_a_line(world, c
     assert "Teams: none defined" in html and "data-team-act" not in html
 
 
+def test_a_wound_down_note_says_who_closed_it_how_soon_and_why(world, client):
+    """design §4.5a team card *wound down* note (TD-262, built by TD-265): who closed the members from
+    their records' closer — the manager's name when it closed any — *after 40 s* for a run under ten
+    minutes, and the manager's own reason; `ao team list` says the same from the same row."""
+    from agentorc import teamrun
+
+    _tmp, fleet = world
+    t0, t1 = "2026-10-01T10:00:00Z", "2026-10-01T10:00:40Z"
+
+    def closed(name, by, **kw):
+        oow = {"at": t1, "why": "nothing pickable on dev-cadence's ledger\nand the rest"}
+        rec = {**badged(name, "ao-grind", state="closed"), "tail": [], "created": t0, "closed_at": t1}
+        return {**rec, "out_of_work": oow, "closer": {"by": by, "at": t1}, **kw}
+
+    fleet.sessions = [closed("orc-ao", "orc-ao"), closed("grind-1", "orc-ao")]
+    row = next(r for r in uiapp.teams_view(fleet.sessions)["teams"] if r["name"] == "ao-grind")
+    assert (row["closed_by"], row["run_seconds"], row["after"]) == ("orc-ao", 40, "40 s")
+    assert row["manager_why"] == "nothing pickable on dev-cadence's ledger"
+    assert teamrun.wound_down_words(row) == " · after 40 s · by orc-ao — nothing pickable on dev-cadence's ledger"
+    html = client.get("/").text
+    head = html[html.index('<section class="tgroup" data-team="ao-grind"') :].split('<div class="grid">', 1)[0]
+    assert "· after 40 s</span> · by orc-ao<span" in head and "— nothing pickable on dev-cadence&#39;s ledger" in head
+    # a person's close, a run of an hour: no *after*, *by you*; a manager that gave no reason, no why
+    late = "2026-10-01T11:00:00Z"
+    fleet.sessions = [
+        {**closed("orc-ao", "person", closed_at=late), "out_of_work": {"at": t1, "why": ""}},
+        closed("grind-1", "person", closed_at=late),
+    ]
+    row = next(r for r in uiapp.teams_view(fleet.sessions)["teams"] if r["name"] == "ao-grind")
+    assert row["wound_down"] and row["run_seconds"] == 3600 and teamrun.wound_down_words(row) == " · by you"
+    # a record from before the closer: nothing said that the records do not hold
+    fleet.sessions = [
+        {**badged(n, "ao-grind", state="closed"), "tail": [], "out_of_work": {"at": t1, "why": ""}}
+        for n in ("orc-ao", "grind-1")
+    ]
+    row = next(r for r in uiapp.teams_view(fleet.sessions)["teams"] if r["name"] == "ao-grind")
+    assert row["wound_down"] and teamrun.wound_down_words(row) == ""
+
+
 def test_a_stopped_teams_card_reads_wound_down_where_it_would_have_read_stopped(world, client):
     """The rendered half of the same row: the words a person actually sees. A wound-down team is
     startable like any other — `ao team start` is the restart (§4.9) — so **Start** stays, its
