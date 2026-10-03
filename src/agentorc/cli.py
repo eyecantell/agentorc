@@ -19,6 +19,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import orgcheck, repoconfig, service, teamrun, teams
+from agentorc.ending import closer_words
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
@@ -261,9 +262,13 @@ def cmd_status(args: argparse.Namespace) -> int:
             usage = got if isinstance(got, dict) else {}
     sessions.sort(key=lambda s: (STATE_RANK.get(s["state"], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
+    id_names = {str(s["id"]): str(s.get("name") or "") for s in sessions}
     for s in sessions:
         print(status_line(s, w))
         if args.verbose:
+            if s["state"] == "closed":  # who closed it, in the card's words (§4.5 row 5 (b), TD-265)
+                when = f" {_age(s['closed_at'])} ago" if s.get("closed_at") else ""
+                print(f"{'':<{w}}      {closer_words(s, id_names)}{when}")
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
             if s.get("team"):

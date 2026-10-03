@@ -13,6 +13,7 @@ from typing import Any
 
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
+from agentorc.ending import NO_CLOSER, closer_words
 from agentorc.org import MANAGER_WHEN
 from sessionorc import identity, mail
 from sessionorc.adapters import short_model
@@ -445,6 +446,8 @@ def view(
     d["open_work"] = state == "idle" and isinstance(s.get("idle_open"), dict)
     # how long a closed card stays (§4.5 row 6, TD-266): said only where the reap's own clock is set
     d["closed_keep"] = closed_keep() if state == "closed" and s.get("closed_at") else ""
+    # who closed it (§4.5 row 5 (b), TD-265): a session named by its name where the fleet holds it
+    d["closer_text"] = closer_words(s, {str(o.get("id")): str(o.get("name") or "") for o in fleet or []})
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d
@@ -537,6 +540,24 @@ def _first_line(text: str) -> str:
     return text.strip().splitlines()[0] if text.strip() else ""
 
 
+def _declared(d: dict[str, Any]) -> tuple[str, str] | None:
+    """A declaration (§4.9a) as the slot says it, `(text, hover)`: the fixed words, then the first line
+    of its reason; the whole reason and when it was said are the hover — a card holds one clock."""
+    said = d["out_of_work"] or d["restart_wanted"]
+    if not said:
+        return None
+    words = "out of work" if d["out_of_work"] else "restart wanted"
+    if not d["out_of_work"] and said["early"]:
+        words += (f" · repeats {said['repeat']}" if said["repeat"] else " · early") + " — for a person"
+    why = said["why"]
+    text = words + (f" — {_first_line(why)}" if why else "")
+    when = f" {said['age']} ago" if said["age"] else ""
+    full = f"{words}{when} — {why or 'no reason recorded'}"
+    if not d["out_of_work"] and said["early"]:
+        full += f" — {said['decided'] or 'early'}, so a controller does not act on it (design §4.9a)"
+    return text, full
+
+
 def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     """The card's slot (design §4.5 *The card's anatomy*, row 5; §4.5a **doing**, TD-095): **one
     text, the first that applies**, and a caption. (a) what needs a person or explains a stop, (b)
@@ -601,25 +622,22 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             f"{text}: it exited on its own each time and the host agent restarted it, up to its ceiling "
             "(design §6) — it is yours now: Resume it, or Forget it"
         )
-    elif state == "exited":
-        code = d.get("exit_code")
-        kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
-    elif state == "closed":
-        kind, text = "ok", "closed by you"
-        full = f"closed by you at {d['closed_at']} · {d['closed_keep']}" if d.get("closed_at") else ""
-    elif d["out_of_work"] or d["restart_wanted"]:
-        # a declaration (§4.9a): the fixed words, then the first line of its reason
-        # (§4.9a); the whole reason and when it was said are the hover — a card holds one clock
-        said = d["out_of_work"] or d["restart_wanted"]
-        words = "out of work" if d["out_of_work"] else "restart wanted"
-        if not d["out_of_work"] and said["early"]:
-            words += (f" · repeats {said['repeat']}" if said["repeat"] else " · early") + " — for a person"
-        why = said["why"]
-        text = words + (f" — {_first_line(why)}" if why else "")
-        when = f" {said['age']} ago" if said["age"] else ""
-        full = f"{words}{when} — {why or 'no reason recorded'}"
-        if not d["out_of_work"] and said["early"]:
-            full += f" — {said['decided'] or 'early'}, so a controller does not act on it (design §4.9a)"
+    elif state in ("exited", "closed"):
+        if state == "exited":
+            code = d.get("exit_code")
+            kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
+            full = text
+        else:
+            # who closed it (§4.5 row 5 (b), TD-265): the record's closer in `ending.closer_words`' words
+            kind, text = "ok", d["closer_text"]
+            full = f"{text} at {d['closed_at']} · {d['closed_keep']}" if d.get("closed_at") else text
+            if text == "closed":
+                full += f" — {NO_CLOSER}"
+        if said := _declared(d):
+            # a record that declared keeps the declaration after its ending: it is what explains it
+            text, full = f"{text} — {said[0]}", f"{full} — {said[1]}"
+    elif said := _declared(d):
+        text, full = said
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (
