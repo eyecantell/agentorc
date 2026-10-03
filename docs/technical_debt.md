@@ -146,6 +146,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#956), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a `look` item in Needs you or Steering, no longer a `watch` | Medium | Open — design first |
+| TD-295 | The context reading's window is a guess from a table of model ids (*of 1M*); Claude Code hands its status line the window it runs (`context_window.context_window_size`, 200k by default): read it there, and Focus's reading is `/context`'s | Medium | Open |
 
 
 ---
@@ -2764,3 +2765,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** the design says who verifies a UI change and how the rest reaches the person, the grinder briefs say it, the build entries are on the ledger with a `Blocked by:` line, and the next merged UI change goes through it.
 
 **Related:** TD-255 (a live look's answers), TD-244 (the page walks), TD-288 (settled half by a headless look), dev-cadence TD-082, cadence §3.5.
+
+## TD-295: The context reading's window is guessed from a model table; read the one Claude Code reports
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the anchor, on Paul's question whether the open check *does Focus's 231k of 1M match /context?* could run by itself: it can be made unnecessary)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`CONTEXT_WINDOWS`, whose comment says *not verified: whether Claude Code runs any of these at a smaller window by default*; `ClaudeCode.context()`, which reads tokens from the transcript and the window from that table; `usage_report()`, which reads the status line's stdin), `src/agentorc/adapters/claude_code/hook.py` (`statusline()`), design §4.3 `context`, TD-190
+
+**Why:** the card's and Focus's context reading (*231k of 1M*) takes its tokens from the transcript's last turn and its window from `CONTEXT_WINDOWS`, a table of model-id prefixes that gives 1M to every current model but Haiku. Claude Code's documentation (*Customize your status line*; *Model configuration*) says the window is **200,000 by default and 1,000,000 for models with extended context**, and its status line JSON carries the truth: `context_window.context_window_size`, `context_window.used_percentage`, `context_window.current_usage` and `exceeds_200k_tokens`. agentorc already runs a status line on every launch (`agentorc-hook --statusline`) and reads `rate_limits` from the same payload, so the real window is in hand and unused. The board's decide line (*Focus matches /context | Focus does not match /context*) was asking a person to catch the guess.
+
+**Fix:** `usage_report()` (or a sibling) also keeps `context_window.context_window_size` and the tokens it reports, written where `context()` can read it for that session; `context()` prefers that window, and its tokens when fresher than the transcript's, and falls back to the table only when no status line has reported. The bound rule (§6 rule 5) then reads the window the tool runs, not a guess. Fixtures from the documented payload; a test that a reported 200k beats the table's 1M.
+
+**Done when:** a session's reading names the window its status line reported, a test pins it, and the board's *Focus matches /context* line is closed as answered by this entry.
+
+**Related:** TD-190 (the context bound), TD-122 / TD-233 (the status line's usage reading, the same payload).
