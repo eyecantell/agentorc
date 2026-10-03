@@ -743,16 +743,17 @@ def team_brief_ids(team: str) -> dict[str, str]:
     return teams.brief_ids(org, team, host_name())
 
 
-def team_reader(team: str, directory: str) -> dict[str, Any]:
+def team_reader(team: str, directory: str, cfg: repoconfig.RepoConfig | None = None) -> dict[str, Any]:
     """The reader a person's session in `team` gets when its role has none (design §4.9 *A person in
     the team*): `{review, line}` — `teams.team_review` over the member roles resolved in
-    `directory`'s repo, and the one line under the picker saying what that is."""
+    `directory`'s repo (`cfg`, when it was read on another host: §4.4a *The New session form on
+    another host*), and the one line under the picker saying what that is."""
     org, _notes = org_here()
     t = org.teams.get(team)
     if t is None:
         return {"review": None, "line": f"no team {team} is defined"}
     try:
-        cfg = repoconfig.discover(directory or os.getcwd())
+        cfg = cfg or repoconfig.discover(directory or os.getcwd())
     except ValueError as e:
         return {"review": None, "line": f"⚠ {e}"}
     review = teams.team_review(t, teams.team_roles(t, cfg, org.roles))

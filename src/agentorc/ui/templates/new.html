@@ -88,14 +88,15 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         <span class="note" id="projectnote">{% if projects %}optional: the repos in reach, and a Project block naming them in front of the brief{% else %}no project defined — a session without one is what every session was before{% endif %}</span>
         <span class="note">{{ fromfile("org.yml", files.org, "projects:") }}</span>
       </div>
-      {#- **Repo** (§4.5a New session **the form**, TD-284 slice 4): the registered checkouts on this host,
+      {#- **Repo** (§4.5a New session **the form**, TD-284 slice 4; TD-294): the registered checkouts on the picked host,
           narrowed by Team and Project, each *name · path*; the last choice, *another directory…*,
           opens the typed path the Directory field was — for a shell or a directory outside any
           repo — checked as it is typed. The pick fills `dir`, which is what Start posts. -#}
       {%- set form_repos = form_repos | default([]) %}{% set repo_pick = repo_pick | default("") %}
       <div class="field"><label>Repo</label>
-        <select class="input" id="repo">{% for r in form_repos %}<option value="{{ r.path }}"{% if r.path == repo_pick %} selected{% endif %}>{{ r.name }} · {{ r.path }}</option>{% endfor %}<option value="" data-other="1"{% if not repo_pick %} selected{% endif %}>another directory…</option></select>
-        <span class="note" id="reponote">{% if form_repos %}a registered checkout on {{ host }}. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo{% else %}no repo is registered on {{ host }}: type the directory{% endif %}</span>
+        <select class="input" id="repo">{% for r in form_repos %}<option value="{{ r.path }}" data-name="{{ r.name }}"{% if r.path == repo_pick %} selected{% endif %}>{{ r.name }} · {{ r.path }}</option>{% endfor %}<option value="" data-other="1"{% if not repo_pick %} selected{% endif %}>another directory…</option></select>
+        {%- set repo_host = repo_host | default(host) %}
+        <span class="note" id="reponote">{% if repo_why | default("") %}⚠ {{ repo_why }}: type the directory{% elif form_repos %}a registered checkout on {{ repo_host }}. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo{% else %}no repo is registered on {{ repo_host }}: type the directory{% endif %}</span>
         <div class="col" id="dirfield" style="gap: 5px;"{% if repo_pick %} hidden{% endif %}>
           <input class="input mono" name="dir" list="recent" value="{{ prefill.dir or repo_pick }}" placeholder="/path/to/a directory" required>
           <datalist id="recent">{% for r in recent %}<option value="{{ r }}">{% endfor %}</datalist>

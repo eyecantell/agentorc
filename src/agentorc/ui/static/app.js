@@ -2335,17 +2335,21 @@
 
   // ---- New session: the anchor rule, shown before you press Start ----
   AO.newSession = function () {
-    const dir = $("[name=dir]"), here = $("[name=where][value=here]"), wt = $("[name=where][value=worktree]"), note = $("#occupancy");
+    // the form's own Directory field: the top bar's Shell form carries a hidden `dir` of its own, first
+    // in the page, which a bare `[name=dir]` found — so a Repo pick wrote there and Start posted the
+    // field as the page drew it (found by TD-294 slice 2's browser check)
+    const dir = $("form[action='/new'] [name=dir]"), here = $("[name=where][value=here]"), wt = $("[name=where][value=worktree]"), note = $("#occupancy");
     // Declared up here, not beside `nameCheck` below: the occupancy check calls it when it moves
     // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
     const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
     const herechoice = $("#herechoice"), inuse = $("#hereinuse"), profSel = $("#profile");
     // Profile is the one tool pick (§4.5a New session **the form**, TD-284): its last choice is the shell
     const isShell = () => !!profSel && !!profSel.selectedOptions[0] && profSel.selectedOptions[0].dataset.adapter === "shell";
-    // the Host pick (TD-284 slice 3): another host's directory is not this one's to read for occupancy;
-    // the name check goes there with it, and the home's create refuses what the node would
+    // the Host pick (TD-284 slice 3): every reading about a place is the picked host's (§4.4a *The New
+    // session form on another host*, TD-294) — each read below carries it as `host`
     const hostSel = $("#host");
     const away = () => !!hostSel && hostSel.selectedIndex > 0;
+    const hq = () => (away() ? `&host=${encodeURIComponent(hostSel.value)}` : "");
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
     let nameBlocked = false, dirBlocked = false, missingDir = false;
@@ -2365,11 +2369,13 @@
     let dseq = 0;
     async function dirCheck() {
       const v = dir.value.trim(), my = ++dseq;
-      if (!other() || !v || away()) { missingDir = false; if (dnote) dnote.textContent = ""; gate(); return; }
+      if (!other() || !v) { missingDir = false; if (dnote) dnote.textContent = ""; gate(); return; }
       try {
-        const o = await (await fetch(`/api/dir_check?dir=${encodeURIComponent(v)}`)).json();
+        const o = await (await fetch(`/api/dir_check?dir=${encodeURIComponent(v)}${hq()}`)).json();
         if (my !== dseq) return;
-        missingDir = !o.exists; dnote.innerHTML = missingDir ? `⚠ <b>${esc(o.why)}</b>` : "";
+        // a host that did not answer is said, never a refusal: the create's own refusal is Start's
+        missingDir = o.exists === false;
+        dnote.innerHTML = missingDir ? `⚠ <b>${esc(o.why)}</b>` : o.exists === null ? esc(o.why) : "";
       } catch (e) { missingDir = false; dnote.textContent = ""; }
       gate();
     }
@@ -2382,21 +2388,28 @@
     }
     // Team and Project narrow the list to their checkouts, both at once (either one's change, or the
     // directory's, re-reads the two); a choice they leave out moves to the first kept
+    // (a Team's checkouts are its host's, which the Team pick sets; a Project's are this host's, so on
+    // another host they narrow by the repo's name — TD-294)
     function kept() {
-      let keep = null;
+      let keep = null, names = null;
       const t = teamSel && teamSel.selectedOptions[0], p = proj && proj.selectedOptions[0];
       if (t && t.value) { try { keep = JSON.parse(t.dataset.dirs || "[]"); } catch (e) { keep = []; } }
       if (p && p.value) {
         let rs = []; try { rs = JSON.parse(p.dataset.repos || "[]"); } catch (e) { rs = []; }
-        const ps = rs.filter((r) => r.path).map((r) => r.path);
-        keep = keep ? keep.filter((x) => ps.includes(x)) : ps;
+        if (away()) names = rs.map((r) => r.repo);
+        else {
+          const ps = rs.filter((r) => r.path).map((r) => r.path);
+          keep = keep ? keep.filter((x) => ps.includes(x)) : ps;
+        }
       }
-      return keep;
+      return { keep, names };
     }
     function narrowRepos() {
       if (!repoSel) return;
-      const paths = kept();
-      for (const o of repoSel.options) if (!o.dataset.other) o.hidden = !!paths && !paths.includes(o.value);
+      const { keep: paths, names } = kept();
+      for (const o of repoSel.options) {
+        if (!o.dataset.other) o.hidden = (!!paths && !paths.includes(o.value)) || (!!names && !names.includes(o.dataset.name));
+      }
       const cur = repoSel.selectedOptions[0];
       if (cur && cur.hidden) {
         const first = [...repoSel.options].find((o) => !o.hidden);
@@ -2440,9 +2453,9 @@
     let wseq = 0;
     async function loadWorktrees() {
       const my = ++wseq;
-      if (other() || away() || !dir.value.trim()) { free = []; chips.hidden = true; wtName(); return; }
+      if (other() || !dir.value.trim()) { free = []; chips.hidden = true; wtName(); return; }
       try {
-        const o = await (await fetch(`/api/worktrees?repo=${encodeURIComponent(dir.value.trim())}`)).json();
+        const o = await (await fetch(`/api/worktrees?repo=${encodeURIComponent(dir.value.trim())}${hq()}`)).json();
         if (my !== wseq) return;
         free = o.worktrees || [];
       } catch (e) { free = []; }
@@ -2470,10 +2483,14 @@
     let seq = 0;
     async function check() {
       const v = dir.value.trim(); const my = ++seq;
-      if (!v || away()) { note.textContent = ""; here.disabled = false; herechoice.classList.remove("taken"); inuse.hidden = true; dirBlocked = false; gate(); return; }
+      if (!v) { note.textContent = ""; here.disabled = false; herechoice.classList.remove("taken"); inuse.hidden = true; dirBlocked = false; gate(); return; }
       try {
-        const r = await fetch(`/api/occupancy?dir=${encodeURIComponent(v)}`); const o = await r.json();
+        const r = await fetch(`/api/occupancy?dir=${encodeURIComponent(v)}${hq()}`); const o = await r.json();
         if (my !== seq) return;
+        if (o.why) {  // the picked host did not answer: said in the note's place, Start left to the create
+          note.textContent = o.why; here.disabled = false; herechoice.classList.remove("taken"); inuse.hidden = true;
+          dirBlocked = false; gate(); return;
+        }
         // an occupied checkout is the Where choice greyed with who is in it, never a warning (TD-277):
         // the form has already picked the worktree; ⚠ only where Start is refused — an occupied
         // directory that is not a git repo has no worktree to go to (shells are exempt, §9)
@@ -2528,7 +2545,7 @@
     async function loadRoles() {
       const v = dir.value.trim(); const my = ++rseq;
       try {
-        const o = await (await fetch(`/api/roles?dir=${encodeURIComponent(v)}`)).json();
+        const o = await (await fetch(`/api/roles?dir=${encodeURIComponent(v)}${hq()}`)).json();
         if (my !== rseq) return;
         const keep = role.value;
         role.innerHTML = `<option value="" data-interactive="1">Interactive</option>`;
@@ -2611,7 +2628,36 @@
     nm.addEventListener("change", nameCheck);
     dir.addEventListener("change", nameCheck);
     for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
-    if (hostSel) hostSel.addEventListener("change", () => { gate(); check(); nameCheck(); dirCheck(); });
+    // a Host change re-reads every reading: the Repo list first — a Repo the new host does not list is
+    // cleared to its first, or to *another directory…* — then all that follow the directory (TD-294)
+    const rnoteRepo = $("#reponote");
+    let hseq = 0;
+    async function loadRepos() {
+      if (!repoSel) return;
+      const my = ++hseq, h = hostSel.value;
+      let o = { repos: [], why: "" };
+      try { o = await (await fetch(`/api/repos?host=${encodeURIComponent(h)}`)).json(); } catch (e) { o = { repos: [], why: `${h} did not answer` }; }
+      if (my !== hseq) return;
+      const last = [...repoSel.options].find((x) => x.dataset.other), cur = repoSel.value;
+      for (const x of [...repoSel.options]) if (!x.dataset.other) x.remove();
+      for (const r of o.repos) {
+        const opt = document.createElement("option");
+        opt.value = r.path; opt.dataset.name = r.name; opt.textContent = `${r.name} · ${r.path}`;
+        repoSel.insertBefore(opt, last);
+      }
+      if (rnoteRepo) rnoteRepo.innerHTML = o.why ? `⚠ ${esc(o.why)}: type the directory`
+        : o.repos.length ? `a registered checkout on ${esc(o.host || h)}. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo`
+        : `no repo is registered on ${esc(o.host || h)}: type the directory`;
+      // the choice kept is the one picked, else the directory set for the person (a Team's checkout)
+      const want = [cur, dir.value.trim()].find((p) => p && o.repos.some((r) => r.path === p));
+      // a typed directory stays typed: *another directory…* is kept rather than replaced by a repo
+      const typed = !cur && !!dir.value.trim();
+      repoSel.value = want || (typed || !o.repos.length ? "" : o.repos[0].path);
+      narrowRepos();
+      applyRepo(false);
+      dir.dispatchEvent(new Event("change"));  // the occupancy, the roles, the chips, the name, the team line
+    }
+    if (hostSel) hostSel.addEventListener("change", () => { gate(); loadRepos(); });
     // The Project picker (design §4.5a New session **Project**, §4.9): picking one narrows the
     // Directory list to that project's repos with their checkouts on this host. The paths came
     // down with the page — a project's repos do not change as you type, so there is nothing to
@@ -2625,13 +2671,18 @@
       let repos = [];
       try { repos = JSON.parse((o && o.dataset.repos) || "[]"); } catch (e) { repos = []; }
       if (!o || !o.value) { options(allDirs); narrowRepos(); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
-      const here = repos.filter((r) => r.path), away = repos.filter((r) => !r.path);
+      const here = repos.filter((r) => r.path), elsewhere = repos.filter((r) => !r.path);
+      if (away()) {  // its paths are this host's: on another host it narrows the Repo list by name (TD-294)
+        narrowRepos();
+        pnote.textContent = `narrows Repo to its repos on ${hostSel.value}: ${repos.map((r) => r.repo).join(", ") || "none"}`;
+        return;
+      }
       options(here.map((r) => r.path)); narrowRepos();
       if (!dir.value.trim() && here.length) { dir.value = here[0].path; syncRepo(); check(); loadRoles(); nameCheck(); }
       const mine = here.some((r) => r.path === dir.value.trim());
       pnote.textContent =
         `${here.length} repo${here.length === 1 ? "" : "s"} on this host: ${here.map((r) => r.repo).join(", ") || "none"}`
-        + (away.length ? ` · ${away.map((r) => `${r.repo} is on ${r.hosts.join(", ")} — out of reach until phase 2`).join("; ")}` : "")
+        + (elsewhere.length ? ` · ${elsewhere.map((r) => `${r.repo} is on ${r.hosts.join(", ")} — out of reach until phase 2`).join("; ")}` : "")
         + (here.length > 1 ? " · the brief gets the Project block naming them" : "")
         + (mine || !here.length ? "" : " · this directory is not one of them, so none is home");
     }
@@ -2656,7 +2707,7 @@
       const o = teamSel.selectedOptions[0]; const my = ++tseq;
       if (!o || !o.value) { tnote.textContent = TNOTE; return; }
       try {
-        const got = await (await fetch(`/api/team_review?team=${encodeURIComponent(o.value)}&dir=${encodeURIComponent(dir.value.trim())}`)).json();
+        const got = await (await fetch(`/api/team_review?team=${encodeURIComponent(o.value)}&dir=${encodeURIComponent(dir.value.trim())}${hq()}`)).json();
         if (my === tseq) tnote.textContent = got.line || TNOTE;
       } catch (e) { /* the default note stands */ }
     }
@@ -2671,7 +2722,7 @@
         if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
         // the team's host is the Host pick's (§4.5a New session **the form**), when it is one to pick
         if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
-          hostSel.value = o.dataset.host; check(); nameCheck();
+          if (hostSel.value !== o.dataset.host) { hostSel.value = o.dataset.host; gate(); loadRepos(); }
         }
         underMe = true; applyMode();  // a person's own session in the team (§4.9): a role runs under you
       } else { underMe = false; applyProject(); applyMode(); }  // *none*: a role is presumed unattended again
