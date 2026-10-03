@@ -1401,14 +1401,13 @@ class TickMixin:
         return {"at": at, "repo": repo, "members": members}
 
     def _question_end(self, e: Any, how: str) -> None:
-        """§6 rule 8 *A question's end is work* (TD-271, TD-274 slice 4): an orphaned question that
-        lapsed (`how: lapsed`) or was answered (`answered`) while its asker's team is **wound down**
-        writes `work_waiting` for the team as a lane's new id does — `members[<name>]` gaining the
-        reference, `questions` gaining `{id, ref, name, how, kind}` (the Inbox row says *steer* or
-        *ask*) — with no settle, a standing mark gaining the question and keeping its `at`. Under `on_work: off`, or for a team stopped rather
-        than wound down, or one live again, nothing is written: a live member is waiting (§4.9a), and
-        a stopped team's note waits in the mailbox for the person's Start. The next tick's
-        `_work_marks` does what the team's `on_work` says. Never on a node."""
+        """§6 rule 8 *A question's end is work* (TD-271, TD-274 slice 4): an orphaned question that lapsed (`how:
+        lapsed`) or was answered (`answered`) while its asker's team is **wound down** writes `work_waiting` for the
+        team as a lane's new id does — `members[<name>]` gaining the reference, `questions` gaining `{id, ref, name,
+        how, kind}` (the Inbox row says *steer* or *ask*) — with no settle, a standing mark gaining the question and
+        keeping its `at`. Under `on_work: off`, or for a team stopped rather than wound down, or one live again, nothing
+        is written: a live member is waiting (§4.9a), and a stopped team's note waits in the mailbox for the person's
+        Start. The next tick's `_work_marks` does what the team's `on_work` says. Never on a node."""
         o = e.orphaned if isinstance(e.orphaned, dict) else {}
         team, name, ref = str(o.get("team") or ""), str(o.get("name") or ""), str(o.get("ref") or "")
         if self.mode != "home" or not (team and name and ref):
