@@ -154,7 +154,7 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 720px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 720px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span></div>
@@ -165,36 +165,34 @@
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-    <div class="field"><label>Host</label><span class="input">kmaster</span></div>
-    <div class="field"><label>Project</label><span class="input">samscrape · 2 repos<span class="muted">▾</span></span><span class="note">optional: narrows Directory to the project's repos on this host, and puts a Project block naming them in front of the brief</span></div>
-    <div class="field"><label>Directory</label><span class="input mono">/home/kmaster/samscrape</span><span class="note">a repo checkout, a worktree, or any directory (registered repos and recent ones offered)</span><span class="note" style="color: #7c3d00;">held by <b>main</b> (idle) — pick a new worktree, or another directory</span></div>
-    <div class="field"><label>Adapter</label><span class="input">claude-code<span class="muted">▾</span></span><span class="note">claude-code: state from hooks · shell: guessed from the screen</span></div>
-    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free — nothing holds that name here</span></div>
-    <div class="field"><label>Profile</label><span class="input">the role's, else claude-code · paul (max) · opus (default)<span class="muted">▾</span></span><span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span></div>
-    <div class="field"><label>Role</label><span class="input">grinder [built-in + repo]<span class="muted">▾</span></span><span class="note">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span></div>
-    <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: the team this session joins — its badge and group, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b> on <span class="mono">src/sessionorc/**, docs/briefs/**</span></span></div>
-    <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">the references this session is handed, in order; empty: the role's default (free-pick)</span></div>
-    <div class="field"><label>Resume (optional)</label><span class="input mono" style="color: #9ca3af;">the tool's session id</span></div>
+    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free in agentorc — it names the session and its worktree</span></div>
+    <div class="field"><label>Host</label><span class="input">kmaster<span class="muted">▾</span></span><span class="note">kmaster · contractmatch-dev (container) — from <span class="mono">hosts.yml</span> · <span style="color: #2563eb;">Open file</span>; one host: plain text</span></div>
+    <div class="field"><label>Role</label><span class="input">grinder · unattended<span class="muted">▾</span></span><span class="note">first choice: <b>Interactive</b> (no role, yours). A role fills the brief, lane and grants and <b>runs unattended</b> — <span style="color: #2563eb;">run it under me instead</span></span></div>
+    <div class="field"><label>Profile</label><span class="input">the role's: claude-code · paul (max) · opus<span class="muted">▾</span></span><span class="note">tool · account · model the session starts with — from <span class="mono">profiles.yml</span> · <span style="color: #2563eb;">Open file</span>; the list ends with <i>shell (no agent)</i></span></div>
+    <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: brings its repo and host, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b></span></div>
+    <div class="field"><label>Project</label><span class="input" style="color: #9ca3af;">none<span class="muted">▾</span></span><span class="note">optional: narrows Repo to its repos — from <span class="mono">org.yml</span> <span class="mono">projects:</span> · <span style="color: #2563eb;">Open file</span></span></div>
   </div>
+  <div class="field"><label>Repo</label><span class="input">agentorc <span class="mono muted" style="margin-left: 8px;">/home/kmaster/agentorc</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">a registered checkout on kmaster. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo</span></div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill plain s-ended">in use by main</span></div>
-      <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
+      <div class="radio on"><span class="rb"></span><div><div>Worktree <span class="mono">td-302</span> · new</div><div class="note"><span class="mono">.claude/worktrees/td-302</span> on branch <span class="mono">td-302</span>, from origin's default branch</div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px;"><span class="note">or one nobody is in:</span><span class="btn sm ghost mono">td-290</span><span class="btn sm ghost mono">errors-alerts</span><span class="btn sm ghost mono">spike-pty</span><span class="note">— a press takes its name</span></div></div></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>The checkout itself</div><div class="note">one agent session per directory; a shell may share it</div></div><span style="flex-grow: 1;"></span><span class="pill plain s-ended">in use by main</span></div>
     </div>
   </div>
-  <div class="field"><label>Saved prompts</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span><span class="note">the role's <span class="mono">prompts:</span> — a press fills the opening prompt below (design §4.8, TD-161)</span></div></div>
-  <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt — a role fills it from its template.</span></div>
-  <div class="field">
-    <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>
+  <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px;">
+    <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">in order; empty: the role's default (free-pick)</span></div>
+    <div class="field"><label>At (optional)</label><span class="input mono" style="color: #9ca3af;">now</span><span class="note"><span class="mono">20:00</span>, <span class="mono">+2h</span></span></div>
+    <div class="field"><label>Until (optional)</label><span class="input mono">06:00</span><span class="note">an unattended session only</span></div>
   </div>
+  <div class="field"><label>Opening prompt (optional)</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span></div><span class="input" style="height: 60px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Empty: the role's brief is sent, filled from its template.</span></div>
   <div class="field"><label>Controllers</label>
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>orc-1</div><div class="note mono">ao-samscrape-orc-1</div></div></div>
-      <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>orchestrator-ao-1</div><div class="note mono">ao-agentorc-orchestrator-ao-1</div></div></div>
+      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>manager-ao-1 <span class="pill plain s-ended">◇ on call</span></div><div class="note mono">ao-agentorc-manager-ao-1</div></div></div>
     </div>
-    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">control</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
+    <span class="note">Who may act on this one (send, wrap up, kill, close). Ticked by the Team pick; none ticked: nobody may.</span>
   </div>
-  <div class="warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
+  <div class="note" style="display: flex; gap: 8px; align-items: center;"><span>▸</span><b>More</b><span>Grants (none) · Resume a conversation by its id</span></div>
   <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
 </div>
 </div>
