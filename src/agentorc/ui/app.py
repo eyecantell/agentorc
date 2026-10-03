@@ -2197,7 +2197,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Settings",
                 "agent_down": agent_down,
                 "volatile": local.volatile,
-                "usage": await chip_usage(call),
+                "usage": {} if agent_down else await chip_usage(call, fleet or None),
             },
         )
 
