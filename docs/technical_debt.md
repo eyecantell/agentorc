@@ -136,6 +136,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-274 | Build the waiting member: `finished` reads a live member's open question to the person as waiting, the slot and the Focus header say it, an orphaned steer lapses to its default into the closed mailbox, a question's end writes `work_waiting.questions`, and a start keeps the mail | High | Slice 1 (#924): the home's reading and rule 9; left: the page's and CLI's reading, the words, the lapse, rule 8 |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
 | TD-277 | The New session form asks for its fields in the order the code grew them: Host is fixed text, Directory, Where, Project and Team are five coupled picks, Adapter repeats the Profile, the warnings show when nothing applies, and Until and At show for an interactive session | Medium | Open — design first |
+| TD-278 | The Inbox reads every board with the first registered repo's copy of the reader, which is samscrape's, synced 2026-09-17 and without `Answers:`: no board row on the page draws its answers, Go with it, or Works / Not right… | High | Open |
+| TD-279 | A board row on the Inbox prints its line as raw text: `**` and backticks show, and a long line (a page walk) is one wall with no fold | Medium | Open |
+| TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Open |
+| TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Open |
 
 
 ---
@@ -2574,3 +2578,75 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** §4.5a's New session rows describe the reworked form, Paul has looked at the mockup, and the build entries are on the ledger with a `Blocked by:` line.
 
 **Related:** TD-269 and TD-276 (the Team pick and a seat on call as controller: the same form), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume lands on this form filled in), TD-160 (a person's own session inside a team).
+
+## TD-278: The Inbox reads the boards with a stale copy of the reader, so no board row draws its answers
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox, TD-255's live look: *It looks like the Answers are not being parsed correctly (do we need a more strict format?)* — the row ended `Answers: Works | Not right: <what>.` and drew Reply, Snooze and Done only)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/inbox.py` (`BOARD_SCRIPT` and the read: *the script from the first of them that carries it (a SYNCED file: every copy is the same)*), `~/.agentorc/repos.json` (the order: dev-cadence, samscrape, contractmatch, pneuma-ops, agentorc, …), design §4.4 / §4.5 screen 6 (the board's reader is dev-cadence's own)
+
+**Why:** the format is not the fault: this repo's reader (`scripts/nudge_user_attention.py --report --json`) gives that line `"answers": ["Works", "Not right: <what>"]`. The page does not run this repo's copy. It runs the first registered repo's that has one: dev-cadence keeps its scripts under `files/`, so the first is samscrape's, last synced 2026-09-17, before dev-cadence TD-036 (2026-09-22, its #110) gave the reader `Answers:`. That copy emits no `answers`, so every row on every board draws without them, and nothing says the copy is old. *Every copy is the same* holds only while every consumer is synced at once, which it is not.
+
+**Fix:** pick the reader by what it can do, not by repo order: prefer dev-cadence's source (`files/scripts/nudge_user_attention.py` in its registered checkout), else the newest copy among the registered repos (or this repo's own); and say on the page when the copy read lacks a field the page draws. Separately, samscrape's synced files are two weeks behind: `sync-all.sh` for it is dev-cadence's rollout, not this entry's.
+
+**Done when:** with samscrape's copy left as it is, the Inbox draws TD-255's answers on this repo's board rows, and a test pins the choice of copy.
+
+**Related:** TD-255 (the answers, built), dev-cadence TD-036 (the reader's `Answers:`), dev-cadence TD-074 (the live look's pair), TD-069 (board items on the Inbox).
+
+## TD-279: A board row on the Inbox prints its line as raw text, and a long line has no fold
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox, TD-138's look: *messages are still poorly formatted*, with a screenshot of the Org walk's row: a forty-line paragraph with `**`, `*` and backticks printed as typed)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/inbox.html`, `src/agentorc/ui/static/app.js` (a board row's body), `src/agentorc/ui/inbox.py`; design §4.5 screen 6, TD-138 (a message's first paragraph and *details*)
+
+**Why:** board lines are written in the board's markdown (bold head, italics, code spans), and the row prints them as text, so the head the writer bolded is not bold and the marks are noise. TD-138 folds a message after its first paragraph; a board line is one paragraph, so a page walk prints whole, and three of them fill the screen.
+
+**Fix:** render the line's inline markdown (bold, italic, code, links; escaped, nothing else), and fold a long line after its bold head and first sentence with *details* as TD-138 does, the fold holding across the refresh. The `Context:`, `Due:` and `Answers:` tail draws as the row's own fields or not at all.
+
+**Done when:** the Org walk's row reads as a bold head, a sentence and *details*, with no `**` or backtick on the page.
+
+**Related:** TD-138 (a message's fold), TD-255 (the row's answers), TD-270 (hovers as lists).
+
+## TD-280: The Inbox's keys and find: `r` for Reply, and the matched words marked
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox: TD-135's find *works, it would be nice to have the matching words highlighted*; TD-124's keys *works, would be nice to have r for reply as well*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the Inbox's keys and the rail's find), `src/agentorc/ui/help.py` (the keys list), design §4.5a's Inbox keys
+
+**Why:** `j` / `k` ring a row and `x` dismisses, but replying still needs the mouse; a find that matched two words in a forty-line row leaves the reader to look for them.
+
+**Fix:** `r` on a ringed row opens its Reply composer (board row or message; nothing on a row with no Reply), listed under `?` and in /help; a find marks each matched word in the rows it shows (`<mark>`, escaped), the marks going with the find. A one-line §4.5a addition for the key.
+
+**Done when:** `j` then `r` opens Reply on that row, and a find of two words shows both marked.
+
+**Related:** TD-124 (the keys), TD-135 (the find), TD-279 (the row's text, where the marks land).
+
+## TD-281: Three frictions on the Inbox's board rows
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox: *it is unclear to me what this is saying* of *Board, coming up*; *The "Whats needed" box should be multiple lines and scrollable*; *after a pull i had to do a hard refresh to see the reply button enabled (it could be i did not wait long enough)*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/inbox.html` (the horizon box), `src/agentorc/ui/templates/board_add.html` (`#batext`, an `<input>`: *one line*), `src/agentorc/ui/inbox.py` (`BOARD_TTL`, the fetching read), `src/agentorc/ui/templates/settings.html` (*board items shown*)
+
+**Why:** (1) *Board, coming up (n)* · *not counted* lists rows not yet due, by Settings → You → *board items shown* (*the next n per team*, *only what is past due*, *due this week*, *all*), but the heading names neither the setting nor that these are not due; an item put on the board for tomorrow lands there, which is right and reads as a misfile. (2) **Put on the board**'s *what's needed* is a one-line input, so a line of any length is read through a slit. (3) After a pull, a row's Reply stayed grey (*on origin, not in this checkout yet*) until a hard reload; the board read is cached `BOARD_TTL` (60 s) with a fetching read behind it, so it may have been the wait, and it may be the poll keeping the old row.
+
+**Fix:** (1) the heading says what it is (*Not due yet — n, shown by your setting*), with the setting linked; (2) *what's needed* as a textarea of four rows that grows and scrolls, Enter adding a line and Ctrl+Enter putting it on; (3) reproduce: pull, wait two minutes, no reload — if the row stays grey, the poll redraws a board row from the fresh read.
+
+**Done when:** each of the three reads as the fix says, (3) either reproduced and fixed or recorded here as the wait.
+
+**Related:** TD-220 (the horizon), TD-140 (Put on the board), TD-221 (rows read from origin).
