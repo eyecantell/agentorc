@@ -2690,7 +2690,11 @@
       cos.addEventListener("change", () => AO.setCopyOnSelect(cos));
     }
     $("#tpaste").addEventListener("click", pasteClip);
-    new ResizeObserver(() => { fit.fit(); ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); }).observe($("#term"));
+    // tmux is told the grid whatever changed it: the pane's box (the observer) or the person's
+    // face and size from Settings (`AO.setTermLook`, which refits) — TD-288: the second resized the
+    // grid here and left the pane drawing at the old width
+    term.onResize(({ cols, rows }) => { ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [cols, rows] })); });
+    new ResizeObserver(() => fit.fit()).observe($("#term"));
     term.focus();
 
     const compose = $("#compose");
