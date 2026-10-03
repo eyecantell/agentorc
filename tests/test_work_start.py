@@ -90,7 +90,7 @@ async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent,
     # so a client counts *n of m* when some replays fail (the techlead's read of #792)
     about = {"ids": ["TD-002"], "start": rec["work_started"][-1], "of": 3}
     assert {c[1] for c in replays.calls} == {"work"} and all(c[2] == about for c in replays.calls)
-    assert replays.calls[2][3] == {"keep_mail": True} and replays.calls[0][3] == {}, "a seat keeps its mail"
+    assert all(c[3] == {"keep_mail": True} for c in replays.calls), "every record keeps its mail (TD-274)"
     rec = _team_rec(agent)
     assert "work_waiting" not in rec and len(rec["work_started"]) == 1
     assert agent.host_store.load()["teams"]["g"]["work_started"] == rec["work_started"], "saved"

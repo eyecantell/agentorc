@@ -16,7 +16,7 @@ from __future__ import annotations
 import contextlib
 import re
 import time
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -558,15 +558,47 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
     return {"line": line, "empty": all(n == 0 for n in roles.values()), "roles": roles}
 
 
+def keep_mail_for(
+    call: Call, verdicts: Mapping[str, Mapping[str, Any]], caller: str | None, *, concluded: bool = True
+) -> tuple[set[str], list[str]]:
+    """The members whose create asks `keep_mail` (§4.10 *The name coming back adopts it*, TD-274):
+    each whose name a **closed** record holds — or, with `concluded`, a live one a Start on a
+    concluded team closes first — so a lapse note or an answer left there while the name was gone
+    is the successor's. Asked only where the host agent grants it, a person or one of that record's
+    controllers (§4.9b, §9 invariant 9), so the start stays all or nothing; anyone else's member
+    starts empty, as §4.1 has it, and a note names it and why. Returns `(names, notes)`."""
+    closed = {
+        n: v for n, v in verdicts.items() if v.get("verdict") == "supersede" and v.get("holder_state") == "closed"
+    }
+    if concluded:
+        closed |= {n: v for n, v in verdicts.items() if v.get("verdict") == "live"}
+    if not closed or caller is None:
+        return set(closed), []
+    ctl = {str(s.get("id")): s.get("controllers") or [] for s in call("list")}
+    keeps, notes = set(), []
+    for n, v in closed.items():
+        holder = str(v.get("holder") or "")
+        if caller in ctl.get(holder, []):
+            keeps.add(n)
+        else:
+            notes.append(
+                f"{n} starts with an empty mailbox: {caller} is not a controller of {holder}, the closed record "
+                "whose mail it would keep — a person's start keeps it (design §4.9b)"
+            )
+    return keeps, notes
+
+
 def start(
-    call: Call, org: orgmod.Org, name: str, host: str, *, profile: str | None = None
+    call: Call, org: orgmod.Org, name: str, host: str, *, profile: str | None = None, caller: str | None = None
 ) -> tuple[teams.Plan, dict[str, Any]]:
     """`ao team start <name>` and the strip's **Start** (design §4.9): resolve the definition, check
     *everything* — checkouts, roles, profiles, briefs, and every session name under §4.1's rule —
     then create the lead and each member with `controllers: [lead id]`.
 
     Raises `TeamError` (or `NamesHeld`) before anything is created, and `PartialStart` if a create
-    fails after the checks passed. Returns the plan and the result the callers render."""
+    fails after the checks passed. Returns the plan and the result the callers render. `caller` is
+    the session running it (`AGENTORC_SESSION`), None for a person: it decides where a closed
+    member's mail is kept (`keep_mail_for`)."""
     plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
@@ -583,20 +615,23 @@ def start(
                 raise teams.TeamError(f"team {name} was not started — {d} does not exist on {plan.host}")
     # §4.1's rule, asked of the agent rather than reimplemented here (`name_check`, the same verdict
     # `create` and the New session form use), for every session before any of them exists.
-    held = [
-        v
-        for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches)
-        if v.get("verdict") in ("live", "suspended")
-    ]
+    verdicts = {x.name: call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches}
+    held = [v for v in verdicts.values() if v.get("verdict") in ("live", "suspended")]
     # Only when a name is held: a concluded team's declared sessions hold its members' names, so a
     # concluded team whose names are all free would be one whose definition renamed every member.
+    # who asks a closed member's mail kept, decided before anything is closed or created (TD-274)
+    keeps, notes = keep_mail_for(call, verdicts, caller)
     closed = _close_concluded(call, org, name, held) if held else []
+
+    def params(x: teams.Launch, controllers: list[str]) -> dict[str, Any]:
+        return {**x.create_params(controllers), **({"keep_mail": True} if x.name in keeps else {})}
+
     created: list[dict[str, Any]] = []
-    notes: list[str] = list(plan.notes)  # said, and the start goes ahead (a seat without its primer, §4.9b)
+    notes += plan.notes  # said, and the start goes ahead (a seat without its primer, §4.9b)
     lead_id = ""
     try:
         if plan.lead:
-            rec = call("create", **plan.lead.create_params([]))
+            rec = call("create", **params(plan.lead, []))
             created.append(rec)
             lead_id = str(rec["id"])
             if plan.manager_id and lead_id != plan.manager_id:
@@ -607,7 +642,7 @@ def start(
         if plan.techlead:
             # The seat is its manager's member (design §4.9b): the manager is its controller, as
             # for any member. Its id was named in every brief before it existed (`{techlead}`).
-            rec = call("create", **plan.techlead.create_params([lead_id] if lead_id else []))
+            rec = call("create", **params(plan.techlead, [lead_id] if lead_id else []))
             created.append(rec)
             if str(rec["id"]) != plan.techlead_id:
                 notes.append(
@@ -617,11 +652,11 @@ def start(
         for x in plan.seats:
             # A seat with a trigger (§4.9b, TD-098): started with the team, as the techlead is, so it
             # runs once now and is on call after; its manager fills it again when its trigger is met.
-            created.append(call("create", **x.create_params([lead_id] if lead_id else [])))
+            created.append(call("create", **params(x, [lead_id] if lead_id else [])))
         for m in plan.members:
             # A person runs a team start, so no attenuation applies (§4.8 create rule); a
             # lead running it is subject to it as for any create, in the host agent.
-            created.append(call("create", **m.create_params([lead_id] if lead_id else [])))
+            created.append(call("create", **params(m, [lead_id] if lead_id else [])))
     except Exception as e:
         raise PartialStart(name, created, plan, e) from e
     # §9 invariant 5, as TD-041 made it a gate: no session acts on an interactive one, so a member
@@ -877,7 +912,15 @@ def _commit(call: Call, message: str) -> None:
 
 
 def add_member(
-    call: Call, path: Path, name: str, host: str, *, role: str, member: str = "", lane: list[str] | None = None
+    call: Call,
+    path: Path,
+    name: str,
+    host: str,
+    *,
+    role: str,
+    member: str = "",
+    lane: list[str] | None = None,
+    caller: str | None = None,
 ) -> dict[str, Any]:
     """**Add member** (design §4.9): the definition edited as text (`orgmod.edit_members`); on a
     live team, the one new member created under the manager as `ao team start` creates one — the
@@ -903,7 +946,10 @@ def add_member(
                 f"org.yml: {did}, but {x.name} is held by a live session, so nothing was created — "
                 "the definition names it for the next Start"
             )
-        out["created"].append(call("create", **x.create_params([lead_id] if lead_id else [])))
+        keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
+        keep = {"keep_mail": True} if keeps else {}
+        out["created"].append(call("create", **x.create_params([lead_id] if lead_id else []), **keep))
+        out["text"] += "".join(f" — {n}" for n in said)
     out["text"] += (
         f" — started {', '.join(str(r.get('name') or r.get('id')) for r in out['created'])} under {lead_id or 'you'}"
     )

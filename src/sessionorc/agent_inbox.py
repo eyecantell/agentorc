@@ -505,6 +505,7 @@ class InboxMixin:
         left, asker_refused = await hand([asker]) if asker else ([], "")
         at = now_iso()
         self._close_entry(e.id, reason, at)
+        self._question_end(e, "answered")  # work for the asker's team, if it wound down (§6 rule 8)
         # Nobody is left to report what became of it: the entry's own debt is settled here, and the
         # handed note carries it on to whoever holds the work (§4.10 *Outcomes*).
         settled = "answered on the board" + (f", sent to {', '.join(sent)}" if sent else "")
@@ -624,6 +625,9 @@ class InboxMixin:
         for e in list(self.person_inbox):  # a `steer` to the person lapses on its bound; an `ask` has none
             if e.open and not e.paused_at and e.bound and _parse(e.bound) <= now:
                 self._lapse_or_expire(e, stamp)
+        if self._question_ended:  # rule 8's mark, written by a lapse (§6, TD-274)
+            self._question_ended = False
+            await self._push_changes()
         if mail.MAIL_RETENTION is None:
             return
         # the trail is kept like read mail: each entry for the retention window from when it ended
@@ -664,6 +668,8 @@ class InboxMixin:
             if e.adopted_at or e.orphaned:
                 text = f'steer {e.id} about {e.about} lapsed: the default was "{e.default}"'
             self._system_note(e.from_, text, wake="uncharged")
+            if e.orphaned:  # nobody is left to act on the default: work for the asker's team (§6 rule 8)
+                self._question_end(e, "lapsed")
         else:
             self._close_entry(e.id, "expired", stamp)
 

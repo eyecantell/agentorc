@@ -653,12 +653,15 @@ class WakeMixin:
         if not isinstance(mark, dict):
             return {"team": team, "cleared": False, "ids": []}
         named = mark.get("members") if isinstance(mark.get("members"), dict) else {}
+        # a question ends once (§6 rule 8 *A question's end is work*, TD-274): its reference is not
+        # lane news, and is not written to `lane_seen`
+        asked = {(str(q.get("name")), str(q.get("ref"))) for q in mark.get("questions") or [] if isinstance(q, dict)}
         for r in self._graph().values():
             ids = named.get(r.name)
             if r.team != team or r.superseded_by or r.lane_seen is None or not isinstance(ids, list):
                 continue
             held = list(r.lane_seen.get("ids") or [])
-            if add := [str(i) for i in ids if str(i) not in held]:
+            if add := [str(i) for i in ids if str(i) not in held and (r.name, str(i)) not in asked]:
                 r.lane_seen = {**r.lane_seen, "at": now_iso(), "ids": [*held, *add]}
                 self._save(r)
         rec.pop("work_waiting", None)

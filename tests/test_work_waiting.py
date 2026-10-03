@@ -189,3 +189,88 @@ async def test_dismiss_adds_the_ids_to_lane_seen_and_a_later_entry_asks_again(ag
     await agent._work_marks(now + 4 * WORK_SETTLE)
     assert agent._host_rec["teams"]["g"]["work_waiting"]["members"] == {"grinder-ao-1": ["TD-003"]}
     assert "clear_work" in modes.HOME_EDITS
+
+
+def _orphan(id: str, kind: str, name: str, ref: str, repo: str, team: str = "g", **kw):
+    from sessionorc.models import MailEntry
+
+    o = {
+        "at": "2026-10-02T09:00:00Z",
+        "how": "closed",
+        "ref": ref,
+        "name": name,
+        "repo": repo,
+        "host": "h",
+        "team": team,
+    }
+    return MailEntry(
+        id=id, from_=f"ao-t-{name}", to=["person"], at="2026-10-02T08:00:00Z", kind=kind, text="which?", about=ref,
+        orphaned=o, **kw,
+    )  # fmt: skip
+
+
+async def test_a_questions_end_is_work_for_a_wound_down_team(agent, tmp_path, monkeypatch):
+    """TD-274 slice 4, design §6 rule 8 *A question's end is work*: an orphaned steer's lapse writes
+    `work_waiting` for its wound-down team with no settle — the reference under the asker's name and
+    `questions` — which the tick keeps with no lane news; an answer on another adds to it keeping
+    `at`; Dismiss clears it and writes no question's reference to `lane_seen`."""
+    await park_ticks(agent)
+    monkeypatch.setattr(agent, "_replay", lambda *a, **k: None)
+    repo = str(tmp_path)
+    agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": []}}
+    _team(agent, repo, _rec("manager-ao"), _rec("designer", lane=["free-pick"], lane_seen={"at": "x", "ids": []}))
+    lapse = _orphan("m-s", "steer", "designer", "TD-222", repo, bound="2026-10-02T09:30:00Z", default="go")
+    agent.person_inbox.append(lapse)
+    now = datetime.now(UTC)
+    await agent._sweep_mail(now)
+    mark = agent._host_rec["teams"]["g"]["work_waiting"]
+    assert mark["members"] == {"designer": ["TD-222"]} and mark["repo"] == repo
+    assert mark["questions"] == [{"id": "m-s", "ref": "TD-222", "name": "designer", "how": "lapsed", "kind": "steer"}]
+    await agent._work_marks(now)  # nothing new in the lanes: the question's mark stands as written
+    assert agent._host_rec["teams"]["g"]["work_waiting"] == mark
+    asked = _orphan("m-a", "ask", "designer", "TD-223", repo)
+    agent._question_end(asked, "answered")
+    again = agent._host_rec["teams"]["g"]["work_waiting"]
+    assert again["at"] == mark["at"] and again["members"] == {"designer": ["TD-222", "TD-223"]}
+    assert [q["how"] for q in again["questions"]] == ["lapsed", "answered"]
+    agent._question_end(asked, "answered")  # a question ends once
+    assert len(agent._host_rec["teams"]["g"]["work_waiting"]["questions"]) == 2
+    async with LocalClient() as person:
+        await person.call("clear_work", team="g")
+    assert "g" not in (agent._host_rec.get("teams") or {})
+    assert agent.sessions["ao-t-designer"].lane_seen["ids"] == []  # a question ends once
+
+
+async def test_a_lane_id_no_longer_new_leaves_the_questions_refs_alone(agent, tmp_path, monkeypatch):
+    """§6 rule 8: a mark whose members gained a lane's id beside a question's reference, once that id
+    is no longer new (the entry resolved on main), keeps the question's reference alone — the id is
+    not counted or started for (the techlead's read of #932)."""
+    await park_ticks(agent)
+    monkeypatch.setattr(agent, "_replay", lambda *a, **k: None)
+    repo = str(tmp_path)
+    agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": []}}
+    _team(agent, repo, _rec("manager-ao"), _rec("designer", lane=["free-pick"], lane_seen={"at": "x", "ids": []}))
+    agent._question_end(_orphan("m-s", "steer", "designer", "TD-222", repo, default="go"), "lapsed")
+    agent._host_rec["teams"]["g"]["work_waiting"]["members"]["designer"].append("TD-300")
+    await agent._work_marks(datetime.now(UTC))
+    mark = agent._host_rec["teams"]["g"]["work_waiting"]
+    assert mark["members"] == {"designer": ["TD-222"]} and len(mark["questions"]) == 1
+
+
+async def test_a_questions_end_on_a_stopped_or_live_team_or_under_off_writes_nothing(agent, tmp_path):
+    """TD-274 slice 4: a team stopped rather than wound down (a member that never declared), one
+    live again, and `on_work: off` are left alone; the note waits in the mailbox for a Start."""
+    await park_ticks(agent)
+    repo = str(tmp_path)
+    q = _orphan("m-x", "steer", "designer", "TD-9", repo)
+    _team(agent, repo, _rec("manager-ao"), _rec("designer", out_of_work=None))
+    agent._question_end(q, "lapsed")
+    assert "g" not in (agent._host_rec.get("teams") or {}), "stopped: nothing"
+    agent.sessions["ao-t-designer"].out_of_work = DECLARED
+    agent.sessions["ao-t-manager-ao"].state = "idle"
+    agent._question_end(q, "lapsed")
+    assert "g" not in (agent._host_rec.get("teams") or {}), "live: the member is waiting, not this rule's"
+    agent.sessions["ao-t-manager-ao"].state = "closed"
+    settings_mod.save({"teams": {"g": {"on_work": "off"}}})
+    agent._question_end(q, "lapsed")
+    assert "g" not in (agent._host_rec.get("teams") or {}), "off: nothing written"

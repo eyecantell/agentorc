@@ -494,6 +494,7 @@ class HostAgent(
         # rule 8 (§6, TD-227): (team, id) → when the home first read that id as new in a wound-down
         # team's lane; in memory, so a restart of the home starts the settle again
         self._work_first: dict[tuple[str, str], datetime] = {}
+        self._question_ended = False  # rule 8: a lapse wrote a question's mark the sweep must push (TD-274)
         # rule 9 (§6, TD-241): team → when the home's reading of *finished* first held; in memory, and
         # dropped the tick it stops holding, so a restart of the home starts the settle again
         self._finished_first: dict[str, datetime] = {}
@@ -675,7 +676,8 @@ class HostAgent(
         the record it supersedes — inbox, outbox, tallies, wake decisions — as a resume does, and
         resumes nothing of its conversation. It is how a techlead seat is filled without forgetting
         the questions that caused the fill. Handing a record's mailbox to a successor is an act on
-        that record, so it is open to a person and to the record's own controllers alone."""
+        that record, so it is open to a person and to the record's own controllers alone: a team's
+        start under a closed member's name asks it (§4.10 *The name coming back adopts it*, TD-274)."""
         if host and host != self.host:
             # Routed before the method runs (`_act_host`) when this is the home; a node asked for
             # another host's create got here through the link, and the link is one host's.

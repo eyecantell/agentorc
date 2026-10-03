@@ -4789,7 +4789,7 @@ merely idle.
 
 **Waiting is read, never declared** (TD-271; designed 2026-10-02; the home's reading built 2026-10-02 —
 TD-274 slice 1, `work.waiting_of`; the page's and the CLI's the same day — TD-274's client half; the words
-are TD-274's rest). On
+the same day — TD-274, `ending.waiting_words`). On
 2026-10-02 the designer held three design PRs whose merge waited on a `steer`'s bound, declared
 `none` since its lane held nothing more to pick, and the team wound down with it: for eighteen
 hours the bounds passed with nobody to take the defaults, and the answers Paul wrote reached
@@ -5799,7 +5799,13 @@ than above: its questions moved with the conversation and are not orphaned.
   conversation — the successor holds the name and the lane, and the ledger entry says what waits.
   Such a create also **keeps the closed record's mail** (TD-271; a person's Restart and a seat's
   fill already did, `keep_mail`, §6 rules 2 and 3; the tick's own replays did not), so a lapse note or an answer written to the record
-  while the name was gone is read at the successor's first `ao inbox`.
+  while the name was gone is read at the successor's first `ao inbox`. A team's start asks it:
+  `ao team start`, the Org's Start and Add member create a member whose name a **closed** record
+  holds with `keep_mail` (§4.9b) where the one starting is a person or one of that record's
+  controllers — the host agent grants it to those alone — and otherwise start the member empty
+  and say so in the start's notes, naming it and why, so the start stays all or nothing; rule 8's
+  replays ask it for every record. A create that does not ask starts with an empty mailbox,
+  whatever its `team` (TD-274 slice 4).
   The question is then an ordinary open question of that session: a Reply lands in its inbox as a
   `reply`, carrying the question's `about`, and the session owes the outcome (*Outcomes*, below).
   A `steer` adopted before its bound lapses to the successor on time, and because the successor
@@ -7185,15 +7191,17 @@ code and needs no grant; a session doing the same work does.
      written only by `set_settings`, which a session cannot call. Not on a node yet, as rule 4
      is not; a team with no lane that matches by header (a lane of references) never has work
      waiting by this rule.
-     **A question's end is work** (TD-271; designed 2026-10-02; the build is TD-274). A member
+     **A question's end is work** (TD-271; designed 2026-10-02; built 2026-10-02 — the home's half
+     TD-274 slice 4, `_question_end`; the Inbox row's clause and the card note's count TD-274's Inbox
+     half, `work_questions`). A member
      closed with a question out — a `steer` or an `ask` to the person about a reference, orphaned
      at the close (§4.10 *A question about a reference outlives its asker*) — meant to act on the
      answer, and the lapse of its `steer` is an answer too (§4.10 *An orphaned `steer` lapses to
      its default*). So when the asker's team is **wound down** by this rule's reading, the lapse,
      or the person's Reply, suggested answer or *Go with it* on the orphaned entry, writes
      `work_waiting` for the team as a lane's new id does — `members[<orphaned.name>]` gaining
-     `orphaned.ref`, `repo` being `orphaned.repo`, and **`questions: [{id, ref, name, how}]`**
-     beside `members`, `how` one of `lapsed`, `answered` — with no settle, since the bound was the
+     `orphaned.ref`, `repo` being `orphaned.repo`, and **`questions: [{id, ref, name, how, kind}]`**
+     beside `members`, `how` one of `lapsed`, `answered`, `kind` the entry's (`steer`, `ask`) — with no settle, since the bound was the
      settle and an answer is one event; a mark already standing gains the question and keeps its
      `at`. What follows is the team's `on_work` as above, under the same five bounds: `ask` draws
      the Inbox row *team start* saying what ended — *designer-ao-1's steer about TD-222 lapsed to
