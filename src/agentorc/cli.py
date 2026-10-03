@@ -599,8 +599,12 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
     if not defaults.get("controllers") and not args.controller and not isolated:
         here = hosts.local_host().name
         mid = teams.manager_id(org, team, team.host or here, here)
-        if mid and any(s["id"] == mid for s in teamrun.live(call_sync("list"))):
+        # live, or a seat on call: its id is the fill's (§6 rule 3, TD-269, built by TD-276)
+        held = teamrun.can_control(call_sync("list"), mid) if mid else None
+        if held is not None:
             defaults["controllers"] = [mid]
+            if teamrun.on_call(held) and not getattr(args, "json", False):
+                print(f"under {held.get('name') or mid} · on call: whoever fills the seat may act on it")
     if defaults.get("review") is None:
         defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
         if defaults["review"] is None:

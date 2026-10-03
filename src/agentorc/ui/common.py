@@ -697,11 +697,11 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The teams for New session's **Team** picker (design §4.5a, §4.9 *A person in the team*,
     TD-173): every definition `org_here` reads — `ao team list`'s set — with the host it runs on,
     its projects' checkouts there (the Directory list it narrows to), its member roles (Role is
-    filtered to them plus `plain`) and its manager's id when that session is live (the Controllers
-    tick). A definition that cannot be read leaves the picker at *none*, as the strip notes it."""
+    filtered to them plus `plain`) and its manager's id when that session is live or a seat on call
+    (the Controllers tick, TD-269). A definition that cannot be read leaves the picker at *none*, as
+    the strip notes it."""
     org, _notes = org_here()
     here = host_name()
-    up = {s["id"] for s in teamrun.live(sessions)}
     out = []
     for t in org.teams.values():
         host = t.host or here
@@ -719,7 +719,7 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "host": host,
                 "dirs": dirs,
                 "roles": sorted({m.role for m in t.members if m.team is None and m.role}),
-                "manager": mid if mid in up else "",
+                "manager": mid if mid and teamrun.can_control(sessions, mid) else "",
             }
         )
     return out

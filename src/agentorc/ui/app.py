@@ -1166,12 +1166,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
         adapters = await call("adapters")
         # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
-        # holding `control` — nothing else could act on the new session anyway.
+        # holding `control` — nothing else could act on the new session anyway — live, or a seat on
+        # call, whose id and grant survive the close for whoever fills it (TD-269, built by TD-276)
         sessions_now = await call("list")
         control_holders = [
-            {"id": o["id"], "name": o.get("name") or o["id"]}
+            {"id": o["id"], "name": o.get("name") or o["id"], "on_call": teamrun.on_call(o)}
             for o in sessions_now
-            if has_control(o.get("capabilities")) and o.get("state") not in ("closed", "exited")
+            if has_control(o.get("capabilities"))
+            and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).

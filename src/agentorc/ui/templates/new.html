@@ -108,11 +108,11 @@
       {% if control_holders %}
         <div class="row gap wrap">
           {% for o in control_holders %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}" data-name="{{ o.name }}"{% if o.id in prefill.controllers or o.name in prefill.controllers or ((not prefill.prefilled) and (o.name in default_controllers or o.id in default_controllers)) %} checked{% endif %}>
-            <div><div>{{ o.name }}</div><div class="note mono">{{ o.id }}</div></div></label>{% endfor %}
+            <div><div>{{ o.name }}{% if o.on_call %} <span class="pill s-oncall" title="a seat on call: closed until a reading fills it, and whoever fills it holds this session (TD-269)">on call</span>{% endif %}</div><div class="note mono">{{ o.id }}</div></div></label>{% endfor %}
         </div>
-        <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>. Ticked in advance: the repo's or the role's <code>controllers:</code> from <code>.agentorc.yml</code>.</div>
+        <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>. Ticked in advance: the repo's or the role's <code>controllers:</code> from <code>.agentorc.yml</code>. A seat on call holds it for whoever fills it.</div>
       {% else %}
-        <div class="note">No session holds the <code>control</code> grant yet, so nothing could act on this one. Grant it from a session's Focus header, then add it here or with <code>ao control</code>.</div>
+        <div class="note">No session holds the <code>control</code> grant and no seat is on call, so nothing could act on this one: start a team, or grant control from a session's Focus header, then add it here or with <code>ao control</code>.</div>
       {% endif %}
     </div>
     <div class="warn">⚠ One agent session per directory. A second agent session in a directory that already has one is refused, not warned about. Shells are exempt.</div>
