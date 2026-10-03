@@ -2348,14 +2348,61 @@
     const away = () => !!hostSel && hostSel.selectedIndex > 0;
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
-    let nameBlocked = false, dirBlocked = false;
+    let nameBlocked = false, dirBlocked = false, missingDir = false;
     // …or a host it cannot reach: a record's host with no live link stays picked and refuses Start
     const hostBlocked = () => !!hostSel && !!hostSel.selectedOptions[0] && hostSel.selectedOptions[0].disabled;
     const gate = () => {
-      start.disabled = nameBlocked || dirBlocked || hostBlocked();
+      start.disabled = nameBlocked || dirBlocked || missingDir || hostBlocked();
       const hb = $("#hostblock");
       if (hb) hb.innerHTML = hostBlocked() ? `⚠ <b>${esc(hostSel.value)}</b>: ${esc(hostSel.selectedOptions[0].title || "not reachable")} — pick another host to start` : "";
     };
+    // **Repo** (§4.5a **the reworked form**, TD-284 slice 4): a registered checkout fills `dir`, which
+    // is what Start posts; *another directory…* opens the typed path, checked that it is there
+    const repoSel = $("#repo"), dirfield = $("#dirfield"), dnote = $("#dircheck");
+    const other = () => !repoSel || !!(repoSel.selectedOptions[0] && repoSel.selectedOptions[0].dataset.other);
+    let dseq = 0;
+    async function dirCheck() {
+      const v = dir.value.trim(), my = ++dseq;
+      if (!other() || !v || away()) { missingDir = false; if (dnote) dnote.textContent = ""; gate(); return; }
+      try {
+        const o = await (await fetch(`/api/dir_check?dir=${encodeURIComponent(v)}`)).json();
+        if (my !== dseq) return;
+        missingDir = !o.exists; dnote.innerHTML = missingDir ? `⚠ <b>${esc(o.why)}</b>` : "";
+      } catch (e) { missingDir = false; dnote.textContent = ""; }
+      gate();
+    }
+    function applyRepo(fire) {
+      if (!repoSel) return;
+      dirfield.hidden = !other();
+      if (!other() && dir.value !== repoSel.value) { dir.value = repoSel.value; if (fire) dir.dispatchEvent(new Event("change")); }
+      dirCheck();
+    }
+    // Team and Project narrow the list to their checkouts, both at once (either one's change, or the
+    // directory's, re-reads the two); a choice they leave out moves to the first kept
+    function kept() {
+      let keep = null;
+      const t = teamSel && teamSel.selectedOptions[0], p = proj && proj.selectedOptions[0];
+      if (t && t.value) { try { keep = JSON.parse(t.dataset.dirs || "[]"); } catch (e) { keep = []; } }
+      if (p && p.value) {
+        let rs = []; try { rs = JSON.parse(p.dataset.repos || "[]"); } catch (e) { rs = []; }
+        const ps = rs.filter((r) => r.path).map((r) => r.path);
+        keep = keep ? keep.filter((x) => ps.includes(x)) : ps;
+      }
+      return keep;
+    }
+    function narrowRepos() {
+      if (!repoSel) return;
+      const paths = kept();
+      for (const o of repoSel.options) if (!o.dataset.other) o.hidden = !!paths && !paths.includes(o.value);
+      const cur = repoSel.selectedOptions[0];
+      if (cur && cur.hidden) {
+        const first = [...repoSel.options].find((o) => !o.hidden);
+        repoSel.value = first ? first.value : "";
+        applyRepo(true);
+      }
+    }
+    if (repoSel) repoSel.addEventListener("change", () => { applyRepo(true); if (other()) dir.focus(); });
+    dir.addEventListener("input", () => { clearTimeout(dir._d); dir._d = setTimeout(dirCheck, 250); });
     // a shell has no role, lane or brief: picking it hides them, and the occupancy rule exempts it (§9)
     function applyShell() {
       const sh = isShell();
@@ -2476,7 +2523,7 @@
     nm.addEventListener("change", nameCheck);
     dir.addEventListener("change", nameCheck);
     for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
-    if (hostSel) hostSel.addEventListener("change", () => { gate(); check(); nameCheck(); });
+    if (hostSel) hostSel.addEventListener("change", () => { gate(); check(); nameCheck(); dirCheck(); });
     // The Project picker (design §4.5a New session **Project**, §4.9): picking one narrows the
     // Directory list to that project's repos with their checkouts on this host. The paths came
     // down with the page — a project's repos do not change as you type, so there is nothing to
@@ -2489,9 +2536,9 @@
       const o = proj.selectedOptions[0];
       let repos = [];
       try { repos = JSON.parse((o && o.dataset.repos) || "[]"); } catch (e) { repos = []; }
-      if (!o || !o.value) { options(allDirs); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
+      if (!o || !o.value) { options(allDirs); narrowRepos(); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
       const here = repos.filter((r) => r.path), away = repos.filter((r) => !r.path);
-      options(here.map((r) => r.path));
+      options(here.map((r) => r.path)); narrowRepos();
       if (!dir.value.trim() && here.length) { dir.value = here[0].path; check(); loadRoles(); nameCheck(); }
       const mine = here.some((r) => r.path === dir.value.trim());
       pnote.textContent =
@@ -2531,7 +2578,7 @@
       if (o && o.value) {
         let dirs = [];
         try { dirs = JSON.parse(o.dataset.dirs || "[]"); } catch (e) { dirs = []; }
-        options(dirs);
+        options(dirs); narrowRepos();
         if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; check(); loadRoles(); nameCheck(); }
         if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
         // the team's host is the Host pick's (§4.5a **the reworked form**), when it is one to pick
@@ -2546,6 +2593,7 @@
     if (teamSel) { teamSel.addEventListener("change", applyTeam); dir.addEventListener("change", teamLine); }
 
     applyShell();  // a Resume with changes… of a shell lands with the shell picked
+    applyRepo(false);  // the page drew the pick; the typed path is checked once if it is the one
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
     applyProject();
