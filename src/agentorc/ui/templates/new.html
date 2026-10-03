@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}New session · ShiftLead{% endblock %}
 {% block body %}
-{#- a pick's file (§4.5a New session **the reworked form**: each of Host, Project and Profile ends its
+{#- a pick's file (§4.5a New session **the form**: each of Host, Project and Profile ends its
     note with its file and **Open file**, the Settings page's; no button under `open_in: none`) -#}
 {%- set files = files | default({}) %}{% set shell_pick = shell_pick | default(":shell") %}
 {% macro fromfile(name, path, key="") -%}
@@ -15,7 +15,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
      knows which control they pressed and what stopped it. Fixed text plus the reason as given. #}
   {% if prefill.why %}<div class="warn" id="resumewhy">⚠ Resume could not be one press: {{ prefill.why }} — the form is filled in from that session; change what needs changing and Start.</div>{% endif %}
   <form method="post" action="/new" class="col gap"{% if prefill.prefilled %} data-prefilled="1"{% endif %}>
-    {#- design §4.5a New session **the reworked form** (TD-277; TD-284 slice 1): asked in the order a
+    {#- design §4.5a New session **the form** (TD-277; TD-284 slice 1): asked in the order a
         person starts a session — who (Name, Host, Role, Profile), where (Team, Project, the
         directory, Where), the job (Lane, At, Until, the opening prompt), who may act on it
         (Controllers), and under a folded **More ▸** Grants and the Resume id. No fixed warning:
@@ -40,10 +40,10 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         {%- else %}<span class="input">{{ host }}</span>{% endif %}
         <span class="note" id="hostblock"></span>
         <span class="note">{% for o in form_hosts %}{{ o.name }}{% if o.note %} ({{ o.note }}){% endif %}{{ " · " if not loop.last }}{% endfor %} — {{ fromfile("hosts.yml", files.hosts) }}</span></div>
-      {# design §4.5a New session **Role** preset + **Lane** field (§4.8): a preset fills the brief
+      {# design §4.5a New session **Role** pick + **Lane** field (§4.8): a preset fills the brief
          from its template, the lane's default, its grants and its profile; the list is the built-ins
          plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}
-      {#- **Role** (§4.5a **the reworked form**, TD-284 slice 5): the first choice is **Interactive** —
+      {#- **Role** (§4.5a New session **the form**, TD-284 slice 5): the first choice is **Interactive** —
           no role, the session the person's own — then every role the repo and the package define,
           each *<role> · unattended*: a role is presumed unattended, and *run it under me instead*
           keeps its brief, lane and grants and starts it interactive. The Unattended switch is
@@ -57,7 +57,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         <span class="note" id="rolemode"></span>
         <span class="note" id="rolenote">a role fills the brief, lane, grants and profile it names; each can be edited before Start</span>
       </div>
-      {#- design §4.5a New session **the reworked form** (TD-284 slice 2): **Profile is the one place
+      {#- design §4.5a New session **the form** (TD-284 slice 2): **Profile is the one place
           the tool is picked** — every profile names its adapter, so there is no Adapter field to
           disagree with it; a shell is the one adapter with no profile, so it closes the list. An
           empty pick lets the role's `profile` apply (design §4.9 precedence), else the default. -#}
@@ -67,7 +67,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
       </div>
       {# design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-160, built by TD-173):
          picking one narrows the Directory list to the team's checkouts, filters Role to its roles
-         plus `plain`, ticks its live manager under Controllers, leaves Unattended off, and says
+         plus `plain`, ticks its live manager under Controllers, starts a role under you, and says
          which reader the session's held PRs get. The terminal's form is `ao new --team`. #}
       <div class="field"><label>Team</label>
         <select class="input" name="team" id="team">
@@ -88,7 +88,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         <span class="note" id="projectnote">{% if projects %}optional: the repos in reach, and a Project block naming them in front of the brief{% else %}no project defined — a session without one is what every session was before{% endif %}</span>
         <span class="note">{{ fromfile("org.yml", files.org, "projects:") }}</span>
       </div>
-      {#- **Repo** (§4.5a **the reworked form**, TD-284 slice 4): the registered checkouts on this host,
+      {#- **Repo** (§4.5a New session **the form**, TD-284 slice 4): the registered checkouts on this host,
           narrowed by Team and Project, each *name · path*; the last choice, *another directory…*,
           opens the typed path the Directory field was — for a shell or a directory outside any
           repo — checked as it is typed. The pick fills `dir`, which is what Start posts. -#}
@@ -103,7 +103,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         </div>
         <span class="note" id="occupancy"></span>
       </div>
-      {#- **Where** is worktree-first (§4.5a **the reworked form**, TD-284 slice 4): a new worktree named
+      {#- **Where** is worktree-first (§4.5a New session **the form**, TD-284 slice 4): a new worktree named
           as the session, selected for a git repo, with the repo's worktrees nobody is in as chips
           whose press takes its name; the checkout itself second — selected for *another directory…*
           and a shell — greyed with who is in it when it is held. Name names the worktree: the

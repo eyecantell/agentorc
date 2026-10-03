@@ -2340,7 +2340,7 @@
     // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
     const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
     const herechoice = $("#herechoice"), inuse = $("#hereinuse"), profSel = $("#profile");
-    // Profile is the one tool pick (§4.5a **the reworked form**, TD-284): its last choice is the shell
+    // Profile is the one tool pick (§4.5a New session **the form**, TD-284): its last choice is the shell
     const isShell = () => !!profSel && !!profSel.selectedOptions[0] && profSel.selectedOptions[0].dataset.adapter === "shell";
     // the Host pick (TD-284 slice 3): another host's directory is not this one's to read for occupancy;
     // the name check goes there with it, and the home's create refuses what the node would
@@ -2358,7 +2358,7 @@
       const hb = $("#hostblock");
       if (hb) hb.innerHTML = hostBlocked() ? `⚠ <b>${esc(hostSel.value)}</b>: ${esc(hostSel.selectedOptions[0].title || "not reachable")} — pick another host to start` : "";
     };
-    // **Repo** (§4.5a **the reworked form**, TD-284 slice 4): a registered checkout fills `dir`, which
+    // **Repo** (§4.5a New session **the form**, TD-284 slice 4): a registered checkout fills `dir`, which
     // is what Start posts; *another directory…* opens the typed path, checked that it is there
     const repoSel = $("#repo"), dirfield = $("#dirfield"), dnote = $("#dircheck");
     const other = () => !repoSel || !!(repoSel.selectedOptions[0] && repoSel.selectedOptions[0].dataset.other);
@@ -2414,7 +2414,7 @@
     }
     if (repoSel) repoSel.addEventListener("change", () => { applyRepo(true); loadWorktrees(); if (other()) dir.focus(); });
     dir.addEventListener("input", () => { clearTimeout(dir._d); dir._d = setTimeout(dirCheck, 250); });
-    // **Where** is worktree-first (§4.5a **the reworked form**, TD-284 slice 4): a new worktree for a
+    // **Where** is worktree-first (§4.5a New session **the form**, TD-284 slice 4): a new worktree for a
     // registered git checkout, the checkout itself for *another directory…* and a shell; Name names
     // the worktree, and the repo's worktrees nobody is in are chips whose press takes its name
     const wtIn = $("[name=worktree]"), chips = $("#wtchips"), chipList = $("#wtchiplist");
@@ -2550,7 +2550,7 @@
       } catch (e) { /* the built-ins rendered with the page still stand */ }
     }
     role.addEventListener("change", applyRole);
-    // **Role** decides the mode (§4.5a **the reworked form**, TD-284 slice 5): *Interactive* is the
+    // **Role** decides the mode (§4.5a New session **the form**, TD-284 slice 5): *Interactive* is the
     // person's own; a role runs unattended unless the person says *run it under me instead*; a role in
     // *another directory…* runs under you only, and a shell has neither. The posted `unattended` is
     // this, and At and Until are drawn only for an unattended pick.
@@ -2640,7 +2640,7 @@
 
     // The Team picker (design §4.5a New session **Team**, §4.9 *A person in the team*, TD-173):
     // the team's checkouts in the Directory list, Role narrowed to its roles plus `plain`, its live
-    // manager ticked under Controllers, Unattended left off, and the reader its held PRs get — the
+    // manager ticked under Controllers, a role started under you, and the reader its held PRs get — the
     // one line /api/team_review answers for the team and the directory. "none" undoes all but the
     // ticks, which are the person's by then.
     const teamSel = $("#team"), tnote = $("#teamnote");
@@ -2669,7 +2669,7 @@
         options(dirs); narrowRepos();
         if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; syncRepo(); check(); loadRoles(); nameCheck(); }
         if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
-        // the team's host is the Host pick's (§4.5a **the reworked form**), when it is one to pick
+        // the team's host is the Host pick's (§4.5a New session **the form**), when it is one to pick
         if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
           hostSel.value = o.dataset.host; check(); nameCheck();
         }

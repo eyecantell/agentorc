@@ -1202,13 +1202,13 @@ def rounds_lines(s: dict[str, Any], entries: list[dict[str, Any]] | None) -> dic
     }
 
 
-# The Profile pick's *shell (no agent)* (design §4.5a New session **the reworked form**, TD-284): a
+# The Profile pick's *shell (no agent)* (design §4.5a New session **the form**, TD-284): a
 # value, not a profile — a shell is the one adapter with no profile, and no profile is named so.
 SHELL_PICK = ":shell"
 
 
 def profile_adapter(profile: str) -> str:
-    """The adapter a New session form's pick starts (§4.5a **the reworked form**): the named profile's,
+    """The adapter a New session form's pick starts (§4.5a New session **the form**): the named profile's,
     else the default profile's, else Claude Code's — every profile names its adapter, so the form asks
     for the tool once. A name `profiles.yml` does not hold is the create's to refuse, not this."""
     try:
@@ -1229,7 +1229,7 @@ def tool_profile(profs: Mapping[str, profiles_mod.Profile], default: str, adapte
 
 
 def form_hosts(info: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """New session's **Host** pick (§4.5a **the reworked form**, TD-284 slice 3): this host, then each
+    """New session's **Host** pick (§4.5a New session **the form**, TD-284 slice 3): this host, then each
     `nodes:` entry of `hosts.yml` at a home, a container marked so, one with no live link disabled
     with its reason (`host`'s `links`, §4.4a). A node lists itself alone: its home routes the rest."""
     here = host_name()
@@ -1249,7 +1249,7 @@ def form_hosts(info: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def form_repos(repos: list[str]) -> list[dict[str, str]]:
-    """New session's **Repo** pick (§4.5a **the reworked form**, TD-284 slice 4): each registered
+    """New session's **Repo** pick (§4.5a New session **the form**, TD-284 slice 4): each registered
     checkout on this host as *name · path*, in the registry's order; one whose directory is gone
     is left out rather than offered to fail."""
     out = []
@@ -1310,7 +1310,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             for o in sessions_now
             if has_control(o.get("capabilities")) and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
-        # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
+        # design §4.5a New session **Role** pick: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
         roles = _roles_for(dir)
         return templates.TemplateResponse(
@@ -1325,7 +1325,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "form_repos": (picks := form_repos(repos)),
                 "repo_pick": repo_of(picks, dir),
                 "form_hosts": form_hosts(await call("host")),
-                # the Profile pick's last choice (§4.5a **the reworked form**, TD-284 slice 2)
+                # the Profile pick's last choice (§4.5a New session **the form**, TD-284 slice 2)
                 "shell_pick": SHELL_PICK,
                 # each of Host, Project and Profile ends its note with its file and **Open file**
                 "files": {
@@ -1398,7 +1398,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def new_submit(
         name: str = Form(...),
         dir: str = Form(...),
-        # the form sends none: Profile is the one tool pick (§4.5a **the reworked form**, TD-284), and
+        # the form sends none: Profile is the one tool pick (§4.5a New session **the form**, TD-284), and
         # the adapter is the picked profile's; `ao`-shaped posts and the tests may still name one
         adapter: str = Form(""),
         profile: str = Form(""),
@@ -1503,7 +1503,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/dir_check")
     async def api_dir_check(dir: str = ""):
-        """*another directory…*'s check as it is typed (§4.5a **the reworked form**, TD-284 slice 4):
+        """*another directory…*'s check as it is typed (§4.5a New session **the form**, TD-284 slice 4):
         whether the directory is there on this host, in the words the form prints."""
         d = dir.strip()
         ok = bool(d) and await asyncio.to_thread(lambda: Path(d).expanduser().is_dir())
@@ -1511,7 +1511,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/worktrees")
     async def api_worktrees(repo: str = ""):
-        """**Where**'s *or one nobody is in:* (§4.5a **the reworked form**, TD-284 slice 4): the repo's
+        """**Where**'s *or one nobody is in:* (§4.5a New session **the form**, TD-284 slice 4): the repo's
         worktrees under its main checkout's `.claude/worktrees/` that hold no live session and no agent
         the adapters can see — the occupancy check's reading of each — by name, for the chips."""
         if not repo.strip():

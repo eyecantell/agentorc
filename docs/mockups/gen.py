@@ -871,60 +871,16 @@ def focus_orchestrator():
 ''' + TAIL
 
 def new_session():
-    """The shipped form (`src/agentorc/ui/templates/new.html`), field for field. It used to draw a
-    four-way **Where** radio group with an *existing worktree* picker and a separate Fresh/Resume
-    pair; the picker was superseded on 2026-09-06 and §4.5a never carried it (TD-037). The Grants
-    checkboxes are the one §4.5a row still unbuilt, so they stay off the picture."""
-    return head("New session") + f'''<div style="width: 720px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org", narrow=True)}
-<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
-  <div style="font-size: 16px; font-weight: 600;">New session</div>
-  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-    <div class="field"><label>Host</label><span class="input">kmaster</span></div>
-    <div class="field"><label>Project</label><span class="input">samscrape · 2 repos<span class="muted">▾</span></span><span class="note">optional: narrows Directory to the project's repos on this host, and puts a Project block naming them in front of the brief</span></div>
-    <div class="field"><label>Directory</label><span class="input mono">/home/kmaster/samscrape</span><span class="note">a repo checkout, a worktree, or any directory (registered repos and recent ones offered)</span><span class="note" style="color: #7c3d00;">held by <b>main</b> (idle) — pick a new worktree, or another directory</span></div>
-    <div class="field"><label>Adapter</label><span class="input">claude-code<span class="muted">▾</span></span><span class="note">claude-code: state from hooks · shell: guessed from the screen</span></div>
-    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free — nothing holds that name here</span></div>
-    <div class="field"><label>Profile</label><span class="input">the role's, else claude-code · paul (max) · opus (default)<span class="muted">▾</span></span><span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span></div>
-    <div class="field"><label>Role</label><span class="input">grinder [built-in + repo]<span class="muted">▾</span></span><span class="note">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span></div>
-    <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: the team this session joins — its badge and group, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b> on <span class="mono">src/sessionorc/**, docs/briefs/**</span></span></div>
-    <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">the references this session is handed, in order; empty: the role's default (free-pick)</span></div>
-    <div class="field"><label>Resume (optional)</label><span class="input mono" style="color: #9ca3af;">the tool's session id</span></div>
-  </div>
-  <div class="field"><label>Where</label>
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill plain s-ended">in use by main</span></div>
-      <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
-    </div>
-  </div>
-  <div class="field"><label>Saved prompts</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span><span class="note">the role's <span class="mono">prompts:</span> — a press fills the opening prompt below (design §4.8, TD-161)</span></div></div>
-  <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt — a role fills it from its template.</span></div>
-  <div class="field">
-    <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>
-  </div>
-  <div class="field"><label>Controllers</label>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>orc-1</div><div class="note mono">ao-samscrape-orc-1</div></div></div>
-      <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>orchestrator-ao-1</div><div class="note mono">ao-agentorc-orchestrator-ao-1</div></div></div>
-    </div>
-    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">control</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
-  </div>
-  <div class="warn">{ICON["warn"]}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
-  <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
-</div>
-</div>
-''' + TAIL
-
-def new_session_reworked():
-    """TD-277 (designed 2026-10-02): the form read as one thing, in the order a person starts a
+    """The shipped form (`src/agentorc/ui/templates/new.html`), field for field: TD-277's design
+    (2026-10-02), built by TD-284. The form read as one thing, in the order a person starts a
     session — who (Name, Host, Role, Profile), where (Team, Project, Repo, the worktree-first
     Where), the job (Lane, Until and At under an unattended role, the prompt), who may act on it.
     No Adapter field (the profile names its tool; *shell* closes the Profile list), no Unattended
     switch (a role runs unattended; *Interactive* is the Role pick's first choice), no Directory
     field for a repo session, and no warning block: an occupied checkout is a greyed choice with
-    its reason. `NewSession.dc.html` stays the shipped form until the build lands."""
+    its reason. The form before it is in git history and in the design round's review shots."""
     lk = 'style="color: #2563eb;"'
-    return head("New session — reworked") + f'''<div style="width: 720px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
+    return head("New session") + f'''<div style="width: 720px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org", narrow=True)}
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
@@ -936,7 +892,7 @@ def new_session_reworked():
     <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: brings its repo and host, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b></span></div>
     <div class="field"><label>Project</label><span class="input" style="color: #9ca3af;">none<span class="muted">▾</span></span><span class="note">optional: narrows Repo to its repos — from <span class="mono">org.yml</span> <span class="mono">projects:</span> · <span {lk}>Open file</span></span></div>
   </div>
-  <div class="field"><label>Repo</label><span class="input">agentorc <span class="mono muted" style="margin-left: 8px;">/home/kmaster/agentorc</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">ao-grind's repo on kmaster. The list ends with <i>another directory…</i> — a typed path, checked that it exists, for a shell or a directory outside any repo</span></div>
+  <div class="field"><label>Repo</label><span class="input">agentorc <span class="mono muted" style="margin-left: 8px;">/home/kmaster/agentorc</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">a registered checkout on kmaster. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo</span></div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div class="radio on"><span class="rb"></span><div><div>Worktree <span class="mono">td-302</span> · new</div><div class="note"><span class="mono">.claude/worktrees/td-302</span> on branch <span class="mono">td-302</span>, from origin's default branch</div>
@@ -1758,7 +1714,6 @@ files = {
     "FocusOrc.dc.html": focus_orchestrator(),
     "FocusReady.dc.html": focus_ready(),
     "NewSession.dc.html": new_session(),
-    "NewSessionReworked.dc.html": new_session_reworked(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Members.dc.html": members_dialog(),
@@ -1802,7 +1757,6 @@ LAYOUT = [
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
-    ("NewSessionReworked.dc.html", "New session — reworked (TD-277)", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
