@@ -19,7 +19,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import orgcheck, repoconfig, service, teamrun, teams
-from agentorc.ending import closer_words
+from agentorc.ending import closer_words, waiting_words
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import mail as mailmod
@@ -253,6 +253,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     # repo readings, read once per call; refused (a node offline) or failed, the lines are unmarked
     readings: dict[str, Any] = {}
     usage: dict[str, Any] = {}
+    asked: teamrun.Waiting = {}
     if args.verbose:
         with contextlib.suppress(Exception):
             got = call_sync("repos")
@@ -260,6 +261,9 @@ def cmd_status(args: argparse.Namespace) -> int:
         with contextlib.suppress(Exception):
             got = call_sync("usage")
             usage = got if isinstance(got, dict) else {}
+        # what each session waits on from the person (§4.5a **waiting** mark, TD-274): the home's reading
+        with contextlib.suppress(Exception):
+            asked = teamrun.waiting_of_home(call_sync)
     sessions.sort(key=lambda s: (STATE_RANK.get(s["state"], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
     id_names = {str(s["id"]): str(s.get("name") or "") for s in sessions}
@@ -305,13 +309,21 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      checks: {'; '.join(cadence_said(c) for c in checks)}")
             if s.get("findings"):
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
+            # the wait rides on the declaration's line, or stands alone without one (§4.5a **waiting**)
+            wait = waiting_words(asked.get(s["id"]))
             if ow := s.get("out_of_work"):
-                print(f"{'':<{w}}      out of work {_age(ow['at'])}: {ow['why']}")
+                print(f"{'':<{w}}      out of work {_age(ow['at'])}{f' · {wait}' if wait else ''}: {ow['why']}")
+                wait = ""
             # the third ending (§4.9a, TD-083): what a controller reads to decide a restart, and
             # `early` is why it would not — the field, never a clock of the controller's own
             if rw := s.get("restart_wanted"):
                 early = f" ({rw.get('decided') or 'early'})" if rw.get("early") else ""  # the row's words
-                print(f"{'':<{w}}      restart wanted{early} {_age(rw['at'])}: {rw['why']}")
+                print(
+                    f"{'':<{w}}      restart wanted{early} {_age(rw['at'])}{f' · {wait}' if wait else ''}: {rw['why']}"
+                )
+                wait = ""
+            if wait:
+                print(f"{'':<{w}}      {wait}")
             # rule 7's mark (§6, TD-217): a file the brief was made from reads otherwise, as merged
             if (bc := s.get("brief_changed")) and isinstance(bc, dict) and bc.get("at"):
                 names = ", ".join(pathlib.Path(str(p)).name for p in bc.get("paths") or [])

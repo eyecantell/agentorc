@@ -13,9 +13,9 @@ from typing import Any
 
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
-from agentorc.ending import NO_CLOSER, closer_words
+from agentorc.ending import NO_CLOSER, closer_words, waiting_words
 from agentorc.org import MANAGER_WHEN
-from sessionorc import identity, mail
+from sessionorc import identity, mail, work
 from sessionorc.adapters import short_model
 from sessionorc.agent_common import CLOSED_KEEP
 from sessionorc.models import (
@@ -137,13 +137,15 @@ def view(
     icons: dict[tuple[str, str], tuple[str, str, str]] | None = None,
     seats: Mapping[str, str] | None = None,
     repos: Mapping[str, Any] | None = None,
+    waits: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
     a lead — which sessions it controls. Without it both come back empty, which is what a
     caller that has only one record should show. `seats` is the ids a team definition names as a
     seat, each with what would make it come (`teamrun.seat_ids`): without it, a seat with nobody in
-    it is drawn as the `exited` it is."""
+    it is drawn as the `exited` it is. `waits` is `waits_of` the person inbox: without it, no card
+    says what it waits on."""
     now = datetime.now(UTC)
     d = dict(s)
     state = s["state"]
@@ -310,6 +312,7 @@ def view(
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )
     d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
+    d["waiting"] = waiting_view((waits or {}).get(s.get("id")))
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
     # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
@@ -536,13 +539,39 @@ def brief_changed_view(bc: Any) -> dict[str, str] | None:
     }
 
 
+def waits_of(entries: Any) -> dict[str, list[dict[str, Any]]]:
+    """What each sender waits on, read from the person inbox the page holds (design §4.5a **waiting**
+    mark, TD-274): `work.waiting_of`'s `{id, ref, bound}` per question, keyed by the entry's sender,
+    each with `text`, the question's first paragraph, for the hover — the page's own read, since the
+    home's `host` reading carries no question's text (§4.9a)."""
+    es = [e for e in entries if isinstance(e, Mapping)] if isinstance(entries, list) else []
+    texts = {e.get("id"): str(e.get("text") or "").strip().split("\n\n")[0].strip() for e in es}
+    out = work.waiting_of(es)
+    for qs in out.values():
+        for q in qs:
+            q["text"] = texts.get(q["id"]) or ""
+    return out
+
+
+def waiting_view(questions: Any) -> dict[str, str] | None:
+    """The **waiting** mark (§4.5a, TD-274) as the slot and the Focus chip draw it: `ending.waiting_words`
+    for the text, and on hover the sooner question's first paragraph. None when it waits on nothing."""
+    words = waiting_words(questions)
+    if not words:
+        return None
+    first = next((q for q in questions if isinstance(q, Mapping) and q.get("ref")), {})
+    asked = str(first.get("text") or "")
+    return {"text": words, "full": f"{words} — {asked}" if asked else words}
+
+
 def _first_line(text: str) -> str:
     return text.strip().splitlines()[0] if text.strip() else ""
 
 
 def _declared(d: dict[str, Any]) -> tuple[str, str] | None:
-    """A declaration (§4.9a) as the slot says it, `(text, hover)`: the fixed words, then the first line
-    of its reason; the whole reason and when it was said are the hover — a card holds one clock."""
+    """A declaration (§4.9a) as the slot says it, `(text, hover)`: the fixed words, what it waits on
+    where it waits (§4.5a **waiting**), then the first line of its reason; the whole reason and when
+    it was said are the hover — a card holds one clock."""
     said = d["out_of_work"] or d["restart_wanted"]
     if not said:
         return None
@@ -550,11 +579,15 @@ def _declared(d: dict[str, Any]) -> tuple[str, str] | None:
     if not d["out_of_work"] and said["early"]:
         words += (f" · repeats {said['repeat']}" if said["repeat"] else " · early") + " — for a person"
     why = said["why"]
-    text = words + (f" — {_first_line(why)}" if why else "")
+    # what it waits on follows the fixed words, before the reason a card cuts (§4.5a **waiting**, TD-274)
+    w = d.get("waiting")
+    text = words + (f" · {w['text']}" if w else "") + (f" — {_first_line(why)}" if why else "")
     when = f" {said['age']} ago" if said["age"] else ""
     full = f"{words}{when} — {why or 'no reason recorded'}"
     if not d["out_of_work"] and said["early"]:
         full += f" — {said['decided'] or 'early'}, so a controller does not act on it (design §4.9a)"
+    if w:
+        full += f" · {w['full']}"
     return text, full
 
 
@@ -636,8 +669,13 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         if said := _declared(d):
             # a record that declared keeps the declaration after its ending: it is what explains it
             text, full = f"{text} — {said[0]}", f"{full} — {said[1]}"
+        elif w := d.get("waiting"):  # what it waits on, where it declared nothing (§4.5a **waiting**, TD-274)
+            text, full = f"{text} · {w['text']}", f"{full} · {w['full']}"
     elif said := _declared(d):
         text, full = said
+    elif d.get("waiting"):
+        # alone, on a session that declared nothing: still an ending's place, row 5 (b)
+        text, full = d["waiting"]["text"], d["waiting"]["full"]
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (

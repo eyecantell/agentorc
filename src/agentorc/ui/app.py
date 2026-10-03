@@ -70,6 +70,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     state_counts,  # noqa: F401
     suspended_note,  # noqa: F401
     view,  # noqa: F401
+    waits_of,
 )
 from .common import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     GRANT_NOTES,  # noqa: F401
@@ -772,6 +773,21 @@ def create_app() -> FastAPI:
         await home_reading(fresh)
         return work_cache["waiting"] or {}
 
+    waits_cache: dict[str, Any] = {"at": 0.0, "waits": None}
+
+    async def person_waits() -> dict[str, Any]:
+        """What each session waits on, from the person inbox (`waits_of`, §4.5a **waiting** mark,
+        TD-274), for the surfaces that do not read the inbox themselves — the events stream, Focus,
+        the sessions list — read at most once in `DEFS_TTL` seconds, `work_marks`' idiom; `{}` when
+        the inbox cannot be read (a node's link down), and no card then says it waits."""
+        now = time.monotonic()
+        if waits_cache["waits"] is None or now - waits_cache["at"] > DEFS_TTL:
+            got: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                got = dict(await call("inbox"))
+            waits_cache.update(at=now, waits=waits_of(got.get("entries") or []))
+        return waits_cache["waits"] or {}
+
     async def work_marks() -> dict[str, Any]:
         """The home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8), `{}` when the agent
         cannot give them — an older agent, a node: the card then carries no note. Read at most once
@@ -868,6 +884,7 @@ def create_app() -> FastAPI:
         defs=defs,
         team_rows=team_rows,
         home_waiting=home_waiting,
+        person_waits=person_waits,
         seats_of=seats_of,
         group_heads=group_heads,
         heads=heads,
@@ -937,7 +954,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
         repos, doing = ({}, {}) if agent_down else await repo_facts()
-        vs = sorted((view(s, sessions, icons=icons, seats=seats, repos=repos) for s in sessions), key=card_order)
+        waits = waits_of(entries)  # what each card waits on, from the inbox read above (§4.5a, TD-274)
+        vs = sorted(
+            (view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions), key=card_order
+        )
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
@@ -1090,6 +1110,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     icons=await role_icons([s]),
                     seats=await seats_of([s]),
                     repos=(await repo_facts())[0],  # the PR's mark on the report line (TD-193)
+                    waits=await h.person_waits(),  # the header's *waiting* chip (§4.5a, TD-274)
                 ),
                 "host": host_name(),
                 "active": "Org",
@@ -1217,8 +1238,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"], "on_call": teamrun.on_call(o)}
             for o in sessions_now
-            if has_control(o.get("capabilities"))
-            and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
+            if has_control(o.get("capabilities")) and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -1743,7 +1763,8 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         seats = await seats_of(sessions)
         # the readings too, so the PR's mark on a report survives Focus's Members refresh (TD-193)
         repos = (await h.repo_facts())[0]
-        return [view(s, sessions, icons=icons, seats=seats, repos=repos) for s in sessions]
+        waits = await h.person_waits()
+        return [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
 
 
 def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
@@ -2628,6 +2649,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         icons=await role_icons([s]),
                         seats=await seats_of([s]),
                         repos=repos,
+                        waits=await h.person_waits(),
                     )
                     compact_in(v, known.values())
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
@@ -2681,6 +2703,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     icons=await role_icons([other]),
                                     seats=await seats_of([other]),
                                     repos=repos,
+                                    waits=await h.person_waits(),
                                 )
                                 compact_in(ov, known.values())
                                 await ws.send_text(

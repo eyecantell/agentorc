@@ -1316,3 +1316,52 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     assert "amounts" not in bare["p"]["profiles"][0]
     shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
     assert shared.endswith(":\napi [day amount $5, week amount 2M tok]: w1\napi2 [day amount $10]")
+
+
+def test_a_card_says_what_it_waits_on_after_its_declaration_or_alone(tmp_path, monkeypatch):
+    """§4.5a **waiting** mark (TD-271, built by TD-274): an open `ask` or `steer` from the session in
+    the person inbox whose `about` names a reference puts *waiting on you: <ref> until <time>* in the
+    slot's ending — after the declaration's words, before its reason; alone on one that declared
+    nothing; after the ending of a closed one — the sooner bound first, *and n more*, an `ask` with no
+    time, the question's first paragraph on hover. Prose holds nothing, and a closed entry leaves."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import view, waits_of
+
+    bound = datetime.now(UTC).replace(hour=9, minute=57, second=0, microsecond=0)
+    clock = bound.astimezone().strftime("%H:%M")
+    if bound.astimezone().date() != datetime.now().astimezone().date():
+        clock = bound.astimezone().strftime("%a ") + clock
+
+    def entry(id, kind="steer", about="TD-222", **kw):
+        return {
+            "id": id,
+            "from": "ao-w",
+            "to": ["person"],
+            "kind": kind,
+            "about": about,
+            "text": f"{id}?\n\nmore",
+            **kw,
+        }
+
+    steer = entry("m-s", bound=bound.isoformat())
+    waits = waits_of([steer, entry("m-p", about="the colour of the button")])
+    oow = {"at": "2026-10-02T09:00:00Z", "why": "nothing pickable\nTD-1 is design-first"}
+    v = view(_card(state="idle", out_of_work=oow), waits=waits)
+    assert v["slot"]["text"] == f"out of work · waiting on you: TD-222 until {clock} — nothing pickable"
+    assert v["slot"]["full"].endswith(f"waiting on you: TD-222 until {clock} — m-s?")  # its first paragraph
+    alone = view(_card(state="working"), waits=waits_of([entry("m-a", kind="ask"), steer]))["slot"]
+    assert alone["text"] == f"waiting on you: TD-222 until {clock} and 1 more"
+    closed = view(_card(state="closed", pane=False, closer={"by": "person"}), waits=waits)["slot"]["text"]
+    assert closed == f"closed by you · waiting on you: TD-222 until {clock}"
+    assert view(_card(state="idle"), waits=waits_of([entry("m-p", about="prose")]))["waiting"] is None
+    assert view(_card(state="idle"), waits=waits_of([entry("m-c", closed_reason="answered")]))["waiting"] is None
+    assert view(_card(state="idle"), waits=waits_of([entry("m-k", kind="ask")]))["slot"]["text"] == (
+        "waiting on you: TD-222"
+    )  # an ask has no bound
+    assert view(_card(state="idle"))["waiting"] is None  # no inbox read: nothing said
+    # the Focus header's chip is drawn from the same view: its words and its hover
+    v = view(_card(state="idle"), waits=waits)
+    assert v["waiting"] == {
+        "text": f"waiting on you: TD-222 until {clock}",
+        "full": f"waiting on you: TD-222 until {clock} — m-s?",
+    }

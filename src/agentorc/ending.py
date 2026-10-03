@@ -6,6 +6,7 @@ since `ao` runs without the `ui` extra."""
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 # the tick's four closes (§6): rule 9's, rule 2's, rule 7's and rule 3's — rule 8's start closes nothing
@@ -49,3 +50,25 @@ def declaration(s: Mapping[str, Any]) -> tuple[str, str] | None:
         if isinstance(got, dict) and got.get("at"):
             return words, str(got.get("why") or "").strip()
     return None
+
+
+def waiting_words(questions: Any) -> str:
+    """*waiting on you: TD-222 until 09:57* (design §4.5a **waiting** mark, §4.9a *Waiting is read,
+    never declared*, TD-274): the sooner bound's question — `work.waiting_of`'s order — in this
+    host's clock, the day too once it is not today, *and n more* for the rest; an `ask` has no bound
+    and says none. "" for no questions, so a caller tests the words. The card, Focus and `ao status
+    -v` all say it with this."""
+    qs = [q for q in questions if isinstance(q, Mapping) and q.get("ref")] if isinstance(questions, list) else []
+    if not qs:
+        return ""
+    until = ""
+    if bound := qs[0].get("bound"):
+        try:
+            at = datetime.fromisoformat(str(bound).replace("Z", "+00:00")).astimezone()
+        except ValueError:
+            at = None
+        if at is not None:
+            day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
+            until = f" until {day}{at:%H:%M}"
+    more = f" and {len(qs) - 1} more" if len(qs) > 1 else ""
+    return f"waiting on you: {qs[0]['ref']}{until}{more}"
