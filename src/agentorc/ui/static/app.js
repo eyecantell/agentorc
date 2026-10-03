@@ -2569,8 +2569,9 @@
       });
     }, { capture: true, passive: false });
     // Copy on select (§4.5a, TD-174): the person's, in settings.yml, on by default. A selection ended —
-    // the mouse released, which a Shift+click is too — is copied silently when it is on; Ctrl+C and
-    // Copy are unchanged either way. It needs the secure context the clipboard needs.
+    // the mouse released, which a Shift+click is too — is copied when it is on, and says so with
+    // Copy's own toast, *copied* or *clipboard blocked* (TD-273: a silent copy could not be told from
+    // a selection); Ctrl+C and Copy are unchanged either way. It needs the secure context the clipboard needs.
     const cos = $("#tcopysel");
     let selMoved = false;
     term.onSelectionChange(() => { selMoved = true; });
@@ -2578,7 +2579,7 @@
       if (!selMoved) return;
       selMoved = false;
       const t = cos && cos.checked && !cos.disabled && term.getSelection();
-      if (t) navigator.clipboard.writeText(t).catch(() => { /* silent, as the copy is */ });
+      if (t) copySel();
     });
     if (cos) {
       if (!window.isSecureContext) {

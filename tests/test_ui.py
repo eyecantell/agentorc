@@ -1906,6 +1906,16 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def test_a_copy_on_release_says_so_with_copys_own_toast():
+    """TD-273: a drag-and-release in the Focus terminal copied and said nothing, and a refused copy
+    was silent too. It goes through Copy's own path, which toasts *copied* or *clipboard blocked*."""
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    release = js.split('document.addEventListener("mouseup", () => {')[1].split("});")[0]
+    assert "copySel()" in release and "writeText" not in release
+    copy = js.split("const copySel = () => {")[1].split("};")[0]
+    assert 'AO.toast("copied", true)' in copy and 'AO.toast("clipboard blocked (needs https or localhost)")' in copy
+
+
 def test_restart_from_the_page_is_the_rpc_and_its_refusal_is_the_toast(client, subprocess_agent, tmp_path):
     """§4.5a **Restart** (§6 rule 2 *A person's restart*, TD-250 slice 2): the page's press is the
     `restart` RPC, a person's own, and what the host agent refuses comes back in its words."""
