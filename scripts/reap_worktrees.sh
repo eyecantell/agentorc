@@ -77,14 +77,18 @@
 # output, a downloaded fixture — is ignored by construction, and so are two
 # worse things: a nested FULL clone (a .git directory, which hydrate's scan
 # prunes, so `nested` passes it) with its unpushed commits, and a worktree's
-# real .claude/settings.local.json, which hydrate refuses to touch because the
-# divergent copy may be the newer one.
+# .claude/settings.local.json when it holds something the main checkout's does
+# not (a permission granted in that worktree).
 #
 # So `clean` also reads `git status --ignored --untracked-files=all` (the
 # traditional mode lists ignored files one by one, and a nested repo as one
 # `dir/` entry) and every ignored entry blocks, except:
 #   - anything under a __pycache__/ directory (derived, regenerated on import);
 #   - a symlink (removing it never touches its target — hydrate's links);
+#   - .claude/settings.local.json when hydrate_worktree.sh --settings-disposable
+#     says it is the copy hydrate wrote and holds nothing the main checkout's file
+#     lacks (TD-080: every hydrated worktree carries one, so a copy that blocked
+#     would make every worktree unreapable);
 #   - a nested WORKTREE (`dir/.git` is a file) when hydrate_worktree.sh is
 #     present, at most nested_depth() deep (3, or the deepest configured path) and not
 #     under node_modules: exactly what hydrate's
@@ -285,6 +289,10 @@ ignored_blockers() {
         rel="${p%/}"
         case "/$rel/" in */__pycache__/*) continue ;; esac
         [[ -L "$wt/$rel" ]] && continue
+        if [[ "$rel" == .claude/settings.local.json && -x "$HYDRATE" ]] \
+            && "$HYDRATE" --settings-disposable "$wt" >/dev/null 2>&1; then
+            continue
+        fi
         if [[ "$p" == */ && -f "$wt/$rel/.git" && -x "$HYDRATE" ]]; then
             depth="${rel//[!\/]/}"
             case "/$rel/" in */node_modules/*) ;; *)

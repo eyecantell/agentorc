@@ -12,6 +12,10 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-01 — a memory note is part of your PR: in a worktree, re-run `scripts/hydrate_worktree.sh` once
+Do: run `scripts/hydrate_worktree.sh` in your worktree (it replaces the symlinked `.claude/settings.local.json` with the worktree's own copy, naming its own `docs/claude-memory`; a session picks it up at its next start), then commit memory notes on your branch. Never commit a note left uncommitted in the main checkout that you did not write.
+See: cadence.md §7.2, §1.8; hydrate_worktree.sh (`settings_local`); TD-080.
+
 ## 2026-10-01 — a ` — <name>, <date>: …` tail on a board item is the person's reply to its session: act on it
 Do: read a reply on an item your session raised as the person's words to you — it decides and closes nothing, so answer it in the work, then close or update the item. Never type one: a tool writes it with `scripts/board_edit.py reply --text … [--by …]`, the fourth tool-made edit beside snooze, done and decide.
 See: cadence.md §3.5, §4.5; board_edit.py; `--report --json` `replies`; TD-075.
