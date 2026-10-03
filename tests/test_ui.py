@@ -1874,7 +1874,9 @@ def test_the_page_reads_person_through_the_agents_settings_read(client, tmp_path
         r = client.get("/")
         assert r.status_code == 200 and uiconf.open_in().kind == "none"
         assert 'id="migratenote"' in r.text
-    finally:
+    finally:  # the module's agent outlives this test: what it wrote there is taken back (TD-275)
+        call_sync("set_settings", person={"open_in": None})
+        (paths.home() / "ui.yml").unlink(missing_ok=True)
         uiconf.set_read({"person": {}, "migrate": []})
 
 
@@ -1904,6 +1906,7 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
     assert client.post("/api/settings/person", json={"terminal": {"copy_on_select": True}}).json()["ok"]
     assert 'id="tcopysel" checked' in client.get(f"/focus/{sid}").text
     client.post(f"/api/sessions/{sid}/kill")
+    call_sync("set_settings", person={"terminal": {"copy_on_select": None}})  # TD-275
 
 
 def test_a_copy_on_release_says_so_with_copys_own_toast():

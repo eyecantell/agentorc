@@ -167,6 +167,21 @@ def _never_docker():
     containers.Runner = original
 
 
+@pytest.fixture(autouse=True)
+def _no_persons_settings_carried_over():
+    """The UI keeps the person's `settings` read in a module global (`uiconf._read`, design §5): a
+    test that draws a page leaves it holding its agent's answer, and a later test that renders a
+    template directly would draw with it — so a result hung on file order (TD-275). Each test starts
+    with nothing read, which is what a fresh UI has."""
+    try:
+        from agentorc.ui import uiconf
+    except ImportError:  # the `ui` extra is not installed: nothing to reset
+        yield
+        return
+    uiconf.set_read({"person": {}, "migrate": []})
+    yield
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _never_this_machines_home(tmp_path_factory):
     """No test reads this machine's `~/.agentorc` or `~/.claude` (TD-044).
