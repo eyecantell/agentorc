@@ -625,10 +625,11 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
     assert (team.techlead.name, team.techlead.context) == ("techlead-ao-1", "docs/briefs/techlead-context.md")
     got = [(m.role, m.names(), m.lane, m.brief, m.unattended) for m in team.members]
     assert got == [
-        ("grinder", ["grinder-ao-1"], ["free-pick"], "docs/briefs/grinder-ao-1.md", True),
-        ("grinder", ["grinder-ao-2"], ["free-pick"], "docs/briefs/grinder-ao-2.md", True),
-        ("designer", ["designer-ao-1"], ["design-first"], None, True),
+        ("grinder", ["grinder-ao-1"], ["free-pick", "owner:grinder"], "docs/briefs/grinder-ao-1.md", True),
+        ("grinder", ["grinder-ao-2"], ["free-pick", "owner:grinder"], "docs/briefs/grinder-ao-2.md", True),
+        ("designer", ["designer-ao-1"], ["design-first", "owner:designer"], None, True),
     ]
+    assert team.entries == {"feature": "designer"}
     briefs = [team.manager.brief, team.techlead.context, *(m.brief for m in team.members if m.brief)]
     assert all((here / b).is_file() for b in briefs)
 
