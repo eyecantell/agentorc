@@ -173,6 +173,23 @@ def test_a_repo_card_draws_the_switch_only_where_the_file_carries_promote(tmp_pa
     a, b = cards
     assert a["promote"] and a["auto"] and {"promote.run", "promote.check"} <= {r["key"] for r in a["rows"]}
     assert not b["promote"] and not b["exists"] and not b["auto"]
+    # **pull** on every card, block or not: on when absent, the home's reading beside it (§6 *Pull*)
+    assert a["pull"] and b["pull"] and a["pull_reading"] == b["pull_reading"] == ""
+    pulls = {"a": {"outcome": "waiting", "occupant": "main"}, "b": {"outcome": "off"}}
+    a, b = setmod.repo_cards([str(with_block), str(without)], {"b": {"pull": False}}, pulls)
+    assert a["pull"] and a["pull_reading"] == "waiting: main is mid-turn"
+    assert not b["pull"] and b["pull_reading"] == "off"
+
+
+@pytest.mark.unit
+def test_the_pull_reading_in_the_designs_words():
+    at = (NOW - timedelta(minutes=4)).isoformat()
+    assert setmod.pull_reading({"outcome": "pulled", "at": at, "commits": 3}, NOW) == "last pulled 4m ago · 3 commits"
+    assert setmod.pull_reading({"outcome": "pulled", "at": at, "commits": 1}, NOW) == "last pulled 4m ago · 1 commit"
+    assert setmod.pull_reading({"outcome": "current"}) == "current"
+    assert setmod.pull_reading({"outcome": "refused", "why": "on topic"}) == "refused: on topic"
+    assert setmod.pull_reading({"outcome": "waiting", "occupant": None}).startswith("waiting: a session here")
+    assert setmod.pull_reading(None) == ""
 
 
 @pytest.mark.unit
@@ -239,6 +256,9 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         assert client.post("/api/settings/repos", json={"repo": "agentorc", "auto": True}).json()["ok"]
         assert call_sync("settings")["repos"]["agentorc"] == {"promote": {"auto": True}}
         assert client.post("/api/settings/repos", json={"repo": "agentorc", "auto": "yes"}).status_code == 400
+        assert client.post("/api/settings/repos", json={"repo": "agentorc", "pull": False}).json()["ok"]
+        assert call_sync("settings")["repos"]["agentorc"] == {"promote": {"auto": True}, "pull": False}
+        assert client.post("/api/settings/repos", json={"repo": "agentorc", "pull": "no"}).status_code == 400
 
         got = client.post("/api/settings/you", json={"open_in": "none", "terminal": {"size": 15, "face": "Fira Code"}})
         assert got.json()["ok"]

@@ -3319,6 +3319,15 @@
         AO.toast(`${card.dataset.repo}: promote ${box.checked ? "auto" : "by hand"} · applies on the next tick`, true);
       } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
     }));
+    // **pull** (§4.5a *Settings page: Repos*, §6 *Pull*, TD-263): on every card, block or not
+    $$(".setpull", page).forEach((box) => box.addEventListener("change", async () => {
+      const card = box.closest(".setcard");
+      try {
+        await post("repos", { repo: card.dataset.repo, pull: box.checked });
+        box.parentElement.querySelector(".note").textContent = box.checked ? "on: the home fast-forwards this checkout when git allows and no session in it is mid-turn" : "off: the checkout is left to you";
+        AO.toast(`${card.dataset.repo}: pull ${box.checked ? "on" : "off"} · applies on the next pass`, true);
+      } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
+    }));
     const openin = $("#setopenin");
     if (openin) openin.addEventListener("change", () => $("#settemplate").classList.toggle("hidden", openin.value !== "template"));
     // *this browser* (§4.5a): what it holds, each set by its own control; Reset clears every `ao.*` key

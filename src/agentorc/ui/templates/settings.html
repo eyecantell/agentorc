@@ -124,7 +124,7 @@
   </section>
 
   {# **Repos** (§4.5a *Settings page: Repos*) #}
-  {% set info_repos = "A card per registered checkout: its .agentorc.yml values, read-only, and for a repo whose file carries promote:, the one setting you flip — auto. Off: the Inbox row offers the press when main is ahead of live. On: the home promotes ten minutes after main stops moving. The switch writes settings.yml's repos: through set_settings; the file itself changes by PR." %}
+  {% set info_repos = "A card per registered checkout: its .agentorc.yml values, read-only, and for a repo whose file carries promote:, the one setting you flip — auto. Off: the Inbox row offers the press when main is ahead of live. On: the home promotes ten minutes after main stops moving. On every card, pull: on, the home fast-forwards the checkout to origin when git allows and no session in it is mid-turn, and the last pass's reading sits beside it; off leaves the checkout to you. The switches write settings.yml's repos: through set_settings; the file itself changes by PR." %}
   <section class="isec" id="sec-repos">
     <div class="row gap sechead"><span class="h2">Repos</span>{{ imark("repos", "Repos", info_repos) }}</div>
     {{ panel("repos", info_repos) }}
@@ -136,6 +136,10 @@
         {% if r.promote %}<input type="checkbox" class="setauto"{% if r.auto %} checked{% endif %}>
         <span class="note">{{ "on: the home promotes 10 min after main moves" if r.auto else "off: the Inbox row offers the press" }}</span>
         {% else %}<span class="note">no switch — {{ ".agentorc.yml carries no promote: block, so this repo promotes by hand" if r.exists else "no .agentorc.yml, so no promote: block" }}</span>{% endif %}</label>
+      <label class="setrow"><span class="setlabel">pull</span>
+        <input type="checkbox" class="setpull"{% if r.pull %} checked{% endif %}>
+        <span class="note">{{ "on: the home fast-forwards this checkout when git allows and no session in it is mid-turn" if r.pull else "off: the checkout is left to you" }}</span>
+        {% if r.pull_reading %}<span class="note mono setpullread">{{ r.pull_reading }}</span>{% endif %}</label>
       {{ rows(r.rows) }}
       {% endif %}
       {{ filefoot(r.file, reads.repo[0], reads.repo[1]) }}

@@ -40,6 +40,7 @@ from sessionorc.models import (
 )
 
 from . import help as helpmod
+from . import inbox as inbox_mod
 from . import settings_page as setmod
 from . import uiconf
 from .cards import (  # re-exported: routes, templates and tests read these from the app (TD-196)
@@ -155,6 +156,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     OWING_CLOSES,  # noqa: F401
     OWING_KINDS,  # noqa: F401
     PERSON_ASK_KINDS,  # noqa: F401
+    PULLS,  # noqa: F401
     RAIL_KIND_NAMES,  # noqa: F401
     RAIL_KINDS,  # noqa: F401
     RAIL_NO_TEAM,  # noqa: F401
@@ -199,6 +201,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     origin_firsts,  # noqa: F401
     origin_note,  # noqa: F401
     promote_rows,  # noqa: F401
+    pull_tail,  # noqa: F401
     rail_counts,  # noqa: F401
     rail_kind,  # noqa: F401
     rail_picks,  # noqa: F401
@@ -619,6 +622,22 @@ def create_app() -> FastAPI:
 
     board_cache: dict[str, Any] = {"at": None, "rows": [], "all": [], "note": "", "task": None, "pressed": {}}
 
+    pull_cache: dict[str, Any] = {"at": float("-inf")}
+
+    async def pull_marks() -> None:
+        """The home's pull readings (`host`'s `pulls`, §6 *Pull*) into `inbox.PULLS`, which the
+        *behind* origin note's tail reads (TD-263); at most once in `DEFS_TTL`, `work_marks`' idiom.
+        An agent that cannot give them — an older one, a node — leaves the note without a tail."""
+        now = time.monotonic()
+        if now - pull_cache["at"] <= DEFS_TTL:
+            return
+        pull_cache["at"] = now
+        got: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            got = dict((await call("host")).get("pulls") or {})
+        inbox_mod.PULLS.clear()
+        inbox_mod.PULLS.update(got)
+
     def board_store(rows: list[dict[str, Any]], note: str) -> None:
         board_cache.update(rows=[r for r in rows if r.get("due_now", True)], all=rows, note=note)
 
@@ -656,6 +675,7 @@ def create_app() -> FastAPI:
         the read after a press — Snooze, Done, Reply, Put on the board: a plain read of that one
         board laid over the last reading, so a press never waits on the network and the other repos'
         rows do not move. `fresh` reads everything plainly now."""
+        await pull_marks()
         now = time.monotonic()
         if board and board_cache["at"] is not None:
             rows, note = await asyncio.to_thread(read_boards, board=board)
@@ -1172,8 +1192,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"], "on_call": teamrun.on_call(o)}
             for o in sessions_now
-            if has_control(o.get("capabilities"))
-            and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
+            if has_control(o.get("capabilities")) and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -1935,7 +1954,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 "profiles_file": str(profiles_mod.profiles_file()),
                 "teams": setmod.team_cards(org.teams, got.get("teams"), sessions=fleet, repos=readings),
-                "repos": setmod.repo_cards(local.repos(), got.get("repos")),
+                "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls")),
                 "you": term,
                 "browser_keys": setmod.BROWSER_KEYS,
                 "host_card": setmod.host_card(
@@ -2049,12 +2068,15 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/repos")
     async def settings_repos(request: Request):
-        """§4.5a *Settings page: Repos* → the promote's **auto** switch: `{repo, auto: bool}`, written
-        to `repos.<repo>.promote.auto` through `set_settings`."""
+        """§4.5a *Settings page: Repos* → the promote's **auto** switch, `{repo, auto: bool}`, written
+        to `repos.<repo>.promote.auto`, or the **pull** switch, `{repo, pull: bool}`, written to
+        `repos.<repo>.pull` (§6 *Pull*, TD-263) — each through `set_settings`."""
         body = await body_of(request)
-        repo, auto = str(body.get("repo") or ""), body.get("auto")
+        repo, auto, pull = str(body.get("repo") or ""), body.get("auto"), body.get("pull")
+        if repo and isinstance(pull, bool) and auto is None:
+            return answer(await call("set_settings", repos={repo: {"pull": pull}}))
         if not repo or not isinstance(auto, bool):
-            raise HTTPException(400, "repos: send {repo, auto: true|false}")
+            raise HTTPException(400, "repos: send {repo, auto: true|false} or {repo, pull: true|false}")
         return answer(await call("set_settings", repos={repo: {"promote": {"auto": auto}}}))
 
     @app.post("/api/settings/you")
