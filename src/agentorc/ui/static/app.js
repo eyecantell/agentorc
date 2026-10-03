@@ -2401,6 +2401,14 @@
         applyRepo(true);
       }
     }
+    // a directory set for the person (a Team's or Project's first checkout) is its Repo choice when one
+    // is, and is checked as a typed one when not (review of #950)
+    function syncRepo() {
+      if (!repoSel) return;
+      const hit = [...repoSel.options].find((o) => !o.dataset.other && !o.hidden && o.value === dir.value);
+      repoSel.value = hit ? hit.value : "";
+      applyRepo(false);
+    }
     if (repoSel) repoSel.addEventListener("change", () => { applyRepo(true); if (other()) dir.focus(); });
     dir.addEventListener("input", () => { clearTimeout(dir._d); dir._d = setTimeout(dirCheck, 250); });
     // a shell has no role, lane or brief: picking it hides them, and the occupancy rule exempts it (§9)
@@ -2539,7 +2547,7 @@
       if (!o || !o.value) { options(allDirs); narrowRepos(); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
       const here = repos.filter((r) => r.path), away = repos.filter((r) => !r.path);
       options(here.map((r) => r.path)); narrowRepos();
-      if (!dir.value.trim() && here.length) { dir.value = here[0].path; check(); loadRoles(); nameCheck(); }
+      if (!dir.value.trim() && here.length) { dir.value = here[0].path; syncRepo(); check(); loadRoles(); nameCheck(); }
       const mine = here.some((r) => r.path === dir.value.trim());
       pnote.textContent =
         `${here.length} repo${here.length === 1 ? "" : "s"} on this host: ${here.map((r) => r.repo).join(", ") || "none"}`
@@ -2579,7 +2587,7 @@
         let dirs = [];
         try { dirs = JSON.parse(o.dataset.dirs || "[]"); } catch (e) { dirs = []; }
         options(dirs); narrowRepos();
-        if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; check(); loadRoles(); nameCheck(); }
+        if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; syncRepo(); check(); loadRoles(); nameCheck(); }
         if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
         // the team's host is the Host pick's (§4.5a **the reworked form**), when it is one to pick
         if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
