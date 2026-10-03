@@ -2742,6 +2742,8 @@ console.log(JSON.stringify({
   counts: cases.picks.map((q) => AO.railCounts(cases.rows, AO.railPicks(q))),
   queries: cases.picks.map((q) => AO.railQuery(AO.railPicks(q))),
   words: AO.findWords("  Merge, #517 (jeff) "),
+  split: [AO.findSplit("Merge #517: merge it", ["merge", "517"]), AO.findSplit("a+b (c)", ["+b", "(c"]),
+          AO.findSplit("nothing here", ["x"]), AO.findSplit("abc", [])],
 }));
 """
 
@@ -2776,6 +2778,11 @@ def test_the_script_counts_the_rail_as_the_server_does():
         assert js == rail_counts(rows, picks), q
         assert rail_picks(dict(parse_qsl(query.lstrip("?")))) == picks, (q, query)  # round trip
     assert got["words"] == find_words("  Merge, #517 (jeff) ") == ["merge", "#517", "jeff"]
+    # the find's marks (TD-280): the text cut at its words, case-insensitive, regex marks as characters
+    hit, miss = (lambda w: [w, True]), (lambda w: [w, False])
+    assert got["split"][0] == [hit("Merge"), miss(" #"), hit("517"), miss(": "), hit("merge"), miss(" it")]
+    assert got["split"][1] == [["a", False], ["+b", True], [" ", False], ["(c", True], [")", False]]
+    assert got["split"][2] == [["nothing here", False]] and got["split"][3] == [["abc", False]]
 
 
 @pytest.mark.unit
