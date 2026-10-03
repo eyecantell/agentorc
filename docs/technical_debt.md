@@ -145,7 +145,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Built (#955), live look pending |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#956), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
-| TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a `look` item in Needs you or Steering, no longer a `watch` | Medium | Open — design first |
+| TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a `look` item in Needs you or Steering, no longer a `watch` | Medium | Designed 2026-10-03 — builds TD-291, TD-292 |
+| TD-291 | Build the builder's half of a UI change's verification: the scratch home script, the UI check in the PR, the techlead's read of screenshots, the briefs | Medium | Open |
+| TD-292 | Build the Inbox's half of a `look`: Needs you or Steering by its default, *lapsed* at its date, screenshots on the row, Send to reviewer | Medium | Open — waits on dev-cadence TD-082 |
 
 
 ---
@@ -2754,7 +2756,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of the pages: *we should probably have these types of verification items sent to a reviewer (and then to me if needed)*; 2026-10-03: *I would expect a grinder who makes ui changes to verify them itself before sending to a reviewer, and only send to a reviewer if needed*; *a distinction between "watch" items (issues that have arisen once and need to be seen again before acting) and "look" items (items that are for me to take a look at) — have the look items go to either steering or "needs you" instead of creating a new category*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design first: cadence §3.5's live look, §4.5a's Inbox answers, the grinder brief's *running inside the thing you are fixing*
+**Status:** **Designed 2026-10-03** (the designer, PR #947 reworked on Paul's three points; the two choices steered to Paul are STEERID). Design: §4.9b *A UI change is verified by its builder* (the builder's scratch home and the **UI check** in its PR; the live copy read by a `watch`, never pressed; the reviewer is the techlead seat, asked only for a judgement against the design, its three replies; the `look` line's three cases; a look's bound is its `Due:` and a lapse is closed by its team as a decided *Works* is), §4.5 screen 6 (*Needs you*, *Steering*), §4.5a **Inbox board row (a `look`)** and **Send to reviewer**, §4.4 (`board_reply` with `look`), the glossary's *look* and *scratch home*, mockup `Inbox.dc.html` (`docs/mockups/reviews/2026-10-03-td290-look-rows.png`). The first shape (2026-10-02: a `reviewer` seat with a browser, a fifth Inbox section) is dropped. One sentence is dev-cadence's: that a `look` with a default is closed by its session at its date (the board line of 2026-10-03). Not built: TD-291, TD-292.
+**Blocked by:** TD-291, TD-292
 **Location:** design §4.5a (a board row's answers, **Works** / **Not right…**; the Inbox's sections), §4.9 (roles), `docs/briefs/grinder-ao-*.md` (*never run `ao ui`*; *a fix that needs a live look is … a `watch` line*), cadence §3.5 (the live look, written as a `watch`); the anchor's Playwright set-up (`~/ao-shots/pwlib`, `~/ao-shots/scripts/`, headless Chromium)
 
 **Why:** today no one checks a UI change before the person does. A grinder may not run `ao ui` (its brief), and the live copy changes only at the anchor's promote, so every merged UI change ends in a `watch` line asking the person to look, and most of what those lines ask is mechanical: a label reads so, a button is greyed, a toast says *x*, a size takes. The board held ten at once on 2026-10-02 and Paul walked them page by page over an evening. A headless browser can make most of those checks: Playwright with Chromium loads a page, waits for its scripts and the terminal, reads values and takes screenshots; it settled TD-288's fresh-load half. And the word is wrong: `watch` means a thing seen once that must be seen again before acting (a session's §6 check), while these lines ask the person to look.
@@ -2765,3 +2768,39 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-255 (a live look's answers), TD-244 (the page walks), TD-288 (settled half by a headless look), dev-cadence TD-082, cadence §3.5.
 
+## TD-291: Build the builder's half of a UI change's verification
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-03 (the designer, TD-290's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `scripts/look_home.py` (new, agentorc's own: the scratch home), `tests/conftest.py` (how the suite isolates a host agent: a temp `AGENTORC_HOME` and a `Tmux` on a private socket handed to `HostAgent`), `src/agentorc/briefs/grinder.md` and `src/agentorc/briefs/techlead.md`, `docs/briefs/grinder-ao-*.md`, `docs/briefs/designer-ao-1.md`, `docs/briefs/techlead-context.md`; design §4.9b *A UI change is verified by its builder*
+
+**Why:** design §4.9b (TD-290; Paul, 2026-10-03: *I would expect a grinder who makes ui changes to verify them itself before sending to a reviewer, and only send to a reviewer if needed*). A grinder may not run `ao ui` today, so every merged change to a page reaches Paul unchecked.
+
+**Fix:** build it as written, in slices, each its own PR. (1) **The scratch home**: `scripts/look_home.py` stands up a host agent and a UI from the worktree it is run in, on an `AGENTORC_HOME` of its own under a short path (a unix socket's path limit), a tmux server of its own and a free port — started in-process with a `Tmux` on a private socket handed to `HostAgent`, as `tests/conftest.py`'s fixture does, since `agentorc-agent serve` builds a bare `Tmux()` on the default server — with fixture sessions under the `shell` adapter and a fixture board; it prints the URL, tears everything down on exit and on a signal, and refuses to run against `~/.agentorc` or the default tmux server; a test starts it, loads the Org page and stops it. (2) **The builder's briefs** (touches `docs/briefs/**`: the reader's read): the grinder preset and this repo's grinder briefs change *never run `ao ui`* to *never run the host agent or `ao ui` against the live home; `scripts/look_home.py` is the one way*, and say the rest of the rule — a PR that changes anything under `src/agentorc/ui/` carries a **UI check** in its body (one line per check: what the change says, what was read) and its screenshots as `docs/mockups/reviews/<date>-td<n>-<what>.png`, cropped, at most four; what a browser cannot settle is an `ask` to `{techlead}` naming the screenshots and the design section, before the merge; what only the live copy shows is a `watch` line the next member makes read-only once `ao promote status` shows the commit live; and the three cases of what is left (no line; a `look` with `Works (default)` naming the techlead's reply and a `Due:` no sooner than the next day; a `look` with the bare pair), written as a `watch` with the pair until TD-292's last slice says the kind is here; where Playwright is on this machine (`~/ao-shots/pwlib`) is this repo's brief's to say. The designer's brief gains the same rule for a mockup it shows. (3) **The techlead's half** (touches `docs/briefs/**`): the techlead preset and the primer say how a screenshot `ask` is answered — read the images against §4.5, §4.5a and the mockup; *matches* or *does not match: <what>* with `--source`, or *not written* with a lean; never passed up as mail. (4) **The first one**: the next merged change to a page goes through it, and what the builder could not do from its brief is fixed there.
+
+**Done when:** a grinder's PR that changes a page carries a UI check made on a scratch home with its screenshots, and no board line is written for a change whose checks all held.
+
+**Related:** TD-290 (the design), TD-292 (the Inbox's half), TD-255 (a live look's answers), cadence §3.5.
+
+## TD-292: Build the Inbox's half of a `look`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-03 (the designer, TD-290's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — waits on dev-cadence TD-082 (the `look` kind in the synced reader, and cadence's sentence that a `look` with a default is closed by its session at its date)
+**Blocked by:** dev-cadence#TD-082
+**Location:** `src/agentorc/ui/inbox.py` (`inbox_sections`, `board_due_now`, the live look's pair, the board row's renderer), `src/agentorc/ui/app.py` (the screenshot route), `src/sessionorc/agent_inbox.py` (`rpc_board_reply`: `look`), `src/agentorc/briefs/grinder.md`, `src/agentorc/briefs/techlead.md`, `docs/briefs/`; design §4.5 screen 6, §4.5a **Inbox board row (a `look`)** and **Send to reviewer**, §4.4 *Board write-back*, §4.9b; mockup `docs/mockups/Inbox.dc.html`, `docs/mockups/reviews/2026-10-03-td290-look-rows.png`
+
+**Why:** Paul, 2026-10-03: *have the look items go to either steering or "needs you" instead of creating a new category*. A person's look is written as a `watch` and counted among the decisions, with no way to say *I checked this; it goes ahead unless you say otherwise*, and no way to a reviewer but a typed reply.
+
+**Fix:** as §4.5a's two rows say, in slices, each its own PR. (1) **The kind**: the pair is drawn on kind `look` (and still on a `watch` with the pair); a `look` with no default is a due board row under *Needs you*, counted. (2) **Steering**: a `look` with `Works (default)` is drawn under *Steering* from the day it is written until its line is closed, outside the board's horizon and every *due now* number, with its date as the bound and the controls the row names; `lapsed` on the board item's view beside `due_now`, and the lapsed row's words; the rail's counts held to one answer by their test. (3) **Screenshots**: `GET /repo/<repo>/shot/<name>.png` serving `docs/mockups/reviews/` of a registered repo at `origin/<default>` and nothing else, and the thumbnails under a row's text, at most four. (4) **Send to reviewer** (touches `src/sessionorc/**`: the reader's read): `board_reply` with `look: [{team, seat}]` writes the fixed reply and hands the techlead seat a `handed` `ask` with the line's head, screenshot paths and `refs` — the mail is built here in its own right, since `rpc_board_reply` writes the file half alone today; the row's *with <seat> since* words from the line's reply; the refusals in the host agent's words. (5) **The briefs and the board** (touches `docs/briefs/**`): the grinder preset and briefs write `look`, name a default only on the techlead's lean, and close a lapsed look as a decided *Works*; the techlead's preset says how a handed look ends (closed, ledgered, or rewritten with `Works (default)`; `blocked` where it cannot say); this repo's open live looks are regroomed from `watch` to `look` in one pass.
+
+**Done when:** a `look` with a default is listed under *Steering* with its screenshots and counted nowhere, one without is under *Needs you*, a lapsed one is closed by a member with no press from Paul, and **Send to reviewer** writes the line's reply and fills the techlead seat.
+
+**Related:** TD-290 (the design), TD-291 (the builder's half), TD-255 (a live look's answers), TD-220 (the board's horizon), TD-142 (`board_reply`), dev-cadence TD-082.
