@@ -31,7 +31,7 @@ from agentorc import review as reviewmod
 from agentorc.cli import stop_time as clistop
 from sessionorc import gitinfo, hosts, mail, naming, paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
-from sessionorc.containers import attach_argv_in
+from sessionorc.containers import attach_argv_in, container_nodes
 from sessionorc.models import (
     GRANTS,
     has_control,
@@ -455,9 +455,11 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     is also where a press that cannot be silent lands, with its reason (§4.5a)."""
     got = resume_create(rec)
     # `capabilities` and `ledger` are the create's, not the form's — §4.5a says capabilities are
-    # **not carried**, and the form derives both from the Role picker. `host` likewise: the form
-    # has no host field, and phase 1 starts a session on the host the page is served from.
+    # **not carried**, and the form derives both from the Role picker. `host` is the Host pick's
+    # (TD-284 slice 3), carried only when it is another host's record, as the create sends it.
     q = {k: v for k, v in got.items() if k in RESUME_CARRIES and k not in ("lane", "controllers") and v}
+    if got.get("host"):
+        q["host"] = got["host"]
     q["resume"] = got["resume"]
     # A worktree record lands on the form as the form says it: **Where** = new worktree, the
     # worktree's name, and the directory field holding the *repo* — which is what the form's own
@@ -1226,6 +1228,26 @@ def tool_profile(profs: Mapping[str, profiles_mod.Profile], default: str, adapte
     return next((k for k, p in profs.items() if p.adapter == adapter), "")
 
 
+def form_hosts(info: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """New session's **Host** pick (§4.5a **the reworked form**, TD-284 slice 3): this host, then each
+    `nodes:` entry of `hosts.yml` at a home, a container marked so, one with no live link disabled
+    with its reason (`host`'s `links`, §4.4a). A node lists itself alone: its home routes the rest."""
+    here = host_name()
+    out: list[dict[str, Any]] = [{"name": here, "up": True, "note": "", "why": ""}]
+    if hosts.is_node():
+        return out
+    links = info.get("links") or {}
+    boxes = container_nodes()
+    for name in hosts.nodes():
+        if name == here:
+            continue
+        link = links.get(name) or {}
+        up = bool(link.get("up"))
+        why = "" if up else f"unreachable: {link.get('why') or 'never linked'}"
+        out.append({"name": name, "up": up, "note": "container" if name in boxes else "", "why": why})
+    return out
+
+
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
     call = h.call
@@ -1252,6 +1274,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         worktree: str = "",
         prefilled: str = "",
         why: str = "",
+        host: str = "",
     ):
         profs, default = profiles_mod.load()
         # registered repos (design §5: the dev-cadence registry, `repos_registry` in hosts.yml) first,
@@ -1279,6 +1302,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
+                "form_hosts": form_hosts(await call("host")),
                 # the Profile pick's last choice (§4.5a **the reworked form**, TD-284 slice 2)
                 "shell_pick": SHELL_PICK,
                 # each of Host, Project and Profile ends its note with its file and **Open file**
@@ -1319,6 +1343,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "unattended": unattended == "on",
                     "where": "worktree" if where == "worktree" else "here",
                     "worktree": worktree,
+                    "host": host,
                     "prefilled": prefilled == "1",
                     "why": why,
                 },
@@ -1368,7 +1393,11 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         at: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
         grant: Annotated[list[str], Form()] = NO_GRANTS,
+        host: str = Form(""),
     ):
+        # the Host pick (TD-284 slice 3): sent only when it names another host — the home routes the
+        # create there (§4.4a) — so a form on one host posts exactly what it always did (§4.4 skew rule)
+        elsewhere = {"host": host.strip()} if host.strip() and host.strip() != host_name() else {}
         wt = None
         if where == "worktree":
             wt = worktree.strip() or naming.slug(name.strip() or "session")
@@ -1440,6 +1469,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             team=team.strip(),  # the badge and the group, as `ao new --team` sets it (§4.9)
             **stop_fields(until, unattended == "on"),
             **start_fields(at, unattended == "on"),
+            **elsewhere,
         )
         # a scheduled record has no terminal yet: the Org shows its card with the *starts* note (§4.5a At)
         return RedirectResponse("/" if s.get("state") == "scheduled" else f"/focus/{s['id']}", status_code=303)
@@ -1456,13 +1486,16 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return await call("occupancy", dir=dir.strip())
 
     @app.get("/api/name_check")
-    async def api_name_check(dir: str = "", name: str = "", worktree: bool = False):
+    async def api_name_check(dir: str = "", name: str = "", worktree: bool = False, host: str = ""):
         """What §4.1's name rule would do (design §4.5a, TD-030): the New session form asks as you
         type, the way it already asks about directory occupancy. `worktree` puts the name in the
         repo's scope, which is where the session would actually land."""
         if not (dir.strip() and name.strip()):
             return {"id": "", "name": name, "verdict": "free", "holder": None, "message": ""}
-        return await call("name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None)
+        on = {"host": host.strip()} if host.strip() and host.strip() != host_name() else {}  # the Host pick's
+        return await call(
+            "name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None, **on
+        )
 
     # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) ---
 
