@@ -617,3 +617,5 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .transcript .tbody { margin: 4px 0; padding: 6px 8px; font-size: var(--t-mono-s); background: var(--input); border: 1px solid var(--line2); border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30em; overflow: auto; }
 .transcript .tsidebody { border-left: 2px solid var(--line); margin: 4px 0 4px 4px; }
 .transcript .tcompact, .transcript .tearlier { text-align: center; padding: 8px; }
+/* the find's matched words (TD-280): a highlight that reads in both themes, the text's own colour */
+mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px; padding: 0 1px; }
