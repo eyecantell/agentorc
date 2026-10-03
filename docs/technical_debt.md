@@ -138,7 +138,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-277 | The New session form asks for its fields in the order the code grew them: Host is fixed text, Directory, Where, Project and Team are five coupled picks, Adapter repeats the Profile, the warnings show when nothing applies, and Until and At show for an interactive session | Medium | Open — design first |
 | TD-278 | The Inbox reads every board with the first registered repo's copy of the reader, which is samscrape's, synced 2026-09-17 and without `Answers:`: no board row on the page draws its answers, Go with it, or Works / Not right… | High | Built (#929): live look pending |
 | TD-279 | A board row on the Inbox prints its line as raw text: `**` and backticks show, and a long line (a page walk) is one wall with no fold | Medium | Built (#933), live look pending |
-| TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Open |
+| TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Built (#942), live look pending |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Built (#939), live look pending |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
@@ -2625,7 +2625,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox: TD-135's find *works, it would be nice to have the matching words highlighted*; TD-124's keys *works, would be nice to have r for reply as well*)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #942 (`r` presses a board row's Reply too; the find marks its words, `AO.findSplit` / `AO.markFind`); merged, live look pending on `docs/user_attention.md`.
 **Location:** `src/agentorc/ui/static/app.js` (the Inbox's keys and the rail's find), `src/agentorc/ui/help.py` (the keys list), design §4.5a's Inbox keys
 
 **Why:** `j` / `k` ring a row and `x` dismisses, but replying still needs the mouse; a find that matched two words in a forty-line row leaves the reader to look for them.
