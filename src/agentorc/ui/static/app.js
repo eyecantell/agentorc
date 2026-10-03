@@ -2342,6 +2342,10 @@
     const herechoice = $("#herechoice"), inuse = $("#hereinuse"), profSel = $("#profile");
     // Profile is the one tool pick (§4.5a **the reworked form**, TD-284): its last choice is the shell
     const isShell = () => !!profSel && !!profSel.selectedOptions[0] && profSel.selectedOptions[0].dataset.adapter === "shell";
+    // the Host pick (TD-284 slice 3): another host's directory is not this one's to read for occupancy;
+    // the name check goes there with it, and the home's create refuses what the node would
+    const hostSel = $("#host");
+    const away = () => !!hostSel && hostSel.selectedIndex > 0;
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
     let nameBlocked = false, dirBlocked = false;
@@ -2355,7 +2359,7 @@
     let seq = 0;
     async function check() {
       const v = dir.value.trim(); const my = ++seq;
-      if (!v) { note.textContent = ""; here.disabled = false; herechoice.classList.remove("taken"); inuse.hidden = true; dirBlocked = false; gate(); return; }
+      if (!v || away()) { note.textContent = ""; here.disabled = false; herechoice.classList.remove("taken"); inuse.hidden = true; dirBlocked = false; gate(); return; }
       try {
         const r = await fetch(`/api/occupancy?dir=${encodeURIComponent(v)}`); const o = await r.json();
         if (my !== seq) return;
@@ -2443,7 +2447,8 @@
       const worktree = $("[name=where][value=worktree]").checked;
       if (!n || !d) { nnote.textContent = ""; nameBlocked = false; gate(); return; }
       try {
-        const q = `dir=${encodeURIComponent(d)}&name=${encodeURIComponent(n)}&worktree=${worktree}`;
+        const q = `dir=${encodeURIComponent(d)}&name=${encodeURIComponent(n)}&worktree=${worktree}`
+          + (away() ? `&host=${encodeURIComponent(hostSel.value)}` : "");
         const o = await (await fetch(`/api/name_check?${q}`)).json();
         if (mine !== nseq) return;
         nameBlocked = o.verdict === "live"; gate();
@@ -2465,6 +2470,7 @@
     nm.addEventListener("change", nameCheck);
     dir.addEventListener("change", nameCheck);
     for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
+    if (hostSel) hostSel.addEventListener("change", () => { check(); nameCheck(); });
     // The Project picker (design §4.5a New session **Project**, §4.9): picking one narrows the
     // Directory list to that project's repos with their checkouts on this host. The paths came
     // down with the page — a project's repos do not change as you type, so there is nothing to
@@ -2522,6 +2528,10 @@
         options(dirs);
         if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; check(); loadRoles(); nameCheck(); }
         if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
+        // the team's host is the Host pick's (§4.5a **the reworked form**), when it is one to pick
+        if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
+          hostSel.value = o.dataset.host; check(); nameCheck();
+        }
         const un = $("[name=unattended]"); if (un) un.checked = false;
       } else applyProject();
       teamRoles();

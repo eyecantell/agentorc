@@ -2934,3 +2934,45 @@ def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tm
     assert 'data-act="restart" data-id="ao-i" data-confirm="Restart i? It is closed if still there' in by["ao-i"]
     for sid in ("ao-s", "ao-w", "ao-u", "ao-o"):  # a seat, a working one, one nothing supervises, a superseded one
         assert 'data-act="restart"' not in by[sid], sid
+
+
+@pytest.mark.unit
+def test_the_host_pick_lists_this_host_and_its_nodes(tmp_path, monkeypatch):
+    """§4.5a New session **the reworked form** (TD-284 slice 3): Host is a pick when `hosts.yml`
+    defines more than one — this host first, each node after it, a container marked so and one with
+    no live link disabled with its reason — and plain text with one. A Resume with changes… of a
+    node's record lands with that host picked."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text(
+        "local:\n  name: kmaster\n  local: true\n"
+        "nodes:\n  laptop: {}\n  box: {container: {devcontainer: /r/.devcontainer}}\n"
+    )
+    from agentorc.ui.app import form_hosts, resume_form_url, templates
+
+    got = form_hosts({"links": {"box": {"up": True}, "laptop": {"up": False, "why": "ssh refused"}}})
+    assert [(h["name"], h["up"], h["note"]) for h in got] == [
+        ("kmaster", True, ""),
+        ("laptop", False, ""),
+        ("box", True, "container"),
+    ]
+    assert got[1]["why"] == "unreachable: ssh refused" and got[2]["why"] == ""
+    assert form_hosts({})[1]["why"] == "unreachable: never linked"
+
+    def page(form_hosts, host=""):
+        return templates.get_template("new.html").render(
+            host="kmaster", active="Org", profiles={}, default_profile="default", recent=[],
+            control_holders=[], grants_all=[], grant_notes={}, roles=[], default_controllers=[], projects=[],
+            form_hosts=form_hosts, prefill={"dir": "", "adapter": "", "host": host, "controllers": []},
+        )  # fmt: skip
+
+    many = page(got, host="box")
+    assert '<select class="input" name="host" id="host">' in many
+    assert '<option value="laptop" disabled title="unreachable: ssh refused">laptop — unreachable: ssh refused' in many
+    assert '<option value="box" selected>box (container)</option>' in many
+    assert "kmaster · laptop · box (container) — from" in many
+    one = page(got[:1])
+    assert 'name="host"' not in one and '<span class="input">kmaster</span>' in one
+    # a node's record carries its host onto the form; this host's record carries none
+    rec = {"id": "ao-w@box", "name": "w", "dir": "/r", "adapter": "claude-code", "adapter_id": "u-1", "host": "box"}
+    assert "host=box" in resume_form_url(rec)
+    assert "host=" not in resume_form_url({**rec, "id": "ao-w", "host": "kmaster"})

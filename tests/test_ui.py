@@ -1956,7 +1956,7 @@ def test_profile_is_the_one_tool_pick(client, tmp_path):
     from agentorc.ui.app import SHELL_PICK
 
     page = client.get("/new").text
-    assert '<label>Adapter</label>' not in page and 'name="adapter"' not in page
+    assert "<label>Adapter</label>" not in page and 'name="adapter"' not in page
     pick = page[page.index('<select class="input" name="profile"') :]
     pick = pick[: pick.index("</select>")]
     assert pick.rstrip().endswith(f'<option value="{SHELL_PICK}" data-adapter="shell">shell (no agent)</option>')
