@@ -2376,6 +2376,7 @@
     function applyRepo(fire) {
       if (!repoSel) return;
       dirfield.hidden = !other();
+      applyMode();
       if (!other() && dir.value !== repoSel.value) { dir.value = repoSel.value; if (fire) dir.dispatchEvent(new Event("change")); }
       dirCheck();
     }
@@ -2463,6 +2464,7 @@
     function applyShell() {
       const sh = isShell();
       for (const f of ["#rolefield", "#lanefield", "#newchips"]) { const el = $(f); if (el) el.hidden = sh; }
+      applyMode();
     }
     if (profSel) profSel.addEventListener("change", () => { applyShell(); check(); });
     let seq = 0;
@@ -2529,23 +2531,50 @@
         const o = await (await fetch(`/api/roles?dir=${encodeURIComponent(v)}`)).json();
         if (my !== rseq) return;
         const keep = role.value;
-        role.innerHTML = "";
+        role.innerHTML = `<option value="" data-interactive="1">Interactive</option>`;
         for (const r of o.roles) {
           const opt = document.createElement("option");
           opt.value = r.name; opt.dataset.lane = r.lane.join(", "); opt.dataset.controllers = r.controllers.join(",");
           opt.dataset.grants = (r.grants || []).join(",");
           opt.dataset.prompts = JSON.stringify(r.prompts || []);
-          opt.textContent = `${r.name} [${r.source}]` + (r.grants.length ? ` · grants ${r.grants.join(", ")}` : "");
+          opt.textContent = `${r.name} · unattended`;
+          opt.title = `${r.source}` + (r.grants.length ? ` · grants ${r.grants.join(", ")}` : "");
           role.appendChild(opt);
         }
-        role.value = [...role.options].some((x) => x.value === keep) ? keep : "plain";
+        role.value = [...role.options].some((x) => x.value === keep) ? keep : "";
         picker.dataset.default = (o.controllers || []).join(",");
-        rnote.textContent = o.error ? `⚠ ${o.error}` : (o.file ? `presets from ${o.file}` : "a preset fills the brief, lane, grants and profile it names; each can be edited before Start");
+        rnote.textContent = o.error ? `⚠ ${o.error}` : (o.file ? `roles from ${o.file}` : "a role fills the brief, lane, grants and profile it names; each can be edited before Start");
         teamRoles();
         applyRole();
+        applyMode();
       } catch (e) { /* the built-ins rendered with the page still stand */ }
     }
     role.addEventListener("change", applyRole);
+    // **Role** decides the mode (§4.5a **the reworked form**, TD-284 slice 5): *Interactive* is the
+    // person's own; a role runs unattended unless the person says *run it under me instead*; a role in
+    // *another directory…* runs under you only, and a shell has neither. The posted `unattended` is
+    // this, and At and Until are drawn only for an unattended pick.
+    const unIn = $("[name=unattended]"), when = $("#whenfields"), rmode = $("#rolemode");
+    let underMe = !!(unIn && unIn.dataset.under);
+    function applyMode() {
+      if (!unIn) return;
+      const o = role.selectedOptions[0], interactive = !o || !o.value, shell = isShell(), outside = other();
+      const un = !interactive && !shell && !outside && !underMe;
+      unIn.value = un ? "on" : "";
+      if (when) when.hidden = !un;
+      if (!rmode) return;
+      if (shell) rmode.textContent = "";
+      else if (interactive) rmode.textContent = "yours: never paused, sent to, or killed by a policy";
+      else if (outside) rmode.textContent = "runs under you: a directory outside a registered repo has no unattended mode";
+      else rmode.innerHTML = underMe
+        ? `runs under you — <a href="#" data-mode="un">make it unattended</a>`
+        : `runs unattended: policies apply — <a href="#" data-mode="me">run it under me instead</a>`;
+    }
+    if (rmode) rmode.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-mode]"); if (!a) return;
+      e.preventDefault(); underMe = a.dataset.mode === "me"; applyMode();
+    });
+    role.addEventListener("change", applyMode);
     dir.addEventListener("change", loadRoles);
     dir.addEventListener("input", () => { clearTimeout(dir._r); dir._r = setTimeout(loadRoles, 400); });
 
@@ -2618,9 +2647,9 @@
     let tseq = 0;
     function teamRoles() {
       const o = teamSel && teamSel.selectedOptions[0];
-      const keep = o && o.value ? ["plain", ...(o.dataset.roles || "").split(",").filter(Boolean)] : null;
+      const keep = o && o.value ? ["", "plain", ...(o.dataset.roles || "").split(",").filter(Boolean)] : null;
       for (const r of role.options) r.hidden = !!keep && !keep.includes(r.value);
-      if (keep && !keep.includes(role.value)) { role.value = "plain"; applyRole(); }
+      if (keep && !keep.includes(role.value)) { role.value = ""; applyRole(); applyMode(); }
     }
     async function teamLine() {
       const o = teamSel.selectedOptions[0]; const my = ++tseq;
@@ -2643,7 +2672,7 @@
         if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
           hostSel.value = o.dataset.host; check(); nameCheck();
         }
-        const un = $("[name=unattended]"); if (un) un.checked = false;
+        underMe = true; applyMode();  // a person's own session in the team (§4.9): a role runs under you
       } else applyProject();
       teamRoles();
       teamLine();

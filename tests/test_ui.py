@@ -49,10 +49,10 @@ def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
-    assert 'name="role"' in r.text and "manager [built-in] · grants control" in r.text
+    assert 'name="role"' in r.text and 'title="built-in · grants control">manager · unattended</option>' in r.text
     (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
     r = client.get(f"/new?dir={tmp_path}")
-    assert "reviewer [repo]" in r.text and 'data-default="orc"' in r.text
+    assert 'title="repo">reviewer · unattended</option>' in r.text and 'data-default="orc"' in r.text
     roles = client.get(f"/api/roles?dir={tmp_path}").json()
     assert roles["controllers"] == ["orc"] and [x["name"] for x in roles["roles"]][-1] == "reviewer"
     (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
@@ -2066,3 +2066,22 @@ def test_the_worktree_line_slugs_a_name_as_the_server_does():
     )  # fmt: skip
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == [naming.slug(n) for n in names]
+
+
+def test_the_role_pick_begins_with_interactive_and_retires_the_switch(client):
+    """§4.5a New session **the reworked form** (TD-284 slice 5): the Role pick's first choice is
+    *Interactive*, each role reads *<role> · unattended*, the Unattended switch is gone — the posted
+    `unattended` is the pick's, kept in a hidden field — and At and Until are drawn for an
+    unattended pick only."""
+    page = client.get("/new").text
+    pick = page[page.index('<select class="input" name="role"') :]
+    pick = pick[: pick.index("</select>")]
+    assert pick.index('data-interactive="1" selected>Interactive</option>') < pick.index("plain · unattended")
+    assert 'type="checkbox" name="unattended"' not in page and '<input type="hidden" name="unattended"' in page
+    assert 'id="whenfields" hidden' in page and 'id="rolemode"' in page
+    # a role's Resume with changes… lands unattended, its At and Until drawn
+    again = client.get("/new?role=grinder&unattended=on&prefilled=1").text
+    assert 'name="unattended" value="on" data-under=""' in again and 'id="whenfields" hidden' not in again
+    # …and one that ran under the person lands *under you*
+    mine = client.get("/new?role=grinder&prefilled=1").text
+    assert 'name="unattended" value="" data-under="1"' in mine
