@@ -1320,6 +1320,22 @@ async def config_on(call: Any, host: str, directory: str) -> repoconfig.RepoConf
     return repoconfig.load_text(((got or {}).get("files") or {}).get(repoconfig.FILE), root)
 
 
+def files_on(call: Any, loop: asyncio.AbstractEventLoop) -> teams.Files:
+    """`teams.Files` over the page's async `call`, for a compose run in a worker thread: Start on
+    another host reads the role's brief there with `host_files` (§4.4a *The New session form on
+    another host*, TD-294), through `teams.reader_on` — the team start's reader, confined to the
+    checkout. A host that does not answer is `OSError`, which the role reports as its brief unread."""
+
+    def files(host: str, directory: str, paths: list[str]) -> dict[str, str | None]:
+        try:
+            got = asyncio.run_coroutine_threadsafe(call("host_files", host=host, dir=directory, paths=paths), loop)
+            return dict((got.result() or {}).get("files") or {})
+        except HTTPException as e:
+            raise OSError(silent(host, e)) from None
+
+    return files
+
+
 def repo_of(choices: list[dict[str, str]], directory: str) -> str:
     """The Repo choice a prefilled directory is (its path), or "" for *another directory…*."""
     if not directory.strip():
@@ -1537,17 +1553,28 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         refs = [r.strip() for r in lane.split(",") if r.strip()]
         if profile == SHELL_PICK:  # *shell (no agent)*, the Profile list's last choice
             adapter, profile = "shell", ""
-        preset = brief = ledger = made_from = None
+        preset = brief = ledger = made_from = cfg = None
+        away = away_host(host)
         if adapter != "shell":
             try:
-                cfg = repoconfig.discover(dir.strip() or os.getcwd())
+                # on another host, what the role resolves — its brief, the ledger, the team's reader —
+                # is that host's repo, read there (§4.4a *The New session form on another host*, TD-294)
+                cfg = (
+                    await config_on(call, away, dir.strip())
+                    if away
+                    else repoconfig.discover(dir.strip() or os.getcwd())
+                )
                 ledger = cfg.ledger
                 if role.strip():
                     preset = repoconfig.resolve_role(cfg, role.strip())
                     # a Team pick names the team's seat and manager in the brief, as a team start
                     # does for its members (`teams.brief_ids`, TD-253); `none` each without one
                     ids = await asyncio.to_thread(team_brief_ids, team.strip()) if team.strip() else {}
-                    brief, made_from = preset.compose(refs or None, **ids)
+                    if away:
+                        read = teams.reader_on(files_on(call, asyncio.get_running_loop()), away, Path(cfg.root or dir))
+                        brief, made_from = await asyncio.to_thread(preset.compose, refs or None, read=read, **ids)
+                    else:
+                        brief, made_from = preset.compose(refs or None, **ids)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
         # design §4.5a New session **Project** picker (§4.9 "Home and reach"): the same block
@@ -1561,12 +1588,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         adapter = adapter or profile_adapter(profile)
         review = preset.review if preset else None
         if team.strip() and adapter != "shell" and review is None:
-            review = (await asyncio.to_thread(team_reader, team.strip(), dir.strip()))["review"]
+            review = (await asyncio.to_thread(team_reader, team.strip(), dir.strip(), cfg if away else None))["review"]
         text = prompt.strip() or brief
         # what the brief was made from (design §6 rule 7, TD-217): only when the brief is the preset's
         made_from = None if prompt.strip() else made_from
         if project.strip():
-            block, _note = teams.reach_block(orgmod.load(), project.strip(), dir.strip() or os.getcwd(), host_name())
+            block, _note = teams.reach_block(
+                orgmod.load(), project.strip(), dir.strip() or os.getcwd(), away or host_name()
+            )
             if block:
                 text = block + text if text else block
                 made_from = repoconfig.prefixed(made_from, block)
