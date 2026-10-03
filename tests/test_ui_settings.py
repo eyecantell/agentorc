@@ -259,6 +259,8 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         assert client.post("/api/settings/repos", json={"repo": "agentorc", "pull": False}).json()["ok"]
         assert call_sync("settings")["repos"]["agentorc"] == {"promote": {"auto": True}, "pull": False}
         assert client.post("/api/settings/repos", json={"repo": "agentorc", "pull": "no"}).status_code == 400
+        both = {"repo": "agentorc", "auto": True, "pull": True}  # one switch per press: never half-applied
+        assert client.post("/api/settings/repos", json=both).status_code == 400
 
         got = client.post("/api/settings/you", json={"open_in": "none", "terminal": {"size": 15, "face": "Fira Code"}})
         assert got.json()["ok"]

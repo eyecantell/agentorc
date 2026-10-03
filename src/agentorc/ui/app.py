@@ -1192,7 +1192,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"], "on_call": teamrun.on_call(o)}
             for o in sessions_now
-            if has_control(o.get("capabilities")) and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
+            if has_control(o.get("capabilities"))
+            and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -2073,9 +2074,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `repos.<repo>.pull` (§6 *Pull*, TD-263) — each through `set_settings`."""
         body = await body_of(request)
         repo, auto, pull = str(body.get("repo") or ""), body.get("auto"), body.get("pull")
-        if repo and isinstance(pull, bool) and auto is None:
+        if repo and isinstance(pull, bool) and "auto" not in body:
             return answer(await call("set_settings", repos={repo: {"pull": pull}}))
-        if not repo or not isinstance(auto, bool):
+        if not repo or not isinstance(auto, bool) or "pull" in body:
             raise HTTPException(400, "repos: send {repo, auto: true|false} or {repo, pull: true|false}")
         return answer(await call("set_settings", repos={repo: {"promote": {"auto": auto}}}))
 
