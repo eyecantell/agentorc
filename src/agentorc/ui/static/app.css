@@ -105,7 +105,7 @@ details#morefields > summary { list-style: none; }
 details#morefields > summary::-webkit-details-marker { display: none; }
 details#morefields[open] > summary { margin-bottom: 10px; }
 /* the Where choice an agent already holds (TD-277): greyed, with who holds it */
-.radio.taken { opacity: .6; } .pill.inuse { background: var(--line2); color: var(--muted); }
+.radio.taken { opacity: .6; } .pill.inuse { background: var(--line2); color: var(--muted); } .pill.inuse[hidden] { display: none; }  /* .pill sets display, which beats [hidden] */
 .radio { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
 .warn { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; color: var(--warn-fg); font-size: var(--t-body); }
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: var(--t-cap); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
