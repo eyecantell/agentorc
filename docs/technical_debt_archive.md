@@ -2953,3 +2953,23 @@ Both go away only when the record says who closed it.
 **Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, and a role started there carries the node's brief and ledger.
 
 **Related:** TD-284 (the form), TD-057 (the link and routed reads), TD-145 (a worktree record's Resume with changes…).
+
+## TD-295: The context reading's window is guessed from a model table; read the one Claude Code reports
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the anchor, on Paul's question whether the open check *does Focus's 231k of 1M match /context?* could run by itself: it can be made unnecessary)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built — PR #967.
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`CONTEXT_WINDOWS`, whose comment says *not verified: whether Claude Code runs any of these at a smaller window by default*; `ClaudeCode.context()`, which reads tokens from the transcript and the window from that table; `usage_report()`, which reads the status line's stdin), `src/agentorc/adapters/claude_code/hook.py` (`statusline()`), design §4.3 `context`, TD-190
+
+**Why:** the card's and Focus's context reading (*231k of 1M*) takes its tokens from the transcript's last turn and its window from `CONTEXT_WINDOWS`, a table of model-id prefixes that gives 1M to every current model but Haiku. Claude Code's documentation mostly agrees: *Model configuration* gives Fable 5 and 5.1, Sonnet 5 and later, and Opus 4.7 and later a native 1M window, and Opus 4.6 and Sonnet 4.6 reach 1M only through the `[1m]` model suffix. So the table's two 4.6 rows overstate the window unless that suffix is chosen, and `message.model` does not show the suffix. *Customize your status line* describes the window field as *200000 by default, or 1000000 for models with extended context*. Rather than keep a table in step with the tool, read the truth from the status line JSON: `context_window.context_window_size`, `context_window.used_percentage`, `context_window.current_usage` and `exceeds_200k_tokens`. agentorc already runs a status line on every launch (`agentorc-hook --statusline`) and reads `rate_limits` from the same payload, so the real window is in hand and unused. The board's decide line (*Focus matches /context | Focus does not match /context*) was asking a person to catch the guess.
+
+**Fix:** `usage_report()` (or a sibling) also keeps `context_window.context_window_size` and the tokens it reports, written where `context()` can read it for that session; `context()` prefers that window, and its tokens when fresher than the transcript's, and falls back to the table only when no status line has reported. The bound rule (§6 rule 5) then reads the window the tool runs, not a guess. Fixtures from the documented payload; a test that a reported 200k beats the table's 1M.
+
+**Resolved:** 2026-10-03 (PR #967) — `agentorc-hook --statusline` keeps the window and tokens Claude Code reports per tool session; `context()` takes that window, and the tokens when later than the turn, the model table only as the fallback (its 4.6 rows now 200k). Tests pin a reported 200k over the table's 1M. The board's *Focus matches /context* line was closed into this entry by #966. The lasting content is design §4.3 `context`.
+
+**Done when:** a session's reading names the window its status line reported, a test pins it, and the board's *Focus matches /context* line is closed as answered by this entry.
+
+**Related:** TD-190 (the context bound), TD-122 / TD-233 (the status line's usage reading, the same payload).
