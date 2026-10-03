@@ -2915,3 +2915,41 @@ Both go away only when the record says who closed it.
 **Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, an occupied directory there is said before Start, and a role started there carries the node's brief and ledger.
 
 **Related:** TD-293 (the design), TD-284 (the form), TD-057 (the link), TD-229 (`host_repos`).
+
+## TD-266: A closed session's card does not say how it is removed — Forget is behind Details, and its menu offers what no longer applies
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, for Paul, with a screenshot of the Org: *there is a closed session in the No team section that I do not see how to remove — is this an oversight?*)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-267
+**Status:** **Designed 2026-10-01** (the designer, PR #903; the placement steered to Paul as `m-1918b64cb2ce`; Paul, 2026-10-02, through the anchor: *go with the default*). Design: §4.5 *The card's anatomy* row 6 (`closed` → **Forget**, Details second, as `exited`; *the menu draws what applies to the state*: on a closed card or one whose pane is gone, Message… · Restart · Forget, the seven that act on a process or a pane left out, not dimmed; the slot's hover and the Details banner say a closed record is forgotten by itself a day after the close; Resume stays on the banner), §4.5a (a **Forget** row for the card's foot, the **Details** row, the **more ▾** row's closed-card shape), the Org mockup's closed card (`gen.py`: Forget · Details), design-history §4.5 and §4.5a. Settled: (1) Forget is the foot's lead, not a menu item alone — the same button an exited card leads with, with no confirm (it stops nothing, and the record goes by itself in a day); (2) the inapplicable controls are left out, since dimmed is for a control that applies and is refused, and the pill already says the process is gone; (3) the hover carries the day, no new note on the card; Resume is not added to the card. The build is TD-267.
+**Location:** `src/agentorc/ui/cards.py` (`next_act`: `forget` for `exited` only; `closed` or a gone pane → `details`), `src/agentorc/ui/templates/card.html` (the foot; the *more ⋯* menu, drawn the same for every state but `scheduled`), design §4.5 *The card's anatomy* row 6 and §4.5a's **more ▾** row and the Details row (where a closed record's Forget is), `src/sessionorc/agent_tick.py` (the reap after `CLOSED_KEEP`, one day)
+
+**Why:** `error_examine`, a person's own interactive session in samscrape, was closed and sat under *No team* reading *closed by you*. Its foot is **Details** and VS Code. Its *more ⋯* menu is Message…, Switch to unattended, Wrap up, Kill, Close, Open shell here, Pop out and Copy tmux command: (and Restart where the record is restartable): three that act on a process that is gone, one that copies a command for a tmux session that no longer exists, and no **Forget**. An `exited` card leads with Forget; a closed one keeps it on the Details page's banner (§4.5a's Details row: *Resume / New session here / Forget*), two presses away with nothing on the card pointing there — Paul looked for it and did not find it — beside `ao forget <id>` and the tick's reap a day after the close (`CLOSED_KEEP`), which the card does not mention either. A team's closed members have **Forget all** on the team's header; a closed session in no team has nothing.
+
+**Resolved:** 2026-10-03 (PR #903 the design, PR #912 the build) — designed 2026-10-01 and built by TD-267 (archived): Forget leads a closed card's foot, the menu draws what applies to the state, the hover and the Details banner say when the record goes. The lasting content is design §4.5 *The card's anatomy* row 6 and §4.5a **more ▾** / **Details**.
+
+**Done when:** a person removes a closed session from its card on the Org, and a closed card's menu holds no control that does nothing.
+
+**Related:** TD-095 (the card's anatomy), TD-156 (the end of a session — Paul's UI review, which covers Focus after Wrap up), TD-262 / TD-265 (who closed it, the same slot), TD-097 (a seat's card).
+
+## TD-293: New session on another host reads this host's disk for its repos, roles and a role's resolution, and checks nothing of the node's
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (grinder-ao-2, TD-284 slice 6; the review of #949)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-294
+**Status:** **Designed 2026-10-03** (the designer, PR #954; obvious from §4.4a *Teams across hosts* — a team start on another host already reads the registry, a directory and the repo's files there — so landed with a note to Paul). Design: §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*). Of the Fix's two ways, the node returns the files and the home parses them: `host_files` and `repoconfig.load_text`, the team start's loader, so nothing new crosses the link for roles; the two new reads are `host_occupancy` and `host_worktrees`, and `stat` gains `root`. **Next:** designed; the build is TD-294.
+**Location:** `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()` in `dirCheck`, `loadWorktrees`, `check`), `src/agentorc/ui/app.py` (`new_form`: `form_repos(hosts.local_host().repos())`, `_roles_for`; `new_submit`: `repoconfig.discover`, `resolve_role`, `team_reader`; `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/sessionorc/agent_link.py` (`_read`), `src/sessionorc/agent_remote.py` (`_act_host`, `_route_read`), design §4.5a New session **the form** (*Another host*), §4.4a
+
+**Why:** the Host pick (TD-284 slice 3) sends the create and the name check to the picked host, but the rest comes from this host or is not drawn: the Repo list is this host's registry, and the Role list and the role a Start resolves come from this disk's `.agentorc.yml` — its brief, its ledger and the team's reader with it; *another directory…*'s check, the occupancy and the Where chips are skipped (`app.js`'s `away()`), so the person learns of a missing directory or an occupied checkout only from the node's refusal at Start. A pick of another host is right only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.
+
+**Resolved:** 2026-10-03 (PR #954 the design, PR #957, #958 and #959 the build) — designed 2026-10-03 and built by TD-294 (archived): the New session form reads the picked host for every reading about a place, and Start resolves the role from that host's files. The lasting content is design §4.4a *The New session form on another host* and §4.5a New session **the form** (*Another host*).
+
+**Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, and a role started there carries the node's brief and ledger.
+
+**Related:** TD-284 (the form), TD-057 (the link and routed reads), TD-145 (a worktree record's Resume with changes…).
