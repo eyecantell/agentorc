@@ -43,9 +43,19 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
       {# design §4.5a New session **Role** preset + **Lane** field (§4.8): a preset fills the brief
          from its template, the lane's default, its grants and its profile; the list is the built-ins
          plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}
+      {#- **Role** (§4.5a **the reworked form**, TD-284 slice 5): the first choice is **Interactive** —
+          no role, the session the person's own — then every role the repo and the package define,
+          each *<role> · unattended*: a role is presumed unattended, and *run it under me instead*
+          keeps its brief, lane and grants and starts it interactive. The Unattended switch is
+          retired by it: the posted `unattended` is the pick's. A role in *another directory…* runs
+          under you only. -#}
       <div class="field" id="rolefield"><label>Role</label>
-        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == (prefill.role or 'plain') %} selected{% endif %} data-prompts='{{ (r.prompts or []) | tojson }}' data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
-        <span class="note" id="rolenote">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span>
+        <select class="input" name="role" id="role">{#- an unattended record with no role is a hand-briefed one: *plain · unattended* (review of #952) -#}
+        {%- set picked = prefill.role or ("plain" if prefill.unattended else "") %}
+        <option value="" data-interactive="1"{% if not picked %} selected{% endif %}>Interactive</option>{% for r in roles %}<option value="{{ r.name }}"{% if r.name == picked %} selected{% endif %} data-prompts='{{ (r.prompts or []) | tojson }}' data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}" title="{{ r.source }}{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}">{{ r.name }} · unattended</option>{% endfor %}</select>
+        <input type="hidden" name="unattended" value="{{ 'on' if prefill.unattended else '' }}" data-under="{{ '1' if prefill.role and not prefill.unattended else '' }}">
+        <span class="note" id="rolemode"></span>
+        <span class="note" id="rolenote">a role fills the brief, lane, grants and profile it names; each can be edited before Start</span>
       </div>
       {#- design §4.5a New session **the reworked form** (TD-284 slice 2): **Profile is the one place
           the tool is picked** — every profile names its adapter, so there is no Adapter field to
@@ -110,11 +120,9 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         <input class="input mono" name="lane" value="{{ prefill.lane }}" placeholder="TD-027, TD-019 · or free-pick">
         <span class="note">the references this session is handed, in order; empty: the role's default</span>
       </div>
-      <div class="field">
-        <label class="radio gap"><input type="checkbox" name="unattended"{% if prefill.unattended %} checked{% endif %}><div><div>Unattended</div><div class="note">off: interactive — never paused, sent to, or killed by a policy. on: policies apply (phase 3).</div></div></label>
-      </div>
     </div>
-    <div class="grid2">
+    {#- **At** and **Until** are drawn for an unattended pick only (TD-284 slice 5) -#}
+    <div class="grid2" id="whenfields"{% if not prefill.unattended %} hidden{% endif %}>
       {# design §6 *Start time* / §4.5a New session **At** field (TD-026, built by TD-152): the start the
          session waits for; empty means now. Refused without Unattended and with an Until not after it. #}
       <div class="field"><label>At (optional)</label>

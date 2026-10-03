@@ -905,7 +905,9 @@ def start_fields(at: str, unattended: bool) -> dict[str, str]:
     if not text:
         return {}
     if not unattended:
-        raise HTTPException(400, "a start time applies to unattended sessions: tick Unattended, or clear At")
+        raise HTTPException(
+            400, "a start time applies to unattended sessions: pick a role that runs unattended, or clear At"
+        )
     try:
         return {"start_at": clistop(text, "At")}
     except AgentError as e:
@@ -921,7 +923,9 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
     if not text:
         return {}
     if not unattended:
-        raise HTTPException(400, "a stop time applies to unattended sessions: tick Unattended, or clear Until")
+        raise HTTPException(
+            400, "a stop time applies to unattended sessions: pick a role that runs unattended, or clear Until"
+        )
     try:
         return {"run_until": clistop(text), "wrapup_prompt": teams.WRAPUP_PROMPT}
     except AgentError as e:

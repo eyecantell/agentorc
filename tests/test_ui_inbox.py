@@ -1929,15 +1929,17 @@ def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_p
                    "profile": "", "role": "grinder", "team": "", "lane": "TD-1", "controllers": ["ao-lead"],
                    "unattended": True, "prefilled": True, "why": "the directory is gone"})  # fmt: skip
     assert 'name="name" value="w1"' in filled and 'value="u-1"' in filled and 'name="lane" value="TD-1"' in filled
-    assert 'value="grinder" selected' in filled and 'name="unattended" checked' in filled
+    assert 'value="grinder" selected' in filled and 'name="unattended" value="on" data-under=""' in filled
     assert 'value="ao-lead" data-name="lead" checked' in filled
     assert 'id="resumewhy"' in filled and "the directory is gone" in filled
-    # and an ordinary New session is untouched: no banner, nothing prefilled, `plain` selected
+    # and an ordinary New session is untouched: no banner, nothing prefilled, *Interactive* picked
     plain = page({"dir": "", "adapter": "claude-code", "resume": "", "project": "", "name": "", "profile": "",
                   "role": "", "team": "", "lane": "", "controllers": [], "unattended": False,
                   "prefilled": False, "why": ""})  # fmt: skip
     assert 'id="resumewhy"' not in plain and 'name="name" value=""' in plain
-    assert 'value="plain" selected' in plain and 'name="unattended" checked' not in plain
+    # the Role pick opens on *Interactive*, and nothing is unattended (TD-284 slice 5)
+    assert 'value="" data-interactive="1" selected>Interactive' in plain
+    assert 'name="unattended" value="" data-under=""' in plain and 'id="whenfields" hidden' in plain
 
     # **a record that had no controllers keeps none.** An ordinary New session takes the repo's
     # default; a form filled in from a record with an empty list must not re-tick it, or a person
