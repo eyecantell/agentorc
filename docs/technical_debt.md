@@ -146,6 +146,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Open |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Open |
+| TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
 
 
 ---
@@ -2765,3 +2766,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a size saved on Settings shows in an open Focus without a reload, and in a freshly loaded one.
 
 **Related:** TD-148 (the Settings page's terminal look), TD-038 (the terminal's face and WebGL).
+
+## TD-290: Live looks go to a reviewer first, and come to the person only for what needs their eyes
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the pages: *we should probably have these types of verification items sent to a reviewer (and then to me if needed) and/or we could add a "send to reviewer" button on the inbox items when it applies*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first: cadence §3.5's live look, §4.5a's Inbox answers, §4.9's reviewer role
+**Location:** design §4.5a (a board row's answers, **Works** / **Not right…**), §4.9 (roles), cadence §3.5 (the live look); the anchor's Playwright set-up (`~/ao-shots/pwlib`, `~/ao-shots/scripts/`, headless Chromium, read-only against the live UI)
+
+**Why:** every merged UI change ends in a `watch` line for the person, and most of what those lines ask is mechanical — a label reads so, a button is greyed, a toast says *x*, a size takes. The board held ten at once on 2026-10-02 and Paul walked them page by page over an evening. A headless browser can now make most of those checks (Playwright with Chromium loads a page, waits for its scripts and the terminal, reads values and takes screenshots; it settled TD-288's fresh-load half), so the person's look can be kept for what is judgement: does it read well, is it the right design.
+
+**Fix:** design first. Say (1) who makes a look: a reviewer seat with a browser, the build's own grinder, or the techlead; (2) what it makes it against (the live copy read-only, or a scratch home where pressing is safe); (3) what it sends the person: the screenshots and one line per check, with only the items it could not decide or that ask for taste left as the person's `watch`; (4) a **Send to reviewer** answer on a live look row when the person would rather have it checked first, and what it writes on the board. (5) Where the looks left for the person sit: today a `watch` line is a board row like any decision and is counted under *Needs you* (Paul, 2026-10-02: *it looks like we need to separate out the watch items*). The reader already gives each item its `kind` (`watch`, `act`, `decide`, none) in `--report --json`, and dev-cadence's session nudge already counts watch items apart, so the Inbox can draw them in a section of their own (*Looks to make*), not counted with *Needs you*, with no dev-cadence change; a file of their own would be one, and is not proposed. Keep it one rule: a look a machine can settle never waits on the person.
+
+**Done when:** the design says who makes looks and how they reach the person, the build entries are on the ledger with a `Blocked by:` line, and the next merged UI change's look goes through it.
+
+**Related:** TD-255 (a live look's answers), TD-244 (the page walks), TD-288 (settled half by a headless look), cadence §3.5.
