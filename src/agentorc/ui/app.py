@@ -70,6 +70,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     state_counts,  # noqa: F401
     suspended_note,  # noqa: F401
     view,  # noqa: F401
+    waiting_view,  # noqa: F401
     waits_of,
 )
 from .common import (  # re-exported: routes, templates and tests read these from the app (TD-196)
