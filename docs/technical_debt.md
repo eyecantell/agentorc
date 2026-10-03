@@ -142,7 +142,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Open |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Open |
-| TD-285 | `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` fails on CI about one run in five: the reach read reports user `root`, not `developer` — main went red on 7cca6af and passed on a rerun | Medium | Open |
+| TD-285 | `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` failed three CI runs in a short window, all on 3.12: the reach read reports user `root`, not `developer` — main went red on 7cca6af and passed on a rerun | Medium | Open |
 
 
 ---
