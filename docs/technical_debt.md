@@ -2589,13 +2589,13 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Status:** Open
 **Location:** `src/agentorc/ui/inbox.py` (`BOARD_SCRIPT` and the read: *the script from the first of them that carries it (a SYNCED file: every copy is the same)*), `~/.agentorc/repos.json` (the order: dev-cadence, samscrape, contractmatch, pneuma-ops, agentorc, …), design §4.4 / §4.5 screen 6 (the board's reader is dev-cadence's own)
 
-**Why:** the format is not the fault: this repo's reader (`scripts/nudge_user_attention.py --report --json`) gives that line `"answers": ["Works", "Not right: <what>"]`. The page does not run this repo's copy. It runs the first registered repo's that has one: dev-cadence keeps its scripts under `files/`, so the first is samscrape's, last synced 2026-09-17, before dev-cadence TD-074 gave the reader `Answers:`. That copy emits no `answers`, so every row on every board draws without them, and nothing says the copy is old. *Every copy is the same* holds only while every consumer is synced at once, which it is not.
+**Why:** the format is not the fault: this repo's reader (`scripts/nudge_user_attention.py --report --json`) gives that line `"answers": ["Works", "Not right: <what>"]`. The page does not run this repo's copy. It runs the first registered repo's that has one: dev-cadence keeps its scripts under `files/`, so the first is samscrape's, last synced 2026-09-17, before dev-cadence TD-036 (2026-09-22, its #110) gave the reader `Answers:`. That copy emits no `answers`, so every row on every board draws without them, and nothing says the copy is old. *Every copy is the same* holds only while every consumer is synced at once, which it is not.
 
 **Fix:** pick the reader by what it can do, not by repo order: prefer dev-cadence's source (`files/scripts/nudge_user_attention.py` in its registered checkout), else the newest copy among the registered repos (or this repo's own); and say on the page when the copy read lacks a field the page draws. Separately, samscrape's synced files are two weeks behind: `sync-all.sh` for it is dev-cadence's rollout, not this entry's.
 
 **Done when:** with samscrape's copy left as it is, the Inbox draws TD-255's answers on this repo's board rows, and a test pins the choice of copy.
 
-**Related:** TD-255 (the answers, built), dev-cadence TD-074 (the reader's `Answers:`), TD-069 (board items on the Inbox).
+**Related:** TD-255 (the answers, built), dev-cadence TD-036 (the reader's `Answers:`), dev-cadence TD-074 (the live look's pair), TD-069 (board items on the Inbox).
 
 ## TD-279: A board row on the Inbox prints its line as raw text, and a long line has no fold
 
