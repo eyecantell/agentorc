@@ -1982,6 +1982,12 @@ async def test_a_close_routed_to_a_node_clears_the_ticks_mark_at_the_home(agent)
         "tick",
         "finished",
     )
+    # a close the node never took writes no closer (review of PR #919)
+    agent.remote["laptop"]["ao-x-w"].closer = None
+    del agent._link_muxes["laptop"]
+    with pytest.raises(Exception):  # noqa: B017 — the refusal's words are the link's
+        await agent._route_act("close", {"id": "ao-x-w"}, None, "laptop")
+    assert agent.remote["laptop"]["ao-x-w"].closer is None
 
 
 async def test_a_persons_close_at_the_node_no_longer_matches_the_ticks_mark(agent):

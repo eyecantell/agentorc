@@ -344,9 +344,6 @@ class RemoteMixin:
         if home_copy is not None:
             # any close clears the tick's mark; the tick writes its own after this returns (§6 rule 2, TD-237)
             home_copy.closed_for = None
-            # who closed it is the home's to record (§4.5 row 5 (b), TD-265); the node writes the
-            # same word from the params it is handed, and an older node drops them
-            home_copy.closer = closer_of(caller, params.get("closer"), now_iso())
             self._save(home_copy)
         mux = self._node_mux(host)
         sent = dict(params)
@@ -382,6 +379,12 @@ class RemoteMixin:
             # nothing (§4.8a *An alarm's answers*, TD-077 a1)
             self._attention_ended(f"{rid}@{host}", "dismissed by you", "alarm")
         reply = reply if isinstance(reply, dict) else {}
+        if home_copy is not None:
+            # who closed it is the home's to record (§4.5 row 5 (b), TD-265), and only once the node
+            # took the close: a refused or unreachable one leaves a live record with no closer. The
+            # node writes the same word from the params it is handed; an older node drops them.
+            home_copy.closer = closer_of(caller, params.get("closer"), now_iso())
+            self._save(home_copy)
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
             held = self.remote.get(host, {}).get(str(reply["record"].get("id"))) if method == "create" else None
