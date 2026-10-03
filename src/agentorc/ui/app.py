@@ -1217,6 +1217,15 @@ def profile_adapter(profile: str) -> str:
     return p.adapter if p else profiles_mod.DEFAULT_ADAPTER
 
 
+def tool_profile(profs: Mapping[str, profiles_mod.Profile], default: str, adapter: str) -> str:
+    """The profile a prefill with a tool and no profile lands on (TD-284 slice 2): none when the
+    default profile's tool is that one, or for a shell; else the first profile of that tool, so a
+    Resume with changes… of a record with no profile does not quietly start another tool."""
+    if not adapter or adapter == "shell" or (profs.get(default) and profs[default].adapter == adapter):
+        return ""
+    return next((k for k, p in profs.items() if p.adapter == adapter), "")
+
+
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
     call = h.call
@@ -1302,7 +1311,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "resume": resume,
                     "project": project,
                     "name": name,
-                    "profile": profile,
+                    "profile": profile or tool_profile(profs, default, adapter),
                     "role": role,
                     "team": team,
                     "lane": lane,

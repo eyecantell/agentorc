@@ -1966,7 +1966,7 @@ def test_profile_is_the_one_tool_pick(client, tmp_path):
     # a shell's Resume with changes… lands with the shell picked, and nothing else
     again = client.get("/new?adapter=shell").text
     assert f'<option value="{SHELL_PICK}" data-adapter="shell" selected>' in again
-    assert "(default)</option>" in again and '" selected>the role' not in again
+    assert '<option value="" selected>' not in again
     r = client.post("/new", data={"name": "sh", "dir": str(tmp_path), "profile": SHELL_PICK}, follow_redirects=False)
     assert r.status_code == 303, r.text
     sid = r.headers["location"].rsplit("/", 1)[-1]
@@ -1987,3 +1987,15 @@ def test_the_adapter_a_profile_pick_starts(tmp_path, monkeypatch):
     assert profile_adapter("other") == "codex"
     assert profile_adapter("") == "claude-code" and profile_adapter("paul") == "claude-code"
     assert profile_adapter("gone") == "claude-code"  # an unknown name is the create's to refuse
+
+
+def test_a_tool_with_no_profile_lands_on_a_profile_of_that_tool():
+    """A Resume with changes… of a record that names a tool and no profile (review of #948)."""
+    from agentorc.profiles import Profile
+    from agentorc.ui.app import tool_profile
+
+    profs = {"paul": Profile(name="paul"), "o": Profile(name="o", adapter="codex")}
+    assert tool_profile(profs, "paul", "codex") == "o"
+    assert tool_profile(profs, "paul", "claude-code") == ""  # the default's tool: the default pick
+    assert tool_profile(profs, "paul", "shell") == "" and tool_profile(profs, "paul", "") == ""
+    assert tool_profile(profs, "paul", "nothing-has-it") == ""

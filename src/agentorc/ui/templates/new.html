@@ -3,6 +3,7 @@
 {% block body %}
 {#- a pick's file (§4.5a New session **the reworked form**: each of Host, Project and Profile ends its
     note with its file and **Open file**, the Settings page's; no button under `open_in: none`) -#}
+{%- set files = files | default({}) %}{% set shell_pick = shell_pick | default(":shell") %}
 {% macro fromfile(name, path, key="") -%}
 from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key }}</span>{% endif %}
 {%- set ed = editor_link(path) if path else None %}{% if ed %} · <a href="{{ ed.url }}" title="open {{ path }} in {{ ed.label }}">Open file</a>{% endif %}
