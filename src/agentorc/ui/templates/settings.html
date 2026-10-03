@@ -178,7 +178,7 @@
         <span class="note">a selection in Focus copies itself — the same switch as Focus's <i>more ▾</i></span></label>
       {#- **board items shown** (§4.5a *Settings page*, §4.5 screen 6 *The board's horizon*; TD-220 slice 4):
           a pick of four, the two numbers beside their choice, written to `person.inbox.board_show` -#}
-      {% set info_board = "which board items the Inbox shows before they are due; they are listed under \"Board, coming up\" and are not counted; what this hides is under \"not shown\"" %}
+      {% set info_board = "which board items the Inbox shows before they are due; they are listed under \"Not due yet\" and are not counted; what this hides is under \"not shown\"" %}
       <div class="setrow setboard" role="radiogroup" aria-label="board items shown"><span class="setlabel">board items shown {{ imark("boardshow", "board items shown", info_board) }}</span>
         <span class="setpicks">
           <label><input type="radio" name="board_show" value="next"{% if you.board_mode == "next" %} checked{% endif %}> the next <input class="input setin setnum" name="board_next" type="number" min="{{ you.board_next_bounds[0] }}" max="{{ you.board_next_bounds[1] }}" value="{{ you.board_next }}"> per team</label>

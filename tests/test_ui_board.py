@@ -390,8 +390,8 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
     with TestClient(uiapp.create_app()) as c:
         page = c.get("/inbox").text
         assert "decide the thing" in page and needs_line(page) == "1"
-        # not yet due: drawn under *Board, coming up*, counted nowhere (TD-220 slice 3)
-        assert "look next week" in page and "Board, coming up" in page and needs_line(page) == "1"
+        # not yet due: drawn under *Not due yet*, counted nowhere (TD-220 slice 3)
+        assert "look next week" in page and "Not due yet" in page and needs_line(page) == "1"
         assert "a note from the reader" in page and 'id="boardnote"' in page
         got = c.get("/api/person/inbox").json()
         assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
@@ -622,7 +622,9 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
         with TestClient(uiapp.create_app()) as c:
             page = c.get("/inbox").text
             assert needs_line(page) == "1"
-            assert 'Board, coming up</span><span class="meta">(9)</span>' in page  # ten places, one due
+            assert 'Not due yet</span><span class="meta">(9)</span>' in page  # ten places, one due
+            # the heading says why these are here: a setting, named and linked (TD-281)
+            assert 'shown by your <a href="/settings#sec-you"' in page and ">board items shown</a> setting" in page
             assert "due in 3 d · Oct 1" in page and 'data-section="coming"' in page
             assert "<summary>not shown (3)</summary>" in page and "later item 11" in page
             assert "showing the next 10 board items per team · 3 not shown, the next due Oct 10" in page
@@ -631,10 +633,10 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
             assert 'data-value="board"' in page
             got = c.get("/api/person/inbox").json()
             assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
-            assert "Board, coming up" in got["html"]["horizon"] and "later item 0" not in got["html"]["needs"]
+            assert "Not due yet" in got["html"]["horizon"] and "later item 0" not in got["html"]["needs"]
             uiconf.set_read({"person": {"inbox": {"board_show": "due"}}})
             page = c.get("/inbox").text
-            assert "Board, coming up" not in page and needs_line(page) == "1"
+            assert "Not due yet" not in page and needs_line(page) == "1"
             assert "showing board items that are due · 12 not shown, the next due Oct 1" in page
             uiconf.set_read({"person": {"inbox": {"board_show": "all"}}})
             page = c.get("/inbox").text
@@ -1458,3 +1460,63 @@ def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
     text = "act — See the Context: of this. **Context:** bold. Due: 2026-10-05."
     (row,) = board_rows(report(root, item(3, text, "2026-10-05", "x")))
     assert (row["lead"], row["rest"]) == ("act — See the Context: of this. **Context:** bold.", "")
+
+
+@pytest.mark.unit
+def test_a_board_read_from_origin_is_drawn_live_once_a_pull_lands(tmp_path, monkeypatch):
+    """TD-281 (3): a row read from origin draws Reply disabled; once the checkout is pulled, the next
+    fetching read past `BOARD_TTL` reads the board as the checkout's, and the poll's own html draws
+    Reply live — no reload. What Paul met was the wait: up to a TTL and one fetch."""
+    import threading
+
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+
+    root = tmp_path / "agentorc"
+    rep = report(root, item(3, "act — Look. Due: 2026-09-20.", "2026-09-20", "2d overdue"))
+    behind = {**rep, "boards": [{**rep["boards"][0], "source": "origin/main"}]}
+    pulled = threading.Event()
+    reads = []
+
+    def fake(run=None, *, fetch=False, board=""):
+        reads.append("fetch" if fetch else "plain")
+        return uiapp.board_rows(rep if pulled.is_set() else behind), ""
+
+    monkeypatch.setattr(uiapp, "read_boards", fake)
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            return {"list": [], "inbox": {"entries": [], "trail": []}, "host": {"name": "kmaster"}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    with TestClient(uiapp.create_app()) as c:
+        needs = c.get("/api/person/inbox").json()["html"]["needs"]
+        assert 'data-act="board_reply"' not in needs and "pull to act on it" in needs
+        pulled.set()
+        monkeypatch.setattr(uiapp, "BOARD_TTL", -1.0)
+        for _ in range(50):
+            needs = c.get("/api/person/inbox").json()["html"]["needs"]
+            if 'data-act="board_reply"' in needs:
+                break
+            threading.Event().wait(0.05)
+        assert 'data-act="board_reply"' in needs and "pull to act on it" not in needs and "fetch" in reads
+
+
+@pytest.mark.unit
+def test_put_on_the_board_takes_its_words_in_a_box_of_lines(tmp_path, monkeypatch):
+    """TD-281 (2): *what's needed* is a textarea of four rows, not a one-line input."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import templates
+
+    html = templates.get_template("board_add.html").render(board_choices=[{"board": "/b", "label": "b"}])
+    assert '<textarea class="input" id="batext" rows="4"' in html and 'id="batext"' in html
+    assert '<input class="input" id="batext"' not in html and "Ctrl+Enter" in html

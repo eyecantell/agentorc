@@ -1,6 +1,6 @@
 {# design §4.5 screen 6 *The board's horizon*, §4.5a *Inbox, Repo page: board rows* (TD-207; built by
-   TD-220 slice 3). Under the due board rows: **Board, coming up (n)**, what the person's mode draws
-   before it is due, soonest first, each the board row with its own controls and its due words, drawn
+   TD-220 slice 3). Under the due board rows: **Not due yet (n)** (TD-281; it read *Board, coming up*), what the person's mode draws
+   before it is due — headed **Not due yet (n)**, naming the setting (TD-281) — soonest first, each the board row with its own controls and its due words, drawn
    quieter and counted in no number but the rail's *board items*; the fold **not shown (n)**, closed,
    holding what the mode hides; and the line that says the mode. The Inbox renders this at load and
    its poll puts it back (`html.horizon`); the Repo page renders it filtered to the repo. `hz` is
@@ -8,7 +8,8 @@
 {% import "inbox_row.html" as hr with context %}
 {%- if hz and hz.line %}
 {%- if hz.ahead %}
-<div class="row gap wrap boardsub"><span class="boardsubh">Board, coming up</span><span class="meta">({{ hz.ahead | length }})</span><span class="meta">not counted</span></div>
+{#- the heading says what these are and why they are here (TD-281): not due, drawn by a setting -#}
+<div class="row gap wrap boardsub"><span class="boardsubh">Not due yet</span><span class="meta">({{ hz.ahead | length }})</span><span class="meta">shown by your <a href="/settings#sec-you" title="Settings → You → board items shown: which board items the Inbox draws before they are due">board items shown</a> setting · not counted</span></div>
 <div class="inboxrows" id="rows-coming">{% set firsts = origin_firsts(hz.ahead) %}{% for e in hz.ahead %}{{ hr.row(e, 'coming', e.id in firsts) }}{% endfor %}</div>
 {%- endif %}
 {%- if hz.hidden %}
