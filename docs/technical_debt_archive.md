@@ -2839,3 +2839,21 @@ Both go away only when the record says who closed it.
 **Why:** `pytest tests/test_ui.py tests/test_ui_org.py` fails that one test on main as on a branch; alone, or in `pdm run test`'s order, it passes. A test whose result depends on which file ran first is one a future reorder or a `-k` run turns red for nothing, and the next session spends its time proving the failure is not its own (TD-270's did).
 
 **Resolved:** 2026-10-02 (PR #916) — the culprit was `test_ui.py::test_the_page_reads_person_through_the_agents_settings_read`, which wrote `open_in: none` and a `ui.yml` into the module agent's home; it now takes them back, and `tests/conftest.py`'s autouse `_no_persons_settings_carried_over` starts every test with nothing read.
+
+## TD-263: Build the pull: the home's tick fast-forwards every registered main checkout when git allows and the anchor session is idle
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-01 (the designer, TD-222's build; decided by Paul 2026-10-01)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/promote.py` (`survey`: the pass over the registry's roots, its `read_main` fetch), `src/sessionorc/agent.py` (the home's promote tick, `promotes` on `host`), `src/sessionorc/board.py` (`ready`'s busy list, to share), `src/sessionorc/settings.py` (`parse_repo`: `pull`), `src/agentorc/ui/` (the Inbox's origin note; the Settings page's Repos card), design §6 *Pull*, §4.5 screen 6, §4.5a *origin note* and *Settings page: Repos*, §5
+
+**Why:** design §6 *Pull* (TD-222): on 2026-10-01 the anchor's `main` stood nineteen commits behind origin with every board row read from origin disabled, and the promote's precondition (1) fails on a checkout no one has pulled. Paul: *lets have it do when git allows and the anchor session is idle*.
+
+**Resolved:** 2026-10-02 (PR #917, PR #918) — the pass, its reading and the switch in `src/sessionorc/promote.py` (`pull`, `pulls`), `HostAgent.pull_occupant` and `repos.<repo>.pull` (#917); the origin note's tail (`inbox.pull_tail`) and the Settings page's Repos card (`settings_page.pull_reading`) (#918). Design §6 *Pull* carries the rule; `tests/test_pull.py`, `tests/test_ui_board.py` and `tests/test_ui_settings.py` hold it.
+
+**Done when:** on a registered checkout left on `main` and behind origin with no session in its root, the home's next full pass fast-forwards it and the Repos card reads *last pulled … · n commits*; with a `working` session in the root the card reads *waiting: <name> is mid-turn* and the checkout does not move; a checkout with its own commit is left alone and says so; and the tests above pass.
+
+**Related:** TD-222 (the design), TD-264 (the write-back on origin's head, which leaves the checkout only ever behind), TD-208 and TD-221 (the origin note), TD-132 (the promote's pass this joins).
