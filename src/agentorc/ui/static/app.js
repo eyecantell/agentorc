@@ -1830,10 +1830,6 @@
     RAIL_KINDS.forEach((k) => { out.kinds[k] = line("kind", k, rows); });
     return out;
   };
-  // the find's words marked in the rows it shows (§4.5a *Inbox page: find*, TD-280): every match in a
-  // row's text — the body, its *details* and its replies — wrapped in `<mark class="findmark">`, the
-  // marks taken off first, so a find that changes or empties leaves none; text nodes only, so no
-  // markup is ever built from what a row says
   // a text cut at the find's words (TD-280): `[[piece, matched], …]`, case-insensitive, the longer
   // word first where two overlap; pure, so the probe tests it without a page
   AO.findSplit = function (text, words) {
@@ -1855,9 +1851,18 @@
   // markup is ever built from what a row says
   AO.markFind = function (root, words) {
     if (!root) return;
-    $$("mark.findmark", root).forEach((m) => { const p = m.parentNode; m.replaceWith(document.createTextNode(m.textContent)); p.normalize(); });
+    // a text already marked for these words is left alone — the poll re-filters every 20 s, and
+    // re-marking would collapse a selection the person is making; a swapped row is new and unmarked
+    const key = words.join(" ");
+    const unmark = (el) => {
+      $$("mark.findmark", el).forEach((m) => { const p = m.parentNode; m.replaceWith(document.createTextNode(m.textContent)); p.normalize(); });
+      delete el.dataset.findmarked;
+    };
+    $$("[data-findmarked]", root).forEach((el) => { if (el.dataset.findmarked !== key) unmark(el); });
     if (!words.length) return;
     $$(".mailrow:not([hidden]) .body, .mailrow:not([hidden]) .boardreply", root).forEach((body) => {
+      if (body.dataset.findmarked === key) return;
+      body.dataset.findmarked = key;
       const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT), nodes = [];
       while (walk.nextNode()) nodes.push(walk.currentNode);
       nodes.forEach((n) => {
