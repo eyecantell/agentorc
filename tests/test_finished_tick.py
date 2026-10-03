@@ -386,3 +386,41 @@ async def test_a_resumed_manager_carries_neither_of_rule_9s_marks(agent, hookstu
         new = agent.sessions[other["id"]]
         assert new.finished_sent_at is None and new.closed_for is None
         await person.call("kill", id=other["id"])
+
+
+async def test_a_member_waiting_on_the_persons_answer_keeps_the_team_live(agent, monkeypatch):
+    """TD-274 slice 1, design §4.9a *Waiting is read, never declared*: a member that declared
+    `none` with a steer about a reference open in the person inbox is not finished, so rule 9 never
+    settles; once the steer closes the reading holds and the wind-down runs as ever."""
+    await park_ticks(agent)
+    g1 = _rec("g1")
+    designer = _rec("designer")
+    home = _Home(agent, monkeypatch, g1, designer, _manager())
+    steer = MailEntry(
+        id="m-s", from_=designer.id, to=[PERSON], at=START, kind="steer", text="go with the default?",
+        about="TD-222", bound="2026-10-02T09:57:00Z", default="the default",
+    )  # fmt: skip
+    agent.person_inbox.append(steer)
+    now = datetime.now(UTC)
+    await agent._finished_pass(now)
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    assert home.closed == [] and home.sent == [], "a member waiting on the person keeps its team live"
+    steer.closed_reason = "lapsed"
+    later = now + FINISHED_SETTLE + timedelta(minutes=1)
+    await agent._finished_pass(later)
+    await agent._finished_pass(later + FINISHED_SETTLE)
+    assert sorted(home.closed) == ["designer", "g1"]
+
+
+async def test_a_member_waiting_after_the_line_takes_the_wind_down_back(agent, monkeypatch):
+    """TD-274 slice 1: once the manager has been told the team is finished, a member that now waits
+    on the person takes the wind-down back."""
+    await park_ticks(agent)
+    g1, manager = _rec("g1"), _manager()
+    _Home(agent, monkeypatch, g1, manager)
+    manager.finished_sent_at = _iso(datetime.now(UTC))
+    agent.person_inbox.append(
+        MailEntry(id="m-w", from_=g1.id, to=[PERSON], at=START, kind="ask", text="?", about="TD-9")
+    )
+    await agent._finished_pass(datetime.now(UTC))
+    assert manager.finished_sent_at is None, "a member waiting on the person is a member at work again"

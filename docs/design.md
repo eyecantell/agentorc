@@ -4760,7 +4760,8 @@ is the fact; whether the process also went is the tool's business. A member that
 **without** declaring is a crash and is restarted, and one that is idle without declaring is
 merely idle.
 
-**Waiting is read, never declared** (TD-271; designed 2026-10-02; the build is TD-274). On
+**Waiting is read, never declared** (TD-271; designed 2026-10-02; the home's reading built 2026-10-02 —
+TD-274 slice 1, `work.waiting_of`; the page's, the CLI's and the words are TD-274's rest). On
 2026-10-02 the designer held three design PRs whose merge waited on a `steer`'s bound, declared
 `none` since its lane held nothing more to pick, and the team wound down with it: for eighteen
 hours the bounds passed with nobody to take the defaults, and the answers Paul wrote reached

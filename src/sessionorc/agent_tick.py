@@ -1585,7 +1585,11 @@ class TickMixin:
             # the manager's half: from the send on the reading is no longer asked of it — its last
             # acts are work — and only a member live and not finished takes the wind-down back
             since = first or _parse(manager.finished_sent_at) - agent_common.FINISHED_SETTLE
-            if any(m.state != "idle" or m.restart_wanted or not m.out_of_work for m in members):
+            asked = work_mod.waiting_of(self.person_inbox)
+            if any(
+                m.state != "idle" or m.restart_wanted or not m.out_of_work or asked.get(self._address(m))
+                for m in members
+            ):
                 manager.finished_sent_at = None
                 self._save(manager)
                 log.info("rule 9: %s has a member at work again — the wind-down is off", team)
@@ -1612,7 +1616,7 @@ class TickMixin:
                 await self._push_changes()
                 return None
             return since
-        reading = work_mod.finished(views)
+        reading = work_mod.finished(views, waiting=work_mod.waiting_of(self.person_inbox))
         if reading is None or reading["why"] or reading["restart"]:
             self._finished_owed.pop(team, None)  # at work again, or started again: nothing is owed
             return None  # not finished, or one that wants another run: rule 2's
