@@ -28,10 +28,17 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
           node, one with no live link disabled with its reason — and plain text with one; a Team
           pick sets it. Another host's pick is posted as `host`, and the home routes the create. -#}
       {%- set form_hosts = form_hosts | default([{"name": host, "up": True, "note": "", "why": ""}]) %}
+      {#- a record's host this form cannot pick (a node not linked, or gone from `hosts.yml`) stays
+          shown and selected, disabled, and Start is refused until another is picked: a disabled
+          choice posts nothing, and the create would land here without a word (review of #949) -#}
+      {%- if prefill.host and prefill.host not in form_hosts | map(attribute="name") | list %}
+      {%- set form_hosts = form_hosts + [{"name": prefill.host, "up": False, "note": "", "why": "not in hosts.yml"}] %}
+      {%- endif %}
       <div class="field"><label>Host</label>
         {%- if form_hosts | length > 1 %}
         <select class="input" name="host" id="host">{% for o in form_hosts %}<option value="{{ o.name }}"{% if o.name == (prefill.host or host) %} selected{% endif %}{% if not o.up %} disabled title="{{ o.why }}"{% endif %}>{{ o.name }}{% if o.note %} ({{ o.note }}){% endif %}{% if o.why %} — {{ o.why }}{% endif %}</option>{% endfor %}</select>
         {%- else %}<span class="input">{{ host }}</span>{% endif %}
+        <span class="note" id="hostblock"></span>
         <span class="note">{% for o in form_hosts %}{{ o.name }}{% if o.note %} ({{ o.note }}){% endif %}{{ " · " if not loop.last }}{% endfor %} — {{ fromfile("hosts.yml", files.hosts) }}</span></div>
       {# design §4.5a New session **Role** preset + **Lane** field (§4.8): a preset fills the brief
          from its template, the lane's default, its grants and its profile; the list is the built-ins

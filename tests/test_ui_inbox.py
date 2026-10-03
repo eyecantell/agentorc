@@ -2970,6 +2970,12 @@ def test_the_host_pick_lists_this_host_and_its_nodes(tmp_path, monkeypatch):
     assert '<option value="laptop" disabled title="unreachable: ssh refused">laptop — unreachable: ssh refused' in many
     assert '<option value="box" selected>box (container)</option>' in many
     assert "kmaster · laptop · box (container) — from" in many
+    # a record's host that cannot be picked stays picked, disabled, so Start is refused (review of #949)
+    down = page(got, host="laptop")
+    assert '<option value="laptop" selected disabled title="unreachable: ssh refused">' in down
+    gone = page(got, host="old-box")
+    assert '<option value="old-box" selected disabled title="not in hosts.yml">' in gone
+    assert 'id="hostblock"' in gone
     one = page(got[:1])
     assert 'name="host"' not in one and '<span class="input">kmaster</span>' in one
     # a node's record carries its host onto the form; this host's record carries none

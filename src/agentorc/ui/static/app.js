@@ -2349,7 +2349,13 @@
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
     let nameBlocked = false, dirBlocked = false;
-    const gate = () => { start.disabled = nameBlocked || dirBlocked; };
+    // …or a host it cannot reach: a record's host with no live link stays picked and refuses Start
+    const hostBlocked = () => !!hostSel && !!hostSel.selectedOptions[0] && hostSel.selectedOptions[0].disabled;
+    const gate = () => {
+      start.disabled = nameBlocked || dirBlocked || hostBlocked();
+      const hb = $("#hostblock");
+      if (hb) hb.innerHTML = hostBlocked() ? `⚠ <b>${esc(hostSel.value)}</b>: ${esc(hostSel.selectedOptions[0].title || "not reachable")} — pick another host to start` : "";
+    };
     // a shell has no role, lane or brief: picking it hides them, and the occupancy rule exempts it (§9)
     function applyShell() {
       const sh = isShell();
@@ -2470,7 +2476,7 @@
     nm.addEventListener("change", nameCheck);
     dir.addEventListener("change", nameCheck);
     for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
-    if (hostSel) hostSel.addEventListener("change", () => { check(); nameCheck(); });
+    if (hostSel) hostSel.addEventListener("change", () => { gate(); check(); nameCheck(); });
     // The Project picker (design §4.5a New session **Project**, §4.9): picking one narrows the
     // Directory list to that project's repos with their checkouts on this host. The paths came
     // down with the page — a project's repos do not change as you type, so there is nothing to
