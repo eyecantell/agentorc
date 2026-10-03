@@ -38,13 +38,16 @@ Call = Callable[..., Any]
 Waiting = dict[str, list[dict[str, Any]]]  # sender id → its open questions (`work.waiting_of`, TD-274)
 
 
-def waiting_of_home(call: Call) -> Waiting:
+def waiting_of_home(call: Call, *, strict: bool = False) -> Waiting:
     """What each live session waits on, from the home's `host` reading (§4.9a *Waiting is read,
     never declared*, TD-274): the person inbox is a person's to read, so a session's `ao team status`
-    asks the home for the references and bounds, never the text. `{}` from an agent without it."""
+    asks the home for the references and bounds, never the text. `{}` from an agent without it —
+    unless `strict`, for a caller about to close sessions, which a failed read must not license."""
     try:
         got = (call("host") or {}).get("waiting")
     except AgentError:  # an agent that answers no `host`: an older one, a stub
+        if strict:
+            raise
         return {}
     return {str(k): list(v) for k, v in got.items() if isinstance(v, list)} if isinstance(got, dict) else {}
 
@@ -648,7 +651,7 @@ def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str
     team = org.teams.get(name)
     mine = crew(name, call("list"))  # a person's session beside a concluded team neither blocks nor is closed
     # a member waiting on the person's answer is not concluded, so a Start never closes it (TD-274)
-    done = concluded(mine, seat_names(team, mine), waiting_of_home(call)) if team is not None else None
+    done = concluded(mine, seat_names(team, mine), waiting_of_home(call, strict=True)) if team is not None else None
     up = {str(s["id"]): s for s in live(mine)} if done else {}
     still = [v for v in held if v.get("verdict") != "live" or str(v.get("holder")) not in up]
     if still:

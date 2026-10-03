@@ -751,19 +751,20 @@ def create_app() -> FastAPI:
 
     work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None}
 
-    async def home_reading() -> None:
+    async def home_reading(fresh: bool = False) -> None:
         now = time.monotonic()
-        if work_cache["work"] is None or now - work_cache["at"] > DEFS_TTL:
+        if fresh or work_cache["work"] is None or now - work_cache["at"] > DEFS_TTL:
             got: dict[str, Any] = {}
             with contextlib.suppress(Exception):
                 got = dict(await call("host"))
             work_cache.update(at=now, work=dict(got.get("work") or {}), waiting=dict(got.get("waiting") or {}))
 
-    async def home_waiting() -> dict[str, Any]:
+    async def home_waiting(fresh: bool = False) -> dict[str, Any]:
         """What each live session waits on (`host`'s `waiting`, §4.9a *Waiting is read, never
         declared*, TD-274), cached as `work_marks` is: a member with a question out to the person
-        keeps its team from *concluded*, as it keeps it from the tick's wind-down."""
-        await home_reading()
+        keeps its team from *concluded*, as it keeps it from the tick's wind-down. `fresh` reads
+        past the cache, for an answer that decides whether Start is offered."""
+        await home_reading(fresh)
         return work_cache["waiting"] or {}
 
     async def work_marks() -> dict[str, Any]:
@@ -1211,7 +1212,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"], "on_call": teamrun.on_call(o)}
             for o in sessions_now
-            if has_control(o.get("capabilities")) and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
+            if has_control(o.get("capabilities"))
+            and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -1789,7 +1791,8 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/teams")
     async def api_teams():
-        v = teams_view(await call("list"), await h.home_waiting())
+        # read fresh, not from the headers' cache: what this answers is whether Start is offered (TD-274)
+        v = teams_view(await call("list"), await h.home_waiting(fresh=True))
         for row in v.get("teams", []):
             if row["name"] in stopping_leads:
                 row["stopping"] = True

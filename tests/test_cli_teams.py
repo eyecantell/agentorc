@@ -142,6 +142,7 @@ def write_org(tmp_path, doc):
 
 def test_a_live_name_holder_aborts_the_whole_start_and_names_it(world, capsys):
     tmp_path, state = world
+    state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     state["verdicts"]["hunt"] = {
         "name": "hunt", "verdict": "live", "holder": "ao-agentorc-hunt", "holder_state": "working",
     }  # fmt: skip
@@ -160,6 +161,7 @@ def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
     member, exactly as it does for a live holder (§4.9: there is never half a team). The person
     who suspended it lifts it, forgets it, or takes it out of the team."""
     tmp_path, state = world
+    state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     state["verdicts"]["hunt"] = {
         "name": "hunt", "verdict": "suspended", "holder": "ao-agentorc-hunt", "holder_state": "exited",
         "message": "hunt was suspended by a person at 2026-09-20T23:00:00Z over an identity alarm",
@@ -818,6 +820,12 @@ def test_a_member_waiting_on_the_person_keeps_its_team_from_concluded(world, cap
     assert cli.main(["--json", "team", "list"]) == 0
     (listed,) = [r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] == "ao-grind"]
     assert listed["concluded"] is None
+    # a Start that cannot read `waiting` closes nothing: a failed read is not *nobody waits*
+    del state["host"]
+    state["calls"].clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not [p for m, p in state["calls"] if m in ("close", "create")]
+    capsys.readouterr()
 
 
 def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
@@ -827,6 +835,7 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     start by name with nothing closed; a team with one undeclared session is refused as any live
     holder refuses, and so is a holder that is not the team's own."""
     tmp_path, state = world
+    state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}  # a seat: idle and undeclared, closed too
     write_org(tmp_path, doc)
