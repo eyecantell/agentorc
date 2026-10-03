@@ -134,7 +134,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Built (#907); live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
-| TD-275 | A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set | Low | Open |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
 
 
@@ -2527,24 +2526,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a designer that opens a design PR, steers and has nothing else to pick is back at the bound or at the answer without a person starting its team, and until then its card and the Inbox say what it waits on.
 
 **Related:** TD-213 / TD-216 (the orphaned question), TD-214 / TD-227 (rule 8, the start on work), TD-240 / TD-241 (rule 9, finished), TD-187 (a member out of work is never woken when its lane gains entries), TD-262 (who closed a session — the same card slot), memory `steer-replies-land-on-the-board`.
-
-## TD-275: A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-02 (grinder-ao-2, met while building TD-270)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/uiconf.py` (`_read`, the person's settings as last read, module-level), `tests/test_ui.py` (whichever test leaves `_read["person"]` holding an `open_in` that draws no editor link), `tests/test_ui_org.py` (`test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one`: asserts **Open file**, drawn only through `editor_link`)
-
-**Why:** `pytest tests/test_ui.py tests/test_ui_org.py` fails that one test on main as on a branch; alone, or in `pdm run test`'s order, it passes. A test whose result depends on which file ran first is one a future reorder or a `-k` run turns red for nothing, and the next session spends its time proving the failure is not its own (TD-270's did).
-
-**Fix:** an autouse fixture in `tests/conftest.py` (or the UI tests' own) that resets `uiconf._read` before each test — or the test that sets it restores it; then the pair above passes in either order.
-
-**Done when:** `pytest tests/test_ui.py tests/test_ui_org.py` and the reverse order both pass.
-
-**Related:** TD-270 (where it was met), TD-229 slice 4 (the Open file link).
 
 ## TD-276: Build the on-call controller: the New session form and `ao new --team` name a seat on call, and the empty note's words
 

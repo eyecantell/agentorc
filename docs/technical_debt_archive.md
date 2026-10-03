@@ -2825,3 +2825,17 @@ Both go away only when the record says who closed it.
 **Done when:** a drag-and-release in the terminal shows that the text was copied, and a refused copy says so.
 
 **Related:** TD-174 (selection and copy in the terminal), TD-046 (Pop out, the same terminal).
+
+## TD-275: A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (grinder-ao-2, met while building TD-270)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/uiconf.py` (`_read`, the person's settings as last read, module-level), `tests/test_ui.py` (whichever test leaves `_read["person"]` holding an `open_in` that draws no editor link), `tests/test_ui_org.py` (`test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one`: asserts **Open file**, drawn only through `editor_link`)
+
+**Why:** `pytest tests/test_ui.py tests/test_ui_org.py` fails that one test on main as on a branch; alone, or in `pdm run test`'s order, it passes. A test whose result depends on which file ran first is one a future reorder or a `-k` run turns red for nothing, and the next session spends its time proving the failure is not its own (TD-270's did).
+
+**Resolved:** 2026-10-02 (PR #916) — the culprit was `test_ui.py::test_the_page_reads_person_through_the_agents_settings_read`, which wrote `open_in: none` and a `ui.yml` into the module agent's home; it now takes them back, and `tests/conftest.py`'s autouse `_no_persons_settings_carried_over` starts every test with nothing read.
