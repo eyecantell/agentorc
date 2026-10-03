@@ -1938,7 +1938,7 @@ def test_the_new_session_form_asks_in_the_order_a_person_starts_a_session(client
     Where choice's pill."""
     page = client.get("/new").text
     labels = ["<label>Name</label>", "<label>Host</label>", "<label>Role</label>", "<label>Profile</label>",
-              "<label>Team</label>", "<label>Project</label>", "<label>Directory</label>", "<label>Where</label>",
+              "<label>Team</label>", "<label>Project</label>", "<label>Repo</label>", "<label>Where</label>",
               "<label>Lane</label>", "<label>At (optional)</label>", "<label>Until (optional)</label>",
               "<label>Opening prompt (optional)</label>", "<label>Controllers</label>", "<summary>More ▸",
               "<label>Grants</label>", "<label>Resume (optional)</label>"]  # fmt: skip
@@ -1999,3 +1999,23 @@ def test_a_tool_with_no_profile_lands_on_a_profile_of_that_tool():
     assert tool_profile(profs, "paul", "claude-code") == ""  # the default's tool: the default pick
     assert tool_profile(profs, "paul", "shell") == "" and tool_profile(profs, "paul", "") == ""
     assert tool_profile(profs, "paul", "nothing-has-it") == ""
+
+
+def test_the_repo_pick_and_another_directory(client, tmp_path):
+    """§4.5a New session **the reworked form** (TD-284 slice 4): Repo lists the registered checkouts
+    on this host and ends with *another directory…*, whose typed path is checked as it is typed; a
+    prefilled directory that is no registered checkout lands on *another directory…* with it typed."""
+    from agentorc.ui.app import form_repos, repo_of
+
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir(), b.mkdir()
+    picks = form_repos([str(a), str(tmp_path / "gone"), str(b)])
+    assert picks == [{"name": "a", "path": str(a)}, {"name": "b", "path": str(b)}]  # a gone checkout is left out
+    assert repo_of(picks, "") == str(a)  # a blank form starts on the first
+    assert repo_of(picks, str(b) + "/") == str(b) and repo_of(picks, str(tmp_path)) == ""
+    page = client.get(f"/new?dir={tmp_path}").text
+    assert '<option value="" data-other="1" selected>another directory…</option>' in page
+    assert f'name="dir" list="recent" value="{tmp_path}"' in page and 'id="dirfield" style="gap: 5px;">' in page
+    assert client.get("/api/dir_check", params={"dir": str(a)}).json()["exists"] is True
+    gone = client.get("/api/dir_check", params={"dir": str(tmp_path / "nope")}).json()
+    assert gone["exists"] is False and gone["why"].startswith("no such directory on ")

@@ -1248,6 +1248,26 @@ def form_hosts(info: Mapping[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def form_repos(repos: list[str]) -> list[dict[str, str]]:
+    """New session's **Repo** pick (§4.5a **the reworked form**, TD-284 slice 4): each registered
+    checkout on this host as *name · path*, in the registry's order; one whose directory is gone
+    is left out rather than offered to fail."""
+    out = []
+    for r in repos:
+        p = Path(r).expanduser()
+        if p.is_dir():
+            out.append({"name": p.name, "path": str(p)})
+    return out
+
+
+def repo_of(choices: list[dict[str, str]], directory: str) -> str:
+    """The Repo choice a prefilled directory is (its path), or "" for *another directory…*."""
+    if not directory.strip():
+        return choices[0]["path"] if choices else ""
+    want = os.path.realpath(os.path.expanduser(directory.strip()))
+    return next((c["path"] for c in choices if os.path.realpath(c["path"]) == want), "")
+
+
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
     call = h.call
@@ -1302,6 +1322,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
+                "form_repos": (picks := form_repos(repos)),
+                "repo_pick": repo_of(picks, dir),
                 "form_hosts": form_hosts(await call("host")),
                 # the Profile pick's last choice (§4.5a **the reworked form**, TD-284 slice 2)
                 "shell_pick": SHELL_PICK,
@@ -1478,6 +1500,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def shell(dir: str = Form(...), name: str = Form("")):  # unnamed: the agent names it (TD-030)
         s = await call("create", name=name, dir=dir, adapter="shell")
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
+
+    @app.get("/api/dir_check")
+    async def api_dir_check(dir: str = ""):
+        """*another directory…*'s check as it is typed (§4.5a **the reworked form**, TD-284 slice 4):
+        whether the directory is there on this host, in the words the form prints."""
+        d = dir.strip()
+        ok = bool(d) and await asyncio.to_thread(lambda: Path(d).expanduser().is_dir())
+        return {"dir": d, "exists": ok, "why": "" if ok or not d else f"no such directory on {host_name()}"}
 
     @app.get("/api/occupancy")
     async def api_occupancy(dir: str = ""):
