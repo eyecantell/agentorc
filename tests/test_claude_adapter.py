@@ -19,6 +19,8 @@ from agentorc.adapters.claude_code import (
     HOOK_EVENTS,
     ClaudeCodeAdapter,
     _pid_alive,
+    context_file,
+    context_report,
     hooks_settings,
     munge,
     parse_usage,
@@ -364,6 +366,65 @@ def test_context_reads_the_last_top_level_turns_usage(tmp_path, monkeypatch):
     haiku = {"type": "assistant", "message": {"model": "claude-haiku-4-5", "usage": use}}
     (d / "abc.jsonl").write_text(json.dumps(haiku) + "\n")
     assert ad.context("abc", repo, "t")["window"] == 200_000
+
+
+def test_context_prefers_the_window_the_status_line_reported(tmp_path, monkeypatch):
+    """TD-295, design §4.3 `context`: a window the session's status line reported beats the table's —
+    a reported 200k on a model the table gives 1M — and its tokens win only when they are later
+    than the transcript's last turn; with no turn yet, the report alone is the reading."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "profiles.yml").write_text(
+        f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
+    )
+    ad = ClaudeCodeAdapter()
+    repo = tmp_path / "repo"
+    rep = context_file("abc")
+    rep.parent.mkdir(parents=True)
+    rep.write_text(json.dumps({"window": 200_000, "tokens": 150_000, "at": "2026-10-03T12:00:00.000Z"}))
+    assert ad.context("abc", repo, "t") == {"tokens": 150_000, "at": "2026-10-03T12:00:00.000Z", "window": 200_000}
+    d = tmp_path / "cc" / "projects" / munge(repo)
+    d.mkdir(parents=True)
+    use = {"input_tokens": 3, "cache_read_input_tokens": 230_000, "cache_creation_input_tokens": 1_200}
+    turn = {
+        "type": "assistant",
+        "timestamp": "2026-10-03T12:05:00.000Z",
+        "message": {"model": "claude-opus-5-5", "usage": use},
+    }
+    (d / "abc.jsonl").write_text(json.dumps(turn) + "\n")
+    # the turn is later than the report: its tokens, the report's window
+    assert ad.context("abc", repo, "t") == {"tokens": 231_203, "at": "2026-10-03T12:05:00.000Z", "window": 200_000}
+    rep.write_text(json.dumps({"window": 200_000, "tokens": 240_000, "at": "2026-10-03T12:06:00.000Z"}))
+    assert ad.context("abc", repo, "t") == {"tokens": 240_000, "at": "2026-10-03T12:06:00.000Z", "window": 200_000}
+    rep.write_text("not json")  # a broken report: the table again
+    assert ad.context("abc", repo, "t")["window"] == 1_000_000
+    sonnet46 = {**turn, "message": {"model": "claude-sonnet-4-6", "usage": use}}
+    (d / "abc.jsonl").write_text(json.dumps(sonnet46) + "\n")
+    assert ad.context("abc", repo, "t")["window"] == 200_000  # 1M only through `[1m]`, which the id hides
+
+
+def test_context_report_reads_the_status_lines_window():
+    cw = {
+        "context_window_size": 200_000,
+        "used_percentage": 42,
+        "current_usage": {
+            "input_tokens": 8,
+            "output_tokens": 500,
+            "cache_creation_input_tokens": 2_000,
+            "cache_read_input_tokens": 80_000,
+        },
+    }
+    assert context_report({"session_id": "u1", "context_window": cw}) == {
+        "sid": "u1",
+        "window": 200_000,
+        "tokens": 82_008,
+    }
+    # before the first response the tool sends no usage: the window alone
+    fresh = {"session_id": "u1", "context_window": {**cw, "current_usage": None}}
+    assert context_report(fresh) == {"sid": "u1", "window": 200_000, "tokens": None}
+    assert context_report({"session_id": "u1"}) is None  # an old client names no window
+    assert context_report({"context_window": cw}) is None  # nor is one kept with no session to key it
+    assert context_report("x") is None
 
 
 def test_parse_usage_and_credentials(tmp_path):

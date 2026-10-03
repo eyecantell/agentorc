@@ -15,6 +15,7 @@ import pytest
 
 from agentorc import profiles
 from agentorc.adapters.claude_code import (
+    context_file,
     displaced_status_line,
     hooks_settings,
     usage_report,
@@ -198,3 +199,21 @@ def test_no_limits_and_no_agent_break_nothing(home, tmp_path, monkeypatch, capsy
         run_statusline(monkeypatch, capsys, {**payload(), "workspace": {"project_dir": str(plain)}}, now=1003.0) == ""
     )
     assert len(agent.got) == 1
+
+
+def test_the_command_keeps_the_reported_context_window_once_per_change(home, tmp_path, monkeypatch, capsys):
+    """TD-295: the window and tokens the tool hands its status line are kept for the adapter's
+    `context`, keyed by the tool's session id and stamped by the redraw that first saw them."""
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    use = {"input_tokens": 5, "cache_read_input_tokens": 100_000, "cache_creation_input_tokens": 0}
+    cw = {"context_window_size": 200_000, "current_usage": use}
+    p = {**payload(), "workspace": {"project_dir": str(plain)}, "context_window": cw}
+    run_statusline(monkeypatch, capsys, p, now=R5)
+    kept = json.loads(context_file("u1").read_text())
+    assert kept == {"window": 200_000, "tokens": 100_005, "at": "2026-09-21T14:13:20.000Z"}
+    run_statusline(monkeypatch, capsys, p, now=R5 + 30)  # a redraw: the first sighting's time stands
+    assert json.loads(context_file("u1").read_text())["at"] == "2026-09-21T14:13:20.000Z"
+    p["context_window"] = {**cw, "current_usage": {**use, "input_tokens": 9}}
+    run_statusline(monkeypatch, capsys, p, now=R5 + 60)
+    assert json.loads(context_file("u1").read_text())["tokens"] == 100_009
