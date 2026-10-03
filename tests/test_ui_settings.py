@@ -426,3 +426,39 @@ def test_balance_card_reads_the_numbers_and_the_mark():
     assert setmod.team_cards({"t": object()}, {"t": {"balance": {"prs": 2}}}, sessions=fleet, repos=repos)[0][
         "balance"
     ]["mark"]
+
+
+def test_every_page_draws_the_usage_chip(client, subprocess_agent, monkeypatch):
+    """design §4.5a *Org top bar* **usage** chip (TD-287): the top bar is one bar, so Settings and the
+    other pages draw the account's chip as the Org does, read by one helper."""
+    from agentorc.ui import app as appmod
+
+    reading = {"paul": {"windows": [{"label": "week", "pct": 42, "resets": None}], "fetched": "x", "profiles": []}}
+
+    async def chip(call, sessions=None):
+        return reading
+
+    monkeypatch.setattr(appmod, "chip_usage", chip)
+    for path in ("/settings", "/help", "/inbox", "/new"):
+        page = client.get(path).text
+        assert 'data-account="paul"' in page and "week 42%" in page, path
+
+
+@pytest.mark.unit
+def test_the_chip_reading_fails_quietly():
+    """A host agent that cannot answer gives no chip, never a page that fails; one without `gate`
+    still gives the reading."""
+    import asyncio
+
+    from agentorc.ui.app import chip_usage
+
+    async def down(method, **kw):
+        raise RuntimeError("down")
+
+    async def no_gate(method, **kw):
+        if method == "gate":
+            raise RuntimeError("unknown method")
+        return [] if method == "list" else {}
+
+    assert asyncio.run(chip_usage(down)) == {}
+    assert asyncio.run(chip_usage(no_gate)) == {}

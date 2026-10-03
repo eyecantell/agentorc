@@ -144,7 +144,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
 | TD-284 | Build the reworked New session form: the order, the Host pick, Profile as the one tool pick, the Repo pick and the worktree-first Where, the Role pick that retires the Unattended switch, warnings only when Start is disabled | Medium | Built (#945, #948–#952, #953); live look pending |
 | TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Built (#955), live look pending |
-| TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
+| TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#PRNUM), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
 | TD-293 | New session on another host reads this host's disk for the Repo list, the roles and the brief, ledger and reader a role resolves, and draws no directory check, occupancy or worktree chips | Medium | Designed 2026-10-03 — the build is TD-294 |
@@ -2740,7 +2740,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of Settings: *I noticed the usage line is not shown in the settings header — is that on purpose?*)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #PRNUM; merged, live look pending
 **Location:** `src/agentorc/ui/app.py` (the Settings page's context passes `"usage": {}` to `base.html`'s `usage_chip`; three other pages pass the same), `src/agentorc/ui/templates/base.html` (`#usagechip`)
 
 **Why:** the top bar is the same bar on every page, and the chip is how a person sees the account's window at a glance; on Settings, where the reserves are set against that reading, it is gone. Nothing in the design says Settings drops it; the empty `usage` reads as a page that never asked.
