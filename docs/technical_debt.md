@@ -140,6 +140,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-279 | A board row on the Inbox prints its line as raw text: `**` and backticks show, and a long line (a page walk) is one wall with no fold | Medium | Open |
 | TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Open |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Open |
+| TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 
 
 ---
@@ -2650,3 +2651,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** each of the three reads as the fix says, (3) either reproduced and fixed or recorded here as the wait.
 
 **Related:** TD-220 (the horizon), TD-140 (Put on the board), TD-221 (rows read from origin).
+
+## TD-282: A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (Paul, through Add entry; drafted by techlead-ao-1)
+**Owner:** paul
+**Kind:** live-check
+**Status:** Open
+**Location:** design §4.5a *Add entry form* → **Hand to the techlead**, §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*; `src/agentorc/briefs/entry.md` (what an entry needs); `docs/technical_debt.md` (this file, where the entry must appear)
+
+**Why:** Paul's words, handed through the form: *This is a test TD, making sure the add entry button works properly. Hopefully this will appear in the TD list. No research needed.* The entry exists to exercise the hand-off end to end — the form's `ask` carrying `entry: {repo, type}` fills the techlead seat, the seat drafts the entry and lands it by PR, and reports the outcome — and its value is the check itself: that an entry a person types once on the page appears in the ledger without a session of their own.
+
+**Fix:** none to build. This entry landing on `main`, and showing in the TD list on the Repo page, is the check passing; the outcome reported on the handed message (`--outcome done`) closes the Inbox's *Waiting on them* row. Paul confirms the entry is in the list, then it archives as resolved.
+
+**Done when:** Paul sees TD-282 in the Repo page's Technical debt list and the *Waiting on them* row is gone; archive it then.
+
+**Related:** TD-180 (the Add entry design), TD-218 (`entry_add` and the outcome's close), TD-219 (the button and the row).
