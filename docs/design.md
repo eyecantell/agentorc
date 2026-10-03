@@ -1312,7 +1312,7 @@ the team start's three and two more:
   role read below knows where the repo's file is;
 - **the occupancy** is **`host_occupancy {host, dir}`**, over a new link method `occupancy`: the
   node's own `occupancy` reading — its live records in the directory and the agents its adapters
-  see. For a container node on this machine, whose checkout is one directory here and there, the
+  see, a directory that is not there reading as empty. For a container node on this machine, whose checkout is one directory here and there, the
   home adds its own reading to the node's, as the create's anchor check does;
 - **the Where chips** are **`host_worktrees {host, repo}`**, over a new link method `worktrees`:
   the repo's worktrees under its `.claude/worktrees/` on that host, each with whether anyone is
@@ -1322,14 +1322,19 @@ the team start's three and two more:
   `controllers:` default and the team's reader — come from the picked host's `.agentorc.yml`
   and brief files, read by `host_files {host, dir, paths}` and parsed here by
   `repoconfig.load_text`: the team start's loader, so the form and a team start cannot disagree
-  about one repo. The role is not resolved on the node's side of the create: `sessionorc` never
-  imports `repoconfig` (§4.3), and a node may run an older install than the home. The built-in
+  about one repo. The role is not resolved on the node's side of the create: `repoconfig` is
+  `agentorc`'s and `sessionorc` never imports `agentorc` (the package rule), and a node may run
+  an older install than the home. The built-in
   presets and their briefs are the home's install's, as at a team start.
 
 The two new reads are host-level, as `host_dir` and `host_repos` are: paths, names and booleans,
-never a file's text, ungated, and in none of `modes.py`'s tables, as those two are in none;
-`host_files` keeps its bounds, its gate — which the form passes as the person's — and its place
-in `HOME_ONLY`. An unreachable host is
+never a file's text, and ungated as those two are. Unlike those two they name another host's
+sessions and worktrees, so both are in `modes.HOME_ONLY` beside `host_files`: never served to a
+call forwarded from a node, which costs the form nothing, since a person at a node may act only
+on that node's records and so starts nothing on a third host. To identity (§4.8a) they are what
+`host_dir` is: not among `identity.READS`. A directory that is not there reads as no occupants,
+as `occupancy` does. `host_files` keeps its bounds and its gate, which the form passes as the
+person's. An unreachable host is
 refused in words by each — the form's Host pick already greys one — and a link that drops while
 the form is open is said in each note's place, the create then refusing as any act does.
 
