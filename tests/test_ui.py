@@ -493,7 +493,7 @@ def test_the_new_session_form_refuses_a_stop_time_on_an_interactive_session(tmp_
     assert stop_fields("", False) == {} and stop_fields("   ", True) == {}
     with pytest.raises(HTTPException) as bad:
         stop_fields("06:00", False)
-    assert bad.value.status_code == 400 and "Unattended" in bad.value.detail
+    assert bad.value.status_code == 400 and "pick a role that runs unattended" in bad.value.detail
     with pytest.raises(HTTPException) as nonsense:
         stop_fields("half six", True)
     assert nonsense.value.status_code == 400
@@ -2085,3 +2085,6 @@ def test_the_role_pick_begins_with_interactive_and_retires_the_switch(client):
     # …and one that ran under the person lands *under you*
     mine = client.get("/new?role=grinder&prefilled=1").text
     assert 'name="unattended" value="" data-under="1"' in mine
+    # an unattended record with no role comes back as *plain · unattended*, not as Interactive (review of #952)
+    bare = client.get("/new?unattended=on&prefilled=1").text
+    assert '<option value="plain"' in bare and bare.split('<option value="plain"', 1)[1].startswith(" selected")

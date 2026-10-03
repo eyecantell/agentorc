@@ -2561,7 +2561,8 @@
       const o = role.selectedOptions[0], interactive = !o || !o.value, shell = isShell(), outside = other();
       const un = !interactive && !shell && !outside && !underMe;
       unIn.value = un ? "on" : "";
-      if (when) when.hidden = !un;
+      // hidden, At and Until post nothing: a time typed before the pick moved is not a refusal (review of #952)
+      if (when) { when.hidden = !un; for (const i of when.querySelectorAll("input")) i.disabled = !un; }
       if (!rmode) return;
       if (shell) rmode.textContent = "";
       else if (interactive) rmode.textContent = "yours: never paused, sent to, or killed by a policy";
@@ -2673,7 +2674,7 @@
           hostSel.value = o.dataset.host; check(); nameCheck();
         }
         underMe = true; applyMode();  // a person's own session in the team (§4.9): a role runs under you
-      } else applyProject();
+      } else { underMe = false; applyProject(); applyMode(); }  // *none*: a role is presumed unattended again
       teamRoles();
       teamLine();
     }

@@ -62,7 +62,7 @@ def test_the_at_field_schedules_and_lands_on_the_org(page):
     r = c.post(
         "/new", data={"name": "w", "dir": str(tmp_path), "adapter": "shell", "at": "+2h"}, follow_redirects=False
     )
-    assert r.status_code == 400 and "tick Unattended" in r.text
+    assert r.status_code == 400 and "pick a role that runs unattended" in r.text
 
 
 def test_start_now_and_the_notes_time_go_to_set_start(page):

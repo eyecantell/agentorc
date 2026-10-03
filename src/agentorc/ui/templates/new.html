@@ -50,7 +50,9 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
           retired by it: the posted `unattended` is the pick's. A role in *another directory…* runs
           under you only. -#}
       <div class="field" id="rolefield"><label>Role</label>
-        <select class="input" name="role" id="role"><option value="" data-interactive="1"{% if not prefill.role %} selected{% endif %}>Interactive</option>{% for r in roles %}<option value="{{ r.name }}"{% if r.name == prefill.role %} selected{% endif %} data-prompts='{{ (r.prompts or []) | tojson }}' data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}" title="{{ r.source }}{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}">{{ r.name }} · unattended</option>{% endfor %}</select>
+        <select class="input" name="role" id="role">{#- an unattended record with no role is a hand-briefed one: *plain · unattended* (review of #952) -#}
+        {%- set picked = prefill.role or ("plain" if prefill.unattended else "") %}
+        <option value="" data-interactive="1"{% if not picked %} selected{% endif %}>Interactive</option>{% for r in roles %}<option value="{{ r.name }}"{% if r.name == picked %} selected{% endif %} data-prompts='{{ (r.prompts or []) | tojson }}' data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}" title="{{ r.source }}{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}">{{ r.name }} · unattended</option>{% endfor %}</select>
         <input type="hidden" name="unattended" value="{{ 'on' if prefill.unattended else '' }}" data-under="{{ '1' if prefill.role and not prefill.unattended else '' }}">
         <span class="note" id="rolemode"></span>
         <span class="note" id="rolenote">a role fills the brief, lane, grants and profile it names; each can be edited before Start</span>

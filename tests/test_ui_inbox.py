@@ -1932,7 +1932,7 @@ def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_p
     assert 'value="grinder" selected' in filled and 'name="unattended" value="on" data-under=""' in filled
     assert 'value="ao-lead" data-name="lead" checked' in filled
     assert 'id="resumewhy"' in filled and "the directory is gone" in filled
-    # and an ordinary New session is untouched: no banner, nothing prefilled, `plain` selected
+    # and an ordinary New session is untouched: no banner, nothing prefilled, *Interactive* picked
     plain = page({"dir": "", "adapter": "claude-code", "resume": "", "project": "", "name": "", "profile": "",
                   "role": "", "team": "", "lane": "", "controllers": [], "unattended": False,
                   "prefilled": False, "why": ""})  # fmt: skip
