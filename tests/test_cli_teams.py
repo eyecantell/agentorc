@@ -142,6 +142,7 @@ def write_org(tmp_path, doc):
 
 def test_a_live_name_holder_aborts_the_whole_start_and_names_it(world, capsys):
     tmp_path, state = world
+    state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     state["verdicts"]["hunt"] = {
         "name": "hunt", "verdict": "live", "holder": "ao-agentorc-hunt", "holder_state": "working",
     }  # fmt: skip
@@ -160,6 +161,7 @@ def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
     member, exactly as it does for a live holder (§4.9: there is never half a team). The person
     who suspended it lifts it, forgets it, or takes it out of the team."""
     tmp_path, state = world
+    state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     state["verdicts"]["hunt"] = {
         "name": "hunt", "verdict": "suspended", "holder": "ao-agentorc-hunt", "holder_state": "exited",
         "message": "hunt was suspended by a person at 2026-09-20T23:00:00Z over an identity alarm",
@@ -784,6 +786,48 @@ def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(w
     assert row["concluded"] is None and row["wound_down"] == out["at"]
 
 
+def test_a_member_waiting_on_the_person_keeps_its_team_from_concluded(world, capsys):
+    """TD-274's client half (design §4.9a *Waiting is read, never declared*): with the home's
+    `host` reading naming a member's open question, the team is not concluded — on the row, in a
+    Start, which then closes nothing, and in `ao team status --json`, whose `waiting` names it."""
+    tmp_path, state = world
+    out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
+    names = ["orc-ao", "grind-1"]
+    state["sessions"][:] = [
+        {"id": f"ao-agentorc-{n}", "name": n, "team": "ao-grind", "state": "idle", "out_of_work": out,
+         "git": {"dirty": 0, "unpushed": 0}}
+        for n in names
+    ]  # fmt: skip
+    state["verdicts"].update(
+        {n: {"name": n, "verdict": "live", "holder": f"ao-agentorc-{n}", "holder_state": "idle"} for n in names}
+    )
+    q = {"id": "m-1", "ref": "TD-222", "bound": None}
+    state["host"] = {"host": "local", "waiting": {"ao-agentorc-grind-1": [q]}}
+    org = cli._org_here()
+    asked = teamrun.waiting_of_home(cli.call_sync)
+    assert teamrun.concluded(state["sessions"], (), asked) is None
+    assert teamrun.concluded(state["sessions"]) is not None  # without the reading, nobody waits
+    (row,) = teamrun.rows(org, state["sessions"], asked)
+    assert row["concluded"] is None and row["not_concluded"] == ["grind-1 waiting on the person: TD-222"]
+    # a Start refuses as on any live holder, and closes nothing
+    state["calls"].clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not [p for m, p in state["calls"] if m in ("close", "create")]
+    assert "grind-1 is idle as ao-agentorc-grind-1" in capsys.readouterr().err
+    assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["waiting"] == {"grind-1": [q]} and got["finished"]["why"] == ["grind-1 waiting on the person: TD-222"]
+    assert cli.main(["--json", "team", "list"]) == 0
+    (listed,) = [r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] == "ao-grind"]
+    assert listed["concluded"] is None
+    # a Start that cannot read `waiting` closes nothing: a failed read is not *nobody waits*
+    del state["host"]
+    state["calls"].clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not [p for m, p in state["calls"] if m in ("close", "create")]
+    capsys.readouterr()
+
+
 def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     """TD-099 step (1), design §4.9a *A person's Start on a concluded team*: the names its concluded
     sessions hold do not refuse the start — each of them is closed, a seat with them, under the
@@ -791,6 +835,7 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     start by name with nothing closed; a team with one undeclared session is refused as any live
     holder refuses, and so is a holder that is not the team's own."""
     tmp_path, state = world
+    state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}  # a seat: idle and undeclared, closed too
     write_org(tmp_path, doc)

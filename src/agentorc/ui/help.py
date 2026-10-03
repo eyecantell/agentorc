@@ -84,8 +84,9 @@ HELP: tuple[Help, ...] = (
         (
             "Says why this team has no Start yet: one clause for each session that keeps it from reading "
             "concluded — one that is working, one idle that has not declared, one that crashed or wants a "
-            "restart. Read it to see what to wait for, or which session to message or close, before the team can "
-            "be started again. It is read from the sessions' records each time the page is drawn and is nothing "
+            "restart, one waiting on your answer to its question. Read it to see what to wait for, or which "
+            "session to message or close, before the team can be started again. It is read from the sessions' "
+            "records and your Inbox each time the page is drawn and is nothing "
             "to press: Wind down and Stop now are the controls beside it."
         ),
     ),
