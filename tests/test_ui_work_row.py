@@ -76,6 +76,10 @@ def test_a_questions_end_is_its_own_clause_before_the_ids_and_one_of_the_notes_n
     html = uiapp.templates.get_template("inbox_row.html").module.work_row({**alone, "snoozed_until": ""}, "needs")
     assert '<a class="mono" href="/repo/agentorc#TD-222">TD-222</a> lapsed to its default' in str(html)
     assert "entries:" not in str(html) and "entry:" not in str(html)  # no lanes clause
+    both_html = str(uiapp.templates.get_template("inbox_row.html").module.work_row({**r, "snoozed_until": ""}, "needs"))
+    assert (
+        'was answered; its lanes gained 1 entry: <a class="mono" href="/repo/agentorc#TD-300">TD-300</a>' in both_html
+    )
 
 
 def test_a_held_start_says_which_bound():
