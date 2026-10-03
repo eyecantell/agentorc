@@ -614,7 +614,21 @@
   <span class="grow"></span>
   <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
 </div>
+{#- §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset as a message's
+    text is (§4.10), its bold head and the sentence after it drawn and the rest under *details*,
+    kept open across the poll as a message's fold is; the `Due:` is the head's due words, the
+    `Context:` closes the fold, and the person's replies stand under the text, outside it. -#}
+{%- if e.lead is defined %}
+<div class="body md">{{ md(e.lead, origin) }}</div>
+{%- if e.rest %}
+<details class="fold" data-fold="{{ e.id }}"{% if fold_open %} open{% endif %}><summary>details</summary><div class="body md">{{ md(e.rest, origin) }}</div></details>
+{%- endif %}
+{%- for r in e.replies %}
+<div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>
+{%- endfor %}
+{%- else %}
 <div class="body">{{ e.body or e.text }}</div>
+{%- endif %}
 {#- §4.5a **answers** (§4.4 *Decide*, TD-255): the item's `Answers:` as the row's buttons, as an
     `ask`'s suggested answers are — from the reader's `answers` field, never a control built from
     prose — in the order written, the default's marked. A press is the `decide` write-back with that
