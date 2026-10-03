@@ -229,6 +229,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     work_held,  # noqa: F401
     work_ids,  # noqa: F401
     work_note,  # noqa: F401
+    work_questions,  # noqa: F401
     work_rows,  # noqa: F401
     work_started,  # noqa: F401
 )

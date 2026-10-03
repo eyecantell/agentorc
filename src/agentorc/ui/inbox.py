@@ -673,6 +673,24 @@ def work_ids(mark: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(str(i) for ids in members.values() if isinstance(ids, list) for i in ids))
 
 
+def work_questions(mark: Mapping[str, Any]) -> list[dict[str, str]]:
+    """A mark's question ends (§6 rule 8 *A question's end is work*, TD-274), each `{name, kind, ref,
+    how, words}`: *designer-ao-1's steer about TD-222 lapsed to its default*, *… ask about TD-222 was
+    answered*. Only a `steer` lapses, so a mark that names no kind reads a lapse as one and an
+    answer as a *question*. Every part is the home's reading, never text a session wrote."""
+    got = mark.get("questions") if isinstance(mark.get("questions"), list) else []
+    out = []
+    for q in got:
+        if not isinstance(q, Mapping) or not q.get("ref"):
+            continue
+        how = str(q.get("how") or "")
+        kind = str(q.get("kind") or ("steer" if how == "lapsed" else "question"))
+        end = "lapsed to its default" if how == "lapsed" else "was answered"
+        name, ref = str(q.get("name") or "a member"), str(q["ref"])
+        out.append({"name": name, "kind": kind, "ref": ref, "how": how, "words": f"{name}'s {kind} about {ref} {end}"})
+    return out
+
+
 def work_held(held: Any, now: datetime) -> str:
     """Why rule 8's start was held back, in the row's words (§4.5a *Inbox row: team start*), from the
     mark's `held: {why, …}` — or "" for no hold, which is `on_work: ask`'s row."""
@@ -721,16 +739,20 @@ def work_rows(
     for team, mark in sorted((work or {}).items()):
         if not isinstance(mark, Mapping):
             continue
-        ids = work_ids(mark)
-        if not ids:
+        # a question's end is its own clause, before the ids where both stand (TD-274)
+        asked = work_questions(mark)
+        refs = {q["ref"] for q in asked}
+        ids = [i for i in work_ids(mark) if i not in refs]
+        if not ids and not asked:
             continue
         down = (wound or {}).get(team)
         repo = Path(str(mark.get("repo") or "")).name
         held = work_held(mark.get("held"), at)
         n = len(ids)
-        said = f"its lanes gained {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}"
+        said = f"its lanes gained {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}" if ids else ""
         if n > WORK_IDS:
             said += f" and {n - WORK_IDS} more"
+        said = "; ".join([*(q["words"] for q in asked), *([said] if said else [])])
         out.append(
             {
                 "row": "work",
@@ -745,6 +767,7 @@ def work_rows(
                 "ids": ids[:WORK_IDS],
                 "more": max(0, n - WORK_IDS),
                 "n": n,
+                "questions": asked,
                 "held": held,
                 "text": f"{team} · wound down · {said}" + (f" · not started: {held}" if held else ""),
                 "find": " ".join(x for x in (str(team), "team start", "wound down", said, held) if x),
@@ -760,6 +783,8 @@ def work_note(mark: Any, now: datetime | None = None) -> dict[str, Any] | None:
         return None
     members = mark.get("members") if isinstance(mark.get("members"), Mapping) else {}
     by = "; ".join(f"{m}: {', '.join(str(i) for i in got)}" for m, got in members.items() if isinstance(got, list))
+    # a question's end is counted as one of the n and named in the tooltip (TD-271, TD-274)
+    by = "; ".join([by, *(q["words"] for q in work_questions(mark))]) if by else by
     return {
         "n": len(ids),
         "at": str(mark.get("at") or ""),
