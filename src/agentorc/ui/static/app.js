@@ -1830,6 +1830,48 @@
     RAIL_KINDS.forEach((k) => { out.kinds[k] = line("kind", k, rows); });
     return out;
   };
+  // the find's words marked in the rows it shows (§4.5a *Inbox page: find*, TD-280): every match in a
+  // row's text — the body, its *details* and its replies — wrapped in `<mark class="findmark">`, the
+  // marks taken off first, so a find that changes or empties leaves none; text nodes only, so no
+  // markup is ever built from what a row says
+  // a text cut at the find's words (TD-280): `[[piece, matched], …]`, case-insensitive, the longer
+  // word first where two overlap; pure, so the probe tests it without a page
+  AO.findSplit = function (text, words) {
+    const t = String(text || ""), out = [];
+    if (!words.length) return [[t, false]];
+    const re = new RegExp([...words].sort((a, b) => b.length - a.length).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "gi");
+    let at = 0;
+    for (let m; (m = re.exec(t)); ) {
+      if (m.index > at) out.push([t.slice(at, m.index), false]);
+      out.push([m[0], true]);
+      at = m.index + m[0].length;
+    }
+    if (at < t.length || !out.length) out.push([t.slice(at), false]);
+    return out;
+  };
+  // the find's words marked in the rows it shows (§4.5a *Inbox page: find*, TD-280): every match in a
+  // row's text — the body, its *details* and its replies — wrapped in `<mark class="findmark">`, the
+  // marks taken off first, so a find that changes or empties leaves none; text nodes only, so no
+  // markup is ever built from what a row says
+  AO.markFind = function (root, words) {
+    if (!root) return;
+    $$("mark.findmark", root).forEach((m) => { const p = m.parentNode; m.replaceWith(document.createTextNode(m.textContent)); p.normalize(); });
+    if (!words.length) return;
+    $$(".mailrow:not([hidden]) .body, .mailrow:not([hidden]) .boardreply", root).forEach((body) => {
+      const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT), nodes = [];
+      while (walk.nextNode()) nodes.push(walk.currentNode);
+      nodes.forEach((n) => {
+        const parts = AO.findSplit(n.nodeValue, words);
+        if (!parts.some(([, hit]) => hit)) return;
+        const frag = document.createDocumentFragment();
+        parts.forEach(([piece, hit]) => {
+          if (!hit) { frag.append(piece); return; }
+          const mk = document.createElement("mark"); mk.className = "findmark"; mk.textContent = piece; frag.append(mk);
+        });
+        n.replaceWith(frag);
+      });
+    });
+  };
   const railRow = (el) => ({ section: el.dataset.section || "", team: el.dataset.team || "none", kind: el.dataset.rkind || "", find: el.dataset.find || "" });
 
   function inboxFilter() {
@@ -1892,6 +1934,7 @@
     // — unless the person had it open, whose fold memory is theirs
     const all = rows.length, shown = rows.filter((r) => railPasses(r, rail, words)).length;
     $("#findn").textContent = words.length ? `${shown} of ${all}` : "";
+    AO.markFind($(".inboxpage"), words);
     ["sec-fyi", "snoozedbox"].forEach((id) => {
       const d = document.getElementById(id); if (!d) return;
       const hit = words.length && $$(".mailrow", d).some((el) => !el.hidden);
@@ -3076,7 +3119,8 @@
     { keys: ["x"], page: "msg", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
     { keys: ["a"], page: "inbox", ring: true, control: "Allow", sel: '[data-act="allow"]' },
     { keys: ["d"], page: "inbox", ring: true, control: "Deny", sel: '[data-act="deny"]' },
-    { keys: ["r"], page: "inbox", ring: true, control: "Reply", sel: '[data-act="reply"]', text: ["Reply"] },
+    // a board row's Reply is `board_reply` (TD-280): `r` opens it as it opens a message's
+    { keys: ["r"], page: "inbox", ring: true, control: "Reply", sel: '[data-act="reply"], [data-act="board_reply"]', text: ["Reply"] },
     { keys: ["s"], page: "inbox", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
     { keys: ["x"], page: "inbox", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
     // **Go with it** on a `steer` row and on a board row with a default; and a row's answer buttons
