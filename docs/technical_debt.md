@@ -135,6 +135,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Designed 2026-10-02 — waiting is read from the person inbox and holds the team live, an orphaned steer lapses to its default, a question's end is rule 8 work; the build is TD-274 |
 | TD-274 | Build the waiting member: `finished` reads a live member's open question to the person as waiting, the slot and the Focus header say it, an orphaned steer lapses to its default into the closed mailbox, a question's end writes `work_waiting.questions`, and a start keeps the mail | High | Slice 1 (#924): the home's reading and rule 9; left: the page's and CLI's reading, the words, the lapse, rule 8 |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
+| TD-277 | The New session form asks for its fields in the order the code grew them: Host is fixed text, Directory, Where, Project and Team are five coupled picks, Adapter repeats the Profile, the warnings show when nothing applies, and Until and At show for an interactive session | Medium | Open — design first |
 
 
 ---
@@ -2546,3 +2547,30 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-269 (the design), TD-173 (the Team field), TD-259 (the manager on call), TD-160 (a person's own session inside a team), TD-097 (a seat's card), TD-036 (membership).
 
+## TD-277: The New session form asks for its fields in the order the code grew them — rework it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's notes on the New session page: *Looks like we need to rework the new session screen … The idea is half-baked, lets bake it*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first: §4.5a's New session rows, read as one form
+**Location:** `src/agentorc/ui/templates/new.html` (the form), `src/agentorc/ui/static/app.js` (`AO.newSession`: the occupancy note, the Project and Team narrowing, the Role refresh), `src/agentorc/ui/app.py` (the page's context), design §4.5a *New session*, §4.2a *Profiles*, §4.9 *Project* and *Team*, §6 *Start time* and *Until*, §9 invariant 2
+
+**Why:** each field was added by its own TD (Project by §4.9, Team by TD-173, Role and Grants by §4.8, Until by TD-026, At by TD-152, Controllers by TD-036), so the form reads as the code grew rather than as a person starts a session. Paul's notes, with what the code says today:
+
+1. **Host** is fixed text: the local host's name. `hosts.yml` defines a node (contractmatch's container) the form never offers, and nothing on the page adds a host (`hosts.yml` by hand, `ao host up`). Should it be a pick when more than one host is defined, and does adding one belong here?
+2. **Project** comes from `org.yml`'s `projects:`, hand-edited; no page adds one. A project already holds more than one repo, each with a checkout per host, so project and repo are independent; today every project has one. How is a project added, and from where?
+3. **Directory** is asked even when **Where** is *New worktree*, where it only names the repo; nothing checks that a typed path exists.
+4. **Adapter** is code (`agentorc/adapters/claude_code/`, `sessionorc/adapters.py`'s shell), not configuration, so a new one is a build. Every profile in `profiles.yml` already names its adapter, so the form asks twice and the two can disagree.
+5. **The two warnings.** The occupancy note (*⚠ in use by … a new worktree is selected instead*) reads as an error for what the form already fixed, and the fixed *⚠ One agent session per directory …* block shows on every visit. Draw each only when it applies, and in words that are not an alarm when nothing is wrong.
+6. **Name** sits fifth; it belongs first or second, beside Host.
+7. **Profile** picks the tool, account and model the session starts with (`profiles.yml`: `default`, `grind` on Opus, `grind-sonnet`, `grind-fable`); the form does not say so, and nothing on the page creates one.
+8. **Team, repo, worktree and directory are coupled.** A directory should be inside the picked project's repos; a team should bring its repo and its checkouts; a directory pick and a worktree pick exclude each other. Paul's half-baked idea, to bake: assume a worktree; list the existing ones nobody is in; the worktree's name is the session's name; a typed name is a new worktree, or the existing one of that name. *This directory* stays for a shell and for a directory outside any repo.
+9. **Until** and **At** apply to an unattended session only and show for every one. Paul's proposal: one pick between *Interactive* and each unattended role defined, a role presumed unattended, which also retires the Unattended checkbox; Until and At show once an unattended pick is made. The design says whether any role is ever wanted interactive (the techlead seat, a person's own session in a team, §4.9 *A person in the team*) and, if so, how the form says it.
+
+**Fix:** design first. Settle the form as one thing: the field order (Name and Host first); Host as a pick when more than one is defined; one place for the tool (Profile, Adapter derived or dropped); the worktree-first shape of item 8, with Project and Team narrowing it; the Interactive / role pick of item 9 with Until and At under it; the two warnings drawn only when they apply; where adding a host, a project and a profile lives (here, the Org page, the Settings page, or a file named on the form). Draw it as a mockup (`docs/mockups/gen.py`) for Paul's review, then name the build entries.
+
+**Done when:** §4.5a's New session rows describe the reworked form, Paul has looked at the mockup, and the build entries are on the ledger with a `Blocked by:` line.
+
+**Related:** TD-269 and TD-276 (the Team pick and a seat on call as controller: the same form), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume lands on this form filled in), TD-160 (a person's own session inside a team).
