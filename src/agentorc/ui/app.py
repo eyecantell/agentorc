@@ -1088,6 +1088,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "host": host_name(),
             "active": "",
         }
+        if not part:  # the page's top bar; the part is the page's body alone
+            ctx["usage"] = await chip_usage(call)
         return templates.TemplateResponse(request, "repo_part.html" if part else "repo.html", ctx)
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
@@ -1118,6 +1120,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 ),
                 "host": host_name(),
                 "active": "Org",
+                "usage": await chip_usage(call, fleet if known else None),
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
                 "popped": window == "1",
                 # §4.5a **Reports** (TD-150): the base a claim in review's PR number links from
@@ -1168,6 +1171,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": host_name(),
                 "active": "Org",
+                "usage": await chip_usage(call),
             },
         )
 
@@ -1226,6 +1230,21 @@ def tool_profile(profs: Mapping[str, profiles_mod.Profile], default: str, adapte
     if not adapter or adapter == "shell" or (profs.get(default) and profs[default].adapter == adapter):
         return ""
     return next((k for k, p in profs.items() if p.adapter == adapter), "")
+
+
+async def chip_usage(call: Any, sessions: Any = None) -> dict[str, Any]:
+    """The top bar's **usage** chip on every page (§4.5a *Org top bar* **usage** chip, TD-287): the
+    Org's reading — the accounts' windows, the gate's lines, one chip per account a live session's
+    profile names. Any failure is no chip, never a page that fails: the chip is display only."""
+    try:
+        if sessions is None:
+            sessions = await call("list")
+        usage = await call("usage")
+        with contextlib.suppress(Exception):  # an agent before TD-100 slice 1 has no `gate`: no lines
+            usage = with_lines(usage, await call("gate"))
+        return usage_accounts(usage, sessions)
+    except Exception:
+        return {}
 
 
 def form_hosts(info: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1319,6 +1338,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 "host": host_name(),
                 "active": "Org",
+                "usage": await chip_usage(call, sessions_now),
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
@@ -2102,7 +2122,7 @@ def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "screens": screens,
                 "host": host_name(),
                 "active": "",
-                "usage": {},
+                "usage": await chip_usage(h.call),
                 "volatile": hosts.local_host().volatile,
             },
         )
@@ -2177,7 +2197,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Settings",
                 "agent_down": agent_down,
                 "volatile": local.volatile,
-                "usage": {},
+                "usage": {} if agent_down else await chip_usage(call, fleet or None),
             },
         )
 
@@ -2319,9 +2339,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the
         person inbox and the sessions' states in three sections, and the count that means *what is
         waiting on a person*. From step 3 the due board items join **Needs you** too."""
-        agent_down = False
+        agent_down, fleet = False, []
         try:
-            got, states = await person_view()
+            fleet = await call("list")  # person_view's one list, kept for the usage chip (TD-287)
+            got, states = await h.person_inbox(fleet), await h.person_states(fleet)
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -2357,7 +2378,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Inbox",
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
-                "usage": {},
+                "usage": {} if agent_down else await chip_usage(call, fleet),
             },
         )
 
@@ -2375,7 +2396,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         ctx: dict[str, Any] = {
             "host": host_name(),
             "active": "Inbox",
-            "usage": {},
+            "usage": await chip_usage(call),
             "volatile": hosts.local_host().volatile,
             "mid": mid,
             "back_url": f"/inbox{back}#{mid}",
