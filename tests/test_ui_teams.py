@@ -31,6 +31,7 @@ class Fleet:
         self.sessions: list[dict] = []
         self.calls: list[tuple[str, dict]] = []
         self.verdicts: dict[str, dict] = {}
+        self.repos: dict[str, dict] = {}
 
     def handle(self, method: str, params: dict):
         self.calls.append((method, params))
@@ -38,6 +39,8 @@ class Fleet:
             return list(self.sessions)
         if method == "usage":
             return {}
+        if method == "repos":  # the home's repo readings: the Start's lane line reads their ledgers (TD-265)
+            return dict(self.repos)
         if method == "recent_dirs":
             return []
         if method == "adapters":
@@ -402,6 +405,48 @@ def test_the_state_pill_has_a_glyph_for_every_state_the_view_can_name():
 
 
 # ── Start: the shared planner, every check before any create ──────────────────────────────────
+
+
+def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, client):
+    """design §4.5a team card **Start**, *What the lanes hold, before the start* (TD-262, built by
+    TD-265): the press reads the lanes; every one empty opens the Start anyway / Cancel dialog in
+    place of starting, a concluded team's closes as its second line, and a start that reaches the
+    page without **Start anyway** is refused before anything is created."""
+    tmp_path, fleet = world
+    checkout = str(tmp_path / "agentorc")
+    some = [{"id": "TD-1", "pickable": "yes", "kind": "build", "owner": ""}]
+    fleet.repos = {checkout: {"ledger": {"entries": some}}}
+    got = client.get("/api/teams/ao-grind/lanes").json()
+    assert (got["line"], got["empty"]) == ("grinder: 1 pickable", False)
+    fleet.repos = {checkout: {"ledger": {"entries": [{**some[0], "pickable": "no"}]}}}
+    got = client.get("/api/teams/ao-grind/lanes").json()
+    assert (got["line"], got["empty"]) == ("grinder: 0", True)
+    r = client.post("/api/teams/ao-grind/start", json={})
+    assert r.status_code == 409 and r.json()["detail"].startswith("nothing to pick") and not fleet.creates()
+    assert client.post("/api/teams/ao-grind/start", json={"anyway": True}).status_code == 200 and fleet.creates()
+    # unreadable: unknown, never empty — no dialog
+    fleet.repos = {checkout: {"ledger": {"error": "gone"}}}
+    assert client.get("/api/teams/ao-grind/lanes").json()["empty"] is False
+    # the dialog and the press: one confirm, the closes in it on a concluded team
+    page = client.get("/").text
+    assert '<dialog id="startdlg"' in page and ">Start anyway</button>" in page and ">Cancel</button>" in page
+    head = uiapp.templates.get_template("group_head.html").render(
+        g={
+            "team": "t",
+            "label": "t",
+            "defined": True,
+            "stopped": True,
+            "members": [],
+            "live": 0,
+            "concluded": {"names": ["a", "b"], "restart": False},
+        },  # fmt: skip
+        help_title=lambda k: k,
+    )
+    assert 'data-closes="a, b"' in head
+    js = (Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert 'if (b && b.dataset.teamAct === "start") return startPress(b);' in js
+    assert "Nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts." in js
+    assert "if (picks && picks.empty)" in js and "It first closes ${b.dataset.closes}." in js
 
 
 def test_start_runs_the_shared_sequence_and_the_members_carry_controllers_lead(world, client):

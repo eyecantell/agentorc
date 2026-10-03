@@ -1781,11 +1781,28 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 row["error"] = failed
         return v
 
+    @app.get("/api/teams/{name}/lanes")
+    async def api_team_lanes(name: str):
+        """What the members' lanes hold before a start (§4.5a team card **Start**, TD-265): read on the
+        press, so the page opens its Start anyway / Cancel dialog when every lane is empty."""
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        got = await asyncio.to_thread(teamrun.lanes, rpc, org, name, host_name())
+        return JSONResponse(got or {"line": "", "empty": False, "roles": {}})
+
     @app.post("/api/teams/{name}/start")
-    async def api_team_start(name: str):
+    async def api_team_start(name: str, request: Request):
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if hosts.is_node():
             raise HTTPException(409, node_org_note())  # the strip's note, as the toast (§4.4a)
         org, _notes = org_here()
+        if not body.get("anyway"):
+            # every lane empty is the dialog's to ask (§4.5a, TD-265); a press that reaches here
+            # without **Start anyway** — the lanes emptied since — is refused, as `ao team start` is
+            picks = await asyncio.to_thread(teamrun.lanes, rpc, org, name, host_name())
+            if picks and picks["empty"]:
+                raise HTTPException(409, f"{teamrun.NOTHING_TO_PICK} ({picks['line']})")
         try:
             _plan, result = await asyncio.to_thread(teamrun.start, rpc, org, name, host_name())
         except (teams.TeamError, ValueError, AgentError, AgentUnavailable) as e:

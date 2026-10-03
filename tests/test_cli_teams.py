@@ -248,7 +248,9 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "## Lane: free-pick" in grind1["prompt"] and "## Area: ui" in hunt["prompt"]
     assert "## Project:" not in grind1["prompt"]  # one repo: no reach to describe
     out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  manager manager")
+    # the first line says what the lanes hold (§4.7, TD-265): no `repos` reading here, so unknown, never empty
+    assert out.splitlines()[0] == "grinder: ledger unreadable · hunter: ledger unreadable"
+    assert out.splitlines()[1].startswith("ao-agentorc-orc-ao  manager manager")
     assert "member grinder" in out
 
 
@@ -341,7 +343,7 @@ def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
     assert [p for m, p in calls if m == "host_dir"] == [{"host": "devenv", "dir": checkout}]  # once per checkout
     assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
     assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
-    order = [m for m, _ in calls]
+    order = [m for m, _ in calls if m not in ("repos", "host_files")]  # the lane reading's, before (TD-265)
     assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
 
 
@@ -1973,3 +1975,36 @@ def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys)
     assert row["on_call"] is False
     assert cli.main(["team", "list"]) == 0
     assert "(on call)" not in capsys.readouterr().out
+
+
+def test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway(world, capsys):
+    """design §4.5a team card **Start**, *What the lanes hold, before the start*, and §4.7 (TD-262,
+    built by TD-265): the first line reads each role's lane against its checkout's ledger, as rules
+    6 and 8 do; every lane empty is a refusal, exit 1, unless `--anyway`; an unreadable ledger is
+    *unknown*, never empty, and starts."""
+    tmp_path, state = world
+    checkout = str(tmp_path / "agentorc")
+
+    def entry(n, pickable="yes", kind="build"):
+        return {"id": f"TD-{n}", "pickable": pickable, "kind": kind, "owner": ""}
+
+    state["repos"] = {checkout: {"ledger": {"entries": [entry(1), entry(2), entry(3), entry(4, "no")]}}}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert capsys.readouterr().out.splitlines()[0] == "grinder: 3 pickable · hunter: 0"
+    # every lane empty: refused before anything is created, in the dialog's words, with the line
+    state["calls"].clear()
+    state["repos"] = {checkout: {"ledger": {"entries": [entry(4, "no"), entry(5, kind="design-first")]}}}
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "nothing to pick: every member's lane is empty" in err and "(grinder: 0 · hunter: 0)" in err
+    assert "--anyway" in err and not creates(state)
+    assert cli.main(["--json", "team", "start", "ao-grind"]) == 1
+    got = json.loads(capsys.readouterr().out)
+    assert got["error"].startswith("nothing to pick") and got["lanes"]["empty"] is True
+    assert cli.main(["team", "start", "ao-grind", "--anyway"]) == 0 and creates(state)
+    assert capsys.readouterr().out.splitlines()[0] == "grinder: 0 · hunter: 0"
+    # a ledger the home could not read: unknown, never empty — it starts
+    state["calls"].clear()
+    state["repos"] = {checkout: {"ledger": {"error": "no ledger", "entries": []}}}
+    assert cli.main(["team", "start", "ao-grind"]) == 0 and creates(state)
+    assert capsys.readouterr().out.splitlines()[0] == "grinder: ledger unreadable · hunter: ledger unreadable"

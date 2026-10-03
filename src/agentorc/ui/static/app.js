@@ -1315,7 +1315,34 @@
   // the header, and the fresh Stop would be pressable while the first request is still out — a
   // second wrap-up prompt to every member (review of PR #183). The team's name is the guard.
   const pendingTeams = new Set();
-  async function teamAct(name, what, btn) {
+  // design §4.5a team card **Start** (TD-262, built by TD-265): what the members' lanes hold is read on
+  // the press. Every lane empty opens the Start anyway / Cancel dialog in place of starting — one
+  // confirm, a concluded team's closes as its second line; otherwise a concluded team's own confirm
+  // carries the lane line, and the start's toast says it. A ledger that cannot be read opens nothing.
+  async function startPress(b) {
+    const name = b.dataset.team;
+    let picks = null;
+    try {
+      const r = await fetch(`/api/teams/${encodeURIComponent(name)}/lanes`);
+      if (r.ok) picks = await r.json();
+    } catch (e) {}
+    const line = (picks && picks.line) || "";
+    if (picks && picks.empty) {
+      const dlg = $("#startdlg");
+      $("#starthead").textContent = `Start ${name}?`;
+      $("#starttext").textContent = "Nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts.";
+      $("#startcloses").textContent = b.dataset.closes ? `It first closes ${b.dataset.closes}.` : "";
+      $("#startcloses").hidden = !b.dataset.closes;
+      $("#startlanes").textContent = line;
+      dlg.returnValue = "";
+      dlg.addEventListener("close", () => { if (dlg.returnValue === "go") teamAct(name, "start", b, true, line); }, { once: true });
+      return dlg.showModal();
+    }
+    if (b.dataset.confirm && !confirm(b.dataset.confirm + (line ? `\n\n${line}` : ""))) return;
+    return teamAct(name, "start", b, false, line);
+  }
+
+  async function teamAct(name, what, btn, anyway = false, lanes = "") {
     if (pendingTeams.has(name)) return;
     pendingTeams.add(name);
     const stop = what !== "start";
@@ -1323,7 +1350,7 @@
     btn.disabled = true;
     try {
       const r = await fetch(url, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ now: what === "stopnow" }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ now: what === "stopnow", anyway }),
       });
       let o = {}; try { o = await r.json(); } catch (e) {}
       // A refused start created nothing (design §4.9): the agent's own message is the whole report,
@@ -1332,6 +1359,7 @@
       // a concluded team's Start closed its sessions first (TD-099): said, since the cards it drew are gone
       const shut = (o.closed || []).length ? ` (closed ${(o.closed || []).map((c) => c.name).join(", ")} first)` : "";
       AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started${shut}`, true);
+      if (lanes) AO.toast(`${name}: ${lanes}`, true);  // what the lanes held at the press (TD-265)
       // The same two things `ao team start|stop` says and a request could not: a member the
       // definition starts interactive is out of its manager's reach (design §9 invariant 5), and the
       // manager's own stop happens after the response (review of PR #124).
@@ -2078,7 +2106,9 @@
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     box.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
-      // a concluded team's Start closes its sessions first, and its confirm names them (TD-099)
+      // a concluded team's Start closes its sessions first, and its confirm names them (TD-099); a
+      // Start reads the lanes first (TD-265)
+      if (b && b.dataset.teamAct === "start") return startPress(b);
       if (b) return b.dataset.confirm && !confirm(b.dataset.confirm) ? undefined : teamAct(b.dataset.team, b.dataset.teamAct, b);
       const fa = e.target.closest("[data-forget-all]");
       if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
