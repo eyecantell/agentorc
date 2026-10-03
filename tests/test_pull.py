@@ -126,6 +126,43 @@ def test_a_dirty_file_elsewhere_stops_nothing(repo):
     assert (root / "notes.md").read_text() == "an unsaved memory note"
 
 
+def test_auto_stash_in_the_persons_config_is_never_used(repo):
+    root, other = repo
+    _git(root, "config", "merge.autoStash", "true")
+    _behind(other, "b")
+    (root / "b").write_text("mine")  # untracked, and the merge would write it
+    r, _ = promote.pull(root, True, None, NOW)
+    assert r["outcome"] == "refused" and (root / "b").read_text() == "mine"
+    assert not _git(root, "stash", "list")
+
+
+def test_the_promote_reuses_the_pulls_fetch_of_main(repo, monkeypatch):
+    root, other = repo
+    head = _behind(other, "b")
+    _, fetched = promote.pull(root, True, "main", NOW)  # fetches, and waits on the occupant
+    calls = []
+    real = promote._git
+    monkeypatch.setattr(promote, "_git", lambda r, *a, **k: calls.append(a) or real(r, *a, **k))
+    assert promote.read_main(root, fetched)["main"] == head  # the pull's fetch went through: none here
+    assert promote.read_main(root, "git fetch: no route")["fetch_why"] == "git fetch: no route"
+    assert not [a for a in calls if a[0] == "fetch"]
+    promote.read_main(root)  # no pull this pass: the promote fetches for itself
+    assert [a for a in calls if a[0] == "fetch"] == [("fetch", "-q", "origin", "main")]
+
+
+def test_a_default_branch_other_than_main_is_followed_and_main_is_not_fetched_for_the_promote(repo):
+    root, other = repo
+    _git(other, "checkout", "-q", "-b", "trunk")
+    _git(other, "push", "-q", "origin", "trunk")
+    _git(root, "fetch", "-q", "origin")
+    _git(root, "checkout", "-q", "-b", "trunk", "origin/trunk")
+    _git(root, "remote", "set-head", "origin", "trunk")
+    _commit(other, "t")
+    _git(other, "push", "-q", "origin", "trunk")
+    r, fetched = promote.pull(root, True, None, NOW)
+    assert r["outcome"] == "pulled" and fetched is None  # the promote fetches main itself
+
+
 def test_off_reads_off_and_fetches_nothing(repo):
     root, other = repo
     before = _git(root, "rev-parse", "HEAD")

@@ -558,11 +558,11 @@ def _git_why(root: str | Path, *args: str) -> tuple[bool, str]:
     try:
         cp = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT)
     except (OSError, subprocess.TimeoutExpired) as e:
-        return False, f"git {args[0]}: {type(e).__name__}"
+        return False, f"git {args[-1]}: {type(e).__name__}"
     if cp.returncode == 0:
         return True, ""
     lines = [ln.strip() for ln in (cp.stderr or cp.stdout or "").splitlines() if ln.strip()]
-    first = re.sub(r"^(error|fatal|hint): ", "", lines[0]) if lines else f"git {args[0]} failed"
+    first = re.sub(r"^(error|fatal|hint): ", "", lines[0]) if lines else "git failed"
     return False, first[:200]
 
 
@@ -621,7 +621,8 @@ def pull(root: str | Path, on: bool, occupant: str | None, now: datetime) -> tup
             "why": "unreadable" if not occupant else None,
         }, main_fetch
     n, _ = _git(root, "rev-list", "--count", f"HEAD..origin/{default}")
-    ok, why = _git_why(root, "merge", "--ff-only", "-q", f"origin/{default}")
+    # `merge.autoStash` off whatever the person's config says: the pull never stashes (§6 *Pull*)
+    ok, why = _git_why(root, "-c", "merge.autoStash=false", "merge", "--ff-only", "-q", f"origin/{default}")
     if not ok:
         return refused(why), main_fetch
     return {**r, "outcome": "pulled", "commits": int(n) if n and n.isdigit() else None}, main_fetch
