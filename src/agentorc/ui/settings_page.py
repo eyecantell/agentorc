@@ -33,7 +33,7 @@ from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.models import tokens_short
 
-from .common import USAGE_UNKNOWN, usage_clock, usage_read
+from .common import USAGE_UNKNOWN, _age, usage_clock, usage_read
 
 # The *i* mark of each file card (§4.5a *Settings page: read-only values and the i mark*): when the
 # file is re-read and who edits it. A host's name, its `home:` and its identity mode are read once,
@@ -316,16 +316,44 @@ def _row(key: str, value: Any, default: Any = None, *, is_default: bool | None =
     return {"key": key, "value": text, "default": bool(is_default)}
 
 
-def repo_cards(checkouts: list[str], settings_repos: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+def pull_reading(reading: Mapping[str, Any] | None, now: datetime | None = None) -> str:
+    """The last pull pass's reading beside the Repos card's **pull** switch (§4.5a, §6 *Pull*,
+    TD-263): *current*, *last pulled <age> ago · n commits*, *waiting: <name> is mid-turn*,
+    *refused: <why>*, *off* — "" before any pass has reached the checkout."""
+    r = reading or {}
+    outcome = r.get("outcome")
+    if outcome == "pulled":
+        n = r.get("commits")
+        age = _age(r.get("at"), now or datetime.now(UTC))
+        count = f" · {n} commit{'' if n == 1 else 's'}" if isinstance(n, int) else ""
+        return f"last pulled {age + ' ago' if age else 'just now'}{count}"
+    if outcome == "waiting":
+        who = r.get("occupant")
+        return (
+            f"waiting: {who} is mid-turn"
+            if who
+            else "waiting: a session here cannot be read, so it is taken as mid-turn"
+        )
+    if outcome == "refused":
+        return f"refused: {r.get('why') or 'no reason given'}"
+    return str(outcome) if outcome in ("current", "off") else ""
+
+
+def repo_cards(
+    checkouts: list[str], settings_repos: Mapping[str, Any] | None, pulls: Mapping[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """**Repos** (§4.5 screen 8): a card per registered checkout with its `.agentorc.yml` values
     read-only — the keys the clients read — and, where the file carries `promote:`, the one setting,
     **auto**, as `settings.yml` holds it (`false` when absent). A repo with no block says why it has
-    no switch; a file that does not parse says so in place of its values."""
+    no switch; a file that does not parse says so in place of its values. Every card, block or not,
+    carries **pull** (§6 *Pull*: on when absent) and the home's last reading of it from `pulls`."""
     out = []
     for path in checkouts:
         root = Path(path)
         name = root.name
         card: dict[str, Any] = {"name": name, "path": path, "file": str(root / repoconfig.FILE), "rows": []}
+        card["pull"] = ((settings_repos or {}).get(name) or {}).get("pull") is not False
+        card["pull_reading"] = pull_reading((pulls or {}).get(name))
         try:
             cfg = repoconfig.load(root)
         except (ValueError, OSError) as e:

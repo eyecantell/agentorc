@@ -870,6 +870,29 @@ def test_the_origin_note_says_each_case_in_the_designs_words():
 
 
 @pytest.mark.unit
+def test_the_behind_note_ends_with_the_pulls_standing(monkeypatch):
+    """§4.5 screen 6, §6 *Pull* (TD-263): the *behind* note's tail is the home's last pull reading
+    for the repo, from the fixed table; no tail before a pass has reached it, or once it is current."""
+    from agentorc.ui import inbox
+
+    head = "read from origin/main: this checkout has not pulled it yet"
+    row = {"source": "origin/main", "fetch_note": "", "root": "/x/agentorc"}
+    for reading, tail in (
+        ({"outcome": "waiting", "occupant": "main"}, " — the host agent pulls it once main is idle"),
+        ({"outcome": "waiting", "occupant": None, "why": "unreadable"}, " — the host agent pulls it once it is idle"),
+        ({"outcome": "refused", "why": "on topic"}, " — it could not be pulled: on topic"),
+        ({"outcome": "off"}, " — pulling is off for this repo"),
+        ({"outcome": "current"}, ""),
+        ({"outcome": "pulled", "commits": 2}, ""),
+        (None, ""),
+    ):
+        monkeypatch.setattr(inbox, "PULLS", {"agentorc": reading} if reading else {})
+        assert inbox.origin_note(row) == {"text": head + tail, "warn": False}
+    monkeypatch.setattr(inbox, "PULLS", {"agentorc": {"outcome": "off"}})
+    assert inbox.origin_note({**row, "root": "/x/other"})["text"] == head  # another repo's reading
+
+
+@pytest.mark.unit
 def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(tmp_path, monkeypatch):
     """One note above the repo's first board row in the list, none for a board that matches; on a
     board whose `source` is origin, Snooze, Done and Reply are disabled with the design's reason and

@@ -402,6 +402,25 @@ ORIGIN_PHRASES: tuple[tuple[str, str, str | None], ...] = (
     ("fetched; board DIFFERS from", "(both sides changed)", "both"),
 )
 ORIGIN_READONLY = "on origin, not in this checkout yet: pull to act on it"
+# the home's pull readings by repo name (`host`'s `pulls`, §6 *Pull*), kept fresh by the app as
+# `work_marks` keeps its marks: what the *behind* note's tail says
+PULLS: dict[str, Any] = {}
+
+
+def pull_tail(reading: Mapping[str, Any] | None) -> str:
+    """The *behind* origin note's tail (§4.5 screen 6, TD-263): the pull's standing for the repo, in
+    the design's words — "" when no pass has reached it, or its last pass left it current or pulled
+    (the board read is then older than the checkout, and the next read says so)."""
+    r = reading or {}
+    outcome = r.get("outcome")
+    if outcome == "waiting":
+        who = str(r.get("occupant") or "")
+        return f" — the host agent pulls it once {who} is idle" if who else " — the host agent pulls it once it is idle"
+    if outcome == "refused":
+        return f" — it could not be pulled: {r.get('why') or 'no reason given'}"
+    if outcome == "off":
+        return " — pulling is off for this repo"
+    return ""
 
 
 def origin_case(source: str, fetch_note: str) -> str | None:
@@ -423,7 +442,8 @@ def origin_note(row: Mapping[str, Any]) -> dict[str, Any] | None:
     source, fetch_note = str(row.get("source") or ""), str(row.get("fetch_note") or "")
     case = origin_case(source, fetch_note)
     if case == "behind":
-        return {"text": f"read from {source or 'origin'}: this checkout has not pulled it yet", "warn": False}
+        tail = pull_tail(PULLS.get(Path(str(row.get("root") or "")).name)) if row.get("root") else ""
+        return {"text": f"read from {source or 'origin'}: this checkout has not pulled it yet{tail}", "warn": False}
     if case == "local":
         return {"text": "board edits made here are not on origin", "warn": False}
     if case == "both":
