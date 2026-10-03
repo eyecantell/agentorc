@@ -40,7 +40,9 @@ async def test_a_question_to_a_closed_seat_survives_a_refused_fill_and_is_there_
         for sid in (seat, plain):
             await person.call("close", id=sid)
         was = agent.sessions[seat]
-        now = datetime.now(UTC)
+        # the sweeps read the clock the test gives them, from the short ask's own send: `bound=1` is a
+        # second of wall clock, which two closes on a slow runner outlast (TD-289)
+        now = datetime.fromisoformat(short["at"])
         agent._profile_gated = lambda *a: True  # the fill is refused: a pause, as a ceiling or a down link would
         await agent._keep_running(now)
         await agent._sweep_mail(now)
