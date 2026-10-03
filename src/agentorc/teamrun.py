@@ -107,6 +107,20 @@ def live(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [s for s in sessions if s["state"] not in DEAD]
 
 
+def on_call(s: dict[str, Any]) -> bool:
+    """A seat with nobody in it (§4.9b, §6 rule 3): a record carrying `seat` that is `exited` or
+    `closed`. Its id and its grants survive the close, so whoever fills it is the controller a
+    session names now (design §4.5a New session **Controllers**, TD-269)."""
+    return bool(s.get("seat")) and s.get("state") in ("exited", "closed")
+
+
+def can_control(sessions: list[dict[str, Any]], sid: str) -> dict[str, Any] | None:
+    """The record `sid` when it may stand as a new session's controller — live, or a seat on call
+    (TD-269, built by TD-276) — else None."""
+    s = next((s for s in sessions if s.get("id") == sid), None)
+    return s if s is not None and (s["state"] not in DEAD or on_call(s)) else None
+
+
 def balance_marks(repos: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """The teams over their line, `{team: mark}`, from the `repos` reading (design §6 *Balance*,
     TD-239): each checkout's reading carries the marks whose `repo` it is."""

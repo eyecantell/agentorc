@@ -666,6 +666,27 @@ def test_the_new_session_form_offers_the_teams_and_says_their_reader(world, clie
     assert got == {"review": None, "line": "no reader: this team has no techlead seat"}
 
 
+def test_a_seat_on_call_is_a_controller_on_the_form_and_the_team_pick_ticks_it(world, client):
+    """TD-269, built by TD-276: since TD-259 a manager is a seat on call, closed until a reading
+    fills it; its id and grant survive the close, so the form lists it and the Team pick ticks it."""
+    tmp_path, fleet = world
+    _reader_org(tmp_path)
+    html = client.get("/new").text
+    assert "No session holds the <code>control</code> grant and no seat is on call" in html
+    seat = {**badged("orc-ao", "ao-grind", state="closed"), "id": "ao-agentorc-orc-ao", "seat": {"trigger": "team"},
+            "capabilities": ["control"]}  # fmt: skip
+    fleet.sessions.append(seat)
+    html = client.get("/new").text
+    assert 'data-manager="ao-agentorc-orc-ao"' in html  # the Team pick ticks it
+    box = html.split('value="ao-agentorc-orc-ao"')[1].split("</label>")[0]
+    assert "orc-ao" in box and 'class="pill s-oncall"' in box and ">on call</span>" in box
+    assert "A seat on call holds it for whoever fills it." in html
+    # a closed record that is no seat is no controller, and neither is it the Team pick's manager
+    fleet.sessions[-1] = {**seat, "seat": None}
+    html = client.get("/new").text
+    assert 'data-manager=""' in html and 'value="ao-agentorc-orc-ao"' not in html
+
+
 def test_start_with_a_team_badges_the_session_and_fills_the_teams_reader(world, client):
     tmp_path, fleet = world
     _reader_org(tmp_path)

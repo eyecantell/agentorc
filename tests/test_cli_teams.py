@@ -1618,6 +1618,23 @@ def test_new_with_a_team_takes_its_reader_and_its_live_manager(world, capsys):
     assert "held PRs read by team ao-grind's techlead on docs/briefs/**" in capsys.readouterr().out
 
 
+def test_new_with_a_team_takes_its_manager_when_it_is_a_seat_on_call(world, capsys):
+    """TD-276: `teamrun.live` dropped a manager on call, so `ao new --team` named no controller."""
+    tmp_path, state = world
+    _reader_org(tmp_path)
+    seat = {"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "closed", "team": "ao-grind"}
+    seat["seat"] = {"trigger": "team"}
+    state["sessions"].append(seat)
+    assert cli.main(["new", "me", "--team", "ao-grind"]) == 0
+    (made,) = creates(state)
+    assert made["controllers"] == ["ao-agentorc-orc-ao"]
+    assert "under orc-ao · on call: whoever fills the seat may act on it" in capsys.readouterr().out
+    state["calls"].clear()
+    state["sessions"] = [{**seat, "seat": None}]  # closed and no seat: nobody
+    assert cli.main(["new", "me2", "--team", "ao-grind"]) == 0
+    assert creates(state)[0]["controllers"] == []
+
+
 def test_new_with_a_team_keeps_a_roles_own_review_and_a_typed_controller(world):
     tmp_path, state = world
     _reader_org(tmp_path)
