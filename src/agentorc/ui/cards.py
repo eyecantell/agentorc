@@ -13,7 +13,7 @@ from typing import Any
 
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
-from agentorc.ending import closer_words
+from agentorc.ending import NO_CLOSER, closer_words
 from agentorc.org import MANAGER_WHEN
 from sessionorc import identity, mail
 from sessionorc.adapters import short_model
@@ -631,6 +631,8 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             # who closed it (§4.5 row 5 (b), TD-265): the record's closer in `ending.closer_words`' words
             kind, text = "ok", d["closer_text"]
             full = f"{text} at {d['closed_at']} · {d['closed_keep']}" if d.get("closed_at") else text
+            if text == "closed":
+                full += f" — {NO_CLOSER}"
         if said := _declared(d):
             # a record that declared keeps the declaration after its ending: it is what explains it
             text, full = f"{text} — {said[0]}", f"{full} — {said[1]}"

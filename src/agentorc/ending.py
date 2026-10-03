@@ -32,6 +32,14 @@ def closer_words(s: Mapping[str, Any], names: Mapping[str, str] | None = None) -
     return f"closed by {(names or {}).get(by) or by}"
 
 
+# why a close can read bare *closed* (§4.5 row 5 (b), design-history §4.4 2026-10-02): the hover says so,
+# so a missing closer is not read as a bug
+NO_CLOSER = (
+    "who closed it is not recorded: a close made before agentorc kept it, on a node older than the field, "
+    "or a person's Close made at the node itself, which the home's copy never sees"
+)
+
+
 def declaration(s: Mapping[str, Any]) -> tuple[str, str] | None:
     """A record's declaration (§4.9a) as `(words, why)` — *out of work* or *restart wanted*, and the
     reason as written — or None. What follows an ending on a closed or exited record, since the

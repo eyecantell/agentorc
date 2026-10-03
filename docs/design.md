@@ -1722,7 +1722,8 @@ Screens:
       *team finished* (§6 rule 9), *for a restart* (rule 2), *brief changed* (rule 7), *seat done*
       (rule 3) — the tick's four closes; rule 8's start closes nothing, a Start's close of a
       concluded session is the presser's, and a person's Restart closes as the person's — and bare *closed* for a record with no closer (every one written before this,
-      and a node older than the field), the hover adding the time; *restarts exhausted · 3 in 2 h*
+      a node older than the field, and a person's Close made at the node itself, which the home's copy never
+      sees — the hover says those three), the hover adding the time; *restarts exhausted · 3 in 2 h*
       (§6); or a
       declaration, *out of work* or *restart wanted* (an early one says *early — for a person*, a repeat
       *repeats TD-229 — for a person*),
