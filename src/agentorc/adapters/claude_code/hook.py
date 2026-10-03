@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from agentorc.adapters.claude_code import (
+    AT_COMPOSER_ENV,
     STATUSLINE_FLAG,
     STATUSLINE_REFRESH,
     displaced_status_line,
@@ -53,6 +54,7 @@ SESSION_START_NOT_A_START = {"compact"}
 # STALL_AFTER, never rung (TD-155). A prompt given with the resume reports `working` through its own
 # UserPromptSubmit, which fires after this.
 SESSION_START_AT_THE_COMPOSER = {"resume"}
+# A launch with no prompt lands at the composer too: the launch says so in `AT_COMPOSER_ENV` (TD-283).
 
 # Tool events that report `working` without being a turn's start. Each carries its name in `event`
 # (`PreToolUse:Bash`), which the host agent logs when one wakes a hook-confirmed `idle` session: an
@@ -70,8 +72,9 @@ NOTIFICATION_KINDS = {
 }
 
 
-def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
-    """Hook payload → agent `hook` params (without the session). None = nothing to report."""
+def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str, Any] | None:
+    """Hook payload → agent `hook` params (without the session). None = nothing to report.
+    `at_composer`: the launch gave no prompt (`AT_COMPOSER_ENV`), so its `startup` is `idle`."""
     ev = payload.get("hook_event_name", "")
     out: dict[str, Any] = {}
     if sid := payload.get("session_id"):
@@ -116,7 +119,9 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
         return {**out, "state": "exited", "pending": None}
     if ev == "SessionStart" and payload.get("source") in SESSION_START_NOT_A_START:
         return out or None  # the session id and model still count; the state is what it was
-    if ev == "SessionStart" and payload.get("source") in SESSION_START_AT_THE_COMPOSER:
+    if ev == "SessionStart" and (
+        payload.get("source") in SESSION_START_AT_THE_COMPOSER or (at_composer and payload.get("source") == "startup")
+    ):
         return {**out, "state": "idle", "pending": None}
     if ev == "SubagentStart":
         return {**out, "subagent_delta": 1}
@@ -274,7 +279,7 @@ def main() -> int:
         payload = json.loads(sys.stdin.read() or "{}")
     except ValueError:
         return 0
-    params = translate(payload)
+    params = translate(payload, at_composer=os.environ.get(AT_COMPOSER_ENV) == "1")
     if params is None:
         return 0
     params["session"] = session

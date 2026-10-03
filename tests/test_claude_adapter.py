@@ -14,6 +14,7 @@ from conftest import run_hook, wait_for
 
 from agentorc import profiles
 from agentorc.adapters.claude_code import (
+    AT_COMPOSER_ENV,
     CADENCE_HOOK_LINE,
     HOOK_EVENTS,
     ClaudeCodeAdapter,
@@ -66,6 +67,19 @@ def test_a_resume_lands_at_the_composer():
     # a prompt given with the resume is its own turn, reported by UserPromptSubmit after it
     assert translate({"hook_event_name": "UserPromptSubmit", "session_id": "u1"})["state"] == "working"
     assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
+
+
+def test_a_launch_with_no_prompt_starts_idle():
+    """TD-283: a launch with no prompt (Add entry's **Open a session**, `ao new` without one) lands at
+    the composer, and no Stop follows until a turn runs; the launch marks it in the pane's environment
+    and its `startup` reads `idle`. A launch with a prompt, a resume and a `/clear` are as before."""
+    ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "startup"}
+    assert translate(ev, at_composer=True) == {"adapter_id": "u1", "state": "idle", "pending": None}
+    assert translate(ev)["state"] == "working"
+    assert translate({**ev, "source": "clear"}, at_composer=True)["state"] == "working"
+    assert translate({**ev, "source": "compact"}, at_composer=True) == {"adapter_id": "u1"}
+    turn = {"hook_event_name": "UserPromptSubmit", "session_id": "u1"}
+    assert translate(turn, at_composer=True)["state"] == "working"  # its first turn is a turn
 
 
 def test_a_subagents_tool_events_leave_the_state_alone():
@@ -209,6 +223,9 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert "CLAUDE_CONFIG_DIR" not in spec.env or spec.env["CLAUDE_CONFIG_DIR"].endswith(".claude")
     assert spec.env["AGENTORC_PERMISSION_WAIT"] == "600"
     assert "AGENTORC_PROFILE" not in spec.env  # read by nothing (TD-149 (8)); the record carries the profile
+    assert AT_COMPOSER_ENV not in spec.env  # a prompt runs at once: its start is `working` (TD-283)
+    bare = ad.launch(profile="", resume=None, prompt=None, unattended=False, cwd=tmp_path)
+    assert bare.env[AT_COMPOSER_ENV] == "1"
     hooks_path = Path(spec.argv[spec.argv.index("--settings") + 1])
     assert json.loads(hooks_path.read_text())["hooks"]["Stop"]
 
@@ -216,6 +233,7 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert g.adapter_id == "abc-123" and "--resume" in g.argv and "--session-id" not in g.argv
     assert "--dangerously-skip-permissions" in g.argv
     assert g.env["CLAUDE_CONFIG_DIR"] == "/tmp/cc-grind" and g.env["AGENTORC_PERMISSION_WAIT"] == "30"
+    assert AT_COMPOSER_ENV not in g.env  # a resume's own `source: resume` says it
     # the unattended launch carries the refusing layer, the interactive one does not (TD-064 (a))
     g_layer = json.loads(Path(g.argv[g.argv.index("--settings") + 1]).read_text())
     assert g_layer["crossSessionInbound"] == "refuse"
