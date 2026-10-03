@@ -98,7 +98,7 @@ not mix:
 - **look** — a board item of kind `look`: the person's look at a merged change, for the one
   thing its builder and the techlead could not settle. With `Works (default)` it is drawn under
   *Steering* and closed at its `Due:` unless the person says otherwise; without, under *Needs
-  you*. Not a **watch**, which is a check a session makes again before acting. — *proposed*
+  you*. Not a `watch`, which is a check a session makes again before acting. — *proposed*
   2026-10-03 (design §4.9b *A UI change is verified by its builder*, TD-290; the kind is
   dev-cadence TD-082).
 - **scratch home** — a host agent and a UI run from a worktree on an `AGENTORC_HOME`, a tmux
