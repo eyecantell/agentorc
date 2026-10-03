@@ -921,7 +921,7 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     assert acts(html) == ["message", "remove"] and not any(g in menu(html) for g in gone)
     assert acts(card.render(s={**closed, "restartable": True})) == ["message", "restart", "remove"]
     # the hover: the time, then the fixed words, the day read from the reap's own constant
-    assert closed["slot"]["full"] == ("closed at 2026-09-21T01:00:00Z · forgotten by itself a day after the close")
+    assert closed["slot"]["full"] == "closed at 2026-09-21T01:00:00Z · forgotten by itself a day after the close"
     assert closed["closed_keep"] == "forgotten by itself a day after the close"
     # a closed record with no `closed_at` is never reaped, so nothing says it will be
     bare = view(_card(state="closed", pane=False))
