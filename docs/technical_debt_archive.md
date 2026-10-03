@@ -2852,7 +2852,7 @@ Both go away only when the record says who closed it.
 
 **Why:** design §6 *Pull* (TD-222): on 2026-10-01 the anchor's `main` stood nineteen commits behind origin with every board row read from origin disabled, and the promote's precondition (1) fails on a checkout no one has pulled. Paul: *lets have it do when git allows and the anchor session is idle*.
 
-**Resolved:** 2026-10-02 (PR #917, PR #918) — the pass, its reading and the switch in `src/sessionorc/promote.py` (`pull`, `pulls`), `HostAgent.pull_occupant` and `repos.<repo>.pull` (#917); the origin note's tail (`inbox.pull_tail`) and the Settings page's Repos card (`settings_page.pull_reading`) (#918). Design §6 *Pull* carries the rule; `tests/test_pull.py`, `tests/test_ui_board.py` and `tests/test_ui_settings.py` hold it.
+**Resolved:** 2026-10-02 (PR #917, PR #918) — the pass, its reading and the switch in `src/sessionorc/promote.py` (`pull`, `pulls`), `HostAgent.pull_occupant` and `repos.<repo>.pull` (#917); the origin note's tail (`inbox.pull_tail`) and the Settings page's Repos card (`settings_page.pull_reading`) (#918). Design §6 *Pull* carries the rule; `tests/test_pull.py`, `tests/test_ui_board.py` and `tests/test_ui_settings.py` hold it. A live look after the next promote is a `watch` line on `docs/user_attention.md` (PR #920).
 
 **Done when:** on a registered checkout left on `main` and behind origin with no session in its root, the home's next full pass fast-forwards it and the Repos card reads *last pulled … · n commits*; with a `working` session in the root the card reads *waiting: <name> is mid-turn* and the checkout does not move; a checkout with its own commit is left alone and says so; and the tests above pass.
 
