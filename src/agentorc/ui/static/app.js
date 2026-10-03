@@ -2588,7 +2588,8 @@
       const cols = Number.isFinite(term.cols) && term.cols > 0 ? term.cols : 120, rows = Number.isFinite(term.rows) && term.rows > 0 ? term.rows : 32;
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
       ws.binaryType = "arraybuffer";
-      ws.onopen = () => { ws.send(JSON.stringify({ resize: [cols, rows] })); };
+      // the grid as it is now, not as it was at the dial: a refit while connecting sends nothing (TD-288)
+      ws.onopen = () => { ws.send(JSON.stringify({ resize: [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows] })); };
       // The backoff resets on pane output, never on open (TD-029): a connection the server accepts
       // and then ends is not a working terminal, and resetting there retried twice a second forever.
       ws.onmessage = (m) => {
@@ -2690,7 +2691,11 @@
       cos.addEventListener("change", () => AO.setCopyOnSelect(cos));
     }
     $("#tpaste").addEventListener("click", pasteClip);
-    new ResizeObserver(() => { fit.fit(); ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); }).observe($("#term"));
+    // tmux is told the grid whatever changed it: the pane's box (the observer) or the person's
+    // face and size from Settings (`AO.setTermLook`, which refits) — TD-288: the second resized the
+    // grid here and left the pane drawing at the old width
+    term.onResize(({ cols, rows }) => { ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [cols, rows] })); });
+    new ResizeObserver(() => fit.fit()).observe($("#term"));
     term.focus();
 
     const compose = $("#compose");
