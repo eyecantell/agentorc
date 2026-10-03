@@ -2335,7 +2335,10 @@
 
   // ---- New session: the anchor rule, shown before you press Start ----
   AO.newSession = function () {
-    const dir = $("[name=dir]"), here = $("[name=where][value=here]"), wt = $("[name=where][value=worktree]"), note = $("#occupancy");
+    // the form's own Directory field: the top bar's Shell form carries a hidden `dir` of its own, first
+    // in the page, which a bare `[name=dir]` found — so a Repo pick wrote there and Start posted the
+    // field as the page drew it (found by TD-294 slice 2's browser check)
+    const dir = $("form[action='/new'] [name=dir]"), here = $("[name=where][value=here]"), wt = $("[name=where][value=worktree]"), note = $("#occupancy");
     // Declared up here, not beside `nameCheck` below: the occupancy check calls it when it moves
     // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
     const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
@@ -2647,7 +2650,9 @@
         : `no repo is registered on ${esc(o.host || h)}: type the directory`;
       // the choice kept is the one picked, else the directory set for the person (a Team's checkout)
       const want = [cur, dir.value.trim()].find((p) => p && o.repos.some((r) => r.path === p));
-      repoSel.value = want || (o.repos.length ? o.repos[0].path : "");
+      // a typed directory stays typed: *another directory…* is kept rather than replaced by a repo
+      const typed = !cur && !!dir.value.trim();
+      repoSel.value = want || (typed || !o.repos.length ? "" : o.repos[0].path);
       narrowRepos();
       applyRepo(false);
       dir.dispatchEvent(new Event("change"));  // the occupancy, the roles, the chips, the name, the team line
@@ -2666,13 +2671,18 @@
       let repos = [];
       try { repos = JSON.parse((o && o.dataset.repos) || "[]"); } catch (e) { repos = []; }
       if (!o || !o.value) { options(allDirs); narrowRepos(); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
-      const here = repos.filter((r) => r.path), away = repos.filter((r) => !r.path);
+      const here = repos.filter((r) => r.path), elsewhere = repos.filter((r) => !r.path);
+      if (away()) {  // its paths are this host's: on another host it narrows the Repo list by name (TD-294)
+        narrowRepos();
+        pnote.textContent = `narrows Repo to its repos on ${hostSel.value}: ${repos.map((r) => r.repo).join(", ") || "none"}`;
+        return;
+      }
       options(here.map((r) => r.path)); narrowRepos();
-      if (!dir.value.trim() && here.length && !away()) { dir.value = here[0].path; syncRepo(); check(); loadRoles(); nameCheck(); }
+      if (!dir.value.trim() && here.length) { dir.value = here[0].path; syncRepo(); check(); loadRoles(); nameCheck(); }
       const mine = here.some((r) => r.path === dir.value.trim());
       pnote.textContent =
         `${here.length} repo${here.length === 1 ? "" : "s"} on this host: ${here.map((r) => r.repo).join(", ") || "none"}`
-        + (away.length ? ` · ${away.map((r) => `${r.repo} is on ${r.hosts.join(", ")} — out of reach until phase 2`).join("; ")}` : "")
+        + (elsewhere.length ? ` · ${elsewhere.map((r) => `${r.repo} is on ${r.hosts.join(", ")} — out of reach until phase 2`).join("; ")}` : "")
         + (here.length > 1 ? " · the brief gets the Project block naming them" : "")
         + (mine || !here.length ? "" : " · this directory is not one of them, so none is home");
     }

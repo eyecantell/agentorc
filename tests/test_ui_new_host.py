@@ -114,3 +114,16 @@ def test_the_page_passes_the_picked_host_on_every_read():
     assert (
         "fetch(`/api/repos?host=" in js and 'hostSel.addEventListener("change", () => { gate(); loadRepos(); })' in js
     )
+
+
+@pytest.mark.unit
+def test_the_form_reads_its_own_directory_field():
+    """The top bar's Shell form carries a hidden `dir` first in the page; the New session script once
+    bound it with a bare `[name=dir]`, so a Repo pick never reached the field Start posts."""
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    body = js[js.index("AO.newSession = function") :]
+    assert "const dir = $(\"form[action='/new'] [name=dir]\")" in body
+    base = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "templates" / "base.html").read_text()
+    assert 'id="shellform"' in base and 'name="dir"' in base  # the reason the selector is scoped
