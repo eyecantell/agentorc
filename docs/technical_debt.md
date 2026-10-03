@@ -137,7 +137,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
 | TD-277 | The New session form asks for its fields in the order the code grew them: Host is fixed text, Directory, Where, Project and Team are five coupled picks, Adapter repeats the Profile, the warnings show when nothing applies, and Until and At show for an interactive session | Medium | Open — design first |
 | TD-278 | The Inbox reads every board with the first registered repo's copy of the reader, which is samscrape's, synced 2026-09-17 and without `Answers:`: no board row on the page draws its answers, Go with it, or Works / Not right… | High | Built (#929): live look pending |
-| TD-279 | A board row on the Inbox prints its line as raw text: `**` and backticks show, and a long line (a page walk) is one wall with no fold | Medium | Open |
+| TD-279 | A board row on the Inbox prints its line as raw text: `**` and backticks show, and a long line (a page walk) is one wall with no fold | Medium | Built (#933), live look pending |
 | TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Open |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Open |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
@@ -2607,7 +2607,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox, TD-138's look: *messages are still poorly formatted*, with a screenshot of the Org walk's row: a forty-line paragraph with `**`, `*` and backticks printed as typed)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #933 (`render.fold_head`, `inbox.board_text`, design §4.5a *Inbox board row: text*); merged, live look pending on `docs/user_attention.md`.
 **Location:** `src/agentorc/ui/templates/inbox.html`, `src/agentorc/ui/static/app.js` (a board row's body), `src/agentorc/ui/inbox.py`; design §4.5 screen 6, TD-138 (a message's first paragraph and *details*)
 
 **Why:** board lines are written in the board's markdown (bold head, italics, code spans), and the row prints them as text, so the head the writer bolded is not bold and the marks are noise. TD-138 folds a message after its first paragraph; a board line is one paragraph, so a page walk prints whole, and three of them fill the screen.
