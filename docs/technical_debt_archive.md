@@ -2857,3 +2857,23 @@ Both go away only when the record says who closed it.
 **Done when:** on a registered checkout left on `main` and behind origin with no session in its root, the home's next full pass fast-forwards it and the Repos card reads *last pulled … · n commits*; with a `working` session in the root the card reads *waiting: <name> is mid-turn* and the checkout does not move; a checkout with its own commit is left alone and says so; and the tests above pass.
 
 **Related:** TD-222 (the design), TD-264 (the write-back on origin's head, which leaves the checkout only ever behind), TD-208 and TD-221 (the origin note), TD-132 (the promote's pass this joins).
+
+## TD-285: A container test fails on CI now and then: the reach it reads says `root`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, at the promote of 7cca6af: main's CI failed on this test alone, and passed on a rerun of the failed job)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, the `container_home` and `agent` fixtures, `Fake`), `src/sessionorc/agent*.py` (`_note_reach`, and the tick that may call it too)
+
+**Why:** `assert reach["container"] == "abc123def456" and reach["user"] == "developer"` failed with `'root' == 'developer'` on main's run of 7cca6af (#930, which touched no container code), and the same test failed on two other recent runs; reruns pass. A red main stops the promote policy (*not now: checks on main are failed*) and a hand promote presses through it, so a flake costs either a stall or a promote over a red check. `root` is the code's fallback, not the `Fake`'s answer (its `user` is `developer`): `src/sessionorc/containers.py` takes the user from the node's devcontainer definition's `remoteUser`, else `root`, and `root` too when the read raises (`_remote_user`). The likely cause, unverified: that read sometimes finds no `remoteUser` or fails — the `agent` fixture's own tick racing the test's `_note_reach`, or the definition read before the fixture has written it.
+
+**Fix:** reproduce under load (`pytest -p no:randomly --count 50` or a loop), confirm the race, and make the test own the reach (the definition written, and the tick kept out, before `_note_reach`), rather than retrying the assertion; if the fallback itself is the fault, the code says so.
+
+**Done when:** the test passes fifty runs in a row locally and is not seen failing on CI for a week.
+
+**Related:** TD-057 (the home and node split, where the reach comes from), TD-132 (the promote's check on main).
+
+**Resolved:** 2026-10-02 (PR #941) — reproduced: `_remote_user` reads the node's own generated definition (`nodes/cm/.devcontainer/devcontainer.json`), which the `agent` fixture's supervisor writes during its provision; read before that write landed, it raised and the user fell back to `root`. Deleting the file before the read gives the CI assertion exactly, and a 1 s delay on the write fails the old test and passes the new. The test now waits until the supervisor has stood down and the definition exists. No product change: a node that dials in has been provisioned.
