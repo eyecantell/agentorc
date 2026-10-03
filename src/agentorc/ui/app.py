@@ -546,7 +546,7 @@ def create_app() -> FastAPI:
 
     async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The definitions' rows for a delta's headers."""
-        return _aged(teamrun.rows(await defs(), sessions))
+        return _aged(teamrun.rows(await defs(), sessions, await home_waiting()))
 
     async def seats_of(fleet: list[dict[str, Any]]) -> dict[str, str]:
         """The ids in `fleet` a team definition names as a seat — what `view()` draws *on call*
@@ -749,18 +749,28 @@ def create_app() -> FastAPI:
         """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
         return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
 
-    work_cache: dict[str, Any] = {"at": 0.0, "work": None}
+    work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None}
+
+    async def home_reading() -> None:
+        now = time.monotonic()
+        if work_cache["work"] is None or now - work_cache["at"] > DEFS_TTL:
+            got: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                got = dict(await call("host"))
+            work_cache.update(at=now, work=dict(got.get("work") or {}), waiting=dict(got.get("waiting") or {}))
+
+    async def home_waiting() -> dict[str, Any]:
+        """What each live session waits on (`host`'s `waiting`, §4.9a *Waiting is read, never
+        declared*, TD-274), cached as `work_marks` is: a member with a question out to the person
+        keeps its team from *concluded*, as it keeps it from the tick's wind-down."""
+        await home_reading()
+        return work_cache["waiting"] or {}
 
     async def work_marks() -> dict[str, Any]:
         """The home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8), `{}` when the agent
         cannot give them — an older agent, a node: the card then carries no note. Read at most once
         in `DEFS_TTL` seconds, `identity_info`'s idiom, so a delta storm never asks per render."""
-        now = time.monotonic()
-        if work_cache["work"] is None or now - work_cache["at"] > DEFS_TTL:
-            got: dict[str, Any] = {}
-            with contextlib.suppress(Exception):
-                got = dict((await call("host")).get("work") or {})
-            work_cache.update(at=now, work=got)
+        await home_reading()
         return work_cache["work"] or {}
 
     async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -851,6 +861,7 @@ def create_app() -> FastAPI:
         render_card=render_card,
         defs=defs,
         team_rows=team_rows,
+        home_waiting=home_waiting,
         seats_of=seats_of,
         group_heads=group_heads,
         heads=heads,
@@ -925,7 +936,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
         counts.update({k: sum(1 for v in vs if v["state"] == k) for k in ("limited", "stalled?")})
-        strip = teams_view(sessions)
+        strip = teams_view(sessions, (info or {}).get("waiting") or {})
         id_info = {} if agent_down else await identity_info()
         boards = [] if agent_down else (await board_items())[0]
         # §4.5a *Inbox row: promote* (TD-132 slice 3): the same rows the Inbox counts, from the
@@ -1200,8 +1211,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"], "on_call": teamrun.on_call(o)}
             for o in sessions_now
-            if has_control(o.get("capabilities"))
-            and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
+            if has_control(o.get("capabilities")) and (o.get("state") not in ("closed", "exited") or teamrun.on_call(o))
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -1779,7 +1789,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/teams")
     async def api_teams():
-        v = teams_view(await call("list"))
+        v = teams_view(await call("list"), await h.home_waiting())
         for row in v.get("teams", []):
             if row["name"] in stopping_leads:
                 row["stopping"] = True

@@ -26,6 +26,7 @@ from agentorc import org as orgmod
 from agentorc import teams
 from sessionorc import balance as balance_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc.client import AgentError
 from sessionorc.gitinfo import work_left
 from sessionorc.work import (
     closed_finished,
@@ -34,6 +35,19 @@ from sessionorc.work import (
 )  # one reading each for the card and the home (rules 8, 9)
 
 Call = Callable[..., Any]
+Waiting = dict[str, list[dict[str, Any]]]  # sender id → its open questions (`work.waiting_of`, TD-274)
+
+
+def waiting_of_home(call: Call) -> Waiting:
+    """What each live session waits on, from the home's `host` reading (§4.9a *Waiting is read,
+    never declared*, TD-274): the person inbox is a person's to read, so a session's `ao team status`
+    asks the home for the references and bounds, never the text. `{}` from an agent without it."""
+    try:
+        got = (call("host") or {}).get("waiting")
+    except AgentError:  # an agent that answers no `host`: an older one, a stub
+        return {}
+    return {str(k): list(v) for k, v in got.items() if isinstance(v, list)} if isinstance(got, dict) else {}
+
 
 SETTLED = ("idle", "exited", "closed")  # what "wrapped up" looks like from outside (design §4.2)
 DEAD = ("exited", "closed")
@@ -250,7 +264,9 @@ def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[d
     return lead, sorted((s for s in sessions if s is not lead), key=lambda s: s.get("name") or s["id"])
 
 
-def concluded(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> dict[str, Any] | None:
+def concluded(
+    sessions: list[dict[str, Any]], seats: Collection[str] = (), waiting: Waiting | None = None
+) -> dict[str, Any] | None:
     """When a live team has said everything it has to say (design §4.5a **team groups**, §4.9a
     *A person's Start on a concluded team*, TD-099): the home's reading of *finished* (§6 rule 9,
     `sessionorc.work.finished`, TD-241) where it holds — every live member `idle` and declared,
@@ -265,8 +281,10 @@ def concluded(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> di
     by a later declared claim — a session that declared and then took a turn is `working` with the
     word still on its record, and its team is not concluded while it is. A seat never declares; one
     that is `working` is answering somebody. `seats` are the definition's names for them, beside
-    the record's own `seat` field."""
-    f = finished(sessions, seats)
+    the record's own `seat` field. `waiting` is the home's `host` reading's (`waiting_of` over the
+    person inbox, §4.9a *Waiting is read, never declared*, TD-274): a live member with a question
+    about a reference out to the person is not concluded, whatever it declared."""
+    f = finished(sessions, seats, waiting)
     if f is None or f["why"]:
         return None
     return {"at": f["at"], "restart": f["restart"], "names": f["names"]}
@@ -403,14 +421,15 @@ def wound_down_words(r: dict[str, Any]) -> str:
     )
 
 
-def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | None = None) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
     the name, the file it came from, its projects, how many sessions it starts, how many carrying
     its badge are live, and — when none are and every one of them said why — when it wound down;
     when some are and every one is idle and declared, when it concluded (TD-099), or else why it
     has not (`not_concluded`, the reading's `why`; TD-241).
     There is no team record — a team that is stopped is only its definition, so both are counted
-    across the fleet on every call."""
+    across the fleet on every call. `waiting`: the home's (`waiting_of_home`), so a member with a
+    question out keeps its team from *concluded* as it keeps it from the tick's wind-down (TD-274)."""
     # a team's own facts read its **unattended** sessions: a person's session in the team keeps
     # nothing live and never winds it down (design §4.9 *A person in the team*, TD-173)
     crew = [s for s in sessions if not persons(s)]
@@ -422,7 +441,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
         n_live = len(badged(t.name, up))
         down = None if n_live else wound_down(mine, seat_names(t, mine))
         # the home's reading (§6 rule 9), asked once: it holds when `why` is empty
-        f = finished(mine, seat_names(t, mine)) if n_live else None
+        f = finished(mine, seat_names(t, mine), waiting) if n_live else None
         rows_out.append(
             {
                 "name": t.name,
@@ -628,7 +647,8 @@ def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str
     what was closed; raises `NamesHeld` or `TeamError` before anything is closed or created."""
     team = org.teams.get(name)
     mine = crew(name, call("list"))  # a person's session beside a concluded team neither blocks nor is closed
-    done = concluded(mine, seat_names(team, mine)) if team is not None else None
+    # a member waiting on the person's answer is not concluded, so a Start never closes it (TD-274)
+    done = concluded(mine, seat_names(team, mine), waiting_of_home(call)) if team is not None else None
     up = {str(s["id"]): s for s in live(mine)} if done else {}
     still = [v for v in held if v.get("verdict") != "live" or str(v.get("holder")) not in up]
     if still:

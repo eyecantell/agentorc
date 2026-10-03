@@ -32,6 +32,7 @@ class Fleet:
         self.calls: list[tuple[str, dict]] = []
         self.verdicts: dict[str, dict] = {}
         self.repos: dict[str, dict] = {}
+        self.waiting: dict[str, list] = {}  # the `host` reading's (TD-274)
 
     def handle(self, method: str, params: dict):
         self.calls.append((method, params))
@@ -66,7 +67,10 @@ class Fleet:
             self.sessions.append(rec)
             return rec
         if method == "host":  # the Org page's node line (design §4.4a): this fake is a home
-            return {"host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {}}
+            return {
+                "host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {},
+                "waiting": self.waiting,
+            }  # fmt: skip
         if method == "inbox":  # the Org top bar's person inbox count (design §4.5a)
             return {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0}
         if method == "identity":  # the teams line's identity note (design §4.8a, TD-077 step 2)
@@ -350,6 +354,12 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     # every declaration out of work: the header says so
     fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "out_of_work": out}
     assert "ago · out of work" in client.get("/").text
+    # a member waiting on the person's answer (TD-274): not concluded, on the page and on /api/teams
+    fleet.waiting = {"grind-1": [{"id": "m-1", "ref": "TD-222", "bound": None}]}
+    assert "grind-1 waiting on the person: TD-222" in client.get("/").text
+    (row,) = [r for r in client.get("/api/teams").json()["teams"] if r["name"] == "ao-grind"]
+    assert row["concluded"] is None and row["not_concluded"] == ["grind-1 waiting on the person: TD-222"]
+    fleet.waiting = {}
     # one member took a turn: not concluded, and Wind down is back
     fleet.sessions[1]["state"] = "working"
     head = (

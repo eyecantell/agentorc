@@ -424,3 +424,16 @@ async def test_a_member_waiting_after_the_line_takes_the_wind_down_back(agent, m
     )
     await agent._finished_pass(datetime.now(UTC))
     assert manager.finished_sent_at is None, "a member waiting on the person is a member at work again"
+
+
+async def test_the_host_reading_carries_what_each_session_waits_on(agent):
+    """TD-274's client half: nobody but a person reads the person inbox, so the home's `host`
+    reading carries `waiting` — the reference and the bound, never the text — for the page's
+    *concluded* and a session's `ao team status`."""
+    agent.person_inbox.append(
+        MailEntry(id="m-h", from_="ao-x-g1", to=[PERSON], at=START, kind="steer", text="secret?", about="td-7",
+                  bound="2026-10-02T09:57:00Z", default="d")
+    )  # fmt: skip
+    got = (await agent.rpc_host())["waiting"]
+    assert got == {"ao-x-g1": [{"id": "m-h", "ref": "TD-007", "bound": "2026-10-02T09:57:00Z"}]}
+    assert "secret" not in str(got)

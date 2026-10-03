@@ -963,8 +963,14 @@ def cmd_team_status(args: argparse.Namespace) -> int:
 
     # the home's reading of the team, the one the tick and the page take: it holds when `why` is empty
     team = org.teams.get(args.name)
-    finished = teamrun.finished(found, teamrun.seat_names(team, found) if team is not None else ())
-    return emit(args, {"team": args.name, "sessions": rows, "finished": finished}, prose)
+    # …and what each member waits on, the home's reading of the person inbox (§4.9a, TD-274): a
+    # member with a question out is not finished, whatever it declared
+    asked: teamrun.Waiting = {}
+    with contextlib.suppress(AgentError, AgentUnavailable):
+        asked = teamrun.waiting_of_home(call_sync)
+    finished = teamrun.finished(found, teamrun.seat_names(team, found) if team is not None else (), asked)
+    waiting = {str(s.get("name") or s["id"]): asked[str(s["id"])] for s in found if str(s.get("id")) in asked}
+    return emit(args, {"team": args.name, "sessions": rows, "finished": finished, "waiting": waiting}, prose)
 
 
 def cmd_team_list(args: argparse.Namespace) -> int:
@@ -975,7 +981,10 @@ def cmd_team_list(args: argparse.Namespace) -> int:
         org = _org_here()
     except ValueError as e:
         return fail(args, str(e), 1)
-    rows = teamrun.rows(org, call_sync("list"))
+    asked: teamrun.Waiting = {}
+    with contextlib.suppress(AgentError, AgentUnavailable):
+        asked = teamrun.waiting_of_home(call_sync)  # a member waiting on the person is not concluded (TD-274)
+    rows = teamrun.rows(org, call_sync("list"), asked)
     # the home's `work_waiting` marks (§6 rule 8), as ids per team; an agent without the reading has none
     waiting: dict[str, int] = {}
     with contextlib.suppress(AgentError, AgentUnavailable):

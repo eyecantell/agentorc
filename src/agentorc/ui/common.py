@@ -767,11 +767,12 @@ def _aged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
-def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
+def teams_view(sessions: list[dict[str, Any]], waiting: teamrun.Waiting | None = None) -> dict[str, Any]:
     """The **Teams** strip's contents (design §4.5a): every definition with its source, projects,
-    member count and live count — `teamrun.rows`, the very rows `ao team list` prints."""
+    member count and live count — `teamrun.rows`, the very rows `ao team list` prints. `waiting` is
+    the `host` reading's (TD-274), without which no member reads as waiting on the person."""
     org, notes = org_here()
-    rows = _aged(teamrun.rows(org, sessions))
+    rows = _aged(teamrun.rows(org, sessions, waiting))
     # on a node the one note is where the org is, not a definition that failed to read
     elsewhere = notes[0] if hosts.is_node() and notes else ""
     return {"teams": rows, "source": str(org.path or ""), "notes": [] if elsewhere else notes, "elsewhere": elsewhere}

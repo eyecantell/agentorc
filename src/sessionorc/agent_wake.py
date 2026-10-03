@@ -22,6 +22,7 @@ from sessionorc import (
     naming,
     paths,
     waits,
+    work,
 )
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
@@ -973,13 +974,18 @@ class WakeMixin:
         shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
         promote's readings per repo (`promotes`, §6 *Promote*), the pull's (`pulls`, §6 *Pull*) and
         each wound-down team's `work_waiting` as the `host` record holds it (`work: {<team>: mark}`,
-        §6 rule 8), which is what draws the Inbox's team start row and the card's note."""
+        §6 rule 8), which is what draws the Inbox's team start row and the card's note; and what
+        each live session waits on (`waiting: {<sender>: [{id, ref, bound}]}`, `work.waiting_of`
+        over the person inbox, §4.9a *Waiting is read, never declared*, TD-274) — references and
+        bounds, never the questions' text — which a session's `ao team status` cannot read for
+        itself, since nobody reads the person inbox but a person."""
         out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
         out["built_from"], out["started_at"] = dict(self.build), self.started_at
         if self.mode == "home":
             out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
             out["promotes"] = self._promotes_view()
             out["pulls"] = self._pulls_view()
+            out["waiting"] = work.waiting_of(self.person_inbox)
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())

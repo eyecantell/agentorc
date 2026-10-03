@@ -2834,10 +2834,10 @@ whose consequence is least visible:
   line has none: Message… on a card opens with that session's own line.
 - **not concluded** (a live team's header) — Says why this team has no Start yet: one clause for
   each session that keeps it from reading concluded — one that is working, one idle that has not
-  declared, one that crashed or wants a restart. Read it to see what to wait for, or which session
-  to message or close, before the team can be started again. It is read from the sessions' records
-  each time the page is drawn and is nothing to press: Wind down and Stop now are the controls
-  beside it.
+  declared, one that crashed or wants a restart, one waiting on your answer to its question. Read it
+  to see what to wait for, or which session to message or close, before the team can be started
+  again. It is read from the sessions' records and your Inbox each time the page is drawn and is
+  nothing to press: Wind down and Stop now are the controls beside it.
 - **Forget** (a card's foot, the exited banner) — Drops this session's record: the card, its report
   line and its mail. Press it when a finished session's card is clutter — its work merged, or pushed
   and accounted for. It stops nothing, since a live session offers no Forget; the worktree and the
@@ -4765,7 +4765,8 @@ is the fact; whether the process also went is the tool's business. A member that
 merely idle.
 
 **Waiting is read, never declared** (TD-271; designed 2026-10-02; the home's reading built 2026-10-02 —
-TD-274 slice 1, `work.waiting_of`; the page's, the CLI's and the words are TD-274's rest). On
+TD-274 slice 1, `work.waiting_of`; the page's and the CLI's the same day — TD-274's client half; the words
+are TD-274's rest). On
 2026-10-02 the designer held three design PRs whose merge waited on a `steer`'s bound, declared
 `none` since its lane held nothing more to pick, and the team wound down with it: for eighteen
 hours the bounds passed with nobody to take the defaults, and the answers Paul wrote reached
@@ -4778,7 +4779,13 @@ is read where *finished* is read — `finished` (§6 rule 9), from the records a
 derived on every tick and never stored — and a waiting member is **not finished, whatever it
 declared**: its `why` clause reads *designer-ao-1 waiting on the person: TD-222, until 09:57* (the
 `about`, and the bound where there is one), so neither the tick nor the manager's round winds the
-team down, and the card, Focus and `ao status -v` say the same (§4.5a *waiting* mark). The
+team down, and the card, Focus and `ao status -v` say the same (§4.5a *waiting* mark). Nobody but
+a person reads the person inbox, so the home's `host` reading carries what each live session waits
+on — `waiting: {<sender>: [{id, ref, bound}]}`, references and bounds, never a question's text —
+and every other reader of *finished* takes it from there: the page's *concluded* and its *not
+concluded* line, a Start's close of a concluded team (§4.9a *A person's Start on a concluded
+team*, so a Start never closes a member whose question is out), `ao team list`, and `ao team status
+--json`, which carries it as `waiting: {<name>: [{id, ref, bound}]}`. The
 declaration stands beside it: `none` says the lane holds nothing to pick, which is true, and the
 wait says what else holds the member; `none` is not refused for it, since a member with a question
 out and nothing to pick has said exactly the right two things. The answer and the lapse both reach
