@@ -2019,3 +2019,29 @@ def test_the_repo_pick_and_another_directory(client, tmp_path):
     assert client.get("/api/dir_check", params={"dir": str(a)}).json()["exists"] is True
     gone = client.get("/api/dir_check", params={"dir": str(tmp_path / "nope")}).json()
     assert gone["exists"] is False and gone["why"].startswith("no such directory on ")
+
+
+def test_where_is_worktree_first_with_the_free_worktrees(client, tmp_path):
+    """§4.5a New session **the reworked form** (TD-284 slice 4): Where offers a new worktree named as
+    the session first, the checkout itself second; `/api/worktrees` lists the repo's worktrees under
+    `.claude/worktrees/` that nobody is in, for the chips whose press takes its name."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    for n in ("spike", "td-290"):
+        subprocess.run([*git, "worktree", "add", "-q", str(repo / ".claude" / "worktrees" / n)], check=True)
+    (repo / ".claude" / "worktrees" / "not-a-worktree").mkdir()
+    got = client.get("/api/worktrees", params={"repo": str(repo)}).json()["worktrees"]
+    assert [w["name"] for w in got] == ["spike", "td-290"]
+    assert client.get("/api/worktrees", params={"repo": str(tmp_path / "plain")}).json()["worktrees"] == []
+    page = client.get(f"/new?dir={repo}").text
+    where = page[page.index("<label>Where</label>") :]
+    assert where.index('value="worktree"') < where.index('value="here"')  # worktree first
+    assert 'id="wtchips" hidden' in where and 'type="hidden" name="worktree"' in where
+    assert "The checkout itself" in where
+    # a Resume with changes… keeps the Where it was filled in with, and its worktree's own name
+    again = client.get(f"/new?dir={repo}&where=worktree&worktree=wt-1&name=w&prefilled=1").text
+    assert 'data-prefilled="1"' in again and '<code id="wtname">wt-1</code>' in again
+    assert 'name="where" value="worktree" checked' in again
