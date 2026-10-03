@@ -147,7 +147,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
-| TD-293 | New session on another host reads this host's disk for the Repo list, the roles and the brief, ledger and reader a role resolves, and draws no directory check, occupancy or worktree chips | Medium | Open: design-first |
+| TD-293 | New session on another host reads this host's disk for the Repo list, the roles and the brief, ledger and reader a role resolves, and draws no directory check, occupancy or worktree chips | Medium | Designed 2026-10-03 — the build is TD-294 |
+| TD-294 | Build the New session form's reads on the picked host: `host_occupancy`, `host_worktrees`, `stat`'s `root`, the page's endpoints taking `host`, the role resolved from the node's files | Medium | Open |
 
 
 ---
@@ -2793,7 +2794,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (grinder-ao-2, TD-284 slice 6; the review of #949)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open: design-first
+**Blocked by:** TD-294
+**Status:** **Designed 2026-10-03** (the designer, PR #954; obvious from §4.4a *Teams across hosts* — a team start on another host already reads the registry, a directory and the repo's files there — so landed with a note to Paul). Design: §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*). Of the Fix's two ways, the node returns the files and the home parses them: `host_files` and `repoconfig.load_text`, the team start's loader, so nothing new crosses the link for roles; the two new reads are `host_occupancy` and `host_worktrees`, and `stat` gains `root`. **Next:** designed; the build is TD-294.
 **Location:** `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()` in `dirCheck`, `loadWorktrees`, `check`), `src/agentorc/ui/app.py` (`new_form`: `form_repos(hosts.local_host().repos())`, `_roles_for`; `new_submit`: `repoconfig.discover`, `resolve_role`, `team_reader`; `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/sessionorc/agent_link.py` (`_read`), `src/sessionorc/agent_remote.py` (`_act_host`, `_route_read`), design §4.5a New session **the form** (*Another host*), §4.4a
 
 **Why:** the Host pick (TD-284 slice 3) sends the create and the name check to the picked host, but the rest comes from this host or is not drawn: the Repo list is this host's registry, and the Role list and the role a Start resolves come from this disk's `.agentorc.yml` — its brief, its ledger and the team's reader with it; *another directory…*'s check, the occupancy and the Where chips are skipped (`app.js`'s `away()`), so the person learns of a missing directory or an occupied checkout only from the node's refusal at Start. A pick of another host is right only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.
@@ -2803,3 +2805,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, and a role started there carries the node's brief and ledger.
 
 **Related:** TD-284 (the form), TD-057 (the link and routed reads), TD-145 (a worktree record's Resume with changes…).
+
+## TD-294: Build the New session form's reads on the picked host
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the designer, TD-293's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_link.py` (the node's link methods beside `stat`, `repos`, `files`), `src/sessionorc/agent_remote.py` (`rpc_host_dir`, `rpc_host_repos`, `rpc_host_files`: the two new reads beside them), `src/agentorc/ui/app.py` (`new_form`, `_roles_for`, `new_submit`, `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()`), `src/agentorc/teamrun.py` (how a team start reads a node's config and briefs: the model); design §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*)
+
+**Why:** design §4.4a *The New session form on another host* (TD-293): a pick of another host is right today only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.
+
+**Fix:** build it as written, in slices, each its own PR. (1) **The reads** (touches `src/sessionorc/**`: the reader's read; `src/sessionorc/modes.py` for `HOME_ONLY`): the link methods `occupancy` and `worktrees` and `root` on `stat`'s reply; the home's `host_occupancy {host, dir}` — the home's own reading added for a container node on this machine — and `host_worktrees {host, repo}` (`[{name, path, occupied}]`), each answering for this host without the link, refusing an unreachable host in words, both in `modes.HOME_ONLY` beside `host_files` (they name another host's sessions and worktrees) and, as `host_dir` is, not in `identity.READS` (`tests/test_identity.py` pins that list); a test over a linked pair for each. (2) **The page**: `/api/repos?host=` and `host` on `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles` and `/api/team_review`; `app.js` passes the picked host, `away()` and its skips go, a Host change re-reads every reading and clears a Repo the new host does not list, *<host> did not answer* in a note's place. (3) **Start**: `new_submit` resolves the role, its brief, the ledger, the `controllers:` default and the team's reader from the picked host's files (`host_files`, `repoconfig.load_text`), as `teamrun` does for a team on another host; the §4.5a row's *Until that is built* sentence comes out.
+
+**Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, an occupied directory there is said before Start, and a role started there carries the node's brief and ledger.
+
+**Related:** TD-293 (the design), TD-284 (the form), TD-057 (the link), TD-229 (`host_repos`).
