@@ -143,7 +143,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
 | TD-284 | Build the reworked New session form: the order, the Host pick, Profile as the one tool pick, the Repo pick and the worktree-first Where, the Role pick that retires the Unattended switch, warnings only when Start is disabled | Medium | Open |
-| TD-289 | `test_seat_closed.py::test_a_question_to_a_closed_seat_survives_a_refused_fill_and_is_there_at_the_fill` fails on CI now and then: a second ask expires beside the one the test expects | Medium | Open |
 
 
 ---
@@ -2710,20 +2709,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-277 (the design), TD-269 / TD-276 (a seat on call as controller), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume with changes…), TD-160 (a person's own session inside a team).
 
-## TD-289: A seat test fails on CI now and then: a second ask expires beside the one expected
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-02 (the anchor, at PR #937's CI: attempt 2 failed on this test alone, attempt 1 and 3 on TD-285's; it also failed run 37090936027 on a branch)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_seat_closed.py` (`test_a_question_to_a_closed_seat_survives_a_refused_fill_and_is_there_at_the_fill`, the assertion `mail["expired"] == [lost["id"]]`), the home's expiry of asks to closed records
-
-**Why:** `assert mail["expired"] == [lost["id"]], "a closed record that is no seat expires its ask, as ever"` failed with a second id in the list (`['m-07d2f728a44c', 'm-4fe2fb1334fa']`): an ask the test expects to survive, the seat's, expired too, or a tick ran an expiry the test did not plan. It passes locally and on reruns, so it is timing: a red check stops the promote policy and makes every PR's author rerun CI.
-
-**Fix:** reproduce under a slowed tick or a loop, find which ask the second id is and what expired it, and make the test own the timing (or fix the expiry if a seat's ask can expire). As TD-285 was (#941): show the cause before the fix.
-
-**Done when:** the cause is shown, and the test passes fifty runs in a row.
-
-**Related:** TD-285 (the container test's race, the same shape), TD-097 (a seat), TD-259 (the manager on call).
