@@ -179,6 +179,46 @@ def test_an_exited_holder_is_superseded_and_the_start_goes_ahead(world):
     assert [p["name"] for p in creates(state)] == ["orc-ao", "grind-1", "grind-2", "hunt"]
 
 
+def test_a_start_under_a_closed_members_name_asks_keep_mail_for_that_create_alone(world):
+    """§4.10 *The name coming back adopts it* (TD-274): a member whose name a **closed** record holds
+    is created with `keep_mail`, so the note left in that mailbox is its successor's; an exited
+    holder's (a crash's) and a free name's are created as before. The host agent decides whether
+    the caller may hand that mailbox on (§4.9b); the start only asks."""
+    tmp_path, state = world
+    state["verdicts"]["grind-1"] = {"name": "grind-1", "verdict": "supersede", "holder_state": "closed"}
+    state["verdicts"]["grind-2"] = {"name": "grind-2", "verdict": "supersede", "holder_state": "exited"}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert {p["name"]: p.get("keep_mail") for p in creates(state)} == {
+        "orc-ao": None, "grind-1": True, "grind-2": None, "hunt": None,
+    }  # fmt: skip
+
+
+def test_a_sessions_start_asks_keep_mail_only_for_a_closed_record_it_controls(world, monkeypatch, capsys):
+    """§4.9b, §9 invariant 9 (TD-274, the techlead's read of #932): the host agent hands a closed
+    record's mailbox on only to a person or that record's controllers, so a session's `ao team start`
+    asks `keep_mail` where it controls the holder and nowhere else — every create still goes through,
+    the start stays all or nothing, and a note names the member that starts empty and why."""
+    tmp_path, state = world
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-lead")
+    state["sessions"][:] = [
+        {"id": "ao-agentorc-grind-1", "name": "grind-1", "state": "closed", "controllers": ["ao-agentorc-lead"]},
+        {"id": "ao-agentorc-grind-2", "name": "grind-2", "state": "closed", "controllers": []},
+    ]
+    for n in ("grind-1", "grind-2"):
+        state["verdicts"][n] = {
+            "name": n,
+            "verdict": "supersede",
+            "holder": f"ao-agentorc-{n}",
+            "holder_state": "closed",
+        }
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    keeps = {p["name"]: p.get("keep_mail") for p in creates(state)}
+    assert keeps == {"orc-ao": None, "grind-1": True, "grind-2": None, "hunt": None}
+    out = capsys.readouterr().err  # a start's notes go to stderr, beside its warnings
+    assert "grind-2 starts with an empty mailbox: ao-agentorc-lead is not a controller of ao-agentorc-grind-2" in out
+    assert "grind-1 starts with an empty mailbox" not in out
+
+
 def test_a_start_ends_with_the_build_line_once_and_never_refuses_on_it(world, capsys):
     """Design §4.7 `ao team start`, TD-132 slice 5 (TD-062): what the team runs under is said once,
     after the members — a build behind main is the person's to promote, and the start goes on."""
@@ -888,6 +928,7 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     first_create = next(i for i, (m, _) in enumerate(state["calls"]) if m == "create")
     assert all(m != "close" for m, _ in state["calls"][first_create:])
     assert [p["name"] for p in creates(state)] == names
+    assert all(p.get("keep_mail") is True for p in creates(state)), "each closed record's mail is kept (TD-274)"
     assert capsys.readouterr().out.count("closed (concluded)") == 5
     concluded_team()
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 0

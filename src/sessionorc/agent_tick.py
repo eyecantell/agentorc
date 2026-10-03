@@ -85,6 +85,17 @@ from sessionorc.models import (
 from sessionorc.tmux import PaneInfo
 
 
+def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) -> dict[str, list[str]]:
+    """A `work_waiting` mark's members with each question's reference under the name that asked it
+    (§6 rule 8 *A question's end is work*, TD-274): `members` (a lane's new ids) copied, or none."""
+    out = {m: list(ids) for m, ids in (members or {}).items()}
+    for q in questions:
+        got = out.setdefault(str(q.get("name")), [])
+        if str(q.get("ref")) not in got:
+            got.append(str(q.get("ref")))
+    return out
+
+
 class TickMixin:
     # -- reconcile -------------------------------------------------------------------------------
     #
@@ -1353,6 +1364,9 @@ class TickMixin:
         is not *no id new* (the techlead's read of #788)."""
         if on_work == "off" or work_mod.team_wound_down(records) is None:
             return None
+        # a question's end (§6 rule 8 *A question's end is work*, TD-274) is written once, at the
+        # lapse or the answer, and stands with the mark until a start, Dismiss or a live team clears it
+        questions = list(old.get("questions") or []) if isinstance(old, dict) else []
         news: dict[str, dict[str, list[str]]] = {}  # repo → member → ids
         for r in sorted(work_mod.crew(records), key=lambda r: (r.name, r.id)):
             if r.seat is not None or r.superseded_by:
@@ -1369,6 +1383,9 @@ class TickMixin:
         news = {repo: {m: ids for m, ids in ms.items() if ids} for repo, ms in news.items()}
         news = {repo: ms for repo, ms in news.items() if ms}
         if not news:
+            if questions:  # nothing new in the lanes: the questions' references alone, under their names
+                at = old.get("at") or now_iso()
+                return {"at": at, "repo": old.get("repo"), "members": _asked(questions), "questions": questions}
             return None
         repo = min(news)
         members = news[repo]
@@ -1378,7 +1395,54 @@ class TickMixin:
         if now - newest < agent_common.WORK_SETTLE:
             return old if isinstance(old, dict) else None  # still settling: what stands, stands
         at = old.get("at") if isinstance(old, dict) and old.get("at") else now_iso()
+        if questions:  # the questions' references and repo are the mark's own, the lanes' news beside them
+            members = _asked(questions, members)
+            return {"at": at, "repo": old.get("repo") or repo, "members": members, "questions": questions}
         return {"at": at, "repo": repo, "members": members}
+
+    def _question_end(self, e: Any, how: str) -> None:
+        """§6 rule 8 *A question's end is work* (TD-271, TD-274 slice 4): an orphaned question that
+        lapsed (`how: lapsed`) or was answered (`answered`) while its asker's team is **wound down**
+        writes `work_waiting` for the team as a lane's new id does — `members[<name>]` gaining the
+        reference, `questions` gaining `{id, ref, name, how, kind}` (the Inbox row says *steer* or
+        *ask*) — with no settle, a standing mark gaining the question and keeping its `at`. Under `on_work: off`, or for a team stopped rather
+        than wound down, or one live again, nothing is written: a live member is waiting (§4.9a), and
+        a stopped team's note waits in the mailbox for the person's Start. The next tick's
+        `_work_marks` does what the team's `on_work` says. Never on a node."""
+        o = e.orphaned if isinstance(e.orphaned, dict) else {}
+        team, name, ref = str(o.get("team") or ""), str(o.get("name") or ""), str(o.get("ref") or "")
+        if self.mode != "home" or not (team and name and ref):
+            return
+        try:
+            on_work = (settings_mod.teams(settings_mod.load()).get(team) or {}).get("on_work", "ask")
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line, never the answer's failure
+            log.exception("reading %s's settings for rule 8's question failed", team)
+            return
+        records = [r for r in self._graph().values() if r.team == team]
+        if on_work == "off" or work_mod.team_wound_down(records) is None:
+            return
+        teams = self._host_rec.setdefault("teams", {})
+        rec = teams.setdefault(team, {})
+        old = rec.get("work_waiting") if isinstance(rec.get("work_waiting"), dict) else {}
+        if any(isinstance(q, dict) and q.get("id") == e.id for q in old.get("questions") or []):
+            return  # a question ends once
+        members = {m: list(ids) for m, ids in (old.get("members") or {}).items()}
+        if ref not in members.setdefault(name, []):
+            members[name].append(ref)
+        questions = [*(old.get("questions") or []), {"id": e.id, "ref": ref, "name": name, "how": how, "kind": e.kind}]
+        rec["work_waiting"] = {
+            **old,
+            "at": old.get("at") or now_iso(),
+            "repo": old.get("repo") or str(o.get("repo") or ""),
+            "members": members,
+            "questions": questions,
+        }
+        log.info("rule 8: %s's %s about %s %s; %s has work waiting", name, e.kind, ref, how, team)
+        self._question_ended = True  # the sweep pushes it: the next tick reads the mark unchanged
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
 
     async def _work_start(
         self,
@@ -1424,7 +1488,9 @@ class TickMixin:
         log.info("rule 8: starting %s again for %s (%d records)", team, ids, len(replays))
         for r in replays:
             try:
-                await self._replay(r, "work", mark=dict(about), **({"keep_mail": True} if r.seat is not None else {}))
+                # every record's mail kept, as a fill's and a Restart's is: a lapse note or an answer
+                # written to the closed record waits there for this successor (§4.10, TD-271)
+                await self._replay(r, "work", mark=dict(about), keep_mail=True)
             except Exception:  # noqa: BLE001 — one record's failure is never the team's start
                 log.exception("%s: rule 8's replay failed", self._address(r))
         return None

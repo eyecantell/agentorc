@@ -2526,3 +2526,33 @@ async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_t
             q4 = (await wc.call("msg", to=tl, text="mine", kind="ask"))["entry"]
             with pytest.raises(AgentError, match="person inbox holds no question"):
                 await w2c.call("msg", to="person", text="not yours", kind="ask", thread=q4["id"])
+
+
+async def test_a_start_under_a_closed_members_name_keeps_its_mail_only_when_asked(agent, tmp_path):
+    """TD-274 slice 4, design §4.10 *The name coming back adopts it*, §4.9b `--keep-mail`: the lapse
+    note left in a closed record's mailbox is its successor's when the create asks `keep_mail` (a
+    team's start does), and the badge alone hands nothing on (§9 invariant 9) — a create under the
+    name with the same team and no `keep_mail` starts empty, and a session that is not one of the
+    record's controllers is refused the ask."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        other = await mk("other", unattended=True, team="ao-grind", capabilities=["control"])
+        w = await mk("w", unattended=True, team="ao-grind")
+        async with LocalClient(caller=w) as s:
+            steer = (await s.call("msg", to="person", text="or?", kind="steer", default="x", about="TD-5", bound=0.2))[
+                "entry"
+            ]["id"]
+        await person.call("close", id=w)
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        again = {"name": "w", "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"]}
+        again.update(unattended=True, team="ao-grind")
+        w2 = (await person.call("create", keep_mail=True, **again))["id"]
+        texts = [e["text"] for e in (await person.call("inbox", id=w2))["entries"]]
+        assert f'steer {steer} about TD-5 lapsed: the default was "x"' in texts
+        await person.call("close", id=w2)
+        async with LocalClient(caller=other) as oc:
+            with pytest.raises(AgentError, match="not a controller of"):
+                await oc.call("create", keep_mail=True, **again)
+            w3 = (await oc.call("create", **again))["id"]
+        assert (await person.call("inbox", id=w3))["entries"] == []
