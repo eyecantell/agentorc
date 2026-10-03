@@ -15,7 +15,7 @@
 - [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — the designer's stacked PRs may already hold the design; compare and reconcile, never design twice
 - [A park is a merged PR, not an open one](a-park-is-a-merged-pr.md) — the designer reads the board on `main`; wait for the park PR to merge, and re-search the id in every state before the round
 - [Check in-flight work before a TD step](check-in-flight-before-a-td-step.md) — another session may hold the next step; conformance-read instead; `ao msg` for leads, never a peer message
-- [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — snap Firefox `--headless --screenshot`; profile and output under a plain home dir, not /tmp or hidden
+- [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — snap Firefox `--headless --screenshot` at load; Playwright (`~/ao-shots/pwlib`, Chromium) for anything after scripts run; read-only against the live UI
 - [Open the PR before writing its number](open-the-pr-before-writing-its-number.md) — a guessed `PR #N` in the ledger points at someone else's PR
 - [pdm run fmt sweeps other sessions' files](pdm-run-fmt-sweeps-other-sessions-files.md) — it formats the whole repo; `git add -A` after it steals a sibling's merged files into your PR
 - [gh comment bodies go in a file](gh-comment-bodies-go-in-a-file.md) — `--body "…"` lets bash run its backticks; use `--body-file`
