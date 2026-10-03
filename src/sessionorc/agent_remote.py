@@ -30,6 +30,7 @@ from sessionorc.agent_common import (
     NODE_ACTS,
     NODE_READS,
     RpcError,
+    closer_of,
     launch_params,
     log,
     read_checkout,
@@ -340,9 +341,12 @@ class RemoteMixin:
         if method == "create":
             await self._check_occupancy_for(host, params)
         home_copy = self.remote.get(host, {}).get(rid) if method == "close" else None
-        if home_copy is not None and home_copy.closed_for:
+        if home_copy is not None:
             # any close clears the tick's mark; the tick writes its own after this returns (§6 rule 2, TD-237)
             home_copy.closed_for = None
+            # who closed it is the home's to record (§4.5 row 5 (b), TD-265); the node writes the
+            # same word from the params it is handed, and an older node drops them
+            home_copy.closer = closer_of(caller, params.get("closer"), now_iso())
             self._save(home_copy)
         mux = self._node_mux(host)
         sent = dict(params)

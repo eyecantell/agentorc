@@ -248,8 +248,8 @@ async def test_a_wanted_restart_counts_toward_the_ceiling_and_a_failed_close_is_
         rec.restart_ceiling, rec.restarts = None, []
         real_close = agent.rpc_close
 
-        async def close_then_fail(id):
-            await real_close(id)
+        async def close_then_fail(id, closer=None):
+            await real_close(id, closer=closer)
             raise RuntimeError("push failed")
 
         monkeypatch.setattr(agent, "rpc_close", close_then_fail)
@@ -386,8 +386,8 @@ async def test_the_ticks_own_failed_close_is_marked_and_a_person_s_close_in_the_
         rec.git = dict(CLEAN)
         real_close = agent.rpc_close
 
-        async def close_then_fail(id):
-            await real_close(id)
+        async def close_then_fail(id, closer=None):
+            await real_close(id, closer=closer)
             raise RuntimeError("push failed")
 
         monkeypatch.setattr(agent, "rpc_close", close_then_fail)
@@ -419,7 +419,7 @@ async def test_a_close_that_fails_before_marking_the_record_leaves_no_mark(agent
         rec.git = dict(CLEAN)
         real_close = agent.rpc_close
 
-        async def fail_at_once(id):
+        async def fail_at_once(id, closer=None):
             raise RuntimeError("kill failed")
 
         monkeypatch.setattr(agent, "rpc_close", fail_at_once)

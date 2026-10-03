@@ -205,6 +205,18 @@ def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[
 INTENT_FIELDS = HOME_OWNED - frozenset(
     {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
 )
+
+
+def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:
+    """A close's `closer: {by, why, at}` (§4.5 row 5 (b), TD-265): `closer` as handed in — the
+    tick's word, or the home's over the link — only from a call with no session caller; otherwise
+    `person` for no caller and the caller's id for a session, which the acting gate verified."""
+    if mail.is_person(caller) and isinstance(closer, dict) and closer.get("by"):
+        why = closer.get("why")
+        return {"by": str(closer["by"]), "why": str(why) if why else None, "at": at}
+    return {"by": "person" if mail.is_person(caller) else str(caller), "why": None, "at": at}
+
+
 # A checkout's files read across the link for a team start (§4.4a "Teams across hosts", step
 # 4b.3): its repo config and the briefs its roles name. A read across a trust boundary, so bounded:
 # at most this many files per call, each at most this many bytes, and only inside the checkout.

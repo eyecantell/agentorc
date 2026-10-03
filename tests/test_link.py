@@ -1973,6 +1973,15 @@ async def test_a_close_routed_to_a_node_clears_the_ticks_mark_at_the_home(agent)
         await person.call("close", id="ao-x-w@laptop")
     assert mux.sent[-1][0] == "act" and mux.sent[-1][1]["rpc"] == "close"
     assert agent.remote["laptop"]["ao-x-w"].closed_for is None
+    # TD-265: who closed it is the home's, written on its copy as it routes the close; the tick's
+    # word rides the params to the node, which writes the same
+    assert agent.remote["laptop"]["ao-x-w"].closer["by"] == "person"
+    await agent._route_act("close", {"id": "ao-x-w", "closer": {"by": "tick", "why": "finished"}}, None, "laptop")
+    assert mux.sent[-1][1]["params"]["closer"] == {"by": "tick", "why": "finished"}
+    assert (agent.remote["laptop"]["ao-x-w"].closer["by"], agent.remote["laptop"]["ao-x-w"].closer["why"]) == (
+        "tick",
+        "finished",
+    )
 
 
 async def test_a_persons_close_at_the_node_no_longer_matches_the_ticks_mark(agent):

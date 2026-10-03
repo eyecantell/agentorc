@@ -40,15 +40,16 @@ class _Home:
     """The agent's close and its policy send stood in for: what rule 9 closed and typed, in order."""
 
     def __init__(self, agent, monkeypatch, *recs: Session) -> None:
-        self.agent, self.closed, self.sent, self.takes = agent, [], [], True
+        self.agent, self.closed, self.sent, self.takes, self.closers = agent, [], [], True, []
         for r in recs:
             r.host = agent.host
             agent.sessions[r.id] = r
         monkeypatch.setattr(agent, "rpc_close", self._close)
         monkeypatch.setattr(agent, "_policy_send", self._send)
 
-    async def _close(self, id: str) -> dict:
+    async def _close(self, id: str, closer: dict | None = None) -> dict:
         s = self.agent.sessions[id]
+        self.closers.append(closer)
         s.set_state("closed", confidence="scraped")
         s.closed_at, s.closed_for = now_iso(), None
         self.closed.append(s.name)
@@ -289,7 +290,7 @@ async def test_a_nodes_manager_closed_with_a_member_left_is_announced_once(agent
 
     async def route(method, params, caller, host):
         assert (method, host) == ("close", "node-1")
-        return await home._close(params["id"])
+        return await home._close(params["id"], params.get("closer"))
 
     monkeypatch.setattr(agent, "_route_act", route)
     monkeypatch.setattr(agent, "_address", lambda r: r.id)
@@ -298,6 +299,8 @@ async def test_a_nodes_manager_closed_with_a_member_left_is_announced_once(agent
     await agent._finished_pass(now)
     await agent._finished_pass(late)
     assert home.closed == ["g1", "manager"] and home.sent == [] and len(home.notes()) == 1
+    # each close carries the tick's word, the node's over the link too (§4.5 row 5 (b), TD-265)
+    assert home.closers == [{"by": "tick", "why": "finished"}] * 2
 
     g2.git = dict(CLEAN)
     await agent._finished_pass(late + timedelta(minutes=1))
