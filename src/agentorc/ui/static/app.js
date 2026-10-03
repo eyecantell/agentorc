@@ -3567,12 +3567,52 @@
         return ["you", { open_in, terminal, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
     };
+    // **Save** and **Cancel** (§4.5a *Settings page*, TD-286): Save is pressable, and Cancel shown, only
+    // while a field differs from what was drawn; Cancel puts the drawn values back, and a Save makes
+    // what was saved the drawn values. A form's `reset()` is exactly *what was drawn*: the defaults.
+    const state = (f) => JSON.stringify([...f.elements].filter((el) => el.name).map((el) => (el.type === "checkbox" || el.type === "radio" ? el.checked : el.value)));
+    const settle = (f) => {
+      const dirty = state(f) !== f.dataset.drawn, save = $(".setsave", f), cancel = $(".setcancel", f);
+      if (save) save.disabled = !dirty;
+      if (cancel) cancel.hidden = !dirty;
+    };
+    const drawn = (f) => {
+      for (const el of f.elements) {
+        if (el.type === "checkbox" || el.type === "radio") el.defaultChecked = el.checked;
+        else if (el.tagName === "SELECT") for (const o of el.options) o.defaultSelected = o.selected;
+        else if ("defaultValue" in el) el.defaultValue = el.value;
+      }
+      // the line beside a saved field is the saved value's now
+      $$(".setline", f).forEach((out) => { if (!out.classList.contains("warn")) out.dataset.was = out.textContent; });
+      f.dataset.drawn = state(f); settle(f);
+    };
+    $$("form.setcard", page).forEach((f) => {
+      f.dataset.drawn = state(f); settle(f);
+      const said = $(".setsaid", f); if (said) said.dataset.was = said.textContent;
+      f.addEventListener("input", () => settle(f));
+      f.addEventListener("change", () => settle(f));
+      const cancel = $(".setcancel", f);
+      if (cancel) cancel.addEventListener("click", () => {
+        f.reset();
+        // what the drawn values show beside them, redrawn without the handlers' side effects
+        $$(".setline", f).forEach((out) => { out.textContent = out.dataset.was; out.classList.remove("warn"); });
+        const said = $(".setsaid", f); if (said) { said.textContent = said.dataset.was; said.classList.remove("warn"); }
+        $$(".setbalance", f).forEach((row) => {
+          const on = f.elements.balance_on.checked;
+          [f.elements.balance_prs, f.elements.balance_oldest, f.elements.balance_review].forEach((x) => { x.disabled = !on; });
+        });
+        $$(".setdayswords", f).forEach((w) => { const d = (f.elements.board_days.value || "").trim() || "7"; w.textContent = d === "7" ? "due this week" : `due within ${d} days`; });
+        if (f.elements.open_in && $("#settemplate")) $("#settemplate").classList.toggle("hidden", f.elements.open_in.value !== "template");
+        settle(f);
+      });
+    });
     page.addEventListener("submit", async (e) => {
       const f = e.target.closest("form.setcard"); if (!f || !forms[f.dataset.section]) return;
       e.preventDefault();
       const [section, body] = forms[f.dataset.section](f);
       try {
         await post(section, body);
+        drawn(f);
         say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
         if (section === "you" && AO.termChan) { AO.termChan.postMessage(body.terminal); AO.setTermLook(body.terminal); }
         if (section === "teams") setTimeout(() => location.reload(), 600);  // the stop time is drawn in this host's clock by the server
