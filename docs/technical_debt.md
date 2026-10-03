@@ -134,7 +134,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Built (#907); live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
-| TD-273 | A drag in the Focus terminal copies on release and says nothing: give the copy a sign | Low | Open |
 | TD-275 | A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set | Low | Open |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
 
@@ -2528,24 +2527,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a designer that opens a design PR, steers and has nothing else to pick is back at the bound or at the answer without a person starting its team, and until then its card and the Inbox say what it waits on.
 
 **Related:** TD-213 / TD-216 (the orphaned question), TD-214 / TD-227 (rule 8, the start on work), TD-240 / TD-241 (rule 9, finished), TD-187 (a member out of work is never woken when its lane gains entries), TD-262 (who closed a session — the same card slot), memory `steer-replies-land-on-the-board`.
-
-## TD-273: A drag in the Focus terminal copies on release and says nothing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus, TD-174's live look: *we should probably give some sort of indicator when text is copied*)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (the terminal's selection handling: the copy on release catches its failure and is otherwise silent — *silent, as the copy is*; `copySel`, the menu's Copy, toasts *copied*), design §4.5a's Focus terminal row (TD-174)
-
-**Why:** a plain drag selects and the release copies, which works; nothing says it happened, so the first time a person cannot tell a copy from a selection, and a blocked clipboard is silent too.
-
-**Fix:** a short sign on a copy that happened — the toast *copied* the menu's Copy already shows, or a quieter mark by the terminal if a toast on every drag is too much (the §4.5a row says which; a one-line design change if it is the mark) — and the *clipboard blocked* toast when it did not.
-
-**Done when:** a drag-and-release in the terminal shows that the text was copied, and a refused copy says so.
-
-**Related:** TD-174 (selection and copy in the terminal), TD-046 (Pop out, the same terminal).
 
 ## TD-275: A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set
 

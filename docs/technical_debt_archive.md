@@ -2807,3 +2807,21 @@ Both go away only when the record says who closed it.
 **Done when:** both buttons for the act carry the same words.
 
 **Related:** TD-156 (the end of a session on Focus), TD-095 (*Close session* on a card).
+
+## TD-273: A drag in the Focus terminal copies on release and says nothing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus, TD-174's live look: *we should probably give some sort of indicator when text is copied*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/static/app.js` (the terminal's selection handling: the copy on release catches its failure and is otherwise silent — *silent, as the copy is*; `copySel`, the menu's Copy, toasts *copied*), design §4.5a's Focus terminal row (TD-174)
+
+**Why:** a plain drag selects and the release copies, which works; nothing says it happened, so the first time a person cannot tell a copy from a selection, and a blocked clipboard is silent too.
+
+**Resolved:** 2026-10-02 (PR #915) — the copy on release goes through `copySel`, Copy's own path, which toasts *copied* or *clipboard blocked*; design §4.5a's **copy on select** row says so; `tests/test_ui.py::test_a_copy_on_release_says_so_with_copys_own_toast` holds it.
+
+**Done when:** a drag-and-release in the terminal shows that the text was copied, and a refused copy says so.
+
+**Related:** TD-174 (selection and copy in the terminal), TD-046 (Pop out, the same terminal).
