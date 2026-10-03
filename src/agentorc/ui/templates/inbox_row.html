@@ -740,8 +740,10 @@
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="since the entries were read as waiting">{{ e.age or '' }}</span>{% endif %}
 </div>
-<div class="body">{{ e.team }} · wound down{% if e.wound_down %} <span class="localtime" data-at="{{ e.wound_down }}" title="{{ e.wound_down }}">{{ e.wound_down }}</span>{% endif %} · its lanes gained {{ e.n }} entr{{ 'y' if e.n == 1 else 'ies' }}:
-  {%- for i in e.ids %} {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ i }}">{{ i }}</a>{% else %}<span class="mono">{{ i }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}{% if e.more %} and {{ e.more }} more{% endif %}</div>
+<div class="body">{{ e.team }} · wound down{% if e.wound_down %} <span class="localtime" data-at="{{ e.wound_down }}" title="{{ e.wound_down }}">{{ e.wound_down }}</span>{% endif %} ·
+  {%- for q in e.questions %} {{ q.name }}'s {{ q.kind }} about {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ q.ref }}">{{ q.ref }}</a>{% else %}<span class="mono">{{ q.ref }}</span>{% endif %} {{ 'lapsed to its default' if q.how == 'lapsed' else 'was answered' }}{{ ';' if not loop.last or e.n }}{% endfor %}
+  {%- if e.n %} its lanes gained {{ e.n }} entr{{ 'y' if e.n == 1 else 'ies' }}:
+  {%- for i in e.ids %} {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ i }}">{{ i }}</a>{% else %}<span class="mono">{{ i }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}{% if e.more %} and {{ e.more }} more{% endif %}{% endif %}</div>
 {%- if e.held %}
 <div class="st">not started: {{ e.held }}</div>
 {%- endif %}

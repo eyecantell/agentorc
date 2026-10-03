@@ -50,6 +50,34 @@ def test_five_ids_at_most_and_one_entry_is_singular():
     assert "gained 1 entry: TD-001" in one["text"] and one["wound_down"] == ""
 
 
+def test_a_questions_end_is_its_own_clause_before_the_ids_and_one_of_the_notes_n():
+    """§4.5a *Inbox row: team start* and *work waiting* note (§6 rule 8 *A question's end is work*,
+    TD-274): `work_waiting.questions` is a clause of its own before the ids where both stand — *<name>'s
+    steer about TD-222 lapsed to its default*, *… ask about TD-223 was answered* — its reference out
+    of the lanes' count; alone, the row stands with no *its lanes gained*; the card's note counts it as
+    one of the n and names it in the tooltip. A mark with no kind reads a lapse as a steer."""
+    q = [
+        {"id": "m-s", "ref": "TD-222", "name": "designer-ao-1", "how": "lapsed"},
+        {"id": "m-a", "ref": "TD-223", "name": "designer-ao-1", "how": "answered", "kind": "ask"},
+    ]
+    both = mark(members={"designer-ao-1": ["TD-222", "TD-223", "TD-300"]}, questions=q)
+    (r,) = work_rows({"g": both}, now=NOW)
+    assert r["ids"] == ["TD-300"] and r["n"] == 1
+    assert r["text"] == (
+        "g · wound down · designer-ao-1's steer about TD-222 lapsed to its default; designer-ao-1's ask about "
+        "TD-223 was answered; its lanes gained 1 entry: TD-300"
+    )
+    (alone,) = work_rows({"g": mark(members={"designer-ao-1": ["TD-222"]}, questions=q[:1])}, now=NOW)
+    assert (
+        alone["n"] == 0 and alone["text"] == "g · wound down · designer-ao-1's steer about TD-222 lapsed to its default"
+    )
+    note = work_note(both, NOW)
+    assert note["n"] == 3 and note["title"].endswith("designer-ao-1's ask about TD-223 was answered")
+    html = uiapp.templates.get_template("inbox_row.html").module.work_row({**alone, "snoozed_until": ""}, "needs")
+    assert '<a class="mono" href="/repo/agentorc#TD-222">TD-222</a> lapsed to its default' in str(html)
+    assert "entries:" not in str(html) and "entry:" not in str(html)  # no lanes clause
+
+
 def test_a_held_start_says_which_bound():
     early = (NOW - timedelta(minutes=12)).isoformat()
     cases = {
