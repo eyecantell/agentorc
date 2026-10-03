@@ -2339,13 +2339,19 @@
     // Declared up here, not beside `nameCheck` below: the occupancy check calls it when it moves
     // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
     const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
-    const herechoice = $("#herechoice"), inuse = $("#hereinuse"), adapterSel = $("[name=adapter]");
-    const isShell = () => !!adapterSel && adapterSel.value === "shell";
+    const herechoice = $("#herechoice"), inuse = $("#hereinuse"), profSel = $("#profile");
+    // Profile is the one tool pick (§4.5a **the reworked form**, TD-284): its last choice is the shell
+    const isShell = () => !!profSel && !!profSel.selectedOptions[0] && profSel.selectedOptions[0].dataset.adapter === "shell";
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
     let nameBlocked = false, dirBlocked = false;
     const gate = () => { start.disabled = nameBlocked || dirBlocked; };
-    if (adapterSel) adapterSel.addEventListener("change", check);
+    // a shell has no role, lane or brief: picking it hides them, and the occupancy rule exempts it (§9)
+    function applyShell() {
+      const sh = isShell();
+      for (const f of ["#rolefield", "#lanefield", "#newchips"]) { const el = $(f); if (el) el.hidden = sh; }
+    }
+    if (profSel) profSel.addEventListener("change", () => { applyShell(); check(); });
     let seq = 0;
     async function check() {
       const v = dir.value.trim(); const my = ++seq;
@@ -2523,6 +2529,7 @@
     }
     if (teamSel) { teamSel.addEventListener("change", applyTeam); dir.addEventListener("change", teamLine); }
 
+    applyShell();  // a Resume with changes… of a shell lands with the shell picked
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
     applyProject();
