@@ -46,20 +46,20 @@ HOOK_EVENTS = (
 )
 TRANSCRIPT_TAIL = 256 * 1024  # bytes of transcript read from the end to find the last assistant turn
 # Each model's context window in tokens (design §4.3 `context`, TD-190), by the id's prefix — the
-# transcript's `message.model`. An id not here has no window: the reading shows the tokens alone.
-# Source: the Claude API's model table (as the claude-api skill carried it, cached 2026-06-24), which
-# gives 1M for every row below but Haiku 4.5's 200k, and says of Fable 5.1 that the maximum is also the
-# default. Not verified: whether Claude Code runs any of these at a smaller window by default (its
-# `[1m]` model suffix), which `message.model` would not show — then *of 1M* overstates the window.
+# transcript's `message.model` — read only when no status line has reported the window the session runs
+# (`context_report`, TD-295). An id not here has no window: the reading shows the tokens alone. Source:
+# Claude Code's *Model configuration*, which gives Fable 5 and later, Sonnet 5 and Opus 4.7 and later a
+# native 1M window, and Opus 4.6 and Sonnet 4.6 1M only through the `[1m]` model suffix, which
+# `message.model` does not show — so those two rows give the default 200k.
 CONTEXT_WINDOWS = (
     ("claude-fable-5", 1_000_000),
     ("claude-mythos-5", 1_000_000),
     ("claude-opus-5", 1_000_000),
     ("claude-opus-4-8", 1_000_000),
     ("claude-opus-4-7", 1_000_000),
-    ("claude-opus-4-6", 1_000_000),
+    ("claude-opus-4-6", 200_000),
     ("claude-sonnet-5", 1_000_000),
-    ("claude-sonnet-4-6", 1_000_000),
+    ("claude-sonnet-4-6", 200_000),
     ("claude-haiku-4-5", 200_000),
 )
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
@@ -330,6 +330,40 @@ def usage_report(payload: dict) -> dict | None:
     return {"windows": windows, "work": work if ok else None, "sid": sid if isinstance(sid, str) else None}
 
 
+def context_report(payload: dict) -> dict | None:
+    """The context the tool tells its status line it runs (design §4.3 `context`, TD-295):
+    `{sid, window, tokens}` — `window` from `context_window.context_window_size`, `tokens` the prompt
+    `context_window.current_usage` names (input plus both cache counts, as `context` reads a turn),
+    None before the session's first response. None when the payload names no window (an old client)."""
+    cw = payload.get("context_window") if isinstance(payload, dict) else None
+    size = cw.get("context_window_size") if isinstance(cw, dict) else None
+    sid = payload.get("session_id") if isinstance(payload, dict) else None
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0 or not isinstance(sid, str) or not sid:
+        return None
+    use = cw.get("current_usage")
+    tokens = None
+    if isinstance(use, dict):
+        try:
+            tokens = sum(
+                int(use.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+            )
+        except (TypeError, ValueError):
+            tokens = None
+    return {"sid": sid, "window": size, "tokens": tokens or None}
+
+
+def context_file(sid: str) -> Path:
+    """Where the status line keeps what `context_report` last read for the tool's session `sid`."""
+    return paths.home() / "statusline" / "context" / f"{Path(sid).name}.json"
+
+
+def _instant(at: object) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
 
 
@@ -545,8 +579,27 @@ class ClaudeCodeAdapter:
                 continue
             model = str(msg.get("model") or "")
             window = next((w for prefix, w in CONTEXT_WINDOWS if model.startswith(prefix)), None)
-            return {"tokens": tokens, "at": d.get("timestamp"), "window": window}
-        return None
+            return self._reported({"tokens": tokens, "at": d.get("timestamp"), "window": window}, session_id)
+        return self._reported(None, session_id)
+
+    @staticmethod
+    def _reported(reading: dict | None, session_id: str) -> dict | None:
+        """`reading` with what the session's status line last reported (TD-295): its window always,
+        and its tokens when the report is later than the transcript's turn, or there is no turn."""
+        try:
+            rep = json.loads(context_file(session_id).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return reading
+        if not isinstance(rep, dict) or not isinstance(rep.get("window"), int):
+            return reading
+        tokens, at = rep.get("tokens"), rep.get("at")
+        if reading is None:
+            return {"tokens": tokens, "at": at, "window": rep["window"]} if isinstance(tokens, int) else None
+        reading = {**reading, "window": rep["window"]}
+        mine, theirs = _instant(at), _instant(reading.get("at"))
+        if isinstance(tokens, int) and tokens > 0 and mine and theirs and mine > theirs:
+            reading.update(tokens=tokens, at=at)
+        return reading
 
     def read_transcript(
         self,

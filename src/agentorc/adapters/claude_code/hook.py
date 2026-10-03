@@ -8,7 +8,8 @@ An error in the reply is the agent answering — a refusal (design §4.8a) or a 
 queued: the tick applies the queue unjudged, so a queued refusal would be applied anyway (TD-115).
 
 With `--statusline` it is the session's status line instead (design §4.4 *A report*, TD-233): it
-reports the account's limits the tool hands it as `usage_report`, then runs the status line it
+reports the account's limits the tool hands it as `usage_report`, keeps the context window and
+tokens it reports for the adapter's `context` (TD-295), then runs the status line it
 displaced and prints what that prints.
 
 Always exits 0. A hook that fails would break the session it is watching.
@@ -23,6 +24,7 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,8 @@ from agentorc.adapters.claude_code import (
     AT_COMPOSER_ENV,
     STATUSLINE_FLAG,
     STATUSLINE_REFRESH,
+    context_file,
+    context_report,
     displaced_status_line,
     usage_report,
 )
@@ -224,6 +228,26 @@ def report_usage(session: str, payload: dict[str, Any], now: float) -> None:
     tmp.replace(f)
 
 
+def keep_context(payload: dict[str, Any], now: float) -> None:
+    """Keep the window and tokens the tool reports for the adapter's `context` (TD-295), stamped with
+    the redraw that first saw them; a redraw that repeats them writes nothing."""
+    rep = context_report(payload)
+    if rep is None:
+        return
+    f = context_file(rep["sid"])
+    try:
+        last = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        last = None
+    if isinstance(last, dict) and (last.get("window"), last.get("tokens")) == (rep["window"], rep["tokens"]):
+        return
+    at = datetime.fromtimestamp(now, UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_name(f"{f.stem}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({"window": rep["window"], "tokens": rep["tokens"], "at": at}), encoding="utf-8")
+    tmp.replace(f)
+
+
 def chained_output(raw: str, payload: dict[str, Any]) -> str:
     """Run the status line the launch's layer displaced with the same stdin, in the session's
     directory, and return what it printed ("" when there is none or it failed)."""
@@ -266,6 +290,8 @@ def statusline() -> int:
     if session := os.environ.get("AGENTORC_SESSION"):
         with contextlib.suppress(Exception):
             report_usage(session, payload, time.time())
+        with contextlib.suppress(Exception):
+            keep_context(payload, time.time())
     return 0
 
 

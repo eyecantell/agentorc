@@ -508,9 +508,12 @@ class Adapter(Protocol):
                                                           # profile *name* as `model_in_use` is — from the
                                                           # tool's own records: Claude Code, the last top-level `assistant` entry's
                                                           # `usage` (input + cache_read + cache_creation), the tail read `model_in_use`
-                                                          # makes, `window` the model's when known; None when it cannot tell (§6
-                                                          # rule 5, TD-188). Read on the tick for unattended records once a minute,
-                                                          # never a grep (built — TD-190 slice 1)
+                                                          # makes, `window` the one the session's status line last reported
+                                                          # (`context_window.context_window_size`, kept by `agentorc-hook
+                                                          # --statusline` per tool session, whose `current_usage` tokens win
+                                                          # when later than the turn), else the model's from a table; None when
+                                                          # it cannot tell (§6 rule 5, TD-188). Read on the tick for unattended
+                                                          # records once a minute, never a grep (built — TD-190 slice 1, TD-295)
     def read_transcript(self, session_id: str, cwd: Path, profile: str, *,
                         before: int | None = None, turns: int = 20, raw: bool = False) -> Transcript | None
                                                           # the tool's transcript as neutral entries — a prompt, text, a thought, a
