@@ -99,6 +99,16 @@ def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
 
 
 templates.env.globals["shaped"] = shaped
+
+
+def md(text: Any, origin: Any = None, *, inline: bool = False) -> Markup:
+    """Text from the closed markdown subset as `shaped` renders it, unsplit — a board row's halves
+    and its replies (§4.5a *Inbox board row: text*, TD-279), already cut where they are drawn."""
+    t, o = str(text or ""), (str(origin) if origin else None)
+    return Markup(rendermod.inline(t, o) if inline else rendermod.render(t, o))
+
+
+templates.env.globals["md"] = md
 # design §4.5a *The help text* (TD-167): a control's `title` is its paragraph's first sentence, and a
 # mark's panel the group's paragraphs — every one of them from `help.py`, the one table
 templates.env.globals["help_title"] = helpmod.first_sentence

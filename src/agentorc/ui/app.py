@@ -114,6 +114,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
     log,  # noqa: F401
+    md,  # noqa: F401
     node_banner,  # noqa: F401
     node_org_note,  # noqa: F401
     org_here,  # noqa: F401
@@ -152,6 +153,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     BOARD_SOURCE,  # noqa: F401
     BOARD_TIMEOUT,  # noqa: F401
     BOARD_TTL,  # noqa: F401
+    CONTEXT_RE,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
     NEEDS_YOU_ROWS,  # noqa: F401
     ORIGIN_PHRASES,  # noqa: F401
@@ -166,6 +168,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
     RAIL_UNDER,  # noqa: F401
+    SUBHEAD_RE,  # noqa: F401
     SYNC_LOCK,  # noqa: F401
     WORK_IDS,  # noqa: F401
     WORKS,  # noqa: F401
@@ -194,6 +197,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_line,  # noqa: F401
     board_reader,  # noqa: F401
     board_rows,  # noqa: F401
+    board_text,  # noqa: F401
     cadence_marks,  # noqa: F401
     find_matches,  # noqa: F401
     find_words,  # noqa: F401

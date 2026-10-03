@@ -965,7 +965,7 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(t
     assert [r["source"] for r in rows] == ["origin/main", "origin/main", "", ""]
     html = templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
     assert html.count("read from origin/main: this checkout has not pulled it yet") == 1
-    assert html.index("this checkout has not pulled it yet") < html.index("one. Due")
+    assert html.index("this checkout has not pulled it yet") < html.index("<p>one.</p>")
     assert html.count('class="originnote meta warnish"') == 1 and html.count("originnote") == 2
     ro = "on origin, not in this checkout yet: pull to act on it"
     behind_html = html[: html.index("same line.")]
@@ -1143,7 +1143,7 @@ def test_a_board_items_answers_are_buttons_in_the_order_written_and_go_with_it_i
     rows, html = rows_html(tmp_path, monkeypatch, decide_item())
     assert rows[0]["body"] == "**Ship it?** Pick one. Due: 2026-09-20."
     assert rows[0]["answers"] == ["approve", "hold", "ask <b>Ann</b>"] and rows[0]["default"] == "hold"
-    assert '<div class="body">**Ship it?** Pick one. Due: 2026-09-20.</div>' in html
+    assert '<div class="body md"><p><strong>Ship it?</strong> Pick one.</p></div>' in html
     btns = re.findall(r'<button class="btn sm answer" ([^>]*)>(.*?)</button>', html, re.S)
     assert [htmllib.unescape(re.search(r'data-answer="([^"]*)"', a).group(1)) for a, _ in btns] == rows[0]["answers"]
     assert ["default" in inner for _, inner in btns] == [False, True, False]
@@ -1372,3 +1372,69 @@ def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_ba
     assert row["decided"]["text"] == "hold" and row["due_now"] and "Answers:" not in row["body"]
     html = templates.get_template("inbox_rows.html").render(rows=[row], section="needs")
     assert "decided: hold · " in html and "btn sm answer" not in html and "Go with it" not in html
+
+
+@pytest.mark.unit
+def test_a_board_row_draws_its_line_as_markdown_folded_after_its_head(tmp_path, monkeypatch):
+    """design §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset — no
+    `**` or backtick printed — drawn up to its bold head and the sentence after it, the rest under
+    *details* with each **Part:** head opening a paragraph and the `Context:` last; the `Due:` goes
+    and the reader's replies stand under the text, outside the fold."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows, templates
+
+    root = tmp_path / "agentorc"
+    filler = " ".join(["the card reads its line and its hover lists every window."] * 6)
+    text = (
+        "watch 2026-09-30 (session `grinder-ao-2` on kmaster) — **One walk of the Org.** The live copy is "
+        f"built from #837: look now. Each look's line is closed. **Top bar:** {filler} (TD-122). "
+        f"**Cards:** {filler} Context: TD-244 / TD-122 PR #517. Due: 2026-10-01. "
+        "— Paul, 2026-10-02: This is a `wall` of text. Answers: Works | Not right: <what>."
+    )
+    it = item(21, text, "2026-10-01", "1d overdue") | {
+        "kind": "watch",
+        "answers": ["Works", "Not right: <what>"],
+        "replies": [{"by": "Paul", "date": "2026-10-02", "text": "This is a `wall` of text."}],
+    }
+    (row,) = board_rows(report(root, it), {})
+    assert row["lead"].endswith("The live copy is built from #837: look now.")
+    assert row["rest"].startswith("Each look's line is closed.\n\n**Top bar:**")
+    assert "\n\n**Cards:**" in row["rest"] and row["rest"].endswith("\n\nContext: TD-244 / TD-122 PR #517")
+    assert "Due:" not in row["lead"] + row["rest"] and "Paul" not in row["rest"]
+    assert row["replies"] == [{"by": "Paul", "date": "Oct 2", "text": "This is a `wall` of text."}]
+    html = templates.get_template("inbox_rows.html").render(rows=[row], section="needs")
+    body = html[html.index('class="body md"') : html.index('class="row gap wrap sugg"')]
+    assert "<strong>One walk of the Org.</strong>" in body and "<code>grinder-ao-2</code>" in body
+    assert "**" not in body and "`" not in body
+    assert '<details class="fold" data-fold="board:' in body and "<p><strong>Cards:</strong>" in body
+    assert "Paul, Oct 2: This is a <code>wall</code> of text." in body
+    assert body.index("</details>") < body.index("Paul, Oct 2")  # the reply stands outside the fold
+
+
+@pytest.mark.unit
+def test_a_short_board_line_draws_whole_and_a_reader_without_replies_keeps_them(tmp_path, monkeypatch):
+    """A line no longer than `FOLD_CHARS` has no *details* (§4.5a **Inbox board row: text**); a
+    `Context:` alone is still under one. A reader that gives no `replies` leaves the tail in the text."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows
+
+    root = tmp_path / "samscrape"
+    (row,) = board_rows(report(root, item(3, "act — **Rotate the key.** Soon. Due: 2026-09-20.", "2026-09-20", "x")))
+    assert (row["lead"], row["rest"], row["replies"]) == ("act — **Rotate the key.** Soon.", "", [])
+    (row,) = board_rows(report(root, item(3, "act — Rotate it. Context: TD-9. Due: 2026-09-20.", "2026-09-20", "x")))
+    assert (row["lead"], row["rest"]) == ("act — Rotate it.", "Context: TD-9")
+    text = "act — Rotate it. Due: 2026-09-20. — Paul, 2026-09-21: today please"
+    (row,) = board_rows(report(root, item(3, text, "2026-09-20", "x")))
+    assert row["lead"] == "act — Rotate it. — Paul, 2026-09-21: today please" and row["replies"] == []
+
+
+@pytest.mark.unit
+def test_fold_head_cuts_after_the_bold_head_and_its_sentence():
+    from agentorc.ui import render
+
+    long = "x " * 200
+    assert render.fold_head("short **head.** one.") == ("short **head.** one.", "")
+    lead, rest = render.fold_head(f"watch — **Head here.** First one. {long}")
+    assert lead == "watch — **Head here.** First one." and rest == long.strip()
+    late = "y" * 250 + " **late head.** after. " + long  # a head past the first 200 characters is no head
+    assert render.fold_head(late) == render.fold(late)

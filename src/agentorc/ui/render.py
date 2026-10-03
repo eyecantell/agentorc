@@ -14,7 +14,8 @@ target is absolute `http` or `https` and not the UI's own origin, opened in a ne
 `noopener`, and followed by its host in small print, so link text can never pass for one of the
 page's controls. Any other link is its characters.
 
-`fold` is the Inbox's split of a text into what the row draws and what goes under *details*.
+`fold` is the Inbox's split of a text into what the row draws and what goes under *details*;
+`fold_head` is a board line's (TD-279), cut after its bold head and the sentence after it.
 """
 
 from __future__ import annotations
@@ -174,4 +175,27 @@ def fold(text: str) -> tuple[str, str]:
         return t, ""
     ends = [m.end() for m in _SENTENCE_END.finditer(t, 0, FOLD_CHARS)]
     cut = ends[-1] if ends else FOLD_CHARS
+    return t[:cut].rstrip(), t[cut:].strip()
+
+
+# §4.5a *Inbox board row: text* (TD-279): how far into a board line its bold head may start — past
+# the kind, the date and the session that open every line — and still be read as the line's head
+HEAD_WITHIN = 200
+_BOLD_HEAD = re.compile(r"\*\*(?=\S)(?P<head>.+?)(?<=\S)\*\*")
+
+
+def fold_head(text: str) -> tuple[str, str]:
+    """design §4.5a *Inbox board row: text* (TD-279): `(lead, rest)` for a board line — one
+    paragraph by the board's own format, so `fold`'s first paragraph would be the whole of it. A
+    line whose bold head opens within `HEAD_WITHIN` characters leads with everything up to the end
+    of that head and the one sentence after it; a line with no such head takes `fold`'s backstop.
+    `rest` is empty when the line is no longer than `FOLD_CHARS`, or nothing follows the lead."""
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if len(t) <= FOLD_CHARS:
+        return t, ""
+    h = _BOLD_HEAD.search(t)
+    if h is None or h.start() > HEAD_WITHIN:
+        return fold(t)
+    end = _SENTENCE_END.search(t, h.end())
+    cut = end.end() if end else len(t)
     return t[:cut].rstrip(), t[cut:].strip()

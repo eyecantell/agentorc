@@ -7,6 +7,7 @@ suite patches both there.
 
 from __future__ import annotations
 
+import re
 import sys
 from collections.abc import Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -26,6 +27,7 @@ from sessionorc.models import (
 )
 from sessionorc.work import manager_of
 
+from . import render as rendermod
 from .cards import _clock, _first_line, alarm_note, alarm_to_view
 from .common import _age, _countdown, _instant, _iso, _left, host_name, templates, vscode_url
 
@@ -830,6 +832,47 @@ def board_body(text: str, it: Mapping[str, Any]) -> str:
     return text[: off + min(starts)].rstrip() if starts else text
 
 
+# the reader's own `Context:` field (`CONTEXT_RE` in dev-cadence's `nudge_user_attention.py`)
+# a bold run ending in a colon after a sentence's end — *… (TD-095). **Cards:** a report …* — is the
+# head of a part of a long line, and opens a paragraph under *details*
+SUBHEAD_RE = re.compile(r"(?<=[.;!?)])\s+(?=\*\*[^*\n]{1,80}?:\*\*)")
+CONTEXT_RE = re.compile(r"\bContext:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
+
+
+def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
+    """A board row's text as the row draws it (§4.5a *Inbox board row: text*, TD-279), from its
+    `board_body`: `lead`, up to the end of its bold head and the sentence after it (`fold_head`),
+    and `rest`, under *details*, ending with the line's `Context:` as a paragraph of its own; the
+    `Due:` is the row's due words and goes, and the person's replies are `replies`, drawn under the
+    text — from the reader's field, so a reader that gives none leaves them in the text. Display
+    only: nothing here is a control."""
+    replies = [
+        {"by": str(r.get("by") or ""), "date": str(r.get("date") or ""), "text": str(r.get("text") or "")}
+        for r in it.get("replies") or ()
+        if isinstance(r, dict) and str(r.get("text") or "").strip()
+    ]
+    text, tail = body, ""
+    due = board_mod.DUE_RE.search(body)
+    if due:
+        text, tail = body[: due.start()].rstrip(), body[due.end() :].lstrip(" .")
+        if replies and tail.startswith("—"):
+            tail = ""  # the reader's replies, drawn from its field
+    ctx = CONTEXT_RE.search(text)
+    context = ctx.group("ctx").rstrip(" .") if ctx else ""
+    if ctx:
+        text = (text[: ctx.start()] + text[ctx.end() :]).rstrip()
+    if tail:
+        text = f"{text} {tail}"
+    lead, rest = rendermod.fold_head(text)
+    rest = SUBHEAD_RE.sub("\n\n", rest)  # a walk's **Part:** heads each open a paragraph
+    if context:
+        rest = f"{rest}\n\nContext: {context}" if rest else f"Context: {context}"
+    for r in replies:
+        d = _civil(r["date"])
+        r["date"] = f"{d:%b} {d.day}" if d else r["date"]
+    return {"lead": lead, "rest": rest, "replies": replies}
+
+
 def live_look(it: Mapping[str, Any]) -> bool:
     """Whether a board item's answers are cadence's fixed pair for a live look (§3.5, design §4.5a
     **Works** / **Not right…**): a `watch` whose two answers are *Works* and the form *Not right:
@@ -921,6 +964,9 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     # fields, never read out of the prose here — the item's answers in the order
                     # written, the one marked default, what was decided, and the body without them
                     "body": board_body(text, it),
+                    # §4.5a *Inbox board row: text* (TD-279): the body folded after its head, the
+                    # `Context:` under *details*, the replies from the reader's field
+                    **board_text(board_body(text, it), it),
                     "answers": [str(a) for a in it.get("answers") or () if str(a).strip()],
                     "default": str(it.get("default") or ""),
                     "decided": _decided(it),
