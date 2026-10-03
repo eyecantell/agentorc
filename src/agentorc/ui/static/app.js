@@ -2754,6 +2754,12 @@
         oow.title = (o && o.why) || "no reason recorded";
         oow.textContent = "out of work" + (o && o.age ? ` ${o.age}` : "");
       }
+      const wait = $("#fwait");  // §4.5a **waiting** mark (TD-274): the view's words, its hover
+      if (wait) {
+        wait.classList.toggle("hidden", !v.waiting);
+        wait.title = (v.waiting && v.waiting.full) || "";
+        wait.textContent = (v.waiting && v.waiting.text) || "";
+      }
       const rw = $("#frw");
       if (rw) {
         const r = v.restart_wanted, early = !!(r && r.early);

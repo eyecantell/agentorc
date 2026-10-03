@@ -2160,3 +2160,26 @@ def test_status_v_says_who_closed_a_record_in_the_cards_words(monkeypatch, capsy
     assert "closed by the tick · team finished 5m ago" in out
     assert re.search(r"^\s+closed 5m ago$", out, re.M)  # no closer: bare *closed*
     assert len(re.findall(r"^\s+closed.* ago$", out, re.M)) == 4  # the idle record has no such line
+
+
+def test_status_v_says_what_a_session_waits_on_on_its_declarations_line(monkeypatch, capsys):
+    """§4.5a **waiting** mark (TD-274): `ao status -v` prints the wait on the declaration's line, or on
+    a line of its own where the session declared nothing, from the home's `host` reading."""
+    at = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)).isoformat()
+    base = {"state": "idle", "confidence": "hook", "since": at, "adapter": "shell"}
+    records = [
+        {**base, "id": "ao-r-d", "name": "d", "out_of_work": {"at": at, "why": "nothing pickable"}},
+        {**base, "id": "ao-r-g", "name": "g"},
+        {**base, "id": "ao-r-x", "name": "x"},
+    ]
+    waiting = {"ao-r-d": [{"id": "m-1", "ref": "TD-222", "bound": None}], "ao-r-g": [{"id": "m-2", "ref": "#9"}]}
+
+    def call(method, **_):
+        return records if method == "list" else {"waiting": waiting} if method == "host" else {}
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    assert "out of work 5m · waiting on you: TD-222: nothing pickable" in out
+    assert re.search(r"^\s+waiting on you: #9$", out, re.M)
+    assert out.count("waiting on you") == 2

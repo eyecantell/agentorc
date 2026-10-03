@@ -42,6 +42,12 @@
          reason on hover. Not a state — the session still reads `idle` or `exited`. #}
       <span class="badge oow{% if not s.out_of_work %} hidden{% endif %}" id="foow"
             title="{{ (s.out_of_work or {}).why or 'no reason recorded' }}">out of work{% if s.out_of_work and s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>
+      {# design §4.5a **waiting** mark (§4.9a *Waiting is read, never declared*, TD-274): what it waits on
+         from the person, beside *out of work*'s place, the question's first paragraph on hover. Read
+         from the person inbox, never from the session's words; always in the page and hidden until
+         true, kept current from the pushed delta as the chips beside it are. #}
+      <span class="badge wait{% if not s.waiting %} hidden{% endif %}" id="fwait"
+            title="{{ (s.waiting or {}).full }}">{{ (s.waiting or {}).text }}</span>
       {# design §4.5a **restart wanted** (§4.9a, TD-083): the third ending, wherever the record is
          drawn. A mark, never pressable, and an **early** one says so — a controller does not act
          on those, so a chip that read the same would promise a restart that is not coming.
