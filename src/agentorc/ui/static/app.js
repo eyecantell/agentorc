@@ -302,14 +302,19 @@
     dlg.querySelectorAll("[data-bawhen]").forEach((w) => { w.onclick = () => { due.value = boardDue(w.dataset.bawhen); }; });
     return new Promise((resolve) => {
       let done = null;
-      // Put it on is the form's one submit, so Enter in the text or the date confirms; Cancel and
-      // Esc close with nothing sent
+      // Put it on is the form's one submit, so Enter in the date confirms, and Ctrl+Enter (⌘+Enter)
+      // in the text, where a plain Enter adds a line (TD-281); Cancel and Esc close with nothing sent
+      if (text) text.onkeydown = (e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); dlg.querySelector("form").requestSubmit(); }
+      };
       const cancel = $("#bacancel");
       if (cancel) cancel.onclick = () => dlg.close("cancel");
       dlg.querySelector("form").onsubmit = async (ev) => {
         ev.preventDefault();
         if (!go || go.disabled) return;
-        const body = { action: "add", msg: b.dataset.msg, board: sel.value, text: text.value.trim(), due: due.value };
+        // the box's lines joined into the board's one line (§4.4, TD-281)
+        const words = text.value.split(/\s+/).filter(Boolean).join(" ");
+        const body = { action: "add", msg: b.dataset.msg, board: sel.value, text: words, due: due.value };
         const miss = !body.board ? "pick a board" : !body.text ? "say what is needed" : !body.due ? "give it a Due date" : "";
         if (miss) { err.textContent = miss; err.hidden = false; return; }
         go.disabled = true;
