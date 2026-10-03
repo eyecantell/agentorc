@@ -998,6 +998,8 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                 live += ", concluded"
             if r.get("balance"):  # the team card's note, in its words (§4.5a, §4.7)
                 live += f", {teamrun.balance_note(r['balance'])}"
+            if not r["live"] and r["wound_down"]:  # who, how soon and why, the card's words (§4.5a, TD-265)
+                live += teamrun.wound_down_words(r)
             print(
                 f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}{' (on call)' if r.get('on_call') else ''}  "
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")

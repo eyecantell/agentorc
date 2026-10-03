@@ -305,6 +305,10 @@ def team_groups(
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
                 "by_tick": bool(row.get("by_tick")),  # *· by the tick*: rule 9 wound it down (§6, TD-241)
+                # who, how soon and why (§4.5a *wound down* note, TD-265): `teamrun.wound_down_note`'s reading
+                "wound_after": row.get("after") or "",
+                "closed_by": row.get("closed_by") or "",
+                "manager_why": row.get("manager_why") or "",
                 # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only
                 "work_note": work_note((work or {}).get(team)) if not live and row.get("wound_down") else None,
                 "work_started": work_started(crew) if live and team != NO_TEAM else None,

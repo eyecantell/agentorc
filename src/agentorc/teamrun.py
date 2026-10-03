@@ -38,6 +38,9 @@ SETTLED = ("idle", "exited", "closed")  # what "wrapped up" looks like from outs
 DEAD = ("exited", "closed")
 WRAPUP_POLL = 2.0  # seconds between reads while a stop waits for the members to settle
 STOP_TIMEOUT = 300.0  # the default wrap-up window (§4.9)
+# a run under this many seconds, first start to last close, says *after 40 s* on the wound-down note
+# (§4.5a, TD-262): a start that ended at once is the thing to notice
+SHORT_RUN = 600
 
 
 class NamesHeld(teams.TeamError):
@@ -349,6 +352,56 @@ def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
     return list(out.values())
 
 
+def _when(iso: Any) -> datetime | None:
+    try:
+        at = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return at if at.tzinfo else at.replace(tzinfo=UTC)
+
+
+def wound_down_note(t: orgmod.TeamDef, mine: list[dict[str, Any]], names: dict[str, str]) -> dict[str, Any]:
+    """**Who, how soon, and why** on a wound-down team's note (design §4.5a *wound down* note, TD-262,
+    built by TD-265): `closed_by` from the run's records' closer — the manager's name when it closed
+    any member, else the first member's closer (*you*, *the tick*, a session's name) — `run_seconds`
+    from the run's first `created` to its last `closed_at`, `after` set only under `SHORT_RUN`, and
+    `manager_why`, the first line of the manager's own `out_of_work.why` (none when it closed without
+    declaring). The run is the records not superseded by a later start; anything unreadable is left
+    out, never guessed."""
+    run = [s for s in mine if not s.get("superseded_by")]
+    mgr_name = t.manager.name if t.manager.role != orgmod.PERSON else ""
+    mgr = next((s for s in run if mgr_name and s.get("name") == mgr_name), None)
+    closers = [
+        (s, str(c["by"])) for s in run if s is not mgr and isinstance(c := s.get("closer"), dict) and c.get("by")
+    ]
+    closed_by = ""
+    if mgr and any(by == mgr.get("id") for _, by in closers):
+        closed_by = mgr_name
+    elif closers:
+        s, by = closers[0]
+        closed_by = {"person": "you", "tick": "the tick"}.get(by) or names.get(by) or by
+    starts = [w for s in run if (w := _when(s.get("created")))]
+    ends = [w for s in run if (w := _when(s.get("closed_at")))]
+    secs = int((max(ends) - min(starts)).total_seconds()) if starts and ends else None
+    after = ""
+    if secs is not None and 0 <= secs < SHORT_RUN:
+        after = f"{secs} s" if secs < 60 else f"{secs // 60} min"
+    oow = mgr.get("out_of_work") if mgr else None
+    why = str(oow.get("why") or "").strip() if isinstance(oow, dict) else ""
+    return {"closed_by": closed_by, "run_seconds": secs, "after": after, "manager_why": why.split("\n", 1)[0]}
+
+
+def wound_down_words(r: dict[str, Any]) -> str:
+    """The note's tail after *wound down <t>*, as the card and `ao team list` both say it:
+    * · after 40 s · by manager-dc-1 — nothing pickable*. *by the tick* where rule 9 ended it."""
+    by = "the tick" if r.get("by_tick") else r.get("closed_by")
+    return (
+        (f" · after {r['after']}" if r.get("after") else "")
+        + (f" · by {by}" if by else "")
+        + (f" — {r['manager_why']}" if r.get("manager_why") else "")
+    )
+
+
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
     the name, the file it came from, its projects, how many sessions it starts, how many carrying
@@ -361,10 +414,12 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
     # nothing live and never winds it down (design §4.9 *A person in the team*, TD-173)
     crew = [s for s in sessions if not persons(s)]
     up = live(crew)
+    names = {str(s.get("id")): str(s.get("name") or "") for s in sessions}
     rows_out = []
     for t in org.teams.values():
         mine = badged(t.name, crew)
         n_live = len(badged(t.name, up))
+        down = None if n_live else wound_down(mine, seat_names(t, mine))
         # the home's reading (§6 rule 9), asked once: it holds when `why` is empty
         f = finished(mine, seat_names(t, mine)) if n_live else None
         rows_out.append(
@@ -388,7 +443,9 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "roles": role_holders(t),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
-                "wound_down": None if n_live else wound_down(mine, seat_names(t, mine)),
+                "wound_down": down,
+                # …who closed it, how soon and why (§4.5a *wound down* note, TD-265): only when it did
+                **(wound_down_note(t, mine, names) if down else {}),
                 # …and whether rule 9 ended it: its manager carries the tick's mark (§6, TD-241)
                 "by_tick": not n_live and any(closed_finished(s) and not s.get("superseded_by") for s in mine),
                 # …and when something is live but every live session is idle and declared (TD-099)
