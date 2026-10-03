@@ -100,15 +100,16 @@ def read_live(root: str | Path, check: str) -> tuple[str | None, str]:
     return sha, ""
 
 
-def read_main(root: str | Path) -> dict[str, Any]:
+def read_main(root: str | Path, fetch_why: str | None = None) -> dict[str, Any]:
     """After the home's own `git fetch origin main` (a policy that acts is not hostage to whoever
     last fetched): `main` (origin/main's head), `moved` (its committer time — when main last moved,
     for the settle and the row's age; a squash merge on GitHub stamps it), and `tree`, None when
     the checkout is on main's head with a clean tree (precondition 1) or the text of why not. A
     failed fetch is `fetch_why` beside the last-fetched main, never a missing one. Reads only:
-    no checkout, no reset."""
+    no checkout, no reset. `fetch_why` is the pull's own fetch of main this pass (§6 *Pull*: one
+    fetch per repo per pass), `""` when it went through; None fetches here."""
     out: dict[str, Any] = {}
-    _, why = _git(root, "fetch", "-q", "origin", "main")
+    why = fetch_why if fetch_why is not None else _git(root, "fetch", "-q", "origin", "main")[1]
     if why:
         out["fetch_why"] = why
     line, why = _git(root, "log", "-1", "--format=%H %cI", "origin/main")
@@ -472,14 +473,20 @@ def _concluded(repo: str, intent: dict[str, Any], main: str | None, now: datetim
 
 
 def survey(
-    roots: list[str], prev: dict[str, dict[str, Any]], full: bool, auto: dict[str, bool], now: datetime
+    roots: list[str],
+    prev: dict[str, dict[str, Any]],
+    full: bool,
+    auto: dict[str, bool],
+    now: datetime,
+    fetched: dict[str, str] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, str]]:
     """One pass, in a thread: every registered checkout whose `.agentorc.yml` carries `promote:`,
     keyed by the repo's name — `(readings, notes, bad)`. `full` takes all three readings (the
     reports' cadence); otherwise only `check`, and only for a repo with a run in flight. A run in
     flight is concluded, and under `auto: true` one is started when live ≠ main, the three
     preconditions hold and main has settled. `notes` are the *promoted …* lines for the person
-    inbox; `bad` names each checkout whose block could not be used, with why."""
+    inbox; `bad` names each checkout whose block could not be used, with why. `fetched` holds the
+    pull's fetch of main for each root it fetched this pass (`pulls`), which `read_main` reuses."""
     readings: dict[str, dict[str, Any]] = {}
     notes: list[str] = []
     bad: dict[str, str] = {}
@@ -499,7 +506,7 @@ def survey(
         r["inflight"], r["failed"] = inflight(repo), failed(repo)
         first = not old
         if full or first:
-            main = read_main(root)
+            main = read_main(root, (fetched or {}).get(str(root)))
             for k in ("fetch_why", "main_why", "moved"):
                 r.pop(k, None)
             r.update(main)
@@ -539,3 +546,106 @@ def survey(
             r["failed"] = {**r["failed"], "tail": tail(r["failed"].get("log"))}
         readings[repo] = r
     return readings, notes, bad
+
+
+# ── the pull: the main checkout follows origin (design §6 *Pull*, TD-263) ──────────────────────
+PULL_OUTCOMES = ("current", "pulled", "waiting", "refused", "off")
+
+
+def _git_why(root: str | Path, *args: str) -> tuple[bool, str]:
+    """`(True, "")` or `(False, why)` — git's own first line, its `error:`/`fatal:` prefix dropped: a
+    refused fast-forward's last line is *Aborting*, its first says what would be overwritten."""
+    try:
+        cp = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, f"git {args[0]}: {type(e).__name__}"
+    if cp.returncode == 0:
+        return True, ""
+    lines = [ln.strip() for ln in (cp.stderr or cp.stdout or "").splitlines() if ln.strip()]
+    first = re.sub(r"^(error|fatal|hint): ", "", lines[0]) if lines else f"git {args[0]} failed"
+    return False, first[:200]
+
+
+def pull(root: str | Path, on: bool, occupant: str | None, now: datetime) -> tuple[dict[str, Any], str | None]:
+    """One registered checkout's pull, in a thread: `(reading, fetch_why)`. The reading is `{at,
+    outcome, why, from, to, commits, occupant}`, `outcome` one of `PULL_OUTCOMES`; `fetch_why` is
+    this pass's fetch of `main` for the promote to reuse — `""` when it went through, None when no
+    fetch of `main` was made here. `occupant` is the caller's read of the root (§6 *Pull* (2)):
+    None when every session there is at rest, a name when one is mid-turn, `""` when one's state
+    cannot be read. Only ever `git fetch` and `git merge --ff-only`: no checkout, reset, rebase or
+    stash, and never a push."""
+    r: dict[str, Any] = {k: None for k in ("why", "from", "to", "commits", "occupant")}
+    r["at"] = now.isoformat()
+    if not on:
+        return {**r, "outcome": "off"}, None
+
+    def refused(why: str) -> dict[str, Any]:
+        return {**r, "outcome": "refused", "why": why}
+
+    from sessionorc import board  # the checkout's default branch and git's busy markers, shared
+
+    default = board.default_branch(Path(root))
+    _, fetch_why = _git(root, "fetch", "-q", "origin", default)
+    main_fetch = fetch_why if default == "main" else None
+    if fetch_why:
+        return refused(fetch_why), main_fetch
+    head, why = _git(root, "rev-parse", "HEAD")
+    to, why2 = _git(root, "rev-parse", f"origin/{default}")
+    if head is None or to is None:
+        return refused(why or why2), main_fetch
+    branch, _ = _git(root, "symbolic-ref", "--short", "-q", "HEAD")
+    if branch != default:
+        return refused(f"on {branch or 'a detached HEAD'}"), main_fetch
+    r["from"], r["to"] = head, to
+    if head == to:
+        return {**r, "outcome": "current"}, main_fetch
+    try:
+        under_way = board.busy(Path(root))
+    except board.Refused as e:
+        return refused(str(e)), main_fetch
+    if under_way:
+        return refused(f"a git operation under way ({', '.join(under_way)})"), main_fetch
+    if inflight(Path(root).name):
+        return refused("a promote in flight"), main_fetch
+    mine, _ = _git(root, "rev-list", "--count", f"origin/{default}..HEAD")
+    if mine and mine != "0":
+        n = int(mine)
+        return refused(
+            f"{n} commit{'' if n == 1 else 's'} of its own, not on origin — the person's to push"
+        ), main_fetch
+    if occupant is not None:
+        return {
+            **r,
+            "outcome": "waiting",
+            "occupant": occupant or None,
+            "why": "unreadable" if not occupant else None,
+        }, main_fetch
+    n, _ = _git(root, "rev-list", "--count", f"HEAD..origin/{default}")
+    ok, why = _git_why(root, "merge", "--ff-only", "-q", f"origin/{default}")
+    if not ok:
+        return refused(why), main_fetch
+    return {**r, "outcome": "pulled", "commits": int(n) if n and n.isdigit() else None}, main_fetch
+
+
+def pulls(
+    roots: list[str], on: dict[str, bool], occupants: dict[str, str | None], now: datetime
+) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    """The pull's pass over every registered checkout, `promote:` block or not, in a thread:
+    `(readings by repo name, fetched)` — `fetched` maps each root whose `main` this pass fetched to
+    that fetch's why (`""` when it went through), for `survey` to reuse. `on` is
+    `repos.<repo>.pull` (absent is true); `occupants` is the caller's read of each root."""
+    readings: dict[str, dict[str, Any]] = {}
+    fetched: dict[str, str] = {}
+    for root in roots:
+        repo = Path(root).name
+        try:
+            reading, main_fetch = pull(root, on.get(repo, True), occupants.get(str(root)), now)
+        except Exception as e:  # noqa: BLE001 — one checkout never stops the pass over the others
+            reading, main_fetch = (
+                {"at": now.isoformat(), "outcome": "refused", "why": f"{type(e).__name__}: {e}"[:200]},
+                None,
+            )
+        readings[repo] = reading
+        if main_fetch is not None:
+            fetched[str(root)] = main_fetch
+    return readings, fetched

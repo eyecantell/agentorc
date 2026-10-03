@@ -507,6 +507,7 @@ class HostAgent(
         self._promote_bad: dict[str, str] = {}
         self._promote_task: asyncio.Task[None] | None = None
         self._promote_lock = asyncio.Lock()
+        self._pulls: dict[str, dict[str, Any]] = {}  # the pull's readings by repo (design §6 *Pull*)
         # the last fifty `ao doing` calls per team (design §4.8 *the doing log*, TD-176 slice 2)
         self.doing_log = DoingLogStore()
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
@@ -1230,6 +1231,34 @@ class HostAgent(
             if Path(ext.cwd).resolve() == directory:
                 out.append(f"{ext.name} ({ext.adapter}, outside agentorc{', ' + ext.status if ext.status else ''})")
         return out
+
+    def pull_occupant(self, directory: Path) -> str | None:
+        """The first session in `directory` not at rest, for the pull (design §6 *Pull* (2)): None
+        when every one there is at rest or there is none; its name when one is mid-turn; `""` when
+        one's state cannot be read, which the pull takes as mid-turn. Unlike `occupants` it counts
+        shells (a foreground command may be `git` itself) and reads each record's state: `idle`,
+        `exited` and `closed` are at rest, everything else may be a turn under way or about to
+        resume. A session outside agentorc is at rest only when its tool's registry says `idle`."""
+        directory = Path(directory).resolve()
+        rest = ("idle", "exited", "closed")
+        mine = list(self.sessions.values())  # a copy taken in one step: this runs in a thread
+        ours = {s.adapter_id for s in mine if s.adapter_id}
+        records = [s for s in mine if Path(s.dir).resolve() == directory]
+        if self.mode == "home" and self.remote:
+            for host in containers.container_nodes():
+                if (self.links.get(host) or {}).get("up"):
+                    records += [
+                        s for s in list(self.remote.get(host, {}).values()) if Path(s.dir).resolve() == directory
+                    ]
+        for s in records:
+            if s.state not in rest:
+                return s.name
+        for ext in adapters.external_sessions():
+            if ext.tool_id and ext.tool_id in ours:
+                continue
+            if Path(ext.cwd).resolve() == directory and ext.status != "idle":
+                return ext.name if ext.status in ("busy", "shell") else ""
+        return None
 
     def conversation_holders(self, adapter_id: str) -> list[str]:
         """Who is driving the tool conversation `adapter_id` right now (TD-012): a live record of

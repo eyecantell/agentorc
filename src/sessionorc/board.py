@@ -181,20 +181,24 @@ def default_branch(root: Path) -> str:
     return ref.split("/", 1)[1] if "/" in ref else "main"
 
 
+BUSY = ("index.lock", "MERGE_HEAD", "rebase-merge", "rebase-apply", "CHERRY_PICK_HEAD")
+
+
+def busy(root: Path) -> list[str]:
+    """The git operations under way in the checkout — a merge, rebase, cherry-pick or index lock —
+    by their marker's name; shared by `ready` and the pull (design §6 *Pull*)."""
+    gitdir = Path(_git(root, "rev-parse", "--absolute-git-dir").stdout.strip())
+    return [n for n in BUSY if (gitdir / n).exists()]
+
+
 def ready(root: Path) -> None:
     """Refused unless the checkout can take the commit without touching anyone's work: on its
     default branch, the board clean, and no merge, rebase, cherry-pick or index lock under way."""
     top = _git(root, "rev-parse", "--show-toplevel")
     if top.returncode != 0:
         raise Refused(f"{root} is not a git checkout")
-    gitdir = Path(_git(root, "rev-parse", "--absolute-git-dir").stdout.strip())
-    busy = [
-        n
-        for n in ("index.lock", "MERGE_HEAD", "rebase-merge", "rebase-apply", "CHERRY_PICK_HEAD")
-        if (gitdir / n).exists()
-    ]
-    if busy:
-        raise Refused(f"{root} has a git operation under way ({', '.join(busy)}): try again once it is finished")
+    if under_way := busy(root):
+        raise Refused(f"{root} has a git operation under way ({', '.join(under_way)}): try again once it is finished")
     branch = _git(root, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
     want = default_branch(root)
     if branch != want:
