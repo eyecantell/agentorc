@@ -136,7 +136,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
 | TD-273 | A drag in the Focus terminal copies on release and says nothing: give the copy a sign | Low | Open |
 | TD-275 | A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set | Low | Open |
-| TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Open |
+| TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
 
 
 ---
@@ -2572,7 +2572,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the designer, TD-269's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #914 (the form's Controllers, the Team pick and `ao new --team` take a seat on call); merged, live look pending on `docs/user_attention.md`: the *Done when*'s fill of the seat is the check.
 **Location:** `src/agentorc/ui/app.py` (`new`: `control_holders` keeps live holders and adds a record with `seat` that is `exited` or `closed` and holds `control`, marked `on_call`), `src/agentorc/ui/common.py` (`teams_for_form`: `"manager": mid if mid in up else ""` blanks the manager whose record is not live — the fix site for the Team pick), `src/agentorc/ui/templates/new.html` (the picker's label with the grey *◇ on call* pill; the empty note's words), `src/agentorc/ui/static/app.js` (`applyTeam`: ticks `data-manager` — unchanged once the id is handed), `src/agentorc/cli.py` (`_team_defaults`, called by `cmd_new` for `--team`: the `teamrun.live(...)` test on the manager's id is what drops a seat on call), design §4.5a New session **Controllers** and **Team** rows (the note's words are written there; this entry makes them true)
 
 **Why:** design §4.5a New session **Controllers** picker, **Team** picker, §4.9 *A person in the team*, §6 rule 3 (TD-269): since TD-259 every manager is a seat on call — closed until a reading fills it — and the form lists live holders only, so on a team started today Paul picked Team ao-grind and read *No session holds the control grant yet*; a person's session joined that way had no controller, and the manager that filled the seat later did not gain it. A seat's grant and its id survive the close (rule 3), so the seat's id is the right controller from the start.
