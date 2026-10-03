@@ -2802,7 +2802,7 @@ Both go away only when the record says who closed it.
 
 **Why:** the button sits on the card's summary line, at its right, where a panel's own close or fold control usually is; it ends the session. The header's button for the same act already reads **Close session**.
 
-**Resolved:** 2026-10-02 (PR #PRNUM) — `focus.html`'s `#closebtn` reads **Close session** with `help_title('close')`; design §4.5a's Focus side panel row names it so; `tests/test_ui_org.py` holds the label.
+**Resolved:** 2026-10-02 (PR #913) — `focus.html`'s `#closebtn` reads **Close session** with `help_title('close')`; design §4.5a's Focus side panel row names it so; `tests/test_ui_org.py` holds the label.
 
 **Done when:** both buttons for the act carry the same words.
 
