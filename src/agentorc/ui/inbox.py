@@ -372,10 +372,17 @@ def state_rows(
 # repo's `docs/user_attention.md`, in dev-cadence's format, and its reader is dev-cadence's own
 # `nudge_user_attention.py --report --json` — never a second parser here (§4.4: the items, with the
 # board line each sits on, come from that report). It is run over the boards of the repos this host
-# knows, with the script from the first of them that carries it (a SYNCED file: every copy is the
-# same), at most once every `BOARD_TTL` seconds, since the page and the top bar poll every few.
+# knows, with the copy `board_reader` picks (TD-278: synced copies differ while a repo lags), at most
+# once every `BOARD_TTL` seconds, since the page and the top bar poll every few.
 BOARD_FILE = Path("docs") / "user_attention.md"
 BOARD_SCRIPT = Path("scripts") / "nudge_user_attention.py"
+# dev-cadence's own source of the reader, in its registered checkout (TD-278): what every synced copy
+# is made from, so preferred over any copy; else the copy whose repo synced last (`cadence-sync.lock`)
+BOARD_SOURCE = Path("files") / "scripts" / "nudge_user_attention.py"
+SYNC_LOCK = Path("docs") / "cadence-sync.lock"
+# the fields of a board item the Inbox draws that a reader older than them does not give: a copy
+# that lacks one is named on the page rather than drawn as if the board had nothing there (TD-278)
+BOARD_FIELDS = {"answers": "dev-cadence TD-036"}
 BOARD_TTL = 60.0
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
@@ -479,6 +486,50 @@ def origin_firsts(rows: Collection[Mapping[str, Any]]) -> set[str]:
 templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts, ORIGIN_READONLY=ORIGIN_READONLY)
 
 
+def _synced(root: Path) -> str:
+    """When a repo last took dev-cadence's files, `synced:` off its `cadence-sync.lock` (an ISO
+    instant, compared as text), or "" when it has none or it cannot be read."""
+    try:
+        text = (root / SYNC_LOCK).read_text()
+    except OSError:
+        return ""
+    return next((ln.split(":", 1)[1].strip() for ln in text.splitlines() if ln.startswith("synced:")), "")
+
+
+def board_reader(roots: Collection[Path]) -> Path | None:
+    """Which copy of dev-cadence's board reader the Inbox runs (§4.5 screen 6, TD-278): picked by
+    what it can do, never by the registry's order — synced copies are the same only while every
+    repo is synced at once, which they are not (samscrape's was two weeks behind and drew no row's
+    answers). dev-cadence's own source when its checkout is registered; else the copy whose repo
+    synced last, the registry's order deciding a tie; None when no repo carries one."""
+    for r in roots:
+        if (r / BOARD_SOURCE).is_file():
+            return r / BOARD_SOURCE
+    copies = [r for r in roots if (r / BOARD_SCRIPT).is_file()]
+    return max(copies, key=_synced) / BOARD_SCRIPT if copies else None
+
+
+def reader_lacks(report: Any, script: str = "") -> str:
+    """The page's note when the reader run gives no field the Inbox draws (TD-278): its items carry
+    no `answers`, say, so no row would draw its answers and nothing would say why. "" when every
+    field is there, or there is no item to tell by."""
+    items = [
+        it
+        for b in (report.get("boards") or [] if isinstance(report, dict) else [])
+        if isinstance(b, dict)
+        for it in b.get("items") or []
+        if isinstance(it, dict)
+    ]
+    if not items:
+        return ""
+    gone = [f for f in BOARD_FIELDS if not any(f in it for it in items)]
+    if not gone:
+        return ""
+    whose = f"the reader at {script}" if script else "the board reader"
+    since = ", ".join(f"`{f}` ({BOARD_FIELDS[f]})" for f in gone)
+    return f"board rows are drawn without {since}: {whose} predates it — sync dev-cadence's files into that repo"
+
+
 def board_argv(roots: Collection[str | Path], *, fetch: bool = False, only: str = "") -> tuple[list[str] | None, str]:
     """The command that reads every open item of these repos' boards — not `--due-only` since TD-220
     (§4.5 screen 6 *The board's horizon*): the page sorts what is due from what comes up — or None
@@ -495,7 +546,7 @@ def board_argv(roots: Collection[str | Path], *, fetch: bool = False, only: str 
         boards = [b for b in boards if b == only] or ([only] if Path(only).is_file() else [])
     if not boards:
         return None, ""
-    script = next((r / BOARD_SCRIPT for r in rs if (r / BOARD_SCRIPT).is_file()), None)
+    script = board_reader(rs)
     if script is None:
         return None, f"board items are not shown: no repo here carries {BOARD_SCRIPT}, dev-cadence's reader"
     argv = [sys.executable, str(script), "--report", "--json"] + (["--fetch"] if fetch else [])
