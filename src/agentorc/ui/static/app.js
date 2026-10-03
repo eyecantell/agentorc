@@ -3582,10 +3582,13 @@
         else if (el.tagName === "SELECT") for (const o of el.options) o.defaultSelected = o.selected;
         else if ("defaultValue" in el) el.defaultValue = el.value;
       }
+      // the line beside a saved field is the saved value's now
+      $$(".setline", f).forEach((out) => { if (!out.classList.contains("warn")) out.dataset.was = out.textContent; });
       f.dataset.drawn = state(f); settle(f);
     };
     $$("form.setcard", page).forEach((f) => {
       f.dataset.drawn = state(f); settle(f);
+      const said = $(".setsaid", f); if (said) said.dataset.was = said.textContent;
       f.addEventListener("input", () => settle(f));
       f.addEventListener("change", () => settle(f));
       const cancel = $(".setcancel", f);
@@ -3593,6 +3596,7 @@
         f.reset();
         // what the drawn values show beside them, redrawn without the handlers' side effects
         $$(".setline", f).forEach((out) => { out.textContent = out.dataset.was; out.classList.remove("warn"); });
+        const said = $(".setsaid", f); if (said) { said.textContent = said.dataset.was; said.classList.remove("warn"); }
         $$(".setbalance", f).forEach((row) => {
           const on = f.elements.balance_on.checked;
           [f.elements.balance_prs, f.elements.balance_oldest, f.elements.balance_review].forEach((x) => { x.disabled = !on; });
