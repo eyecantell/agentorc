@@ -915,6 +915,53 @@ def new_session():
 </div>
 ''' + TAIL
 
+def new_session_reworked():
+    """TD-277 (designed 2026-10-02): the form read as one thing, in the order a person starts a
+    session — who (Name, Host, Role, Profile), where (Team, Project, Repo, the worktree-first
+    Where), the job (Lane, Until and At under an unattended role, the prompt), who may act on it.
+    No Adapter field (the profile names its tool; *shell* closes the Profile list), no Unattended
+    switch (a role runs unattended; *Interactive* is the Role pick's first choice), no Directory
+    field for a repo session, and no warning block: an occupied checkout is a greyed choice with
+    its reason. `NewSession.dc.html` stays the shipped form until the build lands."""
+    lk = 'style="color: #2563eb;"'
+    return head("New session — reworked") + f'''<div style="width: 720px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org", narrow=True)}
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+  <div style="font-size: 16px; font-weight: 600;">New session</div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free in agentorc — it names the session and its worktree</span></div>
+    <div class="field"><label>Host</label><span class="input">kmaster<span class="muted">▾</span></span><span class="note">kmaster · contractmatch-dev (container) — from <span class="mono">hosts.yml</span> · <span {lk}>Open file</span>; one host: plain text</span></div>
+    <div class="field"><label>Role</label><span class="input">grinder · unattended<span class="muted">▾</span></span><span class="note">first choice: <b>Interactive</b> (no role, yours). A role fills the brief, lane and grants and <b>runs unattended</b> — <span {lk}>run it under me instead</span></span></div>
+    <div class="field"><label>Profile</label><span class="input">the role's: claude-code · paul (max) · opus<span class="muted">▾</span></span><span class="note">tool · account · model the session starts with — from <span class="mono">profiles.yml</span> · <span {lk}>Open file</span>; the list ends with <i>shell (no agent)</i></span></div>
+    <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: brings its repo and host, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b></span></div>
+    <div class="field"><label>Project</label><span class="input" style="color: #9ca3af;">none<span class="muted">▾</span></span><span class="note">optional: narrows Repo to its repos — from <span class="mono">org.yml</span> <span class="mono">projects:</span> · <span {lk}>Open file</span></span></div>
+  </div>
+  <div class="field"><label>Repo</label><span class="input">agentorc <span class="mono muted" style="margin-left: 8px;">/home/kmaster/agentorc</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">ao-grind's repo on kmaster. The list ends with <i>another directory…</i> — a typed path, checked that it exists, for a shell or a directory outside any repo</span></div>
+  <div class="field"><label>Where</label>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div class="radio on"><span class="rb"></span><div><div>Worktree <span class="mono">td-302</span> · new</div><div class="note"><span class="mono">.claude/worktrees/td-302</span> on branch <span class="mono">td-302</span>, from origin's default branch</div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px;"><span class="note">or one nobody is in:</span><span class="btn sm ghost mono">td-290</span><span class="btn sm ghost mono">errors-alerts</span><span class="btn sm ghost mono">spike-pty</span><span class="note">— a press takes its name</span></div></div></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>The checkout itself</div><div class="note">one agent session per directory; a shell may share it</div></div><span style="flex-grow: 1;"></span><span class="pill plain s-ended">in use by main</span></div>
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px;">
+    <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">in order; empty: the role's default (free-pick)</span></div>
+    <div class="field"><label>At (optional)</label><span class="input mono" style="color: #9ca3af;">now</span><span class="note"><span class="mono">20:00</span>, <span class="mono">+2h</span></span></div>
+    <div class="field"><label>Until (optional)</label><span class="input mono">06:00</span><span class="note">an unattended session only</span></div>
+  </div>
+  <div class="field"><label>Opening prompt (optional)</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span></div><span class="input" style="height: 60px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Empty: the role's brief is sent, filled from its template.</span></div>
+  <div class="field"><label>Controllers</label>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>manager-ao-1 <span class="pill plain s-ended">◇ on call</span></div><div class="note mono">ao-agentorc-manager-ao-1</div></div></div>
+    </div>
+    <span class="note">Who may act on this one (send, wrap up, kill, close). Ticked by the Team pick; none ticked: nobody may.</span>
+  </div>
+  <div class="note" style="display: flex; gap: 8px; align-items: center;"><span>▸</span><b>More</b><span>Grants (none) · Resume a conversation by its id</span></div>
+  <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
+</div>
+</div>
+''' + TAIL
+
 def legend():
     rows = [
         ("working", "Green: alive. A hook reported UserPromptSubmit / PreToolUse and output is still flowing. On a card green means working and nothing else."),
@@ -1711,6 +1758,7 @@ files = {
     "FocusOrc.dc.html": focus_orchestrator(),
     "FocusReady.dc.html": focus_ready(),
     "NewSession.dc.html": new_session(),
+    "NewSessionReworked.dc.html": new_session_reworked(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Members.dc.html": members_dialog(),
@@ -1754,6 +1802,7 @@ LAYOUT = [
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
+    ("NewSessionReworked.dc.html", "New session — reworked (TD-277)", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
