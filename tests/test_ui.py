@@ -1928,3 +1928,22 @@ def test_restart_from_the_page_is_the_rpc_and_its_refusal_is_the_toast(client, s
     got = client.post(f"/api/sessions/{sid}/restart")
     assert got.status_code == 400 and "no launch record" in got.json()["detail"]  # nothing supervises a shell
     assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["state"] == "idle"  # untouched
+
+
+def test_the_new_session_form_asks_in_the_order_a_person_starts_a_session(client, tmp_path):
+    """§4.5a New session **the reworked form** (TD-277; TD-284 slice 1): Name and Host first, then
+    Role and Profile, Team and Project, the directory, Where, Lane, At and Until, the opening prompt,
+    Controllers, and Grants and the Resume id under a folded **More ▸** that opens when a Resume id
+    is set; the fixed *One agent session per directory* block is gone, an occupied checkout being the
+    Where choice's pill."""
+    page = client.get("/new").text
+    labels = ["<label>Name</label>", "<label>Host</label>", "<label>Role</label>", "<label>Profile</label>",
+              "<label>Team</label>", "<label>Project</label>", "<label>Directory</label>", "<label>Where</label>",
+              "<label>Lane</label>", "<label>At (optional)</label>", "<label>Until (optional)</label>",
+              "<label>Opening prompt (optional)</label>", "<label>Controllers</label>", "<summary>More ▸",
+              "<label>Grants</label>", "<label>Resume (optional)</label>"]  # fmt: skip
+    at = [page.index(x) for x in labels]
+    assert at == sorted(at)
+    assert "One agent session per directory." not in page
+    assert '<details class="fold" id="morefields">' in page and 'id="hereinuse" hidden' in page
+    assert '<details class="fold" id="morefields" open>' in client.get("/new?resume=abc-123").text

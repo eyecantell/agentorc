@@ -2066,7 +2066,7 @@ def test_the_new_session_form_says_a_suspended_name_is_a_lift_and_leaves_start_e
     assert "esc(o.message)" in block  # the agent's sentence, escaped, never rebuilt from fields
     assert "lifts the suspension" in block and "Look at it first" in block
     assert "start.disabled" not in block  # only `live` disables Start; this one is a person's act
-    assert 'start.disabled = o.verdict === "live";' in js  # …and that rule is untouched
+    assert 'nameBlocked = o.verdict === "live"; gate();' in js  # …and that rule is untouched
 
 
 @pytest.mark.unit

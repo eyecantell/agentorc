@@ -142,7 +142,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-281 | Three frictions on the Inbox's board rows: *Board, coming up* does not say what it is, **Put on the board**'s *what's needed* is one line, and Reply stayed grey after a pull until a hard reload | Low | Built (#939), live look pending |
 | TD-282 | A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger | Low | Open |
 | TD-283 | **Open a session** from Add entry starts a session whose card reads `working` before anything is sent, and its brief sits in the composer for the person to read past: a person's own session should read idle until a turn runs | Medium | Part (1) built (#938); (2) design-first |
-| TD-284 | Build the reworked New session form: the order, the Host pick, Profile as the one tool pick, the Repo pick and the worktree-first Where, the Role pick that retires the Unattended switch, warnings only when Start is disabled | Medium | Open |
+| TD-284 | Build the reworked New session form: the order, the Host pick, Profile as the one tool pick, the Repo pick and the worktree-first Where, the Role pick that retires the Unattended switch, warnings only when Start is disabled | Medium | Slice 1 built (#945); 2–6 open |
 | TD-286 | The Settings page's cards: Save is live with nothing changed and there is no Cancel, a card's *Open file* foot does not say which settings it holds, and *when work appears* describes only the choice picked | Low | Open |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Open |
@@ -2701,7 +2701,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the designer, TD-277's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 built — PR #945 (the order, **More ▸**, the warnings: an occupied checkout is the greyed *This directory* choice, ⚠ only where Start is refused); slices 2–6 open.
 **Location:** `src/agentorc/ui/templates/new.html` (the form), `src/agentorc/ui/static/app.js` (`AO.newSession`: occupancy, the Project and Team narrowing, the Role refresh, `applyTeam`), `src/agentorc/ui/app.py` (the page's context: hosts, repos, profiles with their adapters, roles; `/api/roles`, `/api/name_check`, a new `/api/dir_check` and a worktree listing per repo), `src/agentorc/ui/common.py` (`teams_for_form`), design §4.5a New session **the reworked form**, mockup `docs/mockups/NewSessionReworked.dc.html`
 
 **Why:** design §4.5 screen 3 *The form reworked as one thing* and §4.5a New session **the reworked form** (TD-277): the form asked for its fields in the order the code grew them — Adapter and Profile both picking the tool, a Directory asked even for a new worktree, Until and At on every session, a warning block on every visit — and Paul's nine notes on the page say what a person starting a session meets.

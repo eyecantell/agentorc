@@ -2339,21 +2339,32 @@
     // Declared up here, not beside `nameCheck` below: the occupancy check calls it when it moves
     // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
     const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
+    const herechoice = $("#herechoice"), inuse = $("#hereinuse"), adapterSel = $("[name=adapter]");
+    const isShell = () => !!adapterSel && adapterSel.value === "shell";
+    // Start is refused by either check: a live holder of the name, or an occupied directory that is
+    // not a git repo; each sets its own flag and the button follows both
+    let nameBlocked = false, dirBlocked = false;
+    const gate = () => { start.disabled = nameBlocked || dirBlocked; };
+    if (adapterSel) adapterSel.addEventListener("change", check);
     let seq = 0;
     async function check() {
       const v = dir.value.trim(); const my = ++seq;
-      if (!v) { note.textContent = ""; here.disabled = false; return; }
+      if (!v) { note.textContent = ""; here.disabled = false; herechoice.classList.remove("taken"); inuse.hidden = true; dirBlocked = false; gate(); return; }
       try {
         const r = await fetch(`/api/occupancy?dir=${encodeURIComponent(v)}`); const o = await r.json();
         if (my !== seq) return;
-        if (o.occupants && o.occupants.length) {
-          note.innerHTML = `⚠ <b>in use</b> by ${esc(o.occupants.join(", "))} — one agent session per directory (design §9); a new worktree is selected instead.`;
-          here.disabled = true; wt.checked = true; nameCheck();  // the scope moved to the repo
-        } else {
-          here.disabled = false;
-          note.textContent = o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
-        }
-      } catch (e) { note.textContent = ""; here.disabled = false; }
+        // an occupied checkout is the Where choice greyed with who is in it, never a warning (TD-277):
+        // the form has already picked the worktree; ⚠ only where Start is refused — an occupied
+        // directory that is not a git repo has no worktree to go to (shells are exempt, §9)
+        const taken = !!(o.occupants && o.occupants.length);
+        here.disabled = taken; herechoice.classList.toggle("taken", taken);
+        inuse.hidden = !taken; inuse.textContent = taken ? `in use by ${o.occupants.join(", ")}` : "";
+        if (taken && o.git) { wt.checked = true; nameCheck(); }  // the scope moved to the repo
+        dirBlocked = taken && !o.git && !isShell();
+        if (dirBlocked) note.innerHTML = `⚠ <b>in use</b> by ${esc(o.occupants.join(", "))} and not a git repo, so there is no worktree to start in — one agent session per directory (§9)`;
+        else note.textContent = taken ? "a git repo: a new worktree is selected" : o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
+        gate();
+      } catch (e) { note.textContent = ""; here.disabled = false; dirBlocked = false; gate(); }
     }
     dir.addEventListener("input", () => { clearTimeout(dir._t); dir._t = setTimeout(check, 250); });
     dir.addEventListener("change", check);
@@ -2424,12 +2435,12 @@
     async function nameCheck() {
       const mine = ++nseq, n = nm.value.trim(), d = dir.value.trim();
       const worktree = $("[name=where][value=worktree]").checked;
-      if (!n || !d) { nnote.textContent = ""; start.disabled = false; return; }
+      if (!n || !d) { nnote.textContent = ""; nameBlocked = false; gate(); return; }
       try {
         const q = `dir=${encodeURIComponent(d)}&name=${encodeURIComponent(n)}&worktree=${worktree}`;
         const o = await (await fetch(`/api/name_check?${q}`)).json();
         if (mine !== nseq) return;
-        start.disabled = o.verdict === "live";
+        nameBlocked = o.verdict === "live"; gate();
         if (o.verdict === "live") {
           const to = o.holder_state === "unrecorded" ? "" : ` <a class="btn sm primary" href="/focus/${encodeURIComponent(o.holder)}">Switch to</a>`;
           nnote.innerHTML = `⚠ <b>${esc(o.message)}</b>${to}`;
@@ -2442,7 +2453,7 @@
           nnote.innerHTML = `⚠ <b>${esc(o.message)}</b><br>Starting it here <b>lifts the suspension</b>`
             + ` — that is a person's act, and yours.${o.holder ? ` <a class="btn sm" href="/focus/${encodeURIComponent(o.holder)}">Look at it first</a>` : ""}`;
         } else nnote.innerHTML = o.verdict === "supersede" ? esc(o.message) : "";
-      } catch (e) { nnote.textContent = ""; start.disabled = false; }
+      } catch (e) { nnote.textContent = ""; nameBlocked = false; gate(); }
     }
     nm.addEventListener("input", () => { clearTimeout(nm._t); nm._t = setTimeout(nameCheck, 250); });
     nm.addEventListener("change", nameCheck);
