@@ -152,6 +152,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _usage_key,  # noqa: F401
     _Wait,  # noqa: F401
     backup_store,  # noqa: F401
+    closer_of,
     launch_params,  # noqa: F401
     log,  # noqa: F401
     read_checkout,  # noqa: F401
@@ -1298,7 +1299,12 @@ class HostAgent(
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
 
-    async def rpc_close(self, id: str) -> dict[str, Any]:
+    async def rpc_close(self, id: str, caller: Any = None, closer: dict[str, Any] | None = None) -> dict[str, Any]:
+        """End a session and keep its record (§4.5a **Close**). Writes `closer: {by, why, at}`
+        (§4.5 row 5 (b), TD-265): `by` is `person` when the envelope carries no caller, else the
+        caller's id. `closer` is the tick's own word (`{"by": "tick", "why": …}`) or the home's,
+        handed on to a node over the link; it is taken only from a call with no session caller, so
+        a session can never write *closed by the tick* or another's name."""
         s = self._get(id)
         if s.state == "scheduled":
             # **Cancel** (design §6 *Start time*, §4.5a): nothing ran, so there is nothing to keep —
@@ -1308,6 +1314,7 @@ class HostAgent(
         s.set_state("closed", confidence="scraped")
         s.pane = False
         s.closed_at = now_iso()
+        s.closer = closer_of(caller, closer, s.closed_at)
         s.closed_for = None  # a Close is nobody's restart; the tick writes its own after this returns (§6 rule 2)
         # A `kill` then a `close` before an intervening tick would otherwise strand a `_killed_at`
         # stamp for `CLOSED_KEEP`: the reconcile skips a closed record before it reaches the guard,

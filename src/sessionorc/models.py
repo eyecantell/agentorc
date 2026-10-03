@@ -85,6 +85,7 @@ NODE_OWNED = frozenset(
 )
 HOME_OWNED = frozenset(
     {
+        "closer",
         "controllers",
         "capabilities",
         "team",
@@ -807,6 +808,12 @@ class Session:
     # same to its own copies (`HostAgent._take_supersession`).
     supersedes: list[dict[str, Any]] = field(default_factory=list)
     closed_at: str | None = None
+    # Who closed it (design §4.5 row 5 (b), TD-262/TD-265): `{by, why, at}` — `by` is `person`, a
+    # session's id (the caller the acting gate verified), or `tick` with `why` one of `finished`,
+    # `wanted`, `brief`, `seat`. The home's (§4.4a): it writes its copy of a node's record as it
+    # routes the close, and hands the word to the node in the close's params so the node's record
+    # holds it too; absent on a record closed before this field existed.
+    closer: dict[str, Any] | None = None
     seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)

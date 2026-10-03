@@ -684,10 +684,11 @@ class TickMixin:
         log.info("%s wants another run and its work is pushed: restarting it", s.id)
         if s.state == "idle":
             try:
+                closer = {"by": "tick", "why": "wanted"}
                 if s.host == self.host:
-                    await self.rpc_close(s.id)
+                    await self.rpc_close(s.id, closer=closer)
                 else:
-                    await self._route_act("close", {"id": s.id}, None, s.host)
+                    await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
                 self._mark_closed(s, "wanted")
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 # `rpc_close` marks the record closed before its own tail runs, so a failure there
@@ -744,7 +745,7 @@ class TickMixin:
         log.info("%s: its brief changed and it is idle with its work pushed: restarting it", s.id)
         if s.state == "idle":
             try:
-                await self.rpc_close(s.id)
+                await self.rpc_close(s.id, closer={"by": "tick", "why": "brief"})
                 self._mark_closed(s, "brief")
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
@@ -1668,10 +1669,11 @@ class TickMixin:
         if s.host != self.host and s.host not in self._link_muxes:
             return False  # its link is down: looked at again next tick (§4.4a)
         try:
+            closer = {"by": "tick", "why": "finished"}
             if s.host == self.host:
-                await self.rpc_close(s.id)
+                await self.rpc_close(s.id, closer=closer)
             else:
-                await self._route_act("close", {"id": s.id}, None, s.host)
+                await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
         except Exception as e:  # noqa: BLE001 — a close that failed is tried again on the next tick
             log.warning("%s: rule 9's close failed: %s", self._address(s), e)
             return False
@@ -1874,10 +1876,11 @@ class TickMixin:
             await self._fill(s, now, records)
         elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
             log.info("%s: a seat with nothing due, idle and pushed — closing it (§6 rule 3)", s.id)
+            closer = {"by": "tick", "why": "seat"}
             if s.host == self.host:
-                await self.rpc_close(s.id)
+                await self.rpc_close(s.id, closer=closer)
             else:
-                await self._route_act("close", {"id": s.id}, None, s.host)
+                await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
 
     @staticmethod
     def _seat_done(s: Session) -> bool:
