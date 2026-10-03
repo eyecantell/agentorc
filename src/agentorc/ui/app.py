@@ -1200,6 +1200,23 @@ def rounds_lines(s: dict[str, Any], entries: list[dict[str, Any]] | None) -> dic
     }
 
 
+# The Profile pick's *shell (no agent)* (design §4.5a New session **the reworked form**, TD-284): a
+# value, not a profile — a shell is the one adapter with no profile, and no profile is named so.
+SHELL_PICK = ":shell"
+
+
+def profile_adapter(profile: str) -> str:
+    """The adapter a New session form's pick starts (§4.5a **the reworked form**): the named profile's,
+    else the default profile's, else Claude Code's — every profile names its adapter, so the form asks
+    for the tool once. A name `profiles.yml` does not hold is the create's to refuse, not this."""
+    try:
+        profs, default = profiles_mod.load()
+    except ValueError:
+        return profiles_mod.DEFAULT_ADAPTER
+    p = profs.get(profile) or profs.get(default)
+    return p.adapter if p else profiles_mod.DEFAULT_ADAPTER
+
+
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
     call = h.call
@@ -1232,7 +1249,6 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # then recent directories; phase 1 reads the local host's file directly
         repos = hosts.local_host().repos()
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
-        adapters = await call("adapters")
         # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
         # holding `control` — nothing else could act on the new session anyway — live, or a seat on
         # call, whose id and grant survive the close for whoever fills it (TD-269, built by TD-276)
@@ -1254,7 +1270,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
-                "adapters": adapters,
+                # the Profile pick's last choice (§4.5a **the reworked form**, TD-284 slice 2)
+                "shell_pick": SHELL_PICK,
+                # each of Host, Project and Profile ends its note with its file and **Open file**
+                "files": {
+                    "hosts": str(hosts.hosts_file()),
+                    "profiles": str(profiles_mod.profiles_file()),
+                    "org": str(orgmod.org_file()),
+                },
                 "control_holders": control_holders,
                 # design §4.5a New session **Grants** checkboxes: the grants a record may hold
                 # (`sessionorc.models.GRANTS`, the same list `ao new --grant` offers), each with
@@ -1319,7 +1342,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def new_submit(
         name: str = Form(...),
         dir: str = Form(...),
-        adapter: str = Form("claude-code"),
+        # the form sends none: Profile is the one tool pick (§4.5a **the reworked form**, TD-284), and
+        # the adapter is the picked profile's; `ao`-shaped posts and the tests may still name one
+        adapter: str = Form(""),
         profile: str = Form(""),
         prompt: str = Form(""),
         resume: str = Form(""),
@@ -1343,6 +1368,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # picker was prefilled from the repo's or preset's `controllers:` when the page loaded, so
         # what is ticked is what was meant — a person unticking the default is a decision.
         refs = [r.strip() for r in lane.split(",") if r.strip()]
+        if profile == SHELL_PICK:  # *shell (no agent)*, the Profile list's last choice
+            adapter, profile = "shell", ""
         preset = brief = ledger = made_from = None
         if adapter != "shell":
             try:
@@ -1363,6 +1390,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own
         # `review:` wins, else the team's reader, as `ao new --team` fills it. The Controllers
         # picker was ticked with the team's live manager when the team was picked.
+        profile = profile or (preset.profile if preset else None) or ""
+        adapter = adapter or profile_adapter(profile)
         review = preset.review if preset else None
         if team.strip() and adapter != "shell" and review is None:
             review = (await asyncio.to_thread(team_reader, team.strip(), dir.strip()))["review"]
@@ -1379,7 +1408,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             name=name.strip() or "session",
             dir=dir.strip(),
             adapter=adapter,
-            profile=profile or (preset.profile if preset else None) or "",
+            profile=profile,
             prompt=text,
             resume=resume.strip() or None,
             unattended=unattended == "on",

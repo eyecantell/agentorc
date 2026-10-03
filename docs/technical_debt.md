@@ -2702,7 +2702,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the designer, TD-277's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 built — PR #945 (the order, **More ▸**, the warnings: an occupied checkout is the greyed *This directory* choice, ⚠ only where Start is refused); slices 2–6 open.
+**Status:** Slice 1 built — PR #945 (the order, **More ▸**, the warnings: an occupied checkout is the greyed *This directory* choice, ⚠ only where Start is refused). Slice 2 built — PR #TBD (Profile as the one tool pick, *shell (no agent)* last and hiding Role and Lane, the Adapter field gone and the adapter derived from the profile by `profile_adapter`; Host, Project and Profile name their files with **Open file**). Slices 3–6 open.
 **Location:** `src/agentorc/ui/templates/new.html` (the form), `src/agentorc/ui/static/app.js` (`AO.newSession`: occupancy, the Project and Team narrowing, the Role refresh, `applyTeam`), `src/agentorc/ui/app.py` (the page's context: hosts, repos, profiles with their adapters, roles; `/api/roles`, `/api/name_check`, a new `/api/dir_check` and a worktree listing per repo), `src/agentorc/ui/common.py` (`teams_for_form`), design §4.5a New session **the reworked form**, mockup `docs/mockups/NewSessionReworked.dc.html`
 
 **Why:** design §4.5 screen 3 *The form reworked as one thing* and §4.5a New session **the reworked form** (TD-277): the form asked for its fields in the order the code grew them — Adapter and Profile both picking the tool, a Directory asked even for a new worktree, Until and At on every session, a warning block on every visit — and Paul's nine notes on the page say what a person starting a session meets.

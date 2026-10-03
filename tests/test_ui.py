@@ -1947,3 +1947,43 @@ def test_the_new_session_form_asks_in_the_order_a_person_starts_a_session(client
     assert "One agent session per directory." not in page
     assert '<details class="fold" id="morefields">' in page and 'id="hereinuse" hidden' in page
     assert '<details class="fold" id="morefields" open>' in client.get("/new?resume=abc-123").text
+
+
+def test_profile_is_the_one_tool_pick(client, tmp_path):
+    """§4.5a New session **the reworked form** (TD-284 slice 2): no Adapter field — every profile
+    names its adapter and the two could disagree — the Profile list ending with *shell (no agent)*,
+    and each of Host, Project and Profile naming its file; a shell picked there starts a shell."""
+    from agentorc.ui.app import SHELL_PICK
+
+    page = client.get("/new").text
+    assert '<label>Adapter</label>' not in page and 'name="adapter"' not in page
+    pick = page[page.index('<select class="input" name="profile"') :]
+    pick = pick[: pick.index("</select>")]
+    assert pick.rstrip().endswith(f'<option value="{SHELL_PICK}" data-adapter="shell">shell (no agent)</option>')
+    assert 'id="rolefield"' in page and 'id="lanefield"' in page  # what picking the shell hides
+    for name in ("hosts.yml", "profiles.yml", "org.yml"):
+        assert f'from <span class="mono">{name}</span>' in page
+    # a shell's Resume with changes… lands with the shell picked, and nothing else
+    again = client.get("/new?adapter=shell").text
+    assert f'<option value="{SHELL_PICK}" data-adapter="shell" selected>' in again
+    assert "(default)</option>" in again and '" selected>the role' not in again
+    r = client.post("/new", data={"name": "sh", "dir": str(tmp_path), "profile": SHELL_PICK}, follow_redirects=False)
+    assert r.status_code == 303, r.text
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    rec = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert rec["adapter"] == "shell" and not rec.get("profile")
+
+
+def test_the_adapter_a_profile_pick_starts(tmp_path, monkeypatch):
+    """The form sends no adapter (TD-284 slice 2): the picked profile's, else the default's."""
+    from agentorc.ui.app import profile_adapter
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    assert profile_adapter("") == "claude-code"  # no profiles.yml: the default profile, Claude Code's
+    (tmp_path / "profiles.yml").write_text(
+        "default: paul\nprofiles:\n  paul: {adapter: claude-code, account: paul}\n"
+        "  other: {adapter: codex, account: o}\n"
+    )
+    assert profile_adapter("other") == "codex"
+    assert profile_adapter("") == "claude-code" and profile_adapter("paul") == "claude-code"
+    assert profile_adapter("gone") == "claude-code"  # an unknown name is the create's to refuse
