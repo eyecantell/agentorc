@@ -520,7 +520,7 @@ class WakeMixin:
         - `teams`: `{team: {schedule?, until?, reserve?, balance?, on_work?} | None}` — a field set to
           None is cleared, a team set to None removed. The team's name is the client's to check
           against the org's definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
-        - `repos`: `{repo: {promote: {auto: bool}} | None}`.
+        - `repos`: `{repo: {promote?: {auto: bool}, pull?: bool} | None}`.
         - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?}}`, a None
           clearing that key (or that field of terminal or inbox).
         - `usage`: `{max_age: "1h" | "90m" | "off" | None}` (§6 *A reading the gate can no longer
@@ -538,7 +538,7 @@ class WakeMixin:
         now = datetime.now(UTC)
         for key, value, parse, known in (
             ("teams", teams, settings_mod.parse_team, settings_mod.TEAM_KEYS),
-            ("repos", repos, settings_mod.parse_repo, ("promote",)),
+            ("repos", repos, settings_mod.parse_repo, settings_mod.REPO_KEYS),
         ):
             if value is None:
                 continue
@@ -971,14 +971,15 @@ class WakeMixin:
         """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
         whether the home can be reached — which a client on a node needs before it labels what it
         shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
-        promote's readings per repo (`promotes`, §6 *Promote*) and each wound-down team's
-        `work_waiting` as the `host` record holds it (`work: {<team>: mark}`, §6 rule 8), which is
-        what draws the Inbox's team start row and the card's note."""
+        promote's readings per repo (`promotes`, §6 *Promote*), the pull's (`pulls`, §6 *Pull*) and
+        each wound-down team's `work_waiting` as the `host` record holds it (`work: {<team>: mark}`,
+        §6 rule 8), which is what draws the Inbox's team start row and the card's note."""
         out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
         out["built_from"], out["started_at"] = dict(self.build), self.started_at
         if self.mode == "home":
             out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
             out["promotes"] = self._promotes_view()
+            out["pulls"] = self._pulls_view()
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())

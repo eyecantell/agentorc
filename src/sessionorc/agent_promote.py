@@ -33,10 +33,16 @@ class PromoteMixin:
                 return
             self._promote_watch_at = now_m
             roots = hosts.local_host().repos()
-            auto = await asyncio.to_thread(self._promote_auto)
+            auto, pull_on = await asyncio.to_thread(self._promote_auto), await asyncio.to_thread(self._pull_on)
             async with self._promote_lock:  # a press and the pass never start two runs of one repo
+                fetched = None
+                if full:  # the pull rides the full readings' cadence and fetches for them (§6 *Pull*)
+                    occupied = {str(r): await asyncio.to_thread(self._pull_occupant_or_unread, r) for r in roots}
+                    self._pulls, fetched = await asyncio.to_thread(
+                        promote_mod.pulls, roots, pull_on, occupied, datetime.now(UTC)
+                    )
                 readings, notes, bad = await asyncio.to_thread(
-                    promote_mod.survey, roots, dict(self._promotes), full, auto, datetime.now(UTC)
+                    promote_mod.survey, roots, dict(self._promotes), full, auto, datetime.now(UTC), fetched
                 )
             if full:
                 self._promote_read_at = time.monotonic()  # after the read: one that raised is retried next tick
@@ -56,6 +62,25 @@ class PromoteMixin:
         """`repos.<repo>.promote.auto` from `settings.yml`; a repo absent promotes by hand."""
         repos = settings_mod.repos(settings_mod.load())
         return {name: bool((v.get("promote") or {}).get("auto")) for name, v in repos.items()}
+
+    def _pull_occupant_or_unread(self, root: str) -> str | None:
+        """`pull_occupant`, a read that raises taken as unreadable — the pull waits on that root and
+        the pass goes on over the others (review of PR #917)."""
+        try:
+            return self.pull_occupant(Path(root))
+        except Exception:  # noqa: BLE001
+            log.exception("pull: the occupants of %s could not be read", root)
+            return ""
+
+    @staticmethod
+    def _pull_on() -> dict[str, bool]:
+        """`repos.<repo>.pull` from `settings.yml`; a repo absent is pulled (§6 *Pull*: Paul's rule is the default)."""
+        repos = settings_mod.repos(settings_mod.load())
+        return {name: bool(v.get("pull", True)) for name, v in repos.items()}
+
+    def _pulls_view(self) -> dict[str, Any]:
+        """`pulls` on `host`: `{<repo>: {at, outcome, why, from, to, commits, occupant}}` (§6 *Pull*)."""
+        return {name: dict(r) for name, r in sorted(self._pulls.items())}
 
     def _promotes_view(self) -> dict[str, Any]:
         """`promotes` on `host`: `{<repo>: {live, main, ahead, checks, auto, inflight, failed, at, …}}`."""

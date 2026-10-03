@@ -7398,7 +7398,8 @@ code and needs no grant; a session doing the same work does.
     promote's own pair.
 - **Pull: the main checkout follows origin** (TD-222; decided by Paul 2026-10-01 — *should we have
   our host agent pull it routinely if no session is running on the anchor? … lets have it do when
-  git allows and the anchor session is idle*; designed 2026-10-01; the build is TD-263): the
+  git allows and the anchor session is idle*; designed 2026-10-01; the pass, its reading and the
+  switch built 2026-10-02 — TD-263 slice 1; the note's tail and the Repos card are TD-263's rest): the
   registry's main checkouts move only when someone pulls, so on 2026-10-01 the anchor's `main`
   stood nineteen commits behind origin with every board row read from origin disabled, and the
   promote's precondition (1) fails on any checkout no one has pulled since the merge. So the

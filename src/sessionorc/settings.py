@@ -338,7 +338,7 @@ def teams(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def repos(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """`repos:` as `{repo: {promote: {auto: bool}}}` — the one switch a person flips per repo."""
+    """`repos:` as `{repo: {promote: {auto: bool}, pull: bool}}` — the switches a person flips per repo."""
     return _keyed(doc, "repos", parse_repo)
 
 
@@ -450,9 +450,12 @@ def parse_balance(value: Any, drop: bool = False) -> dict[str, Any]:
     return got
 
 
+REPO_KEYS = ("promote", "pull")
+
+
 def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
     """One repo's settings: `promote: {auto: bool}` (§6 *Promote*; `run` and `check` stay in the
-    repo's `.agentorc.yml`)."""
+    repo's `.agentorc.yml`) and `pull: bool` (§6 *Pull*; absent is true)."""
 
     def promote(v: Any) -> dict[str, bool]:
         _fields(v, ("auto",), "promote")
@@ -460,8 +463,13 @@ def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"promote.auto is true or false, not {v.get('auto')!r}")
         return {"auto": v["auto"]}
 
-    value = _fields(value, ("promote",), "a repo's settings", drop)
-    return _each(value, {"promote": promote}, drop)
+    def pull(v: Any) -> bool:
+        if not isinstance(v, bool):
+            raise ValueError(f"pull is true or false, not {v!r}")
+        return v
+
+    value = _fields(value, REPO_KEYS, "a repo's settings", drop)
+    return _each(value, {"promote": promote, "pull": pull}, drop)
 
 
 def parse_open_in(v: Any) -> str | dict[str, str]:
