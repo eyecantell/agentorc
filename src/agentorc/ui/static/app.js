@@ -2423,8 +2423,11 @@
       const want = !other() && !isShell() && git ? wt : here;
       if (!want.checked && !want.disabled) { want.checked = true; nameCheck(); }
     }
+    // the worktree a Name makes is the server's `naming.slug` of it (`[a-z0-9-]`, 32 at most), so the
+    // line shows that and the reuse is read on it; a chip's or a Resume's own name goes as it is
+    const slugOf = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32).replace(/-+$/, "") || "x";
     function wtName() {
-      const n = (wtIn && wtIn.value.trim()) || nm.value.trim() || "<name>";
+      const n = (wtIn && wtIn.value.trim()) || (nm.value.trim() ? slugOf(nm.value.trim()) : "<name>");
       $$("#wtname, .wtn").forEach((el) => { el.textContent = n; });
       const reuse = free.some((w) => w.name === n);
       const line = $("#wtline");
@@ -2448,7 +2451,7 @@
     }
     if (chipList) chipList.addEventListener("click", (e) => {
       const b = e.target.closest("[data-wt]"); if (!b) return;
-      nm.value = b.dataset.wt; if (wtIn) wtIn.value = "";
+      nm.value = b.dataset.wt; if (wtIn) wtIn.value = b.dataset.wt;  // reused as it is named, never re-slugged
       wt.checked = true; whereTouched = true;
       nm.dispatchEvent(new Event("change"));
     });
@@ -2480,7 +2483,7 @@
         else defaultWhere(o.git);
         dirBlocked = taken && !o.git;
         if (dirBlocked) note.innerHTML = `⚠ <b>in use</b> by ${esc(o.occupants.join(", "))} and not a git repo, so there is no worktree to start in — one agent session per directory (§9)`;
-        else note.textContent = taken ? "a git repo: a new worktree is selected" : o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
+        else note.textContent = taken ? "a git repo: a new worktree is selected" : held ? "a shell may share the checkout" : o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
         gate();
       } catch (e) { note.textContent = ""; here.disabled = false; dirBlocked = false; gate(); }
     }

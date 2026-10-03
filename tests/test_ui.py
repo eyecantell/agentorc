@@ -2045,3 +2045,24 @@ def test_where_is_worktree_first_with_the_free_worktrees(client, tmp_path):
     again = client.get(f"/new?dir={repo}&where=worktree&worktree=wt-1&name=w&prefilled=1").text
     assert 'data-prefilled="1"' in again and '<code id="wtname">wt-1</code>' in again
     assert 'name="where" value="worktree" checked' in again
+
+
+def test_the_worktree_line_slugs_a_name_as_the_server_does():
+    """The Where line shows the worktree a Name makes, which is `naming.slug` of it (review of #951):
+    the page's `slugOf` is that function in JavaScript, run here under node beside the Python one."""
+    import shutil
+
+    from sessionorc import naming
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    js = (pathlib.Path(__file__).resolve().parent.parent / "src/agentorc/ui/static/app.js").read_text()
+    line = next(x for x in js.splitlines() if "const slugOf = " in x).strip()
+    names = ["TD-302", "My Feature", "  --x--  ", "Spike_2.feat", "a" * 40 + "-b", "!!!", "td-290"]
+    out = subprocess.run(
+        [node, "-e", f"{line}\nconsole.log(JSON.stringify({json.dumps(names)}.map(slugOf)))"],
+        capture_output=True, text=True, timeout=30,
+    )  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == [naming.slug(n) for n in names]

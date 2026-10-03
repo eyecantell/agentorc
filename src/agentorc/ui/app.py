@@ -1520,11 +1520,21 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             root = await asyncio.to_thread(gitinfo.worktree_path, Path(repo.strip()).expanduser(), "")
         except gitinfo.WorktreeError:
             return {"repo": repo, "worktrees": []}
-        found = await asyncio.to_thread(
-            lambda: sorted(p for p in root.iterdir() if (p / ".git").exists()) if root.is_dir() else []
-        )
-        held = await asyncio.gather(*(call("occupancy", dir=str(p)) for p in found))
-        free = [{"name": p.name, "path": str(p)} for p, o in zip(found, held, strict=True) if not o.get("occupants")]
+
+        def listed() -> list[Path]:
+            try:
+                return sorted(p for p in root.iterdir() if (p / ".git").exists()) if root.is_dir() else []
+            except OSError:
+                return []
+
+        found = await asyncio.to_thread(listed)
+        # one worktree the agent cannot read is left out, not the list (review of #951)
+        held = await asyncio.gather(*(call("occupancy", dir=str(p)) for p in found), return_exceptions=True)
+        free = [
+            {"name": p.name, "path": str(p)}
+            for p, o in zip(found, held, strict=True)
+            if isinstance(o, dict) and not o.get("occupants")
+        ]
         return {"repo": repo, "worktrees": free}
 
     @app.get("/api/occupancy")
