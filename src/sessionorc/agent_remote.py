@@ -34,6 +34,7 @@ from sessionorc.agent_common import (
     launch_params,
     log,
     read_checkout,
+    stat_dir,
 )
 from sessionorc.gitinfo import WorktreeError, worktree_path
 from sessionorc.models import (
@@ -102,7 +103,7 @@ class RemoteMixin:
         if rpc in modes.HOME_ONLY:
             # a checkout's files are read by a caller at the home, for a team start there (4b.3);
             # a node — a person or a session on it — never reads another host's files through here
-            return {"id": 0, "error": f"host_files is not served to a call from {host}: ask at the home (design §4.4a)"}
+            return {"id": 0, "error": f"{rpc} is not served to a call from {host}: ask at the home (design §4.4a)"}
         p = naming.readdress(dict(params.get("params") or {}), lambda a: self._from_host(a, host))
         if rpc == "set_controllers":
             for key in ("add", "remove"):
@@ -230,7 +231,7 @@ class RemoteMixin:
         """Whether `dir` exists on `host` (design §4.4a "Teams across hosts"): `ao team start`'s
         *every checkout exists on the record's host*, asked of that host's node. A read."""
         if host == self.host:
-            return {"host": host, "dir": dir, "exists": await asyncio.to_thread(Path(dir).expanduser().is_dir)}
+            return {"host": host, **await asyncio.to_thread(stat_dir, dir)}
         mux = self._node_mux(host)
         try:
             seen = await mux.request("stat", timeout=ACT_TIMEOUT, dir=dir)
@@ -290,6 +291,91 @@ class RemoteMixin:
         except (link.LinkClosed, TimeoutError) as e:
             raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
         return {"host": host, **(got if isinstance(got, dict) else {"dir": dir, "files": {}})}
+
+    async def _ask_node(self, host: str, method: str, **params: Any) -> Any:
+        """One link request to `host`'s node, every failure an `RpcError` in words: refused while
+        the link is down (`_node_mux`), the node's own refusal, or *<host> did not answer*."""
+        mux = self._node_mux(host)
+        try:
+            return await mux.request(method, timeout=ACT_TIMEOUT, **params)
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
+
+    def _occupant_from(self, who: str, host: str) -> str:
+        """A node's occupant line (`<id> (<state>)`, or an agent outside agentorc) in the home's
+        form: a record of that node's is `<id>@<host>`, as the home's own reading names it."""
+        sid, sep, rest = who.partition(" ")
+        return f"{sid}@{host}{sep}{rest}" if sid in self.remote.get(host, {}) else who
+
+    async def rpc_host_occupancy(self, host: str, dir: str) -> dict[str, Any]:
+        """Who holds the agent slot for `dir` on `host` (design §4.4a *The New session form on
+        another host*, TD-294): `occupancy` there, over the link method of that name — its live
+        records in the directory and the agents its adapters see, a directory that is not there
+        reading as empty. For a container node on this machine, whose checkout is one directory
+        here and there, this host's own reading is added, as the create's anchor check does. A read
+        like `host_dir`, and in `modes.HOME_ONLY`: it names another host's sessions."""
+        if not str(dir or "").strip():
+            return {"host": host, "dir": "", "occupants": [], "git": False}
+        if host == self.host:
+            return {"host": host, **await self.rpc_occupancy(dir)}
+        got = await self._ask_node(host, "occupancy", dir=dir)
+        if not isinstance(got, dict) or not isinstance(got.get("occupants"), list):
+            raise RpcError(f"{host} answered its occupancy with no list of occupants")
+        theirs = [self._occupant_from(str(o), host) for o in got["occupants"]]
+        if host in containers.container_nodes():
+            here = Path(dir).expanduser()
+            theirs = (await asyncio.to_thread(self.occupants, here) if here.is_dir() else []) + theirs
+        seen: dict[str, str] = {}  # one line per occupant: the home's copy of a record and the node's own
+        for who in theirs:
+            seen.setdefault(who.partition(" ")[0], who)
+        return {
+            "host": host,
+            "dir": str(got.get("dir") or dir),
+            "occupants": list(seen.values()),
+            "git": bool(got.get("git")),
+        }
+
+    def worktrees_here(self, repo: str) -> list[dict[str, Any]]:
+        """`repo`'s worktrees on this host — the directories under its main checkout's
+        `.claude/worktrees/` that git knows, by name — each with whether anyone is in it, the
+        occupancy reading's verdict (TD-294). `[]` outside a git repository. Blocking: a thread's."""
+        if not str(repo or "").strip():
+            return []
+        try:
+            root = worktree_path(Path(repo).expanduser(), "")
+            found = sorted(p for p in root.iterdir() if (p / ".git").exists()) if root.is_dir() else []
+        except (WorktreeError, OSError):
+            return []
+        return [{"name": p.name, "path": str(p), "occupied": bool(self.occupants(p))} for p in found]
+
+    async def rpc_host_worktrees(self, host: str, repo: str) -> dict[str, Any]:
+        """**Where**'s chips for a repo on `host` (design §4.4a *The New session form on another
+        host*, TD-294): `[{name, path, occupied}]` in one call, the listing and the occupancy both
+        made where the directories are — the `worktrees` link method. A container node's worktree
+        is one directory here and there, so this host's occupancy of it counts too. A read, in
+        `modes.HOME_ONLY` as `host_occupancy` is."""
+        if host == self.host:
+            return {"host": host, "repo": repo, "worktrees": await asyncio.to_thread(self.worktrees_here, repo)}
+        got = await self._ask_node(host, "worktrees", repo=repo)
+        listed = got.get("worktrees") if isinstance(got, dict) else None
+        if not isinstance(listed, list):
+            raise RpcError(f"{host} answered its worktrees with no list")
+        out = [
+            {"name": str(w.get("name") or ""), "path": str(w.get("path") or ""), "occupied": bool(w.get("occupied"))}
+            for w in listed
+            if isinstance(w, dict) and w.get("path")
+        ]
+        if host in containers.container_nodes():
+
+            def held_here() -> None:
+                for w in out:
+                    if not w["occupied"] and Path(w["path"]).is_dir():
+                        w["occupied"] = bool(self.occupants(Path(w["path"])))
+
+            await asyncio.to_thread(held_here)
+        return {"host": host, "repo": repo, "worktrees": out}
 
     async def _check_occupancy_for(self, host: str, params: dict[str, Any]) -> None:
         """The anchor rule (§9 invariant 2) for a create routed to a container node on this

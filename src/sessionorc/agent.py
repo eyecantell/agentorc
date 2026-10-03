@@ -156,6 +156,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     launch_params,  # noqa: F401
     log,  # noqa: F401
     read_checkout,  # noqa: F401
+    stat_dir,  # noqa: F401
 )
 from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_inbox import InboxMixin

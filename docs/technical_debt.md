@@ -2813,7 +2813,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the designer, TD-293's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 built — PR #PRNUM (the link methods `occupancy` and `worktrees`, `stat`'s `root`, the home's `host_occupancy` and `host_worktrees`, both in `modes.HOME_ONLY`; `tests/test_link.py`). Slices 2 (the page) and 3 (Start) open.
 **Location:** `src/sessionorc/agent_link.py` (the node's link methods beside `stat`, `repos`, `files`), `src/sessionorc/agent_remote.py` (`rpc_host_dir`, `rpc_host_repos`, `rpc_host_files`: the two new reads beside them), `src/agentorc/ui/app.py` (`new_form`, `_roles_for`, `new_submit`, `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()`), `src/agentorc/teamrun.py` (how a team start reads a node's config and briefs: the model); design §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*)
 
 **Why:** design §4.4a *The New session form on another host* (TD-293): a pick of another host is right today only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.

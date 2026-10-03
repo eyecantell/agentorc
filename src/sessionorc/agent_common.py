@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import link, mail, paths
+from sessionorc.gitinfo import toplevel
 from sessionorc.models import (
     GRANTS,
     HOME_OWNED,
@@ -884,3 +885,12 @@ def _usage_checked_at(reading: dict[str, Any]) -> float | None:
     except (ValueError, TypeError):
         return None
     return time.monotonic() - max(age, 0.0)
+
+
+def stat_dir(dir: str) -> dict[str, Any]:
+    """The `stat` link method's reply, and `host_dir`'s for this host: whether `dir` is a directory
+    here and `root`, the top level of the checkout it is in ("" outside one, or where it is not
+    there) — design §4.4a *The New session form on another host*. Blocking: a thread's."""
+    d = Path(str(dir or "")).expanduser()
+    exists = bool(str(dir or "").strip()) and d.is_dir()
+    return {"dir": str(d), "exists": exists, "root": toplevel(d) if exists else ""}
