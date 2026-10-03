@@ -17,7 +17,9 @@
 #                                 the memory guard's SessionStart hook notices
 #                                 and warns. It holds the permission allowlist
 #                                 too, so a worktree re-prompts for everything
-#                                 the main checkout already trusts.
+#                                 the main checkout already trusts. The worktree
+#                                 gets its OWN COPY, with the memory path
+#                                 rewritten to the worktree's (TD-080, below).
 #
 #   nested repos                  in a CONSTELLATION (cadence.md §9: one project,
 #                                 several repos, cadence installed once in a
@@ -144,6 +146,9 @@
 #   scripts/hydrate_worktree.sh --dehydrate [<worktree>]  # undo, refusing on unsaved work
 #   scripts/hydrate_worktree.sh --check [<worktree>]      # dry run of --dehydrate; mutates nothing
 #   scripts/hydrate_worktree.sh --quiet ...               # print only problems
+#   scripts/hydrate_worktree.sh --settings-disposable [<worktree>]
+#                                  # exit 0 when removing the worktree's settings.local.json
+#                                  # loses nothing (reap_worktrees.sh asks); mutates nothing
 #
 # --check is a dry run of --dehydrate specifically, not a general "is this
 # hydrated?" report, because that is the question with a caller: reap_worktrees.sh
@@ -151,7 +156,9 @@
 # and needs to know it without mutating the worktree it is only reporting on.
 #
 # Idempotent in both directions: re-running --hydrate adds only what is missing
-# and never replaces something already there.
+# and never replaces something already there — with one exception, the
+# settings.local.json copy, which every hydrate REFRESHES from the main
+# checkout's file (see settings_local).
 #
 # Exit: 0 = the worktree is in the requested state. 1 = it is not, and the
 # reason is printed (unsaved work in a nested repo, a sibling that could not be
@@ -170,6 +177,7 @@ for a in "$@"; do
         --check)     MODE=check ;;
         --dehydrate) MODE=dehydrate ;;
         --detect)    MODE=detect ;;
+        --settings-disposable) MODE=disposable; QUIET=1 ;;
         --hook)      MODE=hook; QUIET=1 ;;
         --all)       ALL=1 ;;
         --quiet)     QUIET=1 ;;
@@ -231,6 +239,11 @@ CLONE_ROOT="$(dirname "$COMMON")"
 IS_MAIN=0
 [[ "$(realpath "$WT")" == "$(realpath "$CLONE_ROOT")" ]] && IS_MAIN=1
 
+# reap_worktrees.sh's question (see settings_disposable, defined below with the
+# rest of the settings half; answered after it). The main checkout's file is the
+# original, never disposable.
+[[ "$MODE" == disposable && $IS_MAIN -eq 1 ]] && exit 1
+
 if [[ $IS_MAIN -eq 1 && "$MODE" != detect && "$MODE" != hook ]]; then
     # The main checkout is where the untracked things already live. Hydrating it
     # would mean linking it to itself; dehydrating it would mean deleting the
@@ -248,7 +261,8 @@ fi
 
 CONFIG="$CLONE_ROOT/docs/nested-repos.txt"
 PARSED="$(mktemp)"
-trap 'rm -f "$PARSED"' EXIT
+SETTINGS_TMP=""   # settings_local's temp file: untracked in the worktree if left behind
+trap 'rm -f "$PARSED" ${SETTINGS_TMP:+"$SETTINGS_TMP"}' EXIT
 rc=0
 MISSING=()   # read-only modes accumulate what hydration would add
 
@@ -296,23 +310,130 @@ read_config() {
 }
 
 # --- per-clone settings: .claude/settings.local.json --------------------------
-# A SYMLINK, not a copy. The file is live per-machine state — grant a permission
-# in one worktree and every other should have it, and if the memory directory
-# moves, a copy keeps pointing at the old one. A copy would fix today's symptom
-# and re-introduce it as drift, which is harder to see than the original bug. It
-# stays gitignored either way: the entry sync.sh installs is the exact path
-# `.claude/settings.local.json`, with no trailing slash, so it matches a symlink
-# as readily as a file (unlike the directory-only sibling patterns above).
+# A COPY with the memory path rewritten, not a symlink (TD-080, decided by the
+# repo owner 2026-10-01: the memory path is per checkout). `autoMemoryDirectory`
+# must be absolute, so the main checkout's file names the MAIN checkout's memory
+# directory; symlinked into a worktree — what this function did until TD-080 —
+# it made every worktree session write its memory into the main checkout's
+# working tree: on no branch of the writer's, in nobody's PR, uncommitted under
+# whoever holds the main checkout. The copy is the main checkout's file with
+# that one value replaced by the worktree's own path, so a memory note is a
+# change on the session's branch and rides its PR.
+#
+# WHAT THE COPY GIVES UP, and what answers it. The symlink was chosen because the
+# file is live per-machine state: a copy drifts. So every hydrate REFRESHES the
+# copy from the main checkout's file — a permission granted in the main checkout
+# reaches a worktree at its next hydrate, and a worktree still carrying the old
+# symlink is migrated by the same run. Nothing re-hydrates a worktree by itself:
+# the refresh is a run somebody makes. And a permission granted INSIDE a
+# worktree stays in that worktree's copy: it never reaches the main checkout or
+# a sibling, and the next hydrate of that worktree drops it (said when it does).
+#
+# Only a memory path INSIDE the main checkout is rewritten (to the same relative
+# path in the worktree). One that points outside it — a constellation's shared
+# memory directory in another repo, cadence.md §9.16 — is carried as it is: there
+# is no per-checkout copy of a directory this checkout does not hold. A key the
+# main checkout's settings.local.json does not carry is not added.
+#
+# It stays gitignored either way: the entry sync.sh installs is the exact path
+# `.claude/settings.local.json`.
+#
+# settings_py gen   <src> <root> <wt>        -> the copy's JSON on stdout (2: src unreadable)
+# settings_py state <src> <root> <wt> <dst>  -> "<same|stale|own|unreadable> <mem-ok|mem-wrong>"
+#   same        dst is what gen would write
+#   stale       dst differs but holds nothing src lacks (the memory path aside):
+#               refreshing or removing it loses nothing
+#   own         dst holds something src does not (a permission granted here)
+#   unreadable  dst is not a JSON object
+settings_py() {
+    python3 - "$@" <<'PY'
+import json, os, sys
+
+KEY = "autoMemoryDirectory"
+
+
+def load(path):
+    with open(path, encoding="utf-8") as fh:
+        d = json.load(fh)
+    if not isinstance(d, dict):
+        raise ValueError("not a JSON object")
+    return d
+
+
+def inside(path, base):
+    rel = os.path.relpath(path, base)
+    return None if rel == ".." or rel.startswith("../") else rel
+
+
+def want(src, root, wt):
+    d = load(src)
+    v = d.get(KEY)
+    if isinstance(v, str) and v:
+        p = os.path.expanduser(v) if v == "~" or v.startswith("~/") else v
+        if os.path.isabs(p):
+            for cand, base in ((p, root), (os.path.realpath(p), os.path.realpath(root))):
+                rel = inside(cand, base)
+                if rel is not None:
+                    d[KEY] = os.path.normpath(os.path.join(wt, rel))
+                    break
+    return d
+
+
+def subset(a, b):
+    """True when a holds nothing b lacks."""
+    if isinstance(a, dict):
+        return isinstance(b, dict) and all(k in b and subset(v, b[k]) for k, v in a.items())
+    if isinstance(a, list):
+        return isinstance(b, list) and all(x in b for x in a)
+    return a == b
+
+
+cmd, src, root, wt = sys.argv[1:5]
+try:
+    w = want(src, root, wt)
+except Exception:
+    sys.exit(2)
+if cmd == "gen":
+    sys.stdout.write(json.dumps(w, indent=2) + "\n")
+    sys.exit(0)
+try:
+    have = load(sys.argv[5])
+except Exception:
+    print("unreadable mem-ok")
+    sys.exit(0)
+mem = "mem-ok" if have.get(KEY) == w.get(KEY) else "mem-wrong"
+if have == w:
+    print("same", mem)
+elif subset({k: v for k, v in have.items() if k != KEY}, w):
+    print("stale", mem)
+else:
+    print("own", mem)
+PY
+}
+
+STALE=()   # hook mode: what is wrong with a settings.local.json that is present
+
 settings_local() {
     local src="$CLONE_ROOT/.claude/settings.local.json"
     local dst="$WT/.claude/settings.local.json"
+    local state tmp
 
     # detect/hook are READ-ONLY and must not touch this. Getting here through a
     # plain `!= hydrate` test would have made a SessionStart hook silently
-    # DELETE the very symlink it exists to check for.
+    # DELETE the very file it exists to check for.
     if [[ "$MODE" == detect || "$MODE" == hook ]]; then
-        if [[ ( -e "$src" || -L "$src" ) && ! -e "$dst" && ! -L "$dst" ]]; then
+        [[ $IS_MAIN -eq 0 ]] || return 0
+        [[ -e "$src" || -L "$src" ]] || return 0
+        if [[ -L "$dst" ]]; then
+            # The pre-TD-080 wiring. A missing file is the only thing the hook used
+            # to report, so an old-symlink worktree read as fine while its session
+            # wrote memory into the main checkout.
+            STALE+=("is a symlink to the main checkout's, so memory written here lands uncommitted in the main checkout (TD-080)")
+        elif [[ ! -e "$dst" ]]; then
             MISSING+=(".claude/settings.local.json")
+        elif command -v python3 >/dev/null 2>&1; then
+            state="$(settings_py state "$src" "$CLONE_ROOT" "$WT" "$dst" 2>/dev/null)" || state=""
+            [[ "$state" == *mem-wrong ]] && STALE+=("names a memory directory that is not this worktree's (autoMemoryDirectory, TD-080)")
         fi
         return 0
     fi
@@ -326,10 +447,20 @@ settings_local() {
                 say "  unlinked  .claude/settings.local.json"
             fi
         elif [[ -e "$dst" ]]; then
-            # Not ours to delete — someone, or a save-by-rename, put a real file
-            # here. Leave it: it is gitignored per-clone state, so it costs
-            # nothing, and removing it could throw away granted permissions.
-            say "  kept      .claude/settings.local.json (a real file, not our symlink)"
+            if settings_disposable; then
+                if [[ "$MODE" == check ]]; then
+                    say "  would remove  .claude/settings.local.json (the copy; holds nothing the main checkout's lacks)"
+                else
+                    rm -f "$dst"
+                    say "  removed   .claude/settings.local.json (the copy; holds nothing the main checkout's lacks)"
+                fi
+            else
+                # Not derived: it holds something the main checkout's file does not
+                # (a permission granted in this worktree), or cannot be read. Leave
+                # it; reap_worktrees.sh asks the same question (--settings-disposable)
+                # and keeps the worktree.
+                say "  kept      .claude/settings.local.json (holds something the main checkout's does not)"
+            fi
         fi
         return 0
     fi
@@ -338,26 +469,60 @@ settings_local() {
         say "  n/a       .claude/settings.local.json (the main checkout has none)"
         return 0
     fi
-    if [[ -L "$dst" ]]; then
-        say "  ok        .claude/settings.local.json -> $(readlink "$dst")"
-        return 0
-    fi
-    if [[ -e "$dst" ]]; then
-        # A regular file here means the link was replaced — editors and settings
-        # writers commonly save by writing a temp file and renaming over the
-        # target, which severs a symlink instead of following it. This worktree
-        # then has a divergent copy and the shared one silently stops being
-        # shared. Say so; do not overwrite, because the divergent copy may be
-        # the newer one.
-        warn "  WARN      $dst is a real file, not a link to the main checkout's — the two will drift"
-        warn "            (a save-by-rename replaces a symlink instead of following it)"
-        warn "            reconcile by hand, then: rm '$dst' && scripts/hydrate_worktree.sh '$WT'"
+    if ! command -v python3 >/dev/null 2>&1; then
+        warn "  WARN      python3 not found — cannot write this worktree's .claude/settings.local.json"
         return 1
     fi
     mkdir -p "$WT/.claude"
-    ln -s "$src" "$dst"
-    say "  linked    .claude/settings.local.json -> $src"
+    # Written beside the destination and renamed over it: a rename replaces a
+    # symlink ITSELF, where a write through it would rewrite the main checkout's
+    # file with the worktree's memory path.
+    tmp="$(mktemp "$WT/.claude/.settings.local.json.XXXXXX")" || return 1
+    SETTINGS_TMP="$tmp"
+    if ! settings_py gen "$src" "$CLONE_ROOT" "$WT" > "$tmp" 2>/dev/null; then
+        rm -f "$tmp"
+        warn "  WARN      $src is not a JSON object — this worktree's copy was not written"
+        return 1
+    fi
+    if [[ -L "$dst" ]]; then
+        mv -f "$tmp" "$dst"
+        say "  migrated  .claude/settings.local.json (was a symlink to the main checkout's; now this worktree's copy)"
+    elif [[ -e "$dst" ]]; then
+        state="$(settings_py state "$src" "$CLONE_ROOT" "$WT" "$dst" 2>/dev/null)" || state=""
+        case "$state" in
+            same*)
+                rm -f "$tmp"
+                say "  ok        .claude/settings.local.json (this worktree's copy, up to date)"
+                return 0 ;;
+            stale*)
+                mv -f "$tmp" "$dst"
+                say "  refreshed .claude/settings.local.json from the main checkout's" ;;
+            *)
+                # Said even under --quiet: something only this worktree had is gone.
+                mv -f "$tmp" "$dst"
+                warn "  NOTE      .claude/settings.local.json refreshed from the main checkout's — what only this"
+                warn "            worktree's copy held (a permission granted here) is dropped; grant it in the"
+                warn "            main checkout to keep it" ;;
+        esac
+    else
+        mv -f "$tmp" "$dst"
+        say "  wrote     .claude/settings.local.json (the main checkout's, with this worktree's memory path)"
+    fi
     return 0
+}
+
+# Would removing this worktree's settings.local.json lose nothing? A symlink, an
+# absent file, or a copy holding nothing the main checkout's file lacks. Anything
+# it cannot judge (no python3, no main-checkout file, unreadable JSON) is "no".
+settings_disposable() {
+    local src="$CLONE_ROOT/.claude/settings.local.json"
+    local dst="$WT/.claude/settings.local.json"
+    local state
+    [[ -L "$dst" || ! -e "$dst" ]] && return 0
+    [[ -e "$src" ]] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    state="$(settings_py state "$src" "$CLONE_ROOT" "$WT" "$dst" 2>/dev/null)" || return 1
+    [[ "$state" == same* || "$state" == stale* ]]
 }
 
 # --- nested repos -------------------------------------------------------------
@@ -667,6 +832,10 @@ detect_nested() {
         sed -e 's:/\.git$::' -e "s:^$CLONE_ROOT/*::" | grep -v '^$' | sort
 }
 
+if [[ "$MODE" == disposable ]]; then
+    settings_disposable; exit $?
+fi
+
 say "== hydrate ($MODE) $WT"
 
 settings_local || rc=1
@@ -724,6 +893,12 @@ if [[ "$MODE" == hook ]]; then
         echo "  Run: $0 '$WT'"
         echo "  (cadence.md §1 — a worktree carries only what the repo tracks; the siblings and"
         echo "   .claude/settings.local.json have to be brought in.)"
+    fi
+    if [[ ${#STALE[@]} -gt 0 ]]; then
+        for st in "${STALE[@]}"; do
+            echo "⚠ This worktree's .claude/settings.local.json $st."
+        done
+        echo "  Run: $0 '$WT'   (it writes the worktree its own copy; cadence.md §7.2 — a memory note is part of your PR)"
     fi
     exit 0
 fi

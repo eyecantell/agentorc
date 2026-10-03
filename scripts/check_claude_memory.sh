@@ -8,6 +8,9 @@
 #      → Claude silently falls back to ~/.claude/projects/<encoded-cwd>/memory/
 #        and writes memory THERE (outside the repo, never committed → lost).
 #   2. New memory written to the repo dir but not yet committed/pushed (not backed up).
+#      The advice depends on whose it is (TD-080): in a worktree, commit it on your
+#      branch; in the main checkout, the files are named; a worktree whose setting
+#      still names the MAIN checkout's directory is told not to commit them from there.
 #   3. The git hooks not installed in this clone → the pre-push main guard is silently
 #      OFF (a per-clone setting a fresh clone lacks), or installed the old way, as a
 #      relative core.hooksPath, which each worktree resolves on its own branch (TD-055).
@@ -235,11 +238,29 @@ fi
 MEM_REPO=""
 [ -d "$MEM_DIR" ] && MEM_REPO=$(git -C "$MEM_DIR" rev-parse --show-toplevel 2>/dev/null || true)
 if [ -n "$MEM_REPO" ]; then
-  dirty=$(git -C "$MEM_REPO" status --porcelain -- "$MEM_DIR" 2>/dev/null | wc -l | tr -d ' ')
+  dirty_out=$(git -C "$MEM_REPO" status --porcelain --untracked-files=all -- "$MEM_DIR" 2>/dev/null)
+  dirty=$(printf '%s' "$dirty_out" | grep -c '' | tr -d ' ')
   if [ "$dirty" -gt 0 ]; then
-    where="$MEM_DIR"
-    [ "$MEM_REPO" != "$REPO_ROOT" ] && where="$MEM_DIR (in $MEM_REPO, a different repo than this session's)"
-    warns+=("$dirty uncommitted change(s) in $where — commit & push to back up new memories.")
+    # WHOSE they are decides the advice (TD-080). "commit & push", said to every
+    # session in the repo, is how one session's note ended up in another's PR.
+    # Resolved only here, on the dirty path, so a clean tree pays nothing more.
+    mem_repo_p="$(cd "$MEM_REPO" 2>/dev/null && pwd -P)"
+    this_p="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)"
+    main_p="$(cd "$REPO_ROOT" 2>/dev/null && d="$(git rev-parse --git-common-dir 2>/dev/null)" && cd "$d/.." && pwd -P)"
+    if [ "$mem_repo_p" = "$this_p" ] && [ -n "$main_p" ] && [ "$this_p" != "$main_p" ]; then
+      # this worktree's own memory: a change on the session's branch
+      warns+=("$dirty uncommitted change(s) in $MEM_DIR — commit them on your branch: a memory note is part of your PR (cadence.md §7.2).")
+    elif [ "$mem_repo_p" = "$this_p" ]; then
+      # the main checkout's own: name them, so its session can tell its notes at a glance
+      names=$(printf '%s\n' "$dirty_out" | sed 's/^...//; s/.* -> //; s:^"::; s:"$::; s:.*/::' | head -5 | paste -sd, - | sed 's/,/, /g')
+      [ "$dirty" -gt 5 ] && names="$names, …"
+      warns+=("$dirty uncommitted change(s) in $MEM_DIR ($names) — commit & push to back up new memories.")
+    elif [ -n "$main_p" ] && [ "$mem_repo_p" = "$main_p" ]; then
+      # a worktree whose setting still names the main checkout (the pre-TD-080 symlink)
+      warns+=("$dirty uncommitted change(s) in $MEM_DIR — the MAIN checkout's memory, which this worktree's autoMemoryDirectory still names. They are on no branch of yours: do not commit them from here. Give this worktree its own memory path (scripts/hydrate_worktree.sh, TD-080), then move any note of yours into its docs/claude-memory.")
+    else
+      warns+=("$dirty uncommitted change(s) in $MEM_DIR (in $MEM_REPO, a different repo than this session's) — commit & push to back up new memories.")
+    fi
   fi
 elif [ -d "$MEM_DIR" ]; then
   warns+=("$MEM_DIR is not inside a git repo — memory written there is never committed or pushed, so it is lost with the machine (cadence.md §7: memories are git-tracked like any other doc).")
