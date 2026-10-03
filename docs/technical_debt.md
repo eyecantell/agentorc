@@ -129,7 +129,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-262 | A card says *closed by you* for every closed session, whoever closed it: dc-grind's manager wound its own team down 40 s after a start and all three cards named the person | Medium | Designed 2026-10-01 — the build is TD-265 |
 | TD-264 | Build the board write-back on origin's head: the host agent's own tree, the PR it opens and squash-merges, the refusals, and every row actionable | Medium | Open — Paul chose origin's head; the road through the ruleset is steered; waits on cadence §4.5's and §4.6's change in dev-cadence |
 | TD-265 | Build the closer: `closer` on the record from the close's caller or the tick's rule, the card's and `ao status -v`'s words, the declaration after the ending, the team card's who / how soon / why, and the Start's lane line with its Start anyway / Cancel confirm | Medium | Built (#919, #922, #923, #926): live look pending |
-| TD-266 | A closed session's card does not say how it is removed: Forget is behind Details, and its *more ⋯* offers Wrap up, Kill and Close, which do nothing for it | Medium | Designed 2026-10-01 — Forget leads a closed card's foot, the menu draws what applies, the hover says when the record goes; the build is TD-267 |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Built (#907); live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Designed 2026-10-02 — waiting is read from the person inbox and holds the team live, an orphaned steer lapses to its default, a question's end is rule 8 work; the build is TD-274 |
@@ -147,7 +146,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#956), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
-| TD-293 | New session on another host reads this host's disk for the Repo list, the roles and the brief, ledger and reader a role resolves, and draws no directory check, occupancy or worktree chips | Medium | Designed 2026-10-03 — the build is TD-294 |
 
 
 ---
@@ -2445,25 +2443,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a team its manager stops with `ao team stop --close` reads *closed by <manager>* on each member's card and *closed itself* on the manager's, with each declaration after; a person's Close reads *closed by you*; the team card reads *wound down <t> · after 40 s · by <manager> — <why>* for a run under ten minutes; `ao status -v` prints the same words; the Start confirm says what the lanes hold, and a team whose every lane is empty opens the Start anyway / Cancel confirm, `ao team start` stopping at the line without `--anyway`; the tests above pass.
 
 **Related:** TD-262 (the design), TD-241 (*by the tick*), TD-256 (rule 9 reads the same missing fact), TD-259 (the manager on call), TD-095 (the card's anatomy), TD-214 (rule 8 reads the lanes the Start now reads).
-## TD-266: A closed session's card does not say how it is removed — Forget is behind Details, and its menu offers what no longer applies
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-01 (the anchor, for Paul, with a screenshot of the Org: *there is a closed session in the No team section that I do not see how to remove — is this an oversight?*)
-**Owner:** designer
-**Kind:** design-first
-**Blocked by:** TD-267
-**Status:** **Designed 2026-10-01** (the designer, PR #903; the placement steered to Paul as `m-1918b64cb2ce`; Paul, 2026-10-02, through the anchor: *go with the default*). Design: §4.5 *The card's anatomy* row 6 (`closed` → **Forget**, Details second, as `exited`; *the menu draws what applies to the state*: on a closed card or one whose pane is gone, Message… · Restart · Forget, the seven that act on a process or a pane left out, not dimmed; the slot's hover and the Details banner say a closed record is forgotten by itself a day after the close; Resume stays on the banner), §4.5a (a **Forget** row for the card's foot, the **Details** row, the **more ▾** row's closed-card shape), the Org mockup's closed card (`gen.py`: Forget · Details), design-history §4.5 and §4.5a. Settled: (1) Forget is the foot's lead, not a menu item alone — the same button an exited card leads with, with no confirm (it stops nothing, and the record goes by itself in a day); (2) the inapplicable controls are left out, since dimmed is for a control that applies and is refused, and the pill already says the process is gone; (3) the hover carries the day, no new note on the card; Resume is not added to the card. The build is TD-267.
-**Location:** `src/agentorc/ui/cards.py` (`next_act`: `forget` for `exited` only; `closed` or a gone pane → `details`), `src/agentorc/ui/templates/card.html` (the foot; the *more ⋯* menu, drawn the same for every state but `scheduled`), design §4.5 *The card's anatomy* row 6 and §4.5a's **more ▾** row and the Details row (where a closed record's Forget is), `src/sessionorc/agent_tick.py` (the reap after `CLOSED_KEEP`, one day)
-
-**Why:** `error_examine`, a person's own interactive session in samscrape, was closed and sat under *No team* reading *closed by you*. Its foot is **Details** and VS Code. Its *more ⋯* menu is Message…, Switch to unattended, Wrap up, Kill, Close, Open shell here, Pop out and Copy tmux command: (and Restart where the record is restartable): three that act on a process that is gone, one that copies a command for a tmux session that no longer exists, and no **Forget**. An `exited` card leads with Forget; a closed one keeps it on the Details page's banner (§4.5a's Details row: *Resume / New session here / Forget*), two presses away with nothing on the card pointing there — Paul looked for it and did not find it — beside `ao forget <id>` and the tick's reap a day after the close (`CLOSED_KEEP`), which the card does not mention either. A team's closed members have **Forget all** on the team's header; a closed session in no team has nothing.
-
-**Fix:** design first — §4.5a's rows, then the card. (1) **A closed card can be forgotten from the card itself**: Forget in its *more ⋯* (or as its foot's second button — the design round says which; row 6 keeps one lead). (2) **The menu draws what applies to the state**: for a `closed` record, and for any record whose pane is gone, no Wrap up, Kill, Close, Pop out or Copy tmux command; say whether they are left out or drawn disabled with the reason (§4.5: *dimmed means disabled and nothing else*). (3) **The card says how long it stays**: the slot's hover, or a note, that a closed record is removed a day after its close. Whether **Resume** belongs on a closed card of a person's own session is the round's to say (Focus's exited banner has it).
-
-**Done when:** a person removes a closed session from its card on the Org, and a closed card's menu holds no control that does nothing.
-
-**Related:** TD-095 (the card's anatomy), TD-156 (the end of a session — Paul's UI review, which covers Focus after Wrap up), TD-262 / TD-265 (who closed it, the same slot), TD-097 (a seat's card).
-
 ## TD-268: Members… → Add member writes a duplicate name: nothing refuses it, nothing starts, and Remove would wind down the live member
 
 **Priority:** High
@@ -2785,23 +2764,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** the design says who makes looks and how they reach the person, the build entries are on the ledger with a `Blocked by:` line, and the next merged UI change's look goes through it.
 
 **Related:** TD-255 (a live look's answers), TD-244 (the page walks), TD-288 (settled half by a headless look), cadence §3.5.
-
-## TD-293: New session on another host reads this host's disk for its repos, roles and a role's resolution, and checks nothing of the node's
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-03 (grinder-ao-2, TD-284 slice 6; the review of #949)
-**Owner:** designer
-**Kind:** design-first
-**Blocked by:** TD-294
-**Status:** **Designed 2026-10-03** (the designer, PR #954; obvious from §4.4a *Teams across hosts* — a team start on another host already reads the registry, a directory and the repo's files there — so landed with a note to Paul). Design: §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*). Of the Fix's two ways, the node returns the files and the home parses them: `host_files` and `repoconfig.load_text`, the team start's loader, so nothing new crosses the link for roles; the two new reads are `host_occupancy` and `host_worktrees`, and `stat` gains `root`. **Next:** designed; the build is TD-294.
-**Location:** `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()` in `dirCheck`, `loadWorktrees`, `check`), `src/agentorc/ui/app.py` (`new_form`: `form_repos(hosts.local_host().repos())`, `_roles_for`; `new_submit`: `repoconfig.discover`, `resolve_role`, `team_reader`; `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/sessionorc/agent_link.py` (`_read`), `src/sessionorc/agent_remote.py` (`_act_host`, `_route_read`), design §4.5a New session **the form** (*Another host*), §4.4a
-
-**Why:** the Host pick (TD-284 slice 3) sends the create and the name check to the picked host, but the rest comes from this host or is not drawn: the Repo list is this host's registry, and the Role list and the role a Start resolves come from this disk's `.agentorc.yml` — its brief, its ledger and the team's reader with it; *another directory…*'s check, the occupancy and the Where chips are skipped (`app.js`'s `away()`), so the person learns of a missing directory or an occupied checkout only from the node's refusal at Start. A pick of another host is right only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.
-
-**Fix:** design first: what a node serves the home for the form. Today a routed read (`NODE_READS`) is a read of one record's pane, keyed by its `id`; the form needs host-level reads (the registry's repos, a directory's existence, occupancy, a repo's worktrees — the last three then drawn for a node as for this host) and a repo's role definitions. `repoconfig` is `agentorc`'s and `sessionorc` never imports it, so either the node returns the `.agentorc.yml` text and the home parses it, or the role resolution moves to the node's side of the create. Then the build: the reads routed with the form's `host`, the page's endpoints taking `host`, `app.js` passing it, and the create resolving the role on the picked host. Most of the build is `src/sessionorc/`.
-
-**Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, and a role started there carries the node's brief and ledger.
-
-**Related:** TD-284 (the form), TD-057 (the link and routed reads), TD-145 (a worktree record's Resume with changes…).
-
