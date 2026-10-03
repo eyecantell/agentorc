@@ -134,7 +134,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-268 | Members… → Add member writes a second member with a name the team already has: the form prefills the existing member's name, nothing refuses it, nothing starts, and Remove on either row would wind down the one live session | High | Built (#907); live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-271 | A member waiting on a steer's bound is closed with its team, and nothing brings it back at the bound or at the answer: three design PRs sat 18 h with the designer *out of work*, its claims still showing | High | Open — design first |
-| TD-272 | Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card: label it **Close session** | Low | Open |
 | TD-273 | A drag in the Focus terminal copies on release and says nothing: give the copy a sign | Low | Open |
 | TD-275 | A test fails when `tests/test_ui.py` runs before `tests/test_ui_org.py` alone: `uiconf._read` is a module cache a test leaves set | Low | Open |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Open |
@@ -2529,24 +2528,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a designer that opens a design PR, steers and has nothing else to pick is back at the bound or at the answer without a person starting its team, and until then its card and the Inbox say what it waits on.
 
 **Related:** TD-213 / TD-216 (the orphaned question), TD-214 / TD-227 (rule 8, the start on work), TD-240 / TD-241 (rule 9, finished), TD-187 (a member out of work is never woken when its lane gains entries), TD-262 (who closed a session — the same card slot), memory `steer-replies-land-on-the-board`.
-
-## TD-272: Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus: *the "close" button looks like it is for closing the "ready to close" card, maybe relabel it "close session"?*)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/templates/focus.html` (the side panel's *Ready to close* card: its summary's button `#closebtn`, labelled **Close**; the header's own is already **Close session**), design §4.5a's Focus rows for **Close session** (TD-156), `src/agentorc/ui/help.py` if the label is bound there
-
-**Why:** the button sits on the card's summary line, at its right, where a panel's own close or fold control usually is; it ends the session. The header's button for the same act already reads **Close session**.
-
-**Fix:** label it **Close session**, as the header's is, in the template and in §4.5a's Focus side panel row, which names it **Close** (the help entry already says *Close session*); no change to when it is shown or enabled.
-
-**Done when:** both buttons for the act carry the same words.
-
-**Related:** TD-156 (the end of a session on Focus), TD-095 (*Close session* on a card).
 
 ## TD-273: A drag in the Focus terminal copies on release and says nothing
 

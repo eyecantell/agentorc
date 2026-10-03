@@ -937,6 +937,17 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     assert "v.closed_keep ? ` <span class=\"meta\">${esc(v.closed_keep)}</span>`" in js
 
 
+def test_ready_to_close_on_focus_says_close_session_as_the_header_does(tmp_path, monkeypatch):
+    """TD-272: the *Ready to close* card's button read **Close**, as if it closed the card."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = view(_card(state="idle", created="2026-09-21T00:00:00Z"))
+    html = templates.get_template("focus.html").render(s={**s, "grants_all": [], "ready": []}, host="h", active="Org")
+    btn = html.split('id="closebtn"')[1].split("</button>")[0]
+    assert btn.endswith(">Close session") and 'title="Kills the session' in btn
+
+
 def test_row_three_says_where_once_and_the_group_hides_what_it_already_says(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui.app import _middle, templates, view

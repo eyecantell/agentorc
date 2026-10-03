@@ -2789,3 +2789,21 @@ Both go away only when the record says who closed it.
 **Done when:** a closed session in no team is removed from its card on the Org with one press of Forget, its *more ⋯* holds nothing that acts on a gone process, and its hover says the record goes by itself a day after the close; the tests above pass.
 
 **Related:** TD-266 (the design), TD-095 (the card's anatomy, the foot's rule), TD-262 / TD-265 (the closer's words in the same slot — the hover's tail follows them), TD-156 (Forget all on a team's header), TD-250 (Restart in the menu), TD-077 (Forget refused on a suspended record).
+
+## TD-272: Focus's *Ready to close* card has a button labelled **Close** that reads as closing the card
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Focus: *the "close" button looks like it is for closing the "ready to close" card, maybe relabel it "close session"?*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/templates/focus.html` (the side panel's *Ready to close* card: its summary's button `#closebtn`, labelled **Close**; the header's own is already **Close session**), design §4.5a's Focus rows for **Close session** (TD-156), `src/agentorc/ui/help.py` if the label is bound there
+
+**Why:** the button sits on the card's summary line, at its right, where a panel's own close or fold control usually is; it ends the session. The header's button for the same act already reads **Close session**.
+
+**Resolved:** 2026-10-02 (PR #913) — `focus.html`'s `#closebtn` reads **Close session** with `help_title('close')`; design §4.5a's Focus side panel row names it so; `tests/test_ui_org.py` holds the label.
+
+**Done when:** both buttons for the act carry the same words.
+
+**Related:** TD-156 (the end of a session on Focus), TD-095 (*Close session* on a card).
