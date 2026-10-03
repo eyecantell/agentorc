@@ -37,7 +37,7 @@
    control sits on the thing it acts on, and only a team with a definition has either. #}
 {% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}"{% if g.stays %} data-confirm="Wind down {{ g.team }}? {{ g.stays | join('; ') }}."{% endif %}>Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}"{% if g.stays %} data-confirm="Stop {{ g.team }} now? {{ g.stays | join('; ') }}."{% endif %}>Stop now</button>
-{% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
+{% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead." data-closes="{{ g.concluded.names | join(', ') }}"{% endif %}>Start</button>{% endif %}{% endif %}
 {# design §4.5a *team card: **Members…*** (§4.9, TD-163, built by TD-172): beside Start on a stopped
    team and beside Wind down on a live one; on a team a repo defines (§4.5a *Members… on a
    repo-defined team*, TD-229) drawn disabled with its reason and **Open file** through the person's

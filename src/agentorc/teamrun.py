@@ -25,6 +25,7 @@ from typing import Any
 from agentorc import org as orgmod
 from agentorc import teams
 from sessionorc import balance as balance_mod
+from sessionorc import ledger as ledger_mod
 from sessionorc.gitinfo import work_left
 from sessionorc.work import (
     closed_finished,
@@ -493,6 +494,46 @@ def repos_via(call: Call) -> orgmod.ReposOf:
         return [str(r) for r in repos]
 
     return repos_of
+
+
+NOTHING_TO_PICK = "nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts"
+
+
+def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] | None:
+    """What the members' lanes hold before a start (design §4.5a team card **Start**, *What the lanes
+    hold, before the start*; TD-262, built by TD-265): each role with a lane, once, read against its
+    checkout's ledger as rules 6 and 8 read it — `ledger.lane_matches` over the home's `repos`
+    reading — as `{line, empty, roles}`: *grinder: 3 pickable · designer: 0*. `empty` only when every
+    lane was read and none matched; a ledger that cannot be read is *unknown*, never empty. None when
+    there is nothing to say: no member has a lane, or the plan itself fails, which the start reports
+    in its own words."""
+    try:
+        plan = teams.plan(org, name, host, files=files_via(call))
+    except (teams.TeamError, ValueError, OSError):
+        return None
+    holders = [x for x in plan.members if x.lane]
+    if not holders:
+        return None
+    try:
+        got = call("repos")
+        readings = got if isinstance(got, dict) else {}
+    except Exception:  # noqa: BLE001 — no reading is every lane unknown, never a refused start
+        readings = {}
+    roles: dict[str, int | None] = {}
+    for x in holders:
+        if x.role in roles:
+            continue  # a role once: its members share a lane (§4.9)
+        led = (readings.get(str(x.dir)) or {}).get("ledger") or {}
+        entries = led.get("entries") if "error" not in led else None
+        roles[x.role] = (
+            sum(1 for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e))
+            if isinstance(entries, list)
+            else None
+        )
+    line = " · ".join(
+        f"{role}: {'ledger unreadable' if n is None else (f'{n} pickable' if n else '0')}" for role, n in roles.items()
+    )
+    return {"line": line, "empty": all(n == 0 for n in roles.values()), "roles": roles}
 
 
 def start(

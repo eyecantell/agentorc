@@ -73,6 +73,22 @@
     </div>
   </form>
 </dialog>
+{#- design §4.5a team card **Start**, *What the lanes hold, before the start* (TD-262, built by TD-265): the
+    press on a team whose every member's lane is empty opens this instead of starting — what it means,
+    the lane line, a concluded team's closes as its second line, and **Start anyway** / **Cancel** -#}
+<dialog id="startdlg" class="card pad maildlg" aria-labelledby="starthead">
+  <form method="dialog" class="col gap">
+    <div class="h2" id="starthead">Start</div>
+    <div id="starttext"></div>
+    <div class="note" id="startcloses" hidden></div>
+    <div class="note" id="startlanes"></div>
+    <div class="row gap">
+      <span class="grow"></span>
+      <button class="btn ghost" value="cancel">Cancel</button>
+      <button class="btn primary" value="go" id="startgo" title="start the team as any Start does: you may know what the ledger does not">Start anyway</button>
+    </div>
+  </form>
+</dialog>
 {# The `personbox` dialog stood here until 2026-09-19: a fixed-width column at `max-height: 60vh`
    that sessions wrote paragraphs into. It is retired with the Inbox page (§4.5a, TD-069 step 1). #}
 {# design §4.5a **?** overlay (TD-124): every key of this page beside the control it presses,

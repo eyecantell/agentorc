@@ -818,8 +818,18 @@ def cmd_team_start(args: argparse.Namespace) -> int:
         org = _org_here()
     except ValueError as e:
         return fail(args, str(e), 1)
+    # what the lanes hold, before anything starts (§4.5a team card **Start**, §4.7; TD-265): the first
+    # line, and a refusal when every lane is empty unless `--anyway` — the person may know better
+    here = hosts.local_host().name
+    picks = teamrun.lanes(call_sync, org, args.name, here)
+    if picks and picks["empty"] and not args.anyway:
+        return fail(args, f"{teamrun.NOTHING_TO_PICK} ({picks['line']}) — --anyway starts it", 1, lanes=picks)
+    if picks and not args.json:
+        print(picks["line"])
     try:
-        p, result = teamrun.start(call_sync, org, args.name, hosts.local_host().name, profile=args.profile)
+        p, result = teamrun.start(call_sync, org, args.name, here, profile=args.profile)
+        if picks:
+            result = {**result, "lanes": picks}
     except teamrun.NamesHeld as e:
         return fail(args, str(e), 1, holders=e.holders)
     except teamrun.PartialStart as e:
@@ -2728,6 +2738,9 @@ def build_parser() -> argparse.ArgumentParser:
     q = add_team("start", help="launch a team: every check first, then the lead, then its members")
     q.add_argument("name")
     q.add_argument("-p", "--profile", help="a profile for every session in it, over the role's and the member's")
+    q.add_argument(
+        "--anyway", action="store_true", help="start it although every member's lane is empty (the page's Start anyway)"
+    )
     q.set_defaults(fn=cmd_team_start)
 
     q = add_team("until", help="set or clear the team's stop time: every live member and seat stops then (§6)")
