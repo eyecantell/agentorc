@@ -147,7 +147,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Open |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A live look waits on the person for what a reviewer could check, and sits among the decisions: a look a browser can make goes to a reviewer first, with screenshots; what is left for the person draws in its own Inbox section; a **Send to reviewer** answer on such a row | Medium | Open — design first |
-| TD-293 | New session on another host reads this host's disk: the Repo list, the roles, the worktree chips, and the brief, ledger and reader a role resolves | Medium | Open: design-first |
+| TD-293 | New session on another host reads this host's disk for the Repo list, the roles and the brief, ledger and reader a role resolves, and draws no directory check, occupancy or worktree chips | Medium | Open: design-first |
 
 
 ---
@@ -2786,7 +2786,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-255 (a live look's answers), TD-244 (the page walks), TD-288 (settled half by a headless look), cadence §3.5.
 
-## TD-293: New session on another host reads this host's disk for its repos, roles and a role's resolution
+## TD-293: New session on another host reads this host's disk for its repos, roles and a role's resolution, and checks nothing of the node's
 
 **Priority:** Medium
 **Type:** debt
@@ -2794,11 +2794,11 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open: design-first
-**Location:** `src/agentorc/ui/app.py` (`new_form`: `form_repos(hosts.local_host().repos())`, `_roles_for`; `new_submit`: `repoconfig.discover`, `resolve_role`, `team_reader`; `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/sessionorc/agent_link.py` (`_read`), `src/sessionorc/agent_remote.py` (`_act_host`, `_route_read`), design §4.5a New session **the form** (*Another host*), §4.4a
+**Location:** `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()` in `dirCheck`, `loadWorktrees`, `check`), `src/agentorc/ui/app.py` (`new_form`: `form_repos(hosts.local_host().repos())`, `_roles_for`; `new_submit`: `repoconfig.discover`, `resolve_role`, `team_reader`; `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/sessionorc/agent_link.py` (`_read`), `src/sessionorc/agent_remote.py` (`_act_host`, `_route_read`), design §4.5a New session **the form** (*Another host*), §4.4a
 
-**Why:** the Host pick (TD-284 slice 3) sends the create and the name check to the picked host, but everything else the form shows and resolves comes from this host: the Repo list is this host's registry, *another directory…*'s check and the occupancy look at this disk, the Where chips list this disk's worktrees, the Role list and the role a Start resolves come from this disk's `.agentorc.yml` — its brief, its ledger and the team's reader with it. A pick of another host is right only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks, says *no such directory* about a path the node has, and starts a session whose brief and ledger are this host's.
+**Why:** the Host pick (TD-284 slice 3) sends the create and the name check to the picked host, but the rest comes from this host or is not drawn: the Repo list is this host's registry, and the Role list and the role a Start resolves come from this disk's `.agentorc.yml` — its brief, its ledger and the team's reader with it; *another directory…*'s check, the occupancy and the Where chips are skipped (`app.js`'s `away()`), so the person learns of a missing directory or an occupied checkout only from the node's refusal at Start. A pick of another host is right only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.
 
-**Fix:** design first: what a node serves the home for the form. Today a routed read (`NODE_READS`) is a read of one record's pane, keyed by its `id`; the form needs host-level reads (the registry's repos, a directory's existence, occupancy, a repo's worktrees) and a repo's role definitions. `repoconfig` is `agentorc`'s and `sessionorc` never imports it, so either the node returns the `.agentorc.yml` text and the home parses it, or the role resolution moves to the node's side of the create. Then the build: the reads routed with the form's `host`, the page's endpoints taking `host`, `app.js` passing it, and the create resolving the role on the picked host. Most of the build is `src/sessionorc/`.
+**Fix:** design first: what a node serves the home for the form. Today a routed read (`NODE_READS`) is a read of one record's pane, keyed by its `id`; the form needs host-level reads (the registry's repos, a directory's existence, occupancy, a repo's worktrees — the last three then drawn for a node as for this host) and a repo's role definitions. `repoconfig` is `agentorc`'s and `sessionorc` never imports it, so either the node returns the `.agentorc.yml` text and the home parses it, or the role resolution moves to the node's side of the create. Then the build: the reads routed with the form's `host`, the page's endpoints taking `host`, `app.js` passing it, and the create resolving the role on the picked host. Most of the build is `src/sessionorc/`.
 
 **Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, and a role started there carries the node's brief and ledger.
 

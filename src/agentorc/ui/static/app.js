@@ -2640,7 +2640,7 @@
 
     // The Team picker (design §4.5a New session **Team**, §4.9 *A person in the team*, TD-173):
     // the team's checkouts in the Directory list, Role narrowed to its roles plus `plain`, its live
-    // manager ticked under Controllers, Unattended left off, and the reader its held PRs get — the
+    // manager ticked under Controllers, a role started under you, and the reader its held PRs get — the
     // one line /api/team_review answers for the team and the directory. "none" undoes all but the
     // ticks, which are the person's by then.
     const teamSel = $("#team"), tnote = $("#teamnote");
