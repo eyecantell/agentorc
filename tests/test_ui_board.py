@@ -1438,3 +1438,23 @@ def test_fold_head_cuts_after_the_bold_head_and_its_sentence():
     assert lead == "watch — **Head here.** First one." and rest == long.strip()
     late = "y" * 250 + " **late head.** after. " + long  # a head past the first 200 characters is no head
     assert render.fold_head(late) == render.fold(late)
+
+
+@pytest.mark.unit
+def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
+    """The review's cases (TD-279): a reply the reader's `replies` missed keeps every tail in the text
+    and draws none twice; a `Context:` after the `Due:` still closes the fold; a bold or mid-sentence
+    *Context:* is text."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows
+
+    root = tmp_path / "agentorc"
+    text = "act — Rotate it. Due: 2026-10-05. — Paul, 2026-10-02: hi — Paul, 2026-10-03: yo"
+    it = item(3, text, "2026-10-05", "x") | {"replies": [{"by": "Paul", "date": "2026-10-02", "text": "hi"}]}
+    (row,) = board_rows(report(root, it))
+    assert row["replies"] == [] and "hi" in row["lead"] and "yo" in row["lead"]
+    (row,) = board_rows(report(root, item(3, "act — Rotate it. Due: 2026-10-05. Context: TD-9.", "2026-10-05", "x")))
+    assert (row["lead"], row["rest"]) == ("act — Rotate it.", "Context: TD-9")
+    text = "act — See the Context: of this. **Context:** bold. Due: 2026-10-05."
+    (row,) = board_rows(report(root, item(3, text, "2026-10-05", "x")))
+    assert (row["lead"], row["rest"]) == ("act — See the Context: of this. **Context:** bold.", "")

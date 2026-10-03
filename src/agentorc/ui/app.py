@@ -168,6 +168,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
     RAIL_UNDER,  # noqa: F401
+    REPLY_MARK_RE,  # noqa: F401
     SUBHEAD_RE,  # noqa: F401
     SYNC_LOCK,  # noqa: F401
     WORK_IDS,  # noqa: F401

@@ -836,7 +836,10 @@ def board_body(text: str, it: Mapping[str, Any]) -> str:
 # a bold run ending in a colon after a sentence's end — *… (TD-095). **Cards:** a report …* — is the
 # head of a part of a long line, and opens a paragraph under *details*
 SUBHEAD_RE = re.compile(r"(?<=[.;!?)])\s+(?=\*\*[^*\n]{1,80}?:\*\*)")
-CONTEXT_RE = re.compile(r"\bContext:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
+# — at a sentence's start only, so *the Context: of this* in prose and a bold **Context:** stay text
+CONTEXT_RE = re.compile(r"(?:^|(?<=[.;!?)]\s))Context:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
+# a reply tail's mark, as the reader writes it: *— Paul, 2026-10-02:*
+REPLY_MARK_RE = re.compile(r"(?:^|\s)—\s+[^,—]+,\s*\d{4}-\d{2}-\d{2}:")
 
 
 def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
@@ -855,14 +858,16 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
     due = board_mod.DUE_RE.search(body)
     if due:
         text, tail = body[: due.start()].rstrip(), body[due.end() :].lstrip(" .")
-        if replies and tail.startswith("—"):
-            tail = ""  # the reader's replies, drawn from its field
+        if replies and tail.startswith("—") and len(REPLY_MARK_RE.findall(tail)) == len(replies):
+            tail = ""  # the reader's replies, drawn from its field — every one of them, or none
+        elif tail:
+            replies = []  # what follows the `Due:` is not just the reader's replies: the text keeps it all, once
+    if tail:
+        text = f"{text} {tail}"
     ctx = CONTEXT_RE.search(text)
     context = ctx.group("ctx").rstrip(" .") if ctx else ""
     if ctx:
         text = (text[: ctx.start()] + text[ctx.end() :]).rstrip()
-    if tail:
-        text = f"{text} {tail}"
     lead, rest = rendermod.fold_head(text)
     rest = SUBHEAD_RE.sub("\n\n", rest)  # a walk's **Part:** heads each open a paragraph
     if context:
