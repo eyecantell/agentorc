@@ -2,12 +2,17 @@
 session **the form** *Another host*; TD-294 slice 2): every reading the form draws about a place —
 the Repo list, *another directory…*'s check, the occupancy, the Where chips, the roles and the
 team's reader — is the picked host's, read through the home's `host_*` reads; a host that does not
-answer is said in the note's place, never a refusal."""
+answer is said in the note's place, never a refusal. Start (slice 3) resolves the role there too: its
+brief, the ledger and the team's reader come from that host's files, never this host's disk."""
 
 import pytest
 from fastapi.testclient import TestClient
 
-REPO_YML = "roles:\n  scout:\n    brief: docs/scout.md\ncontrollers: [lead-1]\n"
+REPO_YML = (
+    "roles:\n  scout:\n    brief: docs/scout.md\n  stray:\n    brief: /etc/stray.md\n"
+    "controllers: [lead-1]\nledger: docs/ledger.md\n"
+)
+NODE_FILES = {".agentorc.yml": REPO_YML, "docs/scout.md": "Scout the node's own alpha.\n"}
 
 
 @pytest.fixture
@@ -30,8 +35,10 @@ def form(tmp_path, monkeypatch):
             there = p["dir"].startswith("/srv/node/alpha")
             return {"host": p["host"], "dir": p["dir"], "exists": there, "root": "/srv/node/alpha" if there else ""}
         if method == "host_files":
-            assert p["dir"] == "/srv/node/alpha" and p["paths"] == [".agentorc.yml"]
-            return {"host": p["host"], "dir": p["dir"], "files": {".agentorc.yml": REPO_YML}}
+            assert p["dir"] == "/srv/node/alpha"
+            return {"host": p["host"], "dir": p["dir"], "files": {k: NODE_FILES.get(k) for k in p["paths"]}}
+        if method == "create":
+            return {"id": f"ao-alpha-{p['name']}@{p['host']}", "state": "starting"}
         if method == "host_worktrees":
             return {"host": p["host"], "repo": p["repo"], "worktrees": [
                 {"name": "td-1", "path": "/srv/node/alpha/.claude/worktrees/td-1", "occupied": False},
@@ -127,3 +134,41 @@ def test_the_form_reads_its_own_directory_field():
     assert "const dir = $(\"form[action='/new'] [name=dir]\")" in body
     base = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "templates" / "base.html").read_text()
     assert 'id="shellform"' in base and 'name="dir"' in base  # the reason the selector is scoped
+
+
+@pytest.mark.unit
+def test_start_on_another_host_carries_that_hosts_brief_and_ledger(form):
+    c, calls = form
+    r = c.post(
+        "/new",
+        data={"name": "w1", "dir": "/srv/node/alpha", "role": "scout", "host": "node1"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, r.text
+    made = next(p for m, p in calls if m == "create")
+    assert made["host"] == "node1" and made["role"] == "scout"
+    assert "Scout the node's own alpha." in made["prompt"] and made["ledger"] == "docs/ledger.md"
+    # the brief was read on node1, by its path in the checkout there
+    assert ("host_files", {"host": "node1", "dir": "/srv/node/alpha", "paths": ["docs/scout.md"]}) in calls
+
+
+@pytest.mark.unit
+def test_a_brief_outside_the_checkout_on_another_host_stops_start(form):
+    c, calls = form
+    r = c.post(
+        "/new",
+        data={"name": "w1", "dir": "/srv/node/alpha", "role": "stray", "host": "node1"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 400 and "outside the checkout" in r.text
+    assert "create" not in [m for m, _ in calls]  # nothing was started
+
+
+@pytest.mark.unit
+def test_start_on_a_host_that_does_not_answer_creates_nothing(form):
+    c, calls = form
+    r = c.post(
+        "/new", data={"name": "w1", "dir": "/x", "role": "scout", "host": "silent"}, follow_redirects=False
+    )
+    assert r.status_code == 400 and "did not answer" in r.text
+    assert "create" not in [m for m, _ in calls]

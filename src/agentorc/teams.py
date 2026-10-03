@@ -270,7 +270,7 @@ Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | orgmod.SeatDe
 Files = Callable[[str, str, list[str]], dict[str, "str | None"]]
 
 
-def _reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
+def reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
     """A `repoconfig.Reader` for a checkout on another host: only its own files, by their path
     relative to it — a brief outside the checkout is not read across the link at all."""
 
@@ -404,7 +404,7 @@ def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: s
         found = (path if path.is_absolute() else checkout / path).is_file()
     elif files is not None and host != here and not path.is_absolute():
         try:
-            found = _reader_on(files, host, checkout)(checkout / path) is not None
+            found = reader_on(files, host, checkout)(checkout / path) is not None
         except OSError:
             return ""  # the seat's own brief read the same checkout; a failure here is not the primer's
     else:
@@ -454,7 +454,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
             )
         # Another host's checkout that is not a directory here — a machine node (a container node
         # shares the path): its roles and briefs are read there, by the same loader (step 4b.3).
-        read = _reader_on(files, host, checkout)
+        read = reader_on(files, host, checkout)
     try:
         cfg = repoconfig.load(checkout, read=read)
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
