@@ -167,8 +167,6 @@ def test_a_brief_outside_the_checkout_on_another_host_stops_start(form):
 @pytest.mark.unit
 def test_start_on_a_host_that_does_not_answer_creates_nothing(form):
     c, calls = form
-    r = c.post(
-        "/new", data={"name": "w1", "dir": "/x", "role": "scout", "host": "silent"}, follow_redirects=False
-    )
+    r = c.post("/new", data={"name": "w1", "dir": "/x", "role": "scout", "host": "silent"}, follow_redirects=False)
     assert r.status_code == 400 and "did not answer" in r.text
     assert "create" not in [m for m, _ in calls]

@@ -2897,3 +2897,21 @@ Both go away only when the record says who closed it.
 **Related:** TD-285 (the container test's race, the same shape), TD-097 (a seat), TD-259 (the manager on call).
 
 **Resolved:** 2026-10-02 (PR #943) — reproduced: the test's `short` ask carries `bound=1`, a second of wall clock from its send, and the first sweep's `now` was read only after two closes; on a slow runner they outlast the second, so that sweep expired `short` beside `lost` (a 1.2 s sleep before `now` fails it exactly as CI did, the extra id being `short`'s). The test now takes `now` from the short ask's own `at`; with the sleep left in it passes, and without it fifty runs in a row. No product change: a seat's ask did not expire wrongly.
+
+## TD-294: Build the New session form's reads on the picked host
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the designer, TD-293's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built — slices 1 (#957), 2 (#958) and 3 (#959).
+**Location:** `src/sessionorc/agent_link.py` (the node's link methods beside `stat`, `repos`, `files`), `src/sessionorc/agent_remote.py` (`rpc_host_dir`, `rpc_host_repos`, `rpc_host_files`: the two new reads beside them), `src/agentorc/ui/app.py` (`new_form`, `_roles_for`, `new_submit`, `/api/dir_check`, `/api/worktrees`, `/api/occupancy`, `/api/roles`, `/api/team_review`), `src/agentorc/ui/static/app.js` (`AO.newSession`: `away()`), `src/agentorc/teamrun.py` (how a team start reads a node's config and briefs: the model); design §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*)
+
+**Why:** design §4.4a *The New session form on another host* (TD-293): a pick of another host is right today only where both hosts hold the same repos at the same paths; elsewhere the form offers repos the node lacks and starts a session whose brief and ledger are this host's.
+
+**Resolved:** 2026-10-03 (PR #959) — slice 1 the reads (#957), slice 2 the page (#958), slice 3 Start (#959): the role, its brief, the ledger and the team's reader resolved from the picked host's files. Lasting content: design §4.4a *The New session form on another host*, §4.5a New session **the form** (*Another host*); `tests/test_ui_new_host.py`, `tests/test_link.py`.
+
+**Done when:** with a node holding a repo this host does not, picking the node lists that repo, its worktrees and its roles, an occupied directory there is said before Start, and a role started there carries the node's brief and ledger.
+
+**Related:** TD-293 (the design), TD-284 (the form), TD-057 (the link), TD-229 (`host_repos`).
