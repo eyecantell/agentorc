@@ -326,7 +326,7 @@ class RemoteMixin:
         theirs = [self._occupant_from(str(o), host) for o in got["occupants"]]
         if host in containers.container_nodes():
             here = Path(dir).expanduser()
-            theirs = (await asyncio.to_thread(self.occupants, here) if here.is_dir() else []) + theirs
+            theirs = await asyncio.to_thread(lambda: self.occupants(here) if here.is_dir() else []) + theirs
         seen: dict[str, str] = {}  # one line per occupant: the home's copy of a record and the node's own
         for who in theirs:
             seen.setdefault(who.partition(" ")[0], who)
