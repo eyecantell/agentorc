@@ -1300,7 +1300,7 @@ forwarded from a node, whoever makes it (`modes.HOME_ONLY`): a laptop does not r
 files through the home. The start stays all-or-nothing: a read that fails stops it before anything
 is created.
 
-**The New session form on another host (TD-293; designed 2026-10-03; not built — TD-294).** A
+**The New session form on another host (TD-293; designed 2026-10-03; the reads built, the page and Start not — TD-294).** A
 session a person starts on another host from the form is asked what a team start there is asked,
 of the same host: **everything the form shows or resolves about a place is read on the picked
 host**, and nothing about another host's session is read from this host's disk. The reads are

@@ -1600,6 +1600,131 @@ async def test_a_node_serves_files_from_its_own_checkout_across_the_link(home, t
                 await at_node.call("host_files", host="kmaster", dir="/", paths=["etc/hostname"])
 
 
+def _git_repo_with_worktree(root, name="wt"):
+    """A git checkout at `root` with one worktree `name` under its `.claude/worktrees/`."""
+    root.mkdir(parents=True)
+    run = lambda *a, cwd=root: subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)  # noqa: E731
+    run("init", "-q")
+    run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "first")
+    run("worktree", "add", "-q", "-b", name, str(root / ".claude" / "worktrees" / name))
+    return root / ".claude" / "worktrees" / name
+
+
+async def test_the_new_session_forms_reads_cross_the_link_to_the_node(home, hookstub, tmp_path, monkeypatch):
+    """Design §4.4a *The New session form on another host* (TD-294), end to end: the home's
+    `host_occupancy` and `host_worktrees` for the node are read on the node — its records in the
+    directory, its worktrees and whether anyone is in each — and `host_dir`'s `stat` names the
+    checkout a directory is in."""
+    wt = _git_repo_with_worktree(tmp_path / "nr")
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        async with LocalClient() as at_node:
+            w = await at_node.call("create", name="w", dir=str(wt), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            occ = await person.call("host_occupancy", host="laptop", dir=str(wt))
+            assert occ["host"] == "laptop" and occ["git"] is True
+            assert [o.split(" ")[0] for o in occ["occupants"]] == [address]
+            free = await person.call("host_occupancy", host="laptop", dir=str(tmp_path / "nr"))
+            assert free["occupants"] == [] and free["git"] is True
+            gone = await person.call("host_occupancy", host="laptop", dir=str(tmp_path / "nope"))
+            assert gone["occupants"] == [], "a directory that is not there reads as no occupants"
+            got = await person.call("host_worktrees", host="laptop", repo=str(tmp_path / "nr"))
+            assert got["worktrees"] == [{"name": "wt", "path": str(wt), "occupied": True}]
+            assert (await person.call("host_worktrees", host="laptop", repo=str(tmp_path / "nope")))["worktrees"] == []
+            seen = await person.call("host_dir", host="laptop", dir=str(wt))
+            assert seen["exists"] is True and seen["root"] == str(wt.resolve())
+            outside = await person.call("host_dir", host="laptop", dir=str(tmp_path))
+            assert outside["exists"] is True and outside["root"] == ""
+        async with LocalClient() as at_node:  # a node answers for itself, and forwards neither to the home
+            assert (await at_node.call("host_occupancy", host="laptop", dir=str(wt)))["occupants"]
+            for rpc, kw in (("host_occupancy", {"dir": "/"}), ("host_worktrees", {"repo": "/"})):
+                with pytest.raises(AgentError, match="is a node of kmaster"):
+                    await at_node.call(rpc, host="kmaster", **kw)
+            await at_node.call("kill", id=w["id"])
+
+
+async def test_host_occupancy_and_worktrees_here_through_a_node_and_for_a_container(agent, tmp_path, monkeypatch):
+    """TD-294's two reads: this host's answered without the link; a node's through its link
+    methods, its record named in the home's form; an unreachable node and an odd answer refused in
+    words; a container node's checkout read here too, one line per occupant; and neither served to
+    a call forwarded from a node (`modes.HOME_ONLY`)."""
+    from sessionorc import containers
+
+    checkout = tmp_path / "repo"
+    wt = _git_repo_with_worktree(checkout)
+    async with LocalClient() as person:
+        assert (await person.call("host_occupancy", host=agent.host, dir=str(wt)))["occupants"] == []
+        here = await person.call("host_worktrees", host=agent.host, repo=str(checkout / ".claude"))
+        assert here["worktrees"] == [{"name": "wt", "path": str(wt), "occupied": False}], "from a subdirectory too"
+        assert (await person.call("host_occupancy", host=agent.host, dir=""))["occupants"] == []
+        assert (await person.call("host_worktrees", host=agent.host, repo=""))["worktrees"] == []
+        agent._take_records("laptop", [record()], whole=True)
+        for rpc, kw in (("host_occupancy", {"dir": "/w"}), ("host_worktrees", {"repo": "/w"})):
+            with pytest.raises(AgentError, match="runs on laptop: unreachable"):
+                await person.call(rpc, host="laptop", **kw)
+
+        class Node(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                self.sent.append((method, params))
+                if method == "occupancy":
+                    return {
+                        "dir": params["dir"],
+                        "occupants": ["ao-x-w (working)", "vs (claude-code, outside agentorc)"],
+                    }
+                return {"worktrees": [{"name": "wt", "path": str(wt), "occupied": False}, "junk"]}
+
+        agent._link_muxes["laptop"] = mux = Node()
+        agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+        occ = await person.call("host_occupancy", host="laptop", dir="/w")
+        assert occ["occupants"] == ["ao-x-w@laptop (working)", "vs (claude-code, outside agentorc)"]
+        got = await person.call("host_worktrees", host="laptop", repo="/w")
+        assert got["worktrees"] == [{"name": "wt", "path": str(wt), "occupied": False}]
+        assert mux.sent == [("occupancy", {"dir": "/w"}), ("worktrees", {"repo": "/w"})]
+
+        class Odd(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                return {"taken": 0}
+
+        agent._link_muxes["laptop"] = Odd()
+        with pytest.raises(AgentError, match="no list of occupants"):
+            await person.call("host_occupancy", host="laptop", dir="/w")
+        with pytest.raises(AgentError, match="worktrees with no list"):
+            await person.call("host_worktrees", host="laptop", repo="/w")
+
+        # a container node: the checkout is one directory here and there, so this host's reading counts
+        (paths.home() / "hosts.yml").write_text(
+            f"local:\n  name: {agent.host}\nnodes:\n  cm:\n    container: {{devcontainer: {checkout}}}\n"
+        )
+        assert "cm" in containers.container_nodes()
+        agent.links["cm"] = {"up": True, "since": "t", "why": "linked"}
+        agent._take_records("cm", [record("ao-repo-w", host="cm", dir=str(wt), kind="interactive")], whole=True)
+
+        class Container(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                if method == "occupancy":  # the node's own copy of its record, in another state
+                    return {"dir": params["dir"], "occupants": ["ao-repo-w (idle)"], "git": True}
+                return {"worktrees": [{"name": "wt", "path": str(wt), "occupied": False}]}
+
+        agent._link_muxes["cm"] = Container()
+        mine = await person.call("create", name="here", dir=str(wt), adapter="shell", argv=["bash", "--norc"])
+        agent.sessions[mine["id"]].adapter = "claude-code"  # an agent session, as far as the rule is concerned
+        occ = await person.call("host_occupancy", host="cm", dir=str(wt))
+        assert occ["occupants"] == [f"{mine['id']} (working)", "ao-repo-w@cm (working)"]
+        got = await person.call("host_worktrees", host="cm", repo=str(checkout))
+        assert got["worktrees"] == [{"name": "wt", "path": str(wt), "occupied": True}]
+        agent.sessions[mine["id"]].adapter = "shell"
+        await person.call("kill", id=mine["id"])
+    for rpc, kw in (("host_occupancy", {"dir": "/"}), ("host_worktrees", {"repo": "/"})):
+        resp = await agent._forwarded("laptop", {"rpc": rpc, "params": {"host": agent.host, **kw}, "caller": None})
+        assert f"{rpc} is not served to a call from laptop" in resp["error"]
+    del agent._link_muxes["laptop"], agent._link_muxes["cm"]
+    assert (await agent._from_home("worktrees", {"repo": str(checkout)}))["worktrees"][0]["name"] == "wt"
+    assert (await agent._from_home("occupancy", {"dir": ""}))["occupants"] == [], "the node's half"
+    assert (await agent._from_home("stat", {"dir": str(checkout)}))["root"] == str(checkout.resolve())
+
+
 def test_the_nightly_tarball_holds_the_store_and_the_orgs_files_and_nothing_else(tmp_path, monkeypatch):
     import stat
     import tarfile

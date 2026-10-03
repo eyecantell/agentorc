@@ -56,6 +56,12 @@ def worktree_path(repo: Path, name: str) -> Path:
     return Path(common.stdout.strip()).parent / WORKTREES_DIR / name
 
 
+def toplevel(directory: Path | str, timeout: float = 5.0) -> str:
+    """The top level of the checkout `directory` is in — a worktree's own, as git says — or "" outside
+    one: the `stat` link method's `root` (design §4.4a *The New session form on another host*)."""
+    return (_git(directory, "rev-parse", "--show-toplevel", timeout=timeout) or "").strip()
+
+
 def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
     (after a fetch) or from HEAD when there is no origin. Reused when it already exists. Runs the

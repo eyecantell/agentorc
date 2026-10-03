@@ -10,7 +10,6 @@ import contextlib
 import inspect
 import json
 import time
-from pathlib import Path
 from typing import Any
 
 from sessionorc import (
@@ -37,6 +36,7 @@ from sessionorc.agent_common import (
     _usage_key,
     log,
     read_checkout,
+    stat_dir,
 )
 from sessionorc.models import (
     NotTheSameSession,
@@ -259,7 +259,8 @@ class LinkMixin:
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
         """What the home may ask of this node: a ping; an `act` (step 4a) — an RPC the home has
         already gated, run here through the same handler a local caller reaches, with no gate of
-        its own; `stat`, whether a directory exists here (a team start's checkout check); `files`,
+        its own; `stat`, whether a directory exists here (a team start's checkout check) and the checkout
+        it is in; `occupancy` and `worktrees`, the New session form's readings of a place (TD-294); `files`,
         a checkout's own files read here (a team's brief on a machine node, TD-057 step 4b.3); and
         `repos`, this node's registry (the home's `host_repos`, §4.9, TD-229). Beside them what the
         home hands down: `read`, `intent`, `settings`, `usage` and `usage_reading`."""
@@ -291,8 +292,12 @@ class LinkMixin:
         if method == "repos":  # this node's registry, for the home's `host_repos` (§4.9, TD-229)
             return {"repos": await asyncio.to_thread(lambda: hosts.local_host().repos())}
         if method == "stat":
-            d = Path(str(params.get("dir") or "")).expanduser()
-            return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
+            return await asyncio.to_thread(stat_dir, str(params.get("dir") or ""))
+        if method == "occupancy":  # the home's `host_occupancy` (§4.4a, TD-294)
+            d = str(params.get("dir") or "")
+            return await self.rpc_occupancy(d) if d.strip() else {"dir": "", "occupants": [], "git": False}
+        if method == "worktrees":  # the home's `host_worktrees` (§4.4a, TD-294)
+            return {"worktrees": await asyncio.to_thread(self.worktrees_here, str(params.get("repo") or ""))}
         raise link.LinkError(f"unknown link method {method!r}")
 
     async def _take_settings(self, doc: Any) -> None:
