@@ -840,7 +840,7 @@ def cmd_team_start(args: argparse.Namespace) -> int:
         print(picks["line"])
     try:
         p, result = teamrun.start(
-            call_sync, org, args.name, here, profile=args.profile, caller=os.environ.get("AGENTORC_SESSION")
+            call_sync, org, args.name, here, profile=args.profile, caller=os.environ.get("AGENTORC_SESSION") or None
         )
         if picks:
             result = {**result, "lanes": picks}
