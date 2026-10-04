@@ -1677,7 +1677,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 return {"dir": d, "exists": None, "why": silent(h, e)}
             return {"dir": d, "exists": ok, "why": "" if ok else f"no such directory on {h}"}
         ok = bool(d) and await asyncio.to_thread(lambda: Path(d).expanduser().is_dir())
-        return {"dir": d, "exists": ok, "why": "" if ok or not d else f"no such directory on {host_name()}"}
+        # whether **Where** may offer a worktree (TD-296 #3): a directory in no checkout has none to make
+        git = bool(await asyncio.to_thread(gitinfo.toplevel, Path(d).expanduser())) if ok else None
+        return {"dir": d, "exists": ok, "git": git, "why": "" if ok or not d else f"no such directory on {host_name()}"}
 
     @app.get("/api/worktrees")
     async def api_worktrees(repo: str = "", host: str = ""):
