@@ -255,6 +255,8 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 details.boardfold { margin: 6px 0 2px; } details.boardfold > .inboxrows { margin-top: 6px; }
 .boardline { padding: 6px 2px 2px; }
 .originnote { padding: 0 0 4px; } .originnote.warnish { color: var(--warn-fg); font-weight: 600; }
+/* §4.5 screen 6 *A board item the person answered waits on them* (TD-305): back after its wait */
+.boardrow .stale.warnish { color: var(--warn-fg); }
 /* design §4.5a **Inbox row: details** (§4.10, TD-138): a message's text is rendered from the closed
    markdown subset, so its paragraphs are elements and `pre-wrap` would double every break. The fold
    is a quiet, unbordered *details* line — a disclosure, not one of the row's bordered controls. A

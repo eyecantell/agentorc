@@ -1073,6 +1073,58 @@ def _civil(v: Any) -> date | None:
         return None
 
 
+# §4.5 screen 6 *A board item the person answered waits on them* (TD-303, built by TD-305): an
+# answered row waits under *Waiting on them* until this many civil days from the answer's date, and
+# then comes back to where it would be drawn unanswered, saying nobody has acted
+BOARD_WAIT_DAYS = 3
+
+
+def board_answered(it: Mapping[str, Any], today: str) -> dict[str, Any]:
+    """Whom a reader's item waits on (§4.5 screen 6 *A board item the person answered waits on
+    them*), from the reader's fields and never the prose: `answered` is `decided` when the reader
+    says `waiting_on: session` (a reader that gives no `waiting_on`: its `decided`), else `replied`
+    when an undecided item carries `replies`, else empty; `answered_at` the answer's date — the
+    `decided` date, the last reply's — and `stale` whether `BOARD_WAIT_DAYS` or more civil days lie
+    between it and the reader's `today`, with `stale_line` the words the row then says. A date that
+    does not parse reads as not stale."""
+    decided = it.get("waiting_on") == "session" if "waiting_on" in it else bool(it.get("decided"))
+    replies = [r for r in it.get("replies") or () if isinstance(r, dict) and str(r.get("text") or "").strip()]
+    if decided:
+        got = it.get("decided")
+        how, at = "decided", str(got.get("date") or "") if isinstance(got, dict) else ""
+    elif replies:
+        how, at = "replied", str(replies[-1].get("date") or "")
+    else:
+        return {"answered": "", "answered_at": "", "stale": False, "stale_line": ""}
+    d, t = _civil(at), _civil(today)
+    days = (t - d).days if d and t else None
+    stale = days is not None and days >= BOARD_WAIT_DAYS
+    line = f"{how} {d:%b} {d.day} — no session has acted in {days} d" if stale and d else ""
+    return {"answered": how, "answered_at": at, "stale": stale, "stale_line": line}
+
+
+def board_waiting_on(r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime) -> str:
+    """The *waiting on …* words of an answered board row (§4.5 screen 6, the standing of §4.5a as
+    words): a live record with an unexpired declared lease on one of the item's `refs` (*waiting on
+    grinder-ao-2 — holds TD-122*), else a live record the item's `session` names, else the next
+    session to read the repo's board. Read from the fleet the page already holds, as
+    `orphan_standing` reads it for mail; display only."""
+    for ref in r.get("refs") or ():
+        held = mail_mod.lease_holders(str(ref), records, now)
+        if held:
+            return f"waiting on {held[0].get('name') or held[0].get('id')} — holds {ref}"
+    sess = str(r.get("session") or "")
+    if sess:
+        for rec in records:
+            if not isinstance(rec, Mapping) or rec.get("state") in mail_mod._NOT_LIVE:
+                continue
+            if sess in (rec.get("name"), rec.get("id")) or (
+                len(sess) >= 8 and str(rec.get("adapter_id") or "").startswith(sess)
+            ):
+                return f"waiting on {rec.get('name') or rec.get('id')}"
+    return f"waiting on the next session to read {r.get('repo') or 'its repo'}'s board"
+
+
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per open item of the report — its repo, its due words, the whole text, and the board at that
@@ -1129,6 +1181,11 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "at": str(it.get("due") or ""),
                     "due_now": board_due_now(it),
                     "today": today,  # the reader's, which `board_horizon` measures days from
+                    # §4.5 screen 6 *A board item the person answered waits on them* (TD-305): whom
+                    # it waits on, and the reader's `session` and `refs` for the *waiting on* words
+                    **board_answered(it, today),
+                    "session": str(it.get("session") or ""),
+                    "refs": [str(x) for x in it.get("refs") or () if str(x).strip()],
                     "due_error": bool(it.get("due_error")),
                     "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today, tag),
                     "editor": url,
@@ -1150,6 +1207,8 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
     fold); soonest first, an undated item after the dated ones. `mode` is the setting as read,
     `next:10` when it is unset or does not parse; `today` is the reader's (each row carries it),
     for the days a `<n>d` reaches. A row with no `due_now` is due: a row from before TD-220 was the `--due-only` read's.
+    An answered row that is not stale (`board_waits`, TD-305) is in none of the three but `waiting`,
+    drawn under *Waiting on them* and taking no place.
 
     - `next:<n>`: per team, the n soonest open items of its boards, the due ones among them, so
       what is due takes places first; a due row whose date could not be read takes none. A board
@@ -1162,6 +1221,8 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         mode = settings_mod.parse_board_show(mode)
     except ValueError:
         mode = settings_mod.BOARD_SHOW_DEFAULT
+    waiting = [r for r in rows if board_waits(r)]
+    rows = [r for r in rows if not board_waits(r)]
     due = [r for r in rows if r.get("due_now", True)]
     rest = sorted(
         (r for r in rows if not r.get("due_now", True)),
@@ -1197,9 +1258,16 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         "due": due,
         "ahead": ahead,
         "hidden": hidden,
+        "waiting": waiting,
         "next_due": _next_due(hidden, now),
         "today": now,
     }
+
+
+def board_waits(r: Mapping[str, Any]) -> bool:
+    """Whether a board row is drawn under *Waiting on them* (§4.5 screen 6, TD-305): answered, and
+    not yet `BOARD_WAIT_DAYS` from the answer — in no count and out of the board's horizon."""
+    return bool(r.get("answered")) and not r.get("stale")
 
 
 def _next_due(hidden: Collection[Mapping[str, Any]], today: str) -> str:
@@ -1221,6 +1289,7 @@ def horizon_of(h: Mapping[str, Any], root: str | Path) -> dict[str, Any]:
 
     hidden = mine(h.get("hidden") or ())
     out = {**h, "due": mine(h.get("due") or ()), "ahead": mine(h.get("ahead") or ()), "hidden": hidden,
+           "waiting": mine(h.get("waiting") or ()),
            "next_due": _next_due(hidden, str(h.get("today") or ""))}  # fmt: skip
     if h.get("line") is not None:  # the line says this repo's hidden count and next date, not the Inbox's
         out["line"] = board_line(out)
@@ -1403,6 +1472,7 @@ def inbox_sections(
     attention_snoozed: dict[str, Any] | None = None,
     boards: Collection[dict[str, Any]] = (),
     handed: Collection[dict[str, Any]] = (),
+    fleet: Collection[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -1437,6 +1507,10 @@ def inbox_sections(
       to a seat*, TD-219) waits here from the press until its outcome, whatever its holder's state
       — a seat that exited is filled again — and is in *Needs you*, counted, once it came back
       `blocked`. A `done` or `dropped` one is no longer listed by the read, so it is in neither.
+      **A board item the person answered** (§4.5 screen 6, TD-305) — decided, or replied to — waits
+      here, uncounted, whatever its `Due:`, until `BOARD_WAIT_DAYS` from the answer (`board_waits`);
+      then it is where it would be unanswered, saying so. Its *waiting on …* words are read from
+      `fleet`, the records the request already holds.
 
     **A state row's snooze** (§4.10 *The Inbox is a queue*, TD-079 step 1b) lives in the home's own
     attention store, per record and row kind, because a state has no mail entry to carry one:
@@ -1500,10 +1574,15 @@ def inbox_sections(
     for e in handed:
         out["needs" if _outcome_of(e).get("state") == "blocked" else "waiting"].append(e)
     out["fyi"].extend(_trail_rows(trail or (), at))
-    out["needs"].extend(boards)
+    for r in boards:
+        if board_waits(r):
+            # a copy: the board rows are the page's cache, read again by the next request
+            out["waiting"].append({**r, "waiting_on": board_waiting_on(r, fleet, at)})
+        else:
+            out["needs"].append(r)
     out["needs"].sort(key=_needs_key)
     out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
-    out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("at") or ""))
+    out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("answered_at") or e.get("at") or ""))
     out["answered"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))

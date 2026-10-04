@@ -1274,7 +1274,8 @@ def test_a_decided_row_reads_decided_in_place_of_the_buttons(tmp_path, monkeypat
     rows, html = rows_html(tmp_path, monkeypatch, decide_item(decided="approve"))
     assert rows[0]["decided"] == {"text": "approve", "date": "Sep 21"} and rows[0]["due_now"]
     assert rows[0]["body"] == "**Ship it?** Pick one. Due: 2026-09-20."
-    assert "decided: approve · Sep 21" in html and "work order" in html
+    # the *not done: … work order* words went with TD-305: the *waiting on …* line says it
+    assert "decided: approve · Sep 21" in html and "work order" not in html
     assert "btn sm answer" not in html and "Go with it" not in html and 'data-board-act="decide"' not in html
     assert 'data-act="board_reply"' in html and 'data-board-act="done"' in html
     # the acts still hand back the whole line, which the agent re-checks word for word
@@ -1526,3 +1527,140 @@ def test_put_on_the_board_takes_its_words_in_a_box_of_lines(tmp_path, monkeypatc
     html = templates.get_template("board_add.html").render(board_choices=[{"board": "/b", "label": "b"}])
     assert '<textarea class="input" id="batext" rows="4"' in html and 'id="batext"' in html
     assert '<input class="input" id="batext"' not in html and "Ctrl+Enter" in html
+
+
+# ── §4.5 screen 6 *A board item the person answered waits on them* (TD-303, built by TD-305) ─────
+
+
+def answered_item(line, *, decided="", replied="", due="2026-09-20", tag="2d overdue", waiting_on=None, **kw):
+    it = {**item(line, f"**Item {line}** words. Due: {due}.", due, tag), **kw}
+    if decided:
+        it["decided"] = {"text": "approve", "date": decided}
+    if replied:
+        it["replies"] = [
+            {"by": "Paul", "date": "2026-09-01", "text": "first"},
+            {"by": "Paul", "date": replied, "text": "go"},
+        ]
+    if waiting_on is not None:
+        it["waiting_on"] = waiting_on
+    elif decided:
+        it["waiting_on"] = "session"
+    if due > "2026-09-22":
+        it["overdue_days"] = None
+    return it
+
+
+@pytest.mark.unit
+def test_board_rows_stamp_whom_the_item_waits_on_and_when_it_comes_back(tmp_path):
+    """`answered` is `decided` from the reader's `waiting_on`, else `replied` from its `replies`;
+    the date is the decided date or the last reply's; `stale` from `BOARD_WAIT_DAYS` (3) civil days
+    to the reader's `today` (2026-09-22): decided Sep 19 is back, Sep 20 is not."""
+    from agentorc.ui.inbox import BOARD_WAIT_DAYS, board_rows
+
+    assert BOARD_WAIT_DAYS == 3
+    root = tmp_path / "r"
+    rows = board_rows(
+        report(
+            root,
+            answered_item(1, decided="2026-09-20"),
+            answered_item(2, decided="2026-09-19"),
+            answered_item(3, replied="2026-09-21"),
+            answered_item(4),
+            answered_item(5, decided="not a date"),
+            # a reader with no `waiting_on` falls back to its `decided`
+            {k: v for k, v in answered_item(6, decided="2026-09-21").items() if k != "waiting_on"},
+            # `waiting_on: person` with replies: the person's word is last — replied
+            answered_item(7, replied="2026-09-10", waiting_on="person"),
+        )
+    )
+    got = {r["line"]: (r["answered"], r["answered_at"], r["stale"]) for r in rows}
+    assert got == {
+        1: ("decided", "2026-09-20", False),
+        2: ("decided", "2026-09-19", True),
+        3: ("replied", "2026-09-21", False),
+        4: ("", "", False),
+        5: ("decided", "not a date", False),
+        6: ("decided", "2026-09-21", False),
+        7: ("replied", "2026-09-10", True),
+    }
+    lines = {r["line"]: r["stale_line"] for r in rows}
+    assert lines[2] == "decided Sep 19 — no session has acted in 3 d"
+    assert lines[7] == "replied Sep 10 — no session has acted in 12 d"
+    assert lines[1] == lines[4] == lines[5] == ""
+
+
+@pytest.mark.unit
+def test_an_answered_row_waits_on_them_in_no_count_and_a_stale_one_comes_back(tmp_path):
+    """Decided and replied rows are under *Waiting on them* — out of `count`, `overdue_n` and the
+    horizon — the undecided due one under *Needs you*; a decided row three days back is counted
+    again; a replied one that is not due and stale goes back to the horizon, not to *Needs you*."""
+    from agentorc.ui.inbox import board_horizon, board_rows, inbox_sections
+
+    root = tmp_path / "r"
+    rows = board_rows(
+        report(
+            root,
+            answered_item(1, decided="2026-09-21"),
+            answered_item(2, replied="2026-09-21"),
+            answered_item(3),
+            answered_item(4, decided="2026-09-19"),
+            answered_item(5, replied="2026-09-21", due="2026-09-25", tag=""),
+            answered_item(6, replied="2026-09-01", due="2026-09-25", tag=""),
+        )
+    )
+    hz = board_horizon(rows, "all")
+    assert [r["line"] for r in hz["waiting"]] == [1, 2, 5]
+    assert [r["line"] for r in hz["due"]] == [3, 4] and [r["line"] for r in hz["ahead"]] == [6]
+    s = inbox_sections([], now=datetime(2026, 9, 22, 12, tzinfo=UTC), boards=hz["due"] + hz["waiting"])
+    assert [e["line"] for e in s["needs"]] == [3, 4]
+    assert sorted(e["line"] for e in s["waiting"]) == [1, 2, 5]
+    assert s["count"] == 2 and s["overdue_n"] == 2  # 3 and 4, both past Sep 20; 1 and 2 are not counted
+    # a caller that hands every due row (the Org's top bar) gets the same placement
+    s2 = inbox_sections([], now=datetime(2026, 9, 22, 12, tzinfo=UTC), boards=[r for r in rows if r["due_now"]])
+    assert s2["count"] == 2 and sorted(e["line"] for e in s2["waiting"]) == [1, 2]
+    # the cache's rows are never written to
+    assert all("waiting_on" not in r for r in rows)
+    # under `next:1` a waiting row takes no place: the one place goes to the due row's group
+    assert [r["line"] for r in board_horizon(rows, "next:3")["ahead"]] == [6]
+
+
+@pytest.mark.unit
+def test_the_waiting_words_say_the_lease_holder_the_named_session_or_the_next_reader():
+    from agentorc.ui.inbox import board_waiting_on
+
+    now = datetime(2026, 9, 22, 12, tzinfo=UTC)
+    lease = {"ref": "TD-122", "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
+    row = {"repo": "agentorc", "refs": ["TD-122"], "session": "grinder-ao-1"}
+    holder = {"id": "ao-x-2", "name": "grinder-ao-2", "state": "working", "progress": [lease]}
+    named = {"id": "ao-x-1", "name": "grinder-ao-1", "state": "idle", "progress": []}
+    assert board_waiting_on(row, [named, holder], now) == "waiting on grinder-ao-2 — holds TD-122"
+    assert board_waiting_on(row, [named], now) == "waiting on grinder-ao-1"
+    assert board_waiting_on(row, [{**named, "state": "exited"}], now) == (
+        "waiting on the next session to read agentorc's board"
+    )
+    # an expired lease holds nothing; a session named by its uuid's first eight is found by adapter_id
+    old = {**holder, "progress": [{**lease, "at": (now - timedelta(days=2)).isoformat()}]}
+    uuid = {"id": "ao-x-3", "name": "w3", "state": "idle", "adapter_id": "294349ee-7da4"}
+    assert board_waiting_on({**row, "session": "294349ee"}, [old, uuid], now) == "waiting on w3"
+
+
+@pytest.mark.unit
+def test_the_waiting_row_offers_reply_done_and_open_board_and_no_answers_or_snooze(tmp_path, monkeypatch):
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows, inbox_sections, templates
+
+    it = {**decide_item(decided="approve"), "waiting_on": "session"}
+    rows = board_rows(report(tmp_path / "samscrape", it))
+    s = inbox_sections([], now=datetime(2026, 9, 22, 12, tzinfo=UTC), boards=rows)
+    assert s["count"] == 0 and len(s["waiting"]) == 1
+    html = templates.get_template("inbox_rows.html").render(rows=s["waiting"], section="waiting")
+    assert "decided: approve · Sep 21" in html
+    assert "waiting on the next session to read samscrape&#39;s board" in html
+    assert 'data-act="board_reply"' in html and 'data-board-act="done"' in html
+    assert "Snooze" not in html and "btn sm answer" not in html and "Go with it" not in html
+    # stale, it is a Needs you row again, saying nobody has acted, with the board row's controls
+    stale = board_rows({**report(tmp_path / "samscrape", it), "today": "2026-09-24"})
+    s = inbox_sections([], now=datetime(2026, 9, 24, 12, tzinfo=UTC), boards=stale)
+    assert s["count"] == 1 and not s["waiting"]
+    html = templates.get_template("inbox_rows.html").render(rows=s["needs"], section="needs")
+    assert "decided Sep 21 — no session has acted in 3 d" in html and "Snooze" in html
