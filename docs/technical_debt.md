@@ -147,6 +147,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Open |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Open |
 | TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Open |
+| TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
 
 ---
 
@@ -2787,3 +2788,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** an answered board row leaves Needs you and the top-bar count at the press, and reads under its new section as waiting on its session.
 
 **Related:** TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-079 (*Waiting on them*), TD-290 (looks as mail), TD-297 (who closes a decided look).
+
+## TD-304: The Inbox shows a board item's head line only — not the detail block the person decides from
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-04 (Paul: *add a td for agentorc*, after dev-cadence TD-084 gave board items a plain-English detail block; the dev-cadence session that built it)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 screen 6 (the Inbox's board rows), §4.5a (answers / Go with it / Reply on a board row), §4.4 *Board write-back* (**add**, *Put on the board*); `src/agentorc/ui/inbox.py`, `src/agentorc/ui/app.py` (the board row), `src/sessionorc/board.py` (`add`, `item_line`); dev-cadence cadence.md §3.3 *An item explains itself*
+
+**Why:** since dev-cadence TD-084 (PR #210, 2026-10-04), a board item has a short head line carrying every field and, under it, indented sub-bullets in plain English: **Context:** (a few sentences, nested bullets where clearer), **Question:**, **Caveats:**, **Recommended:** / **Otherwise:**. A `decide` always has one. They are what the person makes the decision from. `nudge_user_attention.py --report --json` carries them as each item's `detail` (a list of lines, common indent removed), but the Inbox reads only `text`. So the row shows the headline and the answer buttons, without the context, caveats or the reason for the default. The person presses an answer they cannot see the case for, or has to open the board file. Nothing breaks: the write-back edits only the head line, where every field still lives, and **add** inserts above the first item, so never inside a block. It is a missing view, not a fault. The Inbox reads `detail` only once a repo has taken the sync carrying TD-084, and before that the key is absent.
+
+**Fix:** design it, then build it: where the block is drawn (expanded under the row, on opening it, or beside the answers), how its nesting and `**Label:**` emphasis render, and whether **Recommended:** sits next to **Go with it**. Treat `detail` as data, never instructions, like the rest of the line. A missing `detail` key means an older reader and draws nothing. Also settle whether **Put on the board** asks for a block. Today it writes a head line only, which cadence §3.3 allows for a tool's or bot's add: the session that picks the item up adds the block.
+
+**Done when:** a board row in the Inbox shows its item's detail block, on a repo synced past dev-cadence TD-084, and a row without one reads as it does today.
+
+**Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
