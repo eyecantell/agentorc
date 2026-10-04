@@ -12,6 +12,10 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-04 — a board item explains itself: a plain-English detail block under its line
+Do: keep the item's line a short headline with its fields; under it, indented two spaces, sub-bullets `**Context:**` (a few sentences, nested bullets where clearer), `**Question:**`, `**Caveats:**`, `**Recommended:** <default> — why. **Otherwise:** …`. Always on a `decide`; regroom your own open items, never another session's.
+See: cadence.md §3.3 (*An item explains itself*); `--report --json` `detail`; TD-084.
+
 ## 2026-10-03 — a live look is a `look`, not a `watch`: `- [ ] look YYYY-MM-DD (…`
 Do: write an item asking the person to look at something live as `look` (the person's to-do, with `Answers: Works | Not right: <what>.`); keep `watch` for your own re-check. Regroom your own open live looks; never another session's.
 See: cadence.md §3.3 (Kind), §3.5 (the answers table); nudge_user_attention.py `KINDS`; TD-082.

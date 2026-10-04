@@ -153,6 +153,9 @@ ANSWER_SPLIT_RE = re.compile(r"\s*(?<!\\)\|\s*")
 # malformed Due: is silent") is never mistaken for one.
 DUE_ATTEMPT_RE = re.compile(r"\bDue:?\s*(?P<raw>\d{1,4}[-/.]\d{1,2}(?:[-/.]\d{1,4})?)\b", re.IGNORECASE)
 MAX_ITEM_CHARS = 200
+# TD-084: the reports print an item's detail block under it, each line clipped like the head
+# and at most this many lines — a board read from origin is text anyone who can push wrote.
+MAX_DETAIL_LINES = 20
 # TD-039: an item's KIND — one optional word before its date, `- [ ] decide 2026-09-27 (…)`.
 # decide/act/look (and an unmarked item) are the person's to-do — `look` is a live look the
 # person is asked to make (TD-082); `watch` is a session's own §6 re-check, its check-by
@@ -255,6 +258,10 @@ class BoardItem:
     bad_due: str | None = None  # the text after "Due:" when it is not a date (TD-053)
     kind: str | None = None  # decide | act | look | watch | fyi, or None when unmarked (TD-039)
     fyi_due: bool = False  # an fyi item that carries a Due: anyway — ignored, and flagged
+    # TD-084: the item's detail block — the lines under it indented deeper than its `-`
+    # (context, bullets, the question, caveats, the recommendation), common indent removed.
+    # No tool edits it: Due:/Answers:/Decided:/replies stay on the head line.
+    detail: list[str] = field(default_factory=list)
 
     @property
     def todo(self) -> bool:
@@ -333,7 +340,8 @@ def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
     merge that took both sides of a close keeps both lines, and the tick wins (TD-062)."""
     items = []
     closed = {item_key(ln) for ln in closed_items(content)}
-    for lineno, line in enumerate(content.splitlines(), start=1):
+    lines = content.splitlines()
+    for lineno, line in enumerate(lines, start=1):
         m = ITEM_RE.match(line)
         if not m or (closed and item_key(line) in closed):
             continue
@@ -357,8 +365,25 @@ def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
         items.append(BoardItem(text=text, due=due, line=lineno, answers=parse_answers(text),
                                default=parse_default(text),
                                decided=parse_decided(text), bad_due=bad,
-                               kind=kind, fyi_due=fyi_due))
+                               kind=kind, fyi_due=fyi_due,
+                               detail=detail_block(lines, lineno)))
     return items
+
+
+def detail_block(lines: list[str], lineno: int) -> list[str]:
+    """TD-084: the detail block under the item on 1-based line `lineno` — the run of lines
+    right after it indented deeper than its `-`, ended by a blank line, a line no deeper than
+    the item, or another item (a checkbox in the block reads as an item of its own). Returned
+    with the block's common indent removed, so its own nesting survives."""
+    indent = len(lines[lineno - 1]) - len(lines[lineno - 1].lstrip())
+    block = []
+    for ln in lines[lineno:]:
+        if not ln.strip() or len(ln) - len(ln.lstrip()) <= indent \
+                or ITEM_RE.match(ln) or CLOSED_ITEM_RE.match(ln):
+            break
+        block.append(ln.rstrip())
+    cut = min(len(b) - len(b.lstrip()) for b in block) if block else 0
+    return [b[cut:] for b in block]
 
 
 def size_note(items: list[BoardItem]) -> str | None:
@@ -377,6 +402,15 @@ def kind_counts(items: list[BoardItem]) -> str:
 
 def _clip(text: str) -> str:
     return text if len(text) <= MAX_ITEM_CHARS else text[: MAX_ITEM_CHARS - 1] + "…"
+
+
+def _detail_lines(item: BoardItem) -> list[str]:
+    """TD-084: the item's detail block as the reports print it — indented under the item,
+    each line clipped, at most MAX_DETAIL_LINES, then how many more (--json has them all)."""
+    out = [f"      {_clip(d)}" for d in item.detail[:MAX_DETAIL_LINES]]
+    if len(item.detail) > MAX_DETAIL_LINES:
+        out.append(f"      … {len(item.detail) - MAX_DETAIL_LINES} more line(s) — --json has them all")
+    return out
 
 
 # TD-075. Parity (cadence.md §7): the board's Format: line writes the head and Context:.
@@ -1350,6 +1384,7 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
         if items:
             for item in sorted(items, key=lambda i: _report_sort_key(i, today)):
                 lines.append(f"  • ({due_tag(item, today)}) {_clip(item.text)}")
+                lines.extend(_detail_lines(item))  # TD-084
         else:
             lines.append("  (no open items)")
     return lines
@@ -1376,6 +1411,8 @@ def _item_json(item: BoardItem, today: date) -> dict:
         **dict(zip(("session", "host"), item_head(item.text))),
         "refs": item_refs(item.text),
         "replies": [{"by": by, "date": d, "text": t} for by, d, t in parse_replies(item.text)],
+        # TD-084: the detail block, one string per line, common indent removed
+        "detail": item.detail,
     }
 
 
@@ -1612,6 +1649,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
                 if items:
                     for item in sorted(items, key=lambda i: _report_sort_key(i, today)):
                         body.append(f"  • ({item_tag(item, today)}) {_clip(item.text)}")
+                        body.extend(_detail_lines(item))  # TD-084
                 else:
                     body.append("  (no open items)")
                 # Deliberately OUTSIDE the open-items gate (TD-14, decided
