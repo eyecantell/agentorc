@@ -3291,7 +3291,7 @@ has no composer to fill.
 message to a session's inbox rather than typing into its pane, and is refused unless the graph
 permits it — the caller's controllers, its members, or a session sharing its team or a controlled
 target. An `ask` to the person takes no `--bound` (TD-069). A message to the person whose first paragraph is long, or which has no paragraph break, sends with a one-line warning (§4.10 *How a message to a person is written*, TD-127). `--outcome` and `--thread` are TD-079;
-`--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093). `--shot <path>` (TD-290; designed 2026-10-03, not built — TD-292), up to four times, names a screenshot and makes the message a **look**: it rides only on a `steer` or an `ask` to the person, each path must be a `.png` under `docs/mockups/reviews/` of the sender's repo, and the envelope carries them as `shots` (§4.10 *A look*). `ao msg person "…"` addresses the org's person inbox,
+`--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093). `--shot <path>` (TD-290; built 2026-10-03, TD-292 slice 2), up to four times, names a screenshot and makes the message a **look**: it rides only on a `steer` or an `ask` to the person, each path must be a `.png` directly under `docs/mockups/reviews/` of the sender's repo, and the envelope carries them as `shots` (§4.10 *A look*); a file in the sender's checkout is sent as its repo-relative path, however it was typed. `ao msg person "…"` addresses the org's person inbox,
 ungated. **Every `ao msg` reply ends with when each addressee will read it** (§4.10 *When it is read*, TD-158, built by TD-168) — a last line per addressee, `<id>: <sentence>` — the same sentence the composer shows, one per addressee, `read_when` under `--json`; from a session it also says when the addressee's wake budget is spent, since a session's message refills nothing. ungated. `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because
 it is its own. **`ao inbox --thread <id>`** (TD-129; built — TD-136 slice 1) is the person's read of one
 thread whole: the `thread` RPC, person-only, gathers every entry sharing the named entry's `root`
@@ -6182,7 +6182,7 @@ on; so the thread itself carries it. A question to the person that closed as **`
   **unanswered** question to a session — a techlead that did not answer within `TECHLEAD_WAIT` —
   closing the first as `asked_person` (§4.9b *When it cannot answer*).
 
-**A look (TD-290; designed 2026-10-03; not built — TD-292).** A `steer` or an `ask` to the person may carry
+**A look (TD-290; designed 2026-10-03; `shots` built, TD-292 slice 2; the row and Send to reviewer not built — TD-292).** A `steer` or an `ask` to the person may carry
 **`shots`** — up to four paths, each a `.png` under `docs/mockups/reviews/` of the sender's repo (`ao msg --shot`, §4.7;
 refused on any other kind, to any other addressee, and for a path of any other shape) — and one that does is a **look**: a
 builder's question about a merged change to a page, for the one thing no check settled (§4.9b *A UI change is verified by

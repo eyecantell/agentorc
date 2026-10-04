@@ -2230,6 +2230,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "source": args.source,
         # design §4.9b *The reader* (TD-093): the PR a held author's `ask` puts in front of its reader
         "pr": args.pr,
+        # design §4.10 *A look* (TD-292): repo-relative, so the page finds them on origin's default
+        "shots": [_shot_path(x) for x in args.shot] if args.shot else None,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
     # design §4.10: a message the person reads — to `person`, or a `--source` reply, which the home
@@ -2256,6 +2258,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f"unless told otherwise: {e['default']}")
         for i, a in enumerate(e.get("answers") or [], 1):  # what the reader may pick (design §4.10)
             print(f"  {i}. {a}")
+        if e.get("shots"):  # a look (design §4.10 *A look*)
+            print(f"screenshots: {', '.join(e['shots'])}")
         if e.get("answer") is not None:
             print(f'answered {e["answer"] + 1}: "{e["text"]}"')
         if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
@@ -2458,6 +2462,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             if _open_entry(e):
                 for i, a in enumerate(e.get("answers") or [], 1):
                     print(f"  {i}. {a}" + (" — default" if a == e.get("default") else ""))
+            if e.get("shots"):  # a look (design §4.10 *A look*)
+                print(f"  screenshots: {', '.join(e['shots'])}")
             # a reply that picked one says which, so a sender branches on the number (design §4.10)
             if e.get("answer") is not None:
                 print(f'  answered {e["answer"] + 1}: "{e["text"]}"')
@@ -2619,6 +2625,28 @@ class _TeamSkillAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):  # noqa: ANN001
         print(team_skill_text(), end="")
         parser.exit(0)
+
+
+def _shot_path(value: str) -> str:
+    """`--shot` as the envelope carries it (design §4.10 *A look*): a path to a file in this checkout
+    is made relative to its repo's top, so `$PWD/docs/mockups/reviews/x.png` and the repo-relative
+    form send the same thing; anything else goes as given, and the host agent says what it refuses."""
+    path = pathlib.Path(value).expanduser()
+    if not path.is_file():
+        return value
+    try:
+        top = subprocess.run(
+            ["git", "-C", str(path.resolve().parent), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=10,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return value
+    if top.returncode != 0 or not top.stdout.strip():
+        return value
+    try:
+        return path.resolve().relative_to(pathlib.Path(top.stdout.strip()).resolve()).as_posix()
+    except ValueError:
+        return value
 
 
 def _refs(value: str) -> list[str]:
@@ -3016,6 +3044,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--pick",
         type=int,
         help="answer --reply-to's suggested answer number <n>, as `ao inbox` numbers them (from 1)",
+    )
+    # design §4.10 *A look* (TD-292): the screenshots a steer or an ask to the person names
+    p.add_argument(
+        "--shot",
+        action="append",
+        metavar="PATH",
+        help="a look: a .png under docs/mockups/reviews/ of your repo, repeatable (up to four; "
+        "only on a steer or an ask to the person)",
     )
     # design §4.10 *Outcomes* (TD-079): an answer the person gave is followed to what became of it.
     p.add_argument(

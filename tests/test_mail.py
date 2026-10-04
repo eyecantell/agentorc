@@ -2556,3 +2556,55 @@ async def test_a_start_under_a_closed_members_name_keeps_its_mail_only_when_aske
                 await oc.call("create", keep_mail=True, **again)
             w3 = (await oc.call("create", **again))["id"]
         assert (await person.call("inbox", id=w3))["entries"] == []
+
+
+# -- a look (design §4.10 *A look*, TD-290; built TD-292 slice 2) -----------------------------------
+
+
+async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_and_nowhere_else(agent, tmp_path):
+    """Design §4.10 *A look*: a `steer` or an `ask` to the person may carry `shots` — up to four
+    paths, each a `.png` directly under `docs/mockups/reviews/` — refused on any other kind, to any
+    other addressee, and for a path of any other shape; nothing else about the message changes, and
+    every copy carries them in the order sent."""
+    good = ["docs/mockups/reviews/2026-10-03-td292-row.png", "./docs/mockups/reviews/b_2.png"]
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        builder, lead = await mk("builder", unattended=True), await mk("lead", unattended=True)
+        await person.call("set_controllers", id=builder, add=[lead])
+        async with LocalClient(caller=builder) as c:
+            steer = (
+                await c.call(
+                    "msg", to="person", kind="steer", default="Works", text="the row?", shots=[*good, good[0]]
+                )
+            )["entry"]
+            # cleaned of a leading ./ and of a repeat, in the order sent; the kind's clock is unchanged
+            assert steer["shots"] == [good[0], "docs/mockups/reviews/b_2.png"] and steer["bound"]
+            ask = (
+                await c.call(
+                    "msg", to="person", kind="ask", text="the row?", answers=["Works", "Not right: x"], shots=good[0]
+                )
+            )["entry"]
+            assert ask["shots"] == [good[0]] and ask["bound"] is None
+            held = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+            assert held[steer["id"]]["shots"] == steer["shots"] and held[ask["id"]]["shots"] == [good[0]]
+            # an ordinary question carries none
+            plain = (await c.call("msg", to="person", kind="ask", text="merge?"))["entry"]
+            assert plain["shots"] == []
+            for bad, said in (
+                ({"kind": "note"}, "only on a steer or an ask"),
+                ({"kind": "steer", "default": "go", "to": lead}, "to the person"),
+                ({"kind": "ask", "to": lead}, "to the person"),
+                ({"kind": "ask", "shots": ["docs/mockups/x.png"]}, "not a screenshot a look can name"),
+                ({"kind": "ask", "shots": ["docs/mockups/reviews/../../../etc/x.png"]}, "not a screenshot"),
+                ({"kind": "ask", "shots": ["/abs/docs/mockups/reviews/x.png"]}, "not a screenshot"),
+                ({"kind": "ask", "shots": ["docs/mockups/reviews/x.jpg"]}, "not a screenshot"),
+                ({"kind": "ask", "shots": ["docs/mockups/reviews/a b.png"]}, "not a screenshot"),
+                ({"kind": "ask", "shots": [f"docs/mockups/reviews/{i}.png" for i in range(5)]}, "at most 4"),
+                ({"kind": "ask", "shots": [1]}, "a list of paths"),
+                ({"kind": "ask", "shots": {"a": 1}}, "a list of paths"),
+            ):
+                params = {"to": "person", "text": "the row?", "shots": good, **bad}
+                with pytest.raises(AgentError, match=said):
+                    await c.call("msg", **params)
+        await person.call("kill", id=builder)
+        await person.call("kill", id=lead)

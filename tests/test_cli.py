@@ -2183,3 +2183,20 @@ def test_status_v_says_what_a_session_waits_on_on_its_declarations_line(monkeypa
     assert "out of work 5m · waiting on you: TD-222: nothing pickable" in out
     assert re.search(r"^\s+waiting on you: #9$", out, re.M)
     assert out.count("waiting on you") == 2
+
+
+def test_a_shot_path_is_sent_relative_to_its_repo(tmp_path, monkeypatch):
+    """Design §4.10 *A look* (TD-292): `ao msg --shot` sends a screenshot in this checkout as the
+    repo-relative path the page finds on origin's default, however it was typed; a path that names
+    no file here goes as given, for the host agent to refuse or keep."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    shots = tmp_path / "docs" / "mockups" / "reviews"
+    shots.mkdir(parents=True)
+    (shots / "2026-10-03-td292-row.png").write_bytes(b"\x89PNG")
+    want = "docs/mockups/reviews/2026-10-03-td292-row.png"
+    assert cli._shot_path(str(shots / "2026-10-03-td292-row.png")) == want
+    monkeypatch.chdir(shots)
+    assert cli._shot_path("2026-10-03-td292-row.png") == want
+    assert cli._shot_path("docs/mockups/reviews/elsewhere.png") == "docs/mockups/reviews/elsewhere.png"
+    args = cli.build_parser().parse_args(["msg", "--kind", "ask", "--shot", "a.png", "--shot", "b.png", "person", "x"])
+    assert args.shot == ["a.png", "b.png"]

@@ -35,6 +35,36 @@ from sessionorc.models import (
 )
 
 
+def _shots(shots: Any, kind: str) -> list[str]:
+    """A look's screenshots (design §4.10 *A look*, TD-292), checked whole before anything else is
+    done with them: a list of repo-relative paths, each a `.png` directly under
+    `docs/mockups/reviews/` (`mail.SHOT_RE`), at most `mail.SHOTS_MAX` once repeats are dropped, and
+    only on a `steer` or an `ask`. Refused in words, never cleaned into another path: the page serves
+    exactly that directory. Who it is addressed to is checked once the addressees are resolved."""
+    if shots is None:
+        return []
+    raw = [shots] if isinstance(shots, str) else shots
+    if not isinstance(raw, list) or any(not isinstance(x, str) for x in raw):
+        raise RpcError("screenshots are a list of paths (design §4.10 *A look*)")
+    if len(raw) > mail.SHOTS_MAX * 2:
+        raise RpcError(f"a look names at most {mail.SHOTS_MAX} screenshots: {len(raw)} given (design §4.10)")
+    looks: list[str] = []
+    for x in raw:
+        path = x.strip().removeprefix("./")
+        if not mail.SHOT_RE.fullmatch(path):
+            raise RpcError(
+                f"{x[:120]!r} is not a screenshot a look can name: a .png directly under docs/mockups/reviews/ "
+                "of your repo, its name letters, digits, '.', '_' and '-' (design §4.10 *A look*)"
+            )
+        if path not in looks:
+            looks.append(path)
+    if len(looks) > mail.SHOTS_MAX:
+        raise RpcError(f"a look names at most {mail.SHOTS_MAX} screenshots: {len(looks)} given (design §4.10)")
+    if looks and kind not in ("steer", "ask"):
+        raise RpcError(f"screenshots ride only on a steer or an ask to the person, not a {kind} (design §4.10)")
+    return looks
+
+
 class MailMixin:
     # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
 
@@ -57,6 +87,7 @@ class MailMixin:
         caller: Any = None,
         source: str | None = None,
         pr: Any = None,
+        shots: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -96,6 +127,7 @@ class MailMixin:
                 thread,
                 source,
                 pr,
+                shots,
             )
         except RpcError as e:
             if key:
@@ -194,6 +226,7 @@ class MailMixin:
         thread: str | None = None,
         source: str | None = None,
         pr: Any = None,
+        shots: Any = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -208,6 +241,7 @@ class MailMixin:
                 raise RpcError(f"a PR number rides only on an `ask` (design §4.9b *The reader*), not a {kind}")
             if isinstance(pr, bool) or not isinstance(pr, int) or pr < 1:
                 raise RpcError(f"`pr` is a pull request's number, a positive integer, not {pr!r}")
+        looks = _shots(shots, kind)
         text = str(text or "").strip()
         if not text:
             raise RpcError("a message needs a body")
@@ -229,6 +263,10 @@ class MailMixin:
         if SYSTEM in named:
             raise RpcError(
                 f"{SYSTEM!r} is the home's own name on a note about your message: it addresses nobody (design §4.10)"
+            )
+        if looks and named != [PERSON]:
+            raise RpcError(
+                "screenshots ride only on a steer or an ask to the person: a look is the person's (design §4.10)"
             )
         # -- a `steer` carries the one line it will go with, cleaned and capped as a `doing` line --
         line = _clean(str(default or "").split("\n", 1)[0]).strip()[: mail.DEFAULT_CAP]
@@ -525,6 +563,7 @@ class MailMixin:
         entry.answers = list(picks)  # data the sender proposed, on the envelope (§4.10, TD-070)
         entry.answer = picked
         entry.pr = pr
+        entry.shots = looks
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
         if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
             # `bound` is None exactly when the addressee is the person and the kind is `ask`: that

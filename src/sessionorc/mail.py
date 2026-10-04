@@ -16,6 +16,7 @@ hours of a four-session team, a lead over three free-pick grinders, on 2026-09-1
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
@@ -46,6 +47,11 @@ SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where t
 # something a person presses.
 ANSWERS_MAX = 4
 ANSWER_CAP = 80
+# A look's screenshots (§4.10 *A look*, TD-290, TD-292): up to four repo-relative paths, each a `.png`
+# directly under `docs/mockups/reviews/`, matched whole — the page serves that one directory and
+# nothing else, so a path of any other shape is refused rather than cleaned into one.
+SHOTS_MAX = 4
+SHOT_RE = re.compile(r"docs/mockups/reviews/[A-Za-z0-9._-]+\.png")
 OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises asking whether this one is a steer
 # Outcomes owed to the person before an `ask` or a `steer` to it is refused (design §4.10
 # *Outcomes*, TD-079). Ten, because the remedy is one line each and a worker with a long night of
