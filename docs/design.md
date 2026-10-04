@@ -5177,8 +5177,9 @@ team has one, the techlead answers it or passes it up, and the person is the top
   from its own worktree, on an `AGENTORC_HOME` of its own on a short path, a tmux server of its
   own and a port of its own, with fixture sessions under the `shell` adapter and a fixture board
   — stood up and torn down by one script, `scripts/look_home.py`, which starts the host agent
-  itself, in a child of its own, on a private socket as the suite's fixture does, since `agentorc-agent serve`
-  always takes the default tmux server and so is never what a look runs. The brief's rule is
+  itself, in a child of its own, on a private socket as the suite's fixture does, so that the home,
+  its tmux server and its port are made and torn down as one, and nothing of the look reaches the
+  default server. The brief's rule is
   therefore *never run the host agent or `ao ui` against the live home*, and the script is the
   one way to run them. The builder drives the page in a headless Chromium under Playwright —
   load, wait for the scripts and the terminal, read values, press, take screenshots — and the

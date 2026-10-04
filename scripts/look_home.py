@@ -8,8 +8,9 @@ and fixture sessions under the `shell` adapter. It prints the URL, and on Ctrl+C
 both processes, kills its tmux server and removes the home it made.
 
 It is never the live system: it refuses a home that is, or is under, `~/.agentorc`, and never runs
-anything on the default tmux server (`agentorc-agent serve` builds a bare `Tmux()` on it, so the agent
-is a child this script starts with a `Tmux` on a private socket, as `tests/conftest.py`'s fixture does).
+anything on the default tmux server: the agent is a child this script starts with a `Tmux` on a private
+socket, as `tests/conftest.py`'s fixture does, so the home, the server and the port are made and torn down
+as one.
 A SIGKILL of the script cannot tear down: its two children, its tmux server (`tmux -L ao-look-…`) and
 its `/tmp/aolook-*` home are then left for you to remove.
 
