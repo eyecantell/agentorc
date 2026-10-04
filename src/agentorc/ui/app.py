@@ -284,7 +284,6 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     PRIORITY_RANK,  # noqa: F401
     compact_in,  # noqa: F401
     doing_chips,  # noqa: F401
-    entry_composer,
     entry_hand,
     entry_line,
     entry_role,
@@ -1864,8 +1863,11 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         **interactive** session in a new worktree `entry-<n>` of the repo, in its team as a person's own
         session is (§4.9 *A person in the team*) with the role `entries:` names for the Type — `plain`
         with no badge where no team services the repo — at the prompt: no opening prompt and no brief.
-        Answers `{id, text}`: the composer's text, which the page keeps in the browser as that session's
-        draft; nothing is typed into the pane and nothing is stored on the record."""
+        `entry.md`'s lines, filled, are the session's **start context** (§4.3, TD-283 part 2): it holds
+        them from its start with no turn run for them, and Focus draws them under **Told at start**.
+        Answers `{id, text}`: the composer's text — the person's words alone — which the page keeps in
+        the browser as that session's draft; nothing is typed into the pane, and the record holds the
+        lines, never the words."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, type, words}")
@@ -1898,8 +1900,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ledger=cfg.ledger,
             controllers=[plan["manager"]] if plan["manager"] else [],
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
+            start_context=repoconfig.entry_text(plan["repo"], plan["type"], plan["ledger"]),
         )
-        text = entry_composer(plan["repo"], plan["type"], plan["ledger"], str(body.get("words") or ""))
+        text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
         return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
 
 

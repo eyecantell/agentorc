@@ -61,8 +61,9 @@ def _link(text: str, url: str, origin: str | None) -> str | None:
     )
 
 
-def inline(text: str, origin: str | None = None) -> str:
-    """One run of text, inline constructs rendered and every other character escaped."""
+def inline(text: str, origin: str | None = None, links: bool = True) -> str:
+    """One run of text, inline constructs rendered and every other character escaped. Without
+    `links` a link is its characters too: text in which nothing may be pressable (TD-071)."""
     out: list[str] = []
     pos = 0
     for m in _INLINE.finditer(text):
@@ -71,21 +72,21 @@ def inline(text: str, origin: str | None = None) -> str:
         if m.group("code"):
             out.append(f"<code>{escape(m.group('ctext'))}</code>")
         elif m.group("url") is not None:
-            got = _link(m.group("ltext"), m.group("url"), origin)
+            got = _link(m.group("ltext"), m.group("url"), origin) if links else None
             out.append(got if got is not None else escape(m.group(0)))
         elif m.group("strong") is not None:
-            out.append(f"<strong>{inline(m.group('strong'), origin)}</strong>")
+            out.append(f"<strong>{inline(m.group('strong'), origin, links)}</strong>")
         else:
-            out.append(f"<em>{inline(m.group('em'), origin)}</em>")
+            out.append(f"<em>{inline(m.group('em'), origin, links)}</em>")
     out.append(escape(text[pos:]))
     return "".join(out)
 
 
-def _lines(lines: list[str], origin: str | None) -> str:
-    return "<br>".join(inline(x.strip(), origin) for x in lines)
+def _lines(lines: list[str], origin: str | None, links: bool = True) -> str:
+    return "<br>".join(inline(x.strip(), origin, links) for x in lines)
 
 
-def _block(lines: list[str], origin: str | None) -> list[str]:
+def _block(lines: list[str], origin: str | None, links: bool = True) -> list[str]:
     """One block between blank lines: runs of list items and runs of paragraph lines, in order."""
     out: list[str] = []
     para: list[str] = []
@@ -96,10 +97,10 @@ def _block(lines: list[str], origin: str | None) -> list[str]:
         nonlocal items, para, kind
         if items:
             tag = "ol" if kind == "ol" else "ul"
-            out.append(f"<{tag}>" + "".join(f"<li>{_lines(i, origin)}</li>" for i in items) + f"</{tag}>")
+            out.append(f"<{tag}>" + "".join(f"<li>{_lines(i, origin, links)}</li>" for i in items) + f"</{tag}>")
             items, kind = [], ""
         if para:
-            out.append(f"<p>{_lines(para, origin)}</p>")
+            out.append(f"<p>{_lines(para, origin, links)}</p>")
             para = []
 
     for line in lines:
@@ -120,9 +121,10 @@ def _block(lines: list[str], origin: str | None) -> list[str]:
     return out
 
 
-def render(text: str, origin: str | None = None) -> str:
+def render(text: str, origin: str | None = None, links: bool = True) -> str:
     """The whole text as HTML from the closed subset (§4.10). `origin` is the UI's own
-    `scheme://host:port`, so a link back to the page itself is drawn as characters."""
+    `scheme://host:port`, so a link back to the page itself is drawn as characters; without `links`
+    every link is."""
     out: list[str] = []
     block: list[str] = []
     fence: list[str] | None = None
@@ -134,16 +136,16 @@ def render(text: str, origin: str | None = None) -> str:
             else:
                 fence.append(line)
         elif _FENCE.match(line):
-            out.extend(_block(block, origin))
+            out.extend(_block(block, origin, links))
             block, fence = [], []
         elif not line.strip():
-            out.extend(_block(block, origin))
+            out.extend(_block(block, origin, links))
             block = []
         else:
             block.append(line)
     if fence is not None:  # an unclosed fence runs to the end, as a reader expects
         out.append(f"<pre><code>{escape(chr(10).join(fence))}</code></pre>")
-    out.extend(_block(block, origin))
+    out.extend(_block(block, origin, links))
     return "".join(out)
 
 

@@ -2115,7 +2115,7 @@
       if (!r.ok) { say(v.detail || "the repo could not be read"); $("#entrygo").disabled = true; return; }
       say(""); $("#entrygo").disabled = false;
       $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
-      $("#entryline").textContent = `Starts ${v.line}, and opens its Focus with these words in the composer, not sent.`;
+      $("#entryline").textContent = `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under Told at start.`;
       const h = v.hand || { why: "the host agent did not say who takes it" };
       handWhy = h.why || "";
       $("#entryseat").textContent = h.name || h.to || "";

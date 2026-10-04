@@ -277,6 +277,9 @@ def view(
     # red past the role's bound (§4.8 *A role has a context bound*, §6 rule 5): the bound rides in
     # the title, so the red says what it is measured against
     d["context_over"] = context_over(s)
+    # **Told at start**'s heading (§4.5a, TD-283 part 2): the start context's length in lines
+    told = s.get("start_context")
+    d["start_lines"] = sum(1 for x in told.splitlines() if x.strip()) if isinstance(told, str) else 0
     bound = s.get("context_bound")
     d["context_bound"] = tokens_short(bound) if isinstance(bound, int) and bound > 0 else ""
     # A record whose `pending` is not a dict — another build, a hand repair — costs its card its

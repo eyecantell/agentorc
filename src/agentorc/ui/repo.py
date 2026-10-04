@@ -42,13 +42,6 @@ def entry_line(role: str, name: str, team: str) -> str:
     return f"an interactive {role} session, {name}, in a new worktree{tail}"
 
 
-def entry_composer(repo: str, type_: str, ledger: str, words: str) -> str:
-    """What the entry session's composer holds (§4.5a **Open a session**): `entry.md`'s lines with the
-    repo, the type and the ledger filled, then the person's words — or the lines alone."""
-    head = repoconfig.entry_text(repo, type_, ledger)
-    return f"{head}\n\n{words.strip()}" if words.strip() else head
-
-
 # the teams that service a checkout: `agentorc.teams`' since TD-218 slice 4, where `ao td add` reads it too
 entry_teams = teams.entry_teams
 
