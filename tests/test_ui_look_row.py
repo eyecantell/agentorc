@@ -42,6 +42,7 @@ def checkout(tmp_path, monkeypatch, name="proj", shots=("a.png",)):
     from agentorc.ui import inbox
 
     inbox._shot_seen.clear()
+    inbox._shot_host_down.clear()
     return root
 
 
@@ -121,6 +122,20 @@ def test_look_shots_address_only_what_origin_holds_in_the_one_directory(tmp_path
     assert look_shots("docs/mockups/reviews/a.png", "proj") == []
 
 
+@pytest.mark.unit
+def test_an_image_past_the_bound_draws_its_name_alone(tmp_path, monkeypatch):
+    from sessionorc import shots
+
+    monkeypatch.setattr(shots, "SHOT_BYTES_MAX", len(PNG) + len("a.png"))
+    root = checkout(tmp_path, monkeypatch, shots=("a.png", "big.png.png"))
+    from agentorc.ui.inbox import look_shots
+
+    assert shots.exists(root.resolve(), "a.png") and shots.read(root.resolve(), "a.png")
+    assert not shots.exists(root.resolve(), "big.png.png") and shots.read(root.resolve(), "big.png.png") is None
+    got = look_shots(["docs/mockups/reviews/a.png", "docs/mockups/reviews/big.png.png"], "proj")
+    assert got == [{"name": "a.png", "url": "/repo/proj/shot/a.png"}, {"name": "big.png.png", "url": ""}]
+
+
 @pytest.mark.integration
 def test_the_shot_route_serves_origins_png_and_nothing_else(tmp_path, monkeypatch):
     checkout(tmp_path, monkeypatch)
@@ -144,3 +159,64 @@ def test_the_shot_route_serves_origins_png_and_nothing_else(tmp_path, monkeypatc
         for bad in ("/repo/proj/shot/local.png", "/repo/proj/shot/a.txt", "/repo/other/shot/a.png"):
             assert c.get(bad).status_code == 404, bad
         assert c.get("/repo/proj/shot/..%2F..%2F..%2FREADME.png").status_code == 404
+
+
+@pytest.mark.integration
+def test_a_look_from_a_sender_on_another_host_is_addressed_and_served_through_the_home(tmp_path, monkeypatch):
+    """TD-300: a sender whose record runs on another host names a repo that host registers. The row
+    asks that host (`host_shot` with `head`, kept `SHOT_TTL`) and addresses the image with `?host=`;
+    the route reads it there, through the home; this host's registry is not consulted."""
+    import base64
+
+    checkout(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+    from agentorc.ui import inbox
+
+    asked: list[tuple[str, str, str, bool]] = []
+
+    def call_sync(method, **kw):
+        assert method == "host_shot" and kw["_timeout"] == inbox.SHOT_WAIT, "a hung node holds the Inbox SHOT_WAIT"
+        asked.append((kw["host"], kw["repo"], kw["name"], kw.get("head", False)))
+        if kw["host"] == "hung":
+            raise TimeoutError("no answer")
+        return {"exists": kw["name"] == "n.png", "png": ""}
+
+    monkeypatch.setattr(inbox, "call_sync", call_sync)
+    got = inbox.look_shots(["docs/mockups/reviews/n.png", "docs/mockups/reviews/a.png"], "proj", "laptop")
+    assert got == [
+        {"name": "n.png", "url": "/repo/proj/shot/n.png?host=laptop"},
+        {"name": "a.png", "url": ""},  # this host holds a.png, but the sender's host does not
+    ]
+    inbox.look_shots(["docs/mockups/reviews/n.png"], "proj", "laptop")
+    assert asked == [("laptop", "proj", "n.png", True), ("laptop", "proj", "a.png", True)], "kept SHOT_TTL"
+    # a host that does not answer is asked once, not once per shot, and not again for SHOT_TTL
+    asked.clear()
+    two = ["docs/mockups/reviews/n.png", "docs/mockups/reviews/m.png"]
+    assert [x["url"] for x in inbox.look_shots(two, "proj", "hung")] == ["", ""]
+    assert [x["url"] for x in inbox.look_shots(two, "proj", "hung")] == ["", ""]
+    assert asked == [("hung", "proj", "n.png", True)]
+    # the page's own host is this host: read here, never asked
+    assert inbox.look_shots(["docs/mockups/reviews/a.png"], "proj", "kmaster")[0]["url"] == "/repo/proj/shot/a.png"
+
+    class Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            assert method == "host_shot" and kw["host"] == "laptop"
+            png = base64.b64encode(PNG + b"node").decode() if kw["name"] == "n.png" else ""
+            return {"exists": bool(png), "png": png}
+
+    monkeypatch.setattr(uiapp, "LocalClient", Client)
+    with TestClient(uiapp.create_app()) as c:
+        r = c.get("/repo/proj/shot/n.png?host=laptop")
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == PNG + b"node"
+        assert c.get("/repo/proj/shot/a.png?host=laptop").status_code == 404, "the node's origin does not hold it"
+        assert c.get("/repo/proj/shot/a.txt?host=laptop").status_code == 404
+        assert c.get("/repo/proj/shot/a.png?host=kmaster").content == PNG + b"a.png", "this host: read here"

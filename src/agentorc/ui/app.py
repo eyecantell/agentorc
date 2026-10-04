@@ -6,6 +6,7 @@ host only, from `hosts.yml`'s `local` entry; ssh transport arrives in phase 2.
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import html
 import json
@@ -175,6 +176,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     SHOT_DIR,  # noqa: F401
     SHOT_NAME,  # noqa: F401
     SHOT_TTL,  # noqa: F401
+    SHOT_WAIT,  # noqa: F401
     SHOTS_MAX,  # noqa: F401
     SUBHEAD_RE,  # noqa: F401
     SYNC_LOCK,  # noqa: F401
@@ -194,6 +196,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
     _same_ref,  # noqa: F401
+    _shot_host_down,  # noqa: F401
+    _shot_on_host,  # noqa: F401
     _shot_on_origin,  # noqa: F401
     _shot_seen,  # noqa: F401
     _synced,  # noqa: F401
@@ -851,9 +855,13 @@ def create_app() -> FastAPI:
             e["board_default"] = board_of(e["from"])
             # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): its screenshots, served
             # from the sender's record's repo — read off the loop, as each is a git read once a minute
+            # (TD-300: from the sender's own host where that is not this one, through the home)
             if e.get("shots"):
-                repo = str((records.get(e["from"]) or {}).get("repo") or "")
-                e["look_shots"] = await asyncio.to_thread(look_shots, e["shots"], Path(repo).name if repo else "")
+                sender = records.get(e["from"]) or {}
+                repo = str(sender.get("repo") or "")
+                e["look_shots"] = await asyncio.to_thread(
+                    look_shots, e["shots"], Path(repo).name if repo else "", str(sender.get("host") or "")
+                )
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
                 e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
@@ -1031,13 +1039,24 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             },
         )
 
+    SHOT_READ_WAIT = 10.0  # seconds one image from another host may take (TD-300): a hung node is a 404
+
     @app.get("/repo/{name}/shot/{shot}")
-    async def repo_shot(name: str, shot: str):
+    async def repo_shot(name: str, shot: str, host: str = ""):
         """A look's screenshot (design §4.5a **Inbox row: a look**, TD-292 slice 3): one `.png` of
         `docs/mockups/reviews/` of a registered repo, as `origin/<default>` holds it, and nothing
-        else — any other name, repo or file is a 404."""
-        root = shot_root(name)
-        data = await asyncio.to_thread(shot_bytes, root, shot) if root is not None else None
+        else — any other name, repo or file is a 404. `host` names the host whose registry holds the
+        repo when it is not this one, and the image is read there (`host_shot`, TD-300)."""
+        data: bytes | None = None
+        if host and host != host_name():
+            if SHOT_NAME.fullmatch(shot):
+                # unreachable, refused, slow past `SHOT_READ_WAIT`, or bad base64: a 404
+                with contextlib.suppress(HTTPException, ValueError, TimeoutError):
+                    got = await asyncio.wait_for(call("host_shot", host=host, repo=name, name=shot), SHOT_READ_WAIT)
+                    data = base64.b64decode(str((got or {}).get("png") or "")) or None
+        else:
+            root = shot_root(name)
+            data = await asyncio.to_thread(shot_bytes, root, shot) if root is not None else None
         if data is None:
             raise HTTPException(404, "no such screenshot")
         return Response(data, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})

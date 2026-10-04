@@ -20,6 +20,7 @@ from sessionorc import (
     link,
     mail,
     naming,
+    shots,
 )
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
@@ -262,7 +263,8 @@ class LinkMixin:
         its own; `stat`, whether a directory exists here (a team start's checkout check) and the checkout
         it is in; `occupancy` and `worktrees`, the New session form's readings of a place (TD-294); `files`,
         a checkout's own files read here (a team's brief on a machine node, TD-057 step 4b.3); and
-        `repos`, this node's registry (the home's `host_repos`, §4.9, TD-229). Beside them what the
+        `repos`, this node's registry (the home's `host_repos`, §4.9, TD-229); `shot`, one look's screenshot
+        from it (the home's `host_shot`, TD-300). Beside them what the
         home hands down: `read`, `intent`, `settings`, `usage` and `usage_reading`."""
         if method == "ping":
             return "pong"
@@ -293,6 +295,11 @@ class LinkMixin:
             return {"repos": await asyncio.to_thread(lambda: hosts.local_host().repos())}
         if method == "stat":
             return await asyncio.to_thread(stat_dir, str(params.get("dir") or ""))
+        if method == "shot":  # one look's screenshot from this node's registry, for the home's `host_shot` (TD-300)
+            name = str(params.get("name") or "")
+            if not mail.SHOT_NAME.fullmatch(name):
+                raise link.LinkError(f"{name!r} is not a screenshot a look can name")
+            return await asyncio.to_thread(shots.reading, str(params.get("repo") or ""), name, bool(params.get("head")))
         if method == "occupancy":  # the home's `host_occupancy` (§4.4a, TD-294)
             d = str(params.get("dir") or "")
             return await self.rpc_occupancy(d) if d.strip() else {"dir": "", "occupants": [], "git": False}
