@@ -145,8 +145,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | In progress — the node rebuilt with Claude Code; the credential steps are Paul's |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
-| TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Open |
+| TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Designed 2026-10-04; the build is TD-305 |
 | TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
+| TD-305 | Build the answered board row: a decided or replied board item is drawn under *Waiting on them*, uncounted, and comes back after `BOARD_WAIT_DAYS` | High | Open |
 | TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
 
@@ -1339,8 +1340,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-24 (TD-126's design, a cloud session with Paul)
 **Owner:** grinder
 **Kind:** build
-**Status:** Partly done — **slice 1 built 2026-09-25 (grinder-ao-1, PR #581)**: `board.write_back` with `reply`, `rpc_board_reply` (person-only, `sent: []` and the note), the row's **Reply** through the mail composer, `/api/person/board` `action: reply`; signed with the checkout's git `user.name`. Slice 1's *trail* line is left to slice 2: the trail is keyed on a session and a board line names none until the reader carries `session`. Slice 2 (the mail half and the standing) waits on dev-cadence's reader. Design: §4.4 *Board write-back*, §4.5a *Due strip / Inbox board row → Reply* and *Inbox board row: standing*, §4.8a (`handed`), §4.10 *A board reply owes an outcome too*, mockup `Inbox.dc.html`.
-**Blocked by:** decision (dev-cadence) — slice 2 waits on dev-cadence's reader carrying `session`, `host` and `refs` (asked on the board 2026-09-24)
+**Status:** Partly done — **slice 1 built 2026-09-25 (grinder-ao-1, PR #581)**: `board.write_back` with `reply`, `rpc_board_reply` (person-only, `sent: []` and the note), the row's **Reply** through the mail composer, `/api/person/board` `action: reply`; signed with the checkout's git `user.name`. Slice 1's *trail* line is left to slice 2: the trail is keyed on a session and a board line names none until the reader carries `session`. Slice 2 (the mail half and the standing) is open: it waited on dev-cadence's reader, which carries `session`, `host` and `refs` now (`scripts/nudge_user_attention.py --report --json`, seen 2026-10-04). Design: §4.4 *Board write-back*, §4.5a *Due strip / Inbox board row → Reply* and *Inbox board row: standing*, §4.8a (`handed`), §4.10 *A board reply owes an outcome too*, mockup `Inbox.dc.html`.
 
 **Location:** `src/sessionorc/board.py` (`ACTIONS` gains `reply`; `edit_line` appends ` — Paul, <date>: <text>` to the item's line, the date local as the board's are; `message` → `agentorc: reply on <head> (session <name>)`), `src/sessionorc/agent.py` (`rpc_board_reply {board, line, text, reply, refs}`: person-only as `board_edit`; `refs` handed in by the page from the reader's JSON, since the agent does not run the reader; the write-back first, then for each live record holding an unexpired declared `claimed` on one of the item's `refs` — the `_lease_holder` walk, over all records — a `note` from the person with `about` the ref, `handed=True`, text *board: <head>\n\nPaul: <reply>*; the reply says `{commit, sent: [{session, ref}]}` and a mail failure after the commit is in it as words), `src/sessionorc/modes.py` (a home-owned write, beside `board_edit`), `src/agentorc/ui/app.py` (`board_rows` carries `session`, `host`, `refs` from the reader's JSON when present and computes `standing` from the records: `{word, holder, ref}`; the route for the press; the trail line), `src/agentorc/ui/templates/inbox_row.html` (the standing beside the sender, **Reply** in the foot, the dialog shared with Reply and Message with the head quoted), `app.js`, `tests/test_board.py`, `tests/test_mail.py` (the `handed` note owes an outcome).
 
@@ -2749,7 +2749,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (Paul: *Currently a "Needs you" item seems to stay in "needs you" once answered - it should move out to "waiting on them"/other so it does not appear to be waiting on me*; the anchor session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** **Designed 2026-10-04** (the designer, PR #1006): design §4.5 screen 6 *A board item the person answered waits on them*, §4.5a **Inbox section: Waiting on them** and the **answers** and **Reply** rows, §4.4 *Decide*; mockup `Inbox.dc.html`, shot as `docs/mockups/reviews/2026-10-04-td303-answered-board-row.png`. The reader already says whom a decided item waits on (`waiting_on: session`, dev-cadence TD-036) and the Inbox did not read it, so the row's place follows from the reader's fields and nothing is stored at the home. Two choices are steered to Paul as `m-3a00d3ac1c03`, which lapsed at its bound (2026-10-04 12:31 MDT), so both stand: a Reply moves the row as a `Decided:` does, and the row comes back to *Needs you* after three days with nothing done (`BOARD_WAIT_DAYS`). No mail row needed the cure. The build is TD-305.
+**Blocked by:** TD-305
 **Location:** design §4.5 screen 6 (the Inbox's sections), §4.5a **answers** / **Go with it** / **Reply** (Inbox board row) and the help text that says the decided line *stays on the board, due*, §4.4 *Board write-back*; `src/agentorc/ui/inbox.py` (`inbox_sections`, `board_due_now`); cadence §3.5 (*a decided entry is not done: it stays on the board, and stays due, until a session acts on it*)
 
 **Why:** a board row answered from the Inbox (a pressed answer or Go with it writes `Decided:`; a Reply writes `— Paul, <date>: …`) stays under **Needs you**, counted in the top bar, because the design keeps the line *due* as its session's work order and the Inbox counts every due board row as the person's. Seen 2026-10-04: samscrape's backup item reads *decided: approve R2 · Oct 3 — not done: it stays on the board as its session's work order* at the head of Needs you (64). Once the person has answered, the item waits on a session, which is what *Waiting on them* says for mail.
@@ -2777,6 +2778,29 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a board row in the Inbox shows its item's detail block, on a repo synced past dev-cadence TD-084, and a row without one reads as it does today.
 
 **Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
+
+## TD-305: Build the answered board row — a decided or replied board item waits under *Waiting on them*
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-04 (the designer, TD-303's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/inbox.py` (`board_rows`, `board_due_now`, `board_horizon`, `inbox_sections`, the rail's counts), `src/agentorc/ui/app.py` and the board row's partial (the row under *Waiting on them*, its controls), `src/agentorc/ui/help.py` and design §4.5a's help list (the **answers** and **Go with it** texts), `docs/mockups/gen.py` (`INBOX_BLURB`)
+
+**Why:** TD-303's design: a board item the person has decided or replied to waits on a session, and the Inbox still draws it under *Needs you*, counted.
+
+**Fix:** design §4.5 screen 6 *A board item the person answered waits on them*; §4.5a **Inbox section: Waiting on them**, **answers**, **Reply**. One slice:
+- `board_rows` stamps each row `answered` — `decided` (the reader's `waiting_on == "session"`), else `replied` (a non-empty `replies` on an undecided item), else nothing — with the answer's date (the `decided` date, the last reply's `date`) and `stale`: `BOARD_WAIT_DAYS = 3` or more civil days from that date to the reader's `today` (decided Oct 3, back on Oct 6). A reader that gives no `waiting_on` falls back to its `decided` field; a date that does not parse reads as not stale.
+- `inbox_sections` puts an answered row that is not stale under `waiting`, in no count (`count`, `overdue_n`, the rail's *Needs you* numbers), whatever its `due_now`; `board_horizon` leaves it out of *coming up* and *not shown*. A stale one is drawn where it would be unanswered, with the line *decided <date> — no session has acted in <n> d* (or *replied <date> — …*).
+- The waiting row: the board row's partial with its *decided* line or replies, the *waiting on …* words (a live record with an unexpired declared lease on one of the item's `refs`; else a live record named by the item's `session`; else *the next session to read <repo>'s board* — from the fleet the page already read, as `orphan_standing` does for mail), and **Reply**, **Done**, **Open board**: no Snooze, no answers, no Dismiss. `waiting` sorts by the answer's date beside the mail rows' `closed_at`.
+- Page text, which this entry words (the design PR left §4.5a's help list alone, since it is bound to `help.py`): the *Waiting on them* blurb gains *and board items you decided or replied to, until a session closes them*; the **answers** and **Go with it** help say the row moves to *Waiting on them* and comes back if nobody acts in three days, in place of *stays on the board, due*; the decided row's *not done: it stays on the board as its session's work order* line goes, the *waiting on …* words saying it.
+- When built, the design's *designed, not built* marks for TD-303 come off (§4.4, §4.5 screen 6, the three §4.5a rows).
+
+**Done when:** on a scratch home (`scripts/look_home.py`) with a board that holds a decided item, a replied one and an undecided due one: the first two are under *Waiting on them* and in neither the top bar's number nor the Org's *m overdue*, the third is under *Needs you*; pressing an answer on the third moves it at the press; a decided item whose date is three days back is under *Needs you*, one two days back is not, counted, saying nobody has acted; tests cover the three placements, the stale return, a reader without `waiting_on`, and the counts. A page change, so the builder looks at it and sends the look (§4.9b).
+
+**Related:** TD-303 (the design), TD-142 (the standing on a *Needs you* board row, slice 2), TD-304 (the detail block on the same row), TD-255 (answers), TD-079 (*Waiting on them*).
 
 ## TD-306: A scraped `needs-you` stays after its screen is gone, until the next hook
 
