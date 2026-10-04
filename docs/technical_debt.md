@@ -2812,6 +2812,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a board row in the Inbox shows its item's detail block, on a repo synced past dev-cadence TD-084, and a row without one reads as it does today.
 
 **Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
+
 ## TD-306: A scraped `needs-you` stays after its screen is gone, until the next hook
 
 **Priority:** Low
