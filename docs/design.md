@@ -6076,7 +6076,8 @@ structured field of the envelope, which is the only reason a page may draw a con
 so nothing can be said through a button that Reply could not say, and a sender that knows nothing
 of answers reads it as any reply. The reply also carries **`answer`**, the zero-based index of the
 one pressed, so a sender can branch on which without comparing strings; a typed reply carries
-none. **The home checks it**: `answer` must index the `answers` of the entry `reply_to` names and
+none. The question the reply closes keeps the same index on every copy, which is where the
+person's Inbox reads what was answered (§4.5a *Waiting on them*). **The home checks it**: `answer` must index the `answers` of the entry `reply_to` names and
 `text` must equal that answer exactly, else the reply is refused (*that is not one of the
 suggested answers*) — a session can call the RPC directly, and a receiver must not be asked to
 trust an index the text does not bear out. **It is always a reply, on a `steer` too**: the
