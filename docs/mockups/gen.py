@@ -1469,7 +1469,7 @@ def inbox(picks=False):
     if not picks:
         secs = [("Needs you", 6, False), ("Steering", 3, False), ("Waiting on them", 2, False), ("Answered for you", 1, False), ("FYI", 14, False)]
         teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
-        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 1, False), ("notes", 3, False), ("trail", 6, False)]
+        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 2, False), ("notes", 3, False), ("trail", 6, False)]
         b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
         later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Board, coming up</span><span class="n" style="background: transparent; color: #6b7280;">1</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
             + mcard("#cbd0d6", "board", "dev-cadence", "dc-grind", "due in 6 d · Oct 4",
@@ -1485,7 +1485,7 @@ def inbox(picks=False):
     else:
         secs = [("Needs you", "2 of 6", True), ("Steering", "0 of 2", False), ("Waiting on them", "0 of 2", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
         teams = [("ao-grind", "2 of 3", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
-        kinds = [("questions", "1 of 1", False), ("steering", "0 of 2", False), ("session states", "1 of 3", False), ("board items", "0 of 0", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
+        kinds = [("questions", "1 of 1", False), ("steering", "0 of 2", False), ("session states", "1 of 3", False), ("board items", "0 of 2", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
         body = (isec("Needs you", "2 of 6") + "".join(needs[:2])
                 + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them, Answered for you and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
         summary, title = "", "Inbox"
