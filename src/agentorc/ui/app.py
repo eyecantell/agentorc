@@ -21,7 +21,7 @@ from typing import Annotated, Any
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from agentorc import org as orgmod
@@ -211,6 +211,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     live_look,  # noqa: F401
+    look_pair,  # noqa: F401
+    look_shots,  # noqa: F401
     origin_case,  # noqa: F401
     origin_firsts,  # noqa: F401
     origin_note,  # noqa: F401
@@ -224,6 +226,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     restart_mark,  # noqa: F401
     review_pr,  # noqa: F401
     row_find,  # noqa: F401
+    shot_bytes,  # noqa: F401
+    shot_root,  # noqa: F401
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
     unclosed_mark,  # noqa: F401
@@ -839,6 +843,11 @@ def create_app() -> FastAPI:
             rw = (records.get(e["from"]) or {}).get("read_when") or {}
             e["reply_when"] = str((e.get("on_handed") and rw.get("refill")) or rw.get("note") or "")
             e["board_default"] = board_of(e["from"])
+            # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): its screenshots, served
+            # from the sender's record's repo — read off the loop, as each is a git read once a minute
+            if e.get("shots"):
+                repo = str((records.get(e["from"]) or {}).get("repo") or "")
+                e["look_shots"] = await asyncio.to_thread(look_shots, e["shots"], Path(repo).name if repo else "")
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
                 e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
@@ -1015,6 +1024,17 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "migrate_note": uiconf.migrate_note(),
             },
         )
+
+    @app.get("/repo/{name}/shot/{shot}")
+    async def repo_shot(name: str, shot: str):
+        """A look's screenshot (design §4.5a **Inbox row: a look**, TD-292 slice 3): one `.png` of
+        `docs/mockups/reviews/` of a registered repo, as `origin/<default>` holds it, and nothing
+        else — any other name, repo or file is a 404."""
+        root = shot_root(name)
+        data = await asyncio.to_thread(shot_bytes, root, shot) if root is not None else None
+        if data is None:
+            raise HTTPException(404, "no such screenshot")
+        return Response(data, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
 
     @app.get("/repo/{name}", response_class=HTMLResponse)
     async def repo_page(request: Request, name: str, part: str = ""):
