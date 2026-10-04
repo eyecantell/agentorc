@@ -1846,7 +1846,7 @@ class HostAgent(
                 return None
             if any(e.ref == ref and e.status == "claimed" for e in s.progress):  # declared or from its branch
                 return None
-        if not mail.is_person(caller) and self._addr(caller) == self._address(s):  # a node's caller is `id@host`
+        if self._is_self(s, caller):
             s.balance_refused = {"at": now_iso(), "ref": ref}
             self._save(s)
         return balance_mod.refusal(s.team, mark)
@@ -1879,7 +1879,7 @@ class HostAgent(
         word = "out of work" if status == "none" else "a restart"
         if _source(source) != "declared":
             raise RpcError(f"{word} is declared, never derived (design §9 invariant 14)")
-        if mail.is_person(caller) or str(caller) != s.id:
+        if not self._is_self(s, caller):
             said = "declare itself out of work" if status == "none" else "declare a restart of itself"
             raise RpcError(
                 f"only {s.id} may {said}: it is the session's own word about its own run (design §9 invariant 14)"
@@ -1965,7 +1965,7 @@ class HostAgent(
         on it and no wake fires on it — it is shown, never acted on, and an exit leaves it in
         place."""
         s = self._find(id)  # a node's session reports here (step 5): the field is the home's
-        if mail.is_person(caller) or str(caller) != s.id:
+        if not self._is_self(s, caller):
             raise RpcError(
                 f"only {s.id} may say what it is doing: it is the session's own word (design §9 invariant 14)"
             )
@@ -1998,7 +1998,7 @@ class HostAgent(
         where the session runs, as the run log is: a node writes its own. A line is text, never a
         control (TD-071): control bytes stripped, one line, capped at `ROUND_LINE_CAP`."""
         s = self._get(id)
-        if mail.is_person(caller) or str(caller) != s.id:
+        if not self._is_self(s, caller):
             raise RpcError(f"only {s.id} may write its round log: it is the session's own memory (design §4.8)")
         line = _clean(str(text or "").split("\n", 1)[0], ROUND_LINE_CAP).strip()
         if not line:
@@ -2082,6 +2082,12 @@ class HostAgent(
         """One normaliser for every id on the way in (design §4.4a, TD-057 step 1): a session on
         this host is stored bare, another host's as `id@host`."""
         return naming.qualify(str(address), local=self.host)
+
+    def _is_self(self, s: Session, caller: Any) -> bool:
+        """Whether `caller` is the session `s` itself (design §9 invariant 14, TD-302): its address in
+        this host's form — a node's session calls the home as `id@<node>` while its record's id is
+        bare. The person never is."""
+        return caller is not None and not mail.is_person(caller) and self._addr(caller) == self._address(s)
 
     def _get(self, sid: str) -> Session:
         try:

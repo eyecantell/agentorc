@@ -145,7 +145,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | In progress — the node rebuilt with Claude Code; the credential steps are Paul's |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Open |
-| TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Open |
+| TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Open |
 
 ---
@@ -2759,7 +2759,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the anchor, from grinder-cm-1's reports on cm-grind's first run on the contractmatch node, TD-299)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #1000 (`HostAgent._is_self`, used by `doing`, `progress none`/`restart`, `log` and the balance mark). The *Done when* waits on a node team's next run with the commit live.
 **Location:** `src/sessionorc/agent.py` (`rpc_progress`'s `none`/`restart` check ~line 1882, `rpc_doing` ~1968: `str(caller) != s.id`; `rpc_log` ~2001 has the same check but is served on the node itself, so it passes), `src/sessionorc/agent_remote.py` (`_forwarded`: the caller is `id@host`), `src/sessionorc/naming.py` (`split_address`, `qualify`); design §9 invariant 14, §4.4a *Mail across hosts*
 
 **Why:** on the node, grinder-cm-1 (`AGENTORC_SESSION=ao-contractmatch-grinder-cm-1`) was refused `ao doing` (*only ao-contractmatch-grinder-cm-1 may say what it is doing*) and `ao progress none` (*… may declare itself out of work*), while `ao progress claim`/`done` and `ao msg` from the same shell were accepted (its mail of 2026-10-04 04:59Z–05:27Z). It exited without the word, which its manager may read as a crash. The techlead seat's `ao doing` was refused the same way. The two forwarded self-word checks compare `str(caller)` to `s.id`. A node's call reaches the home through `_forwarded` with the caller as `id@<node>`, while the record's `s.id` is the bare id, so the session never equals itself.
