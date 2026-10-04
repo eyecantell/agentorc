@@ -146,10 +146,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#956), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a look sent as mail — a steer or an ask, in Steering or Needs you — no longer a `watch` | Medium | Designed 2026-10-03 — build TD-292 (TD-291 built) |
-| TD-292 | Build the mail half of a look: the briefs' three cases as a steer or an ask, `--shot` and the envelope's `shots`, screenshots and the pair on the row, Send to reviewer | Medium | The board row's pair built (#975); the briefs (#980); `--shot` (#983); slices 3–4 open |
+| TD-292 | Build the mail half of a look: the briefs' three cases as a steer or an ask, `--shot` and the envelope's `shots`, screenshots and the pair on the row, Send to reviewer | Medium | The board row's pair built (#975); the briefs (#980); `--shot` (#983); the row (#982); slice 4 open |
 | TD-296 | What the live looks of 2026-10-03 found off: seventeen page defects, each small, from a stray decimal to a read-only line that never shows | Medium | Partly done — #14 fixed (#979), #13 not reproduced; the rest open |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Open — the credential steps are Paul's |
+| TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Open |
 
 
 ---
@@ -2779,7 +2780,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the designer, TD-290's build; re-scoped the same evening on Paul's note: a look is mail)
 **Owner:** grinder
 **Kind:** build
-**Status:** Partly done — the board row's pair on cadence's kind `look` is built: PR #975 (`LOOK_KINDS`), slice 1 of the entry as it was first scoped. Re-scoped 2026-10-03 evening (PR #977) to the mail rows. Slice 1 built — PR #980 (the grinder brief's three cases as mail; the techlead preset's two sentences). Slice 2 built — PR #983 (`ao msg --shot`; `shots` on the envelope, checked whole against `docs/mockups/reviews/<name>.png`). Slices 3–4 open.
+**Status:** Partly done — the board row's pair on cadence's kind `look` is built: PR #975 (`LOOK_KINDS`), slice 1 of the entry as it was first scoped. Re-scoped 2026-10-03 evening (PR #977) to the mail rows. Slice 1 built — PR #980 (the grinder brief's three cases as mail; the techlead preset's two sentences). Slice 2 built — PR #983 (`ao msg --shot`; `shots` on the envelope, checked whole against `docs/mockups/reviews/<name>.png`). Slice 3, the row, built — PR #982 (`look_shots`, `look_pair`, `GET /repo/<repo>/shot/<name>.png`; this host's registry only, another host's is TD-300). Slice 4 open.
 **Location:** `docs/briefs/grinder-ao-1.md` (the paragraph *A change to a page is verified by you*, the one brief that carries it), `src/agentorc/briefs/techlead.md` (*A screenshot ask*: *The builder then puts a board line before the person*; *what reaches the person is the builder's board line, one road*), `src/agentorc/cli.py` (`ao msg --shot`), `src/sessionorc/mail.py` and `src/sessionorc/models.py` (`shots`, `snoozed_for`, `read_by` on an envelope), `src/sessionorc/agent_inbox.py` (`inbox_hand`), `src/agentorc/ui/inbox.py` and `src/agentorc/ui/app.py` (the row, the screenshot route); design §4.9b *A UI change is verified by its builder*, §4.10 *A look*, §4.7, §4.5a **Inbox row: a look** and **Send to reviewer**; mockup `docs/mockups/Inbox.dc.html`, `docs/mockups/reviews/2026-10-03-td290-look-rows.png`
 
 **Why:** Paul, 2026-10-03 (his note `m-d435ff0d831a`): *rework TD-290 so a look that reaches the person is mail, not a board line*; his reason there: *a steer already means go with the default at the bound unless I say otherwise, which is what the leaned-Works look wants*. The briefs TD-291 landed (#972, #973) still tell a builder to write a board line.
@@ -2860,3 +2861,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** cm-grind and a guardians team each run on their node, each with a PR merged from inside, and TD-057's *Done when* reads met.
 
 **Related:** TD-057 (the home and node split), TD-229 (repo-defined teams and `place:`), TD-296/TD-298 (2026-10-03's looks).
+
+## TD-300: A look's screenshots from a sender on another host draw their names alone
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-03 (grinder-ao-2, TD-292 slice 3)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/inbox.py` (`shot_root`, `shot_bytes`, `look_shots`: `hosts.local_host().repos()` only), `src/agentorc/ui/app.py` (`repo_shot`), `src/sessionorc/` (a node read of one file at `origin/<default>`: none exists); design §4.5a **Inbox row: a look** (*through the host whose registry holds the repo*)
+
+**Why:** the row (#982) serves a screenshot only from a checkout in this host's registry. A look sent by a member running on a node (TD-299, `place:`) names a repo that the node's registry holds and the home's does not, so the row draws the file names and no images.
+
+**Fix:** a host-agent read of one `.png` under `docs/mockups/reviews/` at `origin/<default>` of a registered repo, refusing any other path; the route asks the host whose registry holds the sender's record's repo (`repos_of`), as the place check does. Tests: a node-placed sender's look draws its thumbnails.
+
+**Done when:** a look from a member on a node draws its screenshots on the home's Inbox.
+
+**Related:** TD-292 (the row), TD-299 (teams on nodes), TD-057 (the home and node split).

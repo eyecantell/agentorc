@@ -45,6 +45,21 @@
 {%- if s.rest %}
 <details class="fold" data-fold="{{ e.id }}"{% if fold_open %} open{% endif %}><summary>details</summary><div class="body md">{{ s.rest }}</div></details>
 {%- endif %}
+{{ shots(e) }}
+{%- endmacro %}
+
+{# §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): the envelope's screenshots under the
+   text, each a thumbnail with its file name, in the order sent, at most four; a press opens the
+   image in a new tab. A file origin does not hold, or a repo not this host's, draws its name alone. #}
+{% macro shots(e) -%}
+{%- if e.look_shots %}
+<div class="row gap wrap shots" aria-label="screenshots">
+  {%- for s in e.look_shots %}
+  {%- if s.url %}<a class="shot" href="{{ s.url }}" target="_blank" rel="noopener" title="open {{ s.name }} in a new tab"><img src="{{ s.url }}" alt="{{ s.name }}" loading="lazy"><span class="st">{{ s.name }}</span></a>
+  {%- else %}<span class="shot gone st" title="not on origin's default branch of the sender's repo">{{ s.name }}</span>{% endif %}
+  {%- endfor %}
+</div>
+{%- endif %}
 {%- endmacro %}
 
 {% macro reply_btn(e) -%}
@@ -75,8 +90,13 @@
 {%- if opts and e['from'] not in ('person', 'system') %}
 <div class="row gap wrap sugg" role="group" aria-label="suggested answers from {{ by }}">
   <span class="st sugglabel">suggested by {{ by }}</span>
+  {#- §4.5a **Inbox row: a look** on an `ask`: the pair drawn as a board row's live look draws it —
+      **Works** replies at once (the index, as any suggested answer), **Not right…** opens the Reply
+      composer with *Not right:* begun -#}
+  {%- set pair = look_pair(e) %}
   {%- for a in opts %}
-  <button class="btn sm answer" data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {%- set form = pair and loop.index0 == 1 %}
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
