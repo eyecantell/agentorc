@@ -2977,7 +2977,18 @@ class TickMixin:
         elif (m := self._screen_verdict(s, adapter, now)) is not None:
             # Hook-fed adapter, screen rule fired, no fresher hook state: the labelled fallback
             if m.state != s.state or (m.pending and m.pending != s.pending):
+                if not self._screen_held(s):  # what the verdict replaces, unless it is a verdict itself
+                    self._hook_state[s.id] = (s.state, s.pending, s.confidence)
                 s.set_state(m.state, confidence="scraped", pending=m.pending)
+        elif self._screen_gone(s, adapter, now):
+            # The screen that set this state is gone and no hook has spoken since (TD-306): back to
+            # what the last hook said, or `idle` when no hook has reported — not the scraped verdict
+            # until the tool's next hook, which on a quiet session may be the next turn
+            saved = self._hook_state.pop(s.id, None)
+            if saved is None or (saved[2] == "hook" and s.id not in self._last_hook):
+                s.set_state("idle", confidence="scraped")  # the launch's assumption is no hook's word
+            else:
+                s.set_state(saved[0], confidence=saved[2], pending=saved[1])
         elif s.state == "working" and s.last_output and now - _parse(s.last_output) > STALL_AFTER:
             # Hook-fed adapters: the liveness cross-check applies to `working` alone — a
             # `needs-you` or `idle` session is silent by design.
@@ -2995,6 +3006,18 @@ class TickMixin:
         if explain is None or self._hook_fresh(s.id, now):
             return None
         return explain(s.tail)
+
+    @staticmethod
+    def _screen_held(s: Session) -> bool:
+        """Whether a hook-fed record's state is a screen rule's verdict: scraped, and not one the
+        tick reads without a rule (`exited`, `closed`, `stalled?`)."""
+        return s.confidence == "scraped" and s.state not in ("exited", "closed", "stalled?")
+
+    def _screen_gone(self, s: Session, adapter: Any, now: datetime) -> bool:
+        """Whether a hook-fed record holds a screen rule's verdict that its screen no longer shows:
+        no hook is fresher and no rule matches the tail (`_screen_verdict` was None)."""
+        has_rules = getattr(adapter, "explain", None) is not None
+        return self._screen_held(s) and has_rules and not self._hook_fresh(s.id, now)
 
     def _apply_event(self, sid: str, event: dict[str, Any], queued: bool = False) -> None:
         """A hook-fed state transition (design §4.2 table). Adapters map hook names to these.
@@ -3047,6 +3070,7 @@ class TickMixin:
                     # capture TD-201 asks for, since the one that did it once is not yet named.
                     log.info("%s: %s turned a hook-confirmed idle session working", sid, event["event"])
                 s.set_state(state, confidence="hook", pending=pending)
+                self._hook_state.pop(sid, None)  # a hook's word: no screen's verdict to go back from
         self.store.save(s)
 
     def _permission_waiting(self, sid: str) -> bool:
@@ -3062,6 +3086,7 @@ class TickMixin:
             self._context_checked,
             self._pre_limited,
             self._last_hook,
+            self._hook_state,
             self._live_hook_at,
             self._killed_at,
             self._mail_hints,

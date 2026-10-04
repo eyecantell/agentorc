@@ -147,7 +147,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Open |
 | TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
-| TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Open |
+| TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Open |
 
 ---
@@ -2785,7 +2785,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (grinder-ao-2, the review of PR #1002)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #1013 (`_screen_held`, `_screen_gone` and `_hook_state` in the tick; design §4.2 *A rule's verdict lasts as long as its screen*). Nothing waits on a live look: the test in `tests/test_agent_paths.py` is the check.
 **Location:** `src/sessionorc/agent_tick.py` (`_observe`: a screen verdict is applied only on a match; the `stalled?` cross-check reads `working` alone)
 
 **Why:** a hook-fed session whose last hook is older than `STALL_AFTER` takes a screen rule's verdict at once (design §4.2), and nothing takes it back when the screen stops matching: the record keeps the scraped `needs-you` until the tool's next hook. For the first-run screens and the trust dialog that hook comes (`SessionStart` once onboarding ends), but a person who opens `/theme` or `/login` in a session idle for twenty minutes and dismisses it leaves the card reading *needs-you* until the next turn — the same for any screen rule's state on a quiet session.
