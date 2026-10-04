@@ -90,17 +90,14 @@
 {%- if opts and e['from'] not in ('person', 'system') %}
 <div class="row gap wrap sugg" role="group" aria-label="suggested answers from {{ by }}">
   <span class="st sugglabel">suggested by {{ by }}</span>
-  {%- if look_pair(e) %}
   {#- §4.5a **Inbox row: a look** on an `ask`: the pair drawn as a board row's live look draws it —
       **Works** replies at once (the index, as any suggested answer), **Not right…** opens the Reply
       composer with *Not right:* begun -#}
-  <button class="btn sm answer" data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="0" title="{{ opts[0] }}"><span class="alabel">Works</span></button>
-  <button class="btn sm answer" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"><span class="alabel">Not right…</span></button>
-  {%- else %}
+  {%- set pair = look_pair(e) %}
   {%- for a in opts %}
-  <button class="btn sm answer" data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {%- set form = pair and loop.index0 == 1 %}
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
-  {%- endif %}
 </div>
 {%- endif %}
 {%- endmacro %}

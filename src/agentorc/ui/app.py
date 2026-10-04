@@ -172,6 +172,10 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_SECTIONS,  # noqa: F401
     RAIL_UNDER,  # noqa: F401
     REPLY_MARK_RE,  # noqa: F401
+    SHOT_DIR,  # noqa: F401
+    SHOT_NAME,  # noqa: F401
+    SHOT_TTL,  # noqa: F401
+    SHOTS_MAX,  # noqa: F401
     SUBHEAD_RE,  # noqa: F401
     SYNC_LOCK,  # noqa: F401
     WORK_IDS,  # noqa: F401
@@ -190,6 +194,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
     _same_ref,  # noqa: F401
+    _shot_on_origin,  # noqa: F401
+    _shot_seen,  # noqa: F401
     _synced,  # noqa: F401
     _trail_rows,  # noqa: F401
     board_argv,  # noqa: F401
