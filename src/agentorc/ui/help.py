@@ -326,8 +326,9 @@ HELP: tuple[Help, ...] = (
             "Records the answer you press as your decision on this board item: it is written on the item's line "
             "as Decided, with today's date, in one commit in that repo's checkout. Press the one you mean when "
             "the item asks you to choose and its answers are offered. It does not close the item and wakes "
-            "nobody: the line stays on the board, due, as its session's work order, the commit is not pushed, and "
-            "an answer in your own words is a Reply."
+            "nobody: the line stays on the board as its session's work order and the row moves to Waiting on "
+            "them, coming back if no session acts on it in three days; the commit is not pushed, and an answer "
+            "in your own words is a Reply."
         ),
     ),
     Help(
@@ -338,7 +339,8 @@ HELP: tuple[Help, ...] = (
             "Records the answer marked default as your decision on this board item, in one press: the same write "
             "as pressing that answer. Press it when the session's own recommendation is what you want. Nothing "
             "takes the default for you — an item nobody decides stays undecided — and the item is not closed: it "
-            "stays on the board as its session's work order."
+            "stays on the board as its session's work order, and the row moves to Waiting on them, coming back "
+            "if no session acts on it in three days."
         ),
     ),
 )

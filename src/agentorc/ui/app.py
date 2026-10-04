@@ -1020,6 +1020,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 )
                 + promos,
                 boards=boards,
+                fleet=sessions,
                 handed=handed_rows(handed, {s.get("id"): s for s in sessions}, datetime.now(UTC)),
             )
             person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]
@@ -2550,7 +2551,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # with the host agent down nothing is claimed as waiting — the Org's top bar and the poll say
         # the same — so the board is left unread rather than counted on this page alone (review of #472)
         hz, board_note = (
-            ({"due": [], "ahead": [], "hidden": [], "line": None}, "") if agent_down else await board_view()
+            ({"due": [], "ahead": [], "hidden": [], "waiting": [], "line": None}, "")
+            if agent_down
+            else await board_view()
         )
         sections = inbox_sections(
             got["entries"],
@@ -2558,7 +2561,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
             handed=got.get("handed") or (),
-            boards=hz["due"],
+            # due rows, and the answered ones that wait on a session (TD-305), with the fleet for
+            # the *waiting on …* words
+            boards=hz["due"] + hz["waiting"],
+            fleet=fleet,
         )
         picks = rail_picks(request.query_params)
         return templates.TemplateResponse(
@@ -2677,7 +2683,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         is corrected by the next one, and a permission answered here leaves at once because the
         press refreshes."""
         try:
-            got, states = await person_view()
+            fleet = await call("list")  # person_view's one list, kept for the board's *waiting on* (TD-305)
+            got, states = await h.person_inbox(fleet), await h.person_states(fleet)
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -2706,7 +2713,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
             handed=got.get("handed") or (),
-            boards=hz["due"],
+            boards=hz["due"] + hz["waiting"],
+            fleet=fleet,
         )
         got["agent_down"] = False
         got["board_note"] = board_note
