@@ -131,6 +131,9 @@
       <button class="btn sm ghost" data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free.">Cancel</button>
     </div>{% endif %}
     <div class="inline-banner hidden" id="fexited"></div>
+    {#- §4.5 screen 2 *Focus watches* (TD-096, TD-296 #11): the read-only line sits over the terminal,
+        not in it — tmux's attach switches xterm to its alternate buffer, which hid a line written there -#}
+    <div class="note termro hidden" id="termro">watching: this session is unattended, so the terminal is read-only — Take over (above) to type.</div>
     <div id="term" class="termbox"></div>
     <div class="card composer{% if s.unattended %} hidden{% endif %}" id="composer">
       <textarea id="compose" placeholder="Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal."></textarea>

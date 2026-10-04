@@ -2816,6 +2816,7 @@
     // decides and drops the keys (§4.6); the page learns it from the attach's first frame and only
     // says so — `mode` is the record's as last seen, and a change to it re-attaches.
     let readOnly = false, mode = !!s.unattended, hinted = 0;
+    const roLine = document.getElementById("termro");
     // The pane is gone for good: end the terminal and stop reconnecting. The events push says so
     // before any reconnect could, and the server's 4404 says so too (TD-029).
     function endTerm(text) {
@@ -2826,6 +2827,7 @@
     function openTerm() {
       if (paneGone) return;
       readOnly = false;  // until this attach says otherwise, in its first frame
+      if (roLine) roLine.classList.add("hidden");
       const cols = Number.isFinite(term.cols) && term.cols > 0 ? term.cols : 120, rows = Number.isFinite(term.rows) && term.rows > 0 ? term.rows : 32;
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
       ws.binaryType = "arraybuffer";
@@ -2839,7 +2841,7 @@
           let c = null; try { c = JSON.parse(m.data); } catch (e) { c = null; }
           if (c && "read_only" in c) {
             readOnly = !!c.read_only;
-            if (readOnly) term.write("\x1b[90m[agentorc] watching: this session is unattended, so the terminal is read-only — Take over (above) to type.\x1b[0m\r\n");
+            if (roLine) roLine.classList.toggle("hidden", !readOnly);
             return;
           }
         }
@@ -2868,12 +2870,14 @@
     term.onData((d) => {
       if (!ws || ws.readyState !== 1) return;
       // A read-only attach drops every key, server-side (the wheel is a scroll message, below);
-      // the page only spares the round trip and says why nothing happened.
-      if (readOnly) {
-        if (Date.now() - hinted > 5000) { hinted = Date.now(); AO.toast("watching: the terminal is read-only — Take over to type"); }
-        return;
-      }
+      // the page only spares the round trip.
+      if (readOnly) return;
       ws.send(d);
+    });
+    // ...and says why nothing happened, on a key the person pressed: `onData` also carries xterm's
+    // own replies to the pane's queries, which fired the toast on load (TD-296 #11).
+    term.onKey(() => {
+      if (readOnly && Date.now() - hinted > 5000) { hinted = Date.now(); AO.toast("watching: the terminal is read-only — Take over to type"); }
     });
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
     // right-click paste; the header buttons do the same for discoverability. Clipboard access
