@@ -150,8 +150,9 @@
         {% else %}<span class="note">no switch — {{ ".agentorc.yml carries no promote: block, so this repo promotes by hand" if r.exists else "no .agentorc.yml, so no promote: block" }}</span>{% endif %}</label>
       <label class="setrow"><span class="setlabel">pull</span>
         <input type="checkbox" class="setpull"{% if r.pull %} checked{% endif %}>
-        <span class="note">{{ "on: the home fast-forwards this checkout when git allows and no session in it is mid-turn" if r.pull else "off: the checkout is left to you" }}</span>
-        {% if r.pull_reading %}<span class="note mono setpullread">{{ r.pull_reading }}</span>{% endif %}</label>
+        {#- the reading shares the note's column: a fourth child of the three-column row wrapped under the label (TD-296 #17) #}
+        <span class="setpullcol"><span class="note">{{ "on: the home fast-forwards this checkout when git allows and no session in it is mid-turn" if r.pull else "off: the checkout is left to you" }}</span>
+        {% if r.pull_reading %}<span class="note mono setpullread">{{ r.pull_reading }}</span>{% endif %}</span></label>
       {{ rows(r.rows) }}
       {% endif %}
       {{ filefoot(r.file, reads.repo[0], reads.repo[1]) }}

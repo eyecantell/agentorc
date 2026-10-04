@@ -199,9 +199,9 @@ def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
     the days left a per-day reserve counts and when the line next moves (§4.5a **usage**); the
     gate's projection after the number when it is projecting."""
     if row is None:
-        return f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})"
+        return f"{w.get('label')} {w['pct']:g}% (resets {w.get('resets') or '?'})"
     pr = _projected(row)
-    now = f"{w['pct']}%" + (f", projected {pr:g}%" if pr is not None else "")
+    now = f"{w['pct']:g}%" + (f", projected {pr:g}%" if pr is not None else "")
     return f"{w.get('label')} {now} / line {row['line']:g}% ({_reserve_why(row)}; resets {w.get('resets') or '?'})"
 
 
@@ -431,7 +431,7 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
     for w, r in ws:
         if id(w) in gone:
             parts.append(f"{w.get('label')} unknown since its reset at {usage_clock(_instant(w['resets']), now)} "
-                         f"(was {w['pct']}%)")  # fmt: skip
+                         f"(was {w['pct']:g}%)")  # fmt: skip
         else:
             parts.append(_usage_hover(w, r))
     head = [f"read at {read['clock']}, {read['age']} ago, {read['source']}"] if read else []
@@ -444,12 +444,12 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
     if unknown:
         # the number is no longer offered as the account's (§4.5a *The age*); it stays on the hover
         since = _instant(worst["resets"]) if id(worst) in gone else _instant(u.get("fetched"))
-        text = f"{prof} · {worst.get('label')} unknown since {usage_clock(since, now)} (was {worst['pct']}%)"
+        text = f"{prof} · {worst.get('label')} unknown since {usage_clock(since, now)} (was {worst['pct']:g}%)"
         return {"text": text, "title": title, "pct": 0, "cls": "unknown", "near": False}
     n = shown(worst, row)
     near = n >= 100 or (n >= row["line"] - 10 if row else n >= NEAR_CAP)
     cls = "cap" if n >= 100 else "near" if near else ""
-    text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *Claude · paul · week 24%* (TD-122)
+    text = f"{prof} · {worst.get('label')} {worst['pct']:g}%"  # *Claude · paul · week 24%* (TD-122)
     if row and projected is None:
         text += f" / {row['line']:g}%"  # *grind · week 61% / 70%* (§4.5a, TD-100)
     if read and read["secs"] > USAGE_AGED:

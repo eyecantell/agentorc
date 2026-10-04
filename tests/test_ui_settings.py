@@ -462,3 +462,14 @@ def test_the_chip_reading_fails_quietly():
 
     assert asyncio.run(chip_usage(down)) == {}
     assert asyncio.run(chip_usage(no_gate)) == {}
+
+
+@pytest.mark.unit
+def test_a_hidden_button_is_not_drawn_whatever_its_class_sets():
+    """TD-296 #2: Settings' **Cancel** carries `hidden` until a field changes, but `.btn` sets
+    `display: inline-flex`, which beats the UA's `[hidden] { display: none }`, so it showed always
+    and pushed Save to its own line on a narrow card. `.btn[hidden]` puts it back."""
+    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    assert ".btn[hidden] { display: none; }" in css
+    html = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/templates/settings.html").read_text()
+    assert 'class="btn sm ghost setcancel" type="button" hidden' in html
