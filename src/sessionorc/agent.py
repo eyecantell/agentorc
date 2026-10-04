@@ -426,10 +426,10 @@ class HostAgent(
         self._last_hook: dict[str, datetime] = {
             sid: datetime.now(UTC) for sid, s in self.sessions.items() if s.confidence == "hook"
         }
-        # sid → the hook's state and pending a screen rule's verdict replaced (TD-306): what the
-        # record goes back to when that screen is gone and no hook has spoken since. Not kept across
-        # a restart: a record whose screen is gone then goes back to `idle`.
-        self._hook_state: dict[str, tuple[str, Any]] = {}
+        # sid → the state, pending and confidence a screen rule's verdict replaced (TD-306): what
+        # the record goes back to when that screen is gone and no hook has spoken since; dropped
+        # when a hook sets the state. Not kept across a restart: the record then goes to `idle`.
+        self._hook_state: dict[str, tuple[str, Any, str]] = {}
         # When a hook event last reached a record **live**, in epoch seconds (TD-169): a queued
         # event stamped before it is older than the state it would set, so its state is skipped.
         self._live_hook_at: dict[str, float] = {}

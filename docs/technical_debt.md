@@ -2785,7 +2785,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (grinder-ao-2, the review of PR #1002)
 **Owner:** grinder
 **Kind:** build
-**Status:** Built — PR #1013 (`_screen_gone` and `_hook_state` in the tick; design §4.2 *A rule's verdict lasts as long as its screen*). Nothing waits on a live look: the test in `tests/test_agent_paths.py` is the check.
+**Status:** Built — PR #1013 (`_screen_held`, `_screen_gone` and `_hook_state` in the tick; design §4.2 *A rule's verdict lasts as long as its screen*). Nothing waits on a live look: the test in `tests/test_agent_paths.py` is the check.
 **Location:** `src/sessionorc/agent_tick.py` (`_observe`: a screen verdict is applied only on a match; the `stalled?` cross-check reads `working` alone)
 
 **Why:** a hook-fed session whose last hook is older than `STALL_AFTER` takes a screen rule's verdict at once (design §4.2), and nothing takes it back when the screen stops matching: the record keeps the scraped `needs-you` until the tool's next hook. For the first-run screens and the trust dialog that hook comes (`SessionStart` once onboarding ends), but a person who opens `/theme` or `/login` in a session idle for twenty minutes and dismisses it leaves the card reading *needs-you* until the next turn — the same for any screen rule's state on a quiet session.

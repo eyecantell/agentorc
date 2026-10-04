@@ -351,4 +351,16 @@ async def test_a_screen_rules_state_goes_back_when_its_screen_is_gone(agent, hoo
         assert await wait_for(lambda: reads("needs-you", "scraped"))
         agent.tmux.send_prompt(s["id"], "clear")
         assert await wait_for(lambda: reads("idle", "hook"))
+        # a later episode goes back to its own state, never an earlier one's (review of PR #1013):
+        # a hook's `working` drops what was kept, the quiet pane reads `stalled?`, and a verdict over
+        # that goes back to `stalled?` when its screen is gone — not to the hook's old `idle`
+        agent.tmux.send_prompt(s["id"], f"cat {fixture}")
+        assert await wait_for(lambda: reads("needs-you", "scraped"))
+        await c.call("hook", session=s["id"], state="working")
+        agent.tmux.send_prompt(s["id"], "clear")
+        assert await wait_for(lambda: reads("stalled?", "scraped"))
+        agent.tmux.send_prompt(s["id"], f"cat {fixture}")
+        assert await wait_for(lambda: reads("needs-you", "scraped"))
+        agent.tmux.send_prompt(s["id"], "clear")
+        assert await wait_for(lambda: reads("stalled?", "scraped"))
         await c.call("kill", id=s["id"])
