@@ -2973,3 +2973,21 @@ Both go away only when the record says who closed it.
 **Done when:** a session's reading names the window its status line reported, a test pins it, and the board's *Focus matches /context* line is closed as answered by this entry.
 
 **Related:** TD-190 (the context bound), TD-122 / TD-233 (the status line's usage reading, the same payload).
+
+## TD-298: A scratch `AGENTORC_HOME` still reads this machine's repo registry and default tmux server
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the anchor: a look agent's scratch host agent fast-forwarded `/home/kmaster/agentorc`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/hosts.py` (`repos_registry`'s default), `src/sessionorc/agent*.py` (`serve`, the bare `Tmux()`), `src/sessionorc/tmux.py`
+
+**Why:** on 2026-10-03 a look agent started `agentorc-agent serve` with `AGENTORC_HOME=~/.cache/aolkE`, a private `AGENTORC_TMUX_SOCKET` and an empty `CLAUDE_CONFIG_DIR`. Its registry still filled with the four real checkouts, since `repos_registry` defaults outside the home, and four seconds after it started (20:33:00 MDT) its pull policy fast-forwarded the real agentorc checkout `05634ce7 → 6cf8e701` — which the live agent was holding *until agentorc-18 is idle*; the scratch agent could not see that session with its empty Claude config. The move was an ff-only merge on a clean checkout and harmed nothing, but a scratch home must not act on real repos. `AGENTORC_TMUX_SOCKET` is also not read by `serve`: its `Tmux()` takes the default server, so only `TMUX_TMPDIR` kept tmux apart. Three other look agents isolated themselves by hand (their own `hosts.yml` with `repos_registry`, a `HostAgent(tmux=Tmux(socket_name=…))`), as TD-291's `scripts/look_home.py` (#970) does.
+
+**Resolved:** 2026-10-03 (PR #974) — `serve` drives the tmux server `AGENTORC_TMUX_SOCKET` names, and an unset `repos_registry` reads `repos.txt` under any home but `~/.agentorc` (`hosts.default_repos_registry`). Lasting content: design §4.4 (*Its own tmux server and its own repos*), §5 (`repos_registry`); `tests/test_hosts.py`.
+
+**Done when:** a host agent on a non-default home with no registry of its own lists no repo and touches no tmux server but its own.
+
+**Related:** TD-291 (`look_home.py`, which isolates by hand), TD-263 (the pull), TD-296.
