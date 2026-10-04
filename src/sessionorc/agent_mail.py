@@ -624,7 +624,9 @@ class MailMixin:
             self.person_inbox.append(note)
             self.person_store.save(self.person_inbox)
         if closes and replied is not None:
-            self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied")
+            # a pressed answer is kept on the question too, which is where the person's Inbox reads
+            # what was answered (§4.5a *Waiting on them*); a typed reply leaves it None (TD-296 #14)
+            self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied", answer=picked)
         if taken is not None:
             # the question goes to the person, so the session it was put to is no longer asked it:
             # its seat stops counting it, and a late answer from it closes nothing (§4.9b)

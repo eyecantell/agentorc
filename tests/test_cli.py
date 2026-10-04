@@ -1267,7 +1267,10 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
         assert said in capsys.readouterr().err, argv
     # a closed question keeps its answers on the record but is no longer offered them to press
     assert cli.main(["inbox"]) == 0
-    assert "  1. merge it" not in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "  1. merge it" not in out
+    # …and says which was pressed in that answer's words, never the question's (TD-296 #14)
+    assert 'answered 2: "hold it"' in out and 'answered 2: "merge PR 9?"' not in out
     # the sender reads which answer it was, so it branches on the number and not on the text
     monkeypatch.setenv("AGENTORC_SESSION", sid)
     assert cli.main(["inbox"]) == 0

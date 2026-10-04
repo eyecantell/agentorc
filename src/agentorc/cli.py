@@ -2261,7 +2261,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
         if e.get("shots"):  # a look (design §4.10 *A look*)
             print(f"screenshots: {', '.join(e['shots'])}")
         if e.get("answer") is not None:
-            print(f'answered {e["answer"] + 1}: "{e["text"]}"')
+            print(f'answered {e["answer"] + 1}: "{_picked_text(e)}"')
         if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
             print(got["advice"])
         if e.get("source"):
@@ -2313,6 +2313,17 @@ def _open_entry(e: dict[str, Any]) -> bool:
     if e.get("closed_reason"):
         return False
     return not (e.get("closed_by") or e.get("expired_at"))
+
+
+def _picked_text(e: dict[str, Any]) -> str:
+    """The words of the answer an entry's `answer` index names (design §4.10 *Suggested answers*): a
+    reply's own text, which the home checked is that answer word for word; on the question it
+    closed, the one of its `answers` the index picks (TD-296 #14)."""
+    answers = e.get("answers") or []
+    idx = e.get("answer")
+    if e.get("kind") != "reply" and isinstance(idx, int) and 0 <= idx < len(answers):
+        return str(answers[idx])
+    return str(e.get("text") or "")
 
 
 def _inbox_status(e: dict[str, Any]) -> str:
@@ -2466,7 +2477,7 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  screenshots: {', '.join(e['shots'])}")
             # a reply that picked one says which, so a sender branches on the number (design §4.10)
             if e.get("answer") is not None:
-                print(f'  answered {e["answer"] + 1}: "{e["text"]}"')
+                print(f'  answered {e["answer"] + 1}: "{_picked_text(e)}"')
 
     rc = emit(args, got, prose)
     if args.unread and not got["entries"] and got["id"] != "person":
