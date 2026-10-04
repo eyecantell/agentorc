@@ -146,11 +146,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Designed 2026-10-04; the build is TD-305 |
-| TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Designed 2026-10-04; the build is TD-306 |
+| TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Designed 2026-10-04; the build is TD-312 |
 | TD-305 | Build the answered board row: a decided or replied board item is drawn under *Waiting on them*, uncounted, and comes back after `BOARD_WAIT_DAYS` | High | Open |
 | TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
-| TD-306 | Build the detail block on an Inbox board row: the reader's `detail` in the row's *details* fold, open on a row with answers; nested lists in the renderer | Medium | Open |
+| TD-312 | Build the detail block on an Inbox board row: the reader's `detail` in the row's *details* fold, open on a row with answers; nested lists in the renderer | Medium | Open |
 
 ---
 
@@ -2769,8 +2769,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (Paul: *add a td for agentorc*, after dev-cadence TD-084 gave board items a plain-English detail block; the dev-cadence session that built it)
 **Owner:** designer
 **Kind:** design-first
-**Status:** **Designed 2026-10-04** (the designer, PR #1009): design §4.5a **Inbox board row: detail block**, §4.4 *Board write-back* (**add** writes a head line alone), §4.10 (the subset's lists nest); mockup `Inbox.dc.html`, shot as `docs/mockups/reviews/2026-10-04-td304-detail-block.png`. The block is drawn in the row's *details* fold, open on a row with answers to press and closed otherwise; nothing is lifted out of it; **Put on the board** asks for no block. The fold's default is steered to Paul as `m-d4d4dcb3c6a3` (bound 2026-10-04 12:39 MDT). The build is TD-306.
-**Blocked by:** TD-306
+**Status:** **Designed 2026-10-04** (the designer, PR #1009): design §4.5a **Inbox board row: detail block**, §4.4 *Board write-back* (**add** writes a head line alone), §4.10 (the subset's lists nest); mockup `Inbox.dc.html`, shot as `docs/mockups/reviews/2026-10-04-td304-detail-block.png`. The block is drawn in the row's *details* fold, open on a row with answers to press and closed otherwise; nothing is lifted out of it; **Put on the board** asks for no block. The fold's default is steered to Paul as `m-d4d4dcb3c6a3`, which lapsed at its bound (2026-10-04 12:39 MDT), so it stands. The build is TD-312.
+**Blocked by:** TD-312
 **Location:** design §4.5 screen 6 (the Inbox's board rows), §4.5a (answers / Go with it / Reply on a board row), §4.4 *Board write-back* (**add**, *Put on the board*); `src/agentorc/ui/inbox.py`, `src/agentorc/ui/app.py` (the board row), `src/sessionorc/board.py` (`add`, `item_line`); dev-cadence cadence.md §3.3 *An item explains itself*
 
 **Why:** since dev-cadence TD-084 (PR #210, 2026-10-04), a board item has a short head line carrying every field and, under it, indented sub-bullets in plain English: **Context:** (a few sentences, nested bullets where clearer), **Question:**, **Caveats:**, **Recommended:** / **Otherwise:**. A `decide` always has one. They are what the person makes the decision from. `nudge_user_attention.py --report --json` carries them as each item's `detail` (a list of lines, common indent removed), but the Inbox row draws `text` (with `line` and `due_tag`) and never `detail`. So the row shows the headline and the answer buttons, without the context, caveats or the reason for the default. The person presses an answer they cannot see the case for, or has to open the board file. Nothing breaks: the write-back edits only the head line, where every field still lives, and **add** inserts above the first item, so never inside a block. It is a missing view, not a fault. The Inbox reads `detail` only once a repo has taken the sync carrying TD-084, and before that the key is absent.
@@ -2837,7 +2837,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
 
 **Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.
-## TD-306: Build the detail block on an Inbox board row
+## TD-312: Build the detail block on an Inbox board row
 
 **Priority:** Medium
 **Type:** feature
