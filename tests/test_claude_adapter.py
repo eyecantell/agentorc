@@ -210,6 +210,27 @@ def test_an_unattended_layer_refuses_the_tools_peer_messages(tmp_path, monkeypat
     assert write_hooks_file(prof, unattended=True).name == "p+unattended.json"
 
 
+def test_the_hook_command_falls_back_to_the_one_beside_the_interpreter(tmp_path, monkeypatch):
+    """TD-301: a container node's host agent runs from its venv with that venv off PATH, so the layer
+    names the `agentorc-hook` beside `sys.executable` rather than a bare name no session resolves."""
+    from agentorc.adapters import claude_code as cc
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    venv = tmp_path / "venv" / "bin"
+    venv.mkdir(parents=True)
+    (venv / "python").write_text("")
+    hook = venv / "agentorc-hook"
+    hook.write_text("#!/bin/sh\n")
+    hook.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.setattr(cc.sys, "executable", str(venv / "python"))
+    assert cc.hook_command() == str(hook)
+    layer = json.loads(write_hooks_file(profiles.Profile(name="p")).read_text())
+    assert layer["hooks"]["SessionStart"][0]["hooks"][0]["command"] == str(hook)
+    hook.unlink()  # neither on PATH nor beside: the bare name, with the warning, as before
+    assert cc.hook_command() is None
+
+
 def test_launch_argv_and_env(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()

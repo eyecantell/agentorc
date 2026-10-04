@@ -3011,3 +3011,19 @@ Both go away only when the record says who closed it.
 **Done when:** a host agent on a non-default home with no registry of its own lists no repo and touches no tmux server but its own.
 
 **Related:** TD-291 (`look_home.py`, which isolates by hand), TD-263 (the pull), TD-296.
+
+## TD-301: A container node's sessions fire no hooks: `agentorc-hook` is not on the node agent's PATH
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-03 (the anchor, at cm-grind's first start on the contractmatch node, TD-299)
+**Owner:** anchor
+**Kind:** build
+**Status:** Built — this PR; live once promoted and the node rebuilt.
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`write_hooks_file`, `hook_command`)
+
+**Why:** every hook in the three cm-grind sessions on the node failed with `/bin/sh: 1: agentorc-hook: not found`. The node's host agent runs from `/agentorc/venv` with `/agentorc/venv/bin` off its PATH, so `shutil.which("agentorc-hook")` found nothing and the layer wrote the bare name. The agent's log said so (*agentorc-hook not on PATH … hooks for profile grind may never fire*). With no hooks, a node session's state is scraped only: no hook-confirmed idle, no status line, no context or usage reading.
+
+**Fix:** `hook_command()` takes `agentorc-hook` from PATH, else the one beside `sys.executable` (a venv's console scripts sit next to its python), and the bare name only when neither exists, with the warning as before.
+
+**Resolved:** 2026-10-03 — `hook_command()` with its fallback, tested in `test_the_hook_command_falls_back_to_the_one_beside_the_interpreter`; the node takes it at the next promote and `ao host rebuild contractmatch`.
