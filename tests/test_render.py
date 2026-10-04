@@ -41,6 +41,21 @@ def test_bullet_and_numbered_lists():
     assert got == "<p>verdict</p><ul><li>one</li><li>two<br>continued</li></ul><ol><li>a</li><li>b</li></ol>"
 
 
+def test_a_deeper_item_opens_a_list_inside_the_item_above_it():
+    """§4.5a *Inbox board row: detail block* (TD-312): lists nest by indent — a `-` or `1.` deeper
+    than the item above opens a list inside it, a shallower one closes back out, every character
+    still escaped, no tag beyond `ul`, `ol` and `li`."""
+    got = render("- **Context:** a <b>\n  - x\n  - y\n    1. deep\n      more\n- **Question:** q?")
+    assert got == (
+        "<ul><li><strong>Context:</strong> a &lt;b&gt;<ul><li>x</li><li>y<ol><li>deep<br>more</li></ol></li></ul></li>"
+        "<li><strong>Question:</strong> q?</li></ul>"
+    )
+    # the other kind at the same indent is a list of its own; a first item deeper than the next stands alone
+    assert render("- a\n1. b") == "<ul><li>a</li></ul><ol><li>b</li></ol>"
+    assert render("  - a\n- b") == "<ul><li>a</li></ul><ul><li>b</li></ul>"
+    assert render("- a\n\t- b") == "<ul><li>a<ul><li>b</li></ul></li></ul>"
+
+
 def test_the_allowed_link_opens_a_new_tab_and_names_its_host():
     got = render("see [docs](https://example.com/p?q=1&r=2)", ORIGIN)
     assert got == (

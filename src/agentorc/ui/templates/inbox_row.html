@@ -664,8 +664,16 @@
     `Context:` closes the fold, and the person's replies stand under the text, outside it. -#}
 {%- if e.lead is defined %}
 <div class="body md">{{ md(e.lead, origin) }}</div>
-{%- if e.rest %}
-<details class="fold" data-fold="{{ e.id }}"{% if fold_open %} open{% endif %}><summary>details</summary><div class="body md">{{ md(e.rest, origin) }}</div></details>
+{#- §4.5a **Inbox board row: detail block** (TD-312): the reader's `detail` drawn after the rest of
+    the line inside the same fold, through the same renderer — text, never a control or a field. A
+    row with a block has the fold however short its line; the fold is drawn open on a row with
+    answers to press (undecided with `Answers:`, a live look's pair) and closed on every other, and
+    the page keeps the person's press either way (`foldsOpen`, `foldsShut`). -#}
+{%- if e.rest or e.detail %}
+{%- set press = (e.answers and not e.decided) or e.pair %}
+<details class="fold" data-fold="{{ e.id }}"{% if fold_open or (e.detail and press) %} open{% endif %}><summary>details</summary>
+{%- if e.rest %}<div class="body md">{{ md(e.rest, origin) }}</div>{% endif %}
+{%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}</details>
 {%- endif %}
 {%- for r in e.replies %}
 <div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>

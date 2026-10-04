@@ -660,6 +660,17 @@
     if (!d || !d.matches || !d.matches("details.fold") || !d.dataset.fold) return;
     if (d.open) foldsOpen.add(d.dataset.fold); else foldsOpen.delete(d.dataset.fold);
   }, true);
+  // …and the folds the person **closed** by a press on the summary (§4.5a *Inbox board row: detail
+  // block*, TD-312): a board row with answers is drawn with its fold open, so a poll would open again
+  // what the person shut. A press, not `toggle`, because a fold drawn open fires `toggle` too; the
+  // capture runs before the summary's own toggling, so `d.open` is the state being left.
+  const foldsShut = new Set();
+  document.addEventListener?.("click", (ev) => {
+    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary");
+    const d = s && s.parentElement;
+    if (!d || !d.dataset.fold) return;
+    if (d.open) foldsShut.add(d.dataset.fold); else foldsShut.delete(d.dataset.fold);
+  }, true);
   // the board line's **show** (§4.5 screen 6 *The board's horizon*, TD-220): opens the *not shown*
   // fold beside it for this page view — the fold's own memory above — and writes no setting
   document.addEventListener?.("click", (ev) => {
@@ -667,10 +678,13 @@
     if (!a) return;
     ev.preventDefault();
     const box = a.closest("#boardhorizon, .inboxpage"), d = box && box.querySelector("details.boardfold");
-    if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
+    if (d) { if (d.dataset.fold) foldsShut.delete(d.dataset.fold); d.open = true; d.scrollIntoView({ block: "nearest" }); }
   });
   AO.reopenFolds = function (root) {
-    (root ? $$("details.fold", root) : []).forEach((d) => { if (foldsOpen.has(d.dataset.fold)) d.open = true; });
+    (root ? $$("details.fold", root) : []).forEach((d) => {
+      if (foldsShut.has(d.dataset.fold)) d.open = false;
+      else if (foldsOpen.has(d.dataset.fold)) d.open = true;
+    });
   };
   // The Focus panel's entry, folded as the Inbox row is: both halves were rendered by the server's
   // closed-subset renderer (`api_inbox`, `shaped`) — escaped text and its own few tags — so nothing

@@ -1125,6 +1125,17 @@ def board_waiting_on(r: Mapping[str, Any], records: Collection[Mapping[str, Any]
     return f"waiting on the next session to read {r.get('repo') or 'its repo'}'s board"
 
 
+def board_detail(it: Mapping[str, Any]) -> str:
+    """An item's **detail block** (§4.5a *Inbox board row: detail block*, TD-312): the reader's
+    `detail` lines joined as one text, drawn through the closed subset under the row's *details* —
+    only when the key is a non-empty list of strings; anything else draws the row as it was. Data,
+    never a field: nothing in it is read here."""
+    got = it.get("detail")
+    if not isinstance(got, list) or not got or not all(isinstance(x, str) for x in got):
+        return ""
+    return "\n".join(got).strip("\n")
+
+
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per open item of the report — its repo, its due words, the whole text, and the board at that
@@ -1146,6 +1157,7 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
             if not isinstance(it, dict) or not it.get("text"):
                 continue
             line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
+            detail = board_detail(it)
             url = vscode_url(board) if board else ""
             if url and isinstance(line, int):
                 head, _, query = url.partition("?")
@@ -1167,6 +1179,7 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     # §4.5a *Inbox board row: text* (TD-279): the body folded after its head, the
                     # `Context:` under *details*, the replies from the reader's field
                     **board_text(board_body(text, it), it),
+                    "detail": detail,  # §4.5a *Inbox board row: detail block* (TD-312)
                     "answers": [str(a) for a in it.get("answers") or () if str(a).strip()],
                     "default": str(it.get("default") or ""),
                     "decided": _decided(it),
@@ -1194,7 +1207,7 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     # sentence for what its fetch found, kept for the note above the repo's rows
                     "source": str(b.get("source") or ""),
                     "fetch_note": str(b.get("fetch_note") or ""),
-                    "find": _find_text(label, text, tag, "board"),
+                    "find": _find_text(label, text, tag, "board", detail),
                 }
             )
     return rows

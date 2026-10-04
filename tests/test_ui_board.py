@@ -1664,3 +1664,45 @@ def test_the_waiting_row_offers_reply_done_and_open_board_and_no_answers_or_snoo
     assert s["count"] == 1 and not s["waiting"]
     html = templates.get_template("inbox_rows.html").render(rows=s["needs"], section="needs")
     assert "decided Sep 21 — no session has acted in 3 d" in html and "Snooze" in html
+
+
+# ── §4.5a **Inbox board row: detail block** (TD-304, built by TD-312) ──────────────────────────────
+
+BLOCK = [
+    "- **Context:** The backup <script>x</script> stopped.",
+    "  - nightly costs 2 GB",
+    "  - weekly costs less",
+    "- **Question:** Back it up? Answers: Never | Always.",
+    "- **Recommended:** Nightly. Decided: Never (2026-09-01).",
+]
+
+
+@pytest.mark.unit
+def test_a_board_rows_detail_block_is_drawn_in_its_fold_nested_and_as_text(tmp_path, monkeypatch):
+    """A `decide` item with a block draws it under *details*, nested bullets as nested lists, the
+    fold open because it has answers to press; `<script>`, `Answers:` and `Decided:` inside it are
+    text and change no field; the find box matches its words."""
+    rows, html = rows_html(tmp_path, monkeypatch, {**decide_item(), "detail": BLOCK})
+    r = rows[0]
+    assert r["detail"] == "\n".join(BLOCK)
+    assert r["answers"] == ["approve", "hold", "ask <b>Ann</b>"] and r["decided"] is None
+    assert "nightly costs 2 gb" in r["find"]
+    assert '<details class="fold"' in html and " open><summary>details</summary>" in html
+    assert "<ul><li><strong>Context:</strong> The backup &lt;script&gt;x&lt;/script&gt; stopped.<ul><li>nightly" in html
+    assert "<script>x" not in html and "Back it up? Answers: Never | Always." in html
+    assert html.count('data-board-act="decide"') == 4  # the three answers and Go with it: none from the block
+
+
+@pytest.mark.unit
+def test_a_block_with_nothing_to_press_is_folded_shut_and_no_block_draws_as_before(tmp_path, monkeypatch):
+    plain = item(9, "**Short.**", "2026-09-20", "2d overdue")
+    rows, html = rows_html(tmp_path, monkeypatch, {**plain, "detail": BLOCK})
+    assert '<details class="fold"' in html and "<summary>details</summary>" in html  # the fold, for a short line
+    assert " open><summary>" not in html
+    # decided: nothing to press, so shut
+    _, html = rows_html(tmp_path, monkeypatch, {**decide_item(decided="approve"), "detail": BLOCK})
+    assert " open><summary>" not in html and "detailblock" in html
+    # no key, an empty list, or not a list of strings: the row as it was
+    for d in ({}, {"detail": []}, {"detail": "- **Context:** x"}, {"detail": [1, 2]}):
+        rows, html = rows_html(tmp_path, monkeypatch, {**plain, **d})
+        assert rows[0]["detail"] == "" and '<details class="fold"' not in html
