@@ -36,6 +36,7 @@ CASES = {
     "see [the PR](https://github.com/x/y/pull/9) and *this* one": "see the PR and this one",
     "2 * 3 * 4 and a_b_c stay": "2 * 3 * 4 and a_b_c stay",
     "![an image](x.png) stays": "![an image](x.png) stays",
+    "[a](https://u)[b](https://u) side by side": "ab side by side",
     "": "",
 }
 

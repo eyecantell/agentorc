@@ -259,7 +259,7 @@
   // reads as the row draws it and not as `**` and backticks; every other character stays
   AO.quoteText = (t) => String(t || "")
     .replace(/(`+)(.+?)\1/g, "$2")
-    .replace(/(^|[^!])\[([^[\]\n]+)\]\(([^()\s]+)\)/g, "$1$2")
+    .replace(/(?<!!)\[([^[\]\n]+)\]\(([^()\s]+)\)/g, "$1")
     .replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, "$1")
     .replace(/(^|[^*\w])\*(?=[^\s*])(.*?[^\s*])\*(?![*\w])/g, "$1$2");
   AO.compose = function (o) {
