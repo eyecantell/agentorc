@@ -2759,7 +2759,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
 
-
 ## TD-308: A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written
 
 **Priority:** Low

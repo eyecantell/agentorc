@@ -3234,6 +3234,7 @@ Both go away only when the record says who closed it.
 **Done when:** an answered board row leaves Needs you and the top-bar count at the press, and reads under its new section as waiting on its session.
 
 **Related:** TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-079 (*Waiting on them*), TD-290 (looks as mail), TD-297 (who closes a decided look).
+
 ## TD-306: A scraped `needs-you` stays after its screen is gone, until the next hook
 
 **Priority:** Low
