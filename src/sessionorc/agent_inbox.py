@@ -17,7 +17,6 @@ from sessionorc import (
 )
 from sessionorc import board as board_mod
 from sessionorc.agent_common import (
-    BOARD_REPLY_NOTE,
     ENTRY_TYPES,
     LEASE_TTL,
     RpcError,
@@ -30,8 +29,29 @@ from sessionorc.models import (
     ATTENTION_KINDS,
     PERSON,
     MailEntry,
+    normalize_ref,
     now_iso,
 )
+
+# A board reply's note quotes the item's head, clipped where the SessionStart line clips an item (§4.4).
+BOARD_HEAD_CHARS = 200
+
+
+def board_refs(refs: list[str] | None) -> list[str]:
+    """The board reader's `refs` as a lease names them (§4.8): `TD-122` canonical, and the reader's
+    `PR #1020` the `#1020` a claim on a PR number is. In order, each once; an unreadable one dropped."""
+    out: list[str] = []
+    for raw in refs or ():
+        r = " ".join(str(raw).split())
+        if r.upper().startswith("PR ") or r.upper().startswith("PR#"):
+            r = r[2:].strip()
+        try:
+            r = normalize_ref(r)
+        except ValueError:
+            continue
+        if r not in out:
+            out.append(r)
+    return out
 
 
 class InboxMixin:
@@ -383,9 +403,13 @@ class InboxMixin:
         ` — <name>, <date>: <reply>` and committed as `agentorc: reply on <head> (session <name>)`,
         refused as `board_edit` refuses. The line stays open and counted: a reply is not Done.
 
-        The file half only. The mail half — a `handed` note to each live session holding a lease
-        on one of the line's `refs` — waits on dev-cadence's reader carrying `session`, `host` and
-        `refs` per item (TD-142 slice 2); until then `sent` is empty and `note` says why."""
+        Then the mail half (TD-142 slice 2): each live record holding an unexpired declared lease
+        on one of the line's `refs` (the reader's, handed in by the page) gets one `note` from the
+        person, `about` that reference and marked `handed`, so it owes an outcome (§4.10 *A board
+        reply owes an outcome too*). Nobody holding one is mailed nothing. The file half is
+        written first; a refused send is said in `note` and `mail_refused`, never raised, since
+        the line is committed and a second press would write it twice. `sent` is `[{session, id,
+        ref}]`, `session` the holder's name."""
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot reply on the board: a board reply is the person's own (design §4.4)")
         root, want = self._board_root(board)
@@ -396,14 +420,58 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
+        sent, refused = await self._board_reply_hand(root, text, reply, refs)
+        note = "written on the board"
+        if sent:
+            note += " · sent to " + ", ".join(f"{x['session']} (holds {x['ref']})" for x in sent)
+        if refused:
+            note += " · not sent to " + "; ".join(refused)
+        if sent:
+            await self._push_changes()
         return {
             "board": str(want),
             "line": int(line),
             "action": "reply",
             **done,
-            "sent": [],
-            "note": BOARD_REPLY_NOTE,
+            "sent": sent,
+            "note": note,
+            **({"mail_refused": refused} if refused else {}),
         }
+
+    async def _board_reply_hand(
+        self, root: Path, text: str, reply: str, refs: list[str] | None
+    ) -> tuple[list[dict[str, str]], list[str]]:
+        """A board reply's mail half (§4.5a *Inbox board row → Reply*): one `handed` note to each
+        live lease holder on the line's `refs`, a holder of two refs mailed once, about the first.
+        Returns what was sent and each refusal as `<name> (holds <ref>): <why>`."""
+        h = board_mod.HEAD_RE.search(text)
+        head = " ".join((h.group("head") if h else text).split())
+        if len(head) > BOARD_HEAD_CHARS:
+            head = head[: BOARD_HEAD_CHARS - 1].rstrip() + "…"
+        by = await asyncio.to_thread(board_mod.author, root)
+        words = " ".join(str(reply or "").split())
+        body = f"board: {head}\n\n{by}: {words}"
+        if len(body.encode()) > mail.TEXT_CAP:
+            body = body.encode()[: mail.TEXT_CAP - 3].decode(errors="ignore") + "…"
+        sent: list[dict[str, str]] = []
+        refused: list[str] = []
+        seen: set[str] = set()
+        for ref in board_refs(refs):
+            for addr in self._lease_holders(ref):
+                if addr in seen:
+                    continue
+                seen.add(addr)
+                r = self._graph().get(addr)
+                name = (r.name if r is not None else "") or addr
+                try:
+                    got = await self._msg(PERSON, body, [addr], "note", ref, None, None, None)
+                except RpcError as e:
+                    refused.append(f"{name} (holds {ref}): {e}")
+                    continue
+                if mid := (got.get("entry") or {}).get("id"):
+                    self._mark(mid, handed=True)  # work the person handed on: it owes an outcome (§4.10)
+                sent.append({"session": name, "id": addr, "ref": ref})
+        return sent, refused
 
     async def _board_add(
         self, root: Path, board: Path, text: str, due: str | None, entry: str | None, caller: Any

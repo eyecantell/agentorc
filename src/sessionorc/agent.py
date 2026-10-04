@@ -51,7 +51,6 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     ACT_TIMEOUT,  # noqa: F401
     BACKUP_KEEP,  # noqa: F401
     BACKUP_MEMBERS,  # noqa: F401
-    BOARD_REPLY_NOTE,  # noqa: F401
     BRIEF_CLAUSE,  # noqa: F401
     BRIEF_SETTLE,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401

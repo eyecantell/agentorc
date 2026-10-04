@@ -303,9 +303,10 @@ def test_a_reply_is_refused_touching_nothing_where_an_edit_is(repo):
     )
 
 
-async def test_board_reply_is_the_persons_and_says_nothing_was_sent_yet(agent, repo, tmp_path):
-    """The RPC (§4.4): person-only, a known board only, the file half written and `sent` empty with
-    the note saying why — and `board_edit` will not take a reply, which is `board_reply`'s."""
+async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agent, repo, tmp_path):
+    """The RPC (§4.4): person-only, a known board only, the file half written and, with nobody
+    holding a lease on the line's refs, `sent` empty — and `board_edit` will not take a reply,
+    which is `board_reply`'s."""
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     (home / "repos.txt").write_text(f"{repo}\n")
@@ -324,9 +325,50 @@ async def test_board_reply_is_the_persons_and_says_nothing_was_sent_yet(agent, r
         with pytest.raises(AgentError, match="names the item's line"):
             await me.call("board_reply", board=path, text=ITEM, reply="x")
         got = await me.call("board_reply", board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
-    assert got["action"] == "reply" and got["sent"] == [] and "no session standing is known" in got["note"]
+    assert got["action"] == "reply" and got["sent"] == [] and got["note"] == "written on the board"
     assert git(repo, "log", "-1", "--format=%s") == got["message"] and got["message"].startswith("agentorc: reply on")
     assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")
+
+
+def test_board_refs_are_named_as_a_lease_names_them():
+    """The reader's `refs` (§4.4) against a claim's reference (§4.8): canonical ids, `PR #N` as `#N`."""
+    from sessionorc.agent_inbox import board_refs
+
+    assert board_refs(["td-122", "PR #1020", "TD-122", " ", "pr#7"]) == ["TD-122", "#1020", "#7"]
+    assert board_refs(None) == []
+
+
+async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, tmp_path):
+    """TD-142 slice 2 (§4.5a *Inbox board row → Reply*, §4.10 *A board reply owes an outcome too*):
+    after the commit, each live record with a declared lease on one of the line's refs gets one
+    `note` from the person, `about` the ref, marked `handed` — a holder of two refs once, a
+    session holding none nothing — and the result says where it went."""
+    _registry(tmp_path, repo)
+    path = str(repo / board.BOARD)
+    async with LocalClient() as me:
+        mk = lambda n: me.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])  # noqa: E731
+        h, both, idle = [(await mk(n))["id"] for n in ("holder", "both", "idle")]
+        for sid, refs in ((h, ["td-122"]), (both, ["#1020", "TD-123"])):
+            async with LocalClient(caller=sid) as s:
+                for ref in refs:
+                    await s.call("progress", id=sid, ref=ref)
+        got = await me.call(
+            "board_reply", board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122", "PR #1020", "td-123"]
+        )
+        assert sorted((x["session"], x["ref"]) for x in got["sent"]) == [("both", "#1020"), ("holder", "TD-122")]
+        assert got["note"].startswith("written on the board · sent to ") and "holder (holds TD-122)" in got["note"]
+        assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")  # the file half first
+        for sid in (h, both):
+            notes = [e for e in (await me.call("inbox", id=sid))["entries"] if e["from"] == "person"]
+            assert len(notes) == 1 and notes[0]["kind"] == "note" and notes[0]["handed"]
+            assert (
+                notes[0]["about"] == ("TD-122" if sid == h else "#1020") and notes[0]["outcome"] is None
+            )  # owes an outcome (§4.10)
+            assert notes[0]["text"].startswith("board: Merged, live check pending: the doorbell.\n\n")
+            assert notes[0]["text"].endswith(": rebase it")
+        assert not [e for e in (await me.call("inbox", id=idle))["entries"] if e["from"] == "person"]
+        for sid in (h, both, idle):
+            await me.call("kill", id=sid)
 
 
 async def _orphan(me, repo, tmp_path, text, about, **kw):
