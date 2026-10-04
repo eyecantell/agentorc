@@ -1229,6 +1229,9 @@ def test_only_a_watch_with_exactly_the_pair_is_a_live_look(tmp_path, monkeypatch
         rows, html = rows_html(tmp_path, monkeypatch, it)
         assert not rows[0]["pair"] and "board_notright" not in html and "&ldquo;" in html
     assert live_look(look_item()) and live_look(look_item(answers=("Works", "Not right:")))
+    assert live_look(look_item(kind="look"))  # the kind cadence names for it (TD-292), as a `watch` before it
+    rows, html = rows_html(tmp_path, monkeypatch, look_item(kind="look"))
+    assert rows[0]["pair"] and "board_notright" in html
     assert board_head("no bold here, just a long line " * 4).endswith("…") and len(board_head("x " * 90)) == 60
 
 
