@@ -179,17 +179,28 @@
       </div>
       <div style="display: flex; flex-direction: column; gap: 6px;">
         <span class="btn" style="align-self: flex-start;">Open a session</span>
-        <span class="note">Starts <b>an interactive techlead session, entry-3, in a new worktree</b>, and opens its Focus with these words in the composer, not sent. You talk the entry through.</span>
+        <span class="note">Starts <b>an interactive techlead session, entry-3, in a new worktree</b>, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under <i>Told at start</i>.</span>
         <span class="note">With Type <i>feature</i>: an interactive designer session (the team's <span class="mono">entries:</span>).</span>
       </div>
     </div>
   </div>
-  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600;">After Open a session: Focus on entry-3, the composer</span><span style="flex-grow: 1;"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
-    <span class="input" style="height: 150px; align-items: flex-start; padding: 8px 10px; flex-direction: column; gap: 6px;"><span class="muted">Draft a ledger entry with me for agentorc (type: debt), in docs/technical_debt.md. Read the ledger's template and its newest entries, find the next free number over main and the open PRs, ask me what you cannot find, and land the entry by PR with its Summary row.</span><span>The Inbox lists a board item only once it is due. I looked for two items I knew were on the board and could not find them. There should be a setting for it, and the page should say which it is showing.</span></span>
-    <div style="display: flex; gap: 8px; align-items: center;"><span class="note">filled and focused, not sent — edit it, then Send</span><span style="flex-grow: 1;"></span><span class="btn primary">Send</span></div>
+  <div style="width: 1100px; display: flex; gap: 14px; align-items: flex-start;">
+    <div class="card" style="flex-grow: 1; min-width: 0; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600;">After Open a session: Focus on entry-3, the composer</span><span style="flex-grow: 1;"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
+      <span class="input" style="height: 96px; align-items: flex-start; padding: 8px 10px;"><span>The Inbox lists a board item only once it is due. I looked for two items I knew were on the board and could not find them. There should be a setting for it, and the page should say which it is showing.</span></span>
+      <div style="display: flex; gap: 8px; align-items: center;"><span class="note">your words only: filled and focused, not sent — edit them, then Send</span><span style="flex-grow: 1;"></span><span class="btn primary">Send</span></div>
+    </div>
+    <div style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">
+      <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Told at start</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">7 lines</span></div></div>
+      <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Told at start</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">7 lines</span></div><div style="font-size: 12px; line-height: 1.5; margin-top: 8px; color: #4b5563; display: flex; flex-direction: column; gap: 6px;" title="the session's start context (design §4.3, TD-283): display only">
+        <div>The person asked for a new entry in the ledger of agentorc: docs/technical_debt.md, with Type debt. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
+        <div><b>Read before you write</b>: the ledger's preamble and template, and its three newest entries …</div>
+        <div><b>The number</b> is the first free one over the ledger, its archive and every open PR …</div>
+        <div class="muted">… four more lines</div></div></div>
+      <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">claude-code · max · fable</span></div></div>
+    </div>
   </div>
-  <div class="note" style="width: 760px;">Design notes, not page text. One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session.</div>
+  <div class="note" style="width: 760px;">Design notes, not page text. <b>Told at start</b> is drawn twice here, closed as it arrives and open as it reads; the page has one, above Session (TD-283 part 2, designed 2026-10-03: the entry brief left the composer). One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session.</div>
 </div>
 </div>
 </x-dc>
