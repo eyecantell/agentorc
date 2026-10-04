@@ -902,6 +902,31 @@ async def test_a_forwarded_wait_blocks_at_the_home_as_the_nodes_session_and_its_
     assert resp["result"]["id"] == "ao-x-w@laptop"
 
 
+async def test_a_node_session_says_its_own_word_at_the_home_and_nobody_else_says_it(agent):
+    """§9 invariant 14 across the link (TD-302): a node's session calls the home as `id@node` while
+    its record's id is bare, so `doing` and `progress none` are its own; another session, the same id
+    at another host, and the person are still refused."""
+    agent._take_records("laptop", [record(kind="interactive", unattended=True)], whole=True)
+
+    async def fwd(rpc, caller, host="laptop", **params):
+        return await agent._forwarded(host, {"rpc": rpc, "params": {"id": "ao-x-w", **params}, "caller": caller})
+
+    resp = await fwd("doing", "ao-x-w", text="TD-302: reading the check")
+    assert "error" not in resp, resp
+    assert agent.remote["laptop"]["ao-x-w"].doing["text"] == "TD-302: reading the check"
+    for caller, host in (("ao-x-other", "laptop"), ("ao-x-w", "cm"), (None, "laptop")):
+        params = {"id": "ao-x-w@laptop"} if host != "laptop" else {}
+        resp = await agent._forwarded(
+            host, {"rpc": "doing", "params": {"id": "ao-x-w", "text": "not mine", **params}, "caller": caller}
+        )
+        assert "only ao-x-w may say what it is doing" in resp["error"], (caller, host, resp)
+    resp = await fwd("progress", "ao-x-other", status="none", why="nothing left")
+    assert "only ao-x-w may declare itself out of work" in resp["error"]
+    resp = await fwd("progress", "ao-x-w", status="none", why="nothing left")
+    assert "error" not in resp, resp
+    assert agent.remote["laptop"]["ao-x-w"].out_of_work["why"] == "nothing left"
+
+
 async def test_a_node_cancels_its_forwarded_call_at_the_home_by_token(agent):
     class Held(FakeMux):
         async def request(self, method, timeout=None, **params):
