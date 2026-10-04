@@ -452,13 +452,25 @@ def _ended_by(s: Session, slot: str, was: str) -> str:
     TD-088): the record now reads `exited` or `closed`, so the home can tell, and *resolved* — the
     word for when it cannot — would tell a person whose question a worker died holding that it had
     sorted itself out. An alarm row does not end with the session, and an `unpushed` row is itself
-    a row of an exited record, so the exit is not what ended it; a close is."""
+    a row of an exited record, so the exit is not what ended it; a close is.
+
+    The record still standing tells the rest (TD-308): an `unpushed` row whose record is still
+    `exited` ended because its work was pushed (or committed and pushed — a forget leaves no record
+    to read); a pending that cleared with no `decide` was answered in the terminal, since an act's
+    own word (*allowed by you*, *resumed*) is read before this one; a `limited` row ended when the
+    limit reset. A `stalled?` row that cleared stays *resolved*: nothing says why output resumed."""
     if slot != "state":
         return ""
     if s.state == "closed":
         return "the session was closed"
     if s.state == "exited" and was != "unpushed":
         return "the session exited"
+    if was == "unpushed":
+        return "pushed"
+    if was in ("permission", "question", "needs"):
+        return "answered in the terminal"
+    if was == "limited":
+        return "the limit reset"
     return ""
 
 

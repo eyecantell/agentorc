@@ -75,7 +75,8 @@ async def test_a_row_that_resolves_itself_leaves_a_trail(agent, hookstub, tmp_pa
         await agent.tick()
         got = (await person.call("inbox"))["trail"]
         assert [e["kind"] for e in got] == ["question"]
-        assert got[0]["sid"] == sid and got[0]["how"] == "resolved" and got[0]["text"] == "which one?"
+        # the pending cleared with no `decide`: answered in the terminal (§4.10, TD-308)
+        assert got[0]["sid"] == sid and got[0]["how"] == "answered in the terminal" and got[0]["text"] == "which one?"
         assert got[0]["id"].startswith("t-") and got[0]["count"] == 1
         # it is kept, not counted twice: the same ending again coalesces
         for _ in range(2):
@@ -330,7 +331,7 @@ async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_p
         await agent.tick()
         assert [(e["kind"], e["how"], e["text"]) for e in (await person.call("inbox"))["trail"]][0] == (
             "question",
-            "resolved",
+            "answered in the terminal",
             "and now?",
         )
         await person.call("kill", id=sid)
@@ -356,6 +357,11 @@ async def test_a_row_its_session_ended_says_so(agent, hookstub, tmp_path):
     agent.trail.clear()
     # an alarm does not end with its session, and an `unpushed` row is a row *of* an exited record
     assert _ended_by(_rec(state="exited"), "alarm", "alarm") == ""
-    assert _ended_by(_rec(state="exited"), "state", "unpushed") == ""
     assert _ended_by(_rec(state="closed"), "state", "unpushed") == "the session was closed"
-    assert _ended_by(_rec(state="idle"), "state", "question") == ""
+    # the record still standing tells the rest (§4.10, TD-308); a cleared stall cannot say why
+    assert _ended_by(_rec(state="exited"), "state", "unpushed") == "pushed"
+    assert _ended_by(_rec(state="idle"), "state", "question") == "answered in the terminal"
+    assert _ended_by(_rec(state="working"), "state", "permission") == "answered in the terminal"
+    assert _ended_by(_rec(state="idle"), "state", "needs") == "answered in the terminal"
+    assert _ended_by(_rec(state="idle"), "state", "limited") == "the limit reset"
+    assert _ended_by(_rec(state="working"), "state", "stalled") == ""
