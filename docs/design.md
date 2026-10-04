@@ -5162,8 +5162,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
   person presses (a seat is asked by mail, which is the person's way in already).
 - **A UI change is verified by its builder; the techlead reads what the builder cannot settle;
   what is left for the person is a `look` (TD-290; designed 2026-10-03 on Paul's three points of
-  that day; the builder's half built — TD-291: the scratch home #970, the briefs #972, the
-  techlead's read #973 — and the Inbox's, TD-292, not built).** **One rule: a look a
+  that day; TD-291, the builder's half, built but for its first use — the scratch home #970,
+  the briefs #972, the techlead's read #973 — and TD-292, the Inbox's, not built).** **One rule: a look a
   machine can settle never waits on the person.** Before it, every merged change to a page ended
   in a board line asking the person to look, most of it mechanical — a label reads so, a button
   is greyed, a toast says its words — and nobody had checked it first.
