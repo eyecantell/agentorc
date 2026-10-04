@@ -154,13 +154,14 @@ ANSWER_SPLIT_RE = re.compile(r"\s*(?<!\\)\|\s*")
 DUE_ATTEMPT_RE = re.compile(r"\bDue:?\s*(?P<raw>\d{1,4}[-/.]\d{1,2}(?:[-/.]\d{1,4})?)\b", re.IGNORECASE)
 MAX_ITEM_CHARS = 200
 # TD-039: an item's KIND — one optional word before its date, `- [ ] decide 2026-09-27 (…)`.
-# decide/act (and an unmarked item) are the person's to-do; `watch` carries a check-by
-# date in its Due: (§6) and is reported apart; `fyi` never has a Due: (one is ignored and
+# decide/act/look (and an unmarked item) are the person's to-do — `look` is a live look the
+# person is asked to make (TD-082); `watch` is a session's own §6 re-check, its check-by
+# date in its Due:, and is reported apart; `fyi` never has a Due: (one is ignored and
 # flagged) and never reaches the SessionStart line. Only a word followed by a date is a
 # kind, so prose that happens to start with "act" is not. Parity (cadence.md §7): the
 # board's Format: line and cadence.md §3 write it.
-KINDS = ("decide", "act", "watch", "fyi")
-KIND_RE = re.compile(r"^(?P<kind>decide|act|watch|fyi)\s+(?=\d{4}-\d{2}-\d{2}\b)", re.IGNORECASE)
+KINDS = ("decide", "act", "look", "watch", "fyi")
+KIND_RE = re.compile(r"^(?P<kind>decide|act|look|watch|fyi)\s+(?=\d{4}-\d{2}-\d{2}\b)", re.IGNORECASE)
 # TD-039: a board past this many open items is warned about (report and SessionStart line).
 BOARD_SIZE_WARN = 15
 # TD-039: an item overdue this long is ledger material, not board material — the report
@@ -180,7 +181,7 @@ def _trailer(text: str) -> str:
 # TD-066: at most one answer ends in " (default)" — the asker's recommendation, as a
 # steer's `default`. Parity (§7): the board's Format: lines write it.
 DEFAULT_MARK_RE = re.compile(r"\s*\(default\)$", re.IGNORECASE)
-# Parity (cadence.md §7): §3.5's table and the seed board write a live look's answers in exactly
+# Parity (cadence.md §7): §3.5's table and the seed board write a live look's (a `look`'s) answers in exactly
 # these words (TD-074), so a tool can draw the same two buttons on every board.
 LIVE_LOOK_ANSWERS = ("Works", "Not right: <what>")
 
@@ -252,12 +253,12 @@ class BoardItem:
     # session acts on it and closes it — but it is no longer the person's to-do.
     decided: tuple[str, date] | None = None
     bad_due: str | None = None  # the text after "Due:" when it is not a date (TD-053)
-    kind: str | None = None  # decide | act | watch | fyi, or None when unmarked (TD-039)
+    kind: str | None = None  # decide | act | look | watch | fyi, or None when unmarked (TD-039)
     fyi_due: bool = False  # an fyi item that carries a Due: anyway — ignored, and flagged
 
     @property
     def todo(self) -> bool:
-        """The person's to-do: decide, act, or unmarked (TD-039)."""
+        """The person's to-do: decide, act, look (TD-082), or unmarked (TD-039)."""
         return self.kind not in ("watch", "fyi")
 
     def escalation(self, today: date) -> str | None:
