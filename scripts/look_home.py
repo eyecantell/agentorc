@@ -9,7 +9,9 @@ both processes, kills its tmux server and removes the home it made.
 
 It is never the live system: it refuses a home that is, or is under, `~/.agentorc`, and never runs
 anything on the default tmux server (`agentorc-agent serve` builds a bare `Tmux()` on it, so the agent
-is started here in-process with a `Tmux` on a private socket, as `tests/conftest.py`'s fixture does).
+is a child this script starts with a `Tmux` on a private socket, as `tests/conftest.py`'s fixture does).
+A SIGKILL of the script cannot tear down: its two children, its tmux server (`tmux -L ao-look-…`) and
+its `/tmp/aolook-*` home are then left for you to remove.
 
     pdm run python scripts/look_home.py            # prints `look home: http://127.0.0.1:<port>/`
     pdm run python scripts/look_home.py --port 8799 --sessions 0
@@ -96,7 +98,8 @@ def free_port() -> int:
 
 def child_env(home: Path, sock: str) -> dict[str, str]:
     env = dict(os.environ)
-    env.pop("AGENTORC_SESSION", None)  # the scratch home's callers are nobody's session
+    for k in ("AGENTORC_SESSION", "TMUX", "TMUX_PANE"):  # nobody's session, inside nobody's pane
+        env.pop(k, None)
     env.update(
         AGENTORC_HOME=str(home),
         AGENTORC_TMUX_SOCKET=sock,
@@ -201,9 +204,11 @@ def main(argv: list[str] | None = None) -> int:
         repo = write_fixtures(home)
         agent = subprocess.Popen([sys.executable, __file__, "--agent", sock], env=env, cwd=ROOT)
         procs.append(agent)
-        if not wait_for(lambda: (home / "agent.sock").exists() or agent.poll() is not None, 15):
+        if not wait_for(lambda: stopping or (home / "agent.sock").exists() or agent.poll() is not None, 15):
             print("look_home: the host agent never opened its socket", file=sys.stderr)
             return 1
+        if stopping:
+            return 0
         if agent.poll() is not None:
             print(f"look_home: the host agent exited {agent.returncode}", file=sys.stderr)
             return 1
@@ -213,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         from sessionorc.client import call_sync
 
         for name in FIXTURE_SESSIONS[: max(0, args.sessions)]:
+            if stopping:
+                return 0
             call_sync("create", name=name, dir=str(repo), adapter="shell")
         ui = subprocess.Popen(
             [
@@ -232,14 +239,19 @@ def main(argv: list[str] | None = None) -> int:
         def up() -> bool:
             with contextlib.suppress(OSError), socket.create_connection(("127.0.0.1", port), timeout=0.5):
                 return True
-            return ui.poll() is not None
+            return stopping or ui.poll() is not None
 
+        if stopping:
+            return 0
         if not wait_for(up, 20) or ui.poll() is not None:
             print("look_home: the UI never answered", file=sys.stderr)
             return 1
         print(f"look home: http://127.0.0.1:{port}/  (AGENTORC_HOME={home}, tmux -L {sock})", flush=True)
         while not stopping and all(p.poll() is None for p in procs):
             time.sleep(0.2)
+        if dead := [n for n, p in zip(("host agent", "UI"), procs, strict=True) if p.poll() is not None]:
+            print(f"look_home: the {' and the '.join(dead)} exited; the scratch home is torn down", file=sys.stderr)
+            return 1
         return 0
     finally:
         for p in reversed(procs):

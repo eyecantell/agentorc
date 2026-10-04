@@ -39,10 +39,11 @@ def test_the_live_home_and_a_long_path_are_refused(tmp_path):
 
 def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
     env = {k: v for k, v in os.environ.items() if k != "AGENTORC_SESSION"}
+    err = (tmp_path / "stderr").open("w")  # what the script said, shown when it printed no URL
     proc = subprocess.Popen(
         [sys.executable, str(SCRIPT), "--sessions", "2"],
         stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
+        stderr=err,
         text=True,
         env=env,
     )
@@ -55,7 +56,7 @@ def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
             if line.startswith("look home:"):
                 break
         m = re.match(r"look home: (http://127\.0\.0\.1:\d+/)\s+\(AGENTORC_HOME=(\S+), tmux -L (\S+)\)", line)
-        assert m, f"no URL printed: {line!r}"
+        assert m, f"no URL printed: {line!r}\n{(tmp_path / 'stderr').read_text()}"
         url, home, sock = m.group(1), Path(m.group(2)), m.group(3)
         assert home.is_relative_to("/tmp") and (home / "agent.sock").exists()
         assert sock.startswith("ao-look-")
