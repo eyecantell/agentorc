@@ -70,14 +70,16 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .page { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; } .page.narrow { max-width: 760px; }
 .h1 { font-size: var(--t-title); font-weight: 600; } .h2 { font-weight: 600; }
 .note { font-size: var(--t-body); color: var(--muted); }
-.topbar { display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 20px; background: var(--top); color: var(--topfg); }
+.topbar { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; min-height: 48px; padding: 6px 20px; background: var(--top); color: var(--topfg); }
+/* the bar wraps rather than widening the page, and the usage chip keeps its width rather than being
+   squeezed to nothing, which made `fitUsage` hide every account behind a bare `+n` (TD-296 #9) */
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: var(--t-title); color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
 .tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; }
 #hostchip { font-size: var(--t-small); color: var(--topdim); } #hostdot.down { color: var(--stalled); }
 /* The chips sit side by side and are measured against this width to decide what still fits
    (TD-073): `max-width` plus `overflow: hidden` is what makes scrollWidth > clientWidth mean
    "one too many", and inline-block is what gives a span a width to measure at all. */
-#usagechip { font-size: var(--t-small); color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
+#usagechip { flex-shrink: 0; font-size: var(--t-small); color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
 #usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
 #usagechip .old { opacity: .6; }  /* a reading past USAGE_FRESH (TD-233) */
 #usagechip .unknown { opacity: .6; font-style: italic; }  /* no reading yet, or none the chip still offers (TD-233) */
@@ -484,7 +486,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .railsheet[open] { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; padding: 16px; }
   .railchips .chip, .railsheet .btn, .railsheet .railline, .railsheet .input { min-height: 44px; }
   .inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }
-  .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 8px; padding: 0 10px; } #hostchip { display: none; }
+  .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
+  /* a phone (TD-296 #9): the usage chip takes a row of its own under the buttons */
+  #usagechip { order: 1; flex-basis: 100%; max-width: 100%; } #usagechip:empty, #usagechip:not(:has([data-account])) { display: none; }
   .grid { grid-template-columns: 1fr; }
 }
 
@@ -590,7 +594,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
 .setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */
 .setpage .setage { grid-column: 3; margin-top: -8px; }  /* the reading's age under its line (TD-233) */
-.setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220) */
+.setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum, .setpage .setin.setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220); `.setin`'s 100% below widened the page (TD-296 #9) */
 .setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
 .setpage .setin { width: 100%; }
 .setpage .setover { color: var(--needs-fg); font-weight: 600; }  /* **balance**: the mark that stands (§6 *Balance*) */
@@ -606,6 +610,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .setpage .setrow, .setpage .setvals { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .setpage .setage { grid-column: auto; margin-top: 0; }
   .setpage .setvals dd { margin-bottom: 6px; }
+  .setpage .setpicks label { white-space: normal; }  /* board items shown wraps rather than widening the page (TD-296 #9) */
 }
 
 /* design §4.5 screen 9 **Transcript** (TD-166): the pane's reading of the conversation, folded — the
