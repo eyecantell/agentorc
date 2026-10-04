@@ -1024,6 +1024,8 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             # CLI would disagree about the same definition. A live team whose every live session is
             # idle and declared is *concluded* on both (TD-099).
             live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
+            if not r["live"] and r["wound_down"] and (ago := _age(str(r["wound_down"]))) != "?":
+                live += f" {ago} ago"  # *wound down 9h 13m ago*, as the card says it (TD-296 #7)
             # *work waiting: n entries* beside *wound down* (§4.7, §6 rule 8), from the home's `work_waiting`
             if not r["live"] and r["wound_down"] and (n := r.get("work_waiting")):
                 live += f", work waiting: {n} entr{'y' if n == 1 else 'ies'}"

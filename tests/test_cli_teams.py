@@ -761,12 +761,14 @@ def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, ca
     assert cli.main(["team", "list"]) == 0
     out = capsys.readouterr().out
     assert "ao-grind" in out and "wound down" in out
+    # how long ago, as the card says it (TD-296 #7): the CLI's own age words
+    assert re.search(r"ao-grind\s+wound down \d+[smhd] ago", out), out
     assert "repo-team" in out and "stopped" in out  # one that never ran is not wound down
     # *work waiting: n entries* beside *wound down*, from the home's `work_waiting` (§6 rule 8, TD-227)
     assert "work waiting" not in out
     state["host"] = {"work": {"ao-grind": {"at": "t", "repo": "/r", "members": {"a": ["TD-1", "TD-2"], "b": ["TD-2"]}}}}
     assert cli.main(["team", "list"]) == 0
-    assert "wound down, work waiting: 2 entries" in capsys.readouterr().out
+    assert re.search(r"wound down \d+[smhd] ago, work waiting: 2 entries", capsys.readouterr().out)
     assert cli.main(["--json", "team", "list"]) == 0
     listed = {r["name"]: r["work_waiting"] for r in json.loads(capsys.readouterr().out)["teams"]}
     assert listed == {"ao-grind": 2, "repo-team": 0}
