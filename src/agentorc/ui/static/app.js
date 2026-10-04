@@ -254,6 +254,14 @@
   };
 
   AO.roleLine = (o) => (!o.reply && o.line ? `Message it about ${o.line}` : "");
+  // the composer's *re:* quote as words (TD-296 #4): the closed subset's inline marks — `code`,
+  // [text](url), **strong**, *em* — taken off as `render.inline` draws them, so a board line's head
+  // reads as the row draws it and not as `**` and backticks; every other character stays
+  AO.quoteText = (t) => String(t || "")
+    .replace(/(`+)(.+?)\1/g, "$2")
+    .replace(/(^|[^!])\[([^[\]\n]+)\]\(([^()\s]+)\)/g, "$1$2")
+    .replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, "$1")
+    .replace(/(^|[^*\w])\*(?=[^\s*])(.*?[^\s*])\*(?![*\w])/g, "$1$2");
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
@@ -262,7 +270,8 @@
     // sender chose already
     const rl = $("#mailrole");
     if (rl) { rl.textContent = AO.roleLine(o); rl.hidden = !rl.textContent; }
-    $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
+    const q = AO.quoteText(o.quote);
+    $("#mailquote").textContent = q ? `re: “${q.length > 160 ? q.slice(0, 160) + "…" : q}”` : "";
     $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = o.text || "";  // an ask by default (§4.5a **Message**, 2026-09-25)
     // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
     // request; a reply reads as a note does, and switching the kind swaps the sentence
