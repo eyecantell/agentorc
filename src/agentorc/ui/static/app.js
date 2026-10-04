@@ -2385,7 +2385,8 @@
     function offerWorktree(yes) {
       const choice = wt && wt.closest("label"); if (!choice) return;
       choice.hidden = !yes;
-      if (!yes && wt.checked && here) { here.checked = true; here.dispatchEvent(new Event("change")); }
+      // the form's move, not the person's: no change event, so Where is not marked touched (review of #989)
+      if (!yes && wt.checked && here) { here.checked = true; nameCheck(); }
     }
     async function dirCheck() {
       const v = dir.value.trim(), my = ++dseq;
