@@ -315,3 +315,40 @@ async def test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks(age
         assert ex["match"] is None and "no screen rules" in ex["reason"]
         await c.call("kill", id=s["id"])
         await c.call("kill", id=sh["id"])
+
+
+async def test_a_screen_rules_state_goes_back_when_its_screen_is_gone(agent, hookstub, tmp_path, monkeypatch):
+    """TD-306: a hook-fed record holding a screen rule's verdict goes back once the screen stops
+    matching — to `idle` while no hook has reported (the launch's `working` is an assumption, not a
+    hook's word), and to the last hook's own state once one has, rather than keeping the scraped
+    verdict until the tool's next hook."""
+    from datetime import timedelta
+
+    from agentorc.adapters.claude_code import RULES_FILE
+    from sessionorc import agent_tick
+    from sessionorc.screen import Manifest
+
+    monkeypatch.setattr(type(hookstub), "rules", Manifest.load(RULES_FILE))
+    fixture = Path(__file__).parent / "fixtures" / "screens" / "trust-dialog.txt"
+    async with LocalClient() as c:
+        s = await c.call("create", name="scr", dir=str(tmp_path), adapter="hookstub")
+
+        async def reads(state, confidence):
+            x = await c.call("get", id=s["id"])
+            return x["state"] == state and x["confidence"] == confidence
+
+        agent.tmux.send_prompt(s["id"], f"cat {fixture}")
+        assert await wait_for(lambda: reads("needs-you", "scraped"))
+        agent.tmux.send_prompt(s["id"], "clear")  # the dialog is dismissed: nothing on screen matches
+        assert await wait_for(lambda: reads("idle", "scraped"))
+        assert (await c.call("get", id=s["id"]))["pending"] is None
+        # a hook reports `idle`; once it is no longer fresh the screen's verdict applies again, and
+        # when that screen is gone the record reads the hook's word, labelled as the hook's
+        await c.call("hook", session=s["id"], state="idle")
+        assert await wait_for(lambda: reads("idle", "hook"))
+        monkeypatch.setattr(agent_tick, "STALL_AFTER", timedelta(milliseconds=200))
+        agent.tmux.send_prompt(s["id"], f"cat {fixture}")
+        assert await wait_for(lambda: reads("needs-you", "scraped"))
+        agent.tmux.send_prompt(s["id"], "clear")
+        assert await wait_for(lambda: reads("idle", "hook"))
+        await c.call("kill", id=s["id"])

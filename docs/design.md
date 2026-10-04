@@ -375,7 +375,12 @@ rule that fired and the evidence, and `ao explain --file` for fixtures. The same
 `limited` from the tool's own limit message and a `stalled?` that can say why. Scraped never
 outranks a fresh hook state — fresh meaning a hook reported within the stall window; a session no
 hook has reported on yet (the trust dialog appears before any hook fires) takes the classifier's
-verdict at once.
+verdict at once. **A rule's verdict lasts as long as its screen** (TD-306): on a hook-fed session,
+once no rule matches and no hook is fresh, the record goes back to the last hook's state and pending
+— the state the verdict replaced, labelled `hook` — or to `idle` (`scraped`) when no hook has
+reported, since the launch's `working` is an assumption; it does not wait for the tool's next hook,
+which on a quiet session is the next turn. `exited`, `closed` and `stalled?` are the tick's own
+readings, not a rule's, and stay.
 
 **Unseen idle.** An **interactive** `idle` session nobody has looked at since it finished
 (`since > seen_at`; Focus sets `seen_at`) renders "idle · unseen" and sorts above plain `idle` —
