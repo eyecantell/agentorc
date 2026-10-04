@@ -1160,7 +1160,8 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
         assert 'data-act="remove"' not in html and "Close session" not in html
         assert 'class="pill s-oncall' in html and ">on call</span>" in html
         # read from the seat's record, so never the dashed *guessed from the screen* pill (TD-296 #10)
-        v_scraped = view(_card(state=state, exit_code=0, git=clean, pane=False, confidence="scraped"), seats={"ao-w": "x"})
+        rec = _card(state=state, exit_code=0, git=clean, pane=False, confidence="scraped")
+        v_scraped = view(rec, seats={"ao-w": "x"})
         assert v_scraped["scraped"] is False
         oncall = templates.get_template("card.html").render(s=v_scraped)
         assert "s-oncall scraped" not in oncall and "guessed from the screen" not in oncall
