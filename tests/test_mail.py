@@ -2596,6 +2596,11 @@ async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_a
             assert ask["shots"] == [good[0]] and ask["bound"] is None
             held = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
             assert held[steer["id"]]["shots"] == steer["shots"] and held[ask["id"]]["shots"] == [good[0]]
+            sent = {e["id"]: e for e in (await c.call("inbox", sent=True))["entries"]}
+            assert sent[steer["id"]]["shots"] == steer["shots"]  # the sender's own copy too
+            # each copy holds its own list, and the stored form keeps them (a restart reloads them)
+            assert agent.person_inbox[-1].shots is not agent.sessions[builder].outbox[-1].shots
+            assert agent.person_store.load()[-1].shots == [good[0]]
             # an ordinary question carries none
             plain = (await c.call("msg", to="person", kind="ask", text="merge?"))["entry"]
             assert plain["shots"] == []
@@ -2608,6 +2613,8 @@ async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_a
                 ({"kind": "ask", "shots": ["/abs/docs/mockups/reviews/x.png"]}, "not a screenshot"),
                 ({"kind": "ask", "shots": ["docs/mockups/reviews/x.jpg"]}, "not a screenshot"),
                 ({"kind": "ask", "shots": ["docs/mockups/reviews/a b.png"]}, "not a screenshot"),
+                ({"kind": "ask", "shots": ["docs/mockups/reviews/a\nb.png"]}, "not a screenshot"),
+                ({"kind": "ask", "shots": ["docs/mockups/reviews/é.png"]}, "not a screenshot"),
                 ({"kind": "ask", "shots": [f"docs/mockups/reviews/{i}.png" for i in range(5)]}, "at most 4"),
                 ({"kind": "ask", "shots": [1]}, "a list of paths"),
                 ({"kind": "ask", "shots": {"a": 1}}, "a list of paths"),

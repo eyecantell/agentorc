@@ -728,6 +728,7 @@ class MailMixin:
             # every addressee's copy carries the answers — a `conflict` is read and picked between
             # sessions, so each controller's copy must hold them (§4.10 *Suggested answers*)
             answers=list(entry.answers),
+            shots=list(entry.shots),
         )
 
     def _pair(self, r: Session, other: str, now: datetime) -> Tally:
