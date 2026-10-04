@@ -39,8 +39,10 @@ fixed message of cadence.md §4's tool-made-edit carve-out —
 words stay on the board, never in the message) — where
 ``<name>`` is the session the item names (``(session <id> …``), or ``--session``. A
 board with uncommitted changes is refused before anything is written, since the commit
-would carry them. The script never pushes: the carve-out's push happens whenever the
-checkout next pushes, under ``ALLOW_MAIN_PUSH=1``.
+would carry them. The script never pushes: the tool runs it in a tree of its own at
+origin's head and lands the commit by a PR it opens and squash-merges at once, titled
+with this message (cadence.md §4.5, TD-083) — or, where the forge takes a direct push,
+pushes it under ``ALLOW_MAIN_PUSH=1``.
 
 The field formats are ``nudge_user_attention.py``'s (imported, never re-typed: one
 reader, one writer — cadence.md §7 parity pairs). Every edit is re-parsed before it is
@@ -279,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     sha = _git(root, "rev-parse", "--short", "HEAD").stdout.strip()
     print(f"board_edit: {a.action} line {a.line}{what} — committed {sha} (not pushed; "
-          "cadence.md §4: push with ALLOW_MAIN_PUSH=1)")
+          "cadence.md §4.5: land it by its own PR, or push with ALLOW_MAIN_PUSH=1)")
     return 0
 
 

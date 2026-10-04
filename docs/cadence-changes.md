@@ -12,6 +12,14 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-03 — a live look is a `look`, not a `watch`: `- [ ] look YYYY-MM-DD (…`
+Do: write an item asking the person to look at something live as `look` (the person's to-do, with `Answers: Works | Not right: <what>.`); keep `watch` for your own re-check. Regroom your own open live looks; never another session's.
+See: cadence.md §3.3 (Kind), §3.5 (the answers table); nudge_user_attention.py `KINDS`; TD-082.
+
+## 2026-10-03 — a tool's board edit lands by its own PR, made in the tool's tree, not by the anchor's push
+Do: a tool offering Snooze/Done/Decide/Reply runs `scripts/board_edit.py` in a tree of its own at origin's head, opens a PR titled with its fixed message and squash-merges it at once; never commit it in the person's checkout. `check_cadence.py` passes such a PR with no review comment.
+See: cadence.md §4.5, §4.6; board_edit.py; check_cadence.py `row_board_edit_pr`; TD-083.
+
 ## 2026-10-01 — a memory note is part of your PR: in a worktree, re-run `scripts/hydrate_worktree.sh` once
 Do: run `scripts/hydrate_worktree.sh` in your worktree (it replaces the symlinked `.claude/settings.local.json` with the worktree's own copy, naming its own `docs/claude-memory`; a session picks it up at its next start), then commit memory notes on your branch. Never commit a note left uncommitted in the main checkout that you did not write.
 See: cadence.md §7.2, §1.8; hydrate_worktree.sh (`settings_local`); TD-080.

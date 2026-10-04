@@ -35,6 +35,12 @@ never a fake pass):
               record and there is nothing left to do — as self-attested as any review
               comment, and a late BLOCK is a plain fail, never acknowledged. A caller that acts on a repeated
               fail skips an acknowledged one (cadence §4.9).
+              A tool-made board PR (cadence §4.5, TD-083) passes with no comment:
+              its title is board_edit.py's fixed message (BOARD_EDIT_MSG_RE), it
+              touches the board alone, and its one commit — merged, a single-parent
+              squash whose subject ends `(#n)`; open, the only commit past the default
+              branch — is the one-item edit the direct audit's board-edit class
+              accepts, read from this clone; unreadable, the row asks for a review.
     ci        every check run on the head commit either succeeded or was SKIPPED by
               the workflow, and at least one actually ran. A skip never fails the row
               — a job gated off on purpose must not block a merge — but it is named
@@ -134,6 +140,7 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import Any
 
 REVIEW_RE = re.compile(
     r"^\s*cadence-review:\s*(?P<verdict>SHIP|FIXED|BLOCK)\b(?P<rest>.*)$", re.IGNORECASE
@@ -201,7 +208,9 @@ def repo_root():
 # --- rows -------------------------------------------------------------------------
 
 
-def row(rule, status, detail):
+def row(rule, status, detail) -> dict[str, Any]:
+    # Any, not str: review's row carries `acknowledged: True` (TD-076), which a strict checker
+    # in a consumer (samscrape's pyright) refuses on a dict inferred as dict[str, str].
     return {"rule": rule, "status": status, "detail": detail}
 
 
@@ -952,6 +961,49 @@ def classify_direct(root, sha, subject, files):
     return "fail", f"board change outside the carve-outs (-{len(removed)} +{len(new)} lines)"
 
 
+def row_board_edit_pr(pr, root):
+    """TD-083, cadence §4.5: a tool lands a board edit by a PR of its own, merged at once.
+    Its review is the person's click, so the review row passes it — when the title is
+    board_edit.py's fixed message, the PR touches the board alone, and its commit is the
+    one-item edit the direct audit accepts (classify_direct, the same rules). That commit is
+    the whole PR only when it is one commit: merged, a single-parent squash whose subject
+    ends `(#n)` (a rebase merge's last commit carries no such suffix, and its earlier ones
+    would go unread); open, the one commit between the default branch and the head. None
+    when it is not one, or its commit is not in this clone: the ordinary review row decides."""
+    if not root or not BOARD_EDIT_MSG_RE.match(pr.get("title") or ""):
+        return None
+    if [f["path"] for f in pr.get("files") or []] != [BOARD]:
+        return None
+    sha = (pr.get("mergeCommit") or {}).get("oid") if pr["state"] == "MERGED" else pr.get("headRefOid")
+    if not sha:
+        return None
+    fetch_once(root)
+    head = git(["log", "-1", "--format=%P%x00%s", sha], cwd=root)
+    parents, _, subject = (head or "").strip("\n").partition("\0")
+    if len(parents.split()) != 1:
+        return None  # unreadable, the root, or a merge commit
+    if pr["state"] == "MERGED":
+        if not subject.endswith(f"(#{pr['number']})"):
+            return None
+    elif (git(["rev-list", "--count", f"{default_ref(root)}..{sha}"], cwd=root) or "").strip() != "1":
+        return None
+    names = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", sha], cwd=root)
+    files = [f for f in (names or "").split("\0") if f]
+    cls, _ = classify_direct(root, sha, pr["title"], files)
+    if cls != "board-edit":
+        return None
+    return row("review", "pass", "tool-made board edit (cadence §4.5 carve-out): board_edit.py's message, "
+               "one item's line — the person's action is the review; no comment needed")
+
+
+def board_edit_or_review(pr, root):
+    try:
+        found = row_board_edit_pr(pr, root)
+    except Exception:  # the carve-out unreadable: the ordinary review row still reads the comments
+        found = None
+    return found or row_review(pr)
+
+
 def direct_commits(root, when):
     """Every first-parent commit on the default branch since `when` that no PR made,
     classified. None when there is no clone to read (the section is then n/a)."""
@@ -996,7 +1048,7 @@ def check_pr(number, root):
     rows = []
     for rule, fn in (
         ("pr", lambda: row_pr(pr)),
-        ("review", lambda: row_review(pr)),
+        ("review", lambda: board_edit_or_review(pr, root)),
         ("ci", lambda: row_ci(pr)),
         ("base", lambda: row_base(pr, root)),
         ("ledger", lambda: row_ledger(pr, root)),
