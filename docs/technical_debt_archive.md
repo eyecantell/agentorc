@@ -3250,3 +3250,39 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-10-04 (PR #1013) — `_screen_held`, `_screen_gone` and `_hook_state` in `src/sessionorc/agent_tick.py`; design §4.2 *A rule's verdict lasts as long as its screen*; pinned by `tests/test_agent_paths.py`.
 
 **Related:** TD-015 (screen rules), TD-296 #6 (the first-run rules), TD-283 (the at-composer `startup`).
+
+## TD-312: Build the detail block on an Inbox board row
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-04 (the designer, TD-304's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/render.py` (`_block`: lists), `src/agentorc/ui/inbox.py` (`board_rows`, `_find_text`), `src/agentorc/ui/templates/inbox_row.html` (the board row's fold), `src/agentorc/ui/static/app.js` (`foldsOpen`, `reopenFolds`), `tests/test_render.py` and the Inbox tests
+
+**Why:** TD-304's design: a board item's detail block is what the person decides from, and the Inbox row draws the head line alone.
+
+**Resolved:** 2026-10-04 (PR #1021) — `render._list` (lists nest by indent), `board_detail` in `src/agentorc/ui/inbox.py`, the board row's fold in `inbox_row.html`, `foldsOpen` / `foldsShut` in `app.js`; pinned by `tests/test_render.py` and `tests/test_ui_board.py`.
+
+**Done when:** on a scratch home (`scripts/look_home.py`) with a board synced past dev-cadence TD-084: a `decide` item with a block shows Context, Question, Caveats and Recommended under its head with nested bullets drawn as nested lists, the fold open; an item with a block and no answers has it closed; an item without a block, and a report whose items carry no `detail` key, draw as today; a block holding `<script>` or `Answers:` draws them as text; tests cover the renderer's nesting and the row. A page change, so the builder looks at it and sends the look (§4.9b).
+
+**Related:** TD-304 (the design), TD-305 (the answered row, the same partial), TD-279 (the row's text and fold), dev-cadence TD-084.
+
+## TD-304: The Inbox shows a board item's head line only — not the detail block the person decides from
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-04 (Paul: *add a td for agentorc*, after dev-cadence TD-084 gave board items a plain-English detail block; the dev-cadence session that built it)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-04** (the designer, PR #1009): design §4.5a **Inbox board row: detail block**, §4.4 *Board write-back* (**add** writes a head line alone), §4.10 (the subset's lists nest); mockup `Inbox.dc.html`, shot as `docs/mockups/reviews/2026-10-04-td304-detail-block.png`. The block is drawn in the row's *details* fold, open on a row with answers to press and closed otherwise; nothing is lifted out of it; **Put on the board** asks for no block. The fold's default is steered to Paul as `m-d4d4dcb3c6a3`, which lapsed at its bound (2026-10-04 12:39 MDT), so it stands. The build is TD-312.
+**Location:** design §4.5 screen 6 (the Inbox's board rows), §4.5a (answers / Go with it / Reply on a board row), §4.4 *Board write-back* (**add**, *Put on the board*); `src/agentorc/ui/inbox.py`, `src/agentorc/ui/app.py` (the board row), `src/sessionorc/board.py` (`add`, `item_line`); dev-cadence cadence.md §3.3 *An item explains itself*
+
+**Why:** since dev-cadence TD-084 (PR #210, 2026-10-04), a board item has a short head line carrying every field and, under it, indented sub-bullets in plain English: **Context:** (a few sentences, nested bullets where clearer), **Question:**, **Caveats:**, **Recommended:** / **Otherwise:**. A `decide` always has one. They are what the person makes the decision from. `nudge_user_attention.py --report --json` carries them as each item's `detail` (a list of lines, common indent removed), but the Inbox row draws `text` (with `line` and `due_tag`) and never `detail`. So the row shows the headline and the answer buttons, without the context, caveats or the reason for the default. The person presses an answer they cannot see the case for, or has to open the board file. Nothing breaks: the write-back edits only the head line, where every field still lives, and **add** inserts above the first item, so never inside a block. It is a missing view, not a fault. The Inbox reads `detail` only once a repo has taken the sync carrying TD-084, and before that the key is absent.
+
+**Resolved:** 2026-10-04 (PR #1009 the design, PR #1021 the build, TD-312) — design §4.5a **Inbox board row: detail block**; `board_detail` and `render._list`, pinned by `tests/test_ui_board.py` and `tests/test_render.py`.
+
+**Done when:** a board row in the Inbox shows its item's detail block, on a repo synced past dev-cadence TD-084, and a row without one reads as it does today.
+
+**Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
