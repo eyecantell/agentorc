@@ -147,7 +147,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a `look` item in Needs you or Steering, no longer a `watch` | Medium | Designed 2026-10-03 — builds TD-291, TD-292 |
 | TD-291 | Build the builder's half of a UI change's verification: the scratch home script, the UI check in the PR, the techlead's read of screenshots, the briefs | Medium | Slices 1–3 built (#970, #972, #973) |
-| TD-292 | Build the Inbox's half of a `look`: Needs you or Steering by its default, *lapsed* at its date, screenshots on the row, Send to reviewer | Medium | Open — waits on dev-cadence TD-082 |
+| TD-292 | Build the Inbox's half of a `look`: Needs you or Steering by its default, *lapsed* at its date, screenshots on the row, Send to reviewer | Medium | Slice 1 built (#975) |
 | TD-296 | What the live looks of 2026-10-03 found off: seventeen page defects, each small, from a stray decimal to a read-only line that never shows | Medium | Open |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-298 | A scratch `AGENTORC_HOME` still reads this machine's repo registry and default tmux server: a look's host agent fast-forwarded the real checkout | Medium | Open |
@@ -2799,8 +2799,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the designer, TD-290's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — waits on dev-cadence TD-082 (the `look` kind in the synced reader, and cadence's sentence that a `look` with a default is closed by its session at its date)
-**Blocked by:** dev-cadence#TD-082
+**Status:** Slice 1 built — PR #975 (`LOOK_KINDS`: a `look` draws the pair; one with no default is a counted due row under *Needs you*). Slices 2–5 open.
 **Location:** `src/agentorc/ui/inbox.py` (`inbox_sections`, `board_due_now`, the live look's pair, the board row's renderer), `src/agentorc/ui/app.py` (the screenshot route), `src/sessionorc/agent_inbox.py` (`rpc_board_reply`: `look`), `src/agentorc/briefs/grinder.md`, `src/agentorc/briefs/techlead.md`, `docs/briefs/`; design §4.5 screen 6, §4.5a **Inbox board row (a `look`)** and **Send to reviewer**, §4.4 *Board write-back*, §4.9b; mockup `docs/mockups/Inbox.dc.html`, `docs/mockups/reviews/2026-10-03-td290-look-rows.png`
 
 **Why:** Paul, 2026-10-03: *have the look items go to either steering or "needs you" instead of creating a new category*. A person's look is written as a `watch` and counted among the decisions, with no way to say *I checked this; it goes ahead unless you say otherwise*, and no way to a reviewer but a typed reply.
