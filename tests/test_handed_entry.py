@@ -316,3 +316,111 @@ def test_the_seats_nudge_names_a_handed_entry_by_its_outcome(agent):
     q = MailEntry(id="m-q", from_="ao-mgr", to=[s.id], at="2026-09-29T11:00:00Z", kind="ask", text="?")
     s.inbox.append(q)
     assert agent._nudge_line(s).startswith("[agentorc] you have 1 questions waiting — run `ao inbox`; 1 entry")
+
+
+# -- TD-292 slice 4: Send to reviewer — a look handed to the techlead seat --------------------------
+
+
+SHOT = "docs/mockups/reviews/2026-10-03-td292-row.png"
+
+
+async def _look(person, tmp_path, *, kind: str = "ask") -> tuple[str, str, str]:
+    async def mk(n: str, **kw) -> str:
+        return (
+            await person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw)
+        )["id"]
+
+    builder, seat = await mk("builder", unattended=True), await mk("tl", unattended=True, seat={"trigger": "asks"})
+    extra = {"default": "Works"} if kind == "steer" else {"answers": ["Works", "Not right: x"]}
+    async with LocalClient(caller=builder) as c:
+        look = (
+            await c.call("msg", to="person", kind=kind, text="the row?", about="TD-292", shots=[SHOT], **extra)
+        )["entry"]["id"]
+    return builder, seat, look
+
+
+@pytest.mark.integration
+async def test_send_to_reviewer_hands_a_look_to_the_seat_and_its_outcome_brings_it_back(agent, tmp_path):
+    """Design §4.10 *A look*, §4.5a **Send to reviewer**: `inbox_hand` sends the seat a `handed` `ask`
+    from the person with the look's text, `shots` and id and no bound, and snoozes the look until that
+    debt closes; the seat's outcome clears the snooze and rides back on the look as `looked_by`."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        builder, seat, look = await _look(person, tmp_path)
+        got = await person.call("inbox_hand", msg=look, seat=seat)
+        assert got["to"] == seat and got["msg"] == look
+        rec = agent.sessions[seat]
+        h = next(e for e in rec.inbox if e.id == got["handed"])
+        assert (h.kind, h.from_, h.text, h.about) == ("ask", PERSON, "the row?", "TD-292")
+        assert h.handed and h.shots == [SHOT] and h.look == look and h.bound is None
+        assert h.handed_entry and rec.asks_waiting() == 1, "it fills the seat"
+        mine = next(e for e in agent.person_inbox if e.id == look)
+        assert mine.snoozed_for == h.id and mine.open, "set aside, still the person's to answer"
+        assert agent.person_store.load()[-1].snoozed_for == h.id, "kept across a restart"
+        with pytest.raises(AgentError, match="already with a reviewer"):
+            await person.call("inbox_hand", msg=look, seat=seat)
+        async with LocalClient(caller=seat) as tl:
+            await tl.call("msg", to=PERSON, kind="note", outcome="done", for_=h.id, text="matches §4.5a Settings page")
+        mine = next(e for e in agent.person_inbox if e.id == look)
+        assert mine.snoozed_for is None and mine.open
+        assert mine.looked_by == {"seat": seat, "text": "matches §4.5a Settings page"}
+        assert rec.asks_waiting() == 0
+        for sid in (builder, seat):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_handed_looks_wait_ends_by_unsnooze_or_dismiss_and_blocked_is_said(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        builder, seat, look = await _look(person, tmp_path)
+        first = (await person.call("inbox_hand", msg=look, seat=seat))["handed"]
+        # Unsnooze brings it back sooner; the handed ask still owes, and its outcome still lands on the look
+        await person.call("inbox_snooze", msg=look)
+        mine = next(e for e in agent.person_inbox if e.id == look)
+        assert mine.snoozed_for is None
+        async with LocalClient(caller=seat) as tl:
+            await tl.call("msg", to=PERSON, kind="note", outcome="blocked", for_=first, text="no screenshot on main")
+        assert mine.looked_by == {"seat": seat, "text": "blocked: no screenshot on main"}
+        # handed again, then the person dismisses the handed row: the look returns with no line
+        mine.looked_by = None
+        second = (await person.call("inbox_hand", msg=look, seat=seat))["handed"]
+        assert mine.snoozed_for == second
+        await person.call("inbox_dismiss", msg=[second])
+        assert mine.snoozed_for is None and mine.looked_by is None
+        for sid in (builder, seat):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_send_to_reviewer_is_refused_in_words(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        builder, seat, look = await _look(person, tmp_path)
+        async with LocalClient(caller=builder) as c:
+            steer = (
+                await c.call("msg", to="person", kind="steer", default="Works", text="the row?", shots=[SHOT])
+            )["entry"]["id"]
+            plain = (await c.call("msg", to="person", kind="ask", text="merge?"))["entry"]["id"]
+        async with LocalClient(caller=seat) as tl:
+            with pytest.raises(AgentError, match="the person's own bookkeeping"):
+                await tl.call("inbox_hand", msg=look, seat=seat)
+        with pytest.raises(AgentError, match="is not a look"):
+            await person.call("inbox_hand", msg=plain, seat=seat)
+        with pytest.raises(AgentError, match="is a steer"):
+            await person.call("inbox_hand", msg=steer, seat=seat)
+        with pytest.raises(AgentError, match="has no techlead seat"):
+            await person.call("inbox_hand", msg=look, seat="")
+        with pytest.raises(AgentError, match="holds no entry m-nope"):
+            await person.call("inbox_hand", msg="m-nope", seat=seat)
+        await person.call("msg", to=builder, kind="reply", reply_to=look, text="Works", answer=0)
+        with pytest.raises(AgentError, match="already answered"):
+            await person.call("inbox_hand", msg=look, seat=seat)
+        assert not any(e.look for e in agent.sessions[seat].inbox), "nothing was sent"
+        for sid in (builder, seat):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.unit
+def test_inbox_hand_travels_with_the_mailbox():
+    assert "inbox_hand" in modes.MAILBOX
