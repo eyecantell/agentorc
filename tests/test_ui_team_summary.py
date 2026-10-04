@@ -475,3 +475,12 @@ def test_a_team_over_its_line_says_so_on_its_header_and_only_while_live():
     assert "overline" not in ui.templates.get_template("group_head.html").render(g=clear)
     (dead,) = ui.team_groups([{**m, "state": "exited"} for m in ms], (), over, {})
     assert dead["balance_note"] == ""
+
+
+def test_the_repo_pages_rows_keep_their_id_tags_and_columns():
+    """TD-296 #16: a debt row with a long title wrapped its id (*TD-* / *122*) and cut its tags to
+    *Hi… · pa…*, and at 700 px a long Doing line dropped below its row. The id and the tags keep
+    their width, the title gives; the narrow page's wrap leaves a Doing row's columns standing."""
+    css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
+    assert ".repopage .rrow > .mono.strong, .repopage .rrow > .meta { flex: none; white-space: nowrap; }" in css
+    assert "@media (max-width: 720px) { .repopage .rrow:not(.drow) { flex-wrap: wrap; } }" in css
