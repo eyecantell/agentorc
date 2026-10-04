@@ -3198,3 +3198,39 @@ Both go away only when the record says who closed it.
 **Done when:** a look home torn down after an Open a session press leaves no `/tmp/aolook-*`.
 
 **Related:** TD-291 (the scratch home), TD-283 (the press that found it).
+
+## TD-305: Build the answered board row — a decided or replied board item waits under *Waiting on them*
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-04 (the designer, TD-303's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/inbox.py` (`board_rows`, `board_due_now`, `board_horizon`, `inbox_sections`, the rail's counts), `src/agentorc/ui/app.py` and the board row's partial (the row under *Waiting on them*, its controls), `src/agentorc/ui/help.py` and design §4.5a's help list (the **answers** and **Go with it** texts), `docs/mockups/gen.py` (`INBOX_BLURB`)
+
+**Why:** TD-303's design: a board item the person has decided or replied to waits on a session, and the Inbox still draws it under *Needs you*, counted.
+
+**Resolved:** 2026-10-04 (PR #1018) — `board_answered`, `board_waits` and `board_waiting_on` in `src/agentorc/ui/inbox.py`, the board row's *Waiting on them* branch in `inbox_row.html`, pinned by `tests/test_ui_board.py`; design §4.5 screen 6 *A board item the person answered waits on them*.
+
+**Done when:** on a scratch home (`scripts/look_home.py`) with a board that holds a decided item, a replied one and an undecided due one: the first two are under *Waiting on them* and in neither the top bar's number nor the Org's *m overdue*, the third is under *Needs you*; pressing an answer on the third moves it at the press; a decided item whose date is three days back is under *Needs you*, one two days back is not, counted, saying nobody has acted; tests cover the three placements, the stale return, a reader without `waiting_on`, and the counts. A page change, so the builder looks at it and sends the look (§4.9b).
+
+**Related:** TD-303 (the design), TD-142 (the standing on a *Needs you* board row, slice 2), TD-304 (the detail block on the same row), TD-255 (answers), TD-079 (*Waiting on them*).
+
+## TD-303: An answered Needs-you row stays in Needs you
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-04 (Paul: *Currently a "Needs you" item seems to stay in "needs you" once answered - it should move out to "waiting on them"/other so it does not appear to be waiting on me*; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-04** (the designer, PR #1006): design §4.5 screen 6 *A board item the person answered waits on them*, §4.5a **Inbox section: Waiting on them** and the **answers** and **Reply** rows, §4.4 *Decide*; mockup `Inbox.dc.html`, shot as `docs/mockups/reviews/2026-10-04-td303-answered-board-row.png`. The reader already says whom a decided item waits on (`waiting_on: session`, dev-cadence TD-036) and the Inbox did not read it, so the row's place follows from the reader's fields and nothing is stored at the home. Two choices are steered to Paul as `m-3a00d3ac1c03`, which lapsed at its bound (2026-10-04 12:31 MDT), so both stand: a Reply moves the row as a `Decided:` does, and the row comes back to *Needs you* after three days with nothing done (`BOARD_WAIT_DAYS`). No mail row needed the cure. The build is TD-305.
+**Location:** design §4.5 screen 6 (the Inbox's sections), §4.5a **answers** / **Go with it** / **Reply** (Inbox board row) and the help text that says the decided line *stays on the board, due*, §4.4 *Board write-back*; `src/agentorc/ui/inbox.py` (`inbox_sections`, `board_due_now`); cadence §3.5 (*a decided entry is not done: it stays on the board, and stays due, until a session acts on it*)
+
+**Why:** a board row answered from the Inbox (a pressed answer or Go with it writes `Decided:`; a Reply writes `— Paul, <date>: …`) stays under **Needs you**, counted in the top bar, because the design keeps the line *due* as its session's work order and the Inbox counts every due board row as the person's. Seen 2026-10-04: samscrape's backup item reads *decided: approve R2 · Oct 3 — not done: it stays on the board as its session's work order* at the head of Needs you (64). Once the person has answered, the item waits on a session, which is what *Waiting on them* says for mail.
+
+**Resolved:** 2026-10-04 (PR #1006 the design, PR #1018 the build, TD-305) — design §4.5 screen 6 *A board item the person answered waits on them*; `board_answered` / `board_waits` in `src/agentorc/ui/inbox.py`, pinned by `tests/test_ui_board.py`.
+
+**Done when:** an answered board row leaves Needs you and the top-bar count at the press, and reads under its new section as waiting on its session.
+
+**Related:** TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-079 (*Waiting on them*), TD-290 (looks as mail), TD-297 (who closes a decided look).
