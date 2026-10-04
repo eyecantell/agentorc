@@ -2761,7 +2761,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of the pages: *we should probably have these types of verification items sent to a reviewer (and then to me if needed)*; 2026-10-03: *I would expect a grinder who makes ui changes to verify them itself before sending to a reviewer, and only send to a reviewer if needed*; *a distinction between "watch" items (issues that have arisen once and need to be seen again before acting) and "look" items (items that are for me to take a look at) — have the look items go to either steering or "needs you" instead of creating a new category*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** **Designed 2026-10-03** (the designer, PR #947 reworked on Paul's three points; the two choices steered to Paul are `m-71d3c709e116`; Paul, 2026-10-03: *Go with both defaults: the techlead seat is the reviewer (considered the designer for its context; kept the techlead for availability, its lane and independence), and a look the techlead leaned Works on closes as Works at its Due date*). Design: §4.9b *A UI change is verified by its builder* (the builder's scratch home and the **UI check** in its PR; the live copy read by a `watch`, never pressed; the reviewer is the techlead seat, asked only for a judgement against the design, its three replies; the `look` line's three cases; a look's bound is its `Due:` and a lapse is closed by its team as a decided *Works* is), §4.5 screen 6 (*Needs you*, *Steering*), §4.5a **Inbox board row (a `look`)** and **Send to reviewer**, §4.4 (`board_reply` with `look`), the glossary's *look* and *scratch home*, mockup `Inbox.dc.html` (`docs/mockups/reviews/2026-10-03-td290-look-rows.png`). The first shape (2026-10-02: a `reviewer` seat with a browser, a fifth Inbox section) is dropped. One sentence is dev-cadence's: that a `look` with a default is closed by its session at its date (the board line of 2026-10-03). Not built: TD-291, TD-292. **Reworked 2026-10-03 evening on Paul's note `m-d435ff0d831a`** (PR PRNUM): a look that reaches the person is mail, not a board line — a `steer` with the default *Works* where the techlead leaned, an `ask` with *Works* / *Not right* where nobody could settle it (§4.9b's table, §4.10 *A look*, §4.7 `--shot`, §4.5a **Inbox row: a look** and its **Send to reviewer**); the board `look`'s Steering draw, its lapse, `board_reply` with `look` and the sentence asked of dev-cadence are dropped, and TD-292 is re-scoped to the mail rows and waits on nothing.
+**Status:** **Designed 2026-10-03** (the designer, PR #947 reworked on Paul's three points; the two choices steered to Paul are `m-71d3c709e116`; Paul, 2026-10-03: *Go with both defaults: the techlead seat is the reviewer (considered the designer for its context; kept the techlead for availability, its lane and independence), and a look the techlead leaned Works on closes as Works at its Due date*). Design: §4.9b *A UI change is verified by its builder* (the builder's scratch home and the **UI check** in its PR; the live copy read by a `watch`, never pressed; the reviewer is the techlead seat, asked only for a judgement against the design, its three replies; the `look` line's three cases; a look's bound is its `Due:` and a lapse is closed by its team as a decided *Works* is), §4.5 screen 6 (*Needs you*, *Steering*), §4.5a **Inbox board row (a `look`)** and **Send to reviewer**, §4.4 (`board_reply` with `look`), the glossary's *look* and *scratch home*, mockup `Inbox.dc.html` (`docs/mockups/reviews/2026-10-03-td290-look-rows.png`). The first shape (2026-10-02: a `reviewer` seat with a browser, a fifth Inbox section) is dropped. One sentence is dev-cadence's: that a `look` with a default is closed by its session at its date (the board line of 2026-10-03). Not built: TD-291, TD-292. **Reworked 2026-10-03 evening on Paul's note `m-d435ff0d831a`** (PR #977): a look that reaches the person is mail, not a board line — a `steer` with the default *Works* where the techlead leaned, an `ask` with *Works* / *Not right* where nobody could settle it (§4.9b's table, §4.10 *A look*, §4.7 `--shot`, §4.5a **Inbox row: a look** and its **Send to reviewer**); the board `look`'s Steering draw, its lapse, `board_reply` with `look` and the sentence asked of dev-cadence are dropped, and TD-292 is re-scoped to the mail rows and waits on nothing.
 **Blocked by:** TD-291, TD-292
 **Location:** design §4.5a (a board row's answers, **Works** / **Not right…**; the Inbox's sections), §4.9 (roles), `docs/briefs/grinder-ao-*.md` (*never run `ao ui`*; *a fix that needs a live look is … a `watch` line*), cadence §3.5 (the live look, written as a `watch`); the anchor's Playwright set-up (`~/ao-shots/pwlib`, `~/ao-shots/scripts/`, headless Chromium)
 
@@ -2808,3 +2808,74 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a builder's leaned-Works look reaches Paul as a `steer` under *Steering* with its screenshots drawn and lapses to *Works* with no press, one nobody settled is an `ask` under *Needs you* with **Works** / **Not right…**, and **Send to reviewer** fills the techlead seat and brings the look back with the seat's reading.
 
 **Related:** TD-290 (the design), TD-291 (the builder's half), TD-255 (a live look's pair), TD-218 (a handed entry), TD-127 (a message's shape).
+
+## TD-296: What the live looks of 2026-10-03 found off
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the anchor, from five look agents on Paul's word: *lets pass the looks back to the grinders or do them here*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/` (templates, `static/app.css`, `static/*.js`), `src/sessionorc/` where named; screenshots on kmaster under `~/ao-shots/looks-A/` … `~/ao-shots/looks-E/` (outside the repo: read them there, copy the ones a PR needs into `docs/mockups/reviews/`)
+
+**Why:** the board's 25 live looks were made on 2026-10-03 by a second session against the live copy `8de3e27` (read-only) and isolated scratch homes (presses). Most work; their lines are closed in `docs/user_attention_archive.md` with a verdict each. These are what did not, numbered as the closed lines cite them.
+
+**Fix:** each its own small PR or grouped by page; check each on a scratch home (TD-291's `scripts/look_home.py`) before the PR.
+1. **Usage chip decimal** (TD-287): Settings, Inbox, Help and New session draw *week 52.0% / 95%* server-side where the Org, Focus and Repo draw *52%*. One formatter. (`~/ao-shots/looks-D/chip-settings.png`, `chip-org.png`)
+2. **Settings Cancel always visible** (TD-286): `.setcancel` gets `hidden`, but `.btn{display:inline-flex}` (app.css ~line 87) overrides it; on narrow cards it pushes Save to its own line. A `[hidden]{display:none!important}` rule or the class's own. (`~/ao-shots/looks-D/dark-top.png`, `aogrind-card-balance.png`)
+3. **New session labels and Where** (TD-284): `.field label`'s upper-case leaks into the Where options and the Controllers labels (*WORKTREE TD-302 · NEW*, *MANAGER-AO-1*), against `docs/mockups/NewSession.dc.html`; and *another directory…* that is not a git repo still offers *Worktree <name> · new*. (`~/ao-shots/looks-D/new-live.png`, `mock-new.png`, `scnew-shell-form.png`)
+4. **Reply composer's quote** (TD-280): the *re:* quote of a board row shows raw `**` and backticks; the row itself strips them (TD-279). (`~/ao-shots/looks-B/L15-r-composer.png`)
+5. **Focus header drops the weekday** (TD-274): the card reads *until Sun 17:17*, the Focus header *until 17:17*, which reads as past on a Saturday evening. (`~/ao-shots/looks-A/focus_sam1.png`)
+6. **A session at Claude Code's first-run screen reads `working`** (TD-283): `entry-1` from Add entry → Open a session, on an empty config at the theme picker, read `working (hook)` with *no screen rule matched* and offered Steer. Either a screen rule for the first-run screens or `idle` until the first turn; check a logged-in session too. (`~/ao-shots/looks-C/entry-2-focus.png`)
+7. **`ao team list` has no age** (TD-265): it prints *wound down · by the tick* where the page prints *wound down 9h 13m ago · by the tick*.
+8. **New session loses the manager's tick** (TD-173, TD-276): opened on another repo (it opens on dev-cadence), picking **Team: ao-grind** switches the repo, and the async role reload (`loadRoles` → `tickControllers`) clears the tick `applyTeam` just set; `/new?team=ao-grind` leaves it unticked too. Picking the repo first keeps it. (`~/ao-shots/looks-A/new_controllers.png`)
+9. **Phone width** (TD-003's neighbour): at 390 px the Org's top bar overflows (page 924 px wide, theme, ? and ⌘ Shell off screen, the chip a zero-width *+1*), and Settings scrolls sideways (scrollWidth 671; the You card's *board items shown* boxes). (`~/ao-shots/looks-A/org_390_view.png`, `~/ao-shots/looks-D/settings-phone-top.png`, `phone-you.png`)
+10. **An on-call pill draws as scraped** (TD-097): the seat card's *on call* pill carries class `scraped` (dashed, hover *guessed from the screen*), wrong for a state read from a closed record.
+11. **The grey read-only line never shows** (TD-096): Focus writes `[agentorc] watching: …read-only…` into xterm's normal buffer, and tmux's attach then switches to the alternate one (`buffer.active.type = alternate`); and its toast *watching: the terminal is read-only — Take over to type* fires on load with no key pressed. (`~/ao-shots/looks-C/ro-ao-agentorc-grinder-ao-1.png`)
+12. **A mouse program gets clicks** (TD-174): a program asking for SGR mouse tracking in the Focus pane received press and release (`\x1b[<0;26;6M`); design §4.5 says it *gets no mouse, since tmux forwards none with its mouse off*. Either the design's sentence or the forwarding changes. (`~/ao-shots/looks-C/mouse-4-mouseapp.png`)
+13. **A claim with an open PR read as in progress** (TD-150): designer-ao-1's TD-290 claim had PR #947 open on its branch, yet `review_pr` stayed null: the panel read *in progress · TD-290 claimed* and more ▾ offered Drop. The tick never attached the PR. (`~/ao-shots/looks-C/focus-ao-agentorc-designer-ao-1.png`)
+14. **Waiting on them omits the answer** (TD-079): an ask answered with its suggested answer showed *you answered · 6s ago* and not the answer, because the entry's `answer` was null. (`~/ao-shots/looks-B/SC-waiting.png`)
+15. **A team's system note under *No team*** (TD-241): cm-grind's wind-down note (naming #102–#106) is filed under *No team* in the Inbox rail, not cm-grind.
+16. **Repo page list** (TD-228, TD-232): a row with a long title wraps its id (*TD-* / *122*) and cuts its tags to *Hi… · pa…*; at 700 px a long Doing line drops below its row at full width. (`~/ao-shots/looks-E/repo-debt.png`, `repo-doing-700.png`)
+17. **Settings pull reading wraps** (TD-263): *last pulled…* wraps in a narrow column under the pull row, not beside it. (`~/ao-shots/looks-D/repo-cm-card.png`)
+
+**Done when:** each of the seventeen is fixed or its design sentence changed, each checked on a scratch home with a screenshot in its PR.
+
+**Related:** TD-297 (what was not seen), TD-298 (the scratch home that leaked), TD-291 (the builder's check), TD-244 (the walks).
+
+## TD-297: The parts of the live looks of 2026-10-03 nobody could see
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-03 (the anchor, with TD-296)
+**Owner:** grinder
+**Kind:** live-check
+**Status:** Open
+**Location:** the closed look lines of 2026-10-03 in `docs/user_attention_archive.md` (each names its TD); design §4.5, §4.5a
+
+**Why:** the looks were made read-only against the live copy, and presses only on isolated scratch homes, two of which stopped early (TD-298). What follows was not seen. None waits on Paul.
+
+**Fix:** make each on a scratch home (TD-291's `scripts/look_home.py`) where a press settles it, or read-only the next time the live event happens; a failure is its own entry. **Presses:** Wrap up → Close session at the front without a reload (TD-156); Close leaving one *pane is gone* line (TD-029); Hand back's label (TD-096); the composer disabled on a killed session (TD-047); a role chip sending `prompts:` (TD-170, needs a claude-code session); the Drop note in the session's inbox (TD-150/TD-028); Reply and Message… dialogs opening (TD-052); Resume on an exited card (TD-155); Deny's *why?* box (TD-117); `a`/`d` keys on a permission card; Start's *Nothing to pick* dialog (TD-265, TD-262); New session's Start and Wind down for a team (TD-173, TD-276) and `ao new me --team`; Members… → Add member on an org.yml-defined scratch team (TD-268 — every live team is repo-defined, TD-210); Snooze on `stalled?` and unpushed rows (TD-079); `x` on an FYI note (TD-124); Promote's failing `run` and `auto` (TD-132); the rollback row and Dismiss ending the hold (TD-226); Put on the board's Ctrl+Enter (TD-281); a profile reserve's chip line after Save, a team stop time on members' cards, the Org's amber *over its line* (TD-244 Settings); *due this week* filtering the Inbox's rows (TD-220); a board row's other answers, Go with it, `1`–`4`/`g` and Not right… handing on (TD-255); Add entry → Hand to the techlead and → Open a session on the live repo page (TD-219, TD-283, with a logged-in session); `ao at <id> now` and Cancel, and a second session in a directory refused (TD-152). **Live events:** a member steering you with nothing else to pick (TD-274's wind-down part); *merged without its read* and either row's Dismiss (TD-258); the Inbox restart row, `ao restart`, an exited Focus banner (TD-250); a manager fill by cause (TD-259); a *reported* reading under a minute after a new session (TD-233 s2) and *· projected n%* (TD-233 s4); *closed by you / by manager-ao-1 / itself* and a wind-down within ten minutes (TD-265); an orphaned question (TD-216); the team-start row on the Inbox (TD-244 Settings); the origin row turning live with no reload after a pull, and agentorc's checkout catching up once the anchor is idle (TD-281, TD-263); *earlier turns* on a transcript of more than 20 turns (TD-166); four restarts in two hours and *early: nothing reported done* (TD-249); *brief: changed* in `ao status -v` (TD-217); a SendMessage to a worker refused (TD-064); a metered profile (TD-151, once one is declared).
+
+**Done when:** each is seen working or ledgered as its own entry.
+
+**Related:** TD-296, TD-291, TD-244.
+
+## TD-298: A scratch `AGENTORC_HOME` still reads this machine's repo registry and default tmux server
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the anchor: a look agent's scratch host agent fast-forwarded `/home/kmaster/agentorc`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/hosts.py` (`repos_registry`'s default), `src/sessionorc/agent*.py` (`serve`, the bare `Tmux()`), `src/sessionorc/tmux.py`
+
+**Why:** on 2026-10-03 a look agent started `agentorc-agent serve` with `AGENTORC_HOME=~/.cache/aolkE`, a private `AGENTORC_TMUX_SOCKET` and an empty `CLAUDE_CONFIG_DIR`. Its registry still filled with the four real checkouts, since `repos_registry` defaults outside the home, and four seconds after it started (20:33:00 MDT) its pull policy fast-forwarded the real agentorc checkout `05634ce7 → 6cf8e701` — which the live agent was holding *until agentorc-18 is idle*; the scratch agent could not see that session with its empty Claude config. The move was an ff-only merge on a clean checkout and harmed nothing, but a scratch home must not act on real repos. `AGENTORC_TMUX_SOCKET` is also not read by `serve`: its `Tmux()` takes the default server, so only `TMUX_TMPDIR` kept tmux apart. Three other look agents isolated themselves by hand (their own `hosts.yml` with `repos_registry`, a `HostAgent(tmux=Tmux(socket_name=…))`), as TD-291's `scripts/look_home.py` (#970) does.
+
+**Fix:** (1) when `AGENTORC_HOME` is not the default, `repos_registry` defaults under it (or is empty), never this machine's; (2) `serve` honours `AGENTORC_TMUX_SOCKET` as the test fixture and `look_home.py` do; (3) the design says both in §4.4's one-host paragraph; a test starts a scratch-home agent and asserts it lists no real repo and no default-server session.
+
+**Done when:** a host agent on a non-default home with no registry of its own lists no repo and touches no tmux server but its own.
+
+**Related:** TD-291 (`look_home.py`, which isolates by hand), TD-263 (the pull), TD-296.
