@@ -148,6 +148,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Open |
 | TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
+| TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Open |
 
 ---
 
@@ -2674,7 +2675,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the anchor, from five look agents on Paul's word: *lets pass the looks back to the grinders or do them here*)
 **Owner:** grinder
 **Kind:** build
-**Status:** Partly built. #14 fixed — PR #979 (a pressed answer's index is written on the question it closes, so *Waiting on them* says the answer; `ao inbox` prints a question's picked answer in the answer's words). #13 not reproduced: the live records carry `review_pr` on a declared claim with an open PR (designer-ao-1's TD-290 → #977, grinder-ao-2's TD-292 → #978, 2026-10-03); the look's shot was taken at 20:25 MDT, the minute #947 merged (02:25:47Z), and a merge clears `review_pr` by design (TD-150) while the declared claim stands until its session says `done`. #1, #2, #17 fixed — PR #985 (the chip prints `:g`, `.btn[hidden]`, the pull reading in its note's column). #4 fixed — PR #986 (`AO.quoteText`: the composer's quote without the inline marks). #5 not reproduced: the look's own `focus_sam1.png` reads *until Sun 17:17* in the Focus header, and the card, Focus and `ao status -v` all draw it with `ending.waiting_words`, which adds the day once it is not today. #7, #10 fixed — PR #988 (`ao team list` says *wound down <t> ago*; a seat's *on call* pill is never `scraped`). #3, #8 fixed — PR #989 (`.field > label`; `/api/dir_check` says `git` and Where hides the worktree choice outside a checkout; `applyRole` keeps a picked team's manager ticked). #16 fixed — PR #991 (the debt row's id and tags `flex: none`; the narrow wrap skips a Doing row). #15 fixed — PR #994 (rule 9's `system` note stamps its team, so the rail files it under that team). #11 fixed — PR #995 (the read-only line sits over the terminal, not in xterm's normal buffer, which tmux's alternate buffer hid; the toast waits for `onKey`). #9 fixed — PR #999 (the top bar wraps and the usage chip keeps its width, its own row below 720 px; Settings' number boxes at 4.5em). The rest is open, most of it in `src/agentorc/`.
+**Status:** Partly built. #14 fixed — PR #979 (a pressed answer's index is written on the question it closes, so *Waiting on them* says the answer; `ao inbox` prints a question's picked answer in the answer's words). #13 not reproduced: the live records carry `review_pr` on a declared claim with an open PR (designer-ao-1's TD-290 → #977, grinder-ao-2's TD-292 → #978, 2026-10-03); the look's shot was taken at 20:25 MDT, the minute #947 merged (02:25:47Z), and a merge clears `review_pr` by design (TD-150) while the declared claim stands until its session says `done`. #1, #2, #17 fixed — PR #985 (the chip prints `:g`, `.btn[hidden]`, the pull reading in its note's column). #4 fixed — PR #986 (`AO.quoteText`: the composer's quote without the inline marks). #5 not reproduced: the look's own `focus_sam1.png` reads *until Sun 17:17* in the Focus header, and the card, Focus and `ao status -v` all draw it with `ending.waiting_words`, which adds the day once it is not today. #7, #10 fixed — PR #988 (`ao team list` says *wound down <t> ago*; a seat's *on call* pill is never `scraped`). #3, #8 fixed — PR #989 (`.field > label`; `/api/dir_check` says `git` and Where hides the worktree choice outside a checkout; `applyRole` keeps a picked team's manager ticked). #16 fixed — PR #991 (the debt row's id and tags `flex: none`; the narrow wrap skips a Doing row). #15 fixed — PR #994 (rule 9's `system` note stamps its team, so the rail files it under that team). #11 fixed — PR #995 (the read-only line sits over the terminal, not in xterm's normal buffer, which tmux's alternate buffer hid; the toast waits for `onKey`). #6 fixed — PR #1002 (screen rules `first-run-theme` and `first-run-login`: Claude Code's first-run screens read `needs-you`, a question answered in the terminal). #9 fixed — PR #999 (the top bar wraps and the usage chip keeps its width, its own row below 720 px; Settings' number boxes at 4.5em). The rest is open, most of it in `src/agentorc/`.
 **Location:** `src/agentorc/ui/` (templates, `static/app.css`, `static/*.js`), `src/sessionorc/` where named; screenshots on kmaster under `~/ao-shots/looks-A/` … `~/ao-shots/looks-E/` (outside the repo: read them there, copy the ones a PR needs into `docs/mockups/reviews/`)
 
 **Why:** the board's 25 live looks were made on 2026-10-03 by a second session against the live copy `8de3e27` (read-only) and isolated scratch homes (presses). Most work; their lines are closed in `docs/user_attention_archive.md` with a verdict each. These are what did not, numbered as the closed lines cite them.
@@ -2811,3 +2812,19 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a board row in the Inbox shows its item's detail block, on a repo synced past dev-cadence TD-084, and a row without one reads as it does today.
 
 **Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
+
+## TD-306: A scraped `needs-you` stays after its screen is gone, until the next hook
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-2, the review of PR #1002)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_observe`: a screen verdict is applied only on a match; the `stalled?` cross-check reads `working` alone)
+
+**Why:** a hook-fed session whose last hook is older than `STALL_AFTER` takes a screen rule's verdict at once (design §4.2), and nothing takes it back when the screen stops matching: the record keeps the scraped `needs-you` until the tool's next hook. For the first-run screens and the trust dialog that hook comes (`SessionStart` once onboarding ends), but a person who opens `/theme` or `/login` in a session idle for twenty minutes and dismisses it leaves the card reading *needs-you* until the next turn — the same for any screen rule's state on a quiet session.
+
+**Fix:** in `_observe`, when the record's state was set `scraped` by a screen rule of a hook-fed adapter and no rule matches now, go back to the state the last hook set (keep it on the record beside the scraped one), or to `idle` when no hook has reported; a test with the trust dialog's fixture appearing and then cleared.
+
+**Related:** TD-015 (screen rules), TD-296 #6 (the first-run rules), TD-283 (the at-composer `startup`).

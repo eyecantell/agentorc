@@ -263,7 +263,9 @@ fresh state with a stale one (TD-169); **an error in the reply is the host agent
 never an outage, so it goes to the hook's stderr and is never queued (TD-115). agentorc chooses Claude Code's session uuid
 at launch (`--session-id`), so `adapter_id` is known from birth; a resume passes `--resume <id>`.
 **First-run quirk**: no hook reports the "trust this folder?" dialog, so the adapter marks the
-directory trusted in the tool's `.claude.json` before launch.
+directory trusted in the tool's `.claude.json` before launch. Nor does any hook report the tool's own first-run
+screens on a config it has never used — the text-style picker, then *Select login method* — so a
+screen rule reads each as `needs-you`, a question answered in the terminal (TD-296 #6).
 
 The hook payload → state mapping:
 

@@ -34,6 +34,30 @@ any = ["^\\s*(❯\\s*)?(\\d+\\.\\s*)?Deliver this message to Claude\\s*$"]
 pending = { kind = "question", text = "a message from another Claude Code session is held (deliver or deny in the terminal)" }
 
 [[rules]]
+# Claude Code's own first-run screens on a config it has never used (TD-296 #6): the text-style picker,
+# then the login method, both before the trust dialog and before any hook — so a session at one read
+# `working` from its birth with nothing running, and offered Steer. Each rule keys on whole lines of
+# the screen as captured from v2.1.289 (tests/fixtures/screens/first-run-*.txt), anchored at both
+# ends, so prose quoting them never fires. `/theme` and `/login` draw the same screens later on, and
+# a person is answering those in the terminal too.
+id = "first-run-theme"
+state = "needs-you"
+priority = 85
+region = 15
+all = ["^\\s*Syntax theme: .+\\(ctrl\\+t to (dis|en)able\\)\\s*$"]
+any = ["^\\s*(❯\\s*)?(✔\\s*)?(Dark|Light) mode( \\((colorblind-friendly|ANSI colors only)\\))?\\s*$"]
+pending = { kind = "question", text = "Claude Code's first-run screens: pick a text style (answer in the terminal)" }
+
+[[rules]]
+id = "first-run-login"
+state = "needs-you"
+priority = 85
+region = 15
+all = ["^\\s*Select login method:\\s*$"]
+any = ["^\\s*(❯\\s*)?\\d\\.\\s*(Claude account with subscription|Anthropic Console account)\\b"]
+pending = { kind = "question", text = "Claude Code wants a login: choose a method (answer in the terminal)" }
+
+[[rules]]
 # The tool's own limit message (the ADR's three usage-limit screens), before TD-001's poll sees it.
 id = "usage-limit"
 state = "limited"

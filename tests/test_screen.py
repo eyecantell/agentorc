@@ -54,6 +54,8 @@ def test_manifest_load_priority_and_pending(tmp_path):
         ("rate-limited-429", "rate-limited-429", "limited"),
         ("remote-control-standdown", "remote-control-standdown", "stalled?"),
         ("held-peer-message", "held-peer-message", "needs-you"),
+        ("first-run-theme", "first-run-theme", "needs-you"),
+        ("first-run-login", "first-run-login", "needs-you"),
     ],
 )
 def test_claude_code_rules_on_the_spike_screens(name, rule, state):
@@ -71,6 +73,8 @@ def test_claude_code_rules_on_the_spike_screens(name, rule, state):
         "rate-limited-429",
         "remote-control-standdown",
         "held-peer-message",
+        "first-run-theme",
+        "first-run-login",
     ],
 )
 def test_rules_fire_within_the_ticks_tail(name):
@@ -184,3 +188,32 @@ def test_a_held_peer_message_needs_a_person_and_prose_about_it_does_not():
         for i in range(max(1, len(lines) - 14)):
             got = m.explain(lines[i : i + 15])
             assert not (got and got.rule == "held-peer-message"), f"{rel} line {i + 1}"
+
+
+def test_claude_codes_first_run_screens_need_a_person_and_prose_about_them_does_not():
+    """TD-296 #6: a session launched on a config Claude Code has never used sits at its text-style
+    picker, then its login method, before any hook fires — and read `working` from its birth. Each
+    rule keys on whole lines of the screen as captured (v2.1.289), so prose quoting them is quiet."""
+    m = Manifest.load(RULES_FILE)
+    for name in ("first-run-theme", "first-run-login"):
+        got = m.explain(screen(name)[-15:])
+        assert got is not None and got.state == "needs-you" and got.pending is not None
+        assert got.pending.kind == "question" and "terminal" in got.pending.text
+    # the footer with ctrl+t pressed, the cursor on another option
+    assert m.explain(["   ❯ Light mode (ANSI colors only)", "  Syntax theme: Monokai Extended (ctrl+t to enable)"])
+    quiet = [
+        ["  Syntax theme: Monokai Extended (ctrl+t to disable)"],  # the footer alone: `/config` shows it too
+        ["     Dark mode", "     Light mode"],  # the options alone
+        ["  the picker lists *Dark mode* and *Light mode*; Syntax theme: x (ctrl+t to disable) is its foot"],
+        [" Select login method:"],  # the heading alone
+        ["  - Select login method:", "  - 1. Claude account with subscription"],
+    ]
+    for lines in quiet:
+        assert m.explain(lines) is None, lines
+    root = pathlib.Path(__file__).parents[1]
+    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
+                root / "docs" / "design.md"):  # fmt: skip
+        lines = pathlib.Path(rel).read_text().splitlines()
+        for i in range(max(1, len(lines) - 14)):
+            got = m.explain(lines[i : i + 15])
+            assert not (got and got.rule.startswith("first-run-")), f"{rel} line {i + 1}"
