@@ -53,7 +53,7 @@ def default_repos_registry() -> Path:
     """Where a host with no `repos_registry:` reads its repos (design §5): dev-cadence's machine roster
     for the default home, and `repos.txt` under any other home (TD-298) — a scratch home (a look, a
     test) never reads, pulls or promotes this machine's real checkouts by default."""
-    if paths.home() == paths.DEFAULT_HOME.expanduser():
+    if paths.home().resolve() == paths.DEFAULT_HOME.expanduser().resolve():  # a symlink to it is the default
         return Path(DEFAULT_REPOS_REGISTRY).expanduser()
     return paths.home() / "repos.txt"
 

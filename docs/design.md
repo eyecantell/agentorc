@@ -6656,7 +6656,7 @@ person:                                       # the person's own — nothing her
   text the person wrote, escaped. Nothing under `person:` reaches a policy: the gate and the tick
   read the file by key and never this one.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
-  duplicated. A repo without dev-cadence can still be listed there. Directories that are not
+  duplicated; a home other than `~/.agentorc` reads its own `repos.txt` unless `repos_registry` names one (TD-298). A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
   ones per host in `~/.agentorc/recent_dirs`.
 - Per repo: `.agentorc.yml` (checked in):

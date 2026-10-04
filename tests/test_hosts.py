@@ -53,6 +53,10 @@ def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("AGENTORC_HOME", "~/.agentorc")
     assert hosts.local_host().repos() == ["/home/p/real"]
+    (tmp_path / ".agentorc").mkdir()
+    (tmp_path / "link").symlink_to(tmp_path / ".agentorc")
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "link"))
+    assert hosts.default_repos_registry() == roster  # a symlink to the default home is the default home
     monkeypatch.delenv("AGENTORC_HOME")
     assert hosts.default_repos_registry() == roster
 
