@@ -471,6 +471,5 @@ def test_a_hidden_button_is_not_drawn_whatever_its_class_sets():
     and pushed Save to its own line on a narrow card. `.btn[hidden]` puts it back."""
     css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
     assert ".btn[hidden] { display: none; }" in css
-    assert 'class="btn sm ghost setcancel" type="button" hidden' in (
-        pathlib.Path(__file__).parents[1] / "src/agentorc/ui/templates/settings.html"
-    ).read_text()
+    html = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/templates/settings.html").read_text()
+    assert 'class="btn sm ghost setcancel" type="button" hidden' in html
