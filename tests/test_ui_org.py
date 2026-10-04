@@ -1365,3 +1365,16 @@ def test_a_card_says_what_it_waits_on_after_its_declaration_or_alone(tmp_path, m
         "text": f"waiting on you: TD-222 until {clock}",
         "full": f"waiting on you: TD-222 until {clock} — m-s?",
     }
+
+
+def test_the_usage_chip_prints_a_whole_float_as_the_script_does():
+    """TD-296 #1: the endpoint's `52.0` drew *week 52.0%* on the pages the server renders (Settings,
+    Inbox, Help, New session) and *week 52%* where `AO.usageChip` redraws it (JS prints a whole
+    float bare). The server now prints `:g`, as the script does; a fraction keeps its decimal."""
+    from agentorc.ui.app import usage_chip
+
+    u = {"windows": [{"label": "week", "pct": 52.0, "resets": "r"}, {"label": "5h", "pct": 7.5, "resets": "r"}],
+         "fetched": "2026-09-20T20:00:00Z", "reason": "ok"}  # fmt: skip
+    c = usage_chip("grind", u, USAGE_NOW)
+    assert c["text"] == "grind · week 52%"
+    assert "week 52% (resets r)" in c["title"] and "5h 7.5% (resets r)" in c["title"]

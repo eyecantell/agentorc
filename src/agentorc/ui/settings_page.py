@@ -155,7 +155,7 @@ def reading_age(w: Mapping[str, Any], read: Mapping[str, Any] | None, now: datet
     """A window's reading as the chip's hover gives it (§4.5a *Settings page: Usage*, *The reading's
     age*; TD-233 slice 1): *week 88% · read 6h ago, asked of the endpoint*; past its reset or past
     `USAGE_UNKNOWN`, *unknown since 22:21 (was 88%)*. Empty for a reading with no time on it."""
-    pct = f"{w['pct']}%" if _is_num(w.get("pct")) else "?"
+    pct = f"{w['pct']:g}%" if _is_num(w.get("pct")) else "?"
     resets = _when(w.get("resets"))
     if resets is not None and resets <= now:
         return f"unknown since its reset at {usage_clock(resets, now)} (was {pct})"

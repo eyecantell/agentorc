@@ -85,6 +85,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 #buildchip.behind { color: var(--topfg); font-weight: 600; } #buildchip.unknown { font-style: italic; }
 #usagemore { cursor: default; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: var(--t-btn); font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
+.btn[hidden] { display: none; }  /* .btn sets display, which beats [hidden]: Settings' Cancel showed always (TD-296 #2) */
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); } .btn.ghost:hover { background: var(--hover); }
@@ -585,6 +586,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setgroup { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
+.setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */
 .setpage .setage { grid-column: 3; margin-top: -8px; }  /* the reading's age under its line (TD-233) */
 .setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220) */
 .setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
