@@ -1,6 +1,7 @@
 """The link between a node and its home (design §4.4a "The link's protocol", TD-057 step 3a)."""
 
 import asyncio
+import base64
 import contextlib
 import os
 import signal
@@ -2176,3 +2177,52 @@ def test_a_socket_is_born_0600_whatever_the_umask_and_the_umask_is_put_back(tmp_
         assert os.umask(0o022) == 0o022, "and after a bind that failed"
     finally:
         os.umask(old)
+
+
+def _repo_with_shot(tmp_path, name="proj"):
+    """A checkout `name` whose origin's `main` holds docs/mockups/reviews/a.png; `b.png` is in its
+    working tree only."""
+    run = lambda *a, cwd=tmp_path: subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)  # noqa: E731
+    origin, root = tmp_path / f"{name}.git", tmp_path / name
+    run("init", "-q", "--bare", "-b", "main", str(origin))
+    run("clone", "-q", str(origin), str(root))
+    run("checkout", "-q", "-b", "main", cwd=root)
+    d = root / "docs" / "mockups" / "reviews"
+    d.mkdir(parents=True)
+    (d / "a.png").write_bytes(b"\x89PNG node shot")
+    run("add", "-A", cwd=root)
+    run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "shot", cwd=root)
+    run("push", "-q", "origin", "main", cwd=root)
+    (d / "b.png").write_bytes(b"\x89PNG working tree")
+    return root
+
+
+async def test_a_looks_screenshot_is_read_on_the_node_whose_registry_holds_the_repo(home, tmp_path, monkeypatch):
+    """TD-300, design §4.5a **Inbox row: a look**: the home's `host_shot` for a node reads one `.png`
+    of `docs/mockups/reviews/` at `origin/<default>` of the checkout the node registers under that
+    name, over the link's `shot`; `head` answers presence alone; a name of any other shape is refused."""
+    root = _repo_with_shot(tmp_path)
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        roster = tmp_path / "laptop" / "repos.txt"
+        roster.write_text(f"{root}\n")
+        dial = home.dial_command()
+        (tmp_path / "laptop" / "hosts.yml").write_text(
+            f"home: kmaster\nlocal:\n  name: laptop\n  repos_registry: {roster}\nlink:\n  command: {dial!r}\n"
+        )
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png")
+            assert (got["host"], got["exists"]) == ("laptop", True)
+            assert base64.b64decode(got["png"]) == b"\x89PNG node shot"
+            head = await person.call("host_shot", host="laptop", repo="proj", name="a.png", head=True)
+            assert head["exists"] is True and head["png"] == ""
+            for repo, name in (("proj", "b.png"), ("other", "a.png")):  # the working tree's; a repo not registered
+                miss = await person.call("host_shot", host="laptop", repo=repo, name=name)
+                assert miss["exists"] is False and miss["png"] == "", (repo, name)
+            for bad in ("../a.png", "a.jpg", "docs/mockups/reviews/a.png"):
+                with pytest.raises(AgentError, match="not a screenshot a look can name"):
+                    await person.call("host_shot", host="laptop", repo="proj", name=bad)
+        async with LocalClient() as at_node:  # a node answers for itself, and asks no other host
+            assert (await at_node.call("host_shot", host="laptop", repo="proj", name="a.png", head=True))["exists"]
+            with pytest.raises(AgentError, match="is a node of kmaster"):
+                await at_node.call("host_shot", host="kmaster", repo="proj", name="a.png")

@@ -7,9 +7,7 @@ suite patches both there.
 
 from __future__ import annotations
 
-import contextlib
 import re
-import subprocess
 import sys
 import time
 from collections.abc import Collection, Mapping
@@ -24,10 +22,11 @@ from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import hosts
-from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mail_mod
 from sessionorc import settings as settings_mod
+from sessionorc import shots as shots_mod
 from sessionorc.agent_common import WRAPUP_GRACE
+from sessionorc.client import call_sync
 from sessionorc.models import (
     normalize_ref,
 )
@@ -928,80 +927,71 @@ def live_look(it: Mapping[str, Any]) -> bool:
 
 # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): the one directory a look's screenshots
 # are served from, as origin's default branch holds it, and the names that may be asked of it —
-# the shape and the count the host agent checks a look's `shots` against (`mail`, TD-292 slice 2)
-SHOT_DIR = Path("docs") / "mockups" / "reviews"
+# the shape and the count the host agent checks a look's `shots` against (`mail`, TD-292 slice 2).
+# The reading itself is `sessionorc.shots`, the one the host agent makes for another host (TD-300).
+SHOT_DIR = shots_mod.SHOT_DIR
 SHOT_NAME = mail_mod.SHOT_NAME
 SHOTS_MAX = mail_mod.SHOTS_MAX
 SHOT_TTL = 60.0  # seconds a screenshot's presence on origin is kept: a row is redrawn on every poll
 _shot_seen: dict[tuple[str, str], tuple[float, bool]] = {}
-
-
-def shot_root(repo: str) -> Path | None:
-    """The registered checkout of this host named `repo` (its directory's name, as `/repo/<name>`
-    and Add entry name a repo), or None — the only checkouts a screenshot is served from."""
-    for p in hosts.local_host().repos():
-        if repo and Path(p).expanduser().name == repo:
-            return Path(p).expanduser().resolve()
-    return None
-
-
-def shot_bytes(root: Path, name: str) -> bytes | None:
-    """`docs/mockups/reviews/<name>` as `origin/<default>` holds it in `root`, or None: a name that is
-    not a bare `.png` name, a checkout with no origin, a file origin does not hold. Never the working
-    tree: what a look shows is what was merged (§4.5a **Inbox row: a look**)."""
-    if not SHOT_NAME.fullmatch(name):
-        return None
-    ref = ledger_mod.default_ref(root)
-    if ref is None:
-        return None
-    try:
-        cp = subprocess.run(
-            ["git", "-C", str(root), "show", f"{ref}:{(SHOT_DIR / name).as_posix()}"],
-            capture_output=True,
-            timeout=10.0,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return cp.stdout if cp.returncode == 0 else None
+SHOT_WAIT = 2.0  # seconds a row waits for another host's answer: a hung node holds the Inbox no longer
+_shot_host_down: dict[str, float] = {}  # a host that did not answer, by when: not asked again for `SHOT_TTL`
+shot_root = shots_mod.root_of
+shot_bytes = shots_mod.read
 
 
 def _shot_on_origin(root: Path, name: str) -> bool:
     key, now = (str(root), name), time.monotonic()
     at, seen = _shot_seen.get(key, (0.0, False))
     if now - at > SHOT_TTL:
-        ref = ledger_mod.default_ref(root)
-        seen = False
-        if ref is not None:
-            with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-                seen = (
-                    subprocess.run(
-                        ["git", "-C", str(root), "cat-file", "-e", f"{ref}:{(SHOT_DIR / name).as_posix()}"],
-                        capture_output=True,
-                        timeout=10.0,
-                    ).returncode
-                    == 0
-                )
+        seen = shots_mod.exists(root, name)
         _shot_seen[key] = (now, seen)
     return seen
 
 
-def look_shots(shots: Any, repo: str) -> list[dict[str, str]]:
+def _shot_on_host(host: str, repo: str, name: str) -> bool:
+    """The same test for a repo another host registers (TD-300): `host_shot` with `head`, asked
+    through the home and kept `SHOT_TTL` as this host's is, waiting `SHOT_WAIT` and no longer. A host
+    that cannot be asked, or does not answer in time, reads as not holding it — the row draws the
+    name alone — and is not asked again, for any name, for `SHOT_TTL`."""
+    key, now = (f"{host}:{repo}", name), time.monotonic()
+    at, seen = _shot_seen.get(key, (0.0, False))
+    if now - at > SHOT_TTL:
+        if now - _shot_host_down.get(host, -SHOT_TTL - 1.0) <= SHOT_TTL:
+            return False
+        try:
+            got = call_sync("host_shot", host=host, repo=repo, name=name, head=True, _timeout=SHOT_WAIT)
+            seen = bool((got or {}).get("exists"))
+        except Exception:  # noqa: BLE001 — whatever the transport raised, the image is not drawn
+            _shot_host_down[host] = now
+            seen = False
+        _shot_seen[key] = (now, seen)
+    return seen
+
+
+def look_shots(shots: Any, repo: str, host: str = "") -> list[dict[str, str]]:
     """A look's screenshots as its row draws them (§4.5a **Inbox row: a look**): each of the
     envelope's `shots`, in the order sent, at most four — `name`, the file's name, and `url`, the
-    image's address on this page when the sender's repo (`repo`, a registered checkout's name) is
-    this host's and origin holds the file there, else "" and the row draws the name alone. A path
-    outside `docs/mockups/reviews/` has no address, whatever its name."""
+    image's address on this page when origin holds the file in the sender's repo (`repo`, a
+    registered checkout's name), else "" and the row draws the name alone. The repo is read where
+    the sender runs: this host's registry, or — `host`, the sender's record's, when it is another —
+    that host's through the home (TD-300). A path outside `docs/mockups/reviews/` has no address,
+    whatever its name."""
     if not isinstance(shots, list):
         return []
-    root = shot_root(repo)
+    there = host if host and host != host_name() else ""
+    root = None if there else shot_root(repo)
     out: list[dict[str, str]] = []
     for raw in shots[:SHOTS_MAX]:
         if not isinstance(raw, str) or not raw.strip():
             continue
         p = Path(raw.strip().removeprefix("./"))
         url = ""
-        if root is not None and p.parent == SHOT_DIR and SHOT_NAME.fullmatch(p.name) and _shot_on_origin(root, p.name):
-            url = f"/repo/{quote(repo)}/shot/{quote(p.name)}"
+        if repo and p.parent == SHOT_DIR and SHOT_NAME.fullmatch(p.name):
+            if there and _shot_on_host(there, repo, p.name):
+                url = f"/repo/{quote(repo)}/shot/{quote(p.name)}?host={quote(there)}"
+            elif root is not None and _shot_on_origin(root, p.name):
+                url = f"/repo/{quote(repo)}/shot/{quote(p.name)}"
         out.append({"name": p.name, "url": url})
     return out
 
