@@ -86,19 +86,46 @@ def _lines(lines: list[str], origin: str | None, links: bool = True) -> str:
     return "<br>".join(inline(x.strip(), origin, links) for x in lines)
 
 
+def _indent(line: str) -> int:
+    wide = line.expandtabs(4)
+    return len(wide) - len(wide.lstrip())
+
+
+def _list(items: list[tuple[int, str, list[str]]], start: int, origin: str | None, links: bool) -> tuple[str, int]:
+    """One list from `items[start]` — `(indent, kind, lines)` each — and the index after it: its
+    items at that item's indent and kind; an item indented deeper opens a list inside the item above
+    it (§4.5a *Inbox board row: detail block*, TD-312), one shallower or of the other kind at this
+    indent ends it."""
+    depth, tag = items[start][0], items[start][1]
+    parts: list[str] = []
+    i = start
+    while i < len(items):
+        ind, kind, body = items[i]
+        if ind < depth or (ind == depth and kind != tag):
+            break
+        if ind > depth and parts:
+            sub, i = _list(items, i, origin, links)
+            parts[-1] += sub
+            continue
+        parts.append(_lines(body, origin, links))
+        i += 1
+    return f"<{tag}>" + "".join(f"<li>{x}</li>" for x in parts) + f"</{tag}>", i
+
+
 def _block(lines: list[str], origin: str | None, links: bool = True) -> list[str]:
-    """One block between blank lines: runs of list items and runs of paragraph lines, in order."""
+    """One block between blank lines: runs of list items and runs of paragraph lines, in order. A
+    list nests by indent: an item indented deeper than the one above it is a list inside that item."""
     out: list[str] = []
     para: list[str] = []
-    items: list[list[str]] = []
-    kind = ""
+    items: list[tuple[int, str, list[str]]] = []
 
     def flush() -> None:
-        nonlocal items, para, kind
-        if items:
-            tag = "ol" if kind == "ol" else "ul"
-            out.append(f"<{tag}>" + "".join(f"<li>{_lines(i, origin, links)}</li>" for i in items) + f"</{tag}>")
-            items, kind = [], ""
+        nonlocal items, para
+        i = 0
+        while i < len(items):
+            html, i = _list(items, i, origin, links)
+            out.append(html)
+        items = []
         if para:
             out.append(f"<p>{_lines(para, origin, links)}</p>")
             para = []
@@ -106,13 +133,11 @@ def _block(lines: list[str], origin: str | None, links: bool = True) -> list[str
     for line in lines:
         ul, ol = _UL.match(line), _OL.match(line)
         if ul or ol:
-            k = "ul" if ul else "ol"
-            if para or (items and k != kind):
+            if para:
                 flush()
-            kind = k
-            items.append([ul.group(1) if ul else ol.group(2)])  # type: ignore[union-attr]
+            items.append((_indent(line), "ul" if ul else "ol", [ul.group(1) if ul else ol.group(2)]))  # type: ignore[union-attr]
         elif items and line[:1] in (" ", "\t") and line.strip():
-            items[-1].append(line)  # an indented line continues the item above it
+            items[-1][2].append(line)  # an indented line continues the item above it
         else:
             if items:
                 flush()

@@ -207,6 +207,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_argv,  # noqa: F401
     board_body,  # noqa: F401
     board_choices,  # noqa: F401
+    board_detail,  # noqa: F401
     board_due_now,  # noqa: F401
     board_head,  # noqa: F401
     board_horizon,  # noqa: F401

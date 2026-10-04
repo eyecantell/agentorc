@@ -653,12 +653,17 @@
   // design §4.5a **Inbox row: details** (§4.10 *How a message to a person is written*; TD-138):
   // which rows' *details* the person has opened, by entry id. The poll replaces rows, so the set is
   // put back after each swap (`reopenFolds`); it lives as long as the page and is never stored —
-  // a fold is not state. `toggle` does not bubble, hence the capture.
-  const foldsOpen = new Set();
-  document.addEventListener?.("toggle", (ev) => {
-    const d = ev.target;
-    if (!d || !d.matches || !d.matches("details.fold") || !d.dataset.fold) return;
-    if (d.open) foldsOpen.add(d.dataset.fold); else foldsOpen.delete(d.dataset.fold);
+  // a fold is not state. Both ways (§4.5a *Inbox board row: detail block*, TD-312): a board row with
+  // answers is drawn with its fold open, so a poll would open again what the person shut. Recorded
+  // from the person's press on the summary, never from `toggle`, which a fold drawn open fires too;
+  // the capture runs before the summary's own toggling, so `d.open` is the state being left.
+  const foldsOpen = new Set(), foldsShut = new Set();
+  document.addEventListener?.("click", (ev) => {
+    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary");
+    const d = s && s.parentElement;
+    if (!d || !d.dataset.fold) return;
+    const id = d.dataset.fold;
+    if (d.open) { foldsShut.add(id); foldsOpen.delete(id); } else { foldsOpen.add(id); foldsShut.delete(id); }
   }, true);
   // the board line's **show** (§4.5 screen 6 *The board's horizon*, TD-220): opens the *not shown*
   // fold beside it for this page view — the fold's own memory above — and writes no setting
@@ -667,10 +672,13 @@
     if (!a) return;
     ev.preventDefault();
     const box = a.closest("#boardhorizon, .inboxpage"), d = box && box.querySelector("details.boardfold");
-    if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
+    if (d) { if (d.dataset.fold) { foldsShut.delete(d.dataset.fold); foldsOpen.add(d.dataset.fold); } d.open = true; d.scrollIntoView({ block: "nearest" }); }
   });
   AO.reopenFolds = function (root) {
-    (root ? $$("details.fold", root) : []).forEach((d) => { if (foldsOpen.has(d.dataset.fold)) d.open = true; });
+    (root ? $$("details.fold", root) : []).forEach((d) => {
+      if (foldsShut.has(d.dataset.fold)) d.open = false;
+      else if (foldsOpen.has(d.dataset.fold)) d.open = true;
+    });
   };
   // The Focus panel's entry, folded as the Inbox row is: both halves were rendered by the server's
   // closed-subset renderer (`api_inbox`, `shaped`) — escaped text and its own few tags — so nothing
