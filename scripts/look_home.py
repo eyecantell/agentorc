@@ -57,6 +57,10 @@ BOARD = "\n".join(
         _LINE.format(kind="look", head="A fixture look.", rest="Say whether the Inbox reads right. ", due="{today}")
         + " Answers: Works | Not right: <what>.",
         _LINE.format(kind="watch", head="A fixture line not due yet.", rest="", due="2099-01-01"),
+        _LINE.format(kind="look", head="A fixture look the techlead leaned on.", rest="", due="{ahead}")
+        + " Answers: Works (default) | Not right: <what>.",
+        _LINE.format(kind="look", head="A fixture look past its bound.", rest="", due="{before}")
+        + " Answers: Works (default) | Not right: <what>.",
         "",
     ]
 )
@@ -117,7 +121,11 @@ def write_fixtures(home: Path) -> Path:
     repo = home / "repo"
     (repo / "docs").mkdir(parents=True)
     today = time.strftime("%Y-%m-%d")
-    (repo / "docs" / "user_attention.md").write_text(BOARD.format(today=today), encoding="utf-8")
+    day = 86400
+    ahead, before = (time.strftime("%Y-%m-%d", time.localtime(time.time() + d)) for d in (2 * day, -day))
+    (repo / "docs" / "user_attention.md").write_text(
+        BOARD.format(today=today, ahead=ahead, before=before), encoding="utf-8"
+    )
     (repo / "docs" / "technical_debt.md").write_text(LEDGER, encoding="utf-8")
     # the Inbox runs the board reader a registered repo carries: this checkout's copy
     (repo / "scripts").mkdir()

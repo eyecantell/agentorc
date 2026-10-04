@@ -612,7 +612,13 @@
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-board">board</span>
   <span class="grow"></span>
+  {#- §4.5a **Inbox board row (a `look`)** (TD-292 slice 2): a look with *Works (default)* reads its
+      bound, as a steer's time left does, and *lapsed* past it -#}
+  {%- if e.steering %}
+  <span class="st" title="Due: {{ e.due }}">{% if e.lapsed %}lapsed {{ e.due }} — Works by default; its team closes the line{% else %}until {{ e.due }}, then closed as Works{% endif %}</span>
+  {%- else %}
   <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
+  {%- endif %}
 </div>
 {#- §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset as a message's
     text is (§4.10), its bold head and the sentence after it drawn and the rest under *details*,
@@ -649,13 +655,20 @@
   {%- endfor %}
 </div>
 {%- endif %}
+{%- if e.steering %}
+<div class="st dflt">will go with: Works — doing nothing is a valid answer</div>
+{%- endif %}
 {#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair %}
 <div class="row gap wrap mfoot">
   {%- if ro %}
   <span class="st">{{ ORIGIN_READONLY }}</span>
   {%- else %}
+  {%- if e.steering %}
+  <span class="st">on the board — Reply writes on its line and Snooze moves its <code>Due:</code> date, and so its bound, each one commit in {{ e.repo }}'s checkout, never pushed</span>
+  {%- else %}
   <span class="st">on the board — Reply writes on its line, Snooze moves its <code>Due:</code> date and Done checks it off, each one commit in {{ e.repo }}'s checkout, never pushed</span>
+  {%- endif %}
   {%- endif %}
   <span class="grow"></span>
   {%- if e.editor %}<a class="btn sm ghost" href="{{ e.editor }}" title="open {{ e.board }} at line {{ e.line }}">Open board</a>{% endif %}
@@ -663,7 +676,7 @@
   <button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Reply</button>
   {%- if gwi %}<button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Go with it</button>{% endif %}
   <button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Snooze</button>
-  <button class="btn sm" disabled title="{{ ORIGIN_READONLY }}">Done</button>
+  {%- if not e.steering %}<button class="btn sm" disabled title="{{ ORIGIN_READONLY }}">Done</button>{% endif %}
   {%- else %}
   <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-name="{{ e.repo }}'s board" title="your words appended to this line of the board — one commit, never pushed; the line stays due">Reply</button>
   {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
@@ -676,7 +689,10 @@
       <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">a date…</button>
     </div>
   </details>
+  {#- a steering look has no Done: it ends by its answer, or closed as Works at its bound -#}
+  {%- if not e.steering %}
   <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-confirm="Check this item off {{ e.repo }}'s board? It is committed in that checkout.">Done</button>
+  {%- endif %}
   {%- endif %}
 </div>
 {%- endmacro %}

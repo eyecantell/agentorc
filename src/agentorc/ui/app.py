@@ -211,6 +211,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     live_look,  # noqa: F401
+    look_lapsed,  # noqa: F401
+    look_steering,  # noqa: F401
     origin_case,  # noqa: F401
     origin_firsts,  # noqa: F401
     origin_note,  # noqa: F401
@@ -2497,7 +2499,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
             handed=got.get("handed") or (),
-            boards=hz["due"],
+            boards=hz["due"] + hz.get("steering", []),
         )
         picks = rail_picks(request.query_params)
         return templates.TemplateResponse(
@@ -2645,7 +2647,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             trail=got.get("trail") or (),
             attention_snoozed=got.get("attention_snoozed"),
             handed=got.get("handed") or (),
-            boards=hz["due"],
+            boards=hz["due"] + hz.get("steering", []),
         )
         got["agent_down"] = False
         got["board_note"] = board_note

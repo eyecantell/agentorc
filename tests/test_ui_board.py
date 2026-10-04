@@ -660,6 +660,14 @@ def test_the_rail_counts_coming_up_as_board_items_and_in_no_section():
     assert got["heads"]["needs"]["all"] == 1 and got["teams"]["t"]["all"] == 1
     picked = rail_counts(rows, rail_picks({"sec": "needs", "kind": "board"}))
     assert picked["kinds"]["board"]["shown"] == 2 and picked["heads"]["needs"]["shown"] == 1
+    # a steering `look` (TD-292 slice 2): one row, counted once — under *Steering* and *board items*
+    look = {"row": "board", "id": "b3", "team": "t", "find": "look", "steering": True}
+    from agentorc.ui.app import inbox_sections
+
+    secs = inbox_sections([], boards=[due, look])
+    got = rail_counts(rail_rows(secs, [later]), rail_picks({}))
+    assert got["kinds"]["board"]["all"] == 3 and got["sections"]["steering"]["all"] == 1
+    assert got["sections"]["needs"]["all"] == 1 and secs["count"] == 1
 
 
 @pytest.mark.unit
@@ -1526,3 +1534,41 @@ def test_put_on_the_board_takes_its_words_in_a_box_of_lines(tmp_path, monkeypatc
     html = templates.get_template("board_add.html").render(board_choices=[{"board": "/b", "label": "b"}])
     assert '<textarea class="input" id="batext" rows="4"' in html and 'id="batext"' in html
     assert '<input class="input" id="batext"' not in html and "Ctrl+Enter" in html
+
+
+@pytest.mark.unit
+def test_a_look_with_works_by_default_is_steering_with_its_due_as_its_bound(tmp_path, monkeypatch):
+    """§4.5a **Inbox board row (a `look`)** (TD-292 slice 2): a `look` whose default is *Works* is
+    under *Steering* from the day it is written until its line is closed — never due now, so in no
+    count and outside the horizon under every mode — reading *until <Due:>, then closed as Works*
+    and *will go with: Works*, with **Go with it: Works** and **Not right…**, Reply, Snooze and Open
+    board, and no Done. Past its date it is *lapsed*, a field beside `due_now`, and still steering.
+    Without a default, or decided, or a `watch`, it is the ordinary row."""
+    from agentorc.ui.app import board_horizon, inbox_sections, templates
+
+    it = {**look_item(default="Works", kind="look"), "overdue_days": None, "due_tag": "due in 2d"}
+    rows, _ = rows_html(tmp_path, monkeypatch, it)
+    r = rows[0]
+    assert r["steering"] and not r["lapsed"] and not r["due_now"] and r["bound"] == "2026-09-20"
+    html = templates.get_template("inbox_rows.html").render(rows=rows, section="steering")
+    assert "until 2026-09-20, then closed as Works" in html and "will go with: Works" in html
+    assert ">Go with it: Works</span>" in html and "Not right…" in html
+    assert ">Reply<" in html and ">Snooze<" in html and 'data-board-act="done"' not in html and ">Done<" not in html
+    for mode in ("next:1", "due", "all", "3d"):
+        h = board_horizon(rows, mode, "2026-09-18")
+        assert h["steering"] == rows and not (h["due"] or h["ahead"] or h["hidden"])
+    secs = inbox_sections([], boards=rows)
+    assert secs["steering"] == rows and secs["count"] == 0 and not secs["needs"]
+
+    rows, _ = rows_html(tmp_path, monkeypatch, {**it, "overdue_days": 2, "due_tag": "2d overdue"})
+    assert rows[0]["lapsed"] and rows[0]["steering"] and not rows[0]["due_now"]
+    html = templates.get_template("inbox_rows.html").render(rows=rows, section="steering")
+    assert "lapsed 2026-09-20 — Works by default; its team closes the line" in html
+
+    for other in (
+        look_item(kind="look"),  # no default: the person's, under Needs you when due
+        {**look_item(default="Works", kind="look"), "decided": {"text": "Works", "date": "2026-09-19"}},
+        look_item(default="Works", kind="watch"),  # a watch is the person's until it is a look
+    ):
+        rows, _ = rows_html(tmp_path, monkeypatch, other)
+        assert not rows[0]["steering"] and not rows[0]["lapsed"] and rows[0]["due_now"]

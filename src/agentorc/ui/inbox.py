@@ -844,6 +844,8 @@ def board_due_now(it: Mapping[str, Any]) -> bool:
     undecided `fyi` item never (the reader's own `surfaces_at_start`, read here from its fields)."""
     if it.get("kind") == "fyi" and not it.get("decided"):
         return False
+    if look_steering(it):
+        return False  # under *Steering* until its line is closed, outside every *due now* number (TD-292)
     return bool(it.get("decided")) or bool(it.get("due_error")) or it.get("overdue_days") is not None
 
 
@@ -918,6 +920,26 @@ def live_look(it: Mapping[str, Any]) -> bool:
         and answers[0] == WORKS
         and bool(board_mod.NOT_RIGHT_FORM.fullmatch(answers[1]))
     )
+
+
+def look_steering(it: Mapping[str, Any]) -> bool:
+    """Whether a board item is a `look` that goes ahead unless the person says otherwise (design
+    §4.5a **Inbox board row (a `look`)**, §4.9b, TD-292 slice 2): kind `look`, its default *Works*
+    (the techlead's lean), undecided. Such a row is drawn under *Steering* from the day it is written
+    until its line is closed, its `Due:` the bound; it is never due now and never counted."""
+    return (
+        str(it.get("kind") or "") == "look"
+        and " ".join(str(it.get("default") or "").split()) == WORKS
+        and not it.get("decided")
+    )
+
+
+def look_lapsed(it: Mapping[str, Any]) -> bool:
+    """A steering `look` whose `Due:` is before today (§4.5a *lapsed*): the reader's fields alone. A
+    lapse is the order a decided *Works* is — a member reading the board closes the line — and the
+    page writes nothing at it."""
+    days = it.get("overdue_days")
+    return look_steering(it) and isinstance(days, int) and days >= 1
 
 
 def board_head(text: str) -> str:
@@ -1013,6 +1035,11 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "due_tag": tag,
                     "at": str(it.get("due") or ""),
                     "due_now": board_due_now(it),
+                    # §4.5a **Inbox board row (a `look`)** (TD-292 slice 2): a look with *Works
+                    # (default)* is a *Steering* row whose bound is its `Due:`, *lapsed* past it
+                    "steering": look_steering(it),
+                    "lapsed": look_lapsed(it),
+                    "bound": str(it.get("due") or "") if look_steering(it) else "",
                     "today": today,  # the reader's, which `board_horizon` measures days from
                     "due_error": bool(it.get("due_error")),
                     "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today, tag),
@@ -1047,6 +1074,9 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         mode = settings_mod.parse_board_show(mode)
     except ValueError:
         mode = settings_mod.BOARD_SHOW_DEFAULT
+    # a steering `look` is outside the horizon: under *Steering* whatever the mode (TD-292 slice 2)
+    steering = sorted((r for r in rows if r.get("steering")), key=lambda r: str(r.get("due") or ""))
+    rows = [r for r in rows if not r.get("steering")]
     due = [r for r in rows if r.get("due_now", True)]
     rest = sorted(
         (r for r in rows if not r.get("due_now", True)),
@@ -1084,6 +1114,7 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         "hidden": hidden,
         "next_due": _next_due(hidden, now),
         "today": now,
+        "steering": steering,
     }
 
 
@@ -1383,7 +1414,8 @@ def inbox_sections(
     for e in handed:
         out["needs" if _outcome_of(e).get("state") == "blocked" else "waiting"].append(e)
     out["fyi"].extend(_trail_rows(trail or (), at))
-    out["needs"].extend(boards)
+    for r in boards:  # a steering `look` (TD-292 slice 2) waits under *Steering*, uncounted
+        out["steering" if r.get("steering") else "needs"].append(r)
     out["needs"].sort(key=_needs_key)
     out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
     out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("at") or ""))
