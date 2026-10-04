@@ -847,7 +847,7 @@ class MailMixin:
         else:
             self._mark(msg_id, closed_at=at, closed_reason=reason)
 
-    def _system_note(self, to: str, text: str, *, wake: str = "note") -> None:
+    def _system_note(self, to: str, text: str, *, wake: str = "note", team: str | None = None) -> None:
         """A `note` from `system` written **straight into the sender's mailbox** (design §4.10 "How
         the sender hears that one closed without a reply"): it does not pass through the send path,
         so no gate, no tally and no depth sees it, and no session can send as `system`. It reports
@@ -867,8 +867,12 @@ class MailMixin:
           the new record, and a host-agent **restart**, which reloads it (review of PR #245).
 
         A sender that has since been resumed is followed to its successor, as mail addressed to a
-        superseded record is (§4.10 lifecycle): the note is about the conversation, not the id."""
+        superseded record is (§4.10 lifecycle): the note is about the conversation, not the id.
+
+        `team` is the team a note is about, stamped where a sender's would be, so the Inbox files it
+        under that team rather than *No team* (§4.10 *An envelope carries its sender's team*)."""
         entry = MailEntry(id="m-" + secrets.token_hex(6), from_=SYSTEM, to=[to], at=now_iso(), kind="note", text=text)
+        entry.team = team or None
         entry.uncharged = wake == "uncharged"
         if to == PERSON:
             self.person_inbox.append(entry)

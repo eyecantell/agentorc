@@ -6274,8 +6274,9 @@ has **Pause** instead (above).
 
 **An envelope carries its sender's `team`**, stamped by the home at send beside `from` — the Inbox
 filters by team, and a join to the sender's record fails exactly when the page most needs it,
-after that record is gone. An entry from a session with no team, or sent before the stamp existed,
-shows under *No team*.
+after that record is gone. A `system` note about one team — rule 9's *finished and the host agent
+wound it down* (§6) — carries that team the same way. An entry from a session with no team, or
+sent before the stamp existed, shows under *No team*.
 
 **A message may still reach an interactive session; an act of control still may not.** Where the
 graph reaches a person's session on its own terms — a session the person drives by hand that
