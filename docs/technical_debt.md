@@ -151,6 +151,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-296 | What the live looks of 2026-10-03 found off: seventeen page defects, each small, from a stray decimal to a read-only line that never shows | Medium | Open |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-298 | A scratch `AGENTORC_HOME` still reads this machine's repo registry and default tmux server: a look's host agent fast-forwarded the real checkout | Medium | Open |
+| TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Open — the credential steps are Paul's |
 
 
 ---
@@ -2879,3 +2880,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a host agent on a non-default home with no registry of its own lists no repo and touches no tmux server but its own.
 
 **Related:** TD-291 (`look_home.py`, which isolates by hand), TD-263 (the pull), TD-296.
+
+## TD-299: Run the guardians and contractmatch teams inside their devcontainers
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-03 (the anchor; Paul lifted the guardians hold the same day: *i think guardians and contractmatch are good candidates for using teams within a container*)
+**Owner:** anchor
+**Kind:** build
+**Status:** Open — the credential steps (3) are Paul's
+**Location:** `~/.agentorc/hosts.yml` (`nodes:`), `~/.agentorc/nodes/<name>/` (`env`, `profiles/`), `~/.agentorc/org.yml` (`place:`), `/home/kmaster/guardians-devenv/.agentorc.yml` (new), `docs/briefs/guardians-orchestrator.md`, `/home/kmaster/contractmatch/.agentorc.yml`; design §4.4a *A container node*, §4.9 *Where a repo's team lands*, §10
+
+**Why:** the hold of 2026-09-23 is lifted: guardians' five repos are checked out at `~/guardians-devenv`, §10 decided that a devcontainer running an `agentorc-agent` is a node, and the contractmatch node reads *running · link: up — linked* (`ao host status contractmatch`). A team in its container gets the project's own toolchain (contractmatch's `frontend/**` PRs are left open today because kmaster cannot run `flutter analyze`), and an unattended worker's reach is the container's mounts, with a repo-scoped token, never the person's credentials. Nothing has run a team on a node yet: TD-057's *Done when* is that run.
+
+**Fix:** (1) **contractmatch first, on the node already up:** check that the image has what a worker runs (`claude`, the toolchain, Python 3.12+ on the agent's PATH); (2) `ao host rebuild contractmatch` at the live version if the node's build is behind; (3) **Paul's, once per node:** `~/.agentorc/nodes/<name>/env` (`0600`) with a fine-grained GitHub token scoped to the repo, the author name and email, and the repo's own needs (contractmatch: a Doppler service token), and one `claude` login inside per profile the node's roles name (`/agentorc/profiles/<profile>/`); (4) `place: {cm-grind: contractmatch}` in `org.yml` with the team wound down, then Start, and watch one entry go from pick to merged PR from inside, a frontend one included; (5) **guardians:** a `nodes: guardians: container: {devcontainer: ~/guardians-devenv}` entry and `ao host up guardians`, step (3) for it, then `guardians-devenv/.agentorc.yml` with a team in the manager / techlead / members shape the other repos use (by a PR in that repo), `place:` to its node, and `docs/briefs/guardians-orchestrator.md` rewritten from the old lead-and-grant shape (a held path: the techlead's read). The five-repo constellation (cadence §9): whether the sub-repos' ledgers are the team's or the umbrella's alone is asked of Paul when the team is defined.
+
+**Done when:** cm-grind and a guardians team each run on their node, each with a PR merged from inside, and TD-057's *Done when* reads met.
+
+**Related:** TD-057 (the home and node split), TD-229 (repo-defined teams and `place:`), TD-296/TD-298 (2026-10-03's looks).
