@@ -389,6 +389,8 @@ BOARD_TTL = 60.0
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
 BOARD_ACTS = ("snooze", "done", "decide")
+# the kinds a live look is written as: `look` since dev-cadence TD-082, `watch` before it (TD-292)
+LOOK_KINDS = ("look", "watch")
 WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is `board.NOT_RIGHT`'s form)
 BOARD_TIMEOUT = 20.0
 # §4.5 screen 6 *Boards are read against origin* (TD-221): the read passes the reader's own `--fetch`,
@@ -905,12 +907,13 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
 
 def live_look(it: Mapping[str, Any]) -> bool:
     """Whether a board item's answers are cadence's fixed pair for a live look (§3.5, design §4.5a
-    **Works** / **Not right…**): a `watch` whose two answers are *Works* and the form *Not right:
-    <what>*. Anything else — a third answer, another kind, a complete *Not right: wrong repo* — is
-    ordinary answer buttons."""
+    **Works** / **Not right…**): a `look` (cadence §3.3's kind for it, dev-cadence TD-082) or a
+    `watch` written before that kind (TD-292), whose two answers are *Works* and the form *Not
+    right: <what>*. Anything else — a third answer, another kind, a complete *Not right: wrong
+    repo* — is ordinary answer buttons."""
     answers = [" ".join(str(a).split()) for a in it.get("answers") or ()]
     return (
-        str(it.get("kind") or "") == "watch"
+        str(it.get("kind") or "") in LOOK_KINDS
         and len(answers) == 2
         and answers[0] == WORKS
         and bool(board_mod.NOT_RIGHT_FORM.fullmatch(answers[1]))

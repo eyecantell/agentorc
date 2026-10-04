@@ -146,10 +146,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#956), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a `look` item in Needs you or Steering, no longer a `watch` | Medium | Designed 2026-10-03 — builds TD-291, TD-292 |
-| TD-291 | Build the builder's half of a UI change's verification: the scratch home script, the UI check in the PR, the techlead's read of screenshots, the briefs | Medium | Slices 1–3 built (#970, #972, #973) |
-| TD-292 | Build the Inbox's half of a `look`: Needs you or Steering by its default, *lapsed* at its date, screenshots on the row, Send to reviewer | Medium | Open — waits on dev-cadence TD-082 |
+| TD-292 | Build the Inbox's half of a `look`: Needs you or Steering by its default, *lapsed* at its date, screenshots on the row, Send to reviewer | Medium | Slice 1 built (#975) |
 | TD-296 | What the live looks of 2026-10-03 found off: seventeen page defects, each small, from a stray decimal to a read-only line that never shows | Medium | Open |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
+| TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Open — the credential steps are Paul's |
 
 
 ---
@@ -2772,24 +2772,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-255 (a live look's answers), TD-244 (the page walks), TD-288 (settled half by a headless look), dev-cadence TD-082, cadence §3.5.
 
-## TD-291: Build the builder's half of a UI change's verification
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-03 (the designer, TD-290's build)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 built — PR #970 (`scripts/look_home.py`: the scratch home, its fixtures and its refusals; `tests/test_look_home.py`). Slice 2 built — PR #972 (the grinder preset's ban; this repo's grinder brief's paragraph *A change to a page is verified by you*; the designer's mockup shots). Slice 3 built — PR #973 (the techlead preset's *A screenshot ask*; the primer's pointer). Slice 4 open.
-**Location:** `scripts/look_home.py` (new, agentorc's own: the scratch home), `tests/conftest.py` (how the suite isolates a host agent: a temp `AGENTORC_HOME` and a `Tmux` on a private socket handed to `HostAgent`), `src/agentorc/briefs/grinder.md` and `src/agentorc/briefs/techlead.md`, `docs/briefs/grinder-ao-*.md`, `docs/briefs/designer-ao-1.md`, `docs/briefs/techlead-context.md`; design §4.9b *A UI change is verified by its builder*
-
-**Why:** design §4.9b (TD-290; Paul, 2026-10-03: *I would expect a grinder who makes ui changes to verify them itself before sending to a reviewer, and only send to a reviewer if needed*). A grinder may not run `ao ui` today, so every merged change to a page reaches Paul unchecked.
-
-**Fix:** build it as written, in slices, each its own PR. (1) **The scratch home**: `scripts/look_home.py` stands up a host agent and a UI from the worktree it is run in, on an `AGENTORC_HOME` of its own under a short path (a unix socket's path limit), a tmux server of its own and a free port — started in-process with a `Tmux` on a private socket handed to `HostAgent`, as `tests/conftest.py`'s fixture does, since `agentorc-agent serve` builds a bare `Tmux()` on the default server — with fixture sessions under the `shell` adapter and a fixture board; it prints the URL, tears everything down on exit and on a signal, and refuses to run against `~/.agentorc` or the default tmux server; a test starts it, loads the Org page and stops it. (2) **The builder's briefs** (touches `docs/briefs/**`: the reader's read): the grinder preset and this repo's grinder briefs change their ban on `agentorc-agent serve` and `ao ui` (`src/agentorc/briefs/grinder.md`: *no `agentorc-agent serve`, `ao ui`, `ao service`*; the repo briefs' *Never run `agentorc-agent serve`, `ao ui` or `ao service`*) to *never run the host agent or `ao ui` against the live home; `scripts/look_home.py` is the one way* — `ao service` and the units stay banned outright, and say the rest of the rule — a PR that changes anything under `src/agentorc/ui/` carries a **UI check** in its body (one line per check: what the change says, what was read) and its screenshots as `docs/mockups/reviews/<date>-td<n>-<what>.png`, cropped, at most four; what a browser cannot settle is an `ask` to `{techlead}` naming the screenshots and the design section, before the merge; what only the live copy shows is a `watch` line the next member makes read-only once `ao promote status` shows the commit live; and the three cases of what is left (no line; a `look` with `Works (default)` naming the techlead's reply and a `Due:` no sooner than the next day; a `look` with the bare pair), written as a `watch` with the pair until TD-292's last slice says the kind is here; where Playwright is on this machine (`~/ao-shots/pwlib`) is this repo's brief's to say. The designer's brief gains the same rule for a mockup it shows. (3) **The techlead's half** (touches `docs/briefs/**`): the techlead preset and the primer say how a screenshot `ask` is answered — read the images against §4.5, §4.5a and the mockup; *matches* or *does not match: <what>* with `--source`, or *not written* with a lean; never passed up as mail (§4.9b's second carve-out from *What it may answer*, and §4.8's preset row). (4) **The first one**: the next merged change to a page goes through it, and what the builder could not do from its brief is fixed there.
-
-**Done when:** a grinder's PR that changes a page carries a UI check made on a scratch home with its screenshots, and no board line is written for a change whose checks all held.
-
-**Related:** TD-290 (the design), TD-292 (the Inbox's half), TD-255 (a live look's answers), cadence §3.5.
-
 ## TD-292: Build the Inbox's half of a `look`
 
 **Priority:** Medium
@@ -2797,8 +2779,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the designer, TD-290's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — waits on dev-cadence TD-082 (the `look` kind in the synced reader, and cadence's sentence that a `look` with a default is closed by its session at its date)
-**Blocked by:** dev-cadence#TD-082
+**Status:** Slice 1 built — PR #975 (`LOOK_KINDS`: a `look` draws the pair; one with no default is a counted due row under *Needs you*). Slices 2–5 open.
 **Location:** `src/agentorc/ui/inbox.py` (`inbox_sections`, `board_due_now`, the live look's pair, the board row's renderer), `src/agentorc/ui/app.py` (the screenshot route), `src/sessionorc/agent_inbox.py` (`rpc_board_reply`: `look`), `src/agentorc/briefs/grinder.md`, `src/agentorc/briefs/techlead.md`, `docs/briefs/`; design §4.5 screen 6, §4.5a **Inbox board row (a `look`)** and **Send to reviewer**, §4.4 *Board write-back*, §4.9b; mockup `docs/mockups/Inbox.dc.html`, `docs/mockups/reviews/2026-10-03-td290-look-rows.png`
 
 **Why:** Paul, 2026-10-03: *have the look items go to either steering or "needs you" instead of creating a new category*. A person's look is written as a `watch` and counted among the decisions, with no way to say *I checked this; it goes ahead unless you say otherwise*, and no way to a reviewer but a typed reply.
@@ -2861,3 +2842,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** each is seen working or ledgered as its own entry.
 
 **Related:** TD-296, TD-291, TD-244.
+
+## TD-299: Run the guardians and contractmatch teams inside their devcontainers
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-03 (the anchor; Paul lifted the guardians hold the same day: *i think guardians and contractmatch are good candidates for using teams within a container*)
+**Owner:** anchor
+**Kind:** build
+**Status:** Open — the credential steps (3) are Paul's
+**Location:** `~/.agentorc/hosts.yml` (`nodes:`), `~/.agentorc/nodes/<name>/` (`env`, `profiles/`), `~/.agentorc/org.yml` (`place:`), `/home/kmaster/guardians-devenv/.agentorc.yml` (new), `docs/briefs/guardians-orchestrator.md`, `/home/kmaster/contractmatch/.agentorc.yml`; design §4.4a *A container node*, §4.9 *Where a repo's team lands*, §10
+
+**Why:** the hold of 2026-09-23 is lifted: guardians' five repos are checked out at `~/guardians-devenv`, §10 decided that a devcontainer running an `agentorc-agent` is a node, and the contractmatch node reads *running · link: up — linked* (`ao host status contractmatch`). A team in its container gets the project's own toolchain (contractmatch's `frontend/**` PRs are left open today because kmaster cannot run `flutter analyze`), and an unattended worker's reach is the container's mounts, with a repo-scoped token, never the person's credentials. Nothing has run a team on a node yet: TD-057's *Done when* is that run.
+
+**Fix:** (1) **contractmatch first, on the node already up:** check that the image has what a worker runs (`claude`, the toolchain, Python 3.12+ on the agent's PATH); (2) `ao host rebuild contractmatch` at the live version if the node's build is behind; (3) **Paul's, once per node:** `~/.agentorc/nodes/<name>/env` (`0600`) with a fine-grained GitHub token scoped to the repo, the author name and email, and the repo's own needs (contractmatch: a Doppler service token), and one `claude` login inside per profile the node's roles name (`/agentorc/profiles/<profile>/`); (4) `place: {cm-grind: contractmatch}` in `org.yml` with the team wound down, then Start, and watch one entry go from pick to merged PR from inside, a frontend one included; (5) **guardians:** a `nodes: guardians: container: {devcontainer: ~/guardians-devenv}` entry and `ao host up guardians`, step (3) for it, then `guardians-devenv/.agentorc.yml` with a team in the manager / techlead / members shape the other repos use (by a PR in that repo), `place:` to its node, and `docs/briefs/guardians-orchestrator.md` rewritten from the old lead-and-grant shape (a held path: the techlead's read). The five-repo constellation (cadence §9): whether the sub-repos' ledgers are the team's or the umbrella's alone is asked of Paul when the team is defined.
+
+**Done when:** cm-grind and a guardians team each run on their node, each with a PR merged from inside, and TD-057's *Done when* reads met.
+
+**Related:** TD-057 (the home and node split), TD-229 (repo-defined teams and `place:`), TD-296/TD-298 (2026-10-03's looks).
