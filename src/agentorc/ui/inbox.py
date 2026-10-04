@@ -7,12 +7,16 @@ suite patches both there.
 
 from __future__ import annotations
 
+import contextlib
 import re
+import subprocess
 import sys
+import time
 from collections.abc import Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from agentorc import review as review_mod
 from sessionorc import balance as balance_mod
@@ -20,6 +24,7 @@ from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import hosts
+from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import WRAPUP_GRACE
 from sessionorc.models import (
@@ -920,6 +925,102 @@ def live_look(it: Mapping[str, Any]) -> bool:
     )
 
 
+# §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): the one directory a look's screenshots
+# are served from, as origin's default branch holds it, and the names that may be asked of it
+SHOT_DIR = Path("docs") / "mockups" / "reviews"
+SHOT_NAME = re.compile(r"[A-Za-z0-9._-]+\.png")
+SHOTS_MAX = 4
+SHOT_TTL = 60.0  # seconds a screenshot's presence on origin is kept: a row is redrawn on every poll
+_shot_seen: dict[tuple[str, str], tuple[float, bool]] = {}
+
+
+def shot_root(repo: str) -> Path | None:
+    """The registered checkout of this host named `repo` (its directory's name, as `/repo/<name>`
+    and Add entry name a repo), or None — the only checkouts a screenshot is served from."""
+    for p in hosts.local_host().repos():
+        if repo and Path(p).expanduser().name == repo:
+            return Path(p).expanduser().resolve()
+    return None
+
+
+def shot_bytes(root: Path, name: str) -> bytes | None:
+    """`docs/mockups/reviews/<name>` as `origin/<default>` holds it in `root`, or None: a name that is
+    not a bare `.png` name, a checkout with no origin, a file origin does not hold. Never the working
+    tree: what a look shows is what was merged (§4.5a **Inbox row: a look**)."""
+    if not SHOT_NAME.fullmatch(name):
+        return None
+    ref = ledger_mod.default_ref(root)
+    if ref is None:
+        return None
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(root), "show", f"{ref}:{(SHOT_DIR / name).as_posix()}"],
+            capture_output=True,
+            timeout=10.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return cp.stdout if cp.returncode == 0 else None
+
+
+def _shot_on_origin(root: Path, name: str) -> bool:
+    key, now = (str(root), name), time.monotonic()
+    at, seen = _shot_seen.get(key, (0.0, False))
+    if now - at > SHOT_TTL:
+        ref = ledger_mod.default_ref(root)
+        seen = False
+        if ref is not None:
+            with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+                seen = (
+                    subprocess.run(
+                        ["git", "-C", str(root), "cat-file", "-e", f"{ref}:{(SHOT_DIR / name).as_posix()}"],
+                        capture_output=True,
+                        timeout=10.0,
+                    ).returncode
+                    == 0
+                )
+        _shot_seen[key] = (now, seen)
+    return seen
+
+
+def look_shots(shots: Any, repo: str) -> list[dict[str, str]]:
+    """A look's screenshots as its row draws them (§4.5a **Inbox row: a look**): each of the
+    envelope's `shots`, in the order sent, at most four — `name`, the file's name, and `url`, the
+    image's address on this page when the sender's repo (`repo`, a registered checkout's name) is
+    this host's and origin holds the file there, else "" and the row draws the name alone. A path
+    outside `docs/mockups/reviews/` has no address, whatever its name."""
+    if not isinstance(shots, list):
+        return []
+    root = shot_root(repo)
+    out: list[dict[str, str]] = []
+    for raw in shots[:SHOTS_MAX]:
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        p = Path(raw.strip().removeprefix("./"))
+        url = ""
+        if root is not None and p.parent == SHOT_DIR and SHOT_NAME.fullmatch(p.name) and _shot_on_origin(root, p.name):
+            url = f"/repo/{quote(repo)}/shot/{quote(p.name)}"
+        out.append({"name": p.name, "url": url})
+    return out
+
+
+def look_pair(e: Mapping[str, Any]) -> bool:
+    """Whether a mail row draws its answers as a live look's pair, **Works** / **Not right…**
+    (§4.5a **Inbox row: a look**): an `ask` whose envelope carries `shots` and whose suggested
+    answers are exactly *Works* and the form *Not right: <what>*. A look is known by its `shots`,
+    never by its words; a `steer` look keeps its kind's row, and any other answers are ordinary."""
+    shots = e.get("shots")
+    answers = [" ".join(str(a).split()) for a in e.get("answers") or ()]
+    return (
+        e.get("kind") == "ask"
+        and isinstance(shots, list)
+        and any(isinstance(s, str) and s.strip() for s in shots)
+        and len(answers) == 2
+        and answers[0] == WORKS
+        and bool(board_mod.NOT_RIGHT_FORM.fullmatch(answers[1]))
+    )
+
+
 def board_head(text: str) -> str:
     """A board item's head, as the write-back's commit message names it: its first bold run, else
     the line, clipped."""
@@ -1575,5 +1676,6 @@ def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -
 # the page computes its rail from its sections when a caller did not (a test rendering the template
 # directly, as the rows are shaped by `shaped` and `suggested_answers` whoever renders them)
 templates.env.globals["rail_picks"] = rail_picks
+templates.env.globals["look_pair"] = look_pair
 templates.env.globals["rail_rows"] = rail_rows
 templates.env.globals["rail_counts"] = rail_counts

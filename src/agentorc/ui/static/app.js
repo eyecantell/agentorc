@@ -394,9 +394,12 @@
       if (action === "message" || action === "reply") {
         const m = await AO.compose({
           to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote, line: b.dataset.line || "",
-          when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" },
+          when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" }, text: b.dataset.begun || "",
         });
         if (!m) return;
+        // §4.5a **Inbox row: a look** (TD-292): **Not right…** begins the reply with the form, and
+        // the form's prefix is kept whatever case it was retyped in, as a board row's is
+        if (b.dataset.begun === "Not right: ") m.text = `Not right: ${m.text.trim().replace(/^not right\s*:?\s*/i, "")}`.trim();
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }
       // design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): a press is an ordinary
