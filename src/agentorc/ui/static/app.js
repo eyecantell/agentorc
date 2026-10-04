@@ -2379,12 +2379,21 @@
     const repoSel = $("#repo"), dirfield = $("#dirfield"), dnote = $("#dircheck");
     const other = () => !repoSel || !!(repoSel.selectedOptions[0] && repoSel.selectedOptions[0].dataset.other);
     let dseq = 0;
+    // **Where** offers *Worktree <name> · new* for a git repo only (§4.5a New session **Where**): a typed
+    // directory the check reads as no checkout has the choice hidden and *The checkout itself* picked
+    // (TD-296 #3); a host that cannot say (`git: null`) leaves it offered
+    function offerWorktree(yes) {
+      const choice = wt && wt.closest("label"); if (!choice) return;
+      choice.hidden = !yes;
+      if (!yes && wt.checked && here) { here.checked = true; here.dispatchEvent(new Event("change")); }
+    }
     async function dirCheck() {
       const v = dir.value.trim(), my = ++dseq;
-      if (!other() || !v) { missingDir = false; if (dnote) dnote.textContent = ""; gate(); return; }
+      if (!other() || !v) { missingDir = false; if (dnote) dnote.textContent = ""; offerWorktree(true); gate(); return; }
       try {
         const o = await (await fetch(`/api/dir_check?dir=${encodeURIComponent(v)}${hq()}`)).json();
         if (my !== dseq) return;
+        offerWorktree(o.git !== false);
         // a host that did not answer is said, never a refusal: the create's own refusal is Start's
         missingDir = o.exists === false;
         dnote.innerHTML = missingDir ? `⚠ <b>${esc(o.why)}</b>` : o.exists === null ? esc(o.why) : "";
@@ -2541,6 +2550,7 @@
       const o = role.selectedOptions[0]; if (!o) return;
       const own = (o.dataset.controllers || "").split(",").filter(Boolean);
       tickControllers(own.length ? own : (picker.dataset.default || "").split(",").filter(Boolean));
+      tickTeamManager();  // a picked team's manager stays ticked through the role's ticks (TD-296 #8)
       tickGrants((o.dataset.grants || "").split(",").filter(Boolean));
       $("[name=lane]").placeholder = o.dataset.lane || "TD-027, TD-019 · or free-pick";
       // §4.5a *New session* **prompt chips** (TD-170): the role's saved prompts, as text
@@ -2723,6 +2733,13 @@
         if (my === tseq) tnote.textContent = got.line || TNOTE;
       } catch (e) { /* the default note stands */ }
     }
+    // the picked team's manager ticked under Controllers (§4.5a New session **Team**). `applyRole` calls
+    // it too, since the roles a Team pick reloads re-tick the role's controllers after the pick
+    // (TD-296 #8: the async `loadRoles` cleared the tick `applyTeam` had just set)
+    function tickTeamManager() {
+      const o = teamSel && teamSel.selectedOptions[0];
+      if (o && o.value && o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
+    }
     function applyTeam() {
       if (!teamSel) return;
       const o = teamSel.selectedOptions[0];
@@ -2731,7 +2748,7 @@
         try { dirs = JSON.parse(o.dataset.dirs || "[]"); } catch (e) { dirs = []; }
         options(dirs); narrowRepos();
         if (!dirs.includes(dir.value.trim()) && dirs.length) { dir.value = dirs[0]; syncRepo(); check(); loadRoles(); nameCheck(); }
-        if (o.dataset.manager) for (const c of picker.querySelectorAll("[name=controller]")) if (c.value === o.dataset.manager) c.checked = true;
+        tickTeamManager();
         // the team's host is the Host pick's (§4.5a New session **the form**), when it is one to pick
         if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
           if (hostSel.value !== o.dataset.host) { hostSel.value = o.dataset.host; gate(); loadRepos(); }

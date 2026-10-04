@@ -2019,6 +2019,17 @@ def test_the_repo_pick_and_another_directory(client, tmp_path):
     assert client.get("/api/dir_check", params={"dir": str(a)}).json()["exists"] is True
     gone = client.get("/api/dir_check", params={"dir": str(tmp_path / "nope")}).json()
     assert gone["exists"] is False and gone["why"].startswith("no such directory on ")
+    # **Where** offers a worktree for a git repo only (TD-296 #3): `git` says whether the typed
+    # directory is in a checkout, and the form hides the worktree choice where it is not
+    assert client.get("/api/dir_check", params={"dir": str(a)}).json()["git"] is False
+    subprocess.run(["git", "init", "-q", str(b)], check=True)
+    assert client.get("/api/dir_check", params={"dir": str(b)}).json()["git"] is True
+    assert gone["git"] is None
+    ui = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+    js, css = (ui / "static" / "app.js").read_text(), (ui / "static" / "app.css").read_text()
+    assert "offerWorktree(o.git !== false);" in js and ".radio[hidden] { display: none; }" in css
+    # the field's heading is upper-case, never the labels of its choices (Where, Controllers)
+    assert ".field > label { font-size: var(--t-cap)" in css and ".field label {" not in css
 
 
 def test_where_is_worktree_first_with_the_free_worktrees(client, tmp_path):
