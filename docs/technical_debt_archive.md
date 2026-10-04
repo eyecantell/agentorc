@@ -3234,3 +3234,18 @@ Both go away only when the record says who closed it.
 **Done when:** an answered board row leaves Needs you and the top-bar count at the press, and reads under its new section as waiting on its session.
 
 **Related:** TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-079 (*Waiting on them*), TD-290 (looks as mail), TD-297 (who closes a decided look).
+## TD-306: A scraped `needs-you` stays after its screen is gone, until the next hook
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-2, the review of PR #1002)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built — PR #1013 (`_screen_held`, `_screen_gone` and `_hook_state` in the tick; design §4.2 *A rule's verdict lasts as long as its screen*). Nothing waits on a live look: the test in `tests/test_agent_paths.py` is the check.
+**Location:** `src/sessionorc/agent_tick.py` (`_observe`: a screen verdict is applied only on a match; the `stalled?` cross-check reads `working` alone)
+
+**Why:** a hook-fed session whose last hook is older than `STALL_AFTER` takes a screen rule's verdict at once (design §4.2), and nothing takes it back when the screen stops matching: the record keeps the scraped `needs-you` until the tool's next hook. For the first-run screens and the trust dialog that hook comes (`SessionStart` once onboarding ends), but a person who opens `/theme` or `/login` in a session idle for twenty minutes and dismisses it leaves the card reading *needs-you* until the next turn — the same for any screen rule's state on a quiet session.
+
+**Resolved:** 2026-10-04 (PR #1013) — `_screen_held`, `_screen_gone` and `_hook_state` in `src/sessionorc/agent_tick.py`; design §4.2 *A rule's verdict lasts as long as its screen*; pinned by `tests/test_agent_paths.py`.
+
+**Related:** TD-015 (screen rules), TD-296 #6 (the first-run rules), TD-283 (the at-composer `startup`).

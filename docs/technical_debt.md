@@ -146,7 +146,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Designed 2026-10-04; the build is TD-312 |
-| TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
 | TD-312 | Build the detail block on an Inbox board row: the reader's `detail` in the row's *details* fold, open on a row with answers; nested lists in the renderer | Medium | Open |
 
@@ -2760,21 +2759,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** dev-cadence TD-084 (the block), TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-140 (Put on the board), TD-303 (answered rows).
 
-## TD-306: A scraped `needs-you` stays after its screen is gone, until the next hook
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-04 (grinder-ao-2, the review of PR #1002)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built — PR #1013 (`_screen_held`, `_screen_gone` and `_hook_state` in the tick; design §4.2 *A rule's verdict lasts as long as its screen*). Nothing waits on a live look: the test in `tests/test_agent_paths.py` is the check.
-**Location:** `src/sessionorc/agent_tick.py` (`_observe`: a screen verdict is applied only on a match; the `stalled?` cross-check reads `working` alone)
-
-**Why:** a hook-fed session whose last hook is older than `STALL_AFTER` takes a screen rule's verdict at once (design §4.2), and nothing takes it back when the screen stops matching: the record keeps the scraped `needs-you` until the tool's next hook. For the first-run screens and the trust dialog that hook comes (`SessionStart` once onboarding ends), but a person who opens `/theme` or `/login` in a session idle for twenty minutes and dismisses it leaves the card reading *needs-you* until the next turn — the same for any screen rule's state on a quiet session.
-
-**Fix:** in `_observe`, when the record's state was set `scraped` by a screen rule of a hook-fed adapter and no rule matches now, go back to the state the last hook set (keep it on the record beside the scraped one), or to `idle` when no hook has reported; a test with the trust dialog's fixture appearing and then cleared.
-
-**Related:** TD-015 (screen rules), TD-296 #6 (the first-run rules), TD-283 (the at-composer `startup`).
 
 ## TD-308: A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written
 
