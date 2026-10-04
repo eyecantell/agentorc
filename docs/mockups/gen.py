@@ -1375,7 +1375,7 @@ def inbox_rows():
     """The rows every Inbox artboard draws (needs, steering, waiting, fyi), in the page's order."""
     b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
     gap = '<span style="flex-grow: 1;"></span>'
-    # TD-290: a look's screenshots, drawn from the paths its line names under docs/mockups/reviews/ — a thumbnail each, the file's name under it
+    # TD-290: a look's screenshots, drawn from the envelope's `shots` (paths under docs/mockups/reviews/) — a thumbnail each, the file's name under it
     shot = lambda f: f'<span style="display: inline-flex; flex-direction: column; gap: 3px; margin-right: 10px;"><span style="width: 168px; height: 96px; border: 1px solid #d5d9df; border-radius: 4px; background: linear-gradient(135deg, #eef0f3, #dfe3e8);"></span><span class="mono muted" style="font-size: 11px;">{f}</span></span>'
     shots = lambda *fs: '<div style="margin: 8px 0 4px;">' + "".join(shot(f) for f in fs) + '</div>'
     needs = [
@@ -1393,13 +1393,12 @@ def inbox_rows():
         mcard(BAR["needs"], "promote", "agentorc", "", "main moved 12m ago",
               '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
               b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
-        # TD-290: a `look` nobody could settle — no default, so it is counted here; Send to reviewer hands it to the techlead seat
-        mcard(BAR["needs"], "board · look", "agentorc", "ao-grind", "due today",
-              '<div class="txt"><span class="muted">grinder-ao-2 on kmaster · <b style="color: #374151;">moved on</b></span></div>'
-              '<div class="txt"><b>Yours to judge: is the usage chip readable at a glance in the dark theme? (TD-122, #517)</b> Checked by grinder-ao-2 on a scratch home: one chip per account, the hover lists every window, both themes drawn.</div>'
+        # TD-290: a look nobody could settle is an `ask` that names screenshots — counted here; Send to reviewer hands it to the techlead seat
+        mcard(BAR["needs"], "ask · look", "grinder-ao-2", "ao-grind", "12m ago · about TD-122",
+              '<div class="txt"><b>Yours to judge: is the usage chip readable at a glance in the dark theme?</b> #517 is merged. I checked on a scratch home that there is one chip per account, the hover lists every window, and both themes draw it; nobody could say whether it reads well.</div>'
               + shots("2026-10-03-td122-chip-dark.png", "2026-10-03-td122-chip-hover.png")
-              + '<div class="meta">on the board — an answer is your decision on this line; Send to reviewer asks techlead-ao-1 to read it against the design first</div>',
-              b("Works") + b("Not right…") + b("Send to reviewer") + b("Reply") + b("Snooze ▾") + b("Done") + gap + b("Open board", "ghost")),
+              + '<div class="sugg"><span class="lbl">suggested by grinder-ao-2</span>' + b("Works") + b("Not right…") + '</div>',
+              b("Reply", "primary") + b("Send to reviewer") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost")),
         mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
@@ -1416,13 +1415,12 @@ def inbox_rows():
               '<div class="meta">its asker would have gone with: <b style="color: #374151;">Remove and refuse</b></div>'
               '<div class="sugg"><span class="lbl">suggested by grinder-ao-1</span>' + b("“Remove and refuse” · default") + b("“Keep, with a warning”") + '</div>',
               b("Reply") + b("Go with it", "primary") + gap + b("Delete", "ghost danger")),
-        # TD-290: a `look` with a default — the techlead read the screenshots and leans Works; closed at its date unless the person says otherwise
-        mcard(BAR["working"], "board · look", "agentorc", "ao-grind", "written 3h ago · <b>until Oct 4, then closed as Works</b>",
-              '<div class="txt"><span class="muted">grinder-ao-1 on kmaster · <b style="color: #374151;">moved on</b></span></div>'
-              '<div class="txt"><b>Yours to judge: Save and Cancel sit under each Settings card, not at its head (TD-286, #955).</b> Checked by grinder-ao-1 on a scratch home: Save greyed until a field changes, Cancel restores it, both settle after a save. techlead-ao-1 read the screenshots: the design names no place for them, and under the card matches the New session form.</div>'
+        # TD-290: a look the techlead leaned Works on is a `steer` that names screenshots — it lapses to Works with no press
+        mcard(BAR["working"], "steer · look", "grinder-ao-1", "ao-grind", "3h ago · about TD-286 · <b>9h left</b>",
+              '<div class="txt"><b>Yours to judge: Save and Cancel sit under each Settings card, not at its head.</b> #955 is merged. I checked on a scratch home that Save is greyed until a field changes, Cancel restores it, and both settle after a save. techlead-ao-1 read the screenshots: the design names no place for them, and under the card matches the New session form.</div>'
               + shots("2026-10-03-td286-settings-save.png", "2026-10-03-td286-settings-cancel.png")
               + '<div class="meta">will go with: <b style="color: #374151;">Works</b> — doing nothing is a valid answer</div>',
-              b("Go with it: Works", "primary") + b("Not right…") + b("Reply") + b("Snooze ▾") + gap + b("Open board", "ghost")),
+              b("Reply") + b("Go with it", "primary") + b("Pause") + gap + b(ICON["focus"] + "Open", "ghost")),
     ]
     waiting = [
         mcard("#cbd0d6", "answered · waiting for the outcome", "tdgrind-ao-1", "ao-grind", "answered 52m ago",
