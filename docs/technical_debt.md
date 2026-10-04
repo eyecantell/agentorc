@@ -146,7 +146,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-287 | The Settings page draws no usage chip in the top bar: the page passes the bar an empty `usage`, as three other pages do | Low | Built (#956), live look pending |
 | TD-288 | A terminal size saved on Settings (17) showed no change in Focus, though every page's `<body>` carries `data-term-size="17"` | Medium | Built — PR #946; merged, live look pending |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a `look` item in Needs you or Steering, no longer a `watch` | Medium | Designed 2026-10-03 — builds TD-291, TD-292 |
-| TD-291 | Build the builder's half of a UI change's verification: the scratch home script, the UI check in the PR, the techlead's read of screenshots, the briefs | Medium | Slice 1 built (#970) |
+| TD-291 | Build the builder's half of a UI change's verification: the scratch home script, the UI check in the PR, the techlead's read of screenshots, the briefs | Medium | Slices 1–2 built (#970, #972) |
 | TD-292 | Build the Inbox's half of a `look`: Needs you or Steering by its default, *lapsed* at its date, screenshots on the row, Send to reviewer | Medium | Open — waits on dev-cadence TD-082 |
 
 
@@ -2777,7 +2777,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-03 (the designer, TD-290's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 built — PR #970 (`scripts/look_home.py`: the scratch home, its fixtures and its refusals; `tests/test_look_home.py`). Slices 2–4 open.
+**Status:** Slice 1 built — PR #970 (`scripts/look_home.py`: the scratch home, its fixtures and its refusals; `tests/test_look_home.py`). Slice 2 built — PR #972 (the grinder preset's ban; this repo's grinder brief's paragraph *A change to a page is verified by you*; the designer's mockup shots). Slices 3–4 open.
 **Location:** `scripts/look_home.py` (new, agentorc's own: the scratch home), `tests/conftest.py` (how the suite isolates a host agent: a temp `AGENTORC_HOME` and a `Tmux` on a private socket handed to `HostAgent`), `src/agentorc/briefs/grinder.md` and `src/agentorc/briefs/techlead.md`, `docs/briefs/grinder-ao-*.md`, `docs/briefs/designer-ao-1.md`, `docs/briefs/techlead-context.md`; design §4.9b *A UI change is verified by its builder*
 
 **Why:** design §4.9b (TD-290; Paul, 2026-10-03: *I would expect a grinder who makes ui changes to verify them itself before sending to a reviewer, and only send to a reviewer if needed*). A grinder may not run `ao ui` today, so every merged change to a page reaches Paul unchecked.
