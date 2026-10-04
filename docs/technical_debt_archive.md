@@ -3162,3 +3162,21 @@ Both go away only when the record says who closed it.
 **Related:** TD-213 / TD-216 (the orphaned question), TD-214 / TD-227 (rule 8, the start on work), TD-240 / TD-241 (rule 9, finished), TD-187 (a member out of work is never woken when its lane gains entries), TD-262 (who closed a session — the same card slot), memory `steer-replies-land-on-the-board`.
 
 **Resolved:** 2026-10-03 — designed (PR #910) and built as TD-274, archived 2026-10-03.
+
+## TD-296: What the live looks of 2026-10-03 found off
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-03 (the anchor, from five look agents on Paul's word: *lets pass the looks back to the grinders or do them here*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built. #14 fixed — PR #979 (a pressed answer's index is written on the question it closes, so *Waiting on them* says the answer; `ao inbox` prints a question's picked answer in the answer's words). #13 not reproduced: the live records carry `review_pr` on a declared claim with an open PR (designer-ao-1's TD-290 → #977, grinder-ao-2's TD-292 → #978, 2026-10-03); the look's shot was taken at 20:25 MDT, the minute #947 merged (02:25:47Z), and a merge clears `review_pr` by design (TD-150) while the declared claim stands until its session says `done`. #1, #2, #17 fixed — PR #985 (the chip prints `:g`, `.btn[hidden]`, the pull reading in its note's column). #4 fixed — PR #986 (`AO.quoteText`: the composer's quote without the inline marks). #5 not reproduced: the look's own `focus_sam1.png` reads *until Sun 17:17* in the Focus header, and the card, Focus and `ao status -v` all draw it with `ending.waiting_words`, which adds the day once it is not today. #7, #10 fixed — PR #988 (`ao team list` says *wound down <t> ago*; a seat's *on call* pill is never `scraped`). #3, #8 fixed — PR #989 (`.field > label`; `/api/dir_check` says `git` and Where hides the worktree choice outside a checkout; `applyRole` keeps a picked team's manager ticked). #16 fixed — PR #991 (the debt row's id and tags `flex: none`; the narrow wrap skips a Doing row). #15 fixed — PR #994 (rule 9's `system` note stamps its team, so the rail files it under that team). #11 fixed — PR #995 (the read-only line sits over the terminal, not in xterm's normal buffer, which tmux's alternate buffer hid; the toast waits for `onKey`). #6 fixed — PR #1002 (screen rules `first-run-theme` and `first-run-login`: Claude Code's first-run screens read `needs-you`, a question answered in the terminal). #9 fixed — PR #999 (the top bar wraps and the usage chip keeps its width, its own row below 720 px; Settings' number boxes at 4.5em). #12: the design's sentence changed — PR #1008 (the techlead's ruling: a program that asks for the mouse gets it; Shift+drag selects off a Mac; a read-only attach drops the reports).
+**Location:** `src/agentorc/ui/` (templates, `static/app.css`, `static/*.js`), `src/sessionorc/` where named; screenshots on kmaster under `~/ao-shots/looks-A/` … `~/ao-shots/looks-E/` (outside the repo: read them there, copy the ones a PR needs into `docs/mockups/reviews/`)
+
+**Why:** the board's 25 live looks were made on 2026-10-03 by a second session against the live copy `8de3e27` (read-only) and isolated scratch homes (presses). Most work; their lines are closed in `docs/user_attention_archive.md` with a verdict each. These are what did not, numbered as the closed lines cite them.
+
+**Resolved:** 2026-10-04 (PRs #979, #985, #986, #988, #989, #991, #994, #995, #999, #1002, #1008) — each of the seventeen fixed, not reproduced (#5, #13) or its design sentence changed (#12); the lasting content is in design §4.2, §4.5, §4.5a and §4.6 and the tests each PR names.
+
+**Done when:** each of the seventeen is fixed or its design sentence changed, each checked on a scratch home with a screenshot in its PR.
+
+**Related:** TD-297 (what was not seen), TD-298 (the scratch home that leaked), TD-291 (the builder's check), TD-244 (the walks).
