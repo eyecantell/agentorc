@@ -146,6 +146,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | In progress — the node rebuilt with Claude Code; the credential steps are Paul's |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Open |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Open |
+| TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Open |
 
 ---
 
@@ -2768,3 +2769,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a session on a node sets `ao doing` and ends its run with `ao progress none`, and its card shows both.
 
 **Related:** TD-299 (teams in containers), TD-057 step 5 (mail across hosts), TD-301 (the node's hooks).
+
+## TD-303: An answered Needs-you row stays in Needs you
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-04 (Paul: *Currently a "Needs you" item seems to stay in "needs you" once answered - it should move out to "waiting on them"/other so it does not appear to be waiting on me*; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 screen 6 (the Inbox's sections), §4.5a **answers** / **Go with it** / **Reply** (Inbox board row) and the help text that says the decided line *stays on the board, due*, §4.4 *Board write-back*; `src/agentorc/ui/inbox.py` (`inbox_sections`, `board_due_now`); cadence §3.5 (*a decided entry is not done: it stays on the board, and stays due, until a session acts on it*)
+
+**Why:** a board row answered from the Inbox (a pressed answer or Go with it writes `Decided:`; a Reply writes `— Paul, <date>: …`) stays under **Needs you**, counted in the top bar, because the design keeps the line *due* as its session's work order and the Inbox counts every due board row as the person's. Seen 2026-10-04: samscrape's backup item reads *decided: approve R2 · Oct 3 — not done: it stays on the board as its session's work order* at the head of Needs you (64). Once the person has answered, the item waits on a session, which is what *Waiting on them* says for mail.
+
+**Fix:** design it: a board row whose last word is the person's — a `Decided:`, or a reply after the item's last session text — is drawn under *Waiting on them* (or the section the round chooses), uncounted, with whom it waits on (the line's session, its lease holder, or the repo's team) and since when; it returns to *Needs you* only when a session writes to the line again or it stays unacted past a bound the round names. The line stays open on the board as the work order (cadence's rule is untouched: this is where the Inbox draws it, not whether it is done). Decide the same for a mail row the person answered, if any still counts.
+
+**Done when:** an answered board row leaves Needs you and the top-bar count at the press, and reads under its new section as waiting on its session.
+
+**Related:** TD-254/TD-255 (answers on a board row), TD-142 (Reply), TD-079 (*Waiting on them*), TD-290 (looks as mail), TD-297 (who closes a decided look).
