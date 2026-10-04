@@ -15,6 +15,7 @@ import os
 import re
 import shlex
 import shutil
+import sys
 import uuid
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
@@ -247,6 +248,17 @@ def repo_wires_cadence(cwd: Path) -> bool:
     return any(m in c for c in cmds for m in CADENCE_WIRED_MARKERS)
 
 
+def hook_command() -> str | None:
+    """`agentorc-hook` on PATH, else the one beside this interpreter: a container node's host agent
+    runs from `/agentorc/venv` with that directory off its PATH (TD-301), and a venv's console
+    scripts sit next to its python."""
+    found = shutil.which("agentorc-hook")
+    if found is not None:
+        return found
+    beside = Path(sys.executable).parent / "agentorc-hook"
+    return str(beside) if beside.is_file() and os.access(beside, os.X_OK) else None
+
+
 def write_hooks_file(profile: Profile, cwd: Path | None = None, unattended: bool = False) -> Path:
     """Write the layer for this launch: the `+cadence` variant when `cwd` does not wire dev-cadence's
     hooks itself, the `+unattended` variant for an unattended launch. Up to four files per profile,
@@ -256,7 +268,7 @@ def write_hooks_file(profile: Profile, cwd: Path | None = None, unattended: bool
     padding = displaced_padding(displaced)
     p = hooks_file(profile, cadence_line, unattended, padding)
     p.parent.mkdir(parents=True, exist_ok=True)
-    cmd = shutil.which("agentorc-hook")
+    cmd = hook_command()
     if cmd is None:
         # A bare name that the launched session cannot resolve either means no state feed at
         # all for this adapter — say so, since nothing downstream can tell.

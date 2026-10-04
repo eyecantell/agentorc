@@ -568,6 +568,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .rrow[hidden], .repopage .rrow.folded { display: none; }
 .repopage button.rrow { background: transparent; border: 0; border-top: 1px solid var(--line2); text-align: left; cursor: pointer; font: inherit; color: var(--muted); }
 .repopage .rtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repopage .rrow > .mono.strong, .repopage .rrow > .meta { flex: none; white-space: nowrap; }  /* the id and the tags keep their width; the title is what gives (TD-296 #16) */
 .repopage .rlh { padding: 8px 14px 4px; font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); border-top: 1px solid var(--line); }
 .repopage .rlh:first-child { border-top: 0; }
 .repopage .tag { font-size: var(--t-small); padding: 1px 7px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); white-space: nowrap; }
@@ -578,7 +579,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .dchips { margin-bottom: 8px; }
 .repopage .dchips .chip { border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
 .repopage .dchips .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-@media (max-width: 720px) { .repopage .rrow { flex-wrap: wrap; } }
+@media (max-width: 720px) { .repopage .rrow:not(.drow) { flex-wrap: wrap; } }  /* a Doing row keeps its columns: its words wrap inside the last (TD-296 #16) */
 /* the Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148): the Inbox's one centred
    column (TD-082) at a reading width — a section is a heading with its i mark, a row is a card; a
    field is a label, its input and what it makes today, on one line that wraps on a phone */
