@@ -101,11 +101,12 @@ def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
 templates.env.globals["shaped"] = shaped
 
 
-def md(text: Any, origin: Any = None, *, inline: bool = False) -> Markup:
+def md(text: Any, origin: Any = None, *, inline: bool = False, links: bool = True) -> Markup:
     """Text from the closed markdown subset as `shaped` renders it, unsplit — a board row's halves
-    and its replies (§4.5a *Inbox board row: text*, TD-279), already cut where they are drawn."""
+    and its replies (§4.5a *Inbox board row: text*, TD-279), already cut where they are drawn.
+    `links=False` draws every link as its characters: Focus's **Told at start** (TD-283)."""
     t, o = str(text or ""), (str(origin) if origin else None)
-    return Markup(rendermod.inline(t, o) if inline else rendermod.render(t, o))
+    return Markup(rendermod.inline(t, o, links) if inline else rendermod.render(t, o, links))
 
 
 templates.env.globals["md"] = md

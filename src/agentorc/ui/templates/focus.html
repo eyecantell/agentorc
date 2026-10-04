@@ -156,7 +156,7 @@
   </div>
   {# **The side panel** (design §4.5 *The Focus screen's anatomy*, TD-156): every card a fold,
      remembered per browser as a team's fold is (`data-side` is the key), in reading order — Git,
-     Reports, Inbox, Members, Ready to close, then Session, which starts folded. `open` here is the
+     Reports, Inbox, Members, Ready to close, Told at start, then Session, which starts folded. `open` here is the
      first paint's default; `AO.focus` applies what this browser remembers. #}
   <div class="side">
     {# **Working** (TD-156, Paul: *drop the current work to a card on the right*): what the session
@@ -215,6 +215,14 @@
       <div class="checks" id="checks"></div>
       <div class="note">{% if s.own %}Closing is your act; the checklist only says when it is ready.{% else %}A team member is closed by its team's Wind down or Start once these pass; Close this one alone is under more ▾.{% endif %}</div>
     </details>
+    {# design §4.5a Focus side panel **Told at start** (TD-283 part 2): what the session was told beside
+       the person's own words — its start context (§4.3), the package's text with the definition's
+       values filled. Display only: the closed markdown subset with no link, escaped, selectable, nothing in it a control; closed by default and
+       drawn only on a record that holds one. #}
+    {% if s.start_lines %}<details class="card pad side" data-side="told" id="toldcard">
+      <summary class="row gap"><span class="h2">Told at start</span><span class="grow"></span><span class="meta">{{ s.start_lines }} line{{ '' if s.start_lines == 1 else 's' }}</span></summary>
+      <div class="told" title="the session's start context (design §4.3, TD-283): display only">{{ md(s.start_context, links=False) }}</div>
+    </details>{% endif %}
     {# **Session**, last and folded (TD-156): what is read at a session's start and rarely after —
        the grants and controllers chips included, which the header carried until this review #}
     <details class="card pad side" data-side="session">

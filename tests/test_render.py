@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentorc.ui.render import FOLD_CHARS, fold, render
+from agentorc.ui.render import FOLD_CHARS, fold, inline, render
 
 pytestmark = pytest.mark.unit
 ORIGIN = "http://kmaster:8765"
@@ -106,3 +106,15 @@ def test_a_short_text_has_nothing_to_fold():
 
 def test_a_blank_line_inside_a_code_block_is_not_the_fold():
     assert fold("```\na\n\nb\n```\nverdict\n\nreading") == ("```\na\n\nb\n```\nverdict", "reading")
+
+
+@pytest.mark.unit
+def test_without_links_a_link_is_its_characters_everywhere_in_the_text():
+    """TD-283's **Told at start**: text in which nothing may be pressable — a link stays its
+    characters, in a paragraph, a list item and inside emphasis, while the rest of the subset renders."""
+    text = "See [a](https://example.com).\n\n- **[b](https://example.org)** and `c`"
+    html = render(text, links=False)
+    assert "<a " not in html and "[a](https://example.com)" in html and "[b](https://example.org)" in html
+    assert "<strong>" in html and "<code>c</code>" in html and "<li>" in html
+    assert "<a " in render(text)  # the default draws them, as before
+    assert "<a " not in inline("[a](https://example.com)", links=False)

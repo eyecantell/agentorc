@@ -149,6 +149,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
 | TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
+| TD-311 | `look_home.py`'s teardown leaves its `/tmp/aolook-*` home behind when a claude-code session ran in it | Low | Open |
 
 ---
 
@@ -2543,7 +2544,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-02 (the anchor, from Paul's walk of the Repo page, TD-219 slice 3's look: *the prompt we inject shows in the text input box. I am torn whether this is good for transparency or just in the way. Also, the "working" pill is probably misleading on an interactive session — it should be idle, then working only while it is actually doing something*)
 **Owner:** grinder
 **Kind:** build
-**Status:** Part (1) built — PR #938 (a launch with no prompt sets `AGENTORC_AT_COMPOSER=1` and its `SessionStart` `startup` reads `idle`; design §4.2); merged, live look pending on `docs/user_attention.md`. **Part (2) designed 2026-10-03** (the designer, PR #981; the techlead's reply `m-a0575a95bf3c` that the round was the designer's; the choice steered to Paul as `m-9fb05ac35d60`, and Paul, 2026-10-03: *go with your default*): the Fix's recommendation, confirmed and made exact. Design: §4.3 `start_context` on `launch`, §4.5a Add entry form **Open a session** and Focus side panel **Told at start**, §4.5 *The Focus screen's anatomy* point 4, §4.9 *Add an entry to the ledger* (2), §6 rule 2's replay list, the glossary's *start context*; mockup `AddEntry.dc.html`, shot as `docs/mockups/reviews/2026-10-03-td283-told-at-start.png`. Of three carriers — an opening prompt (a turn before the person has spoken; the session reads `working` again), the lines joined to the first Send by the page (lost when the first message is typed in the terminal or from another browser), the tool's own start context — the third. Slice 1, the carrier, built — PR #1014 (`create`'s `start_context`, the Claude Code adapter's `--append-system-prompt`, the record and the launch record, a resume carrying the conversation's own). **Next:** slice 2, the page.
+**Status:** Part (1) built — PR #938 (a launch with no prompt sets `AGENTORC_AT_COMPOSER=1` and its `SessionStart` `startup` reads `idle`; design §4.2); merged, live look pending on `docs/user_attention.md`. **Part (2) designed 2026-10-03** (the designer, PR #981; the techlead's reply `m-a0575a95bf3c` that the round was the designer's; the choice steered to Paul as `m-9fb05ac35d60`, and Paul, 2026-10-03: *go with your default*): the Fix's recommendation, confirmed and made exact. Design: §4.3 `start_context` on `launch`, §4.5a Add entry form **Open a session** and Focus side panel **Told at start**, §4.5 *The Focus screen's anatomy* point 4, §4.9 *Add an entry to the ledger* (2), §6 rule 2's replay list, the glossary's *start context*; mockup `AddEntry.dc.html`, shot as `docs/mockups/reviews/2026-10-03-td283-told-at-start.png`. Of three carriers — an opening prompt (a turn before the person has spoken; the session reads `working` again), the lines joined to the first Send by the page (lost when the first message is typed in the terminal or from another browser), the tool's own start context — the third. Slice 1, the carrier, built — PR #1014 (`create`'s `start_context`, the Claude Code adapter's `--append-system-prompt`, the record and the launch record, a resume carrying the conversation's own). Slice 2, the page, built — PR #1016 (`/api/entry/session` hands the lines as `start_context` and the person's words as the composer's text; Focus's **Told at start**; `entry.md`'s first line); seen on a scratch home (the PR's UI check). Merged, live look pending: a look mailed to Paul after the merge (design §4.10 *A look*) for what only a logged-in session shows — the session drafting from the lines, and Resume keeping them.
 **Location:** `src/agentorc/ui/app.py` (Add entry → **Open a session**, TD-219 slice 3: an interactive session `entry-<n>` with the words in its composer, unsent), the Claude Code adapter's state from hooks, design §4.5a *Add entry form*
 
 **Why:** (1) `entry-1`, started this way and never sent a turn, read `working (hook)` in `ao explain` and on its Focus header, its composer offering **→ Steer** (*this session is working, and Claude Code queues what you type*), while the pane showed Claude Code at its empty prompt. A person's own session that has not run a turn is idle; a `working` pill there sends the person to wait for nothing. (2) The words go into Focus's composer with the entry brief in front of them, so the person sees a long brief above their two sentences. It is transparent, and it is in the way: the brief is the session's instructions, not the person's text.
@@ -2811,3 +2812,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
 
 **Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.
+
+## TD-311: `look_home.py`'s teardown leaves its `/tmp/aolook-*` home behind when a claude-code session ran in it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-2, TD-283 slice 2's UI check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `scripts/look_home.py` (`main`'s `finally`: `tmux kill-server`, then one `shutil.rmtree(home)`)
+
+**Why:** a UI check that presses Add entry → Open a session starts a real `claude` in the scratch home's tmux server. The teardown kills the server and removes the home once, but the dying tool's hooks still fire after that (its `SessionEnd`/`Stop` run the hook script, which appends to `<home>/events/<id>.jsonl`). That recreates `<home>/events/` after the `rmtree`. Twice on 2026-10-04, `/tmp/aolook-*` was left holding one events file. The script's docstring promises that only a SIGKILL leaves anything behind.
+
+**Fix:** after the kill, give the pane processes a moment to exit, then remove the home. Either wait until no process has the scratch home in its environment, or retry the `rmtree` a few times about a second apart until the path stays gone. Add a test that a hook write landing after the first removal still leaves no home.
+
+**Done when:** a look home torn down after an Open a session press leaves no `/tmp/aolook-*`.
+
+**Related:** TD-291 (the scratch home), TD-283 (the press that found it).

@@ -5,6 +5,7 @@ Type, at the prompt; its composer text comes back to the page and nothing is typ
 
 from __future__ import annotations
 
+import re
 import subprocess
 
 import pytest
@@ -97,12 +98,13 @@ def test_open_a_session_starts_the_types_role_interactive_in_a_new_worktree_with
     assert kw["unattended"] is False and kw["prompt"] == "" and kw["role"] == "designer" and kw["team"] == "sam-grind"
     assert kw["controllers"] == ["ao-samscrape-manager-sam"]
     assert kw["context_bound"] is None  # a person's own session takes no default bound (§4.8, TD-249)
-    # the composer's text: entry.md's lines with the repo, the type and the ledger, then the words
-    text = r.json()["text"]
-    assert text.startswith(
+    # entry.md's lines, filled, are the session's start context (§4.3, TD-283 part 2): the create carries them
+    assert kw["start_context"].startswith(
         "The person asked for a new entry in the ledger of samscrape: docs/technical_debt.md, with Type feature"
     )
-    assert text.endswith(words) and r.json()["id"] == "ao-samscrape-entry-2"
+    assert "Their first message is their words for it." in kw["start_context"] and words not in kw["start_context"]
+    # …and the composer holds the person's words and nothing else
+    assert r.json()["text"] == words and r.json()["id"] == "ao-samscrape-entry-2"
 
 
 def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatch):
@@ -114,10 +116,11 @@ def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatc
     r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": ""})
     (kw,) = created
     assert kw["role"] == "plain" and kw["team"] == "" and kw["controllers"] == [] and kw["unattended"] is False
-    # with **What** empty the composer holds the lines alone
+    # with **What** empty the composer is empty, and the session is told the same
     from agentorc import repoconfig
 
-    assert r.json()["text"] == repoconfig.entry_text("samscrape", "debt", "docs/technical_debt.md")
+    assert r.json()["text"] == ""
+    assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "docs/technical_debt.md")
 
 
 def test_a_bad_type_or_an_unknown_repo_is_refused_and_nothing_starts(tmp_path, monkeypatch):
@@ -209,3 +212,37 @@ def test_a_seat_with_no_checkout_is_not_read_as_no_seat():
     assert none["why"] == "this team has no techlead seat" and none["to"] == ""
     bare = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": "techlead-sam"}], {}, now)
     assert bare["why"] == "techlead-sam: the techlead seat has no checkout on its host" and bare["to"] == ""
+
+
+@pytest.mark.unit
+def test_focus_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_one(tmp_path, monkeypatch):
+    """§4.5a Focus side panel **Told at start** (TD-283 part 2): a fold, closed, above Session, its
+    heading the start context's length in lines, the text escaped with nothing in it a control — and
+    no card at all on a record without one."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-entry-1", "name": "entry-1", "kind": "interactive", "adapter": "claude-code",
+        "dir": str(tmp_path), "state": "idle", "since": "2026-10-04T07:00:00Z", "confidence": "hook",
+        "pane": True, "tail": [], "created": "2026-10-04T07:00:00Z",
+    }  # fmt: skip
+
+    def page(**rec):
+        v = view({**base, **rec})
+        return templates.get_template("focus.html").render(
+            s={**v, "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+        )
+
+    told = "The person asked for a new entry.\n\n- **Read** <b>first</b>\n- [the site](https://example.com) `code`"
+    html = page(start_context=told)
+    card = re.search(r'<details class="card pad side" data-side="told" id="toldcard">(.*?)</details>', html, re.S)
+    assert card, "drawn closed: no `open` on it"
+    assert ">Told at start<" in card[1] and ">3 lines<" in card[1]  # blank lines are not counted
+    # the closed markdown subset (bold, code), every other character escaped, and no link: nothing pressable
+    assert "<strong>Read</strong>" in card[1] and "<code>code</code>" in card[1]
+    assert "&lt;b&gt;first&lt;/b&gt;" in card[1] and "<a " not in card[1] and "<button" not in card[1]
+    assert "[the site](https://example.com)" in card[1]
+    assert html.index('data-side="told"') < html.index('data-side="session"')  # above Session
+    assert 'data-side="told"' not in page() and 'data-side="told"' not in page(start_context=None)
+    assert ">1 line<" in page(start_context="one")
