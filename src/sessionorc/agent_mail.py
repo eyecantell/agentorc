@@ -835,6 +835,32 @@ class MailMixin:
                     setattr(e, k, v)
         if mine:
             self.person_store.save(self.person_inbox)
+        if fields.get("outcome"):
+            self._look_back(msg_id, fields["outcome"])
+
+    def _look_back(self, handed: str, outcome: dict[str, Any]) -> None:
+        """**The seat's outcome ends the wait** (design §4.10 *A look*, §4.5a **Send to reviewer**,
+        TD-292 slice 4): a look snoozed for the `handed` `ask` that just closed comes back — its
+        `snoozed_for` cleared, and the outcome's line, when it has one, written on it as
+        `looked_by: {seat, text}`. Any end of the debt brings it back: an outcome, the person's
+        Dismiss of the handed row. The look is found by the handed entry's `look`, not by its own
+        `snoozed_for`, so a look the person unsnoozed sooner still gets the seat's line."""
+        held = next(((r.id, e) for r in self._graph().values() for e in r.inbox if e.id == handed and e.look), None)
+        if held is None:
+            return
+        seat, h = held
+        looks = [e for e in self.person_inbox if e.id == h.look]
+        if not looks:
+            return
+        line = str(outcome.get("text") or "").strip()
+        if line and outcome.get("state") == "blocked":
+            line = f"blocked: {line}"
+        for e in looks:
+            if e.snoozed_for == handed:
+                e.snoozed_for = None
+            if line:
+                e.looked_by = {"seat": seat, "text": line}
+        self.person_store.save(self.person_inbox)
 
     def _close_entry(self, msg_id: str, reason: str, at: str) -> None:
         """Design §4.10 "One way of being closed": `closed_reason` is set whenever an entry closes,

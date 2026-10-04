@@ -61,8 +61,59 @@ class InboxMixin:
         e = self._person_entry(msg, caller, "snooze")
         if e.kind == "steer":
             raise RpcError(f"{msg} is a steer: it has Pause, which stops its clock, and no Snooze (design §4.10)")
-        self._mark(msg, snoozed_until=str(until) if until else None)
+        # **Unsnooze** brings a look handed to a reviewer back sooner (§4.5a **Send to reviewer**): the
+        # handed `ask` stays with the seat and owes its outcome, which is still written on the look
+        self._mark(msg, snoozed_until=str(until) if until else None, **({} if until else {"snoozed_for": None}))
         return {"id": PERSON, "msg": msg, "snoozed_until": e.snoozed_until}
+
+    async def rpc_inbox_hand(self, msg: str, seat: str = "", caller: Any = None) -> dict[str, Any]:
+        """**Send to reviewer** (design §4.5a, §4.10 *A look*, TD-292 slice 4): a look that is an
+        open `ask`, handed to its sender's team's techlead seat as an `ask` from the person marked
+        `handed`, carrying the look's text, `about`, `shots` and id (`look`), with **no bound** — it
+        ends by its outcome or the person's Dismiss, as a handed entry does — and the look snoozed
+        **until that debt closes** (`snoozed_for`, the handed entry's id). The person's alone,
+        refused to every session as `inbox_snooze` is. The host agent does not read `org.yml`, so the
+        caller names the seat (`seat`, the id the sender's team's techlead takes; empty where the
+        team defines none). Refused in words: not a look, not an open `ask`, already with a reviewer,
+        no techlead seat. Returns `{id, msg, to, read_when}`."""
+        e = self._person_entry(msg, caller, "hand")
+        if not e.shots:
+            raise RpcError(f"{msg} is not a look: it names no screenshots (design §4.10 *A look*)")
+        if e.kind != "ask":
+            raise RpcError(
+                f"{msg} is a {e.kind}: only an `ask` look is sent to a reviewer — a steer has Go with it "
+                "and lapses to its default (design §4.5a)"
+            )
+        if not e.open:
+            raise RpcError(f"{msg} is already answered: there is nothing left to send to a reviewer (design §4.5a)")
+        if busy := next((h.id for r in self._graph().values() for h in r.inbox if h.look == e.id and h.owes), None):
+            raise RpcError(f"{msg} is already with a reviewer ({busy}): its outcome brings it back")
+        to = str(seat or "").strip()
+        if not to:
+            raise RpcError(
+                f"{e.team or 'its sender'} has no techlead seat: there is nobody to send the look to (design §4.9b)"
+            )
+        # held from the check to the snooze: two presses (two tabs, a double click) send one ask
+        handing: set[str] = self.__dict__.setdefault("_looks_handing", set())
+        if e.id in handing:
+            raise RpcError(f"{msg} is already with a reviewer: it is being sent now")
+        handing.add(e.id)
+        try:
+            sent = await self._msg(PERSON, e.text, [to], "ask", e.about, None, None, None)
+        finally:
+            handing.discard(e.id)
+        mid = (sent.get("entry") or {}).get("id")
+        if not mid:
+            raise RpcError(f"the look was not delivered to {to}")
+        to = next(iter(sent.get("delivered") or ()), to)  # a seat started again under its name (review of #764)
+        # the debt, the look's screenshots and its id, and no bound: it ends by its outcome (§4.10). The
+        # shots are written here, not sent: `--shot` rides only toward the person, and this is the
+        # person's own look going the other way
+        self._mark(mid, handed=True, shots=list(e.shots), look=e.id, bound=None)
+        self._mark(e.id, snoozed_for=mid, looked_by=None)  # an earlier reading is not this one's
+        await self._push_changes()
+        log.info("inbox_hand: look %s handed to %s as %s", e.id, to, mid)
+        return {"id": PERSON, "msg": e.id, "handed": mid, "to": to, "read_when": self._entry_read_when(to)}
 
     async def rpc_inbox_dismiss(self, msg: list[str] | str, caller: Any = None) -> dict[str, Any]:
         """**Dismiss** and **Dismiss all** (design §4.10 *The Inbox is a queue*, TD-079): the one

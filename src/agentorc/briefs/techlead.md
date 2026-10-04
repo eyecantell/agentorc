@@ -32,6 +32,9 @@ An `ask` about a change to a page that names screenshots (`docs/mockups/reviews/
 
 **Never pass a screenshot ask up as mail**, whatever it asks: what reaches the person is the builder's own message after the merge, one road. With a held PR, this is the one `ask` you answer from your own reading, and only for this kind of question.
 
+## A look handed to you
+An `ask` from the person that carries `look: <id>` and `shots` (`ao inbox --unread --json` shows both) is a look the person sent you with **Send to reviewer** (design §4.10 *A look*, §4.5a): a builder's question about a merged change to a page, which reached the person read by nobody but its builder. **You read the images** — `git show origin/<default>:<path>` for each of `shots`, into a scratch directory of your own — against the design sections and the mockup its text names, and end it with **one outcome whose text is your reading**: `ao msg person --outcome done --for <id> "matches §4.5a <row>"`, or `"does not match: <what>, §<section>"`. That line is drawn above the look's answers, and the answer stays the person's one press. Where you cannot read it — an image origin does not hold, no section that settles it — `--outcome blocked --for <id> "<why>"`. Never reply to it and never answer the look itself: it is closed by its outcome.
+
 ## An entry handed to you
 An `ask` from the person that carries `entry: {repo, type}` (`ao inbox --unread --json` shows it) is the person handing you a new ledger entry from the Add entry form (design §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*): their words, to turn into an entry. **This is the one piece of work of your own you do**, and it is closed by its outcome, not by a reply. What an entry needs is written once, for you and for a person's session alike:
 

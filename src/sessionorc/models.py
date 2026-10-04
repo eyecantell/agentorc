@@ -286,6 +286,14 @@ class MailEntry:
     default: str | None = None  # a `steer`: the one line saying what the sender will do, required on it
     team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
     snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
+    # A look handed to a reviewer (design §4.10 *A look*, §4.5a **Send to reviewer**, TD-292 slice 4):
+    # `snoozed_for` is the id of the `handed` `ask` that carries it to its sender's team's techlead
+    # seat, in place of a time — the look is set aside until that debt closes. `looked_by` is
+    # `{seat, text}`, the seat's outcome line brought back to the look, drawn above its answers.
+    # `look` is on the handed `ask` itself: the id of the look it carries.
+    snoozed_for: str | None = None
+    looked_by: dict[str, str] | None = None
+    look: str | None = None
     paused_at: str | None = None  # a person-inbox `steer` whose clock the person stopped (§4.10 *Pause*)
     # Suggested answers (design §4.10 *Suggested answers*, 2026-09-20, TD-070). `answers` is the
     # sender's own likely answers on an `ask`, a `steer` or a `conflict` — **data the sender

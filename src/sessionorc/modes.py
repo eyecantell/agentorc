@@ -70,6 +70,7 @@ MAILBOX = frozenset(
         "thread",
         "inbox_delete",
         "inbox_snooze",
+        "inbox_hand",
         "inbox_pause",
         "inbox_resume",
         "inbox_go_with_it",
