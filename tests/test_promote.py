@@ -264,7 +264,7 @@ def test_a_malformed_block_is_skipped_never_fatal(checkout, tmp_path):
 
 
 def _register(*roots: Path) -> None:
-    reg = Path(hosts.DEFAULT_REPOS_REGISTRY)
+    reg = hosts.default_repos_registry()
     reg.parent.mkdir(parents=True, exist_ok=True)
     reg.write_text("".join(f"{r}\n" for r in roots))
 

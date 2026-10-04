@@ -34,6 +34,52 @@ def test_local_host_from_file(tmp_path, monkeypatch):
         assert h.name and h.local is False
 
 
+def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
+    """TD-298: a home other than the default, with no `repos_registry:` of its own, reads its own
+    `repos.txt` — never dev-cadence's machine roster, whose real checkouts it would pull."""
+    roster = tmp_path / "machine" / "repos.txt"
+    roster.parent.mkdir()
+    roster.write_text("/home/p/real\n")
+    monkeypatch.setattr(hosts, "DEFAULT_REPOS_REGISTRY", str(roster))
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    monkeypatch.setenv("AGENTORC_HOME", str(scratch))
+    h = hosts.local_host()
+    assert h.repos_registry == scratch / "repos.txt" and h.repos() == []
+    assert hosts.Host(name="x", vscode_host="x").repos() == []  # the dataclass's default reads the home too
+    (scratch / "repos.txt").write_text("/home/p/mine\n")
+    assert hosts.local_host().repos() == ["/home/p/mine"]
+    # the default home (however it is spelled) keeps the machine roster
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTORC_HOME", "~/.agentorc")
+    assert hosts.local_host().repos() == ["/home/p/real"]
+    (tmp_path / ".agentorc").mkdir()
+    (tmp_path / "link").symlink_to(tmp_path / ".agentorc")
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "link"))
+    assert hosts.default_repos_registry() == roster  # a symlink to the default home is the default home
+    monkeypatch.delenv("AGENTORC_HOME")
+    assert hosts.default_repos_registry() == roster
+
+
+def test_serve_takes_the_tmux_socket_from_the_env(tmp_path, monkeypatch):
+    """TD-298: `agentorc-agent serve` honours `AGENTORC_TMUX_SOCKET`, as the tests and `look_home.py`
+    do, so a scratch home's agent never lists or drives the default server's sessions."""
+    from sessionorc import agent
+
+    seen = []
+
+    async def fake_serve(a, sock=None):
+        seen.append(a.tmux.socket_name)
+
+    monkeypatch.setattr(agent, "serve_until_signal", fake_serve)
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", "ao-scratch-td298")
+    assert agent.main(["serve"]) == 0
+    monkeypatch.delenv("AGENTORC_TMUX_SOCKET")
+    assert agent.main(["serve"]) == 0
+    assert seen == ["ao-scratch-td298", None]
+
+
 def test_env_overrides_are_gone(tmp_path, monkeypatch):
     """TD-004: the file is the only source; the phase-1 env overrides no longer apply."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))

@@ -641,6 +641,10 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   between: a pane list **older than the kill that ended a record never revives it** (TD-063), or
   an `exited` session comes back as `idle` and then refuses its own `remove`.
 - Create / kill / send / resume sessions (the only writer).
+- **Its own tmux server and its own repos, on any home but the default** (TD-298): `serve` drives the
+  server `AGENTORC_TMUX_SOCKET` names (`tmux -L <name>`), the default server only when it is unset, and
+  a home other than `~/.agentorc` with no `repos_registry:` reads `repos.txt` under itself (§5) — so a
+  scratch home, as `scripts/look_home.py` stands up, lists, pulls and promotes nothing of the machine's.
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - **Repo facts** (§4.5 screens 1 and 11, TD-176; the readings built by slice 1, the doing log by
@@ -5164,8 +5168,9 @@ team has one, the techlead answers it or passes it up, and the person is the top
   from its own worktree, on an `AGENTORC_HOME` of its own on a short path, a tmux server of its
   own and a port of its own, with fixture sessions under the `shell` adapter and a fixture board
   — stood up and torn down by one script, `scripts/look_home.py`, which starts the host agent
-  itself, in a child of its own, on a private socket as the suite's fixture does, since `agentorc-agent serve`
-  always takes the default tmux server and so is never what a look runs. The brief's rule is
+  itself, in a child of its own, on a private socket as the suite's fixture does, so that the home,
+  its tmux server and its port are made and torn down as one, and nothing of the look reaches the
+  default server. The brief's rule is
   therefore *never run the host agent or `ao ui` against the live home*, and the script is the
   one way to run them. The builder drives the page in a headless Chromium under Playwright —
   load, wait for the scripts and the terminal, read values, press, take screenshots — and the
@@ -6568,7 +6573,7 @@ session is never woken by mail at all.
 - Hosts: `~/.agentorc/hosts.yml` on every host — the UI host's copy lists the hosts; each host
   agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
   fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
-  you sit at), `volatile: true|false`, `repos_registry` path, `runs_keep_days`, `identity` (§4.8a)
+  you sit at), `volatile: true|false`, `repos_registry` path (unset: dev-cadence's `~/.config/dev-cadence/repos.txt` on the default home `~/.agentorc`, `repos.txt` under any other home — TD-298), `runs_keep_days`, `identity` (§4.8a)
   and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). The UI
   host's entries for other hosts — `transport: ssh|local` and an `ssh` target each — arrive with
   the ssh transport (TD-004, phase 2); nothing reads them today. The UI process may run on a
@@ -6656,7 +6661,7 @@ person:                                       # the person's own — nothing her
   text the person wrote, escaped. Nothing under `person:` reaches a policy: the gate and the tick
   read the file by key and never this one.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
-  duplicated. A repo without dev-cadence can still be listed there. Directories that are not
+  duplicated; a home other than `~/.agentorc` reads its own `repos.txt` unless `repos_registry` names one (TD-298). A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
   ones per host in `~/.agentorc/recent_dirs`.
 - Per repo: `.agentorc.yml` (checked in):

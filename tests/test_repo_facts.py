@@ -229,7 +229,7 @@ def test_pr_reading_that_failed_is_an_error_never_zero(tmp_path, monkeypatch):
 
 
 def _register(*roots: Path) -> None:
-    reg = Path(hosts.DEFAULT_REPOS_REGISTRY)
+    reg = hosts.default_repos_registry()
     reg.parent.mkdir(parents=True, exist_ok=True)
     reg.write_text("".join(f"{r}\n" for r in roots))
 

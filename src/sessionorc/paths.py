@@ -5,9 +5,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+DEFAULT_HOME = Path("~/.agentorc")
+
 
 def home() -> Path:
-    return Path(os.environ.get("AGENTORC_HOME", "~/.agentorc")).expanduser()
+    return Path(os.environ.get("AGENTORC_HOME", str(DEFAULT_HOME))).expanduser()
 
 
 def sessions_dir() -> Path:

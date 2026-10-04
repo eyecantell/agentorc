@@ -149,7 +149,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-292 | Build the mail half of a look: the briefs' three cases as a steer or an ask, `--shot` and the envelope's `shots`, screenshots and the pair on the row, Send to reviewer | Medium | The board row's pair built (#975); the mail slices open |
 | TD-296 | What the live looks of 2026-10-03 found off: seventeen page defects, each small, from a stray decimal to a read-only line that never shows | Medium | Open |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
-| TD-298 | A scratch `AGENTORC_HOME` still reads this machine's repo registry and default tmux server: a look's host agent fast-forwarded the real checkout | Medium | Open |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Open — the credential steps are Paul's |
 
 
@@ -2843,24 +2842,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** each is seen working or ledgered as its own entry.
 
 **Related:** TD-296, TD-291, TD-244.
-
-## TD-298: A scratch `AGENTORC_HOME` still reads this machine's repo registry and default tmux server
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-03 (the anchor: a look agent's scratch host agent fast-forwarded `/home/kmaster/agentorc`)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/hosts.py` (`repos_registry`'s default), `src/sessionorc/agent*.py` (`serve`, the bare `Tmux()`), `src/sessionorc/tmux.py`
-
-**Why:** on 2026-10-03 a look agent started `agentorc-agent serve` with `AGENTORC_HOME=~/.cache/aolkE`, a private `AGENTORC_TMUX_SOCKET` and an empty `CLAUDE_CONFIG_DIR`. Its registry still filled with the four real checkouts, since `repos_registry` defaults outside the home, and four seconds after it started (20:33:00 MDT) its pull policy fast-forwarded the real agentorc checkout `05634ce7 → 6cf8e701` — which the live agent was holding *until agentorc-18 is idle*; the scratch agent could not see that session with its empty Claude config. The move was an ff-only merge on a clean checkout and harmed nothing, but a scratch home must not act on real repos. `AGENTORC_TMUX_SOCKET` is also not read by `serve`: its `Tmux()` takes the default server, so only `TMUX_TMPDIR` kept tmux apart. Three other look agents isolated themselves by hand (their own `hosts.yml` with `repos_registry`, a `HostAgent(tmux=Tmux(socket_name=…))`), as TD-291's `scripts/look_home.py` (#970) does.
-
-**Fix:** (1) when `AGENTORC_HOME` is not the default, `repos_registry` defaults under it (or is empty), never this machine's; (2) `serve` honours `AGENTORC_TMUX_SOCKET` as the test fixture and `look_home.py` do; (3) the design says both in §4.4's one-host paragraph; a test starts a scratch-home agent and asserts it lists no real repo and no default-server session.
-
-**Done when:** a host agent on a non-default home with no registry of its own lists no repo and touches no tmux server but its own.
-
-**Related:** TD-291 (`look_home.py`, which isolates by hand), TD-263 (the pull), TD-296.
 
 ## TD-299: Run the guardians and contractmatch teams inside their devcontainers
 

@@ -229,7 +229,7 @@ async def test_the_home_pass_pulls_and_host_carries_the_reading(agent, repo, mon
     root, other = repo
     await park_ticks(agent)
     monkeypatch.setattr(adapters, "external_sessions", lambda: [])
-    reg = Path(hosts.DEFAULT_REPOS_REGISTRY)
+    reg = hosts.default_repos_registry()
     reg.parent.mkdir(parents=True, exist_ok=True)
     reg.write_text(f"{root}\n")
     agent.sessions["ao-x-main"] = _rec("main", root, "working", adapter="claude-code")
