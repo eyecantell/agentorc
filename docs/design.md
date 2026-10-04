@@ -1007,7 +1007,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   from, dismissed once the commit lands; refused for an open `ask` or `steer`) and **`board_reply {board, line, text, reply, refs}`** (`refs` the references the
   reader gave the row, handed back as the line and text are, since the host agent does not run the
   reader) — the write-back, then the mail to whoever still holds the context (§4.5a *Inbox board row
-  → Reply*) — the person's alone (refused to every session, as `inbox_delete` is), served by the
+  → Reply*; the mail half is the home's, **`board_reply_hand {head, by, reply, refs}`**, which a node that
+  wrote the line forwards over the link and, with the link down, does not send, saying so beside the
+  committed line) — the person's alone (refused to every session, as `inbox_delete` is), served by the
   host whose repos registry holds the repo, on that repo's board and no other file. **The edit is
   made on origin's head, and landed there** (TD-222, designed 2026-10-01; the build is TD-264 — until it
   lands the edit is committed in the main checkout, never pushed, and the anchor's next push

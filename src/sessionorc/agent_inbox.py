@@ -420,14 +420,15 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
-        sent, refused = await self._board_reply_hand(root, text, reply, refs)
+        h = board_mod.HEAD_RE.search(text)
+        head = " ".join((h.group("head") if h else text).split())
+        by = await asyncio.to_thread(board_mod.author, root)
+        sent, refused = await self._board_reply_mail(head, by, reply, refs)
         note = "written on the board"
         if sent:
             note += " · sent to " + ", ".join(f"{x['session']} (holds {x['ref']})" for x in sent)
         if refused:
             note += " · not sent to " + "; ".join(refused)
-        if sent:
-            await self._push_changes()
         return {
             "board": str(want),
             "line": int(line),
@@ -438,17 +439,40 @@ class InboxMixin:
             **({"mail_refused": refused} if refused else {}),
         }
 
-    async def _board_reply_hand(
-        self, root: Path, text: str, reply: str, refs: list[str] | None
+    async def _board_reply_mail(
+        self, head: str, by: str, reply: str, refs: list[str] | None
     ) -> tuple[list[dict[str, str]], list[str]]:
-        """A board reply's mail half (§4.5a *Inbox board row → Reply*): one `handed` note to each
-        live lease holder on the line's `refs`, a holder of two refs mailed once, about the first.
-        Returns what was sent and each refusal as `<name> (holds <ref>): <why>`."""
-        h = board_mod.HEAD_RE.search(text)
-        head = " ".join((h.group("head") if h else text).split())
+        """The mail half where it is served (§4.4a): the mailbox, the lease records and the
+        `handed` mark are the home's, so a node that wrote the board hands this half to the home
+        as `board_reply_hand`, and mails nobody while the link is down, saying so. The file half
+        stays where the repos registry holds the repo (§4.4)."""
+        if not board_refs(refs):
+            return [], []
+        if self.mode == "home":
+            got = await self.rpc_board_reply_hand(head=head, by=by, reply=reply, refs=refs)
+            return got["sent"], got["refused"]
+        if not self.home_reachable():
+            return [], [f"mail is the home's: {self.home} (home) is unreachable from {self.host}"]
+        out = await self._forward(0, "board_reply_hand", {"head": head, "by": by, "reply": reply, "refs": refs}, None)
+        if "error" in out:
+            return [], [f"mail is the home's: {out['error']}"]
+        got = out.get("result") or {}
+        return list(got.get("sent") or ()), list(got.get("refused") or ())
+
+    async def rpc_board_reply_hand(
+        self, head: str = "", by: str = "", reply: str = "", refs: list[str] | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """A board reply's mail half (§4.5a *Inbox board row → Reply*, TD-142 slice 2), served at
+        the home (`modes.HOME_EDITS`): one `note` from the person, `about` the ref and marked
+        `handed`, to each live lease holder on the line's `refs` — a holder of two refs mailed
+        once, about the first. The person's alone, as `board_reply` is; `board_reply` calls it
+        after its commit, a node's over the link. Returns `{sent: [{session, id, ref}], refused:
+        ["<name> (holds <ref>): <why>"]}`, a refused send said, never raised."""
+        if not mail.is_person(caller):
+            raise RpcError(f"{caller} cannot reply on the board: a board reply is the person's own (design §4.4)")
+        head = " ".join(str(head or "").split())
         if len(head) > BOARD_HEAD_CHARS:
             head = head[: BOARD_HEAD_CHARS - 1].rstrip() + "…"
-        by = await asyncio.to_thread(board_mod.author, root)
         words = " ".join(str(reply or "").split())
         body = f"board: {head}\n\n{by}: {words}"
         if len(body.encode()) > mail.TEXT_CAP:
@@ -470,8 +494,13 @@ class InboxMixin:
                     continue
                 if mid := (got.get("entry") or {}).get("id"):
                     self._mark(mid, handed=True)  # work the person handed on: it owes an outcome (§4.10)
-                sent.append({"session": name, "id": addr, "ref": ref})
-        return sent, refused
+                # a seat started again under its name is followed to the record that took it (review of #764)
+                to = next(iter(got.get("delivered") or ()), addr)
+                r = self._graph().get(to)
+                sent.append({"session": (r.name if r is not None else "") or name, "id": to, "ref": ref})
+        if sent:
+            await self._push_changes()
+        return {"sent": sent, "refused": refused}
 
     async def _board_add(
         self, root: Path, board: Path, text: str, due: str | None, entry: str | None, caller: Any

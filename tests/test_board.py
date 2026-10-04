@@ -675,3 +675,54 @@ def test_an_offered_answer_word_for_word_comes_before_the_not_right_form():
         with pytest.raises(board.Refused, match="needs its words"):
             A._board_answer("decide", bad, both)
     assert A._board_answer("snooze", "anything", both) == ""
+
+
+def test_board_reply_hand_is_the_homes_edit():
+    """The mail half is the home's (§4.4a, review of PR #1019): a node forwards it, never serves it."""
+    from sessionorc import modes
+
+    assert "board_reply_hand" in modes.HOME_EDITS and "board_reply" not in modes.HOME_EDITS
+    assert "kmaster (home) is unreachable" in modes.offline_refusal(
+        "board_reply_hand", None, {}, host="laptop", home="kmaster"
+    )
+
+
+async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, repo, tmp_path, monkeypatch):
+    """At a node (§4.4a) `board_reply` writes the line where the registry holds the repo and hands
+    the mail half to the home as `board_reply_hand`; with the link down it mails nobody and says
+    so beside the committed line. Nothing is written to the node's own mailbox."""
+    _registry(tmp_path, repo)
+    path = str(repo / board.BOARD)
+    async with LocalClient() as me:
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=h) as s:
+            await s.call("progress", id=h, ref="TD-122")
+        with pytest.raises(AgentError, match="the person's own"):
+            async with LocalClient(caller=h) as s:
+                await s.call("board_reply_hand", head="x", by="p", reply="y", refs=["TD-122"])
+        monkeypatch.setattr(agent, "mode", "node")
+        monkeypatch.setattr(agent, "home", "kmaster")
+        monkeypatch.setitem(agent.home_link, "up", False)
+        got = await agent.rpc_board_reply(board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
+        assert got["sent"] == [] and "mail is the home's: kmaster (home) is unreachable" in got["note"]
+        assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")
+        forwarded = []
+
+        async def forward(rid, name, params, caller):
+            forwarded.append((name, params, caller))
+            return {
+                "id": rid,
+                "result": {"sent": [{"session": "holder", "id": "h@kmaster", "ref": "TD-122"}], "refused": []},
+            }
+
+        monkeypatch.setattr(agent, "_forward", forward)
+        monkeypatch.setitem(agent.home_link, "up", True)
+        line = (repo / board.BOARD).read_text().splitlines()[6][len("- [ ] ") :]
+        got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="and push", refs=["TD-122"])
+        assert got["note"] == "written on the board · sent to holder (holds TD-122)"
+        assert [(n, p["head"], p["reply"], c) for n, p, c in forwarded] == [
+            ("board_reply_hand", "Merged, live check pending: the doorbell.", "and push", None)
+        ]
+        assert not [e for e in agent.sessions[h].inbox if e.from_ == "person"]  # the node's store untouched
+        monkeypatch.setattr(agent, "mode", "home")
+        await me.call("kill", id=h)
