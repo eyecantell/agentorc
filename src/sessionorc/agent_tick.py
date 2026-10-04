@@ -1786,7 +1786,7 @@ class TickMixin:
             why = (r.out_of_work or {}).get("why") if isinstance(r.out_of_work, dict) else None
             if why:
                 lines.append(f"{r.name}: {why}")
-        self._system_note(PERSON, "\n".join(lines))
+        self._system_note(PERSON, "\n".join(lines), team=team)
         log.info("rule 9: %s wound down by the tick — the person told", team)
 
     @staticmethod

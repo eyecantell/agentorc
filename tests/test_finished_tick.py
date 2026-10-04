@@ -95,6 +95,7 @@ async def test_a_finished_team_is_wound_down_after_the_settle_and_the_person_tol
     assert manager.closed_for == {"why": "finished", "closed_at": manager.closed_at}
     (note,) = home.notes()
     assert note.startswith("g finished and the host agent wound it down") and "#812, #813" in note
+    assert [e.team for e in agent.person_inbox if e.from_ == SYSTEM] == ["g"], "filed under its team"
     assert "#700" not in note, "a pull request from before the team's start"
     assert "g1: g1 found nothing pickable" in note and "g2: g2 found nothing pickable" in note
     assert work.team_wound_down([g1, g2, manager, seat, paul]) is None, "its seat is live: rule 3's to close"
