@@ -2146,7 +2146,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if args.cmd == "serve":
-        asyncio.run(serve_until_signal(HostAgent()))
+        # `AGENTORC_TMUX_SOCKET` names a private tmux server (TD-298), as the tests and `scripts/look_home.py`
+        # use: a scratch home's agent never lists or drives the default server's sessions.
+        tmux = Tmux(socket_name=os.environ.get("AGENTORC_TMUX_SOCKET") or None)
+        asyncio.run(serve_until_signal(HostAgent(tmux=tmux)))
         return 0
     if args.cmd == "rpc":
         from sessionorc.client import bridge_stdio

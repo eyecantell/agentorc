@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import functools
 import socket
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -49,13 +49,22 @@ DEFAULT_REPOS_REGISTRY = "~/.config/dev-cadence/repos.txt"
 DEFAULT_RUNS_KEEP_DAYS = 30
 
 
+def default_repos_registry() -> Path:
+    """Where a host with no `repos_registry:` reads its repos (design §5): dev-cadence's machine roster
+    for the default home, and `repos.txt` under any other home (TD-298) — a scratch home (a look, a
+    test) never reads, pulls or promotes this machine's real checkouts by default."""
+    if paths.home() == paths.DEFAULT_HOME.expanduser():
+        return Path(DEFAULT_REPOS_REGISTRY).expanduser()
+    return paths.home() / "repos.txt"
+
+
 @dataclass
 class Host:
     name: str
     vscode_host: str
     local: bool = False
     volatile: bool = False
-    repos_registry: Path = Path(DEFAULT_REPOS_REGISTRY).expanduser()
+    repos_registry: Path = field(default_factory=default_repos_registry)
     runs_keep_days: int = DEFAULT_RUNS_KEEP_DAYS
     # design §4.8a: `off | observe | enforce`, read by `sessionorc.identity.mode_of` ('' = the default)
     identity: str = ""
@@ -208,7 +217,7 @@ def local_host() -> Host:
         vscode_host=str(data.get("vscode_host") or name),
         local=_flag(data.get("local")),
         volatile=_flag(data.get("volatile")),
-        repos_registry=Path(str(registry) if registry else DEFAULT_REPOS_REGISTRY).expanduser(),
+        repos_registry=Path(str(registry)).expanduser() if registry else default_repos_registry(),
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
         identity=str(data.get("identity") or ""),
         person=data.get("person") is not False,
