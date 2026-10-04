@@ -614,7 +614,7 @@
   <span class="grow"></span>
   {#- §4.5a **Inbox board row (a `look`)** (TD-292 slice 2): a look with *Works (default)* reads its
       bound, as a steer's time left does, and *lapsed* past it -#}
-  {%- if e.steering %}
+  {%- if e.steering and e.bound %}
   <span class="st" title="Due: {{ e.due }}">{% if e.lapsed %}lapsed {{ e.due }} — Works by default; its team closes the line{% else %}until {{ e.due }}, then closed as Works{% endif %}</span>
   {%- else %}
   <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>

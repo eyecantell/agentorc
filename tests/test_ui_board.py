@@ -1559,6 +1559,13 @@ def test_a_look_with_works_by_default_is_steering_with_its_due_as_its_bound(tmp_
         assert h["steering"] == rows and not (h["due"] or h["ahead"] or h["hidden"])
     secs = inbox_sections([], boards=rows)
     assert secs["steering"] == rows and secs["count"] == 0 and not secs["needs"]
+    from agentorc.ui.app import horizon_of
+
+    h = board_horizon(rows, "next:1", "2026-09-18")
+    assert horizon_of(h, rows[0]["root"])["steering"] == rows and horizon_of(h, tmp_path / "other")["steering"] == []
+    undated = {**rows[0], "bound": "", "due": "", "due_tag": "no date"}
+    html = templates.get_template("inbox_rows.html").render(rows=[undated], section="steering")
+    assert "until , then" not in html and "no date" in html  # a date the reader could not read: its words
 
     rows, _ = rows_html(tmp_path, monkeypatch, {**it, "overdue_days": 2, "due_tag": "2d overdue"})
     assert rows[0]["lapsed"] and rows[0]["steering"] and not rows[0]["due_now"]
