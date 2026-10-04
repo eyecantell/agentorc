@@ -149,7 +149,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
 | TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
-| TD-311 | `look_home.py`'s teardown leaves its `/tmp/aolook-*` home behind when a claude-code session ran in it | Low | Open |
 
 ---
 
@@ -2812,21 +2811,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
 
 **Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.
-
-## TD-311: `look_home.py`'s teardown leaves its `/tmp/aolook-*` home behind when a claude-code session ran in it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-04 (grinder-ao-2, TD-283 slice 2's UI check)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `scripts/look_home.py` (`main`'s `finally`: `tmux kill-server`, then one `shutil.rmtree(home)`)
-
-**Why:** a UI check that presses Add entry → Open a session starts a real `claude` in the scratch home's tmux server. The teardown kills the server and removes the home once, but the dying tool's hooks still fire after that (its `SessionEnd`/`Stop` run the hook script, which appends to `<home>/events/<id>.jsonl`). That recreates `<home>/events/` after the `rmtree`. Twice on 2026-10-04, `/tmp/aolook-*` was left holding one events file. The script's docstring promises that only a SIGKILL leaves anything behind.
-
-**Fix:** after the kill, give the pane processes a moment to exit, then remove the home. Either wait until no process has the scratch home in its environment, or retry the `rmtree` a few times about a second apart until the path stays gone. Add a test that a hook write landing after the first removal still leaves no home.
-
-**Done when:** a look home torn down after an Open a session press leaves no `/tmp/aolook-*`.
-
-**Related:** TD-291 (the scratch home), TD-283 (the press that found it).
