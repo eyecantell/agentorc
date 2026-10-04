@@ -2845,14 +2845,14 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/agentorc/ui/render.py` (`_block`: lists), `src/agentorc/ui/inbox.py` (`board_rows`, `_find_text`), `src/agentorc/ui/templates/inbox_row.html` (the board row's fold), `tests/test_render.py` and the Inbox tests
+**Location:** `src/agentorc/ui/render.py` (`_block`: lists), `src/agentorc/ui/inbox.py` (`board_rows`, `_find_text`), `src/agentorc/ui/templates/inbox_row.html` (the board row's fold), `src/agentorc/ui/static/app.js` (`foldsOpen`, `reopenFolds`), `tests/test_render.py` and the Inbox tests
 
 **Why:** TD-304's design: a board item's detail block is what the person decides from, and the Inbox row draws the head line alone.
 
 **Fix:** design §4.5a **Inbox board row: detail block**. One slice:
 - `render`: a `-` or `1.` item indented deeper than the list it follows opens a list inside that item; depth by indent, every character still through `html.escape`, no new tag beyond `ul`, `ol`, `li`. A message's text gains the same nesting.
 - `board_rows` carries `detail` — the reader's lines joined as one text, only when the key is a non-empty list of strings — and adds its words to the row's `find`.
-- The board row draws the block inside its *details* fold after `rest`, through `md`; a row with a block has the fold even when `rest` is empty; the fold is drawn `open` when the row has answers to press (undecided with `answers`, or a live look's pair) and closed otherwise, the page's own memory of a pressed fold winning over the default as it does today.
+- The board row draws the block inside its *details* fold after `rest`, through `md`; a row with a block has the fold even when `rest` is empty; the fold is drawn `open` when the row has answers to press (undecided with `answers`, or a live look's pair) and closed otherwise, and the person's press wins over the default: `app.js`'s `foldsOpen` records opened folds only and `reopenFolds` only opens, so the page also remembers a fold closed by hand and closes it again after a poll that drew it open.
 - No control is built from the block and nothing in it is read as a field; **Put on the board** is unchanged.
 
 **Done when:** on a scratch home (`scripts/look_home.py`) with a board synced past dev-cadence TD-084: a `decide` item with a block shows Context, Question, Caveats and Recommended under its head with nested bullets drawn as nested lists, the fold open; an item with a block and no answers has it closed; an item without a block, and a report whose items carry no `detail` key, draw as today; a block holding `<script>` or `Answers:` draws them as text; tests cover the renderer's nesting and the row. A page change, so the builder looks at it and sends the look (§4.9b).
