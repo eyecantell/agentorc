@@ -1991,12 +1991,21 @@ async def test_a_picked_answer_is_an_ordinary_reply_on_an_ask_and_on_a_steer(age
             held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == mid][0]
             # closed `replied` — never `go_with_it`, which is the person's separate act
             assert held["closed_reason"] == "replied" and held["closed_by"] == got["entry"]["id"]
+            # and the question keeps which was pressed, which is what the Inbox's *Waiting on
+            # them* row says was answered (§4.5a, TD-296 #14)
+            assert held["answer"] == index
         async with LocalClient(caller=loner) as c:
             got = [e for e in (await c.call("inbox"))["entries"] if e["kind"] == "reply"]
             # the sender reads the index and need not compare strings
             assert [(e["answer"], e["text"]) for e in got] == [(1, "hold it"), (0, "off main")]
         # a person's reply refills the sender's wake budget, picked or typed alike
         assert agent.sessions[loner].wake_refilled_at is not None
+        # a typed reply leaves the question's `answer` empty: the row then says *you answered*
+        async with LocalClient(caller=loner) as c:
+            typed = (await c.call("msg", to="person", text="rebase?", kind="ask", answers=["yes", "no"]))["entry"]["id"]
+        await person.call("msg", kind="reply", reply_to=typed, text="yes, after lunch")
+        held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == typed][0]
+        assert held["closed_reason"] == "replied" and held["answer"] is None
         await person.call("kill", id=loner)
 
 
