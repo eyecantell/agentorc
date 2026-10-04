@@ -146,10 +146,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-303 | An answered Needs-you row stays in Needs you: a board item with your decision or reply reads as still waiting on you | High | Designed 2026-10-04; the build is TD-305 |
-| TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Open |
+| TD-304 | The Inbox shows a board item's head line only — not the detail block (context, question, caveats, recommendation) the person decides from | Medium | Designed 2026-10-04; the build is TD-306 |
 | TD-305 | Build the answered board row: a decided or replied board item is drawn under *Waiting on them*, uncounted, and comes back after `BOARD_WAIT_DAYS` | High | Open |
 | TD-306 | A scraped `needs-you` stays after its screen is gone, until the next hook | Low | Built — PR #1013 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
+| TD-306 | Build the detail block on an Inbox board row: the reader's `detail` in the row's *details* fold, open on a row with answers; nested lists in the renderer | Medium | Open |
 
 ---
 
@@ -2768,7 +2769,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (Paul: *add a td for agentorc*, after dev-cadence TD-084 gave board items a plain-English detail block; the dev-cadence session that built it)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** **Designed 2026-10-04** (the designer, PR #PRNUM): design §4.5a **Inbox board row: detail block**, §4.4 *Board write-back* (**add** writes a head line alone), §4.10 (the subset's lists nest); mockup `Inbox.dc.html`, shot as `docs/mockups/reviews/2026-10-04-td304-detail-block.png`. The block is drawn in the row's *details* fold, open on a row with answers to press and closed otherwise; nothing is lifted out of it; **Put on the board** asks for no block. The fold's default is steered to Paul as `STEERID`. The build is TD-306.
+**Blocked by:** TD-306
 **Location:** design §4.5 screen 6 (the Inbox's board rows), §4.5a (answers / Go with it / Reply on a board row), §4.4 *Board write-back* (**add**, *Put on the board*); `src/agentorc/ui/inbox.py`, `src/agentorc/ui/app.py` (the board row), `src/sessionorc/board.py` (`add`, `item_line`); dev-cadence cadence.md §3.3 *An item explains itself*
 
 **Why:** since dev-cadence TD-084 (PR #210, 2026-10-04), a board item has a short head line carrying every field and, under it, indented sub-bullets in plain English: **Context:** (a few sentences, nested bullets where clearer), **Question:**, **Caveats:**, **Recommended:** / **Otherwise:**. A `decide` always has one. They are what the person makes the decision from. `nudge_user_attention.py --report --json` carries them as each item's `detail` (a list of lines, common indent removed), but the Inbox row draws `text` (with `line` and `due_tag`) and never `detail`. So the row shows the headline and the answer buttons, without the context, caveats or the reason for the default. The person presses an answer they cannot see the case for, or has to open the board file. Nothing breaks: the write-back edits only the head line, where every field still lives, and **add** inserts above the first item, so never inside a block. It is a missing view, not a fault. The Inbox reads `detail` only once a repo has taken the sync carrying TD-084, and before that the key is absent.
@@ -2835,3 +2837,24 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
 
 **Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.
+## TD-306: Build the detail block on an Inbox board row
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-04 (the designer, TD-304's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/render.py` (`_block`: lists), `src/agentorc/ui/inbox.py` (`board_rows`, `_find_text`), `src/agentorc/ui/templates/inbox_row.html` (the board row's fold), `tests/test_render.py` and the Inbox tests
+
+**Why:** TD-304's design: a board item's detail block is what the person decides from, and the Inbox row draws the head line alone.
+
+**Fix:** design §4.5a **Inbox board row: detail block**. One slice:
+- `render`: a `-` or `1.` item indented deeper than the list it follows opens a list inside that item; depth by indent, every character still through `html.escape`, no new tag beyond `ul`, `ol`, `li`. A message's text gains the same nesting.
+- `board_rows` carries `detail` — the reader's lines joined as one text, only when the key is a non-empty list of strings — and adds its words to the row's `find`.
+- The board row draws the block inside its *details* fold after `rest`, through `md`; a row with a block has the fold even when `rest` is empty; the fold is drawn `open` when the row has answers to press (undecided with `answers`, or a live look's pair) and closed otherwise, the page's own memory of a pressed fold winning over the default as it does today.
+- No control is built from the block and nothing in it is read as a field; **Put on the board** is unchanged.
+
+**Done when:** on a scratch home (`scripts/look_home.py`) with a board synced past dev-cadence TD-084: a `decide` item with a block shows Context, Question, Caveats and Recommended under its head with nested bullets drawn as nested lists, the fold open; an item with a block and no answers has it closed; an item without a block, and a report whose items carry no `detail` key, draw as today; a block holding `<script>` or `Answers:` draws them as text; tests cover the renderer's nesting and the row. A page change, so the builder looks at it and sends the look (§4.9b).
+
+**Related:** TD-304 (the design), TD-305 (the answered row, the same partial), TD-279 (the row's text and fold), dev-cadence TD-084.

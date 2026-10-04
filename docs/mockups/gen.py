@@ -1413,6 +1413,18 @@ def inbox_rows():
         mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
+        # TD-304: a board `decide` item with its detail block (dev-cadence TD-084) — the fold is open because the row has answers to press
+        mcard(BAR["needs"], "board · decide", "samscrape", "", "due today · Sep 28",
+              '<div class="txt"><b>Back up the notice_data share?</b></div>'
+              + fold("details", open_=True, body=
+                     '<ul style="margin: 0 0 0 18px; padding: 0;">'
+                     '<li><b>Context:</b> The share holds every notice scraped since March and exists on one disk. Nothing copies it today.'
+                     '<ul style="margin: 2px 0 2px 18px; padding: 0;"><li>2 GB now, about 40 MB a week</li><li>R2 would cost under a dollar a month at that size</li></ul></li>'
+                     '<li><b>Question:</b> Should it be backed up, and how often?</li>'
+                     '<li><b>Caveats:</b> Nightly needs an R2 key in Doppler, which only you can add.</li>'
+                     '<li><b>Recommended:</b> Nightly — a week of notices cannot be scraped again. <b>Otherwise:</b> weekly loses up to seven days.</li></ul>')
+              + '<div class="sugg"><span class="lbl">its answers</span>' + b("Nightly · default") + b("Weekly") + b("No backup") + '</div>',
+              b("Reply") + b("Go with it", "primary") + b("Snooze ▾") + b("Done") + gap + b("Open board", "ghost")),
     ]
     steering = [
         mcard(BAR["working"], "steer", "orchestrator-ao-1", "ao-grind", "9m ago · <b>21m left</b>",
@@ -1467,32 +1479,32 @@ def inbox(picks=False):
     needs, steering, waiting, answered, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
-        secs = [("Needs you", 6, False), ("Steering", 3, False), ("Waiting on them", 2, False), ("Answered for you", 1, False), ("FYI", 14, False)]
-        teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
-        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 2, False), ("notes", 3, False), ("trail", 6, False)]
+        secs = [("Needs you", 7, False), ("Steering", 3, False), ("Waiting on them", 2, False), ("Answered for you", 1, False), ("FYI", 14, False)]
+        teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 3, False)]
+        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 3, False), ("notes", 3, False), ("trail", 6, False)]
         b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
         later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Board, coming up</span><span class="n" style="background: transparent; color: #6b7280;">1</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
             + mcard("#cbd0d6", "board", "dev-cadence", "dc-grind", "due in 6 d · Oct 4",
                     '<div class="txt" style="color: #4b5563;">Decide whether the sweep reads worktrees of a repo that is not in the roster.</div>',
                     b("Reply") + b("Snooze ▾") + b("Done") + b("Open board", "ghost"))
             + '<div class="muted" style="padding: 2px 2px 8px; font-size: 12px;"><span style="font-size: 10px;">▸</span> not shown (14)</div><div class="muted" style="padding: 2px 2px 8px; font-size: 12px;">showing the next 10 board items per team · 14 not shown, the next due Oct 12 — <a href="#">show</a> · <a href="#">Settings</a></div>')
-        body = (isec("Needs you", 6, opened=True) + "".join(needs) + later + isec("Steering", 3) + "".join(steering)
+        body = (isec("Needs you", 7, opened=True) + "".join(needs) + later + isec("Steering", 3) + "".join(steering)
                 + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
                 "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks. <b>A board row</b> (TD-126) says its sender's standing before the press — <i>still on TD-122 — grinder-ao-2 holds it</i>, <i>moved on</i> or <i>gone</i> — and carries <b>Reply</b>: the words go on the board line under Paul's name always, and to the lease holder as well while one exists; a reply is not Done. <b>A message has one shape</b> (TD-127): its first paragraph is the whole of what you need, the rest folds under <i>details</i> — closed on the ask row, open on the <i>answered for you</i> row, where the reading is a rendered list from the closed markdown subset and the one link carries its host after its text.")
     else:
-        secs = [("Needs you", "2 of 6", True), ("Steering", "0 of 2", False), ("Waiting on them", "0 of 2", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
-        teams = [("ao-grind", "2 of 3", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
-        kinds = [("questions", "1 of 1", False), ("steering", "0 of 2", False), ("session states", "1 of 3", False), ("board items", "0 of 2", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
-        body = (isec("Needs you", "2 of 6") + "".join(needs[:2])
+        secs = [("Needs you", "2 of 7", True), ("Steering", "0 of 2", False), ("Waiting on them", "0 of 2", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
+        teams = [("ao-grind", "2 of 3", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 3", False)]
+        kinds = [("questions", "1 of 1", False), ("steering", "0 of 2", False), ("session states", "1 of 3", False), ("board items", "0 of 3", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
+        body = (isec("Needs you", "2 of 7") + "".join(needs[:2])
                 + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them, Answered for you and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
         summary, title = "", "Inbox"
-        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 6</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
+        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 7</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
                 "Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).")
     return head(title) + f'''<div style="width: 1440px; min-height: {2480 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Inbox 6 · 2")}
+{topbar("Inbox 7 · 2")}
 <div style="padding: 16px 20px 28px;">
 <div style="max-width: 1324px; margin: 0 auto 12px;">{page_head(title, summary)}</div>
 <div style="display: flex; gap: 24px; align-items: flex-start; max-width: 1324px; margin: 0 auto;">
