@@ -300,6 +300,11 @@ class MailEntry:
     # author's `ask` puts in front of its reader, an integer so a row can link it and a header can
     # count it — the text stays the author's summary. Only an `ask` carries one.
     pr: int | None = None
+    # A look's screenshots (design §4.10 *A look*, TD-292): repo-relative paths of `.png` files under
+    # `docs/mockups/reviews/` of the sender's repo, in the order sent, at most `mail.SHOTS_MAX`. Only a
+    # `steer` or an `ask` to the person carries them, and one that does is a look; drawn only as file
+    # names and images, never parsed from the text.
+    shots: list[str] = field(default_factory=list)
     # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another
     # session's message). It is on the entry rather than in a set beside the records so that it
     # survives what the entry survives: a resume moves it with the note, and a host-agent restart
