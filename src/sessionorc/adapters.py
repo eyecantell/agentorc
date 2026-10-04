@@ -42,6 +42,10 @@ class Adapter(Protocol):
         ...
 
     # Optional, looked up with getattr:
+    #   start_context: bool                               True when `launch` takes `start_context`, text the
+    #                                                      session holds from its start with no turn run for it
+    #                                                      (design §4.3, TD-283); `create` hands it only to such
+    #                                                      an adapter, and refuses it in words for any other
     #   explain(tail) -> screen.Match | None               the screen-rule verdict with its evidence
     #                                                      (hook-fed adapters: applied as `scraped` only
     #                                                      when no fresher hook state exists; TD-015)

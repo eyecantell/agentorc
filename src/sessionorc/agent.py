@@ -635,6 +635,7 @@ class HostAgent(
         resume: str | None = None,
         prompt: str | None = None,
         prompt_from: dict[str, Any] | None = None,  # kept in the launch record only (§6 rule 7, TD-217)
+        start_context: str | None = None,
         capabilities: list[str] | None = None,
         lane: list[str] | None = None,
         controllers: list[str] | None = None,
@@ -662,6 +663,11 @@ class HostAgent(
         instant. Refused without `unattended`, in the past, and with a `run_until` not after it.
         `start_of` is that start: the tick's replay names the scheduled record it starts, which is
         then superseded in place, its mail kept, rather than refused as the live holder it is.
+
+        `start_context` (design §4.3, TD-283): text the session holds from its start that is no
+        prompt, handed to the adapter's `launch` — refused for an adapter that cannot carry one,
+        never folded into the prompt — and kept on the record and the launch record. A resume that
+        gives none carries the conversation's own, so every launch of it holds the same text.
 
         `review` (design §4.9b *The reader*, TD-093): the role preset's `{reader, held, bound}`,
         checked and kept on the record, read afterwards by the author's own `ao`. `context_bound`
@@ -729,6 +735,20 @@ class HostAgent(
                 f"the prompt is {size - 1:,} bytes — past what a process can be started with ({ARG_LIMIT:,}): "
                 "put a brief that long in a file and tell the session to read it (design §4.9, TD-068)"
             )
+        start_context = (str(start_context).strip() or None) if start_context else None
+        if start_context:
+            if not getattr(ad, "start_context", False):
+                raise RpcError(
+                    f"the {adapter} adapter cannot carry a start context: give the text as a prompt, or start "
+                    "a tool that holds one (design §4.3, TD-283)"
+                )
+            # one argument of its own, counted as the prompt is (TD-068)
+            if (size := len(start_context.encode("utf-8", "surrogateescape")) + 1) > ARG_LIMIT:
+                raise RpcError(
+                    f"the start context is {size - 1:,} bytes — past what a process can be started with "
+                    f"({ARG_LIMIT:,}): put text that long in a file and tell the session to read it "
+                    "(design §4.3, TD-068)"
+                )
         if worktree:
             # Design §4.5 New session "new worktree": the checkout is the repo, the session runs in
             # `<repo>/.claude/worktrees/<name>` on branch <name>, created here if missing.
@@ -781,11 +801,20 @@ class HostAgent(
                     self._save(held)
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
+                if start_context is None:
+                    # the conversation's own, whoever presses Resume (§4.3): the tool keeps it in no file
+                    start_context = self._start_context_of(resume, holder)
             if starts:
                 return await self._schedule(locals(), holder, directory, repo, name, starts)
             try:
                 spec = ad.launch(
-                    profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory, name=name
+                    profile=profile,
+                    resume=resume,
+                    prompt=prompt,
+                    unattended=unattended,
+                    cwd=directory,
+                    name=name,
+                    **({"start_context": start_context} if start_context else {}),
                 )
             except (KeyError, ValueError) as e:
                 raise RpcError(str(e).strip('"')) from None
@@ -854,6 +883,7 @@ class HostAgent(
                 seat=dict(seat) if seat else None,
                 review=reading,
                 context_bound=bound,
+                start_context=start_context,
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
@@ -929,6 +959,7 @@ class HostAgent(
             seat=dict(given["seat"]) if given.get("seat") else None,
             review=given["reading"],
             context_bound=given["bound"],
+            start_context=given.get("start_context"),
             start_at=starts,
         )
         s.set_state("scheduled", confidence="hook")
@@ -941,6 +972,15 @@ class HostAgent(
             self._write_launch(s.id, s, launch_params(given))
         log.info("%s scheduled to start at %s", sid, starts)
         return s.view()
+
+    def _start_context_of(self, resume: str, holder: Session | str | None) -> str | None:
+        """The start context a resume of conversation `resume` carries when its create gave none
+        (design §4.3, TD-283): the record of this name's, when it holds that conversation, else the
+        newest record that does — a Resume under another name is still the same conversation."""
+        if isinstance(holder, Session) and holder.adapter_id == resume and holder.start_context:
+            return holder.start_context
+        held = [r for r in self.sessions.values() if r.adapter_id == resume and r.start_context]
+        return max(held, key=lambda r: r.created).start_context if held else None
 
     def _check_keep_mail(self, holder: Session | str | None, caller: Any, resume: str | None) -> None:
         """`create(keep_mail=true)` is refused, naming the rule, unless it has a record to keep the
