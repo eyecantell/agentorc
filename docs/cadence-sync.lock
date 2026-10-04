@@ -1,19 +1,19 @@
 # Written by eyecantell/dev-cadence sync.sh — do not edit by hand.
 source: https://github.com/eyecantell/dev-cadence
-commit: 7404ef3
-files_commit: 7404ef32922972587811fe3db3ef8a691697689b
-synced: 2026-10-04T01:28:16Z
-file: docs/cadence.md ab8bf421162aa22e82b3d166d2865ed5cba8cca5873143ce576be9b2fd140998 644
-file: docs/cadence-rationale.md 95e191ae2bbcb8650ae642cbce2e9579d2989ac20d56995e8e5b282db3696395 644
+commit: 75f4ea3
+files_commit: 75f4ea396278591b990c36a1ffff6b58371d4d01
+synced: 2026-10-04T06:18:24Z
+file: docs/cadence.md b017ba2d95a0529c115ec16838be1a66943008e3d61b40b1fcc95ec683ae8f79 644
+file: docs/cadence-rationale.md 41049dc14b0454b319c7de60e2b375ab298d1f95cc4bee453cd394cb99ebf5a7 644
 file: docs/cadence-incidents.md c84f86aa67526fa481a81bd1bae4cb788b76b2798d78ed25deea215587726b19 644
-file: docs/cadence-changes.md f306c0acae645ace66d2cfbbb355990d82bf80f2a50e3fcb93161b8ee8fe8605 644
+file: docs/cadence-changes.md 0962152301081b499f0329c6cd8b38875fd39f7181a3701128938a827b203d3e 644
 file: docs/adr-template.md a9844d63a9b82c3154cce9955d02eba22709eedc56f0481f512a15c938bfffc6 644
 file: .claude/skills/stranded-work/SKILL.md 3fbcd99c6a25ccb3c69b47e4a08fef9f8fca43ba68ee278978c314e4afb9e715 644
-file: .claude/skills/attention/SKILL.md 525ecf170a270ec8e02b3ea461cf271aeadf948b9bd13566aaa5bbeefa266303 644
+file: .claude/skills/attention/SKILL.md 8d01de70268e92986eef1a4cc72a86bdfbc67036105da42a693d403916225e51 644
 file: .claude/skills/cadence/SKILL.md 93d9e279bed04b09d8156eced74ba89a818f00895cdc2399e44eec34bb648c22 644
 file: scripts/check_claude_memory.sh 6fd0cafb36f345f63dfbb6d66cd0c1175eab592f694c1a8db04a270b4da498fd 755
 file: scripts/check_anchor.py 0038197e66591d9b744ebd71e316290ae5bd4e1e347e871804ad35b14443664d 755
-file: scripts/nudge_user_attention.py 235626b397da6c446d6d86a0da01b8bef591113ac7545eaec3a1f2d3cda795aa 755
+file: scripts/nudge_user_attention.py 7c2dd4f7e61d13f84b71834737018173ff8cf8cdcc6ad5b32b49dbea15be6976 755
 file: scripts/board_edit.py 60e8f4b28c11da0fd691f71ca7a9cc95a530710a9857f52c79478a593abe35a6 755
 file: scripts/ledger.py 08b7311bb9db6f901b816ee0f5df6f48b7c4604ff0ef1da8eba279cc7481335a 755
 file: scripts/list_sessions.py 0e8115c5acbb315d10097c0cef0bae2c31b06b8c21134ed99d5211e826a50cb1 755

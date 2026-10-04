@@ -44,6 +44,10 @@ TL;DR, then the per-repo sections. The report is already ordered (decided items 
 they wait on a session, not the user — then overdue-most-first, dated soonest-first,
 undated; then `watch` items, then `fyi` last — TD-039) — do not re-sort or re-derive tags.
 An item tagged *ledger it* is overdue 14 days or more: offer to ledger it and close it here.
+An item's detail block (the indented lines the report prints under it, `detail` in `--json` —
+TD-084) is what the person decides from: when they turn to an item, show its Context, Question,
+Caveats and Recommended as written rather than summarising them away. An item that asks for a
+decision without one is worth offering to have its session fill in (cadence.md §3.3).
 
 When the user answers, snoozes or closes an item here, make the edit with
 `scripts/board_edit.py decide|snooze|done --board <board> --line <N> --expect "<item text>"`
