@@ -93,7 +93,15 @@ class InboxMixin:
             raise RpcError(
                 f"{e.team or 'its sender'} has no techlead seat: there is nobody to send the look to (design §4.9b)"
             )
-        sent = await self._msg(PERSON, e.text, [to], "ask", e.about, None, None, None)
+        # held from the check to the snooze: two presses (two tabs, a double click) send one ask
+        handing: set[str] = self.__dict__.setdefault("_looks_handing", set())
+        if e.id in handing:
+            raise RpcError(f"{msg} is already with a reviewer: it is being sent now")
+        handing.add(e.id)
+        try:
+            sent = await self._msg(PERSON, e.text, [to], "ask", e.about, None, None, None)
+        finally:
+            handing.discard(e.id)
         mid = (sent.get("entry") or {}).get("id")
         if not mid:
             raise RpcError(f"the look was not delivered to {to}")
@@ -102,7 +110,7 @@ class InboxMixin:
         # shots are written here, not sent: `--shot` rides only toward the person, and this is the
         # person's own look going the other way
         self._mark(mid, handed=True, shots=list(e.shots), look=e.id, bound=None)
-        self._mark(e.id, snoozed_for=mid)
+        self._mark(e.id, snoozed_for=mid, looked_by=None)  # an earlier reading is not this one's
         await self._push_changes()
         log.info("inbox_hand: look %s handed to %s as %s", e.id, to, mid)
         return {"id": PERSON, "msg": e.id, "handed": mid, "to": to, "read_when": self._entry_read_when(to)}

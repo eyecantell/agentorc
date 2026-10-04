@@ -5,6 +5,7 @@ reads *fills this seat* to a seat on call, and the tick fills it."""
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -383,9 +384,9 @@ async def test_a_handed_looks_wait_ends_by_unsnooze_or_dismiss_and_blocked_is_sa
             await tl.call("msg", to=PERSON, kind="note", outcome="blocked", for_=first, text="no screenshot on main")
         assert mine.looked_by == {"seat": seat, "text": "blocked: no screenshot on main"}
         # handed again, then the person dismisses the handed row: the look returns with no line
-        mine.looked_by = None
+        mine.looked_by = {"seat": seat, "text": "an earlier reading"}
         second = (await person.call("inbox_hand", msg=look, seat=seat))["handed"]
-        assert mine.snoozed_for == second
+        assert mine.snoozed_for == second and mine.looked_by is None, "a new hand clears the old reading"
         await person.call("inbox_dismiss", msg=[second])
         assert mine.snoozed_for is None and mine.looked_by is None
         for sid in (builder, seat):
@@ -417,6 +418,17 @@ async def test_send_to_reviewer_is_refused_in_words(agent, tmp_path):
         with pytest.raises(AgentError, match="already answered"):
             await person.call("inbox_hand", msg=look, seat=seat)
         assert not any(e.look for e in agent.sessions[seat].inbox), "nothing was sent"
+        # two presses at once send one ask: the second is refused while the first is in flight
+        (tmp_path / "two").mkdir()
+        _, seat2, look2 = await _look(person, tmp_path / "two")
+        async with LocalClient() as tab1, LocalClient() as tab2:
+            both = await asyncio.gather(
+                tab1.call("inbox_hand", msg=look2, seat=seat2),
+                tab2.call("inbox_hand", msg=look2, seat=seat2),
+                return_exceptions=True,
+            )
+        assert sum(isinstance(x, dict) for x in both) == 1
+        assert sum(1 for e in agent.sessions[seat2].inbox if e.look == look2) == 1
         for sid in (builder, seat):
             await person.call("kill", id=sid)
 
