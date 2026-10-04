@@ -222,6 +222,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     inbox_sections,  # noqa: F401
     live_look,  # noqa: F401
     look_pair,  # noqa: F401
+    look_review,  # noqa: F401
     look_shots,  # noqa: F401
     origin_case,  # noqa: F401
     origin_firsts,  # noqa: F401
@@ -845,6 +846,8 @@ def create_app() -> FastAPI:
             if isinstance(t, dict):
                 t["board_default"] = board_of(t.get("sid"))
         at = datetime.now(UTC)
+        here = host_name()
+        handed_by = {str(h.get("id")): h for h in got.get("handed") or () if isinstance(h, dict) and h.get("id")}
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
@@ -862,6 +865,14 @@ def create_app() -> FastAPI:
                 e["look_shots"] = await asyncio.to_thread(
                     look_shots, e["shots"], Path(repo).name if repo else "", str(sender.get("host") or "")
                 )
+                # §4.5a **Send to reviewer** (TD-292 slice 4b): the seat is the sender's team's
+                # techlead as this page reads it from `org.yml`; a look already with one reads so
+                t = (await defs()).teams.get(str(e.get("team") or ""))
+                seat = teams.seat_id(await defs(), t, t.host or here, here) if t is not None else ""
+                look_review(e, seat, t.techlead.name if seat and t and t.techlead else "", handed_by)
+            if isinstance(lb := e.get("looked_by"), dict) and lb.get("seat"):
+                # the seat's reading names it by the name it is known by, as a sender is (§4.5a)
+                e["looked_by"] = {**lb, "name": names.get(str(lb["seat"]), str(lb["seat"]))}
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
                 e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
@@ -2764,6 +2775,20 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             else:
                 got = await call(PERSON_ACTS[action], msg=ref)
             return JSONResponse({"ok": True, **got})
+        if action == "hand_look":
+            # design §4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b): one press, no
+            # dialog — `inbox_hand {msg, seat}`, the seat being the sender's team's techlead as this
+            # page reads it from `org.yml`, since the host agent reads none. No seat is passed as
+            # "", and the agent's refusal says so in its own words, as it does a look already answered
+            ref, team = str(body.get("msg") or "").strip(), str(body.get("team") or "").strip()
+            if not ref:
+                raise HTTPException(400, "Send to reviewer needs the look's id")
+            org = await h.defs()
+            t = org.teams.get(team)
+            here = host_name()
+            seat = teams.seat_id(org, t, t.host or here, here) if t is not None else ""
+            got = await call("inbox_hand", msg=ref, seat=seat)
+            return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "board":
             # design §4.5a **Due strip / Inbox board row** → **Snooze ▾** and **Done** on a board row
             # (§4.4 *Board write-back*, TD-069 step 3): the host agent edits the one line and commits

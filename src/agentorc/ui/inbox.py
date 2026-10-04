@@ -1013,6 +1013,28 @@ def look_pair(e: Mapping[str, Any]) -> bool:
     )
 
 
+def look_review(e: dict[str, Any], seat: str, seat_name: str, handed: Mapping[str, Mapping[str, Any]]) -> None:
+    """§4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b), on a look that is an open `ask`
+    (it carries `shots`): with a reviewer already — `snoozed_for` names the `handed` `ask` that
+    carries it — the row reads *with <seat> since <time>* from that entry in `handed` (by id, the
+    holder's own copy the person's read lists), *a reviewer* where the read no longer lists it;
+    otherwise the button is drawn when the sender's team has a techlead seat, `seat` being the id it
+    takes as the page reads it from `org.yml` (the host agent reads none) and `seat_name` its name.
+    Any other entry is left as it is."""
+    if not e.get("shots") or e.get("kind") != "ask" or not _entry_open(e):
+        return
+    hid = str(e.get("snoozed_for") or "")
+    if hid:
+        h = handed.get(hid) or {}
+        e["with_seat"] = str(h.get("holder_name") or h.get("holder") or "a reviewer")
+        e["with_at"] = str(h.get("at") or "")
+        e["with_since"] = _clock(h.get("at"))
+        return
+    if seat:
+        e["review_seat"] = seat
+        e["review_name"] = seat_name or seat
+
+
 def board_head(text: str) -> str:
     """A board item's head, as the write-back's commit message names it: its first bold run, else
     the line, clipped."""
@@ -1455,7 +1477,9 @@ def inbox_sections(
     for e in entries:
         snoozed = _iso(e.get("snoozed_until"))
         outcome = _outcome_of(e)
-        if snoozed and snoozed > at:
+        if (snoozed and snoozed > at) or (e.get("snoozed_for") and _entry_open(e)):
+            # a look with a reviewer (`snoozed_for`, §4.5a **Send to reviewer**) is set aside until
+            # that debt closes, which clears the field: listed with the snoozed, in no count
             out["snoozed"].append(e)
         elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at") or _orphan_held(e)):
             out["needs"].append(e)

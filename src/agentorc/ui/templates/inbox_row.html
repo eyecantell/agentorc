@@ -162,7 +162,11 @@
   <span class="ref" title="{{ e.holder }}">{{ e.holder_name }}</span>
   {%- if e.holder_open %} <a class="btn sm ghost" href="/focus/{{ e.holder_open }}" title="Focus on {{ e.holder_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
+  {%- if e.look %}
+  <span class="badge kindmark k-{{ e.kind }}" title="a look you sent to be read (design §4.10 *A look*)">look</span>
+  {%- else %}
   <span class="badge kindmark k-{{ e.kind }}" title="an entry you handed to be drafted into the ledger">entry{% if en.type %} · {{ en.type }}{% endif %}</span>
+  {%- endif %}
   {%- if en.repo %} <span class="st">for {{ en.repo }}</span>{% endif %}
   <span class="grow"></span>
   {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
@@ -177,7 +181,7 @@
   {%- elif e.holder_state in ('exited', 'closed') %}
   <span class="st">handed · {{ e.holder_name }} {{ e.holder_state }} before reporting — the seat is filled again to finish it</span>
   {%- else %}
-  <span class="st">handed · waiting on {{ e.holder_name }} to report the entry and its PR</span>
+  <span class="st">handed · waiting on {{ e.holder_name }} to {% if e.look %}read the look and report what it found{% else %}report the entry and its PR{% endif %}</span>
   {%- endif %}
   <span class="grow"></span>
   <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this? It says you do not need to hear back: the debt ends and {{ e.holder_name }} is told. A draft PR it opened stays open.">Dismiss</button>
@@ -250,17 +254,32 @@
 {%- endif %}
 {%- endmacro %}
 
+{# §4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b): on a look that is an open `ask` and
+   not already with a reviewer, when its sender's team has a techlead seat — one press, no dialog, and
+   the look goes to that seat as a handed `ask`, set aside with the snoozed until the seat reports. #}
+{% macro review_btn(e) -%}
+{%- if e.review_seat %}<button class="btn sm ghost" data-act="hand_look" data-id="person" data-msg="{{ e.id }}" data-team="{{ e.team or '' }}" data-name="{{ e.review_name }}" title="hand this look to {{ e.review_name }}, {{ e.team }}'s techlead, to read: it is set aside until the seat reports, and comes back with its reading above the answers">Send to reviewer</button>{% endif %}
+{%- endmacro %}
+
+{# The seat's reading brought back on the look (`looked_by`, §4.5a **Send to reviewer**): its outcome
+   line, drawn above the answers as text — the answer is still the person's one press. #}
+{% macro looked_by(e) -%}
+{%- if e.looked_by and e.looked_by.text %}<div class="st dflt lookedby" title="what the reviewer you sent it to reported (design §4.10 *A look*)">{{ e.looked_by.name or e.looked_by.seat or 'the reviewer' }} read it: {{ e.looked_by.text }}</div>{% endif %}
+{%- endmacro %}
+
 {# §4.5a **Inbox row: `ask`** — the whole text, sender, `about`, age, and no countdown: an `ask` to
    the person does not expire (§4.10). Reply · Delete (confirms; it declines) · Snooze. #}
 {% macro ask(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
 {{ recommends(e) }}
+{{ looked_by(e) }}
 {{ answers(e) }}
 <div class="row gap wrap mfoot">
   <span class="st">open · no bound — it waits until you answer it</span>
   <span class="grow"></span>
   {{ reply_btn(e) }}
+  {{ review_btn(e) }}
   {{ snooze_btn(e) }}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
 </div>
@@ -408,7 +427,12 @@
 <div class="row gap wrap mfoot">
   {#- the instant is stored UTC; the person set it in their own clock and reads it back in it,
       as every other time on the page is shown. The raw instant stays on hover. -#}
+  {%- if e.snoozed_for %}
+  {#- a look with a reviewer (§4.5a **Send to reviewer**): until the seat reports, not until a time #}
+  <span class="st">with {{ e.with_seat or 'a reviewer' }}{% if e.with_since %} since <span title="{{ e.with_at }}">{{ e.with_since }}</span>{% endif %} — it comes back with the reading when the seat reports</span>
+  {%- else %}
   <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span></span>
+  {%- endif %}
   <span class="grow"></span>
   <button class="btn sm ghost" data-act="unsnooze" data-id="person" data-msg="{{ e.id }}" title="bring it back into its section now">Unsnooze</button>
 </div>
