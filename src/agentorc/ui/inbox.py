@@ -25,6 +25,7 @@ from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import hosts
 from sessionorc import ledger as ledger_mod
+from sessionorc import mail as mail_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import WRAPUP_GRACE
 from sessionorc.models import (
@@ -926,10 +927,11 @@ def live_look(it: Mapping[str, Any]) -> bool:
 
 
 # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): the one directory a look's screenshots
-# are served from, as origin's default branch holds it, and the names that may be asked of it
+# are served from, as origin's default branch holds it, and the names that may be asked of it —
+# the shape and the count the host agent checks a look's `shots` against (`mail`, TD-292 slice 2)
 SHOT_DIR = Path("docs") / "mockups" / "reviews"
-SHOT_NAME = re.compile(r"[A-Za-z0-9._-]+\.png")
-SHOTS_MAX = 4
+SHOT_NAME = mail_mod.SHOT_NAME
+SHOTS_MAX = mail_mod.SHOTS_MAX
 SHOT_TTL = 60.0  # seconds a screenshot's presence on origin is kept: a row is redrawn on every poll
 _shot_seen: dict[tuple[str, str], tuple[float, bool]] = {}
 

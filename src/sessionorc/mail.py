@@ -51,7 +51,8 @@ ANSWER_CAP = 80
 # directly under `docs/mockups/reviews/`, matched whole — the page serves that one directory and
 # nothing else, so a path of any other shape is refused rather than cleaned into one.
 SHOTS_MAX = 4
-SHOT_RE = re.compile(r"docs/mockups/reviews/[A-Za-z0-9._-]+\.png")
+SHOT_NAME = re.compile(r"[A-Za-z0-9._-]+\.png")  # a screenshot's file name, as the page serves it
+SHOT_RE = re.compile(r"docs/mockups/reviews/" + SHOT_NAME.pattern)
 OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises asking whether this one is a steer
 # Outcomes owed to the person before an `ask` or a `steer` to it is refused (design §4.10
 # *Outcomes*, TD-079). Ten, because the remedy is one line each and a worker with a long night of
