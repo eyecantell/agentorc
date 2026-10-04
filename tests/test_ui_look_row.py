@@ -220,3 +220,116 @@ def test_a_look_from_a_sender_on_another_host_is_addressed_and_served_through_th
         assert c.get("/repo/proj/shot/a.png?host=laptop").status_code == 404, "the node's origin does not hold it"
         assert c.get("/repo/proj/shot/a.txt?host=laptop").status_code == 404
         assert c.get("/repo/proj/shot/a.png?host=kmaster").content == PNG + b"a.png", "this host: read here"
+# -- §4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b) --------------------------------
+
+
+@pytest.mark.unit
+def test_look_review_draws_the_button_only_on_an_open_ask_look_with_a_seat():
+    from agentorc.ui.inbox import look_review
+
+    e = look(team="ao-grind")
+    look_review(e, "ao-proj-techlead-ao-1", "techlead-ao-1", {})
+    assert (e["review_seat"], e["review_name"]) == ("ao-proj-techlead-ao-1", "techlead-ao-1")
+    for other in (
+        look(team="ao-grind", closed_reason="answered"),  # answered: nothing left to send
+        look("steer", team="ao-grind"),  # a steer lapses to its default
+        entry("m-2", "ask", team="ao-grind"),  # no shots: not a look
+    ):
+        look_review(other, "ao-proj-techlead-ao-1", "techlead-ao-1", {})
+        assert "review_seat" not in other
+    seatless = look(team="solo")
+    look_review(seatless, "", "", {})
+    assert "review_seat" not in seatless
+    html = rows("needs", [e])
+    assert 'data-act="hand_look" data-id="person" data-msg="m-1" data-team="ao-grind"' in html
+    assert ">Send to reviewer</button>" in html
+    assert "Send to reviewer" not in rows("needs", [seatless])
+
+
+@pytest.mark.unit
+def test_a_look_with_a_reviewer_is_listed_with_the_snoozed_as_with_the_seat_since():
+    """`snoozed_for` sets it aside until the handed `ask` closes — in no count — and the row names
+    the seat holding it, from the person's read's `handed` list, and when it went."""
+    from agentorc.ui.inbox import inbox_sections, look_review
+
+    e = look(team="ao-grind", snoozed_for="m-9")
+    handed = {
+        "m-9": {
+            "id": "m-9",
+            "holder": "ao-proj-techlead-ao-1",
+            "holder_name": "techlead-ao-1",
+            "at": "2026-09-19T10:00:00Z",
+        }
+    }
+    look_review(e, "ao-proj-techlead-ao-1", "techlead-ao-1", handed)
+    assert "review_seat" not in e and e["with_seat"] == "techlead-ao-1" and e["with_since"]
+    got = inbox_sections([e])
+    assert [x["id"] for x in got["snoozed"]] == ["m-1"] and got["count"] == 0 and not got["needs"]
+    html = rows("snoozed", [e])
+    assert "with techlead-ao-1 since" in html and "snoozed until" not in html
+    assert 'data-act="unsnooze"' in html  # Unsnooze brings it back sooner
+    gone = look(snoozed_for="m-8")  # the read no longer lists the handed entry
+    look_review(gone, "", "", {})
+    assert gone["with_seat"] == "a reviewer" and gone["with_since"] == ""
+    # once the debt closed the home clears `snoozed_for`: the look is a question again
+    assert inbox_sections([look()])["count"] == 1
+
+
+@pytest.mark.unit
+def test_the_seats_reading_is_drawn_above_the_answers_and_its_handed_ask_reads_as_a_look():
+    e = look(answers=["Works", "Not right: <what>"], looked_by={"seat": "techlead-ao-1", "text": "matches §4.5a"})
+    html = rows("needs", [e])
+    assert "techlead-ao-1 read it: matches §4.5a" in html
+    named = look(looked_by={"seat": "ao-proj-techlead-ao-1", "name": "techlead-ao-1", "text": "matches"})
+    assert "techlead-ao-1 read it: matches" in rows("needs", [named]) and "ao-proj-" not in rows("needs", [named])
+    assert html.index("read it: matches") < html.index('class="row gap wrap sugg"')
+    from datetime import UTC, datetime
+
+    from agentorc.ui.inbox import handed_rows
+
+    copy = {**look(), "id": "m-9", "from": "person", "look": "m-1", "holder": "ao-t", "holder_name": "techlead-ao-1"}
+    h = handed_rows([{**copy, "owes": True}], {}, datetime.now(UTC))
+    html = rows("waiting", h)
+    assert ">look</span>" in html and "waiting on techlead-ao-1 to read the look" in html
+
+
+@pytest.mark.unit
+def test_send_to_reviewer_passes_the_senders_teams_techlead_seat(tmp_path, monkeypatch):
+    """The press posts the look and its team; the page reads that team's techlead seat from the
+    definitions (the host agent reads no `org.yml`) and calls `inbox_hand` with it — "" where the
+    team has none, so the agent's refusal is the toast."""
+    from types import SimpleNamespace
+
+    from agentorc.ui import app as uiapp
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    org = SimpleNamespace(
+        teams={"ao-grind": SimpleNamespace(host=None, techlead=SimpleNamespace(name="techlead-ao-1"))}
+    )
+    monkeypatch.setattr(uiapp, "org_here", lambda: (org, []))
+    monkeypatch.setattr(uiapp.teams, "seat_id", lambda o, t, host, here: "ao-proj-techlead-ao-1" if t.techlead else "")
+    calls: list[tuple[str, dict]] = []
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call(self, method, **params):
+            calls.append((method, params))
+            return {"id": "person", "msg": params.get("msg"), "handed": "m-9", "to": params.get("seat")}
+
+    monkeypatch.setattr(uiapp, "LocalClient", FakeClient)
+    with TestClient(uiapp.create_app()) as c:
+        got = c.post("/api/person/hand_look", json={"msg": "m-1", "team": "ao-grind"})
+        assert got.status_code == 200 and got.json()["to"] == "ao-proj-techlead-ao-1"
+        assert ("inbox_hand", {"msg": "m-1", "seat": "ao-proj-techlead-ao-1"}) in calls
+        calls.clear()
+        c.post("/api/person/hand_look", json={"msg": "m-1", "team": "no-such-team"})
+        assert ("inbox_hand", {"msg": "m-1", "seat": ""}) in calls
+        assert c.post("/api/person/hand_look", json={"team": "ao-grind"}).status_code == 400

@@ -455,6 +455,9 @@
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
       if (["pause", "resume", "gowithit"].includes(action)) body = { msg: b.dataset.msg };
+      // §4.5a **Send to reviewer** (TD-292 slice 4b): the look and its sender's team — the server
+      // reads that team's techlead seat from `org.yml`, and the host agent's refusal is the toast
+      if (action === "hand_look") body = { msg: b.dataset.msg, team: b.dataset.team };
       if (action === "unsnooze") { action2 = "snooze"; body = { msg: b.dataset.msg }; }  // no `until` clears it
       if (action === "snooze") {
         const until = snoozeUntil(b.dataset.when);
@@ -584,6 +587,10 @@
       if (["message", "reply", "answer", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
       if (action === "snooze") AO.toast("snoozed — it comes back at that time; the sender is not told", true);
       if (action === "unsnooze") AO.toast("back in its section", true);
+      if (action === "hand_look") {
+        AO.toast(`sent to ${b.dataset.name || res.to || "the reviewer"} — set aside until it reports, then back with its reading`, true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+      }
       if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
       if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
       if (action === "gowithit" && !orphanNote) AO.toast("go with it — the sender takes its default now", true);
