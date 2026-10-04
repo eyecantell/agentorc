@@ -1987,7 +1987,7 @@ Screens:
    manager. So on every `unattended` session, whatever its state, Focus opens **read-only**: the
    bridge does not forward keys (the rule is the server's, in the attach, not a client setting —
    a read-only attach drops key frames and passes only resize and scroll), the composer is
-   closed, and the terminal says so in one line. What stays is every act on the record that is
+   closed, and a grey line over the terminal says so. What stays is every act on the record that is
    not a keystroke: Allow / Deny (a permission is answered through the hook, never the keyboard),
    **Message…** (mail types nothing — the way to ask a working session a question without taking
    it over), Wrap up, Kill, Open shell here, the side panels, and **Copy**, which reads the
