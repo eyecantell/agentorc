@@ -454,11 +454,16 @@ def _ended_by(s: Session, slot: str, was: str) -> str:
     sorted itself out. An alarm row does not end with the session, and an `unpushed` row is itself
     a row of an exited record, so the exit is not what ended it; a close is.
 
-    The record still standing tells the rest (TD-308): an `unpushed` row whose record is still
-    `exited` ended because its work was pushed (or committed and pushed — a forget leaves no record
-    to read); a pending that cleared with no `decide` was answered in the terminal, since an act's
-    own word (*allowed by you*, *resumed*) is read before this one; a `limited` row ended when the
-    limit reset. A `stalled?` row that cleared stays *resolved*: nothing says why output resumed."""
+    The record still standing tells the rest (TD-308): an `unpushed` row whose record reads its git
+    clean — nothing uncommitted, nothing unpushed — ended because its work was pushed (a forget
+    leaves no record to read; a git read that failed, `git: None`, tells nothing); a pending that
+    cleared with no `decide`, the record no longer waiting on anyone, was answered in the terminal,
+    since an act's own word (*allowed by you*, *resumed*) is read before this one — a permission
+    whose hook timed out into the terminal's own question is still waiting, so not that; a
+    `limited` row ended when the limit reset. A `stalled?` row that cleared stays *resolved*:
+    nothing says why output resumed. One limit is known: a row that was only uncommitted files,
+    discarded rather than pushed, also reads *pushed*, since the home keeps no record of which
+    fact made the row."""
     if slot != "state":
         return ""
     if s.state == "closed":
@@ -466,9 +471,10 @@ def _ended_by(s: Session, slot: str, was: str) -> str:
     if s.state == "exited" and was != "unpushed":
         return "the session exited"
     if was == "unpushed":
-        return "pushed"
+        git = s.git if isinstance(s.git, dict) else None
+        return "pushed" if git is not None and not git.get("dirty") and not git.get("unpushed") else ""
     if was in ("permission", "question", "needs"):
-        return "answered in the terminal"
+        return "answered in the terminal" if s.state != "needs-you" else ""
     if was == "limited":
         return "the limit reset"
     return ""

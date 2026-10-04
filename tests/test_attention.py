@@ -359,9 +359,12 @@ async def test_a_row_its_session_ended_says_so(agent, hookstub, tmp_path):
     assert _ended_by(_rec(state="exited"), "alarm", "alarm") == ""
     assert _ended_by(_rec(state="closed"), "state", "unpushed") == "the session was closed"
     # the record still standing tells the rest (§4.10, TD-308); a cleared stall cannot say why
-    assert _ended_by(_rec(state="exited"), "state", "unpushed") == "pushed"
+    assert _ended_by(_rec(state="exited", git={"dirty": 0, "unpushed": 0}), "state", "unpushed") == "pushed"
+    assert _ended_by(_rec(state="exited", git=None), "state", "unpushed") == ""  # a git read that failed
     assert _ended_by(_rec(state="idle"), "state", "question") == "answered in the terminal"
     assert _ended_by(_rec(state="working"), "state", "permission") == "answered in the terminal"
     assert _ended_by(_rec(state="idle"), "state", "needs") == "answered in the terminal"
+    # a permission whose hook timed out into the terminal's question is still waiting (review of #1015)
+    assert _ended_by(_rec(state="needs-you"), "state", "permission") == ""
     assert _ended_by(_rec(state="idle"), "state", "limited") == "the limit reset"
     assert _ended_by(_rec(state="working"), "state", "stalled") == ""

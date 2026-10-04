@@ -2801,7 +2801,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (grinder-ao-1, a TD-297 press on a scratch home)
 **Owner:** grinder
 **Kind:** build
-**Status:** Built — PR #1015 (`_ended_by` reads the record still standing). The row template's *resolved: resolved* for a bare *resolved* is left: the words now say how wherever the home can tell.
+**Status:** Built — PR #1015 (`_ended_by` reads the record still standing: *pushed* only when its git reads clean, *answered in the terminal* only when the record waits on nobody). Known limits, from the review: an `unpushed` row that was only uncommitted files and was discarded also reads *pushed*; a `limited` row that ends with no fresh usage reading reads *the limit reset*. The row template's *resolved: resolved* for a bare *resolved* is left: the words now say how wherever the home can tell.
 **Location:** `src/sessionorc/agent_attention.py` (`_trail_append`: `how = … or ended or "resolved"`), `src/sessionorc/agent_common.py` (`_ended_by`: only *the session was closed* / *the session exited*); design §4.10 *The Inbox is a queue* (the trail's `how` words)
 
 **Why:** design §4.10 lists what the home can tell as a trail row's `how`: *allowed by you*, *denied by you*, *answered in the terminal*, *resumed*, *pushed*, *forgotten*, *the session exited*, *the session was closed*, *the limit reset*, *dismissed by you*, and plain *resolved* only when it cannot tell. Nothing writes *pushed*, *answered in the terminal* or *the limit reset*. On a scratch home on 2026-10-04 an exited session's `unpushed` row ended because its repo was pushed, and FYI drew *resolved: resolved ×2* — which says nothing, and doubles the word.
