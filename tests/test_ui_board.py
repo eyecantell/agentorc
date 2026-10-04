@@ -1213,7 +1213,7 @@ def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, m
 
 
 @pytest.mark.unit
-def test_only_a_watch_with_exactly_the_pair_is_a_live_look(tmp_path, monkeypatch):
+def test_only_a_look_or_watch_with_exactly_the_pair_is_a_live_look(tmp_path, monkeypatch):
     """Else they are ordinary answer buttons: another kind, a third answer, a complete *Not right:
     wrong repo*, or the words in another order."""
     from agentorc.ui.inbox import board_head, live_look
@@ -1232,6 +1232,9 @@ def test_only_a_watch_with_exactly_the_pair_is_a_live_look(tmp_path, monkeypatch
     assert live_look(look_item(kind="look"))  # the kind cadence names for it (TD-292), as a `watch` before it
     rows, html = rows_html(tmp_path, monkeypatch, look_item(kind="look"))
     assert rows[0]["pair"] and "board_notright" in html
+    from agentorc.ui.inbox import board_due_now
+
+    assert board_due_now(look_item(kind="look"))  # with no default, a counted due row under Needs you
     assert board_head("no bold here, just a long line " * 4).endswith("…") and len(board_head("x " * 90)) == 60
 
 
