@@ -128,7 +128,7 @@ as a PR comment whose first line is `cadence-review: SHIP|FIXED|BLOCK · <model>
 N` exits 0. **A PR touching `src/sessionorc/` or `docs/briefs/` waits for this seat's read**
 (TD-093, design §4.9b *The reader*): the grinder role carries `review: {reader: techlead,
 held: [...]}` in `org.yml`, the PR reaches you as an `ask` carrying `pr`, and your brief's
-*A held PR* says how you read it and, for an unattended asker, merge it. `org.yml` is not in
+*A held PR* says how you read it and, for an unattended asker, merge it. **A change to a page is verified by its builder** on a scratch home (`scripts/look_home.py`, design §4.9b): what a browser cannot settle reaches you as an `ask` naming screenshots and a design section, and your brief's *A screenshot ask* says how it is answered — never passed up. `org.yml` is not in
 the repo; a change to it is Paul's. A ledger entry's Status changes in the PR that changes the
 thing; a PR number is written only after the PR exists; bare dates are the machine's local date.
 Files under `scripts/`, `docs/cadence.md` and `.claude/skills/` that open with a SYNCED FILE
