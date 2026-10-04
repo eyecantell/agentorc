@@ -157,6 +157,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     BOARD_TTL,  # noqa: F401
     CONTEXT_RE,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
+    LOOK_KINDS,  # noqa: F401
     NEEDS_YOU_ROWS,  # noqa: F401
     ORIGIN_PHRASES,  # noqa: F401
     ORIGIN_READONLY,
