@@ -3157,13 +3157,14 @@ it is why the terminal rides the host agent's pipe and why the adapter contract 
   notch is lines, not a page, and `-e` leaves copy mode at the bottom as before. The wheel is a
   tmux command per frame down the bridge, never a mouse report: the read-only attach passes it as
   it passes every scroll message, and its carve-out for wheel-only report frames goes (below).
-  **What is lost, and simply so**: a program in the pane that asks for mouse tracking itself
-  (htop, a mouse-enabled `less`) gets no mouse, since tmux forwards none with its mouse off — a
-  runtime fact `man tmux` does not state, and TD-174's build could not look at a live pane, so it
-  is on the board for the first live look;
-  Claude Code asks for none, and a person who needs the mouse in such a program has `ao focus` in
-  a real terminal. No per-session escape: a setting over which drag selects is the thing this
-  removes. **Copy on select** is the one choice left, and it is the person's (§4.5a *Focus:
+  **A program that asks for the mouse gets it**: one in the pane that asks for mouse tracking
+  itself (htop, a mouse-enabled `less`) has its request passed out to xterm.js by tmux, mouse off
+  or not, and xterm.js's reports passed back in, so inside it a plain drag and a click go to the
+  program, and **Shift+drag** still selects in the browser — xterm.js forces its own selection with
+  Shift while tracking is on (the live look of 2026-10-03, TD-296 #12). In a read-only attach the
+  program gets nothing: a mouse report is a key frame, and the read-only bridge drops every one.
+  Claude Code asks for none, so ordinary Focus use is a plain drag that selects. No per-session
+  escape: a setting over which drag selects is the thing this removes. **Copy on select** is the one choice left, and it is the person's (§4.5a *Focus:
   copy on select*, §5 `person.terminal.copy_on_select`).
 - **The round log** (§4.8 *A session's round log*, TD-175; built — TD-191) sits beside the run
   log, `~/.agentorc/runs/<base id>.rounds.log` — the record's base id, `ao-<repo>-<name>` (§4.1),
