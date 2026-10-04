@@ -1365,9 +1365,11 @@ head}` is the one host-level read that returns a file's bytes: `docs/mockups/rev
 a file, because it reads only what `GET /repo/<repo>/shot/<name>.png` already serves on the page:
 one directory, merged images only, the name matched whole against `[A-Za-z0-9._-]+\.png` at every
 hop (the home, the link, the node's reading), at most 4 MiB, and `exists` false past that bound, so
-the row draws such a name alone rather than an image that 404s. It is served to a call forwarded
-from a node — not in `modes.HOME_ONLY` — since a person's page at a node draws a look's images
-through it and it names no session, worktree or path the caller chose. To identity (§4.8a) it is
+the row draws such a name alone rather than an image that 404s. A node answers it for its own
+registry and refuses another host's, as `host_dir` and `host_repos` do (it is not among what
+`modes.offline_refusal` forwards), so a page at a node draws its own host's looks and another
+host's as names alone; it is not in `modes.HOME_ONLY`, since it names no session, worktree or path
+the caller chose and nothing is lost if a node ever forwards it. To identity (§4.8a) it is
 what `host_dir` is: not among `identity.READS`. A repo the host does not register reads as not
 there; an unreachable host is refused in words, which the page draws as the name alone.
 
