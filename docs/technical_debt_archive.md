@@ -3180,3 +3180,21 @@ Both go away only when the record says who closed it.
 **Done when:** each of the seventeen is fixed or its design sentence changed, each checked on a scratch home with a screenshot in its PR.
 
 **Related:** TD-297 (what was not seen), TD-298 (the scratch home that leaked), TD-291 (the builder's check), TD-244 (the walks).
+
+## TD-311: `look_home.py`'s teardown leaves its `/tmp/aolook-*` home behind when a claude-code session ran in it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-2, TD-283 slice 2's UI check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `scripts/look_home.py` (`main`'s `finally`: `tmux kill-server`, then one `shutil.rmtree(home)`)
+
+**Why:** a UI check that presses Add entry → Open a session starts a real `claude` in the scratch home's tmux server. The teardown kills the server and removes the home once, but the dying tool's hooks still fire after that (its `SessionEnd`/`Stop` run the hook script, which appends to `<home>/events/<id>.jsonl`). That recreates `<home>/events/` after the `rmtree`. Twice on 2026-10-04, `/tmp/aolook-*` was left holding one events file. The script's docstring promises that only a SIGKILL leaves anything behind.
+
+**Resolved:** 2026-10-04 (PR #1017) — `remove_home` in `scripts/look_home.py`, pinned by `tests/test_look_home.py`.
+
+**Done when:** a look home torn down after an Open a session press leaves no `/tmp/aolook-*`.
+
+**Related:** TD-291 (the scratch home), TD-283 (the press that found it).

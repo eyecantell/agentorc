@@ -70,3 +70,27 @@ def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
     assert home is not None and not home.exists()  # the home it made is gone
     gone = subprocess.run(["tmux", "-L", sock, "list-sessions"], capture_output=True)
     assert gone.returncode != 0  # and its tmux server with it
+
+
+def test_the_home_is_removed_again_when_an_exit_hook_writes_into_it_after_the_first_removal(tmp_path):
+    """TD-311: a claude-code session killed with the tmux server still runs its exit hooks, which append
+    to `<home>/events/` after the first removal; the teardown removes the home until it stays gone."""
+    import threading
+
+    lh = _load()
+    home = tmp_path / "aolook-x"
+    (home / "events").mkdir(parents=True)
+
+    def late_hook():
+        time.sleep(0.3)  # after the first removal
+        (home / "events").mkdir(parents=True, exist_ok=True)
+        (home / "events" / "ao-repo-entry-1.jsonl").write_text("{}\n")
+
+    t = threading.Thread(target=late_hook)
+    t.start()
+    lh.remove_home(home, quiet=2.0, limit=8.0, step=0.1)  # wide of the hook's 0.3 s, under load too
+    t.join()
+    assert not home.exists()
+    started = time.monotonic()
+    lh.remove_home(tmp_path / "never-made", quiet=0.2)  # nothing there: returns after the quiet spell
+    assert time.monotonic() - started < 1.0

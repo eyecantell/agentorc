@@ -170,6 +170,22 @@ def stop(proc: subprocess.Popen | None) -> None:
         proc.wait(timeout=5)
 
 
+def remove_home(home: Path, quiet: float = 1.0, limit: float = 6.0, step: float = 0.2) -> None:
+    """Remove the scratch home, and again while anything writes into it, until it stays gone for `quiet`
+    seconds or `limit` passes (TD-311). A tool killed with the tmux server still runs its exit hooks,
+    which append to `<home>/events/` after the first removal, and that would leave the home behind."""
+    deadline, gone_since = time.monotonic() + limit, None
+    while True:
+        if home.exists():
+            shutil.rmtree(home, ignore_errors=True)
+            gone_since = None
+        now = time.monotonic()
+        gone_since = gone_since if gone_since is not None else now
+        if now - gone_since >= quiet or now >= deadline:
+            return
+        time.sleep(step)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="look_home.py", description=__doc__.split("\n\n")[0])
     ap.add_argument("--port", type=int, default=0, help="the UI's port (default: a free one)")
@@ -263,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
             subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
         with contextlib.suppress(FileNotFoundError):
             os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
-        shutil.rmtree(home, ignore_errors=True)
+        remove_home(home)
 
 
 if __name__ == "__main__":
