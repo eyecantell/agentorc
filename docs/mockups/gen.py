@@ -1440,7 +1440,7 @@ def inbox_rows():
         # TD-303: a board item the person answered waits on a session — uncounted, back in Needs you after BOARD_WAIT_DAYS
         mcard("#cbd0d6", "board · decided", "samscrape", "", "decided 1 d ago",
               '<div class="txt"><b>Approve an R2 bucket for the nightly backup.</b> The dump is 2 GB a night and the disk holds nine.</div>'
-              '<div class="meta">decided: <b style="color: #374151;">approve R2</b> · Oct 3 — waiting on the next session to read samscrape’s board</div>',
+              '<div class="meta">decided: <b style="color: #374151;">approve R2</b> · Sep 27 — waiting on the next session to read samscrape’s board</div>',
               b("Reply") + b("Done") + gap + b("Open board", "ghost")),
     ]
     answered = [
