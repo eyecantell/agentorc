@@ -508,8 +508,8 @@ class Adapter(Protocol):
     label: str                        # "Claude" — the tool's display name, for the usage chip and nowhere it is keyed on (TD-122)
     def launch_cmd(self, *, profile: Profile, resume: str | None, prompt_file: Path | None, unattended: bool) -> list[str]
     def launch(...) -> LaunchSpec                     # argv + env + adapter_id; writes the per-profile hooks layer.
-                                                      # `start_context: str | None` (TD-283 part 2, designed 2026-10-03,
-                                                      # not built): text the session holds from its start that is no
+                                                      # `start_context: str | None` (TD-283 part 2; the carrier built
+                                                      # 2026-10-04, the page not): text the session holds from its start that is no
                                                       # prompt — no turn runs for it and nothing is typed. Claude Code:
                                                       # `--append-system-prompt`, given again at every launch of the
                                                       # conversation, a resume included, since the tool keeps it in no
@@ -518,8 +518,9 @@ class Adapter(Protocol):
                                                       # that cannot (`shell`) is refused in words, never folded into a
                                                       # prompt. The record keeps the text (`start_context`) and so does
                                                       # the launch record, so a restart, a Resume and a profile switch
-                                                      # launch with it; a page shows it as text and nothing else (§4.5a
-                                                      # **Told at start**)
+                                                      # launch with it, and a resume that names none carries the
+                                                      # conversation's own; a page shows it as text and nothing else
+                                                      # (§4.5a **Told at start**)
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
@@ -6987,7 +6988,7 @@ code and needs no grant; a session doing the same work does.
      nothing unpushed; else refused by name with what is left (*git state unknown*, *2
      uncommitted*, *1 unpushed*), as a wanted restart is held — and **replays it from its
      launch record** as this rule replays one: the same name, directory, worktree, profile, role,
-     team, lane, brief and start context (§4.3; designed, TD-283 part 2), `unattended` and `supervised` as the launch record says whatever the
+     team, lane, brief and start context (§4.3, TD-283 part 2), `unattended` and `supervised` as the launch record says whatever the
      old record had become (a member a person took over with `ao mode` comes back unattended
      when its launch record says so: a restart is the team's run resumed, where Resume is the
      person's own), the prompt as rule 7's replay hands it — refilled from the files it was

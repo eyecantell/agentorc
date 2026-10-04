@@ -451,6 +451,7 @@ class ClaudeCodeAdapter:
     name = "claude-code"
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    start_context = True  # `--append-system-prompt`, given at every launch of the conversation (§4.3, TD-283)
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self.binary = binary or "claude"
@@ -467,6 +468,7 @@ class ClaudeCodeAdapter:
         unattended: bool,
         cwd: Path,
         name: str = "",
+        start_context: str | None = None,
     ) -> LaunchSpec:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
@@ -480,6 +482,10 @@ class ClaudeCodeAdapter:
         argv += prof.extra_args
         if unattended:
             argv += prof.unattended_args or ["--dangerously-skip-permissions"]
+        if start_context:
+            # the system prompt's tail, not a turn: the tool keeps it in no file of the session's, so
+            # a resume is handed it again (design §4.3, TD-283)
+            argv += ["--append-system-prompt", start_context]
         if prompt:
             if prompt.startswith("-"):
                 argv.append("--")  # a pasted brief that starts with '-' is a prompt, not an option

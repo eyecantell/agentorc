@@ -139,9 +139,10 @@ HOME_OWNED = frozenset(
         "wake_refilled_at",
     }
 )
-IDENTITY = frozenset(
-    {"id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "created", "host"}
-)
+IDENTITY = frozenset({
+    "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "created", "host",
+    "start_context",
+})  # fmt: skip
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
 # depending on whether the host is volatile, so it gets two slots.
@@ -853,6 +854,11 @@ class Session:
     # §4.8 *A role has a context bound*, TD-190): from its role preset's `context: {bound}`, written
     # at start as `review` is; None is no bound. The home's, like the rest of the role's intent.
     context_bound: int | None = None
+    # Text the session holds from its start that is no prompt (design §4.3 `start_context`, TD-283):
+    # no turn ran for it and nothing typed it. Set once at create and handed to every launch of the
+    # conversation — a resume carries it whether or not it says so — so a page can show what the
+    # session was told beside the person's own words (§4.5a **Told at start**). None: there is none.
+    start_context: str | None = None
     # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
     # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
     # are what the session says it did.
