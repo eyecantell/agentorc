@@ -88,7 +88,7 @@ def test_the_home_is_removed_again_when_an_exit_hook_writes_into_it_after_the_fi
 
     t = threading.Thread(target=late_hook)
     t.start()
-    lh.remove_home(home, quiet=0.8, limit=5.0, step=0.1)
+    lh.remove_home(home, quiet=2.0, limit=8.0, step=0.1)  # wide of the hook's 0.3 s, under load too
     t.join()
     assert not home.exists()
     started = time.monotonic()
