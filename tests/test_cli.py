@@ -1487,7 +1487,11 @@ def test_slices_line_marks_a_derived_slice_and_skips_a_finished_entry():
     entry no longer claimed prints none."""
     s = {
         "progress": [
-            {"ref": "TD-1", "status": "claimed", "slices": [{"pr": 3, "source": "declared"}, {"pr": 4, "source": "derived"}]},
+            {
+                "ref": "TD-1",
+                "status": "claimed",
+                "slices": [{"pr": 3, "source": "declared"}, {"pr": 4, "source": "derived"}],
+            },
             {"ref": "TD-2", "status": "done", "pr": 9, "slices": [{"pr": 8, "source": "declared"}]},
         ]
     }
