@@ -1824,7 +1824,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     live team, how its records differ from what the current flow compiles to, by member; with a flow,
     writes `teams.<team>.flow` through `set_settings` — a person's own — refused here for a flow the
     team does not list, as a team's name is, and then applies it as `--apply` does: the sit-outs, the
-    starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per member."""
+    starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per member, and one per
+    PR already asked of a reader, which stays its (*What a switch leaves alone*)."""
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -1880,6 +1881,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
                 print(f"applied {applied['flow']}:")
             for d in done:
                 print(f"  {d['line']}")
+            for x in applied.get("stays") or []:
+                print(f"  {x['line']}")
         elif out.get("unread"):
             print(f"the records are not compared: {out['unread']}")
         elif out["differences"]:

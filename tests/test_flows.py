@@ -754,6 +754,42 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
     assert cli.main(["team", "flow", "ao-grind", "td", "--apply"]) == 2
 
 
+def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    """§4.9c *What a switch leaves alone*: a PR already asked of the techlead stays its, and the
+    apply says so from the seat's `prs_waiting.asks` (TD-333) — the sender by its name, an address
+    this home does not list as given."""
+    from agentorc import cli
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build"])
+    tl = next(s for s in state["sessions"] if s["name"] == "techlead-ao")
+    tl["prs_waiting"] = {
+        "n": 3,
+        "oldest": "2026-10-05T09:00:00Z",
+        "asks": [
+            {"from": "ao-agentorc-grind-1", "pr": 1020},
+            {"from": "ao-x-w@devenv", "pr": 1021},
+            {"from": f"ao-agentorc-grind-2@{HOST}", "pr": 1022},
+        ],
+    }
+    assert cli.main(["team", "flow", "ao-grind", "build"]) == 0
+    out = capsys.readouterr().out
+    assert "  grind-1's PR #1020 stays with techlead-ao" in out
+    assert "  ao-x-w@devenv's PR #1021 stays with techlead-ao" in out
+    assert "  grind-2's PR #1022 stays with techlead-ao" in out
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    got = json.loads(capsys.readouterr().out)["apply"]
+    assert got["stays"][0] == {
+        "from": "ao-agentorc-grind-1",
+        "pr": 1020,
+        "reader": "techlead-ao",
+        "line": "grind-1's PR #1020 stays with techlead-ao",
+    }
+    # a team with no ask waiting says nothing of it
+    tl["prs_waiting"] = None
+    assert cli.main(["team", "flow", "ao-grind", "--apply"]) == 0
+    assert "stays with" not in capsys.readouterr().out
+
+
 def test_ao_team_list_says_flow_changed_while_the_records_differ(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     """§4.9c *Switching*: a client reading a live team compares it with its current flow — a pick
     written and not yet applied (the page's, before slice 4b applies at once) reads *flow changed*."""
