@@ -1,0 +1,4 @@
+# The built-in flow `build-review` (design §4.9c, TD-309): build → review.
+stages:
+  - {name: build,  role: grinder,  lane: [free-pick, "owner:grinder"],     brief: build.md}
+  - {name: review, role: techlead,                                          brief: ../td/review.md}

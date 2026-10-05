@@ -1,0 +1,276 @@
+"""Flows: the path an entry takes through a team (design §4.9c, TD-307; built by TD-309).
+
+A flow is a directory holding `flow.yml` — an ordered list of stages, each a role, the lane it gives
+and its stage brief — and the briefs beside it. This module finds a flow by name (the package's
+built-ins, then a repo's `.agentorc/flows/<name>/`; the org's directories are TD-313's), reads it,
+and says whether it is **usable** (whole: every brief present, every role resolved and of the kind
+its stage wants) and whether a team can **follow** it (its members staff every stage). It reads and
+judges; it writes nothing, and nothing here starts a session.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Collection
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from agentorc import repoconfig
+from sessionorc.models import LANE_WORDS, owner_word
+
+PACKAGE_DIR = Path(__file__).resolve().parent / "flows"
+REPO_DIR = Path(".agentorc") / "flows"
+FILE = "flow.yml"
+BUILTIN = ("td", "build-review", "build")
+FLOW_KEYS = ("stages",)
+STAGE_KEYS = ("name", "role", "lane", "brief")
+PACKAGE_REF = "package:"
+# Today one seat holds a review stage: the team's `techlead:` seat (§4.9b *The reader* knows two
+# readers); a review stage of any other seat role is TD-314's design.
+REVIEW_ROLE = "techlead"
+REF_RE = re.compile(r"(?i)[a-z]{2,6}-\d{1,4}|#?\d{1,6}")
+
+
+@dataclass
+class Stage:
+    name: str
+    role: str
+    lane: list[str] = field(default_factory=list)  # empty: a review stage
+    brief: str = ""  # the reference as written
+    path: Path | None = None  # the brief's file, resolved; None when the reference cannot be
+
+    @property
+    def review(self) -> bool:
+        return not self.lane
+
+
+@dataclass
+class Flow:
+    name: str
+    place: str  # `package` | `repo`
+    dir: Path
+    stages: list[Stage] = field(default_factory=list)
+    problems: list[str] = field(default_factory=list)  # empty: usable (once `check` has run)
+
+    @property
+    def usable(self) -> bool:
+        return not self.problems
+
+    def stage_of(self, role: str) -> Stage | None:
+        return next((s for s in self.stages if s.role == role), None)
+
+    @property
+    def review_stage(self) -> Stage | None:
+        return next((s for s in self.stages if s.review), None)
+
+
+def _read_here(path: Path) -> str | None:
+    """A file's text, or None for anything that is not a readable text file (missing, a directory,
+    not UTF-8): a flow's brief that cannot be read is a reason it is not usable, never a crash."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _brief_path(ref: str, flow_dir: Path, place_root: Path) -> tuple[Path | None, str]:
+    """A stage's `brief:` as a file: relative to the flow's directory; `../<flow>/<file>` a sibling
+    flow's **in the same place**; `package:<flow>/<file>` a built-in's from anywhere. Anything that
+    leaves its place — an absolute path, a `..` that climbs out — is refused."""
+    if ref.startswith(PACKAGE_REF):
+        rest = Path(ref[len(PACKAGE_REF) :])
+        parts = rest.parts
+        if len(parts) != 2 or ".." in parts or rest.is_absolute():
+            return None, f"brief {ref!r}: `package:` takes <flow>/<file>"
+        return PACKAGE_DIR / rest, ""
+    rel = Path(ref)
+    if not rel.parts or rel.parts[-1] in (".", ".."):
+        return None, f"brief {ref!r}: name a file"
+    if rel.is_absolute():
+        return None, f"brief {ref!r}: relative to the flow's directory, never absolute"
+    parts = rel.parts
+    if parts[:1] == ("..",):
+        if len(parts) != 3 or ".." in parts[1:]:
+            return None, f"brief {ref!r}: `../` reaches a sibling flow's <flow>/<file>, nothing further"
+        return place_root / parts[1] / parts[2], ""
+    if ".." in parts:
+        return None, f"brief {ref!r}: a brief stays in its flow's directory, `../<flow>/` or `package:`"
+    return flow_dir / rel, ""
+
+
+def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: Path) -> Flow:
+    """A flow from its `flow.yml` text, every structural problem collected rather than raised: a
+    flow that fails is *not usable*, named with every reason (§4.9c)."""
+    flow = Flow(name=name, place=place, dir=flow_dir)
+    where = f"flow {name} ({flow_dir / FILE})"
+    if text is None:
+        flow.problems.append(f"{where}: no {FILE}")
+        return flow
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as e:
+        flow.problems.append(f"{where}: not valid YAML ({e})")
+        return flow
+    if not isinstance(data, dict):
+        flow.problems.append(f"{where}: the top level must be a mapping with `stages:`")
+        return flow
+    for k in data:
+        if k not in FLOW_KEYS:
+            flow.problems.append(f"{where}: {k!r} is not a flow key ({', '.join(FLOW_KEYS)})")
+    raw = data.get("stages")
+    if not isinstance(raw, list) or not raw:
+        flow.problems.append(f"{where}: `stages:` must be a non-empty list")
+        return flow
+    for i, st in enumerate(raw):
+        key = f"{where}: stages[{i}]"
+        if not isinstance(st, dict):
+            flow.problems.append(f"{key} must be a mapping ({', '.join(STAGE_KEYS)})")
+            continue
+        for k in st:
+            if k not in STAGE_KEYS:
+                flow.problems.append(f"{key}.{k} is not a stage key ({', '.join(STAGE_KEYS)})")
+        sname, role, brief = (str(st.get(k) or "").strip() for k in ("name", "role", "brief"))
+        lane = st.get("lane")
+        if lane is None:
+            lane = []
+        if not isinstance(lane, list) or not all(isinstance(w, str) and w.strip() for w in lane):
+            flow.problems.append(f"{key}.lane must be a list of lane words")
+            lane = []
+        for k, v in (("name", sname), ("role", role), ("brief", brief)):
+            if not v:
+                flow.problems.append(f"{key}.{k} is required")
+        stage = Stage(name=sname or f"#{i}", role=role, lane=[w.strip() for w in lane], brief=brief)
+        if brief:
+            stage.path, why = _brief_path(brief, flow_dir, place_root)
+            if why:
+                flow.problems.append(f"{key}: {why}")
+        flow.stages.append(stage)
+    names = [s.name for s in flow.stages]
+    for n in dict.fromkeys(names):
+        if names.count(n) > 1:
+            flow.problems.append(f"{where}: two stages are called {n!r} — a stage's name is unique in its flow")
+    roles = [s.role for s in flow.stages if s.role]
+    for r in dict.fromkeys(roles):
+        if roles.count(r) > 1:
+            flow.problems.append(f"{where}: two stages name the role {r!r} — a member would have two lanes")
+    return flow
+
+
+def find(name: str, repo_root: Path | None = None, *, read: repoconfig.Reader | None = None) -> Flow | None:
+    """The flow called `name` for a team of the repo at `repo_root`: a built-in (`td`,
+    `build-review`, `build`, the package's), else the repo's `.agentorc/flows/<name>/` read through
+    `read` (this host's disk by default, a node's checkout across the link). None: no such flow.
+    A repo directory that takes a built-in's name is never read — the built-in is the flow."""
+    if name in BUILTIN:
+        d = PACKAGE_DIR / name
+        return parse(name, "package", d, _read_here(d / FILE), PACKAGE_DIR)
+    if not name or "/" in name or name.startswith("."):
+        return None
+    if repo_root is None:
+        return None
+    base = Path(repo_root).expanduser() / REPO_DIR
+    text = (read or _read_here)(base / name / FILE)
+    if text is None:
+        return None
+    return parse(name, "repo", base / name, text, base)
+
+
+def _lane_ok(word: str, role: repoconfig.Role) -> bool:
+    """A lane word §6 rule 6 knows (`free-pick`, `design-first`, `owner:<word>`, a ledger id or a
+    PR number), or one its role's lane shape takes — a hunter-shaped role (its default lane `free`)
+    takes `free` and any area (§4.8's table)."""
+    if word in LANE_WORDS or owner_word(word) is not None:
+        return True
+    if REF_RE.fullmatch(word.strip()):  # a named item: a ledger id or a PR number (`normalize_ref`'s shapes)
+        return True
+    return "free" in role.lane
+
+
+def check(
+    flow: Flow,
+    cfg: repoconfig.RepoConfig,
+    overlay: dict[str, dict[str, Any]] | None = None,
+    *,
+    read: repoconfig.Reader | None = None,
+) -> Flow:
+    """Fill `flow.problems` with what keeps it from being **usable** (§4.9c *A flow is usable only
+    when it is whole*): a brief that is not a file, a role that does not resolve here or is not of
+    the kind its stage wants — a `worker` where the stage gives a lane, the `techlead` seat where it
+    gives none — a lane word nothing knows. `cfg` is the team's repo (a repo flow's roles are that
+    repo's, the package's and the org's). Returns `flow`."""
+    where = f"flow {flow.name}"
+    for st in flow.stages:
+        key = f"{where}: stage {st.name}"
+        if st.path is not None:
+            reader = _read_here if flow.place == "package" or st.path.is_relative_to(PACKAGE_DIR) else read
+            try:
+                text = (reader or _read_here)(st.path)
+            except (OSError, UnicodeDecodeError) as e:  # a node's checkout across the link that did not answer
+                flow.problems.append(f"{key}: its brief {st.brief!r} could not be read ({e})")
+            else:
+                if text is None:
+                    flow.problems.append(f"{key}: its brief {st.brief!r} is not a file ({st.path})")
+        if not st.role:
+            continue
+        try:
+            role = repoconfig.resolve_role(cfg, st.role, overlay)
+        except (KeyError, ValueError) as e:
+            flow.problems.append(f"{key}: {str(e).strip(chr(34))}")
+            continue
+        if st.review:
+            if role.kind != "seat":
+                flow.problems.append(f"{key}: a review stage names a seat, and {st.role!r} is a {role.kind}")
+            elif st.role != REVIEW_ROLE:
+                flow.problems.append(
+                    f"{key}: today only the `techlead` seat holds a review stage — another seat's is TD-314's design"
+                )
+        else:
+            if role.kind != "worker":
+                flow.problems.append(
+                    f"{key}: a stage that gives a lane names a worker, and {st.role!r} is a {role.kind}"
+                )
+            for w in st.lane:
+                if not _lane_ok(w, role):
+                    flow.problems.append(
+                        f"{key}: lane word {w!r} is not one §6 rule 6 knows, nor {st.role}'s lane shape"
+                    )
+    return flow
+
+
+def load(
+    name: str,
+    cfg: repoconfig.RepoConfig,
+    overlay: dict[str, dict[str, Any]] | None = None,
+    *,
+    read: repoconfig.Reader | None = None,
+) -> Flow | None:
+    """`find` then `check`: the flow as a team of `cfg`'s repo would run it, or None when there is
+    no flow of that name."""
+    flow = find(name, cfg.root, read=read)
+    return check(flow, cfg, overlay, read=read) if flow is not None else None
+
+
+def unfollowable(flow: Flow, staffed: Collection[str], *, techlead: bool, held: Collection[str]) -> list[str]:
+    """Why a team cannot follow `flow` (§4.9c *Every listed flow must be followable*), in the shared
+    words' middle part, or [] when it can: a member stage whose role the team starts no member of; the
+    review stage when the team has no `techlead:` seat, or when nothing would be held (its repos
+    write no `held:`). `staffed` is the roles the definition's members take."""
+    out: list[str] = []
+    for st in flow.stages:
+        if st.review:
+            if not techlead:
+                out.append("no techlead seat — add `techlead:` to the team")
+            elif not held:
+                out.append("nothing held — write held:")
+        elif st.role not in staffed:
+            out.append(f"no {st.role} — add one to members:")
+    return out
+
+
+def cannot_follow(flow: str, team: str, reasons: Collection[str]) -> str:
+    """The shared words (§4.9c): *build-review cannot be followed by dc-grind: nothing held — write
+    held:, or drop build-review from flows:*."""
+    return f"{flow} cannot be followed by {team}: {'; '.join(reasons)}, or drop {flow} from flows:"

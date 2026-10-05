@@ -26,8 +26,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from agentorc import flowdefs, profiles, repoconfig
 from agentorc import org as orgmod
-from agentorc import profiles, repoconfig
 from sessionorc import naming
 from sessionorc.models import REVIEW_BOUND
 
@@ -414,26 +414,11 @@ def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: s
     return f"{seat.name}: its `context:` {seat.context} is not in {checkout} — the seat will start without its primer"
 
 
-def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
-    *,
-    org: orgmod.Org,
-    team: orgmod.TeamDef,
-    name: str,
-    role_name: str,
-    home: str,
-    host: str,
-    here: str,
-    profile_override: str | None,
-    member: Spec,  # the lead's own definition or a member's: both carry lane, brief, grants, profile
-    lead: bool,
-    block: str,
-    files: Files | None = None,
-    techlead: str = "",
-    context: str = "",
-    manager: str = "",
-    seat: bool = False,
-) -> Launch:
-    where = f"team {team.name}: {name}"
+def _checkout(
+    org: orgmod.Org, team: orgmod.TeamDef, home: str, host: str, here: str, files: Files | None, where: str
+) -> tuple[Path, repoconfig.Reader | None]:
+    """Where repo `home` is checked out on `host`, and how to read it: this host's disk (None), or
+    the node's files across the link for a checkout that is not a directory here (step 4b.3)."""
     project = project_of(org, team.projects, home)
     checkout = org.checkout(project, home, host)
     if checkout is None:
@@ -455,11 +440,81 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         # Another host's checkout that is not a directory here — a machine node (a container node
         # shares the path): its roles and briefs are read there, by the same loader (step 4b.3).
         read = reader_on(files, host, checkout)
+    return checkout, read
+
+
+def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files: Files | None) -> None:
+    """A team's `flows:` and `entries:` against its repo (design §4.9c): each listed flow is one that
+    exists, is **usable** and that the team can **follow**, and each `entries:` role is a worker or a
+    seat — else the start is refused in the shared words, and `ao org check` says so (it runs
+    `plan`). A team with neither key is not read here at all."""
+    if not team.flows and not team.entries:
+        return
+    repos = org.team_repos(team)
+    home = repos[0]  # every team today is one repo (§4.9c item 2: the repos' `held:` is their union)
+    where = f"team {team.name}"
+    checkout, read = _checkout(org, team, home, host, here, files, where)
+    try:
+        cfg = repoconfig.load(checkout, read=read)
+    except (ValueError, OSError) as e:
+        raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+    for t, rname in team.entries.items():
+        try:
+            kind = repoconfig.resolve_role(cfg, rname, org.roles).kind
+        except (KeyError, ValueError):
+            continue  # an unknown role is `org._entries_resolve`'s line, said where the file is read
+        if kind not in ("worker", "seat"):
+            raise TeamError(f"{where}: entries.{t} takes a worker or a seat, and {rname!r} is a {kind} (design §4.9c)")
+    staffed = {m.role for m in team.members if m.team is None and m.role}
+    for name in team.flows:
+        try:
+            flow = flowdefs.load(name, cfg, org.roles, read=read)
+        except (OSError, ValueError) as e:  # its flow.yml across the link, unreadable
+            raise TeamError(f"{where}: flows: {name}: {str(e).strip(chr(34))}") from None
+        if flow is None:
+            raise TeamError(
+                f"{where}: flows: no flow {name!r} — not a built-in ({', '.join(flowdefs.BUILTIN)}) and no "
+                f"{flowdefs.REPO_DIR / name}/ in {home}"
+            )
+        if flow.problems:
+            raise TeamError(f"{where}: flows: {name} is not usable — {'; '.join(flow.problems)}")
+        reasons = flowdefs.unfollowable(flow, staffed, techlead=team.techlead is not None, held=cfg.held or ())
+        if reasons:
+            raise TeamError(flowdefs.cannot_follow(name, team.name, reasons))
+
+
+def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
+    *,
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    name: str,
+    role_name: str,
+    home: str,
+    host: str,
+    here: str,
+    profile_override: str | None,
+    member: Spec,  # the lead's own definition or a member's: both carry lane, brief, grants, profile
+    lead: bool,
+    block: str,
+    files: Files | None = None,
+    techlead: str = "",
+    context: str = "",
+    manager: str = "",
+    seat: bool = False,
+) -> Launch:
+    where = f"team {team.name}: {name}"
+    checkout, read = _checkout(org, team, home, host, here, files, where)
     try:
         cfg = repoconfig.load(checkout, read=read)
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
     except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+    # §4.9c *Roles and flows are orthogonal* (TD-309): a slot takes the kind it names — `manager:` a
+    # manager role, a member a worker, the techlead seat and each `seats:` entry a seat
+    want = "manager" if lead else "seat" if seat else "worker"
+    if role.kind != want:
+        slot = "manager:" if lead else "a seat" if seat else "a member"
+        raise TeamError(f"{where}: {slot} takes a {want} role, and {role_name!r} is a {role.kind} (design §4.9c)")
     if isinstance(member, orgmod.SeatDef):
         lane: list[str] = []  # a seat has no lane, whatever its role's (§4.9b): its area is its brief's
     else:
@@ -487,7 +542,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         home=home,
         dir=checkout,
         team=team.name,
-        project=project,
+        project=project_of(org, team.projects, home),
         profile=profile,
         prompt=prompt,
         grants=grants,
@@ -667,6 +722,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                     manager=mid,
                 )
             )
+    _check_flows(org, team, host, here, files)
     # One line per finding, not per session: a team's members share a brief, and four copies of
     # the same sentence is how a warning gets ignored.
     by_finding: dict[str, list[str]] = {}

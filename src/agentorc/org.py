@@ -163,6 +163,9 @@ class TeamDef:
     # the role a person's entry session takes, per Type (design §4.9 *Add an entry to the ledger*, TD-219):
     # only the keys the definition says; `entry_role` reads a missing one as the techlead
     entries: dict[str, str] = field(default_factory=dict)
+    # the flows the team may run, the first its default (design §4.9c, TD-309): names only — a flow
+    # is found and judged where the team's repo is read (`teams.plan`, `flowdefs`); empty: no flow
+    flows: list[str] = field(default_factory=list)
 
     def entry_role(self, type_: str) -> str:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
@@ -586,7 +589,7 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended", "on_call")
 # a member is never on call (§4.9): the key is the manager's alone, so on a member it is a stray one
 MEMBER_KEYS = (*(k for k in MANAGER_KEYS if k != "on_call"), "count", "team")
-TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host", "entries")
+TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host", "entries", "flows")
 # the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
 ENTRY_TYPES = ("debt", "feature")
 TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
@@ -679,7 +682,21 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         source=source,
         host=_str(raw.get("host"), f"{key}.host"),
         entries=_entries(raw.get("entries"), f"{key}.entries"),
+        flows=_flows(raw.get("flows"), f"{key}.flows"),
     )
+
+
+def _flows(raw: Any, key: str) -> list[str]:
+    """`flows: [td, build-review]` (design §4.9c): flow names, each once. Whether each names a usable
+    flow the team can follow is read with the team's repo (`teams.plan`)."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(f, str) and f.strip() for f in raw):
+        raise ValueError(f"{key} must be a list of flow names, e.g. [td, build-review]")
+    names = [f.strip() for f in raw]
+    if twice := [n for n in dict.fromkeys(names) if names.count(n) > 1]:
+        raise ValueError(f"{key}: {twice[0]!r} is listed twice")
+    return names
 
 
 def _entries(raw: Any, key: str) -> dict[str, str]:

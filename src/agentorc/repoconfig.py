@@ -49,7 +49,14 @@ DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
 ROLE_KEYS = (
     "brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "context", "message", "prompts",
+    "kind",
 )  # fmt: skip
+# A role's **kind** (design §4.9c *Roles and flows are orthogonal*, TD-309): all a flow's stage, and a
+# team's slot, asks of a role. A definition's key — a preset's — and refused in an overlay
+# (`org.yml`'s and `.agentorc.yml`'s `roles:`), so no install or repo changes what a flow may ask of
+# a role it did not define. A role that writes none (a key-only role) is a `worker`.
+KINDS = ("worker", "seat", "manager", "plain")
+DEFAULT_KIND = "worker"
 # The built-in worker presets' context bound (design §4.8 *A role has a context bound*, *The bound
 # has two layers*; TD-190, TD-249): the cost break-even TD-189's research found, since a bound under
 # start-up plus one entry restarts after every entry. A repo's own number goes in its `.agentorc.yml`.
@@ -129,6 +136,7 @@ def entry_text(repo: str, type_: str, ledger: str) -> str:
 # None names a profile: profile names are the person's (§4.2a, §4.9).
 PRESETS: dict[str, dict[str, Any]] = {
     "grinder": {
+        "kind": "worker",
         "brief": "grinder.md",
         "lane": ["free-pick"],
         "grants": [],
@@ -138,6 +146,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "message": "its own card only: the entry it holds, a finding on its PR",
     },
     "hunter": {
+        "kind": "worker",
         "brief": "hunter.md",
         "lane": ["free"],
         "grants": [],
@@ -147,6 +156,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "message": "an area to look at; it files, never fixes",
     },
     "manager": {
+        "kind": "manager",
         "brief": "manager.md",
         "lane": [],
         "grants": ["control"],
@@ -157,6 +167,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     # The go-between (design §4.9b, TD-075): answers teammates' questions from the record, passes the
     # rest up. No grants — it acts on no session; the design's `alarms` grant is not built.
     "techlead": {
+        "kind": "seat",
         "brief": "techlead.md",
         "lane": [],
         "grants": [],
@@ -168,6 +179,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     # A seat with a trigger (design §4.9b, TD-098): hunter-shaped — checks one area every n merged
     # PRs or every so often, files what it finds, and ends. The area is its brief's, never a lane.
     "auditor": {
+        "kind": "seat",
         "brief": "auditor.md",
         "lane": [],
         "grants": [],
@@ -176,7 +188,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "context": WORKER_CONTEXT,
         "message": "what its trigger counts: the last n PRs, the period",
     },
-    "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
+    "plain": {"kind": "plain", "brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
 # Reads one file by its absolute path and returns its text, or None when there is no such file;
@@ -231,6 +243,7 @@ class Role:
     prompts: list[dict[str, str]] = field(default_factory=list)  # saved prompts (§4.8, TD-170), in file order
     controllers: list[str] = field(default_factory=list)
     review: dict[str, Any] | None = None  # who reads its PRs (design §4.9b *The reader*, TD-093)
+    kind: str = DEFAULT_KIND  # §4.9c (TD-309): `worker`, `seat`, `manager` or `plain`, from its definition
     context_bound: int | None = None  # tokens past which §6 rule 5 tells it to end its run (§4.8, TD-190)
     context_default: bool = False  # no layer said `context:`: the bound is `DEFAULT_CONTEXT`'s (TD-249)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
@@ -387,6 +400,9 @@ class RepoConfig:
     # §5 `promote:` (§6 *Promote*, TD-120): `{run, check}`, accepted and checked now so writing the
     # designed block does not break `ao new` in that repo; `sessionorc.promote` runs it at the home (TD-132)
     promote: dict[str, str] | None = None
+    # §4.9c (TD-309): the repo's held paths, top level — what a flow's review stage waits for. None:
+    # the key is absent (a review stage then has nothing to hold); never an empty list
+    held: list[str] | None = None
 
 
 def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
@@ -458,6 +474,11 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         cfg.teams = _mapping(value, where)
     elif key == "promote":
         cfg.promote = _promote(value, where)
+    elif key == "held":
+        held = _str_list(value, where)
+        if not held:
+            raise ValueError(f"{where} names no path — a review that holds nothing is no key (design §4.9c)")
+        cfg.held = held
     elif key in RETIRED:
         raise ValueError(f"{where} is not a `.agentorc.yml` key any more (design §5): {RETIRED[key]}")
     else:
@@ -534,6 +555,11 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
         k = str(k)
         if k not in ROLE_KEYS:
             raise ValueError(f"{here}.{k} is not a role key ({', '.join(ROLE_KEYS)})")
+        if k == "kind":
+            raise ValueError(
+                f"{here}.kind: a role's kind is its definition's — a preset's — and no overlay changes it "
+                "(design §4.9c)"
+            )
         if k in ("brief", "profile"):
             if v is not None and (not isinstance(v, str) or not v.strip()):
                 raise ValueError(f"{here}.{k} must be a string")
@@ -641,6 +667,8 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
     role = Role(name=name, root=cfg.root)
     for src, block in spoke:
         role.sources.append(src)
+        if "kind" in block:  # a preset's alone: `_role_block` refuses it in an overlay
+            role.kind = block["kind"]
         if "brief" in block:
             role.brief, role.brief_source = block["brief"], src
         if "lane" in block:
