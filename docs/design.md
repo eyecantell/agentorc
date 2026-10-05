@@ -724,8 +724,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   entry has one: *for you* (`Owner: paul`, `Kind: decision`, or blocked by a decision),
   *design-first* (`Kind: design-first`, blocked by another entry or not: it is the designer's
   list, less what waits on the person, which the first test took),
-  *pickable* (pickable, `Kind: build` or none: work a grinder can start), else *other* (a
-  build that is blocked, a live check, an evaluation). **A written `Pickable:` line is not read**: a ledger that still
+  *pickable* (pickable, `Kind: build` or none: work a grinder can start — and, once TD-323 is
+  built, a live check whose build is live, §4.9b), else *other* (a
+  build that is blocked, a live check that waits for its build to be live, an evaluation). **A written `Pickable:` line is not read**: a ledger that still
   carries one is read as if it did not, as the script reads the line as a field that overrides
   nothing (cadence §2.12), so the home and the script differ by no entry. What nothing blocks
   and a grinder still cannot build — *built, the live look is left*, *needs an attended run*,
@@ -5352,6 +5353,50 @@ team has one, the techlead answers it or passes it up, and the person is the top
   no `ao` verb that acts on a session of the live home, nothing under `~/.agentorc`; it closes
   the line with what it read, or ledgers what is wrong.
 
+  **A live check is a grinder's once its build is live (TD-320; Paul, 2026-10-04: *we should
+  make live-checks pickable by grinders so they do not have to wait on a promote*; designed that
+  day, not built — TD-323).** A built entry whose *Done when* only the running system can show
+  becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
+  after every promote, and seven High entries stood that way on 2026-10-04.
+  - **The entry names its build on its `Kind:` line.** The PR that makes an entry a live check
+    writes **`**Kind:** live-check #<n>`** — the kind's word, then the last merged PR of the
+    build, or several. Both readers take a field's first word as its value and leave the rest of
+    the line alone, so cadence's script reads `live-check` as before; agentorc's reader also
+    reads the `#<n>` after that one word. It is not a field of its own — a header field the
+    ledger's `Fields:` line does not declare fails cadence's check on the edit that adds it, and
+    a declared field takes fixed words — and not an item of `Blocked by:`, which is cadence's
+    line, where an item its script cannot read blocks for good.
+  - **Live is read, never declared.** A PR is live when its squash commit on the default branch
+    (the commit whose subject ends `(#<n>)`) is an ancestor of the repo's live commit, the
+    home's promote reading (`promotes.<repo>.live`, §6 *Promote*). The home reads it with the
+    ledger, at the repo facts' cadence (§4.4), and keeps `live: yes | no` on the entry's reading.
+    **Unknown is never live**: no PR on the `Kind:` line, a PR whose commit is not found, a live commit
+    that cannot be read, or a repo with no `promote:` block — each reads `no`, and the entry is
+    where it was before this rule.
+  - **The lane.** A pickable live check that reads `live: yes` matches `free-pick` (§6 rule 6),
+    and the owner word narrows it as it narrows a build: `[free-pick, owner:grinder]` takes the
+    live checks whose `Owner:` is `grinder` or unwritten. **What stays the anchor's or the
+    person's says so on its `Owner:` line** — a check whose *Done when* is a judgement only the
+    person can make, or one that needs the live home's settings changed. A live check is chosen
+    as any entry is, by priority first (§4.8 *Choosing in a free-pick lane*), and claimed as one
+    (§4.8): two grinders' package lanes do not divide it. A build that becomes live is new work
+    in the lane, told once by rule 6 to a member that declared out of work, and counted by
+    rule 8 for a team that wound down.
+  - **What the grinder does** is the rule above: the live copy is read — `ao status -v`, a
+    record's fields, `ao promote status`, a transcript, a headless GET of a page — and never
+    pressed; a check that needs a press is made on a scratch home (`scripts/look_home.py`), where
+    the merged code runs whether or not it is live. It ends one of four ways, each in a PR that
+    touches the ledger alone. **It holds**: what was read is written on the entry and the entry
+    is archived with `**Resolved:**`. **It does not**: a new entry says what is wrong, and the
+    check is `Blocked by:` it. **It waits for an event nobody can cause** (a usage window's
+    reset, a node team's next run): what was read so far and the event are written in the
+    Status, and the entry's `Owner:` becomes `anchor`, so it leaves the lane instead of being
+    picked again each run. **It is the person's to judge**: the grinder sends the look (§4.10
+    *A look*), and the entry is `Blocked by: decision (paul)` with the mail's id.
+  - **What this does not change.** The promote is still a person's press or the home's policy
+    (§6 *Promote*; whether `auto` is on is the person's, and only shortens the wait). No member
+    acts on the live home, and a live check gives no grant.
+
   **A reviewer only if needed, and it is the techlead.** What a browser cannot settle — whether
   a layout or a wording is what the design means — goes to the team's techlead before the merge
   as the ordinary `ask` about the work (`ao msg --kind ask --about TD-NNN {techlead} "…"`),
@@ -7974,7 +8019,9 @@ code and needs no grant; a session doing the same work does.
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      with pickable derived (§4.4 *Repo facts*, TD-223; built — TD-228 slice 1), `design-first`
      is a pickable entry with `Kind: design-first`, and `free-pick` a pickable entry whose kind
-     is `build` or unwritten, so a live check, an evaluation and a decision match no lane, and a
+     is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; not built —
+     TD-323; §4.9b *A live check is a grinder's once its build is live*) — so an evaluation, a
+     decision and a live check whose build is not live match no lane, and a
      ledger with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.
      **An `owner:<word>` in a lane narrows it** (TD-214; built — TD-227 slice 1): with one or more,
