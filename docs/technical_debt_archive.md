@@ -4591,7 +4591,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Why:** a wait returns the mail its wake decision covers, so mail an earlier wait already reported, and the session has not yet read, is not in the next wait's `mail`. That next wait, timing out, prints `[agentorc] nothing unread — end your turn; you are rung when mail lands` and then, from the reply's own count, `[agentorc] you have 1 unread messages — run ao inbox`: two lines that contradict each other, the first one false. Seen 2026-10-05 on a scratch home (TD-057's press): `ao wait` woke on one mail, a second `ao wait --timeout 10` with that mail still unread ended with both lines. The design's rule is *the poll that found nothing*; a session with unread mail has found something, and should read it, not end its turn.
 
-**Resolved:** 2026-10-05 (PR #TBD) — `cmd_wait` prints the end-the-turn line only when the reply's unread count is 0 as well; design §4.10 *Waiting on mail is ending the turn*; pinned by `tests/test_cli.py::test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn`.
+**Resolved:** 2026-10-05 (PR #1093) — `cmd_wait` prints the end-the-turn line only when the reply's unread count is 0 as well; design §4.10 *Waiting on mail is ending the turn*; pinned by `tests/test_cli.py::test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn`.
 
 **Done when:** a timed-out `ao wait` from a session with unread mail prints the unread line and not *nothing unread*; with none it prints the end-the-turn line as today; the suite passes.
 
