@@ -6710,7 +6710,8 @@ person is one of three things, and the envelope says which:
   free a slot an unanswered question holds, and one worker cannot fill the Inbox with questions that
   never lapse. The **FYIs** — every other entry still there: notes, replies, the answered-FYI, a
   closed question — refuse any other send at 1000 in all and 500 from one sender; a person's read
-  marks nothing, so an FYI holds its slot until retention or a Dismiss takes it. Neither stops the
+  marks nothing, so a note or a reply holds its slot until a Dismiss takes it (a closed question
+  ages out with retention, 12 hours after it closed). Neither stops the
   other's sends: a seat whose notes fill its FYIs can still ask, and one whose questions fill
   theirs can still write a note. The refusal names the board and the count that is full.
 - **Steering — a `steer`.** A preference the session can go on without: *I will do X unless you

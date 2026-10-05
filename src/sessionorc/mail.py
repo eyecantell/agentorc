@@ -38,9 +38,10 @@ PERSON_INBOX_DEPTH: int | None = 200  # open questions the person inbox holds be
 # techlead seat's replies to the person were refused for a day with every one of its 20 slots held
 PERSON_SENDER_DEPTH: int | None = 100
 # **FYIs** — every other entry still in the person inbox: notes, replies, the answered-FYI, a closed
-# question — refuse any other send to the person. A person's read marks nothing, so an FYI counts
-# until retention or a Dismiss takes it; until 2026-10-04 they counted against the questions'
-# figures, and a seat's 100 notes stopped its verdicts and escalations reaching the person (Paul).
+# question — refuse any other send to the person. A person's read marks nothing, so a note counts
+# until a Dismiss takes it (a closed question ages out with retention); until 2026-10-04 they
+# counted against the questions' figures, and a seat's 100 notes stopped its verdicts and
+# escalations reaching the person (Paul).
 PERSON_FYI_DEPTH: int | None = 1000  # Paul's figure
 PERSON_FYI_SENDER_DEPTH: int | None = 500  # so one looping sender leaves the others room
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
