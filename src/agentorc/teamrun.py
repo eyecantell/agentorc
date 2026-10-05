@@ -25,6 +25,7 @@ from typing import Any
 from agentorc import org as orgmod
 from agentorc import teams
 from sessionorc import balance as balance_mod
+from sessionorc import hosts
 from sessionorc import ledger as ledger_mod
 from sessionorc.client import AgentError
 from sessionorc.gitinfo import work_left
@@ -963,13 +964,23 @@ def add_member(
     return out
 
 
-def remove_member(call: Call, path: Path, name: str, *, index: int, role: str) -> dict[str, Any]:
+def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, host: str = "") -> dict[str, Any]:
     """**Remove** (design §4.9): the entry's `count:` decremented — the highest-numbered member goes
     — or its line deleted; a live member so removed is sent Wrap up's wind-down, never a kill, and
-    its record stays a card until Forget. A member not live: the definition only."""
-    team = teams.find(orgmod.load(path), name)
+    its record stays a card until Forget. A member not live: the definition only. Under a team that
+    lists flows, the last member of a role a listed flow's stage needs is refused, naming the flow
+    (§4.9c), the file untouched; `host` is where the team's checkout is read."""
+    org = orgmod.load(path)
+    team = teams.find(org, name)
     if not 0 <= index < len(team.members):
         raise teams.TeamError(f"team {name} has no member entry {index + 1} — reload and try again")
+    m = team.members[index]
+    if m.team is None and m.role and team.flows:
+        left = sum(len(x.names()) for x in team.members if x.team is None and x.role == m.role) - 1
+        here = hosts.local_host().name
+        need = teams.flow_needs(org, team, m.role, team.host or host or here, here, files_via(call)) if left < 1 else ""
+        if need:
+            raise teams.TeamError(f"{need} needs a {m.role}: drop {need} from flows: first")
     gone = team.members[index].names()[-1] if team.members[index].team is None else ""
     did = orgmod.edit_members(path, name, remove=index, role=role)
     _commit(call, f"org: {name} {did}")

@@ -2277,6 +2277,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     name,
                     index=int(body.get("index")),
                     role=str(body.get("role") or ""),
+                    host=host_name(),
                 )
             else:
                 raise HTTPException(400, "action is add or remove")

@@ -400,3 +400,48 @@ def test_a_session_started_into_a_team_takes_the_flows_reader(world, tmp_path): 
     assert teams.flow_review(org, team, cfg, "hunter") == (True, None)
     bare = _with(tmp_path, flows=[])
     assert teams.flow_review(bare, bare.teams["ao-grind"], cfg) == (False, None)
+
+
+# ── Members… and Add entry under flows (TD-309 slice 3b) ─────────────────────────────────────────
+
+
+def test_remove_refuses_the_last_member_of_a_role_a_listed_flow_needs(world, tmp_path):  # noqa: F811
+    """§4.9c *Every listed flow must be followable*: **Remove** refuses the last designer while `td`
+    is listed, naming the flow, and leaves the file as it was; a grinder of two goes."""
+    from test_cli_teams import org_doc
+
+    from agentorc import cli, teamrun
+
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = org_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    path = tmp_path / "home" / "org.yml"
+    path.write_text(yaml.safe_dump(doc, default_flow_style=None))
+    before = path.read_text()
+    with pytest.raises(teams.TeamError, match=r"^td needs a designer: drop td from flows: first$"):
+        teamrun.remove_member(cli.call_sync, path, "ao-grind", index=2, role="designer", host=HOST)
+    assert path.read_text() == before
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder", host=HOST)
+    assert got["did"] == "grind count: 2 → 1"
+    with pytest.raises(teams.TeamError, match=r"^build-review needs a grinder"):
+        teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder", host=HOST)
+    # a role no listed flow stages goes, as before
+    assert teamrun.remove_member(cli.call_sync, path, "ao-grind", index=1, role="hunter", host=HOST)["did"] == (
+        "removed hunt"
+    )
+
+
+def test_a_feature_entry_opens_the_flows_design_stage(world, tmp_path):  # noqa: F811
+    """§4.9c item 4: `entries.feature` defaults to the role of the current flow's stage whose lane
+    holds `design-first`; a debt stays the techlead's; the team's own `entries:` wins."""
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    org = _with(tmp_path, flows=["td"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    team = org.teams["ao-grind"]
+    assert teams.entry_role(org, team, "feature", HOST, HOST) == "designer"
+    assert teams.entry_role(org, team, "debt", HOST, HOST) == "techlead"
+    org = _with(tmp_path, flows=["build-review"])
+    assert teams.entry_role(org, org.teams["ao-grind"], "feature", HOST, HOST) == "techlead"  # no design stage
+    org = _with(tmp_path, flows=["td"], entries={"feature": "grinder"})
+    assert teams.entry_role(org, org.teams["ao-grind"], "feature", HOST, HOST) == "grinder"

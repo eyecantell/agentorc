@@ -19,7 +19,7 @@ from sessionorc.models import (
 )
 
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
-from .common import _age
+from .common import _age, host_name
 from .inbox import work_note, work_started
 from .org import compact_line, team_summary
 
@@ -30,10 +30,14 @@ ENTRY_TRIES = 200  # how far the first free number is looked for before the pres
 
 
 def entry_role(org: orgmod.Org, team: str, type_: str) -> str:
-    """The role **Open a session** starts for `type_`: the team's `entries:` word for it, else the
-    techlead; `plain` where no team services the repo (§4.9 *Where there is no seat*)."""
+    """The role **Open a session** starts for `type_`: the team's `entries:` word for it, else, for a
+    feature, its current flow's design stage (§4.9c item 4), else the techlead; `plain` where no team
+    services the repo (§4.9 *Where there is no seat*)."""
     t = org.teams.get(team) if team else None
-    return t.entry_role(type_) if t is not None else "plain"
+    if t is None:
+        return "plain"
+    here = host_name()
+    return teams.entry_role(org, t, type_, t.host or here, here)  # §4.9c item 4: a flow's design stage
 
 
 def entry_line(role: str, name: str, team: str) -> str:

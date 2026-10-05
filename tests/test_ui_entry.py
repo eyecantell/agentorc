@@ -246,3 +246,17 @@ def test_focus_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_o
     assert html.index('data-side="told"') < html.index('data-side="session"')  # above Session
     assert 'data-side="told"' not in page() and 'data-side="told"' not in page(start_context=None)
     assert ">1 line<" in page(start_context="one")
+
+
+def test_under_a_flow_a_feature_opens_its_design_stage(tmp_path, monkeypatch):
+    """§4.9c item 4 (TD-309 slice 3b): with no `entries:` written, a team running `td` opens a
+    feature with the design stage's role — the line under the button says designer — and a debt
+    with the techlead."""
+    world(tmp_path)
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["teams"]["sam-grind"]["flows"] = ["td"]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    c = client(monkeypatch, tmp_path, fake([]))
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "feature"}).json()
+    assert got["role"] == "designer" and "an interactive designer session" in got["line"]
+    assert c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["role"] == "techlead"
