@@ -1689,6 +1689,13 @@ def settings_page():
         '<div class="txt">' + field("editor", "vscode", "the card’s and Focus’s button; none removes it") + '</div>'
         '<div class="txt">' + field("terminal size", "13", "px", 60) + field("terminal face", "JetBrains Mono", "monospace always the fallback · ligatures off", 160) + field("board items shown", "the next 10 per team ▾", "or: only what is past due · due this week · all — what is due is always shown; the rest is under not shown (TD-207)", 190) + '</div>',
         b("Save", "primary"))
+    telegram = card("when you are not looking", "Telegram · TD-092",
+        '<div class="txt">' + field("tell me on Telegram", "on", "one message when a session or a team is stopped until you answer", 50) + '</div>'
+        '<div class="txt">' + field("secrets", "samscrape/prd", "a Doppler project/config — a name; the token is never shown or stored here", 150) + field("link", "http://kmaster:8765", "how your phone reaches this page", 190) + '</div>'
+        '<div class="meta">told: a session waiting on you · a question · a blocked outcome · an identity alarm · a member not restarted · a team with work</div>'
+        '<div class="meta">after a minute, once, and never while a page is visible · no text a session wrote is sent</div>'
+        '<div class="meta">last sent 14:02 · <span class="mono">agentorc · grinder-ao-1 (ao-grind) needs you: permission</span></div>',
+        b("Save", "primary") + b("Cancel") + b("Send a test") + gap + '<span class="muted" style="font-size: 12px;">settings.yml · notify · sent by the home</span>')
     browser = card("this browser", "",
         ro("theme", "dark · the ◐ toggle in the top bar") + ro("mine", "off") + ro("Inbox folds", "FYI open · Answered open") + ro("shell directory", "~"),
         b("Reset this browser", "ghost danger") + gap + '<span class="muted" style="font-size: 12px;">remembered in this browser only</span>')
@@ -1712,8 +1719,8 @@ def settings_page():
   {teams}
   {sec("Repos", 1)}
   {repos}
-  {sec("You", 2)}
-  {you}{browser}
+  {sec("You", 3)}
+  {you}{telegram}{browser}
   {sec("Hosts", 1)}
   {hosts}
   {sec("Profiles", 2)}
