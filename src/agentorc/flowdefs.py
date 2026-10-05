@@ -274,3 +274,33 @@ def cannot_follow(flow: str, team: str, reasons: Collection[str]) -> str:
     """The shared words (§4.9c): *build-review cannot be followed by dc-grind: nothing held — write
     held:, or drop build-review from flows:*."""
     return f"{flow} cannot be followed by {team}: {'; '.join(reasons)}, or drop {flow} from flows:"
+
+
+def path_line(flow: Flow, role: str | None, *, techlead: str = "", held: Collection[str] = ()) -> str:
+    """The `{flow}` text a member of `role` is told (§4.9c item 5): the stages in order by role, its
+    own stage marked, the review stage by its seat's id and the paths held, and the person last with
+    how the team's questions get there — *td: design (designer) → **build** (grinder) → review
+    (techlead-ao-1, on src/sessionorc/**) → you, through techlead-ao-1.* No member's id is in it, so a
+    member added or removed changes no sibling's brief. A role with no stage reads *you stand
+    outside it*."""
+    parts = []
+    for st in flow.stages:
+        who = st.role
+        if st.review:
+            who = ", on ".join(x for x in (techlead or st.role, ", ".join(held)) if x)
+        word = f"**{st.name}**" if st.role == role else st.name
+        parts.append(f"{word} ({who})")
+    route = f"through {techlead}" if techlead else "directly"
+    text = f"{flow.name}: {' → '.join(parts)} → you, {route}."
+    if role is None or flow.stage_of(role) is None:
+        text += " You stand outside it."
+    return text
+
+
+def under(flow: Flow, role: str | None, *, techlead: str = "", held: Collection[str] = ()) -> repoconfig.UnderFlow:
+    """What `Role.compose` fills a member of `role` started under `flow` with: the `{flow}` line and
+    its stage's brief for `{stage}` — none for a role the flow gives no stage."""
+    stage = flow.stage_of(role) if role else None
+    return repoconfig.UnderFlow(
+        text=path_line(flow, role, techlead=techlead, held=held), stage=stage.path if stage else None
+    )

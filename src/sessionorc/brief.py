@@ -12,6 +12,7 @@ git blob sha, which is what the record's `brief.sources` keeps and what the tick
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,10 @@ from sessionorc.models import now_iso
 GIT_TIMEOUT = 10.0
 # origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
+# The package's placeholder shape (design §6 rule 7, §4.9c item 5): lower-case letters between braces.
+PLACEHOLDER_RE = re.compile(r"\{[a-z]+\}")
+# Only a template fills it, so a record whose slots name it was built on a template.
+TEMPLATE_SLOT = "{repo}"
 
 
 class Unreadable(Exception):
@@ -80,13 +85,35 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
     """The prompt `prompt_from` makes now, and `[{path, sha}]` for every file read: `base`, then
     each slot in order by plain replacement of its name — a file's text stripped, `none` when
     empty — then `prefix` in front. `Unreadable` when a file cannot be read or the shape is not
-    one a client hands."""
+    one a client hands.
+
+    A record built on a template (its slots name `{repo}`) whose template has since gained a slot
+    its `slots` do not name — every record written before `{flow}` and `{stage}` existed — is told
+    what it was told before (§6 rule 7, §4.9c): before any slot is filled, each such placeholder in
+    `base`'s own text is filled from the file beside `base` named `<base's stem>.<slot>.md` when
+    there is one (read as merged, a source like any other), else with `none`. Only `base`'s text is
+    read for it, so a brace word that arrives in a slot's text is never touched."""
     base = prompt_from.get("base") if isinstance(prompt_from, dict) else None
     slots = prompt_from.get("slots") if isinstance(prompt_from, dict) else None
     if not isinstance(base, str) or not base or not isinstance(slots, dict):
         raise Unreadable("prompt_from has no base or no slots")
     text, sha = read(base, merged)
     sources = [{"path": base, "sha": sha}]
+    if TEMPLATE_SLOT in slots:
+        for name in dict.fromkeys(PLACEHOLDER_RE.findall(text)):
+            if name in slots:
+                continue
+            beside = Path(base).with_name(f"{Path(base).stem}.{name[1:-1]}.md")
+            # read as every source is — as merged inside a checkout — and one that is not there, there,
+            # is no file beside: `none`, never a guess from the working tree
+            try:
+                got, sha = read(str(beside), merged)
+            except Unreadable:
+                value = "none"
+            else:
+                sources.append({"path": str(beside), "sha": sha})
+                value = got.strip() or "none"
+            text = text.replace(name, value)
     for slot, spec in slots.items():
         if isinstance(spec, dict) and isinstance(spec.get("file"), str):
             got, sha = read(spec["file"], merged)

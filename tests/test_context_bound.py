@@ -41,7 +41,7 @@ def test_the_worker_presets_carry_300k_and_a_layer_can_change_or_remove_it(tmp_p
     got = {n: repoconfig.resolve_role(cfg, n) for n in repoconfig.PRESETS}
     # 300k is the worker presets' own, and the default of every role that sets none (TD-249)
     assert {r.context_bound for r in got.values()} == {300_000}
-    assert {n for n, r in got.items() if r.context_default} == {"manager", "techlead", "plain"}
+    assert {n for n, r in got.items() if r.context_default} == {"manager", "techlead", "designer", "plain"}
     (tmp_path / ".agentorc.yml").write_text(
         "roles:\n  grinder:\n    context: {bound: 400k}\n  hunter:\n    context: none\n"
         "  manager:\n    context: none\n  scribe:\n    brief: docs/scribe.md\n"

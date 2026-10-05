@@ -14,7 +14,15 @@ def test_missing_file_gives_the_defaults(tmp_path):
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
     assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
-    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "auditor", "plain"]
+    assert [r.name for r in repoconfig.roles(cfg)] == [
+        "grinder",
+        "hunter",
+        "manager",
+        "techlead",
+        "auditor",
+        "designer",
+        "plain",
+    ]
 
 
 @pytest.mark.parametrize("key", ["adapter", "worktrees", "anchor"])
@@ -68,6 +76,7 @@ commands:
         "manager",
         "techlead",
         "auditor",
+        "designer",
         "plain",
         "reviewer",
     ]
@@ -123,8 +132,8 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     # design §4.9a *A wind-down is announced* (TD-053 step 5): the note to the person comes before the close (TD-125)
     assert orc.index("ran out of work at <t>. Merged this run") < orc.index("ao close $AGENTORC_SESSION")
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
-    for name in ("grinder", "hunter", "manager"):  # one screen each
-        assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 40
+    for name in ("grinder", "hunter", "manager"):  # one screen each, *The path* section included (§4.9c)
+        assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 45
 
 
 def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
@@ -201,7 +210,8 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     text, made = tl.compose([])
     assert "{entry}" not in text and "## An entry handed to you" in text
     assert repoconfig.entry_text(*(repoconfig.HANDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS)) in text
-    assert list(made["slots"])[:2] == ["{repo}", "{entry}"]  # a replay fills it after the repo's brief
+    # a replay fills it after the repo's brief and the path's two slots (§4.9c)
+    assert list(made["slots"])[:4] == ["{repo}", "{flow}", "{stage}", "{entry}"]
     for name in ("grinder", "hunter", "manager", "auditor"):
         _, made = repoconfig.resolve_role(repoconfig.RepoConfig(), name).compose([])
         assert "{entry}" not in made["slots"]
@@ -227,6 +237,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "manager": "Manager",
         "techlead": "Tech Lead",
         "auditor": "Auditor",
+        "designer": "Designer",
         "plain": "Plain",
     }
     assert "label" in repoconfig.ROLE_KEYS
@@ -259,6 +270,7 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
         "manager": "flag",
         "techlead": "book",
         "auditor": "eye",
+        "designer": None,
         "plain": None,
     }
     assert "icon" in repoconfig.ROLE_KEYS
