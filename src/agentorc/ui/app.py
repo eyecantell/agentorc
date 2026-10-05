@@ -297,6 +297,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     entry_line,
     entry_role,
     entry_teams,
+    flow_head,  # noqa: F401
     ledger_lists,  # noqa: F401
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
@@ -599,6 +600,27 @@ def create_app() -> FastAPI:
             doing = await call("doing_log")
         return repos, doing
 
+    flow_cache: dict[str, Any] = {"flows": {}}
+
+    async def flow_views(sessions: list[dict[str, Any]], org: orgmod.Org | None = None) -> dict[str, Any]:
+        """Each team's `teamrun.flow_view` (§4.9c *What is shown*, *Switching*): read when the Org page
+        is drawn and after an Apply, off the loop, and kept for the deltas — a plan reads files (a
+        node team's over the link), so a delta never reads it. A node draws none: the org is the
+        home's (§4.4a). A failed read keeps the last."""
+        if hosts.is_node():
+            return {}
+        here = host_name()
+
+        def read() -> dict[str, Any]:
+            o = org or org_here()[0]  # fresh, as the page's strip reads it: not the deltas' cached definitions
+            return {n: teamrun.flow_view(rpc, o, n, here, sessions) for n, t in o.teams.items() if t.flows}
+
+        try:
+            flow_cache["flows"] = await asyncio.to_thread(read)
+        except Exception:  # noqa: BLE001 — a read that failed keeps the last; it never costs the page
+            log.debug("the flows read failed; the last reading stands", exc_info=True)
+        return flow_cache["flows"]
+
     async def group_heads(
         known: dict[str, dict[str, Any]],
         repos: Mapping[str, Any] | None = None,
@@ -625,6 +647,7 @@ def create_app() -> FastAPI:
             repos,
             doing,
             await work_marks(),
+            flow_cache["flows"],  # the page load's reading: a delta reads no plan
         )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
@@ -926,6 +949,7 @@ def create_app() -> FastAPI:
         seats_of=seats_of,
         group_heads=group_heads,
         heads=heads,
+        flow_views=flow_views,
         repo_facts=repo_facts,
         identity_info=identity_info,
         person_states=person_states,
@@ -953,7 +977,7 @@ def create_app() -> FastAPI:
 def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The Org page and Focus (design §4.5)."""
     call, seats_of, identity_info, board_items = h.call, h.seats_of, h.identity_info, h.board_items
-    repo_facts, board_view = h.repo_facts, h.board_view
+    repo_facts, board_view, flow_views = h.repo_facts, h.board_view, h.flow_views
 
     @app.get("/", response_class=HTMLResponse)
     async def org(request: Request):
@@ -1028,7 +1052,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": (groups := team_groups(vs, strip["teams"], repos, doing, work)),
+                "groups": (
+                    groups := team_groups(
+                        vs, strip["teams"], repos, doing, work, {} if agent_down else await flow_views(sessions)
+                    )
+                ),
                 "rollup": rollup(groups),
                 "strip": strip,
                 "counts": counts,
@@ -2224,6 +2252,22 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # A failed pre-flight check created nothing (§4.9): the toast is the whole outcome.
             raise _team_http(e) from None
         return JSONResponse({"ok": True, **result})
+
+    @app.post("/api/teams/{name}/flow/apply")
+    async def api_team_flow_apply(name: str):
+        """The team card's **Apply** beside *flow changed* (§4.5a, §4.9c *Switching*; TD-309): what
+        `ao team flow <team> --apply` does — the sit-outs, the starts and the relaunches — a person's
+        own, and not on a node, as Start is not. The flows are read again after it, so the next
+        delta draws what it left."""
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        try:
+            got = await asyncio.to_thread(teamrun.apply, rpc, org, name, host_name())
+        except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
+            raise _team_http(e) from None
+        await h.flow_views(await call("list"), org)
+        return JSONResponse({"ok": True, **got})
 
     # design §4.9 *Add or remove a member from the team card*, §4.5a *team card: Members…* and the
     # *Members dialog* (TD-163, built by TD-172): the one control that edits a definition from the

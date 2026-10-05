@@ -1231,7 +1231,7 @@
   // live), folded with nothing live — and a person's choice, once pressed, wins whatever the team's
   // state becomes (TD-194). *No team* is a section, not a card, and never folds.
   const foldKey = (team) => "fold:" + team;
-  const FOLD_SKIP = "button, a, input, select, textarea, summary, label, .badge, .pill, .helppanel, .answeredmark, .prswaiting";
+  const FOLD_SKIP = "button, a, input, select, textarea, summary, label, .badge, .pill, .helppanel, .answeredmark, .prswaiting, .flowchanged";
   AO.teamFolded = (team, live, get) => !!team && !!get(foldKey(team), !+live);
   const isFolded = (sec) => !!$(".ghead .fold", sec) && AO.teamFolded(sec.dataset.team, sec.dataset.live, store.get);
   function toggleFold(sec) {
@@ -1382,6 +1382,24 @@
     }
     if (b.dataset.confirm && !confirm(b.dataset.confirm + (line ? `\n\n${line}` : ""))) return;
     return teamAct(name, "start", b, false, line);
+  }
+
+  // design §4.5a team card **flow changed — Apply** (§4.9c *Switching*, TD-309): `ao team flow <team>
+  // --apply`'s act, one toast per member it applied, skipped or left with a reader, in its own words
+  async function flowApply(btn) {
+    const name = btn.dataset.flowApply;
+    btn.disabled = true;
+    try {
+      const r = await fetch(`/api/teams/${encodeURIComponent(name)}/flow/apply`, { method: "POST" });
+      let o = {}; try { o = await r.json(); } catch (e) {}
+      if (!r.ok) throw new Error(o.detail || r.statusText);
+      const lines = [...(o.applied || []), ...(o.skipped || []), ...(o.stays || [])].map((d) => d.line);
+      if (!lines.length) AO.toast(`${name}: every live record already matches ${o.flow}`, true);
+      lines.forEach((l) => AO.toast(`${name}: ${l}`, true));
+    } catch (e) {
+      AO.toast(`${name}: ${e.message}`);
+      btn.disabled = false;
+    }
   }
 
   async function teamAct(name, what, btn, anyway = false, lanes = "") {
@@ -2202,6 +2220,8 @@
       if (b) return b.dataset.confirm && !confirm(b.dataset.confirm) ? undefined : teamAct(b.dataset.team, b.dataset.teamAct, b);
       const fa = e.target.closest("[data-forget-all]");
       if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
+      const ap = e.target.closest("[data-flow-apply]");
+      if (ap) return confirm(ap.dataset.confirm) ? flowApply(ap) : undefined;
       const f = e.target.closest("[data-fold]");
       if (f) return toggleFold(f.closest(".tgroup"));
       // the header's row is the fold's mouse target (TD-194): not a press on its controls, links,

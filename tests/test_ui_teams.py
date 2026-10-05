@@ -75,6 +75,8 @@ class Fleet:
             return {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0}
         if method == "identity":  # the teams line's identity note (design §4.8a, TD-077 step 2)
             return {"host": HOST, "mode": "off", "detached_check": False, "tally": {}, "alarms": [], "sessions": {}}
+        if method == "relaunch":  # §4.9c *Switching*: the home's half, kept in the call log (TD-309)
+            return next(s for s in self.sessions if s["id"] == params["id"])
         if method in ("send", "kill", "seen"):
             for s in self.sessions:
                 if s["id"] == params["id"]:
@@ -924,3 +926,59 @@ def test_a_placed_teams_host_registry_is_asked_once_per_ttl_and_a_refusal_is_unk
     while "hung" in common._place_asking and time.monotonic() < deadline:
         time.sleep(0.01)
     assert common.repos_of("hung") == ["/w/sam"]
+
+
+# ── the header's flow (design §4.5a *team groups*, *flow changed — Apply*; §4.9c; TD-309 slice 6b) ──
+
+
+def _flow_org(tmp_path, flows):
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(techlead={"name": "tl-ao"}, flows=flows)
+    write_org(tmp_path, doc)
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+
+
+def _head(html, team="ao-grind"):
+    head = html[html.index(f'<section class="tgroup" data-team="{team}"') :]
+    return head[: head.index('<div class="grid">')]
+
+
+def test_a_teams_header_reads_its_flow_and_strip_and_why_it_cannot_follow_it(world, client):
+    tmp_path, fleet = world
+    _flow_org(tmp_path, ["build-review"])
+    head = _head(client.get("/").text)
+    assert "· flow: build-review — build → review → you, through ao-agentorc-tl-ao</span>" in head
+    assert "flowcannot" not in head and "data-flow-apply" not in head  # stopped: nothing to compare
+    # a team whose current flow needs a role it has none of: the reason, and the flow it could follow
+    _flow_org(tmp_path, ["td", "build-review"])
+    head = _head(client.get("/").text)
+    assert '<div class="meta flowcannot">td cannot be followed by ao-grind: no designer' in head
+    assert "(it could follow build-review)</div>" in head
+    # …and a listed flow that is not the current one, said too
+    _flow_org(tmp_path, ["build-review", "td"])
+    head = _head(client.get("/").text)
+    assert '<div class="meta flowcannot">td cannot be followed by ao-grind: no designer' in head
+    assert "it could follow" not in head
+    # a team that lists no flow says none
+    write_org(tmp_path, org_doc(tmp_path))
+    assert "flow:" not in _head(client.get("/").text)
+
+
+def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunches(world, client):
+    """§4.9c *Switching*: the header compares a live team's records with its current flow when the
+    page is drawn; **Apply** is `ao team flow <team> --apply`, and the flows are read again after it."""
+    tmp_path, fleet = world
+    _flow_org(tmp_path, ["build-review"])
+    fleet.sessions = [
+        {**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []},
+    ]
+    head = _head(client.get("/").text)
+    # the one live member is relaunched, and the ones the flow needs and nobody runs are started
+    assert "grind-1: relaunched — lane none → free-pick; reader none → techlead&#10;" in head
+    assert '<span class="meta flowchanged" title="orc-ao: starts under build-review&#10;' in head
+    assert 'data-flow-apply="ao-grind"' in head and 'data-confirm="Apply build-review to ao-grind? orc-ao:' in head
+    got = client.post("/api/teams/ao-grind/flow/apply").json()
+    assert got["ok"] and {d["name"]: d["act"] for d in got["applied"]}["grind-1"] == "relaunch"
+    (sent,) = [p for m, p in fleet.calls if m == "relaunch"]
+    assert sent["id"] == "ao-agentorc-grind-1" and sorted(sent["launch"]) == ["lane", "prompt", "prompt_from", "review"]
+    assert client.post("/api/teams/nobody/flow/apply").status_code == 400

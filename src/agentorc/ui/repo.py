@@ -190,12 +190,39 @@ def who_for_what(roles: Collection[Mapping[str, Any]], views: Collection[Mapping
     return out
 
 
+def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
+    """A team header's flow (design §4.5a *team groups*, *team card **flow changed — Apply***; §4.9c):
+    `flow`, the current one or "" for a team that lists none; `flow_strip`, its stages and the
+    person; `flow_lines`, what is drawn under the header: a pick that is not one it lists, each listed
+    flow it cannot follow — the current one first, with the flows it could — and a repo not read
+    from here; and `flow_changed`, a live team's members whose records differ from what the flow compiles
+    to, each `{name, act, line}`."""
+    if not fv or not fv.get("flow"):
+        return {"flow": "", "flow_strip": "", "flow_lines": [], "flow_changed": []}
+    rows = list(fv.get("flows") or [])
+    now = next((r for r in rows if r.get("current")), {})
+    lines = [str(fv["flow_note"])] if fv.get("flow_note") else []
+    could = [r["name"] for r in rows if not r.get("current") and not r.get("cannot") and not r.get("unread")]
+    if now.get("cannot"):  # the flow it runs first, with the flows it could follow
+        lines.append(str(now["cannot"]) + (f" (it could follow {', '.join(could)})" if could else ""))
+    lines += [str(r["cannot"]) for r in rows if r.get("cannot") and not r.get("current")]
+    if unread := next((r["unread"] for r in rows if r.get("unread")), ""):
+        lines.append(f"flows not read from here: {unread}")
+    return {
+        "flow": str(fv["flow"]),
+        "flow_strip": str(now.get("strip") or ""),
+        "flow_lines": lines,
+        "flow_changed": list(fv.get("differences") or []) if live else [],
+    }
+
+
 def team_groups(
     views: list[dict[str, Any]],
     rows: Collection[dict[str, Any]] = (),
     repos: Mapping[str, Any] | None = None,
     doing: Mapping[str, Any] | None = None,
     work: Mapping[str, Any] | None = None,
+    flows: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -223,7 +250,11 @@ def team_groups(
 
     `work` is the home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8): a wound-down
     team's header says *n entries waiting since <t>* from its mark, and a live one *started <t> for
-    …* from its records' `restarts` (§4.5a team card **work waiting** note)."""
+    …* from its records' `restarts` (§4.5a team card **work waiting** note).
+
+    `flows` is each team's `teamrun.flow_view`, read when the page was drawn and not per delta
+    (§4.9c *What is shown*): the header's flow and strip, the lines under it while the definition
+    cannot follow its flow, and, on a live team, *flow changed — Apply* (`flow_head`)."""
     defs = {str(r["name"]): r for r in rows}
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
@@ -339,6 +370,8 @@ def team_groups(
                 "unread": sum(int(m.get("unread") or 0) for m in members),
                 # design §4.5a ***i*** mark **who for what** (§4.8, TD-171): whom to write to, by role
                 "who": who_for_what((defs.get(team) or {}).get("roles") or (), views) if team != NO_TEAM else [],
+                # design §4.5a *team groups*: the flow it runs and its strip, and *flow changed — Apply*
+                **flow_head((flows or {}).get(team), live=bool(live) and team in defs),
             }
         )
     # what is running is read first; *No team* is never "stopped" — nothing there starts as one
