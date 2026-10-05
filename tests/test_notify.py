@@ -305,3 +305,13 @@ async def test_a_failed_send_is_kept_on_the_host_read_and_is_no_row(agent, tmp_p
 async def test_the_real_child_without_doppler_says_so(agent, monkeypatch):
     monkeypatch.setenv("PATH", "/nonexistent")
     assert await agent._notify_run("p/c", "x") == "doppler: not installed"
+
+
+async def test_a_child_past_its_time_is_killed_with_its_group(agent, monkeypatch, tmp_path):
+    """The child runs in a group of its own, so a timeout ends Doppler's child as well (review of #1086)."""
+    script = tmp_path / "doppler"
+    script.write_text("#!/bin/sh\nsleep 30 &\nwait\n")
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    monkeypatch.setattr(notify, "CHILD_SECONDS", 0.3)
+    assert await agent._notify_run("p/c", "x") == "no answer in 0.3 s"

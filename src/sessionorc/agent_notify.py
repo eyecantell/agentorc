@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
+import signal
 from datetime import datetime
 from typing import Any
 
@@ -119,6 +121,7 @@ class NotifyMixin:
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,  # its own group: a timeout ends Doppler's child, which holds the token, too
             )
         except FileNotFoundError:
             return "doppler: not installed"
@@ -127,8 +130,8 @@ class NotifyMixin:
         try:
             _, err = await asyncio.wait_for(proc.communicate(text.encode()), notify.CHILD_SECONDS)
         except TimeoutError:
-            with contextlib.suppress(ProcessLookupError):
-                proc.kill()
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(proc.pid, signal.SIGKILL)
             await proc.wait()
             return f"no answer in {notify.CHILD_SECONDS:g} s"
         if proc.returncode == 0:

@@ -7091,7 +7091,8 @@ newly stops a session or a team until they answer.
   afterwards. **A backlog is not told**: a row whose hold ended more than `NOTIFY_LATE` (5 min)
   before the home could tell it — one standing before the switch was turned on, or through a home
   that was down for longer than a restart takes — is never told, so turning the switch on or a
-  long outage sends nothing about rows the person could already have seen.
+  long outage sends nothing about rows the person could already have seen; a row snoozed through
+  that window is not told when the snooze ends either — the snooze was the person's own press.
 - **What a message says: who and what kind, never what a session wrote.** One line from structured
   fields and a link: *agentorc · grinder-ao-1 (ao-grind) needs you: permission*; *… asks you a
   question · TD-229*; *… reports blocked · TD-142*; *identity alarm on …*; *ao-grind: grinder-ao-2
