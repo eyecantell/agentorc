@@ -506,12 +506,15 @@
       // outright, the second adds the page's own first prompt.
       // design §4.5a **Due strip / Inbox board row** → **Reply** (§4.4, TD-142): the mail composer, the
       // line quoted; what it sends is written on the line by `board_reply`. The row stays — a reply
-      // is not Done — and the refresh brings it back with the reply on it.
+      // is not Done — and the refresh brings it back with the reply on it. `refs` are the reader's,
+      // handed as they came: the home mails each live lease holder on one of them (TD-142).
       if (action === "board_reply") {
         const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.text });
         if (!m) return;
+        let refs = [];
+        try { refs = JSON.parse(b.dataset.refs || "[]"); } catch (_) { refs = []; }
         const res = await act("person", "board", {
-          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, reply: m.text,
+          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, reply: m.text, refs,
         });
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
         AO.toast(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
