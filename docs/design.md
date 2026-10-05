@@ -5683,7 +5683,7 @@ name is (§4.9 *The org is an aggregate*) — the org's over a repo's over the p
 overrides a repo's without a PR:
 
 - **the package**: `agentorc/flows/<name>/` for the built-in flows; the built-in roles stay the
-  presets they are (`org.PRESETS`, `agentorc/briefs/<role>.md`), `kind` added to each;
+  presets they are (`repoconfig.PRESETS`, `agentorc/briefs/<role>.md`), `kind` added to each;
 - **the org**: `~/.agentorc/flows/<name>/` and `~/.agentorc/roles/<name>/`, every team's to use, kept
   in the home's history beside the three files it already tracks (§4.9 *What is left at the home has
   a history*), committed by the home as `org.yml` is;
@@ -5814,7 +5814,7 @@ its stage's brief and its repo's supplement, and each says only what the others 
 one only a repo describes: the package ships **`designer.md`**, the mechanics of the seat a repo
 defines today in its own whole brief (the lane, declaring a design, the obvious / steer / ask split
 by mail, merging nothing on a held path), with the template slots; `designer` joins the presets
-(`org.PRESETS`), and §4.8 *Role names* no longer calls it a role a repo defines with its own brief.
+(`repoconfig.PRESETS`), and §4.8 *Role names* no longer calls it a role a repo defines with its own brief.
 **The template wraps a designer only under a flow**: a designer member of a team with no `flows:` is
 started as today, its repo's brief (`roles.designer.brief`, agentorc's `designer-ao-1.md`) the whole
 brief and no template around it, so no team's designer reads its mechanics twice; a team that lists
@@ -6095,7 +6095,7 @@ the held-PR words of its template, no longer does — intended, since under `bui
 the seat answers questions only.
 
 Rejected: **an engine that moves an entry from stage to stage** — the host agent would key on a
-stage, which is a role by another name (§9 invariant 9, §4.8 *capabilities, not roles*), and it
+stage, which is a role by another name (§9 invariant 9; §4.8: roles are only presets over capabilities), and it
 would take the judgement the designer's obvious / steer / ask split and the techlead's filter
 exist for; the facts that end a stage are already read. **A flow per entry** (Paul: per team).
 **Stages merged by key across layers** (two lists have no one merge). **The UI check and escalation
