@@ -1192,7 +1192,12 @@
       sec.dataset.manager = g.manager || "";
       sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
-      if (g.html) {
+      // a header whose **Flow** pick is open or in flight is left as it is until the pick settles
+      // (§4.5a, TD-309): a swap would close the menu, or redraw the old flow under a pick being applied
+      const picking = head && [...head.querySelectorAll("[data-flow-pick]")].some((p) => p.disabled || p === document.activeElement);
+      if (g.html && picking) {
+        // the next delta after the pick draws it
+      } else if (g.html) {
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
         head.innerHTML = g.html;
         AO.applyHelpMarks(head);  // the header's *i* panel comes back as this browser left it
@@ -1399,6 +1404,39 @@
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);
       btn.disabled = false;
+    }
+  }
+
+  // design §4.5a team card **Flow** pick (§4.9c *Switching*, TD-309 slice 4b): what the pick would do
+  // is read first and confirmed — who sits out, starts and is relaunched, and what stays with a reader
+  // — then written and applied; a cancel or a refusal puts the pick back
+  AO.flowWords = (o) => [...(o.differences || []), ...(o.stays || [])].map((d) => d.line);
+  AO.flowAsk = async (name, flow) => {
+    const r = await fetch(`/api/teams/${encodeURIComponent(name)}/flow?flow=${encodeURIComponent(flow)}`);
+    let o = {}; try { o = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error(o.detail || r.statusText);
+    const lines = AO.flowWords(o);
+    return confirm(`Switch ${name} to ${flow}?${lines.length ? " " + lines.join("; ") + "." : " Nothing running changes."}`);
+  };
+  async function flowPick(sel) {
+    const name = sel.dataset.flowPick, flow = sel.value;
+    sel.disabled = true;
+    try {
+      if (!(await AO.flowAsk(name, flow))) { sel.value = sel.dataset.was; return; }
+      const r = await fetch(`/api/teams/${encodeURIComponent(name)}/flow`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ flow }),
+      });
+      let o = {}; try { o = await r.json(); } catch (e) {}
+      if (!r.ok) throw new Error(o.detail || r.statusText);
+      sel.dataset.was = flow;  // written, whether or not it applied: the setting is what the header reads
+      AO.toast(`${name}: flow set to ${flow}`, true);
+      [...(o.applied || []), ...(o.skipped || []), ...(o.stays || [])].forEach((d) => AO.toast(`${name}: ${d.line}`, true));
+      if (o.not_applied) AO.toast(`${name}: ${o.not_applied}`);
+    } catch (e) {
+      sel.value = sel.dataset.was;
+      AO.toast(`${name}: ${e.message}`);
+    } finally {
+      sel.disabled = false;
     }
   }
 
@@ -2210,6 +2248,10 @@
       const f = $("#filter"), q = "team:" + b.dataset.team;
       f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
       layout();
+    });
+    box.addEventListener("change", (e) => {
+      const sel = e.target.closest("[data-flow-pick]");
+      if (sel) flowPick(sel);
     });
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     box.addEventListener("click", (e) => {
@@ -3686,6 +3728,8 @@
         // **balance** (§6 *Balance*): the lines whole, written only when they moved; off is null, an empty field no line
         const row = $(".setbalance", f);
         if (row) { const bal = AO.balanceOf(f); if (JSON.stringify(bal) !== row.dataset.was) body.balance = bal; }
+        // **flow** (§4.9c): written only when the pick moved, and applied at once after the confirm
+        const fl = f.elements.flow; if (fl && fl.value !== fl.dataset.was) body.flow = fl.value;
         return ["teams", body];
       },
       you: (f) => {
@@ -3739,11 +3783,18 @@
       e.preventDefault();
       const [section, body] = forms[f.dataset.section](f);
       try {
-        await post(section, body);
+        // a flow's switch is confirmed first, as the team card's Flow pick is (§4.5a)
+        if (body.flow && !(await AO.flowAsk(body.team, body.flow))) return;
+        const got = await post(section, body);
         drawn(f);
         say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
+        const ap = (got && got.apply) || null;
+        if (ap) [...(ap.applied || []), ...(ap.skipped || []), ...(ap.stays || [])].forEach((d) => AO.toast(`${body.team}: ${d.line}`, true));
+        if (ap && ap.not_applied) AO.toast(`${body.team}: ${ap.not_applied}`);
         if (section === "you" && AO.termChan) { AO.termChan.postMessage(body.terminal); AO.setTermLook(body.terminal); }
-        if (section === "teams") setTimeout(() => location.reload(), 600);  // the stop time is drawn in this host's clock by the server
+        if (ap && f.elements.flow) f.elements.flow.dataset.was = body.flow;  // saved: a second Save does not send it again
+        // the stop time is drawn in this host's clock by the server; a switch's toasts are read first
+        if (section === "teams") setTimeout(() => location.reload(), ap ? 4000 : 600);
       } catch (err) { say(f, err.message, true); }
     });
     page.addEventListener("click", async (e) => {

@@ -221,6 +221,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .ghead .overline { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* **over its line** (§4.5a, TD-239): amber, display only */
 .ghead .notconcluded { flex-basis: 100%; white-space: normal; }  /* its own line under the header */
 .ghead .flowcannot { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* *cannot be followed* (§4.5a, §4.9c): its own line */
+.ghead .flowpick { width: auto; flex: none; height: 26px; display: inline-block; }  /* the **Flow** pick (§4.5a, TD-309): inline, beside the strip */
 .ghead .flowchanged { color: var(--needs-fg); }  /* *flow changed* beside its Apply (§4.5a, TD-309) */
 .helppanel ul.whofor { margin: 0 0 .5em; padding-left: 1.4em; }
 .helppanel p { margin: 0 0 .5em; } .helppanel p:last-child { margin-bottom: 0; }

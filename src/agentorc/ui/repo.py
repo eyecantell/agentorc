@@ -198,7 +198,7 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
     from here; and `flow_changed`, a live team's members whose records differ from what the flow compiles
     to, each `{name, act, line}`."""
     if not fv or not fv.get("flow"):
-        return {"flow": "", "flow_strip": "", "flow_lines": [], "flow_changed": []}
+        return {"flow": "", "flow_strip": "", "flow_lines": [], "flow_changed": [], "flow_picks": []}
     rows = list(fv.get("flows") or [])
     now = next((r for r in rows if r.get("current")), {})
     lines = [str(fv["flow_note"])] if fv.get("flow_note") else []
@@ -213,6 +213,8 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
         "flow_strip": str(now.get("strip") or ""),
         "flow_lines": lines,
         "flow_changed": list(fv.get("differences") or []) if live else [],
+        # the **Flow** pick (§4.5a), on a team that lists more than one: each `{name, current, cannot}`
+        "flow_picks": [{k: r.get(k) for k in ("name", "current", "cannot")} for r in rows] if len(rows) > 1 else [],
     }
 
 

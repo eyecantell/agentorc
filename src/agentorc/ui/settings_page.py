@@ -272,6 +272,7 @@ def team_cards(
     now: datetime | None = None,
     sessions: list[dict[str, Any]] | None = None,
     repos: Mapping[str, Any] | None = None,
+    flows: Mapping[str, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """**Teams** (§4.5 screen 8): a card per team the org defines, with the settings a person
     moves — the schedule (drawn disabled until TD-133), the stop time, the reserve priority,
@@ -279,7 +280,8 @@ def team_cards(
     the `repos` reading) — as `settings.yml` holds them. The stop time is drawn in the
     reader's clock, as `ao team until` takes it; one already past says so. `on_work` is the picker's
     value, `ask` while the key is absent, which `on_work_set` tells apart (*ask me* is then marked
-    *default*)."""
+    *default*). `flows` is each team's `teams.flow_rows`, for the **flow** pick (§4.9c): the current
+    one is `flow`, its strip `flow_strip`."""
     now = now or datetime.now(UTC)
     out = []
     for name, d in defs.items():
@@ -296,6 +298,9 @@ def team_cards(
                 "on_work": t.get("on_work") if t.get("on_work") in settings_mod.ON_WORK else "ask",
                 "on_work_set": t.get("on_work") in settings_mod.ON_WORK,
                 "balance": balance_card(name, t.get("balance"), sessions, repos),
+                "flows": (rows := list((flows or {}).get(name) or [])),
+                "flow": next((r["name"] for r in rows if r.get("current")), ""),
+                "flow_strip": next((r.get("strip") or "" for r in rows if r.get("current")), ""),
             }
         )
     return out
