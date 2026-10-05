@@ -14,6 +14,7 @@ import pytest
 from conftest import park_ticks
 from test_brief_replay import _made_from, _merge, _repo
 
+from agentorc.ending import closer_words
 from sessionorc import paths
 from sessionorc.agent import RESTART_SETTLE
 from sessionorc.agent_common import FLOW_CLAUSE
@@ -74,6 +75,7 @@ async def test_a_relaunch_replaces_the_launch_record_and_the_tick_restarts_on_it
         await agent._keep_running(now)
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["flow"]
+        assert closer_words(rec.view()) == "closed by the tick · flow changed"  # the card says why it closed
         assert new.relaunch is None and new.lane == ["TD-009"] and new.review is None
         assert _launch(sid)["prompt"] == "P\nbase: first TD-9 / lane TD-9\n"  # refilled from the new prompt_from
         _idle(new)

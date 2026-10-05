@@ -1819,8 +1819,8 @@ Screens:
       *closed by you* for a person's — the UI, or `ao` outside a session — *closed by manager-dc-1*
       for a session's (`ao close`, or the per-member close of `ao team stop --close`, run inside
       one), *closed itself* for a session's own, *closed by the tick · <why>* for the home's —
-      *team finished* (§6 rule 9), *for a restart* (rule 2), *brief changed* (rule 7), *seat done*
-      (rule 3) — the tick's four closes; rule 8's start closes nothing, a Start's close of a
+      *team finished* (§6 rule 9), *for a restart* (rule 2), *brief changed* and *flow changed* (rule 7 and its second trigger, §4.9c), *seat done*
+      (rule 3) — the tick's closes; rule 8's start closes nothing, a Start's close of a
       concluded session is the presser's, and a person's Restart closes as the person's — and bare *closed* for a record with no closer (every one written before this,
       a node older than the field, and a person's Close made at the node itself, which the home's copy never
       sees — the hover says those three), the hover adding the time; *restarts exhausted · 3 in 2 h*
