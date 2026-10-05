@@ -1667,7 +1667,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-05 (grinder-ao-2, found pressing TD-099's live check on a scratch home)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — **decided 2026-10-05 (techlead-ao-1's answer to grinder-ao-2's steer, mail `m-354be66e09a0`):** refuse at `teams.plan` a member or manager whose profile's adapter is the shell's, in the words `ao team start`, Start and `ao org check` share, and say so in design §4.9 in the same PR; **and** `Launch.create_params` sends the profile's own adapter, not `profiles.DEFAULT_ADAPTER`, so no record names a profile whose tool it is not running. The test of *an agent's* is `adapter` is not the shell's, as §4.1's anchor rule scopes it, never keyed on a role. A refusal that needs more than `plan` and its three callers is said on that thread first.
 **Location:** `src/agentorc/teams.py` (`Launch.create_params`: `"adapter": profiles.DEFAULT_ADAPTER`), `src/agentorc/profiles.py` (`Profile.adapter`), design §4.2a (a profile names its adapter), §4.9
 
 **Why:** a team definition's member `{role: grinder, profile: sh}`, where `profiles.yml` gives `sh` `adapter: shell`, was started by `ao team start` as a `claude-code` session with the profile `sh` on its record, and sat on Claude Code's first-run screens. Every create a team start makes sends the default adapter whatever the profile says, so the record names a profile whose tool it is not running. The New session form already derives the adapter from the profile (`ui/app.py` `profile_adapter`, TD-284 slice 2); a team start does not.
