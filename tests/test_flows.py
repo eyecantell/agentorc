@@ -188,6 +188,9 @@ def test_an_org_flow_is_found_over_a_repos_and_never_over_a_built_in(tmp_path, m
     assert rows[("hunt", str(org_flow))]["usable"]
     assert "the org's flow hunt" in rows[("hunt", str(tmp_path / "r" / ".agentorc" / "flows" / "hunt"))]["shadowed"]
     assert "built-in's name" in rows[("td", str(flowdefs.org_dir() / "td"))]["shadowed"]
+    (flowdefs.org_dir() / ".hidden").mkdir()
+    (flowdefs.org_dir() / ".hidden" / "flow.yml").write_text("stages: []\n")
+    assert ".hidden" not in {r["name"] for r in flowdefs.visible([])}  # never found, so never listed
 
 
 @pytest.mark.unit
