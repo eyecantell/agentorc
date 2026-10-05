@@ -4303,3 +4303,148 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** the Org walk's row reads as a bold head, a sentence and *details*, with no `**` or backtick on the page.
 
 **Related:** TD-138 (a message's fold), TD-255 (the row's answers), TD-270 (hovers as lists).
+
+## TD-288: A terminal size saved on Settings showed no change in Focus
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Settings, TD-148's look: *No apparent change when changing font size to 17*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`AO.setTermLook`, the `ao-term` BroadcastChannel, `AO.TERM_OPTS`, the terminal's creation with `...AO.TERM_OPTS`, `AO.termFont`, the WebGL addon), `src/agentorc/ui/templates/base.html` (`data-term-size`)
+
+**Why:** the save landed (`person.terminal.size: 17` in `settings.yml`), and the Focus and Settings pages both draw `<body data-term-size="17">`, so the server side holds. What the person saw in Focus was the old size. Unknown which half failed: the open tab's live change (the BroadcastChannel to `setTermLook`, which sets `term.options.fontSize` and refits; with the WebGL renderer the glyph atlas may need clearing), or a fresh load. A fresh load is settled: Playwright (Chromium, 2026-10-02) opened Focus on `entry-1` after the save, and the terminal drew at 17 (`AO.terms[0].term.options.fontSize` 17, the text visibly larger). Left is the open tab's live change, or the tab Paul looked at was not reloaded.
+
+**Resolved:** 2026-10-05 (built by PR #946; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): *Works* — on a scratch home a size of 13→20 reached the open Focus at once, tmux redrew once, and held on reload) — Focus sends the resize from `term.onResize` in `src/agentorc/ui/static/app.js`; pinned by `tests/test_ui_term_look.py`.
+
+**Done when:** a size saved on Settings shows in an open Focus without a reload, and in a freshly loaded one.
+
+**Related:** TD-148 (the Settings page's terminal look), TD-038 (the terminal's face and WebGL).
+
+## TD-166: Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-25 (the designer, from TD-154's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+
+**Location:** `src/agentorc/ui/app.py` (a page route beside Focus's; the editor link's template, §5 *The person's own*), `src/agentorc/ui/templates/`, `src/agentorc/ui/static/app.js` (the Focus header's buttons — VS Code, Open shell here — and `#fexited`), `src/agentorc/ui/static/app.css`.
+
+**Why:** TD-154's *Why*; the page is the reading surface, the raw file is one JSON object per line.
+
+**Resolved:** 2026-10-05 (built by PR #707; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): *Works* — ☰ Transcript, the page's turns, VS Code on the `.jsonl`, no session started) — design §4.5 screen 9 and §4.5a *Focus header* **Transcript**; `src/agentorc/ui/transcript.py`, pinned by `tests/test_ui_transcript.py`. *earlier turns*, offered on no live record at the look, is TD-297's to read.
+
+**Done when** Paul can read the designer's last run from its exited card without a session starting (TD-154's *Done when*), and a live grinder's page shows its last twenty turns while the card still reads `working`.
+
+**Related:** TD-154 (the design), TD-165 (the RPC), TD-095 (the editor button), TD-071 (nothing on a page is a control from what a session wrote), TD-046 (a new tab beside Focus).
+
+## TD-265: Build the closer: who closed a session on its record and its card, the declaration after the ending, the team card's who / how soon / why, and the Start's lane line
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-01 (the designer, TD-262's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_close`: takes `caller`; `_cancel_start` unchanged), `src/sessionorc/agent_tick.py` (every `rpc_close` / `_route_act("close")` of the tick: rules 2, 7, 9, the seat's rule 3, rule 8's start), `src/sessionorc/agent_remote.py` (the close's params to a node), `src/sessionorc/models.py` (`closer`, in `view()`), `src/agentorc/ui/cards.py` (the closed slot and its hover; the declaration after an ending), `src/agentorc/ui/templates/group_head.html` and `src/agentorc/teamrun.py` (`rows`: the wound-down note's closer, run length and reason; `ao team list`), `src/agentorc/cli.py` (`ao status -v`; `ao team start`'s first line), `src/agentorc/ui/org.py` or wherever the Start confirm's text is built, `src/sessionorc/ledger.py` (`lane_matches`), design §4.4, §4.5 row 5 (b), §4.5a **doing**, *wound down* note, team card **Start**, §4.7, §4.9a
+
+**Why:** design §4.5 *The card's anatomy* row 5 (b) and §4.5a (TD-262): on 2026-10-01 dc-grind's manager wound its own team down forty seconds after Paul started it, and every card read *closed by you*; the record keeps when a session closed and not who asked, and the ending hides the declaration that explains it.
+
+**Resolved:** 2026-10-05 (built by PRs #919, #922, #923 and #926; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): *closed by the tick · team finished* works) — the age `ao team list` left off was TD-296 (7), fixed; the other closers and the Start's *Nothing to pick* are TD-297's to read.
+
+**Done when:** a team its manager stops with `ao team stop --close` reads *closed by <manager>* on each member's card and *closed itself* on the manager's, with each declaration after; a person's Close reads *closed by you*; the team card reads *wound down <t> · after 40 s · by <manager> — <why>* for a run under ten minutes; `ao status -v` prints the same words; the Start confirm says what the lanes hold, and a team whose every lane is empty opens the Start anyway / Cancel confirm, `ao team start` stopping at the line without `--anyway`; the tests above pass.
+
+**Related:** TD-262 (the design), TD-241 (*by the tick*), TD-256 (rule 9 reads the same missing fact), TD-259 (the manager on call), TD-095 (the card's anatomy), TD-214 (rule 8 reads the lanes the Start now reads).
+
+## TD-276: Build the on-call controller: the New session form and `ao new --team` name a seat on call, and the empty note's words
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-02 (the designer, TD-269's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (`new`: `control_holders` keeps live holders and adds a record with `seat` that is `exited` or `closed` and holds `control`, marked `on_call`), `src/agentorc/ui/common.py` (`teams_for_form`: `"manager": mid if mid in up else ""` blanks the manager whose record is not live — the fix site for the Team pick), `src/agentorc/ui/templates/new.html` (the picker's label with the grey *◇ on call* pill; the empty note's words), `src/agentorc/ui/static/app.js` (`applyTeam`: ticks `data-manager` — unchanged once the id is handed), `src/agentorc/cli.py` (`_team_defaults`, called by `cmd_new` for `--team`: the `teamrun.live(...)` test on the manager's id is what drops a seat on call), design §4.5a New session **Controllers** and **Team** rows (the note's words are written there; this entry makes them true)
+
+**Why:** design §4.5a New session **Controllers** picker, **Team** picker, §4.9 *A person in the team*, §6 rule 3 (TD-269): since TD-259 every manager is a seat on call — closed until a reading fills it — and the form lists live holders only, so on a team started today Paul picked Team ao-grind and read *No session holds the control grant yet*; a person's session joined that way had no controller, and the manager that filled the seat later did not gain it. A seat's grant and its id survive the close (rule 3), so the seat's id is the right controller from the start.
+
+**Resolved:** 2026-10-05 (built by PR #914; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): the on-call pill and note work) — the Team pick that left the manager unticked when the form opened on another repo was TD-296 (8), fixed.
+
+**Done when:** on a team started today, picking it under Team ticks *manager-ao-1 · on call*, the session starts with the seat's id in `controllers`, and the manager that next fills the seat can act on it (`ao status -v` shows it under `members:`).
+
+**Related:** TD-269 (the design), TD-173 (the Team field), TD-259 (the manager on call), TD-160 (a person's own session inside a team), TD-097 (a seat's card), TD-036 (membership).
+
+## TD-284: Build the reworked New session form
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-02 (the designer, TD-277's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/new.html` (the form), `src/agentorc/ui/static/app.js` (`AO.newSession`: occupancy, the Project and Team narrowing, the Role refresh, `applyTeam`), `src/agentorc/ui/app.py` (the page's context: hosts, repos, profiles with their adapters, roles; `/api/roles`, `/api/name_check`, a new `/api/dir_check` and a worktree listing per repo), `src/agentorc/ui/common.py` (`teams_for_form`), design §4.5a New session **the reworked form**, mockup `docs/mockups/NewSessionReworked.dc.html`
+
+**Why:** design §4.5 screen 3 *The form reworked as one thing* and §4.5a New session **the reworked form** (TD-277): the form asked for its fields in the order the code grew them — Adapter and Profile both picking the tool, a Directory asked even for a new worktree, Until and At on every session, a warning block on every visit — and Paul's nine notes on the page say what a person starting a session meets.
+
+**Resolved:** 2026-10-05 (built by PRs #945, #948, #949, #950, #951, #952 and #953; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): the order, all four kinds, Resume with changes… and At/Until work) — the upper-case option labels and a non-git directory offering a worktree were TD-296 (3), fixed; another host's directory was TD-293, built by TD-294.
+
+**Done when:** the New session page matches `NewSessionReworked.dc.html` field for field, a session of each kind — interactive, a role unattended, a role under the person, a shell in a plain directory — starts from it, and Resume with changes… still lands on it filled in.
+
+**Related:** TD-277 (the design), TD-269 / TD-276 (a seat on call as controller), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume with changes…), TD-160 (a person's own session inside a team).
+
+## TD-281: Three frictions on the Inbox's board rows
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox: *it is unclear to me what this is saying* of *Board, coming up*; *The "Whats needed" box should be multiple lines and scrollable*; *after a pull i had to do a hard refresh to see the reply button enabled (it could be i did not wait long enough)*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/inbox.html` (the horizon box), `src/agentorc/ui/templates/board_add.html` (`#batext`, an `<input>`: *one line*), `src/agentorc/ui/inbox.py` (`BOARD_TTL`, the fetching read), `src/agentorc/ui/templates/settings.html` (*board items shown*)
+
+**Why:** (1) *Board, coming up (n)* · *not counted* lists rows not yet due, by Settings → You → *board items shown* (*the next n per team*, *only what is past due*, *due this week*, *all*), but the heading names neither the setting nor that these are not due; an item put on the board for tomorrow lands there, which is right and reads as a misfile. (2) **Put on the board**'s *what's needed* is a one-line input, so a line of any length is read through a slit. (3) After a pull, a row's Reply stayed grey (*on origin, not in this checkout yet*) until a hard reload; the board read is cached `BOARD_TTL` (60 s) with a fetching read behind it, so it may have been the wait, and it may be the poll keeping the old row.
+
+**Resolved:** 2026-10-05 (built by PR #939; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): *Works* — the heading and its Settings link, the box that grows and scrolls) — Ctrl+Enter and the origin row turning live are TD-297's to read.
+
+**Done when:** each of the three reads as the fix says, (3) either reproduced and fixed or recorded here as the wait.
+
+**Related:** TD-220 (the horizon), TD-140 (Put on the board), TD-221 (rows read from origin).
+
+## TD-286: The Settings page's cards: Save with nothing changed, no Cancel, an unlabelled Open file, a *when work appears* that explains one choice
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Settings, TD-148's look: *the save button should be disabled unless a change is actually made to a value. Should we have a cancel button?*; *the "open file" is present but it's not clear what setting it is next to*; *Lets make sure the "start the team" setting is described as an option then the user is asked*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/settings.html` (each card's form and Save; the file card's foot, *§4.5a Open file*; the team card's `on_work` select and its note), `src/agentorc/ui/static/app.js` (the page's forms), design §4.5a *Settings page*
+
+**Why:** (1) every card's **Save** is pressable on a card nobody touched, so the person cannot tell from the button whether anything is unsaved, and a typo has no way back but retyping. (2) A team card ends with a row reading */home/kmaster/.agentorc/org.yml · read by the clients on every use; never the host agent · defined by hand* and **Open file**, below the Save row: it reads as one more setting, not as *where this card's values live*. (3) *when work appears* offers three choices, *ask me* (*(default)* while unset), *start the team* and *do nothing*, and its note follows the pick (for *ask me*: *wound down, an Inbox row asks when its lanes gain entries*), so the person reads what the other two would do only by picking them.
+
+**Resolved:** 2026-10-05 (built by PR #955; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): Save greyed until a change, and Cancel's restore, work) — Cancel drawn always was TD-296 (2), fixed.
+
+**Done when:** a card shows Save and Cancel only once a value changes, each card says which file its values live in, and *when work appears* describes all three choices.
+
+**Related:** TD-148 (the Settings page), TD-227 (*when work appears*), TD-277 (the New session form's rework, the same habit of fields that explain one case).
+
+## TD-287: The Settings page draws no usage chip in the top bar
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of Settings: *I noticed the usage line is not shown in the settings header — is that on purpose?*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (the Settings page's context passes `"usage": {}` to `base.html`'s `usage_chip`; three other pages pass the same), `src/agentorc/ui/templates/base.html` (`#usagechip`)
+
+**Why:** the top bar is the same bar on every page, and the chip is how a person sees the account's window at a glance; on Settings, where the reserves are set against that reading, it is gone. Nothing in the design says Settings drops it; the empty `usage` reads as a page that never asked.
+
+**Resolved:** 2026-10-05 (built by PR #956; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): *Works* on every page, one reading and one hover) — the server-drawn pages' `52.0%` against the Org's `52%` was TD-296 (1), fixed.
+
+**Done when:** Settings' top bar carries the usage chip as the Org's does, and every page that omits it has a stated reason.
+
+**Related:** TD-122 (the usage chip), TD-233 (its age), TD-148 (the Settings page).
