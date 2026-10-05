@@ -821,15 +821,16 @@ def create_app() -> FastAPI:
         fleet = await call("list")
         return await person_inbox(fleet), await person_states(fleet)
 
-    async def person_inbox(fleet: list[dict[str, Any]]) -> dict[str, Any]:
+    async def person_inbox(fleet: list[dict[str, Any]], watching: bool = False) -> dict[str, Any]:
         """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
         caller and no id — **a person's read, which sets no `read_at`**, because a person is not
         the session. That is what lets the Inbox page poll it every few seconds without marking
         anything read and without freeing a depth slot an unanswered question still holds; it is
         the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
         sender gets the name it is known by, and `from_open` the id **Open** goes to while that
-        record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
-        got = await call("inbox")
+        record still exists (§4.5 screen 6: a row opens the session that needs the person).
+        `watching`: the read is from a visible page, which the home keeps (§4.10 *Looking*, TD-319)."""
+        got = await call("inbox", watching=True) if watching else await call("inbox")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
         records = {o.get("id"): o for o in fleet}
         # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board is the sender's
@@ -2698,7 +2699,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         press refreshes."""
         try:
             fleet = await call("list")  # person_view's one list, kept for the board's *waiting on* (TD-305)
-            got, states = await h.person_inbox(fleet), await h.person_states(fleet)
+            watching = request.query_params.get("watching") == "1"  # the page is visible (§4.10, TD-319)
+            got, states = await h.person_inbox(fleet, watching=watching), await h.person_states(fleet)
         except HTTPException as e:
             if e.status_code != 503:
                 raise

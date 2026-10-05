@@ -293,6 +293,8 @@ class HostAgent(
         # (on the attention store) is what keeps a standing row from being told twice
         self._notify_sent: list[datetime] = []
         self._notify_last: dict[str, Any] = {}
+        self._notify_quiet_until: datetime | None = None  # after the burst's *and more*, nothing until then
+        self._notify_watched_at: datetime | None = None  # the last person's read from a visible page
         self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
         self._id_host_dirty = False  # counts moved since the last write; the tick writes them
         self.identity_tally: dict[str, int] = defaultdict(int)

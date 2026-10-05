@@ -30,6 +30,7 @@ HOLD = timedelta(seconds=60)  # NOTIFY_HOLD: a row is told once it has stood thi
 LATE = timedelta(minutes=5)
 BURST = 6  # NOTIFY_BURST: messages in BURST_WINDOW; the next reads MORE, and then nothing until it clears
 BURST_WINDOW = timedelta(minutes=10)
+WATCHED = timedelta(minutes=2)  # NOTIFY_WATCHED: a hold ending this soon after a visible page's read is not told
 CHILD_SECONDS = 30.0  # the child's whole life, doppler's start included
 PREFIX = "agentorc"
 MORE = f"{PREFIX} · and more need you — open the Inbox"
@@ -51,6 +52,26 @@ def state_line(name: str, team: str, kind: str) -> str:
 def ask_line(name: str, team: str, ref: str) -> str:
     """An open `ask` in the person inbox: *agentorc · grinder-ao-1 (ao-grind) asks you a question · TD-229*."""
     return f"{PREFIX} · {_who(name, team)} asks you a question" + (f" · {ref}" if ref else "")
+
+
+def blocked_line(name: str, team: str, ref: str) -> str:
+    """An outcome reported `blocked`: *agentorc · grinder-ao-1 (ao-grind) reports blocked · TD-142*."""
+    return f"{PREFIX} · {_who(name, team)} reports blocked" + (f" · {ref}" if ref else "")
+
+
+def restart_line(name: str, team: str) -> str:
+    """A record the tick could not restart: *agentorc · ao-grind: grinder-ao-2 was not restarted*."""
+    return f"{PREFIX} · {team + ': ' if team else ''}{name} was not restarted"
+
+
+def work_line(team: str, n: int) -> str:
+    """A wound-down team whose lanes gained work: *agentorc · cm-grind wound down and has work: 3 entries*."""
+    return f"{PREFIX} · {team} wound down and has work: {n} entr{'y' if n == 1 else 'ies'}"
+
+
+def test_line(home: str) -> str:
+    """**Send a test**: *agentorc · a test from kmaster*."""
+    return f"{PREFIX} · a test from {home}"
 
 
 def alarm_line(name: str, team: str) -> str:

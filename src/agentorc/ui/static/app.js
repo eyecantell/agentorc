@@ -766,7 +766,8 @@
   AO.refreshInboxCount = async function () {
     let got;
     try {
-      const r = await fetch("/api/person/inbox");
+      // a visible page says so (§4.10 *Told on Telegram*, *Looking*): a row on a screen is not told
+      const r = await fetch(document.visibilityState === "visible" ? "/api/person/inbox?watching=1" : "/api/person/inbox");
       if (!r.ok) return null;
       got = await r.json();
     } catch (e) { return null; }
