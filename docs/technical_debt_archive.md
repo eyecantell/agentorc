@@ -3965,4 +3965,4 @@ Both go away only when the record says who closed it.
 
 **Related:** TD-095 (the mode on a card, and *interactive* standing out), TD-075 (the techlead seat), §9 invariant 5.
 
-**Resolved:** 2026-10-05 (built by PR #492; live check held, recorded in the PR that archived it) — design §4.5 screen 2 and §4.5a's Focus header rows (the mode toggle, **Hand back**) carry it; `src/agentorc/ui/templates/focus.html` and `cards.py`.
+**Resolved:** 2026-10-05 (built by PR #492; live check held: PR #1069) — design §4.5 screen 2 and §4.5a's Focus header rows (the mode toggle, **Hand back**) carry it; `src/agentorc/ui/templates/focus.html` and `cards.py`.
