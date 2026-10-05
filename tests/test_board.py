@@ -442,6 +442,9 @@ async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agen
         "message"
     ].startswith("agentorc: reply on")
     assert origin_board(repo).splitlines()[6].endswith(": rebase it")
+    async with LocalClient() as me:  # no holder: no mail, and the trail line is still owed (§4.5a)
+        trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
+    assert [t["how"] for t in trail] == ["written on the board"]
 
 
 def test_board_refs_are_named_as_a_lease_names_them():
@@ -481,6 +484,10 @@ async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, t
             assert notes[0]["text"].startswith("board: Merged, live check pending: the doorbell.\n\n")
             assert notes[0]["text"].endswith(": rebase it")
         assert not [e for e in (await me.call("inbox", id=idle))["entries"] if e["from"] == "person"]
+        # the trail says what the result says (§4.5a *Inbox board row → Reply*): one entry, no record
+        trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
+        assert len(trail) == 1 and trail[0]["how"] == got["note"] and trail[0]["sid"] == ""
+        assert trail[0]["name"] == repo.name and trail[0]["text"].endswith(": rebase it")
         for sid in (h, both, idle):
             await me.call("kill", id=sid)
 
@@ -838,10 +845,27 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
         got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="and push", refs=["TD-122"])
         assert got["note"] == "written on the board · sent to holder (holds TD-122)"
-        assert [(n, p["head"], p["reply"], c) for n, p, c in forwarded] == [
-            ("board_reply_hand", "Merged, live check pending: the doorbell.", "and push", None)
+        assert [(n, p["head"], p["reply"], p["repo"], c) for n, p, c in forwarded] == [
+            ("board_reply_hand", "Merged, live check pending: the doorbell.", "and push", repo.name, None)
         ]
         assert not [e for e in agent.sessions[h].inbox if e.from_ == "person"]  # the node's store untouched
+        # the trail is the home's too (§4.10): handed over with no refs as well, never written here
+        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
+        await agent.rpc_board_reply(board=path, line=7, text=line, reply="thanks", refs=[])
+        assert forwarded[-1][1]["refs"] == [] and forwarded[-1][1]["repo"] == repo.name
+        assert not [t for t in agent.trail if t["kind"] == "board reply"]
+
+        async def broken(rid, name, params, caller):
+            return {"id": rid, "error": "link dropped"}
+
+        monkeypatch.setattr(agent, "_forward", broken)  # a failed hand with nobody to mail: nothing to say
+        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
+        got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="once more", refs=[])
+        assert got["note"] == "written on the board"
+        monkeypatch.setitem(agent.home_link, "up", False)  # down, and nobody to mail: nothing to say
+        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
+        got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="again", refs=None)
+        assert got["note"] == "written on the board"
         monkeypatch.setattr(agent, "mode", "home")
         await me.call("kill", id=h)
 
@@ -855,3 +879,14 @@ def test_a_merge_that_landed_though_the_forge_said_otherwise_is_a_landed_edit(re
     assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
     board.write_back(repo, 8, ITEM, "done")
     assert f"- [x] {ITEM}" in origin_board(repo)
+
+
+async def test_the_home_writes_the_trail_line_a_node_handed_it(agent):
+    """`board_reply_hand` with `repo` (a node's Reply, §4.4a): the home writes the trail line in the
+    result's words, holder or none — the trail is the home's, beside the person inbox (§4.10)."""
+    got = await agent.rpc_board_reply_hand(head="A line.", by="Paul", reply="go on", refs=["TD-999"], repo="cm")
+    assert got == {"sent": [], "refused": []}
+    t = next(t for t in agent.trail if t["kind"] == "board reply")
+    assert (t["name"], t["sid"], t["how"], t["text"]) == ("cm", "", "written on the board", "A line. — Paul: go on")
+    await agent.rpc_board_reply_hand(head="B", by="Paul", reply="x", refs=["TD-999"])  # no repo: no line
+    assert len([t for t in agent.trail if t["kind"] == "board reply"]) == 1

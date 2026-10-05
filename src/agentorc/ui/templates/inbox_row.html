@@ -215,17 +215,22 @@
    control but **Dismiss**, and `resolved: <how>` is a mark. #}
 {% macro trail(e, section) -%}
 <div class="row gap wrap mhead">
-  {%- if e.sid %}<span class="ref" title="{{ e.sid }}">{{ e.name or e.sid }}</span>{% endif %}
+  {%- if e.sid %}<span class="ref" title="{{ e.sid }}">{{ e.name or e.sid }}</span>
+  {%- elif e.name %}<span class="ref" title="the repo whose board was replied on">{{ e.name }}</span>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-trail">trail</span>
-  <span class="st">resolved: {{ e.how or 'resolved' }}</span>
+  <span class="st">{% if e.kind == 'board reply' %}replied: {{ e.how }}{% else %}resolved: {{ e.how or 'resolved' }}{% endif %}</span>
   {%- if e.count and e.count > 1 %} <span class="st">&times;{{ e.count }}</span>{% endif %}
   <span class="grow"></span>
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 {%- if e.text %}<div class="body">{{ e.text }}</div>{% endif %}
 <div class="row gap wrap mfoot">
+  {%- if e.kind == 'board reply' %}
+  <span class="st">you replied on the board; the line stays open until it is carried out</span>
+  {%- else %}
   <span class="st">it was a <b>{{ e.kind }}</b> row{% if e.for_words %}, up for {{ e.for_words }}{% endif %} — it left the Inbox without you answering it, so it is here</span>
+  {%- endif %}
   <span class="grow"></span>
   {{ put_btn(e) }}
   <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}">Dismiss</button>
