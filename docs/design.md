@@ -3689,6 +3689,39 @@ manager controls.** Prior art: [ADR 2026-09-12](decisions/2026-09-12-orchestrato
   `set_grants`: a person at a terminal or the UI always may; a session only if it already
   controls that target. Control is handed on, never seized.
 
+**A person's own act is a named RPC, and the gate is one list (TD-108; the build is TD-317).**
+Some RPCs are a person's and no session's, whatever grant or membership the session holds: the
+person's bookkeeping on their Inbox (`inbox_delete`, `inbox_snooze`, `inbox_hand`, `inbox_dismiss`,
+`attention_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it`, and the `thread` read), an
+identity alarm's answers (`identity_ack`, `identity_log`, `suspend`), the board and the ledger from
+the page (`board_edit`, `board_reply`, `board_reply_hand`, `entry_add`), the home's settings and
+definitions (`settings`, `set_settings`, `commit_defs`), and the presses that start, clear or undo
+(`promote`, `clear_promote`, `clear_work`, `clear_mark`, `restart`, `forget_host`).
+
+- **Each keeps its own wire name.** There is no one `inbox_act {entry, action}`: a method's name is
+  what routes it. §4.4a's offline table and its sets (`HOME_EDITS`, `MAILBOX`,
+  `PERSON_NODE_BOUND`), §4.8a's `READS` and the link's `act` method all key on the name, and these
+  acts do not share a route — `suspend` and `identity_log` are home edits, the pause and the snooze
+  travel with the mailbox, `identity_ack` is run at the node that owns the alarm, `inbox_dismiss`
+  and `attention_snooze` are served where they are asked. One name for them would make every one of
+  those tables key on a pair, to save nothing a caller sees.
+- **What they share is the gate, and it is written once.** `PERSON_ONLY`, beside `is_person` in
+  `sessionorc/mail.py`, is the one list of these RPCs, and each begins with the same check, which
+  refuses a session in one shape: who called, what it may not do, and the section that says why.
+  **The check runs in the RPC, never in the dispatcher**: an act the home hands a node by the link's
+  `act` method does not pass the dispatcher, and its person-only check must still run there (§4.4a
+  *Acts across the link*). A test holds the list and the code to each other in both directions — an
+  RPC in the list that serves a session fails it, and so does an RPC that makes the check and is
+  not in the list — so a new person's act is one name added and cannot be forgotten.
+- **What is not in the list.** An RPC a person *or* a grant holder may call (`host_files`), an
+  acting RPC (the grant and the membership above), and an RPC with one branch that is the person's
+  (`inbox` naming another record, `msg` to a person inbox): those keep their own rules.
+- **The gate is as strong as the host's mode** (§4.8a): under `observe` or `off` a session that
+  leaves its `caller` out is the person to every RPC in the list.
+- **One exception is designed and not built** (§4.8a *Who answers first*): `identity_ack` and
+  `suspend` admit a team's techlead for one record of its team. When it is built the two leave the
+  list for a rule of their own, as `host_files` has, and the list's test is unchanged.
+
 **A session's round log: `ao log`, never a commit (TD-175; built — TD-191).** Paul, at a manager's card reading *18 unpushed*: *is making round-by-round commits on the
 manager's branch the right design?* It was not: the manager template's round step appended one line
 per round to a file on its launch branch and committed it — a save-point branch by another name, a
