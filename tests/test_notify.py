@@ -458,3 +458,27 @@ def test_notify_test_is_a_persons_and_the_homes():
     from sessionorc import mail, modes
 
     assert "notify_test" in mail.PERSON_ONLY and "notify_test" in modes.HOME_EDITS
+
+
+async def test_a_dismissed_restart_row_and_a_handed_entrys_blocked_outcome(agent, sent, tmp_path):
+    """Review of #1092: the restart row's Dismiss (`dismissed:<mark at>`) is that row gone, as the page
+    reads it; a handed entry's `blocked` outcome sits on the holder's copy and is counted, so it is told."""
+    _on(link="")
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="exited", since=_z(t0))
+    s.restart_ceiling = {"at": _z(t0), "count": 3}
+    agent.attention_snoozed[f"{s.id}|restart"] = f"dismissed:{_z(t0)}"
+    h = _session(agent, tmp_path, sid="ao-x-seat", name="seat-x", state="idle", since=_z(t0))
+    e = MailEntry(
+        id="m-h1", from_="person", to=[h.id], at=_z(t0 - timedelta(hours=1)), kind="ask", text="w", about="TD-077"
+    )
+    e.handed = True
+    e.outcome = {"state": "blocked", "text": "no access", "at": _z(t0), "by": h.id}
+    h.inbox.append(e)
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        assert [t for _, t in sent] == ["agentorc · seat-x (x-grind) reports blocked · TD-077"]
+    finally:
+        agent.attention_snoozed.clear()
+        agent.sessions.pop(s.id, None)
+        agent.sessions.pop(h.id, None)

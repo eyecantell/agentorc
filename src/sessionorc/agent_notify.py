@@ -29,8 +29,9 @@ class _Row:
     began: str
     line: str
     link: str  # the Inbox's row key, or a mail id when `mail`
-    snooze: str  # the attention store's snooze key, or a mail id when `mail`
+    snooze: str  # the attention store's snooze key; for `mail`, the mail id
     mail: bool = False
+    until: str | None = None  # a mail row's own `snoozed_until`, read where the entry is kept
 
 
 def _restart_at(s: Any) -> str:
@@ -83,12 +84,24 @@ class NotifyMixin:
             name, team = (s.name or e.from_, s.team or "") if s is not None else (e.from_, e.team or "")
             ref = reference_of(e.about) or ""
             if e.kind == "ask" and e.open:
-                rows[e.id] = _Row(e.passed_up or e.at, notify.ask_line(name, team, ref), e.id, e.id, mail=True)
+                line = notify.ask_line(name, team, ref)
+                rows[e.id] = _Row(e.passed_up or e.at, line, e.id, e.id, mail=True, until=e.snoozed_until)
             outcome = e.outcome or {}
             if outcome.get("state") == "blocked":
-                k = f"blocked:{e.id}"
                 line = notify.blocked_line(name, team, ref)
-                rows[k] = _Row(str(outcome.get("at") or ""), line, e.id, e.id, mail=True)
+                rows[f"blocked:{e.id}"] = _Row(
+                    str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until
+                )
+        # work the person handed a session (§4.10 *An entry handed to a seat*): its one copy is the
+        # holder's, and the Inbox counts it under Needs you once it comes back `blocked`
+        for addr, r in graph.items():
+            for e in r.inbox:
+                outcome = e.outcome or {}
+                if e.handed_entry and outcome.get("state") == "blocked":
+                    line = notify.blocked_line(r.name or addr, r.team or "", reference_of(e.about) or "")
+                    rows[f"blocked:{e.id}"] = _Row(
+                        str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until
+                    )
         doc = settings_mod.load()
         on_work = {name: t.get("on_work") for name, t in settings_mod.teams(doc).items()}
         for team, rec in (self._host_rec.get("teams") or {}).items():
@@ -101,12 +114,12 @@ class NotifyMixin:
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:
-        if row.mail:
-            until = next((e.snoozed_until for e in self.person_inbox if e.id == row.snooze), None)
-        else:
-            until = self.attention_snoozed.get(row.snooze)
+        until = row.until if row.mail else self.attention_snoozed.get(row.snooze)
         if not until:
             return False
+        if until.startswith("dismissed:"):
+            # the restart row's **Dismiss** (§4.5a, TD-103): that one mark's row is gone, as the page reads it
+            return until == f"dismissed:{row.began}"
         with contextlib.suppress(ValueError, TypeError):
             return _parse(until) > now
         return False
