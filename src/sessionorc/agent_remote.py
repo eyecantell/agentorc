@@ -243,11 +243,11 @@ class RemoteMixin:
         return {"host": host, **(seen if isinstance(seen, dict) else {"dir": dir, "exists": False})}
 
     async def rpc_host_repos(self, host: str) -> dict[str, Any]:
-        """The checkouts `host`'s registry lists (design §4.9 *Where a repo's team lands*, TD-229 slice
-        3): a repo-defined team that no `place:` names and this host's registry does not hold lands
-        on the one linked node whose registry does, and the clients ask each node here. A read, as
-        `host_dir` is: paths, never a file's text. `{host, repos}`; an unreachable node is refused
-        in words, never queued."""
+        """The checkouts `host`'s registry lists (design §4.9 *Where a repo's team lands* and *A
+        definition is read at the home*, TD-229 slice 3, TD-318): the clients ask it for the path of
+        a team's checkout on the host `place:` puts it on, and `ao org` for the repos a linked node
+        holds that the home does not. A read, as `host_dir` is: paths, never a file's text.
+        `{host, repos}`; an unreachable node is refused in words, never queued."""
         if host == self.host:
             return {"host": host, "repos": await asyncio.to_thread(lambda: hosts.local_host().repos())}
         mux = self._node_mux(host)
