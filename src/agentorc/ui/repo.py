@@ -37,7 +37,9 @@ def entry_role(org: orgmod.Org, team: str, type_: str) -> str:
     if t is None:
         return "plain"
     here = host_name()
-    return teams.entry_role(org, t, type_, t.host or here, here)  # §4.9c item 4: a flow's design stage
+    # §4.9c item 4: a flow's design stage. Read from this host's disk: a team on a node whose checkout
+    # is not here reads no flow and opens the techlead, unless its `entries:` says otherwise
+    return teams.entry_role(org, t, type_, t.host or here, here)
 
 
 def entry_line(role: str, name: str, team: str) -> str:
