@@ -95,7 +95,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slice 1 built |
-| TD-327 | A timed-out `ao wait` says *nothing unread — end your turn* while mail an earlier wait reported is still unread | Low | Open |
 | TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Host half built |
 | TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
@@ -1662,24 +1661,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** on a scratch home with the switch on, a session going `needs-you` with no page open produces exactly one recorded send after the hold, whose link opens the Inbox on that row; with a page visible it produces none; and the suite passes. **Then a live check that is Paul's** (it needs the Doppler config's name saved on the Settings page and his phone): **Send a test** arrives, and one real `needs-you` reaches him once — TD-092 archives on that.
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
-
-## TD-327: A timed-out `ao wait` says *nothing unread — end your turn* while mail an earlier wait reported is still unread
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-1, found pressing TD-057's live check on a scratch home)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/cli.py` (`cmd_wait`: `if not changed and not mail: end_the_turn_line(args)`; `end_the_turn_line`, `END_THE_TURN`), design §4.10 *Waiting on mail is ending the turn* (TD-153)
-
-**Why:** a wait returns the mail its wake decision covers, so mail an earlier wait already reported, and the session has not yet read, is not in the next wait's `mail`. That next wait, timing out, prints `[agentorc] nothing unread — end your turn; you are rung when mail lands` and then, from the reply's own count, `[agentorc] you have 1 unread messages — run ao inbox`: two lines that contradict each other, the first one false. Seen 2026-10-05 on a scratch home (TD-057's press): `ao wait` woke on one mail, a second `ao wait --timeout 10` with that mail still unread ended with both lines. The design's rule is *the poll that found nothing*; a session with unread mail has found something, and should read it, not end its turn.
-
-**Fix:** `cmd_wait` prints the end-the-turn line only when the reply's unread count is 0 as well (`clientmod.last_mail`, which `unread_line` reads); `ao inbox --unread` with no entries is unread 0 by definition and is unchanged. A test in `tests/` beside TD-153's: a wait that times out with unread mail prints the unread line alone.
-
-**Done when:** a timed-out `ao wait` from a session with unread mail prints the unread line and not *nothing unread*; with none it prints the end-the-turn line as today; the suite passes.
-
-**Related:** TD-153 (the line), TD-057 (where it was seen), design §4.10.
 
 ## TD-328: A scheduled record takes Switch to interactive and Kill as if it were live
 

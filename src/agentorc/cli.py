@@ -158,7 +158,9 @@ def cmd_wait(args: argparse.Namespace) -> int:
             print(f"mail: {len(mail)} new from {who} — run ao inbox")
 
     rc = emit(args, got, prose)
-    if not changed and not mail:
+    # mail an earlier wait reported is in no later wait's `mail`, but still unread: the unread line says so,
+    # and *nothing unread* would contradict it (TD-327)
+    if not changed and not mail and not (clientmod.last_mail or {}).get("unread"):
         end_the_turn_line(args)
     return rc
 
