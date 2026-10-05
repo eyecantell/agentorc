@@ -26,6 +26,7 @@ from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc.agent_common import (
     BRIEF_CLAUSE,
+    FLOW_CLAUSE,
     NODE_READS,
     PUSH_OPEN,
     RpcError,
@@ -275,7 +276,9 @@ class ServeMixin:
             over = context_over_text({"context": s.context, "context_bound": s.context_bound}) if s else ""
             # and rule 7's clause (TD-217 slice 4): a member whose brief changed is not interrupted either
             declared = s is not None and (s.restart_wanted or s.out_of_work or s.seat is not None)
-            changed = BRIEF_CLAUSE if s is not None and s.brief_changed and not declared else ""
+            changed = ""
+            if s is not None and not declared:
+                changed = BRIEF_CLAUSE if s.brief_changed else FLOW_CLAUSE if s.relaunch else ""
             # and rule 10's clause (TD-258): an open PR of its own fails the cadence check
             failing = cadence_mod.clause(s.checks) if s is not None and s.supervised and s.seat is None else ""
             # and rule 11's (TD-258): a held PR of its own merged without its read — said once, on

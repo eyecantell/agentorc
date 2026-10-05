@@ -137,6 +137,7 @@ PERSON_ONLY = frozenset(
         "clear_work",
         "clear_mark",
         "restart",
+        "relaunch",
         "notify_test",
         "forget_host",
     }

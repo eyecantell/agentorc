@@ -67,6 +67,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     FILL_CEILING,  # noqa: F401
     FILL_WINDOW,  # noqa: F401
     FINISHED_SETTLE,  # noqa: F401
+    FLOW_CLAUSE,  # noqa: F401
     GIT_EVERY,  # noqa: F401
     HOME_EDITS,  # noqa: F401
     ID_RECHECK,  # noqa: F401
@@ -82,6 +83,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     PASTE_SHOW_SECONDS,  # noqa: F401
     PRUNE_EVERY,  # noqa: F401
     PUSH_OPEN,  # noqa: F401
+    RELAUNCH_KEYS,
     REMOVED_GUARD_SECONDS,  # noqa: F401
     REPORT_EVERY,  # noqa: F401
     REPORT_WRITE,  # noqa: F401
@@ -1492,6 +1494,57 @@ class HostAgent(
         log.info("%s restarted by the person from its launch record", self._address(new))
         return self._view(new)
 
+    async def rpc_relaunch(self, id: str, launch: dict[str, Any] | None = None, caller: Any = None) -> dict[str, Any]:
+        """A person's Apply, one member (design §4.9c *Switching*, TD-309 slice 5): the client composed
+        the member under the team's current flow and hands its launch here — `prompt`, `prompt_from`,
+        `lane`, `review` (`RELAUNCH_KEYS`), each replaced as handed and an absent one removed, the rest
+        of the launch record standing. The home writes it as the record's launch record, re-records
+        `brief` from the new `prompt_from` as a create does, clears `brief_changed`, and marks the record
+        `relaunch: {at}`, which rule 7 reads as its second trigger (`why: flow`): every replay reads the
+        new record, and a create under the name clears the mark. **A person's own**, refused to a
+        session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`); never an interactive
+        session, and never one with no launch record. Nothing is touched before every check passes;
+        the reply is the record."""
+        agent_common.person_only(caller, "relaunch a session", "§4.9c")
+        if self.mode != "home":
+            raise RpcError("relaunch runs at the home (design §4.9c): this host is a node")
+        s = self._find(id)
+        rule = "(design §4.9c *Switching*)"
+        if not isinstance(launch, dict):
+            raise RpcError(f"relaunch needs the member's composed launch {rule}")
+        stray = sorted(k for k in launch if k not in RELAUNCH_KEYS)
+        if stray:
+            raise RpcError(f"a relaunch replaces {', '.join(RELAUNCH_KEYS)} alone, not {', '.join(stray)} {rule}")
+        kinds = {"prompt": str, "prompt_from": dict, "lane": list, "review": dict}
+        for k, v in launch.items():
+            if v is not None and not isinstance(v, kinds[k]):
+                raise RpcError(f"a relaunch's {k} is a {kinds[k].__name__}, not {type(v).__name__} {rule}")
+        if not s.unattended:
+            raise RpcError(f"{s.name} is interactive: its lane and brief are the person's, never relaunched {rule}")
+        if s.superseded_by:
+            raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to relaunch {rule}")
+        address = self._address(s)
+        try:
+            if not s.supervised:
+                raise RpcError("not supervised")
+            params = self._read_launch(address)
+        except RpcError:
+            raise RpcError(f"{s.name} has no launch record, so there is nothing to relaunch {rule}") from None
+        for k in RELAUNCH_KEYS:
+            params.pop(k, None)
+        params.update({k: v for k, v in launch.items() if v is not None})
+        made = params.get("prompt_from")
+        # a node member's files are that host's, which rule 7 never reads here (as the replay)
+        read = await asyncio.to_thread(brief.record, made, False) if made and s.host == self.host else None
+        self._write_launch(address, s, params)
+        s.brief, s.brief_changed = read, None
+        self._brief_differs.pop(s.id, None)
+        s.relaunch = {"at": now_iso()}
+        self._save(s)
+        await self._push_changes()
+        log.info("%s relaunched by the person: its launch record replaced", address)
+        return self._view(s)
+
     def _restart_check(self, s: Session, now: datetime) -> dict[str, Any]:
         """`restart`'s refusals, each by name (design §6 rule 2 *A person's restart*), and the launch
         record as `create`'s arguments when none applies. Nothing is changed here."""
@@ -2198,9 +2251,10 @@ class HostAgent(
             # reported new work is not one that never began, and one that reports only what an
             # earlier run did, or leaves a claim a third time, is the person's whenever it says so.
             # A restart its changed brief asked for (§6 rule 7) is neither: the run is not over on
-            # its own account, and rule 2 is what brings the new brief
+            # its own account, and rule 2 is what brings the new brief; nor is one its team's changed flow
+            # asked for (§4.9c *Switching*)
             reading = agent_common._restart_reading(s, datetime.now(UTC))
-            if s.brief_changed:
+            if s.brief_changed or s.relaunch:
                 reading = {"early": False, "repeat": None, "words": None}
             if reading["early"]:
                 mark["early"] = True

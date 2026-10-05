@@ -42,6 +42,8 @@ from sessionorc.mail import self_decide_refusal
 # clears are the home's; a node's member is closed and created from the home, over the link.
 # **`clear_mark`** (§4.5a, §6 rules 10 and 11, TD-258): Dismiss on the two rows writes `checks` and
 # `held_missed`, which the home owns on every record, a node's member's too.
+# **`relaunch`** (§4.9c *Switching*, TD-309 slice 5): the launch record it replaces and the mark it writes
+# are the home's, a node member's too.
 # **`notify_test`** (§4.10 *Told on Telegram*, TD-319): only the home sends, so a node's Send a test is
 # sent from the home.
 HOME_EDITS = frozenset(
@@ -62,6 +64,7 @@ HOME_EDITS = frozenset(
         "clear_mark",
         "commit_defs",
         "restart",
+        "relaunch",
         "notify_test",
     }
 )
