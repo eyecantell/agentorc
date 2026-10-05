@@ -77,6 +77,9 @@ def test_drop_is_behind_more_on_in_progress_claims_and_its_confirm_names_the_cos
     assert "v.git.branch" not in body  # the checked-out branch may be another claim's
     assert '$("#reportsmenu").innerHTML = drops.map' in body and '$("#reportsmore").hidden = !drops.length' in body
     assert "claimed · in review ${prLink(p.review_pr)}" in body
+    # TD-325: a claim still held prints its merged slices after it, each a link from the field
+    assert '(p.status === "claimed" && p.slices)' in body and "· slices ${sl.map((x) => prLink(x.pr))" in body
+    assert "${st}${slices}${why}" in body
     assert body.count('data-act="drop"') == 1  # only the menu's; the rows carry no control
 
 
