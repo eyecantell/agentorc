@@ -861,6 +861,11 @@ def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, mon
         assert c.get("/api/person/inbox").json()["needs"] == 2 and reads == ["plain"]
         c.get("/api/person/inbox")
         c.get("/api/person/inbox")
+        # the fetch is a task on the app's loop, so it may not have reached its thread yet
+        for _ in range(100):
+            if len(reads) > 1:
+                break
+            threading.Event().wait(0.02)
         assert reads == ["plain", "fetch"]  # one fetching read, the requests answered meanwhile
         r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 3, "text": "answered"})
         assert r.status_code == 200 and reads == ["plain", "fetch", board]
