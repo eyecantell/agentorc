@@ -1584,7 +1584,17 @@ nodes:
   `ao host rebuild <name>` rebuilds the image on purpose; `ao host forget <name>` is the removal
   path a runtime needs that a machine does not — it removes the container, the link directory and
   the `nodes:` entry, closes the host's records at the home as a closed session is kept, and keeps
-  `~/.agentorc/nodes/<name>/` (the run logs, invariant 3) unless told `--purge`. `volatile: true`
+  `~/.agentorc/nodes/<name>/` (the run logs, invariant 3) unless told `--purge`. Both end every
+  session in the container, so **neither ends a live one without being told to**: before the
+  container is touched each asks the home for the node's records that are not `exited` or
+  `closed`, and with any it refuses, exits non-zero and names them by team, the container left as
+  it was. With none it goes on as above. Two ways on: `--wind-down` runs `ao team stop` for each
+  team with a session there (the wrap-up prompt and its wait, §4.9a), closes each session on the
+  node that then settled clean and pushed, and goes on once the node holds no live record — it
+  refuses before sending anything when a session there carries no team or is a person's, and
+  refuses after, naming them, when one is left open; `--force` is the old behaviour said aloud,
+  printing the sessions it ended. A home it cannot reach is a refusal too, since the check cannot
+  be made; `--force` still goes on. `ao host up` needs neither: it reuses the container. `volatile: true`
   is right for one the person stops: the supervisor then never starts the container itself — a
   stopped, paused or gone one is *left as the person left it* on the card — and still starts the
   agent inside a running one.

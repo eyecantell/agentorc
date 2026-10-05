@@ -788,6 +788,24 @@ def reach(n: ContainerNode, cid: str, user: str, name: str = "") -> dict[str, st
     return out
 
 
+ENDED = ("exited", "closed")
+
+
+def live_on_node(records: list[dict[str, Any]], name: str) -> list[dict[str, Any]]:
+    """The home's records on node `name` that a rebuild or a forget would end (§4.4a, TD-316):
+    every one not `exited` or `closed` — an idle session is a live tmux session all the same."""
+    return [s for s in records if s.get("host") == name and s.get("state") not in ENDED]
+
+
+def by_team(records: list[dict[str, Any]]) -> str:
+    """`team ao-grind: a (working), b (idle); no team: c (idle)` — how a refusal names them."""
+    groups: dict[str, list[str]] = {}
+    for s in records:
+        team = f"team {s['team']}" if s.get("team") else "no team"
+        groups.setdefault(team, []).append(f"{s.get('name') or s['id']} ({s.get('state')})")
+    return "; ".join(f"{k}: {', '.join(v)}" for k, v in sorted(groups.items()))
+
+
 def host_forget(name: str, r: Runner | None = None, *, purge: bool = False) -> dict[str, Any]:
     """Remove the container, the link directory and the `nodes:` entry; keep the node's volume
     (its run logs, invariant 3) unless `purge`. Closing the host's records at the home is the
