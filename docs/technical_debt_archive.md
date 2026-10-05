@@ -4558,6 +4558,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Done when:** §4.5a's New session rows describe the reworked form, Paul has looked at the mockup, and the build entries are on the ledger with a `Blocked by:` line.
 
-**Resolved:** 2026-10-05 (designed 2026-10-02, PR #934, on Paul's *Go with the form as drawn*; built by TD-284, PRs #945, #948, #949, #950, #951, #952 and #953; its live look closed 2026-10-03 (PR #971) and it was archived in PR #1087: the order, all four kinds, *Resume with changes…* and At / Until seen) — design §4.5 screen 3 *The form reworked as one thing*, §4.5a New session **the reworked form**.
+**Resolved:** 2026-10-05 (designed 2026-10-02, PR #934, on Paul's *Go with the form as drawn*; built by TD-284, PRs #945, #948, #949, #950, #951, #952 and #953; its live look closed 2026-10-03 (PR #971) and it was archived in PR #1087: the order, all four kinds, *Resume with changes…* and At / Until seen) — design §4.5 screen 3 *New session*, §4.5a New session **the form**.
 
 **Related:** TD-269 and TD-276 (the Team pick and a seat on call as controller: the same form), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume lands on this form filled in), TD-160 (a person's own session inside a team).
