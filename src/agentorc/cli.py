@@ -787,6 +787,7 @@ def cmd_org(args: argparse.Namespace) -> int:
             list(hosts.nodes()),
             files=teamrun.files_via(call_sync),
             settings=settings_mod.read(),
+            repos_of=teamrun.repos_via(call_sync),
         )
 
         def verdict() -> None:
@@ -801,7 +802,16 @@ def cmd_org(args: argparse.Namespace) -> int:
 
         emit(args, got, verdict)
         return 0 if got["ok"] else 1
-    got = {**orgcheck.view(org, here, roots=hosts.local_host().repos()), "notes": notes}
+    got = {
+        **orgcheck.view(
+            org,
+            here,
+            roots=hosts.local_host().repos(),
+            linked=list(hosts.nodes()),
+            repos_of=teamrun.repos_via(call_sync),
+        ),
+        "notes": notes,
+    }
 
     def prose() -> None:
         rows = got["teams"]
@@ -832,6 +842,11 @@ def cmd_org(args: argparse.Namespace) -> int:
         for f in rem["files"]:
             state = "not there" if not f["exists"] else (f["commit"] or ("not committed yet" if rem["tree"] else ""))
             print(f"  {f['name']:<{fw}}  {state}".rstrip())
+        # a repo only a node holds defines nothing the org sees (§4.9 *A definition is read at the home*)
+        for row in got["held_elsewhere"]:
+            print(orgcheck.held_line(row, here))
+        for note in got["unread"]:
+            print(f"note: {note}")
 
     return emit(args, got, prose)
 

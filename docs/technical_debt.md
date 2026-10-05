@@ -1649,7 +1649,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-04 (the designer, from TD-229's open question)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built — PR #TBD: the landing rule's two clauses, `orgcheck.held_elsewhere` in `ao org` and its check, the design marks. Left: `rpc_host_repos`'s docstring (a held file), reworded when next touched.
 **Location:** `src/agentorc/org.py` (`landing`, `_land`), `src/agentorc/orgcheck.py` (`view`, `check`), `src/agentorc/cli.py` (`cmd_org`), `tests/test_org.py`, `tests/test_cli_org.py`; design §4.9 *A definition is read at the home, and only there* and *Where a repo's team lands*, §4.7 `ao org`.
 
 **Why:** TD-229's build left a question: `org.landing` holds a clause, *else the one linked node whose registry does*, that is tested and that no client reaches, because every definition is read from a checkout in the home's registry. The design now says a definition is read at the home and only there, so the clause is dead code that describes a rule the design does not have; and a repo a node holds that the home does not is silent today, where the person should be told its teams are not read.

@@ -45,7 +45,8 @@ def repo(root: Path, teams: dict | None = None) -> Path:
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     """A temp home with `org.yml` and `profiles.yml`, a registry of two checkouts (`alpha` defines
-    a team, `beta` none), no node, and an agent that answers nothing — a check needs none."""
+    a team, `beta` none), one linked node `devenv` whose registry is empty, and an agent that
+    answers nothing else — a check needs nothing else."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("AGENTORC_HOME", str(home))
@@ -68,6 +69,8 @@ def world(tmp_path, monkeypatch):
     (home / "org.yml").write_text(yaml.safe_dump(org))
 
     def no_agent(method, **params):
+        if method == "host_repos" and params.get("host") == "devenv":
+            return {"repos": []}  # the linked node holds nothing the home does not (TD-318)
         raise cli.AgentError(f"unknown method: {method}")
 
     monkeypatch.setattr(cli, "call_sync", no_agent)
@@ -261,3 +264,35 @@ def test_a_place_on_a_host_whose_registry_cannot_be_asked_is_one_lack_not_two(wo
     code, got = check(capsys)
     assert code == 1 and len(got["lacks"]) == 1
     assert "`place:` puts it on mars, whose registry could not be read" in got["lacks"][0]
+
+
+def test_a_repo_held_only_on_a_node_is_listed_and_warned_of_and_an_unread_registry_said(world, capsys, monkeypatch):
+    """§4.9 *A definition is read at the home, and only there* (TD-318): a repo a linked node's
+    registry holds that the home's does not is listed by `ao org` and warned of by its check, which
+    still exits 0; a node whose registry cannot be read is said so, never read as holding nothing."""
+    tmp_path, _, _ = world
+    regs = {"devenv": ["/workspaces/sam", "/workspaces/alpha", "/w/sam"]}
+
+    def agent(method, **params):
+        if method == "host_repos" and params.get("host") in regs:
+            return {"repos": regs[params["host"]]}
+        raise cli.AgentError(f"unknown method: {method}")
+
+    monkeypatch.setattr(cli, "call_sync", agent)
+    line = f"sam — held only on devenv: its .agentorc.yml is not read; register a checkout at {HOST}"
+    code, got = check(capsys)
+    assert (code, got["warnings"]) == (0, [line])  # alpha is held here too; sam is said once
+    assert cli.main(["--json", "org"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["held_elsewhere"] == [{"host": "devenv", "repo": "sam", "path": "/workspaces/sam"}]
+    assert got["unread"] == []
+    assert cli.main(["org"]) == 0
+    assert line in capsys.readouterr().out
+    # the node does not answer: one note, and nothing read as held nowhere
+    regs.clear()
+    code, got = check(capsys)
+    assert code == 0 and len(got["warnings"]) == 1
+    assert got["warnings"][0].startswith("devenv: its registry could not be read (")
+    assert cli.main(["org"]) == 0
+    out = capsys.readouterr().out
+    assert "note: devenv: its registry could not be read (" in out and "held only on" not in out

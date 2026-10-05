@@ -3348,13 +3348,13 @@ aggregate it (§4.9 *The org is an aggregate*): each team with its source file, 
 it lands on and why (*place*, *registered here*), a shadowed or twice-named
 team said so; then the remainder's files with their last commit, and each repo a linked node's
 registry holds that the home's does not (*held only on `<node>`*, §4.9 *A definition is read at the
-home*; not built — TD-318). **`ao org check`** is the same
+home*; built — TD-318, `orgcheck.held_elsewhere`; a node whose registry cannot be read is a note). **`ao org check`** is the same
 reading as a verdict, exit 1 when something is lacking, each lack on a line: a registered
 checkout that is not there, a team whose role names a profile `profiles.yml` does not hold, a
 brief that is not in the checkout, a name defined twice, a team whose definition names one session twice (TD-268), a `place:` naming no linked host, a
 team in `settings.yml` that no definition names (a repo renamed its team); and, as warnings
 that do not fail it, a registered checkout off its default branch or holding changes, and a repo
-held only on a node (TD-318). Once flows
+held only on a node, or a linked registry that could not be read (TD-318). Once flows
 are built (§4.9c, TD-309), `ao org` also lists every flow the org can see with its source and
 whether each is usable, `ao org check` fails on a flow that is not usable (a stage brief missing, a
 role that does not resolve, a lane word unknown, two stages of one role) and on a team listing a flow
@@ -4518,14 +4518,14 @@ repo. The org a client sees is the union:
   sat on a laptop would leave the org each time the laptop slept, taking its card and the
   settings keyed on its name with it. `ao org` lists such a repo under its node — *held only
   on `<node>`: its .agentorc.yml is not read; register a checkout at `<home>`* — and `ao org
-  check` warns in those words (§4.7; not built — TD-318), from the node's registry, which the
+  check` warns in those words (§4.7; built — TD-318), from the node's registry, which the
   home's `host_repos {host}` RPC returns through the node's `repos` link method (a read like
   `host_dir`; built, TD-229 slice 3's host-agent half). A node whose registry cannot be read
   is *unknown*, said as a note, never *holds nothing more*.
 - **Where a repo's team lands**: `place:` when it names the team; else this host, whose
   registry holds the repo because the definition was read from it (`org.landing`, applied by
   `org.with_repos`; the clause *else the one linked node whose registry does* is taken out of
-  the rule and, by TD-318, of the code). A team `place:`
+  the rule and, by TD-318, of the code: `landing` has the two clauses). A team `place:`
   puts on another host takes that host as its `host:`, and the repo's path there is the one
   entry of that host's registry with the checkout's name (the CLI asks at each read, the pages
   keep the answer five seconds and wait two for it, a slower host reading as unknown until it
