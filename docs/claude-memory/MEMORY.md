@@ -40,3 +40,4 @@
 - [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write; never chain `git commit` after an edit script
 - [Never count the unread inbox](never-count-the-unread-inbox.md) — `ao inbox --unread` marks entries read; save it to a file, never pipe it through `jq length`; check open questions from the full inbox before stopping
 - [Stop a scratch home by its pid](stop-a-scratch-home-by-its-pid.md) — `pkill -f`/`pgrep -f` on look_home args kills the tool's own shell; `ps | grep '[l]ook…'`, then kill the number
+- [Designer run lessons 2026-10-04](designer-run-lessons-2026-10-04.md) — a history line goes above a section's newest lines, never at its tail; re-check the build number at the merge; no checkout while a reviewer reads the worktree
