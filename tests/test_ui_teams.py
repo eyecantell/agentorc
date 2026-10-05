@@ -1064,3 +1064,51 @@ def test_a_pick_written_and_not_applied_says_so_and_is_no_refusal(world, client,
     assert got.json()["not_applied"] == (
         "flow set to build, but not applied — kmaster is not answering: Apply on the team card tries again"
     )
+
+
+def test_a_members_flow_mark_says_what_a_switch_did_or_left_on_it(monkeypatch):
+    """§4.5a *flow changed — Apply*'s member marks (§4.9c *Switching*, TD-309): *sits out under
+    <flow>* winding down or closed for it, *— close it yourself* on a person's session, *flow changed*
+    on a node member Apply skipped, and the node's own words on an idle one relaunched."""
+    from agentorc.ui import cards
+
+    monkeypatch.setattr(cards, "FLOWS", {"t": "build"})
+    monkeypatch.setattr(cards, "FLOW_ACTS", {"p": "left", "n@devenv": "relaunch"})
+    mark = lambda **s: (cards.flow_mark({"team": "t", **s}, here="kmaster") or {}).get("text")  # noqa: E731
+    assert mark(id="d", sit_out={"at": "x"}) == "sits out under build"
+    assert mark(id="d", state="closed", closed_for={"why": "sit_out"}) == "sits out under build"
+    assert mark(id="p") == "sits out under build — close it yourself"
+    assert mark(id="n@devenv", host="devenv", state="unreachable") == "flow changed"  # Apply skipped it
+    assert mark(id="n@devenv", host="devenv", state="idle") is None  # Apply reaches it: nothing to keep
+    monkeypatch.setitem(cards.FLOW_ACTS, "d", "start")
+    assert mark(id="d", state="closed", closed_for={"why": "sit_out"}) is None  # the flow starts it again
+    del cards.FLOW_ACTS["d"]
+    # winding down is what it does, ahead of its doing line; the other marks only where none stands
+    v = {"state": "working", "pending": {}, "doing": {"text": "pushing", "age": ""}, "ready_ok": False}
+    v.update(out_of_work=None, restart_wanted=None, waiting=None, open_work=None, seat=None, brief_changed=None)
+    sat = {"text": "sits out under build", "full": "x", "first": True}
+    assert cards.card_slot({**v, "flow_mark": sat})["text"] == "sits out under build"
+    assert cards.card_slot({**v, "flow_mark": {"text": "flow changed", "full": "x"}})["text"] == "pushing"
+    assert mark(id="n2@devenv", host="devenv", relaunch={"at": "x"}, state="idle") == cards.NODE_RESTART
+    assert mark(id="n2@devenv", host="devenv", relaunch={"at": "x"}, state="working") is None  # it is told
+    assert mark(id="h", host="kmaster", relaunch={"at": "x"}, state="idle") is None  # the home's tick restarts it
+    assert mark(id="h") is None
+
+
+def test_a_member_closed_for_a_sit_out_keeps_its_card_saying_so(world, client):
+    tmp_path, fleet = world
+    _flow_org(tmp_path, ["build-review"])
+    rec = {**badged("ao-agentorc-designer", "ao-grind", state="closed"), "name": "designer", "tail": []}
+    rec.update(closed_for={"why": "sit_out"}, closer={"by": "tick", "why": "sit_out"})
+    fleet.sessions = [rec, {**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    html = client.get("/").text
+    assert "sits out under build-review" in html and "its card stays until Forget · closed by the tick" in html
+    # …and a person's session the flow sits out, live: on its compact line, since nothing winds it down
+    _flow_org(tmp_path, ["build-review", "td"])
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(techlead={"name": "tl-ao"}, flows=["build-review", "td"])
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "des"})
+    write_org(tmp_path, doc)
+    me = {**badged("ao-agentorc-des", "ao-grind", state="idle", unattended=False), "name": "des", "tail": []}
+    fleet.sessions = [me, {**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    assert "interactive · sits out under build-review — close it yourself" in client.get("/").text

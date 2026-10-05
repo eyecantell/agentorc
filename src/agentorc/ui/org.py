@@ -330,7 +330,8 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
 
 def compact_line(v: dict[str, Any]) -> str:
     """A compact card's one line of its own (§4.5a *card: compact*): the seat's *last came*, an
-    ending, the role and its claim with the PR, what it says it is doing, or the role alone."""
+    ending, a flow's mark (*sits out under build*), the role and its claim with the PR, what it says
+    it is doing, or the role alone."""
     role = str(v.get("role_label") or v.get("role") or ("interactive" if not v.get("unattended") else ""))
     slot = v.get("slot") or {}
     if v.get("seat"):
@@ -339,6 +340,9 @@ def compact_line(v: dict[str, Any]) -> str:
         # an ending, and the last reference after it with its PR's mark (TD-193): *Grinder · exited ·
         # TD-066 → #158 merged*, so a wound-down team's cards say what each member left
         what = " · ".join(x for x in (str(slot.get("text") or v.get("state") or ""), v.get("report_ref") or "") if x)
+    elif isinstance(v.get("flow_mark"), dict) and str(v["flow_mark"]["text"]).startswith("sits out"):
+        # what a switch did or left on it (§4.5a, TD-309): a node's longer marks leave its claim the line
+        what = str(v["flow_mark"]["text"])
     else:
         claims = [p for p in v.get("progress") or [] if isinstance(p, dict) and p.get("status") == "claimed"]
         doing = (v.get("doing") or {}).get("text") if isinstance(v.get("doing"), dict) else ""

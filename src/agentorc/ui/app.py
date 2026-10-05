@@ -40,6 +40,7 @@ from sessionorc.models import (
     stop_note,
 )
 
+from . import cards as cards_mod
 from . import help as helpmod
 from . import inbox as inbox_mod
 from . import settings_page as setmod
@@ -49,7 +50,10 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     COUNT_ORDER,  # noqa: F401
     DEAD,  # noqa: F401
     DEFS_TTL,  # noqa: F401
+    FLOW_ACTS,  # noqa: F401
+    FLOWS,  # noqa: F401
     NO_TEAM,  # noqa: F401
+    NODE_RESTART,  # noqa: F401
     _clock,  # noqa: F401
     _count,  # noqa: F401
     _declared,  # noqa: F401
@@ -63,6 +67,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     card_order,  # noqa: F401
     card_slot,  # noqa: F401
     closed_keep,  # noqa: F401
+    flow_mark,  # noqa: F401
     gated_view,  # noqa: F401
     group_place,  # noqa: F401
     next_act,  # noqa: F401
@@ -626,7 +631,16 @@ def create_app() -> FastAPI:
             flow_cache["flows"] = await asyncio.to_thread(read)
         except Exception:  # noqa: BLE001 — a read that failed keeps the last; it never costs the page
             log.debug("the flows read failed; the last reading stands", exc_info=True)
-        return flow_cache["flows"]
+        # what every card a delta draws reads of it (`cards.flow_mark`): the flow by team, the acts by id
+        got = flow_cache["flows"]
+        cards_mod.FLOWS.clear()
+        cards_mod.FLOWS.update({n: str(v["flow"]) for n, v in got.items() if v.get("flow")})
+        cards_mod.FLOW_ACTS.clear()
+        for v in got.values():
+            for d in v.get("differences") or []:
+                if d.get("id"):
+                    cards_mod.FLOW_ACTS[str(d["id"])] = str(d.get("act") or "")
+        return got
 
     async def group_heads(
         known: dict[str, dict[str, Any]],
@@ -1023,6 +1037,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         seats = await seats_of(sessions)
         repos, doing = ({}, {}) if agent_down else await repo_facts()
         waits = waits_of(entries)  # what each card waits on, from the inbox read above (§4.5a, TD-274)
+        # the teams' flows before the cards: a member's flow mark reads them (`cards.flow_mark`)
+        flows = {} if agent_down else await flow_views(sessions)
         vs = sorted(
             (view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions), key=card_order
         )
@@ -1059,11 +1075,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": (
-                    groups := team_groups(
-                        vs, strip["teams"], repos, doing, work, {} if agent_down else await flow_views(sessions)
-                    )
-                ),
+                "groups": (groups := team_groups(vs, strip["teams"], repos, doing, work, flows)),
                 "rollup": rollup(groups),
                 "strip": strip,
                 "counts": counts,
