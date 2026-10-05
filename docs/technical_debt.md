@@ -132,9 +132,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-316 | `ao host rebuild` replaces a node's container and ends the team sessions inside without a word: refuse, or wind the team down first | Medium | Open |
 | TD-317 | Build the person-only gate: `mail.PERSON_ONLY`, one check opening each of the 25 RPCs, the test that holds list and code together; and move `agent_wake.py`'s passengers to where they belong | Low | Open |
 | TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Designed 2026-10-04 (the build's PR on the `Kind:` line, live read by the home, `free-pick` takes it) — the build is TD-323 |
-| TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Open — design-first |
+| TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Designed 2026-10-04 (a claim's `slices`, declared with `--slice` or derived at the merge, counted as the run's done) — the build is TD-325 |
 | TD-323 | Build live checks in the free-pick lane: the build's PR on the `Kind:` line and its `live` reading, `lane_matches`, the grinder brief's pick list and four endings, the PR written on the open live checks | High | Open |
 | TD-324 | The person inbox counts FYI notes against the same depth as open questions, and nothing marks a person's note read, so FYIs fill a sender's slot until dismissed | High | Open |
+| TD-325 | Build slices as done work: `slices` on a claim, `ao progress done --pr N --slice`, the tick's write at a merge, `_reported` and the repeat test, the Reports panel, the grinder brief | Medium | Open |
 
 ---
 
@@ -2457,7 +2458,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (the anchor, from the live check of TD-249; Paul chose to count the work rather than split every slice into its own entry)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — **Next:** the designer settles how a slice's merge is recorded; a build entry follows.
+**Status:** Designed 2026-10-04 (the designer, PR #1048) — design §4.8 (the `progress` channel: a claim's `slices`), §4.9a *A slice is work done*, §4.7: a claim carries `slices: [{pr, at, source}]`, written by `ao progress done <ref> --pr <n> --slice` (the claim stays claimed) and by the tick from a derived `done` on the claim's reference; a run's `done` holds its slices as `{ref, pr, slice: true}`; a reference with a new slice this run is not in `left`, so three runs that each land a slice are never a repeat and three that merge nothing still are. **The build is TD-325.** Earlier: Open.
+**Blocked by:** TD-325
 **Location:** `src/sessionorc/agent_common.py` (`_reported`: a run's `done` is its `progress` entries with status `done`; `_restart_reading`: the third-run `repeat` test on `left`; `_new_done`, `_counted`), `src/sessionorc/agent_tick.py` (`_derive_reports_inner`: a derived entry is refused where the session declared the same reference), design §4.9a *Inside the ceiling* (*Repeated work is the person's at once*), §9 invariant 10
 
 **Why:** grinder-ao-2 ran TD-309 across restarts on 2026-10-04 and 2026-10-05: its run to 01:01:33Z left TD-309 claimed, and its run to 01:36:51Z merged slices 2 (#1025) and 2a (#1027) and again left TD-309, yet that `restarts` entry reads `done: []`. A slice's PR closes no entry, so no `done` progress is declared, and the derived `done` for the PR is likely refused because the run holds a declared claim on the same reference (`models.py` `_note_review` keeps it only as `review_pr`); for #1027, merged 25 seconds before the restart, the derivation's slow cadence may simply not have run, but #1025 merged seven minutes before it. The record therefore sees two runs that did nothing on TD-309, and by `_restart_reading` a third run that leaves TD-309 is a **repeat**, marked early and sent to the person, though each run landed real work. Every entry built *in slices a PR each* (the ledger's usual shape: TD-249 had seven) is exposed. Splitting each slice into its own entry would avoid it but costs numbers, a designer step per slice, and the shared context of slices one grinder holds; Paul chose to count the work.
@@ -2515,3 +2517,23 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a sender with 100 notes still in the person inbox can still send an `ask` and a note to the person, and the design's figures match `mail.py`.
 
 **Related:** TD-069 (the depths counting open questions, 2026-09-19), TD-075 (the techlead seat, the heaviest writer to the person), TD-052 (the bounds).
+
+## TD-325: Build slices as done work — `slices` on a claim, `--slice`, the tick's write, the restart reading
+
+**Priority:** Medium
+**Added:** 2026-10-04 (the designer, TD-321's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/models.py` (`ProgressEntry`, `_note_review`), `src/sessionorc/agent.py` (`rpc_progress`), `src/sessionorc/agent_tick.py` (`_derive_reports_inner`), `src/sessionorc/agent_common.py` (`_reported`, `_restart_reading`; `_new_done` and `_counted` unchanged), `src/agentorc/cli.py` (`ao progress done --slice`), `src/agentorc/ui/` (the Reports panel), `src/agentorc/briefs/grinder.md`, `src/agentorc/skill.md`, `tests/`; design §4.8 (the `progress` channel), §4.9a *A slice is work done*, §4.7. Held path (`src/sessionorc/**`): the techlead reads slice 1.
+
+**Why:** TD-321's design. A run that merges slices on an entry it still holds reports `done: []`, so its restart reads *early* inside `RESTART_EARLY`, counts toward the ceiling, and its third run on the entry is a *repeat* sent to the person, though each run landed work.
+
+**Fix, in two slices, a PR each:**
+1. **The record and the reading** (`src/sessionorc`). `ProgressEntry.slices: list[{pr, at, source}]`, kept across the replica's merge as the entry is, one item per `pr`. `rpc_progress` takes `slice: true` with `status="done"`: refused without a `pr` or where the caller holds no declared claim on the reference (naming `ao progress claim`); appends `{pr, at, source: declared}` and leaves status, `pr` and `why` as they are; the reply says the entry stays claimed. Where a derived `done` carrying a PR meets a declared claim on its reference (today refused whole, `_note_review` keeping only an open PR as `review_pr`), the tick appends `{pr: derived.pr, at, source: derived}` to the claim's `slices` unless that `pr` is held, and `review_pr` is cleared as today; a PR closed unmerged (`PR_CLOSED`) writes nothing. `_reported` takes `now` (both callers have it), for the window: `done` gains `{ref, pr, slice: true}` for each slice whose `at` is at or after the record's `created`; `left` leaves out a reference with a slice that is new by `_new_done` against the window. `_restart_reading`'s *reported done by an earlier run too* test reads declared slices with declared `done`s, never derived ones. Tests (TD-321's *Fix* 4, and the edges): three runs on one entry each merging a slice — never early, never a repeat, none counted by `_counted`; three runs merging nothing — a repeat on the third; a slice re-derived after a replay — not new, the reference still `left`; `--slice` with no claim or no `--pr` refused; a slice declared and then derived is held once.
+2. **The words** (`src/agentorc`). `ao progress done <ref> --pr <n> --slice` and its help; the Reports panel prints *claimed · slices #1025, #1027* from the field, each a link as `review_pr`'s is; `ao status -v` prints them; the grinder preset's brief and `ao --skill` say it in one sentence — *a slice merged and the entry still yours: `ao progress done TD-NNN --pr <n> --slice`, before the next slice and before a `restart`* — and that the last slice is a plain `done`.
+
+**Done when** a grinder that lands one slice per run across three restarts on one entry is restarted each time without a repeat mark, and a run that merges nothing on its third pass still reaches the person (TD-321's *Done when*), shown by the tests above; then TD-321 archives with this entry.
+
+**Related:** TD-321 (the design), TD-249 and TD-245 (the restart reading), TD-150 (`review_pr`), TD-309 (the entry it was seen on).
+
