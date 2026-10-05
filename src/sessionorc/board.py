@@ -223,6 +223,31 @@ def unreachable(why: str) -> Refused:
     return Refused(f"origin could not be reached ({why}): the edit was not made")
 
 
+class _Neighbour(Refused):
+    """A squash the forge refused while origin moved under it and the item still holds: a neighbouring
+    line's change, which refuses nothing (§4.4) — the press is made once more on origin's new head."""
+
+
+def _twice(press: Any) -> dict[str, Any]:
+    try:
+        return press()
+    except _Neighbour:
+        return press()
+
+
+def _identity(root: Path) -> list[str]:
+    """The checkout's git identity as `-c` options for the tree's commit (§4.4): read where the
+    checkout is, so an `includeIf "gitdir:…"` identity that does not reach the tree's path still
+    authors the commit."""
+    out: list[str] = []
+    for key in ("user.name", "user.email"):
+        with contextlib.suppress(Refused):
+            v = _git(root, "config", key).stdout.strip()
+            if v:
+                out += ["-c", f"{key}={v}"]
+    return out
+
+
 class _Clock:
     """The press's one bound, shared by every git and forge call in it."""
 
@@ -336,7 +361,19 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
     allows (§4.4): a branch of the host agent's own, a PR it opens and squash-merges at once. A
     refused merge closes the PR and deletes the branch, and refuses the press as a moved line when
     `still()` — origin's board read again — no longer holds the item, else as unreachable."""
-    cp = _git(t, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD), timeout=clock.left("git commit"))
+    base = _git(t, "rev-parse", "HEAD").stdout.strip()
+    cp = _git(
+        t,
+        *_identity(root),
+        "commit",
+        "--quiet",
+        "-m",
+        msg,
+        "--only",
+        "--",
+        str(BOARD),
+        timeout=clock.left("git commit"),
+    )
     if cp.returncode != 0:
         _reset(t, want)
         raise Refused(f"the commit failed, and the board is as it was: {_why(cp, 'git commit')}")
@@ -382,14 +419,18 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
             # and a retried add must not write twice: the forge's own word on the PR first, since
             # origin's board may have changed elsewhere in the same moment; origin's board else
             landed = _pr_merged(t, n)
-            moved = False
+            moved = shifted = False
             with contextlib.suppress(Refused):
                 if not landed and _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
                     landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", str(BOARD)).returncode == 0
                     moved = not landed and not still()
+                    shifted = _git(t, "rev-parse", f"origin/{want}").stdout.strip() != base
             if not landed:
                 _gh_quiet(t, "pr", "close", str(n))
-                raise Refused(MOVED) if moved else unreachable(why)
+                if moved:
+                    raise Refused(MOVED)
+                # origin moved under the squash and the item still holds: a neighbouring line's change
+                raise _Neighbour(str(unreachable(why))) if shifted else unreachable(why)
     except Refused:
         if pushed:
             _git_quiet(t, "push", "-q", "origin", "--delete", branch)
@@ -445,15 +486,23 @@ def write_back(
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     with _EDIT:
-        return _write_back(root, line, text, action, due, reply, answer)
+        clock = _Clock()
+        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock))
 
 
 def _write_back(
-    root: Path, line: int, text: str, action: str, due: str | None, reply: str = "", answer: str = ""
+    root: Path,
+    line: int,
+    text: str,
+    action: str,
+    due: str | None,
+    reply: str = "",
+    answer: str = "",
+    clock: _Clock | None = None,
 ) -> dict[str, Any]:
     if not isinstance(line, int):
         raise Refused(MOVED)
-    clock = _Clock()
+    clock = clock or _Clock()
     if shutil.which("gh") is None:
         raise unreachable("gh is not installed")
     t, want = _tree(root, clock)
@@ -557,21 +606,25 @@ def add(
     if answer is not None:
         words = " ".join(str(text or "").split()).rstrip(".") + reply_tail(answer, author(root), today)
     line = item_line(words, due, today, session, host, context)
+    head = " ".join(str(text).split()).rstrip(".")
+    if len(head) > HEAD_MAX:
+        head = head[: HEAD_MAX - 1].rstrip() + "…"
+    msg = f"agentorc: {'board' if answer is None else 'answer'} {head} (from {entry})"
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:
             raise unreachable("gh is not installed")
-        t, want = _tree(root, clock)
-        path = t / BOARD
-        lines = _read_lines(path)
-        at = _top_of_needs(lines)
-        if lines and not lines[-1].endswith("\n") and at == len(lines):
-            lines[-1] += "\n"
-        lines.insert(at, line)
-        head = " ".join(str(text).split()).rstrip(".")
-        if len(head) > HEAD_MAX:
-            head = head[: HEAD_MAX - 1].rstrip() + "…"
-        msg = f"agentorc: {'board' if answer is None else 'answer'} {head} (from {entry})"
-        path.write_text("".join(lines), encoding="utf-8")
-        # an add moves no line, so a refused merge is never a moved line: always the unreachable refusal
-        return {**_land(root, t, want, msg, clock, lambda: True), "line": at + 1}
+
+        def press() -> dict[str, Any]:
+            t, want = _tree(root, clock)
+            path = t / BOARD
+            lines = _read_lines(path)
+            at = _top_of_needs(lines)
+            if lines and not lines[-1].endswith("\n") and at == len(lines):
+                lines[-1] += "\n"
+            lines.insert(at, line)
+            path.write_text("".join(lines), encoding="utf-8")
+            # an add moves no line, so a refused merge is never a moved line: unreachable, or made once more
+            return {**_land(root, t, want, msg, clock, lambda: True), "line": at + 1}
+
+        return _twice(press)
