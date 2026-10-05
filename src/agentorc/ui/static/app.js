@@ -545,7 +545,7 @@
         } catch (e) {
           handed = `no entry was handed on: ${e.message}`; refused = true;
         }
-        AO.toast(`decided: ${answer} — committed on the board, not pushed · ${handed}`, !refused);
+        AO.toast(`decided: ${answer} — landed on the board on origin · ${handed}`, !refused);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -554,7 +554,7 @@
         if (!res) return;
         AO.toast(res.dismiss_refused
           ? `on the board, committed — but the entry stayed: ${res.dismiss_refused}`
-          : "on the board — committed there, not pushed; the entry is dismissed", true);
+          : "on the board — landed on origin; the entry is dismissed", true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -605,8 +605,8 @@
       if (action === "clear_work") AO.toast(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
       if (action === "clear_mark") AO.toast(!(res.cleared || []).length ? "nothing was standing any more" : res.kind === "held" ? "dismissed — the crossings stay on the record; the next one is a note again" : "dismissed — the read stays on the record; a later failing read is a row again", true);
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
-      if (action === "board" && body.action === "decide") AO.toast(`decided: ${body.answer} — committed on the board, not pushed; the item stays, as its session's work order`, true);
-      else if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
+      if (action === "board" && body.action === "decide") AO.toast(`decided: ${body.answer} — landed on the board on origin; the item stays, as its session's work order`, true);
+      else if (action === "board") AO.toast(body.action === "done" ? "checked off — landed on the board on origin" : `snoozed to ${body.due} — landed on the board on origin`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) AO.toast("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
       else if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);

@@ -3,11 +3,13 @@ repo's `docs/user_attention.md`, read by dev-cadence's own reader, as counted **
 
 from __future__ import annotations
 
+import os
 import pathlib
 import shutil
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from conftest import fake_gh_bin, with_origin
 from fastapi.testclient import TestClient
 from test_ui_inbox import needs_line
 
@@ -804,8 +806,9 @@ def test_a_fetch_that_is_stopped_or_fails_is_followed_by_a_plain_read(tmp_path, 
 def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, monkeypatch):
     """The first request reads plainly; from then a stale reading starts one fetching read, however
     many requests find it stale, and each is answered from the last reading meanwhile; a press
-    reads its own board plainly, laid over the last reading, and does not wait on the fetch. A
-    fetch that began before the press does not put the answered row back."""
+    reads its own board with a fetch of its own (TD-264: the edit is on origin), laid over the last
+    reading, and does not wait on the other fetch. A fetch that began before the press does not
+    put the answered row back."""
     import threading
 
     host(tmp_path, monkeypatch)
@@ -827,8 +830,8 @@ def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, mon
     gate, reads, board_ = threading.Event(), [], board
 
     def fake(run=None, *, fetch=False, board=""):
-        reads.append("fetch" if fetch else board or "plain")
-        if fetch:
+        reads.append(board or ("fetch" if fetch else "plain"))
+        if fetch and not board:
             assert gate.wait(10)
             return [row(board_, "answered"), row(other, "from origin")], ""
         if board:
@@ -946,10 +949,10 @@ def test_the_behind_note_ends_with_the_pulls_standing(monkeypatch):
 
 
 @pytest.mark.unit
-def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(tmp_path, monkeypatch):
+def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_live(tmp_path, monkeypatch):
     """One note above the repo's first board row in the list, none for a board that matches; on a
-    board whose `source` is origin, Snooze, Done and Reply are disabled with the design's reason and
-    Open board stays; a two-sided board's note is in the warning colour."""
+    board whose `source` is origin, Snooze, Done and Reply are as live as any (TD-264: the write-back
+    works on origin's line) and Open board stays; a two-sided board's note is in the warning colour."""
     host(tmp_path, monkeypatch)
     from agentorc.ui.app import board_rows, templates
 
@@ -969,12 +972,12 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(t
     assert html.count("read from origin/main: this checkout has not pulled it yet") == 1
     assert html.index("this checkout has not pulled it yet") < html.index("<p>one.</p>")
     assert html.count('class="originnote meta warnish"') == 1 and html.count("originnote") == 2
-    ro = "on origin, not in this checkout yet: pull to act on it"
     behind_html = html[: html.index("same line.")]
-    assert 'data-act="' not in behind_html and behind_html.count(f'disabled title="{ro}"') == 6
+    assert "disabled" not in behind_html and "pull to act on it" not in html
+    assert behind_html.count('data-board-act="done"') == 2 and behind_html.count('data-act="board_reply"') == 2
     assert behind_html.count("Open board") == 2
     rest = html[html.index("same line.") :]
-    assert rest.count('data-board-act="done"') == 2 and ro not in rest
+    assert rest.count('data-board-act="done"') == 2
     # the Repo page and the horizon draw it by the same rule
     part = templates.get_template("board_horizon.html").render(
         hz={"ahead": rows, "hidden": [], "line": {"says": "x", "rest": "y", "n": 0}}, origin=""
@@ -983,21 +986,20 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_read_only(t
 
 
 @pytest.mark.unit
-def test_a_press_on_a_board_read_from_origin_is_refused_before_the_write_back(tmp_path, monkeypatch):
-    """The page draws the controls disabled; a press that comes anyway is refused in the same words
-    and never reaches `board_edit` or `board_reply` while the checkout's own board lacks the line.
-    Put on the board is not a row's press. Once pulled, the press goes through at once."""
+def test_a_press_on_a_board_read_from_origin_goes_to_the_write_back(tmp_path, monkeypatch):
+    """TD-264 (§4.4, §4.5 screen 6): a row read from origin is pressable — the write-back works on
+    origin's line, so the press goes to `board_edit` or `board_reply` as any row's does — and the
+    read after it is a fetching read of that one board."""
     host(tmp_path, monkeypatch)
     from agentorc.ui import app as uiapp
 
     board = str(tmp_path / "r/docs/user_attention.md")
     row = {"row": "board", "id": f"board:{board}:3", "board": board, "text": "x", "due_now": True, "at": "2026-09-01"}
-    pulled = []
+    reads = []
 
     def fake(run=None, *, fetch=False, board=""):
-        if board and pulled:  # the checkout pulled since the reading: its own board holds the line
-            return [dict(row, line=3, source="")], ""
-        return [dict(row, line=3 if not board else 9, source="" if board else "origin/main")], ""
+        reads.append((board, fetch))
+        return [dict(row, line=3, source="origin/main")], ""
 
     monkeypatch.setattr(uiapp, "read_boards", fake)
     calls = []
@@ -1027,18 +1029,9 @@ def test_a_press_on_a_board_read_from_origin_is_refused_before_the_write_back(tm
             {"action": "reply", "board": board, "line": 3, "text": "x", "reply": "y"},
         ):
             r = c.post("/api/person/board", json=body)
-            assert r.status_code == 409 and "pull to act on it" in r.text
-        assert calls == []
-        r = c.post(
-            "/api/person/board",
-            json={"action": "add", "msg": "m-1", "board": board, "text": "new", "due": "2026-10-01"},
-        )
-        assert r.status_code == 200 and calls == [("board_edit", "add")]
-        # pulled since the last reading: the plain read of the one board finds the line, and the
-        # press goes through without waiting on the next fetching read
-        pulled.append(1)
-        r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 3, "text": "x"})
-        assert r.status_code == 200 and calls[-1] == ("board_edit", "done")
+            assert r.status_code == 200, r.text
+        assert calls == [("board_edit", "done"), ("board_edit", "snooze"), ("board_reply", None)]
+        assert reads[-1] == (board, True)  # the read after the press fetches
 
 
 def _behind_clone(tmp_path):
@@ -1069,8 +1062,8 @@ def _behind_clone(tmp_path):
 
 @pytest.mark.unit
 def test_after_a_pull_the_row_is_pressable_and_a_two_sided_board_warns(tmp_path, monkeypatch):
-    """Real git, the real reader (TD-221 slice 4): behind, the row only on origin is read-only under
-    the *behind* note; after a pull the same row is pressable and no note is drawn; a local board
+    """Real git, the real reader (TD-221 slice 4): behind, the row only on origin is drawn under the
+    *behind* note, pressable (TD-264); after a pull no note is drawn; a local board
     edit against a new line on origin shows the checkout's rows under the warning note."""
     clone, due = _behind_clone(tmp_path)
     host(tmp_path, monkeypatch, [clone])
@@ -1084,7 +1077,7 @@ def test_after_a_pull_the_row_is_pressable_and_a_two_sided_board_warns(tmp_path,
 
     rows, html = page()
     assert [r["text"].split(".")[0] for r in rows] == ["the old line", "the line only on origin"]
-    assert "this checkout has not pulled it yet" in html and 'data-board-act="done"' not in html
+    assert "this checkout has not pulled it yet" in html and html.count('data-board-act="done"') == 2
     _git("pull", "-q", "--ff-only", cwd=clone)
     rows, html = page()
     assert [r["source"] for r in rows] == ["", ""] and rows[0]["fetch_note"].startswith("fetched; board matches")
@@ -1180,7 +1173,7 @@ def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, m
     two `.btn.answer` — **Works**, the `decide` with *Works*, and **Not right…**, the composer's
     act carrying the reader's list, the repo's name and the item's head for the hand-off — and no
     quoted answer text. A default on *Works* is that button, *Go with it: Works*, with none in the
-    foot. Read from origin both are disabled."""
+    foot. Read from origin both are live (TD-264)."""
     import json
     import re
 
@@ -1209,7 +1202,7 @@ def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, m
 
     _, html = rows_html(tmp_path, monkeypatch, look_item(), source="origin/main")
     btns = re.findall(r'<button class="btn sm answer" ([^>]*)>', html)
-    assert len(btns) == 2 and all("disabled" in a and "data-act" not in a for a in btns)
+    assert len(btns) == 2 and all("disabled" not in a and "data-act" in a for a in btns)
 
 
 @pytest.mark.unit
@@ -1283,14 +1276,14 @@ def test_a_decided_row_reads_decided_in_place_of_the_buttons(tmp_path, monkeypat
 
 
 @pytest.mark.unit
-def test_a_row_read_from_origin_draws_its_answers_and_go_with_it_disabled(tmp_path, monkeypatch):
+def test_a_row_read_from_origin_draws_its_answers_and_go_with_it_live(tmp_path, monkeypatch):
+    """TD-264: the answers and Go with it on a row read from origin press the write-back."""
     _, html = rows_html(tmp_path, monkeypatch, decide_item(), source="origin/main")
     import re
 
     btns = re.findall(r'<button class="btn sm answer" ([^>]*)>', html)
-    assert len(btns) == 3 and all("disabled" in a and "data-act" not in a for a in btns)
-    assert "data-board-act" not in html
-    assert re.search(r"<button[^>]*disabled[^>]*>Go with it</button>", html)
+    assert len(btns) == 3 and all("disabled" not in a and 'data-board-act="decide"' in a for a in btns)
+    assert re.search(r'<button[^>]*data-board-act="decide"[^>]*>Go with it</button>', html)
 
 
 @pytest.mark.unit
@@ -1360,6 +1353,8 @@ def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_ba
     git("config", "user.name", "T")
     git("add", "-A")
     git("commit", "-qm", "board")
+    with_origin(root)
+    monkeypatch.setenv("PATH", f"{fake_gh_bin(tmp_path / 'fake-bin')}{os.pathsep}{os.environ.get('PATH', '')}")
 
     def read():
         out = subprocess.run(
@@ -1377,6 +1372,7 @@ def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_ba
     assert html.count('class="btn sm answer"') == 2 and ">Go with it<" in html
     monkeypatch.setattr(board_mod, "default_branch", lambda r: "main")
     board_mod.write_back(root, row["line"], row["text"], "decide", None, answer=row["default"])
+    git("pull", "-q", "--ff-only", "origin", "main")  # the edit is on origin; the checkout catches up
     (row,) = read()
     assert row["decided"]["text"] == "hold" and row["due_now"] and "Answers:" not in row["body"]
     html = templates.get_template("inbox_rows.html").render(rows=[row], section="needs")
@@ -1467,55 +1463,6 @@ def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
     text = "act — See the Context: of this. **Context:** bold. Due: 2026-10-05."
     (row,) = board_rows(report(root, item(3, text, "2026-10-05", "x")))
     assert (row["lead"], row["rest"]) == ("act — See the Context: of this. **Context:** bold.", "")
-
-
-@pytest.mark.unit
-def test_a_board_read_from_origin_is_drawn_live_once_a_pull_lands(tmp_path, monkeypatch):
-    """TD-281 (3): a row read from origin draws Reply disabled; once the checkout is pulled, the next
-    fetching read past `BOARD_TTL` reads the board as the checkout's, and the poll's own html draws
-    Reply live — no reload. What Paul met was the wait: up to a TTL and one fetch."""
-    import threading
-
-    host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
-
-    root = tmp_path / "agentorc"
-    rep = report(root, item(3, "act — Look. Due: 2026-09-20.", "2026-09-20", "2d overdue"))
-    behind = {**rep, "boards": [{**rep["boards"][0], "source": "origin/main"}]}
-    pulled = threading.Event()
-    reads = []
-
-    def fake(run=None, *, fetch=False, board=""):
-        reads.append("fetch" if fetch else "plain")
-        return uiapp.board_rows(rep if pulled.is_set() else behind), ""
-
-    monkeypatch.setattr(uiapp, "read_boards", fake)
-
-    class Fake:
-        def __init__(self, *a, **k):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def call(self, method, **kw):
-            return {"list": [], "inbox": {"entries": [], "trail": []}, "host": {"name": "kmaster"}}.get(method, {})
-
-    monkeypatch.setattr(uiapp, "LocalClient", Fake)
-    with TestClient(uiapp.create_app()) as c:
-        needs = c.get("/api/person/inbox").json()["html"]["needs"]
-        assert 'data-act="board_reply"' not in needs and "pull to act on it" in needs
-        pulled.set()
-        monkeypatch.setattr(uiapp, "BOARD_TTL", -1.0)
-        for _ in range(50):
-            needs = c.get("/api/person/inbox").json()["html"]["needs"]
-            if 'data-act="board_reply"' in needs:
-                break
-            threading.Event().wait(0.05)
-        assert 'data-act="board_reply"' in needs and "pull to act on it" not in needs and "fetch" in reads
 
 
 @pytest.mark.unit
