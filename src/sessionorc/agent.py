@@ -1397,6 +1397,10 @@ class HostAgent(
 
     async def rpc_kill(self, id: str) -> dict[str, Any]:
         s = self._get(id)
+        if s.state == "scheduled":
+            # nothing runs, so a kill is its Cancel (design §6 *Start time*, TD-328): a record left
+            # `exited` would read as a run that never happened, and no policy would ever start it
+            return await self._cancel_start(s)
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("exited", confidence="scraped")
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
@@ -1845,6 +1849,13 @@ class HostAgent(
         ride `set_stop` (design §6, TD-100): a session made unattended after its create would
         otherwise be gated with nothing to type. Given only when set; an empty one clears it."""
         s = self._find(id)  # the home's own copy of another host's record too (4a)
+        if s.state == "scheduled" and not unattended:
+            # the tick would start it from its launch record, unattended: the switch silently undone
+            # and a policy's act on a session the person made interactive (§6 *Start time*, TD-328)
+            raise RpcError(
+                f"{s.name} has not started: a scheduled start is unattended — `ao at` moves it, Cancel "
+                f"forgets it; switch it to interactive once it runs (design §6 Start time, §9 invariant 5)"
+            )
         s.unattended = bool(unattended)
         if pause_prompt is not None:
             s.pause_prompt = str(pause_prompt).strip() or None

@@ -109,6 +109,27 @@ async def test_close_and_remove_cancel_it_and_free_the_slot(agent, tmp_path, hoo
         assert sid not in agent.sessions
 
 
+async def test_kill_cancels_it_and_switch_to_interactive_is_refused(agent, tmp_path, hookstub):
+    """TD-328, §6 *Start time*: a scheduled record runs nothing, so **Kill** is its Cancel — not an
+    `exited` record of a run that never happened — and **Switch to interactive** is refused until it
+    runs, since the tick would start it unattended from the launch record and undo the switch."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = (await _scheduled(person, tmp_path, adapter="hookstub"))["id"]
+        with pytest.raises(AgentError, match="has not started: a scheduled start is unattended"):
+            await person.call("set_mode", id=sid, unattended=False)
+        assert agent.sessions[sid].unattended is True and agent.sessions[sid].state == "scheduled"
+        await person.call("set_mode", id=sid, unattended=True)  # what it already is: no change, no refusal
+        got = await person.call("kill", id=sid)
+        assert got["cancelled"] is True and sid not in agent.sessions
+        assert not (paths.launch_dir() / f"{sid}.json").exists()
+        sid = (await _scheduled(person, tmp_path, adapter="hookstub"))["id"]  # the slot was free again
+        assert agent.sessions[sid].state == "scheduled"
+        with pytest.raises(AgentError, match="has not started — there is nothing to stop"):
+            await person.call("suspend", id=sid)
+        assert agent.sessions[sid].suspended is None
+
+
 async def test_a_start_that_fails_counts_up_to_the_ceiling(agent, tmp_path):
     await park_ticks(agent)
     async with LocalClient() as person:
