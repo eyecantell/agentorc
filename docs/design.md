@@ -7070,7 +7070,8 @@ newly stops a session or a team until they answer.
   restart row, §6 *Keeping a team running*), and a wound-down team whose lanes gained work under `on_work: ask` (§6
   rule 8). **Not told**: `stalled?`, `limited` and `unpushed` rows, *idle · open work*, a failed
   cadence check, *merged without its read*, a promote, a due board item, a `steer` (it takes its
-  default at its bound) and everything in FYI — each waits for the person's next visit and stops
+  default at its bound; one the person paused or whose asker is gone is under *Needs you*, and
+  is not told either: the pause was the person's own press) and everything in FYI — each waits for the person's next visit and stops
   nobody meanwhile, or ends by itself. The list is the design's, not a setting: one switch, no
   picks per kind.
 - **When: once, after a minute, and only if nobody is looking.** A row is told when it has stood
