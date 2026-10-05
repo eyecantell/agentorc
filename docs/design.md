@@ -5384,8 +5384,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
 
   **A live check is a grinder's once its build is live (TD-320; Paul, 2026-10-04: *we should
   make live-checks pickable by grinders so they do not have to wait on a promote*; designed that
-  day; the reading and the lane built — TD-323 slice 1, the briefs and the ledger's lines not
-  yet).** A built entry whose *Done when* only the running system can show becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
+  day; the reading and the lane built — TD-323 slice 1, the briefs, `ao repo` and the Repo page
+  slice 2, the ledger's lines not yet).** A built entry whose *Done when* only the running system can show becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
   after every promote, and seven High entries stood that way on 2026-10-04.
   - **The entry names its build on its `Kind:` line.** The PR that makes an entry a live check
     writes **`**Kind:** live-check #<n>`** — the kind's word, then the last merged PR of the
@@ -5410,7 +5410,11 @@ team has one, the techlead answers it or passes it up, and the person is the top
     as any entry is, by priority first (§4.8 *Choosing in a free-pick lane*), and claimed as one
     (§4.8): two grinders' package lanes do not divide it. A build that becomes live is new work
     in the lane, told once by rule 6 to a member that declared out of work, and counted by
-    rule 8 for a team that wound down.
+    rule 8 for a team that wound down. **Where it is listed:** `ao repo` and the Repo page list
+    a live check whose build is live among the pickable entries, marked *live check* with its
+    build's PRs, and one whose build is not with *waits for its build to be live* — `ao repo` on
+    a `live-check` line of its own, the page under *other* (built — TD-323 slice 2). The pick list
+    is `ao repo`'s, since cadence's `scripts/ledger.py` cannot tell a live build.
   - **What the grinder does** is the rule above: the live copy is read — `ao status -v`, a
     record's fields, `ao promote status`, a transcript, a headless GET of a page — and never
     pressed; a check that needs a press is made on a scratch home (`scripts/look_home.py`), where
