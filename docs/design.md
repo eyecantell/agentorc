@@ -3307,7 +3307,7 @@ under the Agent call before them).
 
 **Reporting (§4.8, §4.9a).** Each is a small RPC on the calling session's own record — `--id`
 for another's, since the channels are ungated:
-- `ao progress claim TD-027`, `ao progress done TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao progress done TD-027 --pr 59 --slice` for a merged PR that leaves the entry claimed (§4.8, TD-321; the RPC built — TD-325 slice 1, the flag not yet);
+- `ao progress claim TD-027`, `ao progress done TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao progress done TD-027 --pr 59 --slice` for a merged PR that leaves the entry claimed (§4.8, TD-321; built — TD-325 slices 1 and 2);
 - `ao progress none --why "..."` — the session found no work it may pick (§4.9a, TD-053);
 - `ao progress restart --why "..."` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*, TD-083);
 - `ao finding TD-029 --priority low`;
@@ -3316,7 +3316,9 @@ for another's, since the channels are ungated:
   is no longer open is marked as the card marks it, `TD-066 → #158 merged` (§4.5a card **report
   line**, TD-182; built — TD-193): the CLI reads `repos` once per call, and where that read is
   refused (a node offline) or holds no such PR the line is printed unmarked. The mark is in the
-  text only; `--json` carries the entries as the record holds them.
+  text only; `--json` carries the entries as the record holds them. A claim holding slices prints
+  them on a line of its own, *slices: TD-309 #1025, #1027*, a slice the tick derived marked `~`
+  (§4.8, TD-325).
 - `ao status -v` prints each record's context reading — *context 231k of 1M, bound 200k*, and *(over)* past it — and `--json` the `context` and `context_bound` fields (§6 rule 5, TD-188, TD-190).
 - `ao status -v` prints a closed record's closer in the card's words — *closed by you*, *closed by manager-dc-1*, *closed itself*, *closed by the tick · team finished* — and `--json` the `closer` field (TD-262; built by TD-265 slice 2): a line under the record's, the words then the close's age.
 
@@ -3628,7 +3630,7 @@ reference, kept while that PR is open and cleared once it merges or is closed un
 an RPC's derived entry over a declared one is refused whole, as ever) — so the Focus panel reads
 *in review* for a claim whose PR was opened without `--pr` (§4.5a *Reports*, TD-150); the claim's
 status, `pr` and `why` stay the session's. **A slice that merged is kept beside the claim too
-(TD-321; designed 2026-10-04; the record, the RPC and the tick built — TD-325 slice 1, the words not yet)**: an entry built *in slices, a PR each* stays
+(TD-321; designed 2026-10-04; built — TD-325 slices 1 and 2)**: an entry built *in slices, a PR each* stays
 claimed while its PRs merge one by one, and a merged PR that closes no entry was, until this
 rule, work the record never saw. The claim carries **`slices: [{pr, at, source}]`**, one item per
 merged PR on its reference, written two ways and held once per `pr`: the session says it —
@@ -5206,7 +5208,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   so `ao status --json` shows what decided it and `ao status -v` prints the row's words. A run that declares `restart` past the
   bound with new work each time, however short, is restarted by rule 2 within a tick.
   **A slice is work done** (TD-321; Paul, 2026-10-04, chose to count the work rather than make
-  every slice an entry; designed that day; built — TD-325 slice 1). grinder-ao-2 ran TD-309 across
+  every slice an entry; designed that day; built — TD-325 slices 1 and 2). grinder-ao-2 ran TD-309 across
   three runs on 2026-10-04 and 05, merged slices 2 and 2a in the second (#1025, #1027), and its
   `restarts` entry read `done: []`: a slice closes no entry, so nothing was declared `done`, and
   the tick's derived `done` is refused beside a declared claim. A third run leaving TD-309

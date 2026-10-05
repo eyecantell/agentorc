@@ -1439,6 +1439,62 @@ def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
     assert sent[0]["force"] is None and sent[1]["force"] is True
 
 
+def test_progress_done_slice_keeps_the_claim(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-325 slice 2 (design §4.8, §4.9a *A slice is work done*): `ao progress done <ref> --pr <n>
+    --slice` holds the PR as a slice of a claim still held and says the entry stays claimed; it is
+    refused without a `--pr` or with any action but `done`, and on a reference with no claim the
+    host agent's refusal names `ao progress claim`; `ao status -v` prints the slices."""
+    assert cli.main(["--json", "new", "slicer", "-a", "shell", "-d", str(tmp_path)]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    wait_state(sid, "idle")
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["progress", "done", "TD-325", "--slice"]) == 2  # no --pr
+    assert cli.main(["progress", "claim", "TD-325", "--pr", "9", "--slice"]) == 2  # not done
+    assert "--slice goes with ao progress done TD-325 --pr <n>" in capsys.readouterr().err
+    assert cli.main(["progress", "done", "TD-325", "--pr", "1025", "--slice"]) == 1  # no claim
+    assert "ao progress claim TD-325 first" in capsys.readouterr().err
+    assert cli.main(["progress", "claim", "TD-325"]) == 0
+    capsys.readouterr()
+    assert cli.main(["progress", "done", "TD-325", "--pr", "1025", "--slice"]) == 0
+    assert "#1025 held as a slice of TD-325; TD-325 stays claimed" in capsys.readouterr().out
+    assert cli.main(["progress", "done", "TD-325", "--pr", "1027", "--slice"]) == 0
+    entry = call_sync("get", id=sid)["progress"][0]
+    assert entry["status"] == "claimed" and [x["pr"] for x in entry["slices"]] == [1025, 1027]
+    capsys.readouterr()
+    assert cli.main(["status", "-v"]) == 0
+    assert "slices: TD-325 #1025, #1027" in capsys.readouterr().out
+    call_sync("kill", id=sid)
+
+
+def test_progress_sends_slice_only_when_asked(monkeypatch, capsys):
+    """As `force` (TD-062 fix (a)): a plain done sends no `slice`, so an agent older than TD-325
+    still answers it."""
+    sent = []
+
+    def fake(method, **params):
+        sent.append(params)
+        return {"id": "ao-x", "progress": [], "lane": []}
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    assert cli.main(["progress", "done", "TD-900", "--pr", "5"]) == 0
+    assert cli.main(["progress", "done", "TD-900", "--pr", "5", "--slice"]) == 0
+    assert sent[0]["slice"] is None and sent[1]["slice"] is True
+
+
+def test_slices_line_marks_a_derived_slice_and_skips_a_finished_entry():
+    """`ao status -v`'s *slices:* line (TD-325): a claim's slices, a derived one marked `~`; an
+    entry no longer claimed prints none."""
+    s = {
+        "progress": [
+            {"ref": "TD-1", "status": "claimed", "slices": [{"pr": 3, "source": "declared"}, {"pr": 4, "source": "derived"}]},
+            {"ref": "TD-2", "status": "done", "pr": 9, "slices": [{"pr": 8, "source": "declared"}]},
+        ]
+    }
+    assert cli.slices_line(s) == "TD-1 #3, #4~"
+    assert cli.slices_line({"progress": []}) == ""
+
+
 def test_whoami_and_identity_say_what_the_host_agent_sees(subprocess_agent, capsys, monkeypatch):
     """Design §4.8a: `ao whoami` is the connection's classification, `ao identity` the host's mode,
     tally and alarms. The suite's agent runs identity `off` (conftest), and both say so plainly;

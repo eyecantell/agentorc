@@ -79,7 +79,9 @@ Mutating — each one is a decision, so check the state first:
 - `ao progress claim|done|drop <ref> [--pr N] [--why "…"]`, `ao finding <ref> [--priority low]` — the
   report channels (§4.8). **Declare a claim before your first edit and the result before the next
   reference**; a reference is a ledger id (`TD-027`), a PR number or a board line, never prose. On
-  your own record (`--id`: another's), never overwritten by derivation (§9 invariant 10). Found
+  your own record (`--id`: another's), never overwritten by derivation (§9 invariant 10). A slice
+  merged and the entry still yours: `ao progress done <ref> --pr <n> --slice`, before the next
+  slice and before a `restart`; the last slice is a plain `done` (§4.9a). Found
   nothing you may pick? `ao progress none --why "<the search>"` **before** you exit (§4.9a).
 - `ao doing "<one line>"` — what you are doing **now** (§4.8): your card shows it, with its age, in place of your terminal's last lines. Say it when you claim and whenever it changes.
 - `ao keys <id> Key…` — raw keys. Not for dialogs, menus, or another agent's composer.

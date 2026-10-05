@@ -3208,9 +3208,13 @@
           ? `<span class="st claimed">claimed · in review ${prLink(p.review_pr)}</span>`
           : `<span class="st ${esc(p.status)}">${esc(p.status)}</span>`
             + (p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "");
+        // the merged PRs of a claim still held (§4.8, TD-325): *claimed · slices #1025, #1027*,
+        // each a link from the field, as `review_pr`'s is
+        const sl = (p.status === "claimed" && p.slices) ? p.slices.filter((x) => x && x.pr) : [];
+        const slices = sl.length ? ` <span class="st slices">· slices ${sl.map((x) => prLink(x.pr)).join(", ")}</span>` : "";
         const why = p.why ? ` <span class="st">${esc(p.why)}</span>` : "";
         return `<div class="rep${derived ? " derived" : ""}"><span class="ref" title="${derived ? "derived by the agent" : "declared by the session"}">${esc(p.ref)}</span>`
-          + `${st}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span></div>`;
+          + `${st}${slices}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span></div>`;
       };
       const g = AO.reportGroups(progress);
       const heads = { progress: "in progress", review: "in review", done: "done", dropped: "dropped" };
