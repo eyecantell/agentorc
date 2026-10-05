@@ -4248,3 +4248,22 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Resolved:** 2026-10-05 (designed by PR #759; built and checked as TD-239, live check held: PR #1080) — design §6 *Balance*.
 
 **Related:** TD-176, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
+
+## TD-067: Standing up a team has no operator's guide — for a person, and for the Claude session Paul tells to do it
+
+**Priority:** Medium
+**Added:** 2026-09-17 (Paul: *"My most likely cadence will be telling an llm (in this case claude) to implement/stand up a team using ao. Do we have plans for documentation that supports that flow as well as the user who wants to do it manually?"*)
+**Owner:** grinder
+**Kind:** live-check #302
+**Status:** Resolved
+**Location:** `README.md` (a "Stand up a team" section, or a `docs/guide/` file it links), `src/agentorc/cli.py` (`skill_text`, `ao --skill`), `docs/briefs/README.md`
+
+**Why:** what exists is written for someone else. README "Run it" installs one host and stops. `docs/briefs/README.md` launches workers and a lead **by hand** with `ao new` and `ao control … add`, which `ao team start` (§4.9, 2026-09-13) replaced — it is still right for a one-off worker and wrong as the way in. Design §4.9 is the spec of `org.yml` and a repo's `.agentorc.yml`, for a designer. `ao --skill` tells an agent how to behave *inside* a session and says nothing about setting one up. So a person has to read the design, and a Claude session told "stand up a grind team for contractmatch" has to read it too and guess — the flow Paul says is his most likely one.
+
+**Fix:** one recipe, written once, with two doors. (1) The **operator's guide** in the repo: the `nodes:` entry and `ao host up` for a container node (3c), the project and team definition in `org.yml` or the repo's `.agentorc.yml` with `host:` (4a), the roles and briefs a repo needs (`docs/briefs/`, `.agentorc.yml` `roles:`), `ao team list` / `start` / `status` / `stop`, what a lead is and how to read `ao status -v`, and the one-time person's steps (a profile's login, the node's `env` file) — each step a command and what it prints, not prose. (2) The same text **printed by the CLI**, on the pattern `ao --skill` set (TD-019): `ao team --skill` (or `ao --skill setup`; decide and say so), so Paul's cadence is `ao team --skill` and "stand up a grind team for repo X" and the Claude session self-serves from the tool rather than from memory of the design. The guide's text is the source; the README section is a pointer, as it is for `ao --skill`. `docs/briefs/README.md` is cut down to the one case it still owns — a worker launched by hand, and the membership pitfall — and points at the guide.
+
+**Done when** a Claude Code session on kmaster with no prior context, given `ao team --skill` and the sentence "stand up a grind team for contractmatch", writes the definition, starts the team and reports its `ao team status` without reading design.md; and a person can do the same from the README section alone.
+
+**Related:** TD-057 (3c.2, 4a — the steps the guide waits on), TD-019 (`ao --skill`), design §4.7, §4.9, §4.4a; `docs/briefs/README.md`.
+
+**Resolved:** 2026-10-05 (grinder-ao-1, the live check pressed on a scratch home) — the recipe holds. A general-purpose Claude session started with no context, given `ao team --skill` and *stand up a grind team for the repo at <fixture>*, and barred from the design, the source and this repo, wrote `.agentorc.yml` (a `roles:` overlay naming the person's profile and `teams: repo-grind` with `manager: {role: manager}` and two grinders), committed it with the `.gitignore` line, ran `ao team list`, `ao roles`, `ao team start repo-grind` (exit 0, three sessions in `.claude/worktrees/`) and reported `ao team status repo-grind` verbatim. The three sessions then sat at Claude Code's first-run screen, because the scratch profile's `config_dir` had no login — the person's one-time step the recipe names, not the recipe's. The person's door is the same text: README *Stand up a team* is a pointer to `ao team --skill`. What the session found wrong or unclear in the recipe is TD-331.
