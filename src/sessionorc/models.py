@@ -200,9 +200,27 @@ class ProgressEntry:
     # of the session's own fields: its status, `pr` and `why` stay as it declared them (§9
     # invariant 10). Cleared when that PR merges, since a merged PR holds no review.
     review_pr: int | None = None
+    # Beside a *declared* claim too (§4.8, §4.9a *A slice is work done*, TD-325): each merged PR on
+    # its reference that closed no entry, `{pr, at, source}`, one item per `pr` — declared by
+    # `ao progress done <ref> --pr <n> --slice`, or derived by the tick from a merged PR the session
+    # did not declare. Neither touches the claim's status, `pr` or `why` (§9 invariant 10).
+    slices: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def add_slice(self, pr: int, source: Source) -> bool:
+        """Hold merged PR `pr` as a slice of this claim, once per `pr` (TD-325). A slice the tick
+        derived and the session then declares becomes declared, since the restart reading reads the
+        session's word (§4.9a); a declared one is never made derived. True when that changed."""
+        for item in self.slices:
+            if item.get("pr") == pr:
+                if source == "declared" and item.get("source") != "declared":
+                    item["source"] = "declared"
+                    return True
+                return False
+        self.slices.append({"pr": pr, "at": now_iso(), "source": source})
+        return True
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ProgressEntry:
@@ -1290,6 +1308,8 @@ def _upsert(entries: list[Any], entry: Any) -> bool:
             return False
         if isinstance(old, ProgressEntry) and old.source == "declared" and entry.status == "claimed" and not entry.pr:
             entry.review_pr = old.review_pr  # a re-claim keeps what the tick last saw; done or dropped holds none
+        if isinstance(old, ProgressEntry) and old.source == entry.source == "declared" and not entry.slices:
+            entry.slices = old.slices  # a re-claim, or the last slice's plain `done`, keeps them (TD-325)
         entries[i] = entry
         return True
     entries.append(entry)
@@ -1304,12 +1324,17 @@ PR_CLOSED = "PR closed unmerged"
 def _note_review(old: ProgressEntry, derived: ProgressEntry) -> bool:
     """A derived progress entry on a *declared* claim's reference is refused (§9 invariant 10) —
     all but its PR, which is kept beside the claim as `review_pr` while it is open and cleared once
-    it merged (TD-150). True only when that changed, so the record is saved only then."""
+    it merged (TD-150), and once merged held as one of the claim's `slices`, `source: derived`,
+    unless the claim holds it already (§4.9a *A slice is work done*, TD-325); a PR closed unmerged
+    writes no slice. True only when that changed, so the record is saved only then."""
     if old.source != "declared" or old.status != "claimed" or derived.source == "declared":
         return False
+    # the claim's own `--pr` merging is that claim's PR, not a slice beside it (review of TD-325)
+    merged = derived.status == "done" and bool(derived.pr) and derived.why != PR_CLOSED and derived.pr != old.pr
+    sliced = merged and old.add_slice(int(derived.pr or 0), "derived")
     want = derived.pr if derived.status == "claimed" and derived.pr and derived.why != PR_CLOSED else None
     if want == old.review_pr:
-        return False
+        return sliced
     old.review_pr = want
     return True
 

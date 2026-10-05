@@ -134,7 +134,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Designed 2026-10-04 (the build's PR on the `Kind:` line, live read by the home, `free-pick` takes it) — the build is TD-323 |
 | TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Designed 2026-10-04 (a claim's `slices`, declared with `--slice` or derived at the merge, counted as the run's done) — the build is TD-325 |
 | TD-323 | Build live checks in the free-pick lane: the build's PR on the `Kind:` line and its `live` reading, `lane_matches`, the grinder brief's pick list and four endings, the PR written on the open live checks | High | Built (slices 1–3: #1051, #1053, #1054); the live check is left |
-| TD-325 | Build slices as done work: `slices` on a claim, `ao progress done --pr N --slice`, the tick's write at a merge, `_reported` and the repeat test, the Reports panel, the grinder brief | Medium | Open |
+| TD-325 | Build slices as done work: `slices` on a claim, `ao progress done --pr N --slice`, the tick's write at a merge, `_reported` and the repeat test, the Reports panel, the grinder brief | Medium | Slice 1 built (the record and the reading); slice 2 open |
 | TD-326 | A 3.12 CI flake: the node's record is not seen suspended within ten seconds in `test_link.py`'s supersession test | Low | Open |
 
 ---
@@ -2501,7 +2501,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (the designer, TD-321's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 built (grinder-ao-1): `ProgressEntry.slices` and `add_slice`, `rpc_progress(slice=True)` (`agent._slice`), the tick's derived slice in `_note_review`, `_reported(s, now)` and `_restart_reading`; `tests/test_slices_done.py`. **Left:** slice 2 (the words: `ao progress done --slice`, the Reports panel, `ao status -v`, the brief and the skill).
 **Location:** `src/sessionorc/models.py` (`ProgressEntry`, `_note_review`), `src/sessionorc/agent.py` (`rpc_progress`), `src/sessionorc/agent_tick.py` (`_derive_reports_inner`), `src/sessionorc/agent_common.py` (`_reported`, `_restart_reading`; `_new_done` and `_counted` unchanged), `src/agentorc/cli.py` (`ao progress done --slice`), `src/agentorc/ui/` (the Reports panel), `src/agentorc/briefs/grinder.md`, `src/agentorc/skill.md`, `tests/`; design §4.8 (the `progress` channel), §4.9a *A slice is work done*, §4.7. Held path (`src/sessionorc/**`): the techlead reads slice 1.
 
 **Why:** TD-321's design. A run that merges slices on an entry it still holds reports `done: []`, so its restart reads *early* inside `RESTART_EARLY`, counts toward the ceiling, and its third run on the entry is a *repeat* sent to the person, though each run landed work.

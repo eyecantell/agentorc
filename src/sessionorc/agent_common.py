@@ -776,15 +776,37 @@ def _recent(at: Any, now: datetime, window: timedelta) -> bool:
         return False
 
 
-def _reported(s: Session) -> dict[str, Any]:
+def _reported(s: Session, now: datetime) -> dict[str, Any]:
     """What a run reported, for the `restarts` entry of the replay that replaces it (design §4.9a
     *early from the record*, §6 rule 1; TD-249): `done`, the `{ref, pr}` of each `progress` entry
     reported `done` since the record's `created`, and `left`, the references it declared a claim on
     and neither finished nor dropped. A derived claim is the tick's reading, not the run's word; a
-    derived `done` is a merged pull request, and is work done whoever read it."""
+    derived `done` is a merged pull request, and is work done whoever read it.
+
+    **A run's `done` holds its slices** (§4.9a *A slice is work done*, TD-325): each item of a
+    claim's `slices` written since `created` is in `done` as `{ref, pr, slice: true}`, declared or
+    derived alike, and a reference with a slice that is new by `_new_done` against the `restarts`
+    inside `RESTART_WINDOW` of `now` is not `left` — a slice derived again after a replay is a pair
+    an earlier entry holds, so it is neither."""
     done = [{"ref": e.ref, "pr": e.pr} for e in s.progress if e.status == "done" and str(e.at) >= str(s.created)]
-    left = [e.ref for e in s.progress if e.status == "claimed" and e.source == "declared"]
+    done += _slices(s)
+    window = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+    moved = {d["ref"] for d in _new_done([d for d in done if d.get("slice")], window)}
+    left = [e.ref for e in s.progress if e.status == "claimed" and e.source == "declared" and e.ref not in moved]
     return {"done": done, "left": left}
+
+
+def _slices(s: Session, declared: bool = False) -> list[dict[str, Any]]:
+    """The `{ref, pr, slice: true}` of each slice on a claim of `s` written since its `created`
+    (TD-325) — the declared ones alone with `declared`."""
+    return [
+        {"ref": e.ref, "pr": item.get("pr"), "slice": True}
+        for e in s.progress
+        for item in e.slices
+        if isinstance(item, dict)
+        and str(item.get("at")) >= str(s.created)
+        and (not declared or item.get("source") == "declared")
+    ]
 
 
 def _new_done(done: Any, earlier: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -842,8 +864,9 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     after a replay the new record sits on the old branch, so the tick's first derivation writes a
     `done {ref, pr}` the last `restarts` entry already holds, and a run that then did nothing
     would read as a repeat of work it never reported. A derived `done` with a new pair is still
-    new work — a merged pull request is work done whoever read it."""
-    run = _reported(s)
+    new work — a merged pull request is work done whoever read it. A declared slice is the run's
+    word as a declared `done` is, and a derived one is not (TD-325)."""
+    run = _reported(s, now)
     entries = [r for r in s.restarts if isinstance(r, dict)]
     window = [r for r in entries if _recent(r.get("at"), now, RESTART_WINDOW)]
     new = _new_done(run["done"], window)
@@ -851,7 +874,7 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
         {"ref": e.ref, "pr": e.pr}
         for e in s.progress
         if e.status == "done" and e.source == "declared" and str(e.at) >= str(s.created)
-    ]
+    ] + [{"ref": d["ref"], "pr": d["pr"]} for d in _slices(s, declared=True)]
     last = entries[-2:]
     both = len(last) == 2
     thrice = next((ref for ref in run["left"] if both and all(ref in (r.get("left") or []) for r in last)), None)
