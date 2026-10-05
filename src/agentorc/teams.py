@@ -359,11 +359,14 @@ def flow_for(
 ) -> repoconfig.UnderFlow | None:
     """What a session of `role` in `team` is told of the team's current flow (§4.9c item 5): its
     `{flow}` line and its stage brief, for `Role.compose(flow=…)`. None for a team with no flow, and
-    for one whose current flow is not there or not usable — the start refuses such a team; a single
+    for one whose current flow is not there, cannot be read or is not usable — the start refuses such a team; a single
     session started into it composes as with no flow. `cfg` is the team's repo, whose `held:` the
     review stage names."""
     name = current_flow(team)
-    flow = flowdefs.load(name, cfg, org.roles, read=read) if name else None
+    try:
+        flow = flowdefs.load(name, cfg, org.roles, read=read) if name else None
+    except OSError:  # a node's checkout that did not answer: no flow read, never a crash past the form
+        return None
     if flow is None or not flow.usable:
         return None
     return flowdefs.under(flow, role, techlead=techlead, held=cfg.held or ())

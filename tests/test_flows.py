@@ -299,3 +299,16 @@ def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path): 
     # without the role and repo, or for a team with no flows, nothing of a flow: `{flow}` reads none
     assert "flow" not in teams.brief_ids(org, "ao-grind", HOST)
     assert "flow" not in teams.brief_ids(_with(tmp_path, flows=[]), "ao-grind", HOST, "grinder", cfg)
+
+
+def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_path):  # noqa: F811
+    # review of TD-309 slice 2a: a node's checkout that does not answer is never a 500 past the form
+    root = tmp_path / "agentorc"
+    cfg = repoconfig.load(root)
+    org = _with(tmp_path, flows=["mine"])
+
+    def down(path: Path) -> str | None:
+        raise OSError("contractmatch is not answering")
+
+    team = org.teams["ao-grind"]
+    assert teams.flow_for(org, team, cfg, "grinder", read=down) is None
