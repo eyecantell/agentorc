@@ -4680,8 +4680,11 @@ badges the session, with one line saying there is no reach to describe.
 
 **Starting and stopping** (`agentorc/teams.py` plans a start and `ao team` runs it). `ao team
 start <name>` resolves the definition, then checks *everything before launching anything*: every
-checkout exists on this host, every role and profile resolves, and every session name is free
-under §4.1's rule — a live holder refuses the whole start and names it, so there is never half a
+checkout exists on this host, every role and profile resolves — to an agent's: a profile whose
+adapter is the shell's is refused, in the words `ao team start`, Start and `ao org check` share,
+since a team session runs a brief and a shell cannot, and each session is created with its
+profile's own adapter, so no record names a profile whose tool it is not running — and every
+session name is free under §4.1's rule — a live holder refuses the whole start and names it, so there is never half a
 team (a member the team's current flow sits out is not started, and is no half: §4.9c); a holder a person suspended over an identity alarm (§4.8a) refuses it for the same reason;
 exited or closed holders are superseded as §4.1 says, which makes `ao team start`
 after a night's exit the restart too. Then it creates the manager (its grants, profile and mode —

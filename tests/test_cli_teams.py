@@ -261,6 +261,56 @@ def test_an_unresolvable_role_or_profile_aborts(world, capsys):
     assert "unknown profile 'nope'" in capsys.readouterr().err and not creates(state)
 
 
+def write_profiles(tmp_path, extra):
+    doc = {
+        "default": "paul",
+        "profiles": {p: {"account": p} for p in ("paul", "org-grind", "repo-grind", "member-grind")},
+    }
+    doc["profiles"].update(extra)
+    (tmp_path / "home" / "profiles.yml").write_text(yaml.safe_dump(doc))
+
+
+def test_a_shell_profile_aborts_the_start_for_a_member_or_the_manager(world, capsys):
+    # TD-329: a team session runs a brief, which a shell cannot — refused before anything starts,
+    # whatever the role, and in the words `ao team start`, Start and `ao org check` share (all `plan`)
+    tmp_path, state = world
+    write_profiles(tmp_path, {"sh": {"adapter": "shell"}})
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][1]["profile"] = "sh"
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "team ao-grind: hunt: profile 'sh' runs a shell, and a team session is an agent's" in err
+    assert not creates(state)
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["manager"]["profile"] = "sh"
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "orc-ao: profile 'sh' runs a shell" in capsys.readouterr().err and not creates(state)
+    with pytest.raises(teams.TeamError, match="runs a shell"):  # `--profile` on the command line too
+        teams.plan(orgmod.load(), "ao-grind", HOST, profile="sh")
+
+
+def test_a_create_sends_the_profiles_own_adapter(tmp_path):
+    # TD-329: the record never names a profile whose tool it is not running
+    x = teams.Launch(name="w", role="grinder", home="r", dir=tmp_path, team="t", project="p")
+    assert x.create_params([])["adapter"] == "claude-code"  # no profile: the default adapter
+    x.adapter = "other-agent"
+    assert x.create_params([])["adapter"] == "other-agent"
+
+
+def test_a_planned_member_carries_its_profiles_adapter(world):
+    tmp_path, state = world
+    write_profiles(tmp_path, {"member-grind": {"account": "g", "adapter": "other-agent"}})
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][1]["profile"] = "member-grind"
+    write_org(tmp_path, doc)
+    p = teams.plan(orgmod.load(), "ao-grind", HOST)
+    by = {x.name: x for x in p.launches}
+    assert by["hunt"].adapter == "other-agent" and by["hunt"].create_params([])["adapter"] == "other-agent"
+    assert by["orc-ao"].create_params([])["adapter"] == "claude-code"
+
+
 def test_a_nested_team_member_says_it_is_not_built_rather_than_pretending(world, capsys):
     tmp_path, state = world
     doc = org_doc(tmp_path)
