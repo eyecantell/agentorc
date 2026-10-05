@@ -1807,11 +1807,12 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
 
 
 def cmd_team_flow(args: argparse.Namespace) -> int:
-    """`ao team flow <team> [<flow>]` (design §4.7, §4.9c): with no flow, the team's flows in order,
-    the current one marked, each one's flow strip and why the team cannot use it; with a flow, writes
-    `teams.<team>.flow` through `set_settings` — a person's own — refused here for a flow the team
-    does not list, as a team's name is. The next start compiles it; Apply to a live team's records
-    (`--apply`, the relaunch) is TD-309 slice 5's."""
+    """`ao team flow <team> [<flow> | --apply]` (design §4.7, §4.9c): with no flow, the team's flows
+    in order, the current one marked, each one's flow strip and why the team cannot use it, and, for a
+    live team, how its records differ from what the current flow compiles to, by member; with a flow,
+    writes `teams.<team>.flow` through `set_settings` — a person's own — refused here for a flow the
+    team does not list, as a team's name is, and then applies it as `--apply` does: the sit-outs, the
+    starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per member."""
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -1820,21 +1821,38 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     team = org.teams[name]
     if not team.flows:
         return fail(args, f"team {name} lists no flows: — it runs as its definition is written (design §4.9c)", 1)
+    if args.flow is not None and args.apply:
+        return fail(args, "a flow named is applied at once: --apply is for the flow the team runs now", 2)
     if args.flow is not None:
         if args.flow not in team.flows:
             return fail(args, f"team {name} lists {', '.join(team.flows)}, not {args.flow!r} (design §4.9c)", 1)
         got = call_sync("set_settings", teams={name: {"flow": args.flow}})
-        team = orgmod.with_settings(org, got.get("teams")).teams[name]
+        org = orgmod.with_settings(org, got.get("teams"))
+        team = org.teams[name]
     here = hosts.local_host().name
     rows = teams.flow_rows(org, team, team.host or here, here)
     note = teams.flow_unlisted(team)
-    out = {"team": name, "flow": teams.current_flow(team), "flows": rows, "note": note}
+    out: dict[str, Any] = {"team": name, "flow": teams.current_flow(team), "flows": rows, "note": note}
+    applied: dict[str, Any] | None = None
+    try:
+        if args.flow is not None or args.apply:
+            applied = teamrun.apply(call_sync, org, name, here, caller=os.environ.get("AGENTORC_SESSION") or None)
+            out["apply"] = applied
+        else:
+            out["differences"] = []
+            sessions = call_sync("list")
+            if teamrun.live(teamrun.crew(name, sessions)):  # a stopped team's next start compiles the flow
+                plan = teams.plan(org, name, here, files=teamrun.files_via(call_sync))
+                out["differences"] = [d.as_dict(plan.flow) for d in teamrun.differences(plan, sessions)]
+    except (teams.TeamError, ValueError, OSError, AgentError) as e:
+        if args.flow is None and not args.apply:
+            out["differences"], out["unread"] = [], str(e)
+        else:
+            return fail(args, f"{name}: flow {'set' if args.flow else 'read'}, but not applied — {e}", 1)
 
     def prose() -> None:
         if args.flow is not None:
-            print(
-                f"{name}: flow set to {args.flow} — its next start runs it (Apply to live members: not built — TD-309)"
-            )
+            print(f"{name}: flow set to {args.flow}")
         if note:
             print(note)
         if unread := next((r["unread"] for r in rows if r.get("unread")), ""):
@@ -1845,6 +1863,20 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             print(f"{mark} {r['name']:<{w}}  {r['strip'] or '—'}")
             if r["cannot"]:
                 print(f"  {'':<{w}}  {r['cannot']}")
+        if applied is not None:
+            done = applied["applied"] + applied["skipped"]
+            if not done:
+                print(f"{applied['flow']}: every live record already matches, or the team is stopped")
+            else:
+                print(f"applied {applied['flow']}:")
+            for d in done:
+                print(f"  {d['line']}")
+        elif out.get("unread"):
+            print(f"the records are not compared: {out['unread']}")
+        elif out["differences"]:
+            print("flow changed — Apply (ao team flow " + name + " --apply):")
+            for d in out["differences"]:
+                print(f"  {d['line']}")
 
     return emit(args, out, prose)
 
@@ -3061,7 +3093,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     q = add_team("flow", help="the team's flows, the one it runs marked; with a flow, pick it (§4.9c)")
     q.add_argument("name")
-    q.add_argument("flow", nargs="?", help="one of the team's flows: — written to teams.<team>.flow")
+    q.add_argument("flow", nargs="?", help="one of the team's flows: — written to teams.<team>.flow, then applied")
+    q.add_argument("--apply", action="store_true", help="bring the live records to the flow the team runs now")
     q.set_defaults(fn=cmd_team_flow)
 
     q = add_team("balance", help="the team's balance lines: over one, its members take no new claim (§6 Balance)")

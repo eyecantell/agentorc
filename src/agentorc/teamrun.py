@@ -22,8 +22,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agentorc import flowdefs, repoconfig, teams
 from agentorc import org as orgmod
-from agentorc import teams
 from sessionorc import balance as balance_mod
 from sessionorc import hosts
 from sessionorc import ledger as ledger_mod
@@ -32,6 +32,7 @@ from sessionorc.gitinfo import work_left
 from sessionorc.work import (
     closed_finished,
     finished,
+    sat_out,
     wound_down,
 )  # one reading each for the card and the home (rules 8, 9)
 
@@ -675,6 +676,181 @@ def start(
         "unrepeatable": list(plan.warnings),
         "notes": notes,
     }
+
+
+# ── a switch of flow: the records against the compile, and Apply (design §4.9c *Switching*) ───
+
+
+@dataclass
+class Difference:
+    """One member whose record differs from what the team's current flow compiles to (§4.9c): `act`
+    is what Apply does — `sit_out` (wind it down by the home's `relaunch {sit_out}`), `start` (create
+    it as **Members…**'s add does), `relaunch` (hand the home its new launch) — or `left`, what Apply
+    never touches (a person's session the flow sits out). `what` names each field that differs."""
+
+    name: str
+    act: str
+    what: list[str] = field(default_factory=list)
+    record: dict[str, Any] | None = None
+    launch: teams.Launch | None = None
+
+    def line(self, flow: str | None) -> str:
+        if self.act == "sit_out":
+            return f"{self.name}: sits out under {flow}"
+        if self.act == "start":
+            return f"{self.name}: starts under {flow}"
+        if self.act == "left":
+            return f"{self.name}: sits out under {flow} — a person's session, left running: close it yourself"
+        return f"{self.name}: relaunched — {'; '.join(self.what)}"
+
+    def as_dict(self, flow: str | None) -> dict[str, Any]:
+        rec = self.record or {}
+        return {
+            "name": self.name,
+            "id": rec.get("id"),
+            "act": self.act,
+            "what": list(self.what),
+            "line": self.line(flow),
+        }
+
+
+def stage_of(prompt_from: Any) -> str | None:
+    """The `{stage}` file a launch's `prompt_from` names, or None where the slot is text (§4.9c)."""
+    slots = prompt_from.get("slots") if isinstance(prompt_from, dict) else None
+    slot = slots.get(repoconfig.STAGE_PLACEHOLDER) if isinstance(slots, dict) else None
+    f = slot.get("file") if isinstance(slot, dict) else None
+    return f if isinstance(f, str) else None
+
+
+def _record_stage(record: dict[str, Any]) -> tuple[bool, str | None]:
+    """The stage file a record's `brief` read, as `(known, path)`: a stage brief is a flow's file or a
+    template's `<stem>.stage.md`. Unknown where the home recorded no `brief` (a node member's, an
+    unreadable file): nothing is claimed about what was not read."""
+    sources = (record.get("brief") or {}).get("sources") if isinstance(record.get("brief"), dict) else None
+    if not isinstance(sources, list):
+        return False, None
+    for src in sources:
+        path = src.get("path") if isinstance(src, dict) else None
+        if isinstance(path, str) and _is_stage(Path(path)):
+            return True, path
+    return True, None
+
+
+def _is_stage(path: Path) -> bool:
+    """A template's `<stem>.stage.md`, or a brief of a flow: the package's or a repo's `.agentorc/flows/`."""
+    if path.name.endswith(repoconfig.STAGE_SUFFIX) or path.is_relative_to(flowdefs.PACKAGE_DIR):
+        return True
+    parts = path.parts
+    return any(parts[i : i + 2] == flowdefs.REPO_DIR.parts for i in range(len(parts) - 1))
+
+
+def _short(path: str | None) -> str:
+    return "/".join(Path(path).parts[-2:]) if path else "none"
+
+
+def _reader(review: Any) -> str:
+    return str(review.get("reader") or "none") if isinstance(review, dict) else "none"
+
+
+def _current(name: str, records: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The record a member's name stands for: the live one, else the newest not resumed as another."""
+    mine = [r for r in records if r.get("name") == name and not r.get("superseded_by")]
+    up = [r for r in mine if r.get("state") not in DEAD]
+    return (up or mine or [None])[-1]
+
+
+def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Difference]:
+    """How a live team's records differ from what its current flow compiles to (design §4.9c
+    *Switching*), member by member: lane, `review`, the `{stage}` file's path, and who should be
+    running — never `{flow}`'s text, which names no member, and nothing of a person's session but
+    that the flow sits it out. Empty for a team that runs no flow, or with nothing live."""
+    mine = badged(plan.team, sessions)
+    if plan.flow is None or not live(crew(plan.team, sessions)):
+        return []
+    out: list[Difference] = []
+    for name in plan.sit_out:
+        rec = _current(name, mine)
+        if rec is None or rec.get("state") == "closed" or rec.get("sit_out") or sat_out(rec):
+            continue
+        if rec.get("seat") is not None or rec.get("state") == "scheduled":
+            continue  # the home never sits one out (`_sit_out`)
+        out.append(Difference(name, "left" if persons(rec) else "sit_out", record=rec))
+    for x in plan.launches:
+        rec = _current(x.name, mine)
+        if rec is None or sat_out(rec):
+            out.append(Difference(x.name, "start", record=rec, launch=x))
+            continue
+        if rec.get("sit_out"):
+            continue  # still winding down from a sit-out: once the home has closed it, it reads `start`
+        if persons(rec) or rec.get("state") == "closed":
+            continue  # a person's lane and brief are theirs; a closed member is the next Start's
+        what = []
+        if list(rec.get("lane") or []) != list(x.lane):
+            what.append(f"lane {', '.join(rec.get('lane') or []) or 'none'} → {', '.join(x.lane) or 'none'}")
+        if (rec.get("review") or None) != (x.review or None):
+            what.append(f"reader {_reader(rec.get('review'))} → {_reader(x.review)}")
+        known, was = _record_stage(rec)
+        now = stage_of(x.prompt_from)
+        if known and was != now:
+            what.append(f"stage {_short(was)} → {_short(now)}")
+        if what:
+            out.append(Difference(x.name, "relaunch", what, record=rec, launch=x))
+    return out
+
+
+def relaunch_params(x: teams.Launch) -> dict[str, Any]:
+    """The `relaunch` RPC's `launch`: the four keys it replaces, an absent one sent as None so the
+    home removes it (a switch to `build` takes `review` off)."""
+    return {"prompt": x.prompt, "prompt_from": x.prompt_from, "lane": list(x.lane), "review": x.review}
+
+
+def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | None = None) -> dict[str, Any]:
+    """**Apply** and `ao team flow <team> --apply` (design §4.9c *Switching*): compile the team's
+    current flow, read its records against it, and per member sit it out, start it or relaunch it —
+    a person's own, since the home's `relaunch` is. A member that cannot be reached, or whose call is
+    refused, is skipped and said; the others are applied. Returns `{team, flow, applied, skipped}`,
+    each entry `{name, act, line}`; nothing for a stopped team, whose next start compiles the flow."""
+    sessions = call("list")
+    if not live(crew(name, sessions)):  # a stopped team: its next start compiles the flow
+        return {"team": name, "flow": teams.current_flow(org.teams[name]), "applied": [], "skipped": []}
+    plan = teams.plan(org, name, host, files=files_via(call))
+    diffs = differences(plan, sessions)
+    lead = next((s for s in live(badged(name, sessions)) if plan.manager_id in (s.get("name"), s.get("id"))), None)
+    lead_id = str(lead["id"]) if lead else ""
+    out: dict[str, Any] = {"team": name, "flow": plan.flow, "applied": [], "skipped": []}
+    for d in diffs:
+        row = d.as_dict(plan.flow)
+        rec = d.record or {}
+        if d.act == "left":
+            out["skipped"].append(row)
+            continue
+        if rec.get("state") == "unreachable":
+            row["line"] = f"{d.name}: {rec.get('host') or 'its host'} is not answering — applied to the others"
+            out["skipped"].append(row)
+            continue
+        try:
+            if d.act == "sit_out":
+                call("relaunch", id=rec["id"], sit_out=True)
+            elif d.act == "relaunch":
+                call("relaunch", id=rec["id"], launch=relaunch_params(d.launch))
+            else:
+                x = d.launch
+                on = {"host": x.host} if x.host else {}
+                verdict = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on)
+                if verdict.get("verdict") in ("live", "suspended"):
+                    raise teams.TeamError(f"held by a live session ({verdict.get('id') or x.name})")
+                keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
+                keep = {"keep_mail": True} if keeps else {}
+                ctl = [lead_id] if lead_id and x is not plan.lead else []
+                got = call("create", **x.create_params(ctl), **keep)
+                row["id"] = got.get("id")
+                row["line"] += "".join(f" — {n}" for n in said)
+        except (AgentError, teams.TeamError) as e:
+            row["line"] = f"{d.name}: not applied — {e}"
+            out["skipped"].append(row)
+            continue
+        out["applied"].append(row)
+    return out
 
 
 def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]]) -> list[dict[str, Any]]:

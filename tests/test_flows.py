@@ -622,3 +622,133 @@ def test_ao_org_check_warns_of_each_key_the_flow_fills_the_same(world, tmp_path,
     t["members"][0]["lane"] = ["free-pick", "owner:grinder"]
     org = _write(tmp_path, doc)
     assert teams.flow_redundant(org, org.teams["ao-grind"], HOST, HOST) == []
+
+
+# ── the switch: the records against the compile, and Apply (TD-309 slice 5c) ─────────────────────
+
+
+def _switching(world, tmp_path, monkeypatch, flows):  # noqa: F811
+    """A live ao-grind under `flows[0]`, its records as the start created them, each carrying the
+    `brief` the home records (the stage file among its sources); `relaunch` calls answered and kept."""
+    from agentorc import cli, teamrun
+
+    _, state = world
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=flows, techlead={"name": "techlead-ao", "home": "agentorc"})
+    del t["members"][0]["lane"]
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    org = _write(tmp_path, doc)
+    plan, _ = teamrun.start(cli.call_sync, org, "ao-grind", HOST)
+    for x, rec in zip(plan.launches, state["sessions"], strict=True):
+        stage = teamrun.stage_of(x.prompt_from)
+        rec.update(brief={"sources": [{"path": stage}] if stage else []}, seat=(x.trigger if x.seat else None))
+    fake = cli.call_sync
+
+    def call(method, **params):
+        if method == "relaunch":
+            state["calls"].append((method, params))
+            return next(s for s in state["sessions"] if s["id"] == params["id"])
+        return fake(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    state["calls"].clear()
+    return state, doc
+
+
+def test_a_team_running_its_flow_reads_no_difference(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    from agentorc import cli
+
+    _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+    assert cli.main(["team", "flow", "ao-grind"]) == 0
+    assert "flow changed" not in capsys.readouterr().out
+
+
+def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_moved(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """§4.9c *Switching*: `ao team flow <team> <flow>` writes the pick and applies it — the designer
+    `build-review` gives no stage sits out by the home's `relaunch {sit_out}`, a grinder whose stage
+    brief moved is handed its new launch, and the seat whose review brief is the same is untouched;
+    then `build` takes the grinders' reader off and the seat's stage brief away."""
+    from agentorc import cli
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review", "build"])
+    assert cli.main(["team", "flow", "ao-grind", "build-review"]) == 0
+    out = capsys.readouterr().out
+    assert state["teams"]["ao-grind"] == {"flow": "build-review"}
+    calls = [(m, p) for m, p in state["calls"] if m == "relaunch"]
+    sat = [p for _, p in calls if p.get("sit_out")]
+    assert [p["id"] for p in sat] == ["ao-agentorc-designer-ao"]
+    handed = {p["id"]: p["launch"] for _, p in calls if "launch" in p}
+    assert sorted(handed) == ["ao-agentorc-grind-1", "ao-agentorc-grind-2"]
+    launch = handed["ao-agentorc-grind-1"]
+    assert sorted(launch) == ["lane", "prompt", "prompt_from", "review"]
+    assert launch["prompt_from"]["slots"]["{stage}"]["file"].endswith("build-review/build.md")
+    assert "designer-ao: sits out under build-review" in out
+    assert "grind-1: relaunched — stage td/build.md → build-review/build.md" in out
+    # the home took them (the fake does not): the records now read as the new launch
+    for s in state["sessions"]:
+        if s["id"] in handed:
+            s["brief"] = {"sources": [{"path": handed[s["id"]]["prompt_from"]["slots"]["{stage}"]["file"]}]}
+        if s["id"] == "ao-agentorc-designer-ao":
+            s.update(state="closed", closed_for={"why": "sit_out"})
+    state["calls"].clear()
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+    # `build`: no review stage — the reader comes off (sent as None, so the home removes it)
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build"]) == 0
+    got = json.loads(capsys.readouterr().out)["apply"]
+    handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch"}
+    assert handed["ao-agentorc-grind-1"]["review"] is None
+    assert handed["ao-agentorc-techlead-ao"]["prompt_from"]["slots"]["{stage}"].get("file") is None
+    lines = [d["line"] for d in got["applied"]]
+    assert any(x.startswith("grind-1: relaunched — reader techlead → none") for x in lines)
+
+
+def test_a_switch_back_starts_the_member_that_sat_out(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    from agentorc import cli
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["build-review", "td"])
+    assert "ao-agentorc-designer-ao" not in [s["id"] for s in state["sessions"]]  # sat out at the start
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+    assert cli.main(["team", "flow", "ao-grind", "td"]) == 0
+    assert "designer-ao: starts under td" in capsys.readouterr().out
+    made = [p for m, p in state["calls"] if m == "create"]
+    assert [p["name"] for p in made] == ["designer-ao"] and made[0]["controllers"] == ["ao-agentorc-orc-ao"]
+    assert made[0]["lane"] == ["design-first", "owner:designer"]
+
+
+def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    from agentorc import cli
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    for s in state["sessions"]:
+        if s["name"] == "designer-ao":
+            s["unattended"] = False  # a person's own session in the team (§4.9 *A person in the team*)
+        if s["name"] == "grind-2":
+            s.update(state="unreachable", host="devenv")
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    assert json.loads(capsys.readouterr().out)["apply"]["applied"] == []  # td is current: nothing differs
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build-review"]) == 0
+    got = json.loads(capsys.readouterr().out)["apply"]
+    assert [d["name"] for d in got["applied"]] == ["grind-1"]
+    skipped = {d["name"]: d["line"] for d in got["skipped"]}
+    assert skipped == {
+        "designer-ao": "designer-ao: sits out under build-review — a person's session, left running: close it yourself",
+        "grind-2": "grind-2: devenv is not answering — applied to the others",
+    }
+    assert not [p for m, p in state["calls"] if m == "relaunch" and p["id"] != "ao-agentorc-grind-1"]
+    assert cli.main(["team", "flow", "ao-grind", "td", "--apply"]) == 2
