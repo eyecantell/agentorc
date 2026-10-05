@@ -988,10 +988,8 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
     in the same words in every preset whose session writes to the person, and in the designer's."""
     root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
-    for name in ("techlead.md", "manager.md", "grinder.md"):
+    for name in ("techlead.md", "manager.md", "grinder.md", "designer.md"):  # the designer a preset since TD-309
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
-    designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
-    assert SHAPE in designer.read_text(encoding="utf-8")  # the fourth writer, whose brief is the repo's
 
 
 @pytest.mark.unit
@@ -1104,7 +1102,7 @@ def test_the_manager_brief_names_none_of_the_four_jobs_the_tick_took():
     ):
         assert gone not in text and gone not in supplement, gone
     assert "one `ao send --wait` naming the PR" not in text and "naming the PR and the rule" not in supplement
-    assert "gh pr list --state merged" not in supplement and "§6 rule 11: `held_missed`" in supplement
+    assert "gh pr list --state merged" not in supplement and "`held_missed`" in text  # the template says it (TD-114)
     # rule 4 types into no node's pane, so the one line a manager still sends is to a member on another host
     assert "except to a member on another host" in text and "for the debt alone" in text
     assert "`checks` in `--json`" in text and "`held_missed` on the member's record" in text
