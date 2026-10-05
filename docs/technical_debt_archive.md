@@ -3648,3 +3648,21 @@ Both go away only when the record says who closed it.
 **Why:** the board is where a session leaves what needs Paul, and the Inbox is where Paul acts on it; every other row's act goes back to a session with a press, and this one's goes back through a text editor.
 
 **Related:** TD-125 (the board only for what waits on the person), TD-069 (the Inbox page), TD-120 (the designer's lane), the SessionStart hook (cadence §3).
+
+## TD-322: The pull's note quotes git's last stderr line, which for a failed fetch can be *and the repository exists.*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-1, the scratch home of TD-264's UI check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Fixed — PR #1044.
+
+**Resolved:** 2026-10-04 (PR #1044) — `promote._git` keeps git's first `fatal:`/`error:` line, the last only when neither appears; `tests/test_pull.py`.
+**Location:** `src/sessionorc/promote.py` (`_git`: `(cp.stderr …).splitlines()[-1]`), the pull's reading (`pull`, `fetch_why`), the Inbox's *behind* note tail (§4.5 screen 6, §6 *Pull*)
+
+**Why:** on a scratch home whose fixture repo had no origin when the home's pull first ran, the board's origin note read *read from origin/main: this checkout has not pulled it yet — it could not be pulled: git fetch: and the repository exists.* — git's fetch error is several lines (*'origin' does not appear to be a git repository … Please make sure you have the correct access rights and the repository exists.*), and `promote._git` keeps the last, which says nothing about what went wrong.
+
+**Fix:** keep git's first `fatal:`/`error:` line (as `_git_why` in the same module already does), not the last; a test with a remote that does not exist.
+
+**Related:** TD-263 (the pull), TD-264 (where it was seen).
