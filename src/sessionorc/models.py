@@ -1329,8 +1329,9 @@ def _note_review(old: ProgressEntry, derived: ProgressEntry) -> bool:
     writes no slice. True only when that changed, so the record is saved only then."""
     if old.source != "declared" or old.status != "claimed" or derived.source == "declared":
         return False
-    # the claim's own `--pr` merging is that claim's PR, not a slice beside it (review of TD-325)
-    merged = derived.status == "done" and bool(derived.pr) and derived.why != PR_CLOSED and derived.pr != old.pr
+    # the claim's own `--pr` merged is a slice too, while the claim is held: the merge is work done,
+    # and a plain `done --pr` after it keeps the slice, read as one pair (techlead, #1055)
+    merged = derived.status == "done" and bool(derived.pr) and derived.why != PR_CLOSED
     sliced = merged and old.add_slice(int(derived.pr or 0), "derived")
     want = derived.pr if derived.status == "claimed" and derived.pr and derived.why != PR_CLOSED else None
     if want == old.review_pr:

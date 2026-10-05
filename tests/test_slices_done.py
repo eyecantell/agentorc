@@ -52,7 +52,8 @@ def test_a_derived_merge_on_a_declared_claim_is_held_once_as_a_slice():
     assert s.note_review(ProgressEntry(ref="TD-1", status="claimed", pr=1026, source="derived", why=PR_CLOSED)) is False
     assert s.note_review(ProgressEntry(ref="TD-1", status="claimed", pr=1027, source="derived")) is True
     assert claim.review_pr == 1027 and len(claim.slices) == 1
-    # a claim declared with its own `--pr` that merges holds no slice of it
+    # a claim declared with its own `--pr` that merges holds it once as a derived slice: the session
+    # that forgets `--slice` is still counted (§4.9a *A slice is work done*; techlead on #1055)
     own = Session(
         id="ao-t-v",
         name="v",
@@ -61,8 +62,10 @@ def test_a_derived_merge_on_a_declared_claim_is_held_once_as_a_slice():
         dir="/tmp/x",
         progress=[ProgressEntry(ref="TD-2", pr=900)],
     )
+    assert own.note_review(ProgressEntry(ref="TD-2", status="done", pr=900, source="derived")) is True
+    assert [(x["pr"], x["source"]) for x in own.progress[0].slices] == [(900, "derived")]
     assert own.note_review(ProgressEntry(ref="TD-2", status="done", pr=900, source="derived")) is False
-    assert own.progress[0].slices == []
+    assert own.progress[0].status == "claimed" and own.progress[0].pr == 900
     # declared after it was derived: held once, now the session's word
     assert claim.add_slice(1025, "declared") is True and claim.slices == [{**claim.slices[0], "source": "declared"}]
     assert claim.add_slice(1025, "derived") is False and claim.slices[0]["source"] == "declared"
