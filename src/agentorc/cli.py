@@ -28,6 +28,7 @@ from sessionorc.adapters import short_model
 from sessionorc.cadence import said as cadence_said
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
+from sessionorc.gitinfo import work_left
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
@@ -2536,8 +2537,15 @@ def cmd_host(args: argparse.Namespace) -> int:
     from sessionorc import containers
 
     try:
+        ended: list[dict[str, Any]] | None = None
+        if args.action in ("rebuild", "forget"):
+            ended, refused = _clear_node(args)
+            if refused is not None:
+                return refused
         if args.action in ("up", "rebuild"):
             out = containers.host_up(args.name, rebuild=args.action == "rebuild")
+            if ended is not None:
+                out["ended"] = ended
             return emit(
                 args,
                 out,
@@ -2545,10 +2553,13 @@ def cmd_host(args: argparse.Namespace) -> int:
                     f"{out['node']}: container {out['container'][:12]} as {out['user']}, {out['wheel']} installed; "
                     + ("agent started" if out["started"] else f"agent already running (pid {out['pid']})")
                     + " — `ao status` shows its card once it dials in"
+                    + _ended_words(out)
                 ),
             )
         if args.action == "forget":
             out = containers.host_forget(args.name, purge=args.purge)
+            if ended is not None:
+                out["ended"] = ended
             try:
                 out["records"] = call_sync("forget_host", host=args.name)
             except (AgentError, AgentUnavailable) as e:
@@ -2560,6 +2571,7 @@ def cmd_host(args: argparse.Namespace) -> int:
                     f"{out['node']}: container {'removed' if out['container'] else 'none'}, link directory removed, "
                     f"`nodes:` entry {'removed' if out['entry_removed'] else 'not found'}, "
                     f"volume {'kept' if out['volume_kept'] else 'purged'}; records at the home: {out['records']}"
+                    + _ended_words(out)
                 ),
             )
         out = containers.host_status(args.name)
@@ -2589,6 +2601,82 @@ def cmd_host(args: argparse.Namespace) -> int:
         return emit(args, out, prose)
     except containers.ContainerError as e:
         return fail(args, str(e), 2)
+
+
+def _clear_node(args: argparse.Namespace) -> tuple[list[dict[str, Any]] | None, int | None]:
+    """Before `ao host rebuild|forget` touches the container (design §4.4a, TD-316): the home's live
+    records on the node, which the container's end would end with no wrap-up. Returns what
+    `--force` goes on to end (None when the home could not say) and a refusal's exit code, or None
+    to go on. `--wind-down` stops each team there and closes what settled clean and pushed."""
+    from sessionorc import containers
+
+    name = args.name
+    try:
+        live = containers.live_on_node(call_sync("list"), name)
+    except (AgentError, AgentUnavailable) as e:
+        if args.force:
+            return None, None
+        msg = f"{name}: cannot ask the home which sessions live on it ({e}); the container is unchanged"
+        return None, fail(args, msg, 1, hint="--force goes on without asking")
+    if not live or args.force:
+        return live, None
+    if not args.wind_down:
+        msg = (
+            f"{name} holds {len(live)} live session(s), which the {args.action} would end with no wrap-up: "
+            f"{containers.by_team(live)}; the container is unchanged"
+        )
+        hint = "--wind-down wraps their teams up first; --force ends them as they are"
+        return None, fail(args, msg, 1, hint=hint, sessions=[s["id"] for s in live])
+    stays = [s for s in live if not s.get("team") or teamrun.persons(s)]
+    if stays:
+        msg = (
+            f"{name}: --wind-down stops teams, and these are no team's or a person's: "
+            f"{containers.by_team(stays)}; nothing was sent and the container is unchanged"
+        )
+        return None, fail(args, msg, 1, hint="end them yourself, or --force", sessions=[s["id"] for s in stays])
+    try:
+        org = _org_here()
+    except ValueError as e:
+        return None, fail(args, f"{name}: --wind-down needs the team definitions: {e}", 1)
+    caller = os.environ.get("AGENTORC_SESSION")
+    for team in sorted({str(s["team"]) for s in live}):
+        try:
+            st = teamrun.stop_members(call_sync, org, team, caller=caller)
+        except (teams.TeamError, ValueError) as e:
+            print(f"team {team}: {e}", file=sys.stderr)
+            continue
+        teamrun.stop_lead(call_sync, st, timeout=args.timeout, close=True)
+    # the lead's wrap-up is sent last and `stop_lead` waits on nobody for it: wait here for every
+    # session on the node, then close each that settled with nothing to lose
+    ids = [s["id"] for s in containers.live_on_node(call_sync("list"), name)]
+    teamrun.wait_settled(call_sync, ids, args.timeout)
+    closed = []
+    for s in containers.live_on_node(call_sync("list"), name):
+        if s["state"] in teamrun.SETTLED and not work_left(s.get("git")):
+            call_sync("close", id=s["id"])
+            closed.append(s["id"])
+    if closed:
+        print(f"{name}: wound down and closed: {', '.join(closed)}", file=sys.stderr)
+    left = containers.live_on_node(call_sync("list"), name)
+    if left:
+        msg = (
+            f"{name}: wound down, and still live there: {containers.by_team(left)} — "
+            "working, or holding uncommitted or unpushed work; the container is unchanged"
+        )
+        return None, fail(
+            args, msg, 1, hint="run it again once they settle, or --force", sessions=[s["id"] for s in left]
+        )
+    return [], None
+
+
+def _ended_words(out: dict[str, Any]) -> str:
+    """`--force`'s report: what the container's end took with it."""
+    ended = out.get("ended")
+    if not ended:
+        return ""
+    from sessionorc import containers
+
+    return f"\nended with the container, no wrap-up: {containers.by_team(ended)}"
 
 
 def fail(args: argparse.Namespace, message: str, code: int, prose: str | None = None, **extra: Any) -> int:
@@ -3116,6 +3204,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["up", "rebuild", "forget", "status"])
     p.add_argument("name", help="the `nodes:` entry in hosts.yml with a `container:` block")
     p.add_argument("--purge", action="store_true", help="forget: also delete the node's volume (its run logs)")
+    ends = p.add_mutually_exclusive_group()
+    ends.add_argument(
+        "--wind-down",
+        action="store_true",
+        help="rebuild/forget: stop each team with a session on the node first, then go on once none is live",
+    )
+    ends.add_argument(
+        "--force", action="store_true", help="rebuild/forget: end the node's live sessions as they are, and say which"
+    )
+    p.add_argument(
+        "--timeout",
+        type=float,
+        default=300.0,
+        help="--wind-down: seconds each wait for them may take — per team, then once for the node (default: 300)",
+    )
     p.set_defaults(fn=cmd_host)
 
     p = add("pr", help="whether a PR waits for this session's reader (design §4.9b *The reader*)")
