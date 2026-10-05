@@ -259,3 +259,13 @@ async def test_the_home_pass_pulls_and_host_carries_the_reading(agent, repo, mon
     async with LocalClient(caller="ao-some-worker") as worker:
         with pytest.raises(AgentError, match="a person's own"):
             await worker.call("set_settings", repos={"repo": {"pull": True}})
+
+
+def test_a_failed_fetch_says_what_went_wrong_not_gits_advice(repo):
+    """TD-322: git's fetch error ends *… and the repository exists.*; the reading keeps its first
+    `fatal:` line, which names the remote."""
+    root, _ = repo
+    _git(root, "remote", "set-url", "origin", str(root.parent / "nowhere.git"))
+    out, why = promote._git(root, "fetch", "origin")
+    assert out is None and why.startswith("git fetch: fatal:") and "nowhere.git" in why
+    assert "repository exists" not in why

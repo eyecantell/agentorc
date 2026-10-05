@@ -78,7 +78,11 @@ def _git(root: str | Path, *args: str, timeout: float = GIT_TIMEOUT) -> tuple[st
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, f"git {args[0]}: {type(e).__name__}"
     if cp.returncode != 0:
-        return None, f"git {args[0]}: " + ((cp.stderr or "").strip().splitlines() or ["failed"])[-1][:200]
+        # git's first `fatal:`/`error:` line says what went wrong; its last may be advice (*… and the
+        # repository exists.*, TD-322), so it is kept only when no line carries either prefix
+        lines = [ln.strip() for ln in (cp.stderr or "").splitlines() if ln.strip()] or ["failed"]
+        why = next((ln for ln in lines if ln.startswith(("fatal:", "error:"))), lines[-1])
+        return None, f"git {args[0]}: {why[:200]}"
     return cp.stdout.strip(), ""
 
 
