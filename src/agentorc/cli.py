@@ -306,6 +306,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      spend:  {line}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
+            if line := slices_line(s):
+                print(f"{'':<{w}}      slices: {line}")
             if checks := s.get("checks"):  # design §6 rule 10 (TD-258): the last check per PR
                 print(f"{'':<{w}}      checks: {'; '.join(cadence_said(c) for c in checks)}")
             if s.get("findings"):
@@ -1894,6 +1896,20 @@ def cmd_control(args: argparse.Namespace) -> int:
     return 1 if refused else 0
 
 
+def slices_line(s: dict[str, Any]) -> str:
+    """`ao status -v`'s *slices:* line (design §4.8, TD-325): each claim still held with the merged
+    PRs held as its slices — `TD-309 #1025, #1027` — a slice the tick derived marked `~`, as a
+    derived entry is. Empty when no claim holds one."""
+    out = []
+    for p in s.get("progress") or []:
+        if p.get("status") == "claimed" and p.get("slices"):
+            prs = ", ".join(
+                f"#{x['pr']}" + ("~" if x.get("source") != "declared" else "") for x in p["slices"] if x.get("pr")
+            )
+            out.append(f"{p['ref']} {prs}")
+    return "; ".join(out)
+
+
 def _finding(f: dict[str, Any]) -> str:
     pri = f" ({f['priority']})" if f.get("priority") else ""
     return f["ref"] + ("~" if f.get("source") != "declared" else "") + pri
@@ -1968,13 +1984,25 @@ def cmd_progress(args: argparse.Namespace) -> int:
         return emit(args, s, lambda: print(f"{s['id']}: restart wanted{early} — {want['why']}{decided}"))
     if not args.ref:
         return fail(args, f"ao progress {args.action} needs a reference", 2)
+    if args.slice and (args.action != "done" or not args.pr):
+        return fail(args, f"--slice goes with ao progress done {args.ref} --pr <n>: a slice is a merged PR", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
-    # `force` only when asked (TD-062 fix (a)): unset is `None`, which the client leaves out of the
-    # envelope, so a host agent older than TD-056 still answers every call that does not force
-    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force or None)
+    # `force` and `slice` only when asked (TD-062 fix (a)): unset is `None`, which the client leaves
+    # out of the envelope, so an older host agent still answers every call that does not use them
+    s = call_sync(
+        "progress",
+        id=sid,
+        ref=args.ref,
+        status=status,
+        pr=args.pr,
+        why=args.why,
+        force=args.force or None,
+        slice=args.slice or None,
+    )
     if (held := s.get("lease_overridden")) and not args.json:
         print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
-    return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
+    # a slice (TD-325): the reply says the entry stays claimed, which the report line cannot
+    return emit(args, s, lambda: print(f"{s['id']}: {s.get('slice') or report_line(s) or args.ref}"))
 
 
 def cmd_doing(args: argparse.Namespace) -> int:
@@ -3109,6 +3137,12 @@ def build_parser() -> argparse.ArgumentParser:
         "is over (required for both)",
     )
     p.add_argument("--force", action="store_true", help="claim a reference another live session holds (design §4.8)")
+    p.add_argument(
+        "--slice",
+        action="store_true",
+        help="with done --pr: a slice merged and the entry still yours — it stays claimed; the last "
+        "slice is a plain done (design §4.8, §4.9a)",
+    )
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
 
