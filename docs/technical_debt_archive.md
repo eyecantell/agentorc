@@ -4651,3 +4651,21 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Resolved:** 2026-10-05 (PR #1100) — `teams._launch` refuses a profile whose adapter is `profiles.SHELL_ADAPTER` for any team session, and `Launch.create_params` sends the profile's adapter; design §4.9 *Starting and stopping*; tests in `tests/test_cli_teams.py`.
 
 **Done when:** a team start never records a profile whose adapter differs from the session's.
+
+## TD-308: A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-1, a TD-297 press on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built — PR #1015 (`_ended_by` reads the record still standing: *pushed* only when its git reads clean, *answered in the terminal* only when the record waits on nobody). Known limits, from the review: an `unpushed` row that was only uncommitted files and was discarded also reads *pushed*; a `limited` row that ends with no fresh usage reading reads *the limit reset*. The row template's *resolved: resolved* for a bare *resolved* is left: the words now say how wherever the home can tell.
+**Location:** `src/sessionorc/agent_attention.py` (`_trail_append`: `how = … or ended or "resolved"`), `src/sessionorc/agent_common.py` (`_ended_by`: only *the session was closed* / *the session exited*); design §4.10 *The Inbox is a queue* (the trail's `how` words)
+
+**Why:** design §4.10 lists what the home can tell as a trail row's `how`: *allowed by you*, *denied by you*, *answered in the terminal*, *resumed*, *pushed*, *forgotten*, *the session exited*, *the session was closed*, *the limit reset*, *dismissed by you*, and plain *resolved* only when it cannot tell. Nothing writes *pushed*, *answered in the terminal* or *the limit reset*. On a scratch home on 2026-10-04 an exited session's `unpushed` row ended because its repo was pushed, and FYI drew *resolved: resolved ×2* — which says nothing, and doubles the word.
+
+**Resolved:** 2026-10-05 (PR #1015) — `agent_common._ended_by` gives a row that ended while its record still stands the word §4.10 lists: *pushed* for an `unpushed` row whose git reads clean, *answered in the terminal* for a pending cleared with no `decide` and the record waiting on nobody, *the limit reset* for `limited`; a cleared stall stays *resolved*. Tests: `tests/test_attention.py::test_a_row_its_session_ended_says_so` and `::test_a_row_that_resolves_itself_leaves_a_trail`, and the FYI row's *resolved: <how>* in `tests/test_ui_inbox.py`. The two limits the review named stand as cases the home cannot tell apart: an `unpushed` row of uncommitted files that were discarded reads *pushed*, and a `limited` row that clears with no fresh usage reading reads *the limit reset*.
+
+**Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
+
+**Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.

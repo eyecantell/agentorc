@@ -88,7 +88,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
-| TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
 | TD-309 | Build flows (design §4.9c): the loader, stage briefs and the three brief layers, the team's `flows:` and the `flow` setting, the compile, `ao team flow` and Apply with the relaunch, the card's strip and marks | Medium | Slice 1 built (the loader and its checks) |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Open |
 | TD-313 | Build role directories (the org's and a repo's) and the org's flow directories, with the home's history tracking them — design §4.9c, the second part of the flows build | Low | Open |
@@ -1520,24 +1519,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** design §4.9c — done 2026-10-04; build in TD-309, move the repos in TD-310.
 
 **Related:** TD-114 (the brief cut, the other half of the copying), TD-209/TD-229 (the repo's own definitions), TD-180 (`entries:`), TD-214 (owner words), TD-093 (the reader).
-
-## TD-308: A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-04 (grinder-ao-1, a TD-297 press on a scratch home)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built — PR #1015 (`_ended_by` reads the record still standing: *pushed* only when its git reads clean, *answered in the terminal* only when the record waits on nobody). Known limits, from the review: an `unpushed` row that was only uncommitted files and was discarded also reads *pushed*; a `limited` row that ends with no fresh usage reading reads *the limit reset*. The row template's *resolved: resolved* for a bare *resolved* is left: the words now say how wherever the home can tell.
-**Location:** `src/sessionorc/agent_attention.py` (`_trail_append`: `how = … or ended or "resolved"`), `src/sessionorc/agent_common.py` (`_ended_by`: only *the session was closed* / *the session exited*); design §4.10 *The Inbox is a queue* (the trail's `how` words)
-
-**Why:** design §4.10 lists what the home can tell as a trail row's `how`: *allowed by you*, *denied by you*, *answered in the terminal*, *resumed*, *pushed*, *forgotten*, *the session exited*, *the session was closed*, *the limit reset*, *dismissed by you*, and plain *resolved* only when it cannot tell. Nothing writes *pushed*, *answered in the terminal* or *the limit reset*. On a scratch home on 2026-10-04 an exited session's `unpushed` row ended because its repo was pushed, and FYI drew *resolved: resolved ×2* — which says nothing, and doubles the word.
-
-**Fix:** in `_ended_by` (or beside it), the word for a row that ended while its record still stands and no act wrote one: `unpushed` on a record still `exited` → *pushed*; `permission` / `question` with no `decide` → *answered in the terminal*; `limited` → *the limit reset*. `stalled?` keeps *resolved*. Tests in the attention-trail tests for each. Optionally the row template draws a bare *resolved* rather than *resolved: resolved*.
-
-**Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
-
-**Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.
 
 ## TD-309: Build flows: design §4.9c
 
