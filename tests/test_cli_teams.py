@@ -1343,6 +1343,7 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
         "commands": [],
         "teams": {},
         "promote": {"run": "scripts/promote.sh", "check": "scripts/live_sha.sh"},
+        "held": ["src/sessionorc/**"],
     }
     assert named == set(accepted)
     for key, value in accepted.items():
@@ -1538,6 +1539,10 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert "not a seat's role" in capsys.readouterr().err
     doc["teams"]["ao-grind"]["seats"] = [{"name": "audit-ao", "role": "hunter", "trigger": {"every": "6h"}}]
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) != 0  # a hunter is a worker, and a seat takes a seat role (§4.9c)
+    assert "a seat takes a seat role, and 'hunter' is a worker" in capsys.readouterr().err
+    doc["teams"]["ao-grind"]["seats"] = [{"name": "audit-ao", "role": "auditor", "trigger": {"every": "6h"}}]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     assert cli.main(["team", "start", "ao-grind"]) == 0
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "audit-ao", "grind-1", "grind-2", "hunt"]
@@ -1549,15 +1554,15 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert seats["orc-ao"] == {"trigger": "team"}  # the manager, on call by default (§4.9 `on_call`, TD-259)
     assert all(seats[n] is None for n in ("grind-1", "grind-2", "hunt"))  # never sent unset
     audit = made[2]
-    # neither the role's grants nor its lane (the hunter preset has both): a seat's area is its brief's
-    assert audit["role"] == "hunter" and audit["capabilities"] == [] and audit["lane"] == []
+    # no lane, whatever its role's: a seat's area is its brief's
+    assert audit["role"] == "auditor" and audit["capabilities"] == [] and audit["lane"] == []
     assert "(none given)" in audit["prompt"]
     assert audit["controllers"] == ["ao-agentorc-orc-ao"] and audit["team"] == "ao-grind"
     assert "`ao-agentorc-techlead-ao`" in audit["prompt"]
-    assert "ao-agentorc-audit-ao  seat hunter" in capsys.readouterr().out
+    assert "ao-agentorc-audit-ao  seat auditor" in capsys.readouterr().out
     assert cli.main(["team", "list", "--json"]) == 0
     (row,) = json.loads(capsys.readouterr().out)["teams"]
-    assert row["seats"] == [{"name": "audit-ao", "role": "hunter", "trigger": "every", "after": "6h"}]
+    assert row["seats"] == [{"name": "audit-ao", "role": "auditor", "trigger": "every", "after": "6h"}]
     org = cli._org_here()
     done = {"at": "2026-09-21T06:00:00Z", "why": "nothing left"}
     sessions = [

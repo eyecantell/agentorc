@@ -1,0 +1,2 @@
+## The path: build
+Your stage is the whole path: you pick what your lane gives and take it to a merged PR, and nothing waits for a reader. After the independent review, once the cadence check (`/cadence`) exits 0, merge and archive the ledger entry; `ao pr held <n>` says *not held* for every PR in this flow.

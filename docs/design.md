@@ -5603,7 +5603,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
 
 ### 4.9c Flows: the path an entry takes through a team
 
-**TD-307; designed 2026-10-04, not built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Paul (2026-10-04): *our current example is for a TD, which is
+**TD-307; designed 2026-10-04, part built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Built (TD-309 slice 1): the package's three flows and a repo's flow directories read and judged usable (`agentorc.flowdefs`), `kind` on the presets, the top-level `held:`, `flows:` on a team, the slots' kind checks, and a start refused — `ao org check` failing — on a listed flow that is unknown, not usable or cannot be followed. `designer` is not a preset yet, so `td` is usable only where a repo defines that role; the briefs' slots, the compile, the setting and the switch are not built. Paul (2026-10-04): *our current example is for a TD, which is
 something like [designer if needed] → [grinder + ui review if needed] → [techlead] → [escalate to me
 if needed], but I believe each repo is currently having to define this separately. It seems
 prudent to have the flow defined once then reused, and to give the ability to create more flows*;
@@ -7350,7 +7350,7 @@ roles:                                # §4.8 presets; every key optional, built
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
-held: ["src/sessionorc/**"]           # §4.9c (TD-307, not built — TD-309): the paths a review stage holds (the `build` flow holds nothing)
+held: ["src/sessionorc/**"]           # §4.9c (TD-307; read since TD-309 slice 1): the paths a review stage holds (the `build` flow holds nothing)
                                       # this repo's own flows and roles are directories in .agentorc/, not keys (§4.9c)
 teams:                                # §4.9: the repo's own teams, aggregated into the org (TD-210); org.yml wins a name
   grind: {flows: [build], manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}

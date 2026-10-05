@@ -1,0 +1,5 @@
+# The built-in flow `td` (design §4.9c, TD-309): design → build → review; the stage briefs beside it.
+stages:
+  - {name: design, role: designer, lane: [design-first, "owner:designer"], brief: design.md}
+  - {name: build,  role: grinder,  lane: [free-pick, "owner:grinder"],     brief: build.md}
+  - {name: review, role: techlead,                                          brief: review.md}
