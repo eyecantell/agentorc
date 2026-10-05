@@ -584,3 +584,41 @@ def test_a_flow_file_that_cannot_be_read_is_a_problem_of_the_flow_not_a_crash(tm
     rows = {f["name"]: f for f in flowdefs.visible([tmp_path])}
     assert not rows["bad"]["usable"] and "could not be read" in rows["bad"]["problems"][0]
     assert "stray.txt" not in rows and all(rows[n]["usable"] for n in flowdefs.BUILTIN)
+
+
+def test_ao_org_check_warns_of_each_key_the_flow_fills_the_same(world, tmp_path, capsys):  # noqa: F811
+    """§4.9c *What is shown*: `ao org check` warns, per team, of each key it writes that its current
+    flow would fill with the same value — a lane in its written order, `entries.feature`, a stage
+    role's `review:` in the repo's `roles:` with `held` as a set — and fails on none of them."""
+    from agentorc import cli
+
+    held = "held: [src/sessionorc/**, docs/briefs/**]\n"
+    review = "roles:\n  grinder:\n    review: {reader: techlead, held: [docs/briefs/**, src/sessionorc/**]}\n"
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text(held + review)
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["td"], techlead={"name": "techlead-ao", "home": "agentorc"}, entries={"feature": "designer"})
+    t["members"][0]["lane"] = ["free-pick", "owner:grinder"]
+    t["members"].append({"role": "designer", "name": "design", "lane": ["owner:designer", "design-first"]})
+    org = _write(tmp_path, doc)
+    teams.plan(org, "ao-grind", HOST)
+    got = teams.flow_redundant(org, org.teams["ao-grind"], HOST, HOST)
+    assert got == [
+        "team ao-grind: grind's lane: free-pick, owner:grinder is what flow td fills — org.yml may drop it",
+        "team ao-grind: entries.feature: designer is what flow td fills — org.yml may drop it",
+        "team ao-grind: grinder's review: in .agentorc.yml is the reader flow td gives — the repo may drop it "
+        "(a session outside a flow still reads it)",
+    ]  # the designer's lane is in another order, its pick order: not the same; the hunter is outside the flow
+    assert cli.main(["org", "check"]) == 0
+    out = capsys.readouterr().out
+    assert "warning: team ao-grind: grind's lane: free-pick, owner:grinder is what flow td fills" in out
+    # a held set that differs, and no flow at all: nothing to say
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text(held + review.replace("docs/briefs/**, ", ""))
+    t["members"][0]["lane"] = "free-pick"
+    t.pop("entries")
+    org = _write(tmp_path, doc)
+    assert teams.flow_redundant(org, org.teams["ao-grind"], HOST, HOST) == []
+    t["flows"] = []
+    t["members"][0]["lane"] = ["free-pick", "owner:grinder"]
+    org = _write(tmp_path, doc)
+    assert teams.flow_redundant(org, org.teams["ao-grind"], HOST, HOST) == []
