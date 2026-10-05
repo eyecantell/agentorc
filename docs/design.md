@@ -5582,7 +5582,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
   **`answered: {question, asker, answerer, source}`**. It keys on the structured field, **never on
   a role** (§9 invariant 9): a manager that answers with `--source` is told the same way.
   `--source` is refused off a reply, from a person (*a person's answer needs no source*), and past
-  one line of 200 characters; the FYI is counted in the person inbox's depths as any entry is, so
+  one line of 200 characters; the FYI is counted in the person inbox's FYI depths as any FYI is, so
   a full inbox refuses the reply itself rather than let the answer land unseen; a reply **to** the
   person files none. `ao inbox` prints a reply's source and the FYI's *who asked what, who
   answered, from where*. A reply to an entry that carries `answered` is addressed **to the asker,
@@ -6666,8 +6666,9 @@ team badges its members, not the person's session. Rejected: inventing an edge s
 Instead the person has an inbox of their own: **one per org, held by the home host agent (§4.4a),
 belonging to no session record**, persisted in its store beside the records (its own file,
 reloaded on restart). `ao msg person "…"` addresses it from any session, ungated, under the same
-kinds and the same bounds (a depth that refuses, and a per-sender depth). **A refusal there names
-the board**: the depth fills exactly when the person has been away, and the refusal tells the
+kinds and the same bounds (a depth that refuses, and a per-sender depth) — two of each, one for
+its open questions and one for its FYIs (*What bounds it*, below). **A refusal there names
+the board**, and which count is full: the depth fills exactly when the person has been away, and the refusal tells the
 sender that `user_attention.md` with a `Due:` date is the channel that reaches an absent person,
 so it is a redirect and not a dead end. The Org top bar shows its unread count and opens it; a
 person replies from there into the sender's inbox, and that reply is a person acting toward the
@@ -6703,11 +6704,16 @@ person is one of three things, and the envelope says which:
   **It is still mail, and mail is not durable** (§9 invariant 13): a question whose answer must
   outlive the record is a board line with a `Due:` date — *needed* changes how long the question
   stands, not where a durable one lives.
-  **What bounds it, since time does not:** the person inbox's two depths (*bounds*, above) count
-  **every entry that is unread or is an open `ask` or `steer`** — one set, each entry once — 200
-  in all, 20 from one sender — so reading the page does not free a slot an unanswered question
-  holds, and one worker cannot fill the Inbox with questions that never lapse. The refusal names
-  the board.
+  **What bounds it, since time does not:** the person inbox's depths (*bounds*, above) are two
+  counts. The **open questions** — every open `ask`, `steer` or `conflict` — refuse a question to
+  the person, and a pass-up, at 200 in all and 100 from one sender, so reading the page does not
+  free a slot an unanswered question holds, and one worker cannot fill the Inbox with questions that
+  never lapse. The **FYIs** — every other entry still there: notes, replies, the answered-FYI, a
+  closed question — refuse any other send at 1000 in all and 500 from one sender; a person's read
+  marks nothing, so a note or a reply holds its slot until a Dismiss takes it (a closed question
+  ages out with retention, 12 hours after it closed). Neither stops the
+  other's sends: a seat whose notes fill its FYIs can still ask, and one whose questions fill
+  theirs can still write a note. The refusal names the board and the count that is full.
 - **Steering — a `steer`.** A preference the session can go on without: *I will do X unless you
   say otherwise*. The envelope carries **`default`** — the one line saying what it will do,
   **required** (`--default`; a `steer` without one is refused, and `--default` on any other kind
@@ -7230,8 +7236,10 @@ still caught in minutes — and where the measurement was tiny, well above twice
 bound guards is a loop, not a busy day: a **thread** refuses at **40** entries; a **pair** at
 **300** reply-less entries in its 24-hour window (this one *is* twice, because it is the one a
 healthy team approaches; a thread is finite and a pair is not, so the two are separate constants);
-a **mailbox** at **100** unread; the **person inbox** at **200** unread and **20** from one sender
-(unmeasured; provisional until a session writes to it on a measured night); a read entry is kept
+a **mailbox** at **100** unread; the **person inbox** counts two things apart (TD-324): its **open
+questions** at **200** and **100** from one sender, its **FYIs** at **1000** and **500** from one
+sender (Paul's figure, and half of it so one looping sender leaves the others room; both
+unmeasured, provisional until a session writes to it on a measured night); a read entry is kept
 **12 hours** (a record is written whole on every change — TD-066); the **wake budget** is **30**
 an hour. What would change them: a pair that hits 300 doing real work (raise it), a team that reads
 its mail in turns longer than 12 hours (raise retention), or a mailbox at 100 that was not a loop.

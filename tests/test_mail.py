@@ -687,18 +687,19 @@ async def test_a_person_deletes_from_the_person_inbox_and_no_session_may(agent, 
 
 async def test_the_person_inbox_depth_refuses_naming_the_board(agent, tmp_path, monkeypatch):
     """Design §4.10 (fourth review): the person inbox's depth fills exactly when the person is
-    away, so its refusal — total or per sender — names user_attention.md with a Due: date."""
+    away, so its refusal — total or per sender — names user_attention.md with a Due: date. Notes
+    are FYIs (TD-324): their own depths."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         a, b = await mk("a", unattended=True), await mk("b", unattended=True)
-        monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 1)
+        monkeypatch.setattr(mail, "PERSON_FYI_SENDER_DEPTH", 1)
         async with LocalClient(caller=a) as ca, LocalClient(caller=b) as cb:
             await ca.call("msg", to="person", text="one")
             with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date") as e:
                 await ca.call("msg", to="person", text="two")
             assert f"from {a}" in str(e.value)
             await cb.call("msg", to="person", text="b's first")  # the per-sender depth is per sender
-            monkeypatch.setattr(mail, "PERSON_INBOX_DEPTH", 2)
+            monkeypatch.setattr(mail, "PERSON_FYI_DEPTH", 2)
             with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date"):
                 await cb.call("msg", to=["person"], text="full")
         assert len((await person.call("inbox"))["entries"]) == 2
@@ -1511,17 +1512,26 @@ async def test_pause_stops_the_clock_and_resume_gives_back_what_was_left(agent, 
         await person.call("kill", id=w)
 
 
-async def test_the_person_inbox_depths_count_read_but_unanswered_questions(agent, tmp_path, monkeypatch):
-    """Design §4.10: from 2026-09-19 the two depths count **every entry that is unread or is an
-    open `ask` or `steer`** — one set, each entry once — so reading the page frees no slot an
-    unanswered question still holds, and one worker cannot fill the Inbox with asks that never
-    lapse. The refusal still names the board."""
+async def test_the_person_inbox_depths_count_open_questions_and_fyis_apart(agent, tmp_path, monkeypatch):
+    """Design §4.10 *The numbers* (TD-324): two counts, each with its depth and per-sender depth.
+    The **open questions** refuse a question: reading the page frees no slot an unanswered one
+    holds, and answering it does. The **FYIs** — every other entry still there, read or not, a
+    closed question among them — refuse any other send. Neither count stops the other's sends: a
+    sender whose notes fill its FYI slots can still ask, and one whose questions fill theirs can
+    still write a note. Each refusal names the board and which count is full."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         w = await mk("w", unattended=True)
-        monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 3)
+        monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 2)
+        monkeypatch.setattr(mail, "PERSON_FYI_SENDER_DEPTH", 2)
         async with LocalClient(caller=w) as c:
-            await c.call("msg", to="person", text="fyi")  # a note: it frees its slot once read
+            await c.call("msg", to="person", text="fyi one")
+            await c.call("msg", to="person", text="fyi two")
+            # the FYI count is full: a third note is refused, naming it
+            with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date") as err:
+                await c.call("msg", to="person", text="fyi three")
+            assert f"2 FYIs from {w}" in str(err.value)
+            # …while a question still lands: the notes hold no question's slot
             one = (await c.call("msg", to="person", text="a?", kind="ask"))["entry"]["id"]
             await c.call("msg", to="person", text="b?", kind="steer", default="x")
         # the person reads the page: nothing is unread, and the two open questions still hold theirs
@@ -1530,15 +1540,42 @@ async def test_the_person_inbox_depths_count_read_but_unanswered_questions(agent
         agent.person_store.save(agent.person_inbox)
         assert (await person.call("inbox"))["unread"] == 0
         async with LocalClient(caller=w) as c:
-            # under the old rule (unread only) the count would be zero here and this would be the
-            # first of many; it is the third slot, and the fourth question is refused
-            assert (await c.call("msg", to="person", text="c?", kind="ask"))["delivered"] == ["person"]
             with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date") as err:
-                await c.call("msg", to="person", text="d?", kind="ask")
-            assert "unread or unanswered" in str(err.value)
-            # answering one frees its slot; the read note never held one
+                await c.call("msg", to="person", text="c?", kind="ask")
+            assert f"2 open questions from {w}" in str(err.value)
+            # a read note still holds its FYI slot: a person's read marks nothing that frees one
+            with pytest.raises(AgentError, match="FYIs"):
+                await c.call("msg", to="person", text="fyi three")
+            # answering one frees its question slot, and the closed question is an FYI from then on
             await person.call("msg", text="yes", kind="reply", reply_to=one)
-            assert (await c.call("msg", to="person", text="d?", kind="ask"))["delivered"] == ["person"]
+            assert (await c.call("msg", to="person", text="c?", kind="ask"))["delivered"] == ["person"]
+            monkeypatch.setattr(mail, "PERSON_FYI_SENDER_DEPTH", 3)
+            with pytest.raises(AgentError, match=f"3 FYIs from {w}"):
+                await c.call("msg", to="person", text="fyi three")
+            # the totals, each its own
+            monkeypatch.setattr(mail, "PERSON_FYI_SENDER_DEPTH", None)
+            monkeypatch.setattr(mail, "PERSON_FYI_DEPTH", 3)
+            with pytest.raises(AgentError, match="holds 3 FYIs:"):
+                await c.call("msg", to="person", text="fyi three")
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", None)
+            monkeypatch.setattr(mail, "PERSON_INBOX_DEPTH", 2)
+            with pytest.raises(AgentError, match="holds 2 open questions:"):
+                await c.call("msg", to="person", text="d?", kind="ask")
+        await person.call("kill", id=w)
+
+
+async def test_a_sender_with_a_hundred_notes_still_asks_and_writes_a_note(agent, tmp_path):
+    """TD-324's *Done when*, at the real figures: a sender with 100 notes still in the person
+    inbox — what stopped techlead-ao-1's verdicts on 2026-10-04 — can still send an `ask` and a
+    note to the person."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        async with LocalClient(caller=w) as c:
+            for i in range(100):
+                await c.call("msg", to="person", text=f"note {i}")
+            assert (await c.call("msg", to="person", text="a?", kind="ask"))["delivered"] == ["person"]
+            assert (await c.call("msg", to="person", text="one more"))["delivered"] == ["person"]
         await person.call("kill", id=w)
 
 
@@ -2442,8 +2479,8 @@ async def test_an_answer_from_the_record_is_told_to_the_person_and_an_overrule_r
             with pytest.raises(AgentError, match="needs no source"):
                 await person.call("msg", reply_to=q2["id"], text="x", source="me")
 
-            # a full person inbox refuses the answer rather than let it steer unseen
-            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 0)
+            # a full person inbox refuses the answer rather than let it steer unseen: the FYI count
+            monkeypatch.setattr(mail, "PERSON_FYI_SENDER_DEPTH", 0)
             q3 = (await wc.call("msg", to=tl, text="one more?", kind="ask"))["entry"]
             with pytest.raises(AgentError, match="person inbox"):
                 await tc.call("msg", reply_to=q3["id"], kind="reply", text="yes", source="design §4.9b")
