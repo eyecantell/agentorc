@@ -580,6 +580,39 @@ def compiled(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files:
     return Compiled(flow=flow, held=list(cfg.held or ()), listed=listed, techlead=team.techlead is not None)
 
 
+def flow_needs(org: orgmod.Org, team: orgmod.TeamDef, role: str, host: str, here: str, files: Files | None) -> str:
+    """The first listed flow with a member stage of `role`, or "" — what **Members…** names when it
+    refuses to remove that role's last member (design §4.9c *Every listed flow must be followable*).
+    A flow that cannot be read needs nothing here: the start says what is wrong with it."""
+    if not team.flows:
+        return ""
+    try:
+        checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
+        cfg = repoconfig.load(checkout, read=read)
+        for name in team.flows:
+            flow = flowdefs.load(name, cfg, org.roles, read=read)
+            stage = flow.stage_of(role) if flow is not None else None
+            if stage is not None and not stage.review:
+                return name
+    except (TeamError, ValueError, OSError):
+        return ""
+    return ""
+
+
+def entry_role(
+    org: orgmod.Org, team: orgmod.TeamDef, type_: str, host: str, here: str, files: Files | None = None
+) -> str:
+    """The role **Open a session** starts for `type_` (§4.9, §4.9c item 4): the team's `entries:`
+    word, else, for a feature, the role of the current flow's stage whose lane holds `design-first`,
+    else the techlead (`TeamDef.entry_role`)."""
+    if type_ == "feature" and type_ not in team.entries:
+        under = compiled(org, team, host, here, files)
+        stage = next((st for st in under.flow.stages if "design-first" in st.lane), None) if under else None
+        if stage is not None:
+            return stage.role
+    return team.entry_role(type_)
+
+
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
     *,
     org: orgmod.Org,

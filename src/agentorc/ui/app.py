@@ -1808,7 +1808,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         root = str(Path(root).expanduser().resolve())
         org, _notes = await asyncio.to_thread(org_here)
         team = repo_teams(org, host_name()).get(root, "")
-        role = entry_role(org, team, type_)
+        role = await asyncio.to_thread(entry_role, org, team, type_)  # reads the team's flow from disk
         try:
             cfg = await asyncio.to_thread(repoconfig.discover, root)
         except ValueError as e:
@@ -2277,6 +2277,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     name,
                     index=int(body.get("index")),
                     role=str(body.get("role") or ""),
+                    host=host_name(),
                 )
             else:
                 raise HTTPException(400, "action is add or remove")
