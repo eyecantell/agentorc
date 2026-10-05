@@ -9,13 +9,14 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-# the tick's closes (§6): rule 9's, rule 2's, rule 7's two (its brief, its team's flow, §4.9c) and rule 3's —
-# rule 8's start closes nothing
+# the tick's closes (§6): rule 9's, rule 2's, rule 7's two (its brief, its team's flow, §4.9c), rule 3's and a
+# sit-out's (§4.9c) — rule 8's start closes nothing
 TICK_WHY = {
     "finished": "team finished",
     "wanted": "for a restart",
     "brief": "brief changed",
     "flow": "flow changed",
+    "sit_out": "flow sat it out",
     "seat": "seat done",
 }
 

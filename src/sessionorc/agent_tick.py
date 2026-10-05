@@ -483,6 +483,7 @@ class TickMixin:
                 await self._crash_restart(s, now)
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
+                await self._sit_out_close(s)
                 await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
                 await self._idle_nudge(s, now)
                 await self._idle_open(s, now)
@@ -577,6 +578,8 @@ class TickMixin:
             and not s.suspended
             and not s.restart_ceiling
             and not s.superseded_by
+            and not s.sit_out
+            and not work_mod.sat_out(s)
             and not self._profile_gated(s.profile, now, s.team)
             and not self._just_restarted(s, now)
         )
@@ -670,8 +673,8 @@ class TickMixin:
         rw = s.restart_wanted
         if not (rw and s.supervised and s.unattended) or s.seat is not None or rw.get("early"):
             return
-        if s.superseded_by or s.suspended or s.gated:
-            return
+        if s.superseded_by or s.suspended or s.gated or s.sit_out or work_mod.sat_out(s):
+            return  # a member its flow sits out is never started again by the tick (§4.9c)
         # A ceiling guards against a crash loop, not a member that has worked since (TD-186): a clean
         # declaration is acted on once the window holds fewer than the ceiling's restarts; the new
         # record carries no mark. Inside the window the mark stands, as it does for rule 1.
@@ -719,6 +722,27 @@ class TickMixin:
                 return
         await self._replay(s, "wanted")
 
+    async def _sit_out_close(self, s: Session) -> None:
+        """A sit-out's end (design §4.9c *Switching*, TD-309 slice 5b): a record carrying `sit_out` — a
+        person's Apply sent it the wrap-up — is closed by the tick with rule 9's close once it is
+        settled (idle, its work known and pushed), and marked `closed_for: {why: sit_out, closed_at}`;
+        one that exited, or that a person closed, in the meantime is marked as it stands, `closed_at`
+        the close's or, for an exit, the time it exited. A working member finishes what it holds first,
+        and one left with work stays open until it reads pushed: waiting tick after tick for it to
+        settle is not a retry — no `restarts` entry is written and no replay follows. Never an
+        interactive record (§9 invariant 5)."""
+        if not s.sit_out or not s.unattended or s.superseded_by or work_mod.sat_out(s):
+            return
+        if s.state == "exited":
+            s.closed_for = {"why": "sit_out", "closed_at": s.closed_at or s.since}
+        elif s.state == "closed" or await self._finished_close(s, "sit_out"):
+            self._mark_closed(s, "sit_out")
+        else:
+            return
+        log.info("%s: sat out by its team's flow — %s", self._address(s), s.state)
+        self._save(s)
+        await self._push_changes()
+
     async def _brief_restart(self, s: Session, now: datetime) -> None:
         """Rule 7's second telling (design §6, TD-217 slice 4): a member whose record carries
         `brief_changed` and that is hook-confirmed `idle`, holds no claim in progress, has declared
@@ -731,7 +755,7 @@ class TickMixin:
         carries `relaunch`, and is restarted the same way under `why: flow` — the replay reads the
         launch record the relaunch wrote."""
         why = "brief" if s.brief_changed else "flow" if s.relaunch else ""
-        if not (why and s.supervised and s.unattended) or s.seat is not None:
+        if not (why and s.supervised and s.unattended) or s.seat is not None or s.sit_out or work_mod.sat_out(s):
             return
         if s.superseded_by or s.suspended or s.gated or s.host != self.host:
             return
@@ -1396,8 +1420,8 @@ class TickMixin:
         questions = list(old.get("questions") or []) if isinstance(old, dict) else []
         news: dict[str, dict[str, list[str]]] = {}  # repo → member → ids
         for r in sorted(work_mod.crew(records), key=lambda r: (r.name, r.id)):
-            if r.seat is not None or r.superseded_by:
-                continue
+            if r.seat is not None or r.superseded_by or work_mod.sat_out(r):
+                continue  # a member its flow sat out has no lane that is the team's work (§4.9c)
             led = (self._repos.get(r.repo or "") or {}).get("ledger") or {}
             if "error" in led or not isinstance(led.get("entries"), list):
                 if isinstance(old, dict):
@@ -1753,10 +1777,11 @@ class TickMixin:
             await self._push_changes()
         return first
 
-    async def _finished_close(self, s: Session) -> bool:
+    async def _finished_close(self, s: Session, why: str = "finished") -> bool:
         """Rule 9's close, under the wrap-up's own safety check in the tick's form (rule 2's): only an
         `idle` record whose git fields are known and show nothing uncommitted and nothing unpushed,
-        never a suspended one, and a node's only while its link is up. True when it was closed."""
+        never a suspended one, and a node's only while its link is up. True when it was closed. A
+        sit-out's close is the same close (§4.9c), under `why: sit_out`."""
         if s.state != "idle" or s.suspended or not s.unattended:
             return False
         git = s.git or {}
@@ -1765,13 +1790,13 @@ class TickMixin:
         if s.host != self.host and s.host not in self._link_muxes:
             return False  # its link is down: looked at again next tick (§4.4a)
         try:
-            closer = {"by": "tick", "why": "finished"}
+            closer = {"by": "tick", "why": why}
             if s.host == self.host:
                 await self.rpc_close(s.id, closer=closer)
             else:
                 await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
         except Exception as e:  # noqa: BLE001 — a close that failed is tried again on the next tick
-            log.warning("%s: rule 9's close failed: %s", self._address(s), e)
+            log.warning("%s: the %s close failed: %s", self._address(s), why, e)
             return False
         return s.state == "closed"
 

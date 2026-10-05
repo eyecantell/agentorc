@@ -31,13 +31,10 @@ from agentorc import org as orgmod
 from sessionorc import naming
 from sessionorc.models import REVIEW_BOUND
 
-WRAPUP_PROMPT = (
-    "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
-    "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
-    "idle), then stop."
-)
-"""The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`). The UI imports it from here,
-so the card and the CLI send the same words — one code path, not two."""
+# The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`), kept in `sessionorc.models` since the
+# home sends it too (a sit-out, §4.9c). The UI imports it from here, so the card, the CLI and the home send
+# the same words — one code path, not two.
+from sessionorc.models import WRAPUP_PROMPT as WRAPUP_PROMPT
 
 PAUSE_PROMPT = (
     "agentorc: pause — the usage gate's line for your profile was crossed. Finish the step in hand, commit "
