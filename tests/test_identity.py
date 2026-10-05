@@ -580,7 +580,7 @@ async def test_dismiss_clears_a_list_for_a_person_and_for_nobody_else(agent, tmp
                 except AssertionError:
                     raise
                 except Exception as e:  # noqa: BLE001 — the client's error type is not under test
-                    assert "only by a person" in str(e)
+                    assert "a person's own act" in str(e)
     assert (await agent.rpc_identity())["sessions"][a]  # nothing was cleared by any of that
 
     async with LocalClient() as person:
@@ -604,7 +604,7 @@ async def test_a_session_under_a_pane_cannot_acknowledge_its_own_alarms_under_en
         a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
         agent._id_alarm({"channel": f"session {a}", "claimed": "ao-b", "rpc": "msg"}, a)
         got = await _probe(me, tmp_path, a, "ack", {"id": 1, "method": "identity_ack", "params": {"id": a}})
-        assert "error" in got and "only by a person" in got["error"]
+        assert "error" in got and "a person's own act" in got["error"]
         assert (await me.call("get", id=a))["identity_alarms"]
         assert "identity_ack" not in identity.READS
 

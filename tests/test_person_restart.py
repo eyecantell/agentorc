@@ -80,7 +80,7 @@ async def test_an_early_wanted_member_is_back_in_its_teams_run(agent, composerst
         old.restarts = [{"at": _iso(now), "why": "wanted", "done": [], "left": []}]
         old.unattended = False  # a person took it over with `ao mode`: the launch record still says unattended
         old.inbox = [MailEntry(id="m-1", from_=lead, to=[sid], kind="note", text="rebase #7 first", at=_iso(now))]
-        with pytest.raises(AgentError, match="a person's own: refused to a session"):
+        with pytest.raises(AgentError, match="a person's own act, refused to every session"):
             async with LocalClient(caller=lead) as manager:
                 await manager.call("restart", id=sid)
         assert agent.sessions[sid] is old and old.state == "idle", "a session's call changes nothing"

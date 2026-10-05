@@ -130,7 +130,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-316 | `ao host rebuild` replaces a node's container and ends the team sessions inside without a word: refuse, or wind the team down first | Medium | Open |
-| TD-317 | Build the person-only gate: `mail.PERSON_ONLY`, one check opening each of the 25 RPCs, the test that holds list and code together; and move `agent_wake.py`'s passengers to where they belong | Low | Open |
+| TD-317 | Build the person-only gate: `mail.PERSON_ONLY`, one check opening each of the 25 RPCs, the test that holds list and code together; and move `agent_wake.py`'s passengers to where they belong | Low | Slice 1 built (the gate); slice 2 open |
 | TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Designed 2026-10-04 (the build's PR on the `Kind:` line, live read by the home, `free-pick` takes it) — the build is TD-323 |
 | TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Designed 2026-10-04 (a claim's `slices`, declared with `--slice` or derived at the merge, counted as the run's done) — the build is TD-325 |
 | TD-323 | Build live checks in the free-pick lane: the build's PR on the `Kind:` line and its `live` reading, `lane_matches`, the grinder brief's pick list and four endings, the PR written on the open live checks | High | Open |
@@ -2413,7 +2413,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (the designer, TD-108's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 built — PR #1049 (`mail.PERSON_ONLY`, `agent_common.person_only` first in each of the 25, `tests/test_person_only.py`; the refusals' words in one shape, the tests that matched the old words moved). **Left:** slice 2, the passengers.
 **Location:** `src/sessionorc/mail.py` (`PERSON_ONLY`, beside `is_person` and `ACTING_RPCS`), `src/sessionorc/agent_common.py` (the check), `agent_identity.py`, `agent_inbox.py` (`_person_entry`), `agent_mail.py`, `agent_promote.py` (`_promote_person`), `agent_link.py`, `agent_wake.py`, `agent.py`, `tests/`; design §4.8 *A person's own act is a named RPC, and the gate is one list*. Held path (`src/sessionorc/**`): the techlead reads each slice.
 
 **Why:** TD-108's design. The 25 person-only RPCs are gated by 18 `is_person` checks written into the RPCs and two helpers (`_person_entry` for five, `_promote_person` for two), and nothing says which RPCs they are: a new one that forgets its check is found by a review or not at all. And `agent_wake.py` (999 lines) still holds what followed the wake section in the old file — the hook's entry, the settings RPCs, the small reads — so its name says a quarter of what is in it.

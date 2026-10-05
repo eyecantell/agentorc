@@ -1813,7 +1813,7 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
         await asyncio.sleep(FAST_TICK * 2)  # a home tick notes the alarm row, so its ending has one to end
 
         async with LocalClient(sock=home.dir / "agent.sock", caller="ao-someone") as as_session:
-            with pytest.raises(AgentError, match="only by a person"):
+            with pytest.raises(AgentError, match="a person's own act"):
                 await as_session.call("identity_ack", id=address)
         assert node.sessions[w["id"]].identity_alarms  # refused at the node, nothing cleared
 

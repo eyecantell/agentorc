@@ -100,6 +100,41 @@ ACTING_RPCS = frozenset(
 )
 
 
+# A person's own acts (design §4.8 *A person's own act is a named RPC, and the gate is one list*,
+# TD-317): RPCs no session may call, whatever grant or membership it holds. Each begins with
+# `agent_common.person_only`, in the RPC and never in the dispatcher, since the link's `act` calls
+# an RPC directly; `tests/test_person_only.py` holds this list and those checks to each other.
+PERSON_ONLY = frozenset(
+    {
+        "inbox_delete",
+        "inbox_snooze",
+        "inbox_hand",
+        "inbox_dismiss",
+        "attention_snooze",
+        "inbox_pause",
+        "inbox_resume",
+        "inbox_go_with_it",
+        "thread",
+        "identity_ack",
+        "identity_log",
+        "suspend",
+        "board_edit",
+        "board_reply",
+        "board_reply_hand",
+        "entry_add",
+        "settings",
+        "set_settings",
+        "commit_defs",
+        "promote",
+        "clear_promote",
+        "clear_work",
+        "clear_mark",
+        "restart",
+        "forget_host",
+    }
+)
+
+
 def is_person(caller: Any) -> bool:
     """`caller is None` — the field absent from the envelope — is the only thing that reads as a
     person. Anything else present is a session, however odd its type: `not caller` would have

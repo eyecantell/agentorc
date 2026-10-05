@@ -446,7 +446,7 @@ async def test_the_home_closes_a_forgotten_hosts_records_and_keeps_them(agent):
         with pytest.raises(Exception, match="cannot forget itself"):
             await c.call("forget_host", host=agent.host)
     async with LocalClient(caller="ao-x-w") as c:  # a session: refused
-        with pytest.raises(Exception, match="a person's act"):
+        with pytest.raises(Exception, match="a person's own act"):
             await c.call("forget_host", host="laptop")
 
 

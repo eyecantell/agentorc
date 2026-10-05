@@ -252,6 +252,14 @@ class RpcError(Exception):
         self.data = data
 
 
+def person_only(caller: Any, act: str, section: str) -> None:
+    """The one check of a person's own act (`mail.PERSON_ONLY`, design §4.8 *A person's own act is a
+    named RPC, and the gate is one list*): the first statement of each such RPC, refusing every
+    session in one shape — who called, what it may not do, the section that says why."""
+    if not mail.is_person(caller):
+        raise RpcError(f"{caller} cannot {act}: a person's own act, refused to every session (design {section})")
+
+
 def _is_branch_claim(e: Any) -> bool:
     """A derived `claimed` entry with no PR: only the branch it came from ever supported it, so it
     is the one kind of report entry the tick may retire (TD-045)."""
