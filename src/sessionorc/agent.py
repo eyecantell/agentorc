@@ -143,6 +143,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _reported,  # noqa: F401
     _restart_reading,  # noqa: F401
     _review,  # noqa: F401
+    _slices,  # noqa: F401
     _source,  # noqa: F401
     _start_time,  # noqa: F401
     _stop_time,  # noqa: F401
@@ -1802,6 +1803,7 @@ class HostAgent(
         why: str | None = None,
         source: str = "declared",
         force: bool = False,
+        slice: bool = False,
         caller: Any = None,
     ) -> dict[str, Any]:
         """`ao progress claim|done|drop <ref>` (design §4.8): what this session set out to resolve
@@ -1817,8 +1819,14 @@ class HostAgent(
 
         A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
         unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
-        the reply carries `lease_overridden`."""
+        the reply carries `lease_overridden`.
+
+        `slice` with `status="done"` is `ao progress done <ref> --pr <n> --slice` (§4.8, §4.9a *A
+        slice is work done*, TD-325): the PR is held in the declared claim's `slices` and the claim
+        stays `claimed`, its status, `pr` and `why` as they were."""
         s = self._find(id)  # a node's session reports here (step 5): the field is the home's
+        if slice:
+            return await self._slice(s, ref, status, pr, source)
         if status in ("none", "restart"):
             if ref or pr is not None:
                 raise RpcError(
@@ -1861,6 +1869,25 @@ class HostAgent(
         out = await self._report(s, applied, entry)
         if holder is not None and applied:
             out["lease_overridden"] = holder
+        return out
+
+    async def _slice(self, s: Session, ref: str, status: str, pr: int | None, source: str) -> dict[str, Any]:
+        """A slice declared (TD-325): refused but for `done` with a PR, declared, on a reference the
+        record holds a declared claim on — a slice is a PR of an entry still held."""
+        ref, number = _ref(ref), _pr(pr)
+        if status != "done" or _source(source) != "declared":
+            raise RpcError("--slice goes with `ao progress done <ref> --pr <n>`, declared by the session itself")
+        if number is None:
+            raise RpcError(f"a slice is a merged PR: ao progress done {ref} --pr <n> --slice")
+        claim = next((e for e in s.progress if e.ref == ref and e.source == "declared" and e.status == "claimed"), None)
+        if claim is None:
+            raise RpcError(
+                f"{ref} holds no claim of yours: a slice is a PR of an entry you still hold — "
+                f"ao progress claim {ref} first, or report the entry finished with a plain done"
+            )
+        out = await self._report(s, claim.add_slice(number, "declared"), claim)
+        out.pop("refused", None)  # held already is no refusal: the slice is on the claim either way
+        out["slice"] = f"#{number} held as a slice of {ref}; {ref} stays claimed — the last slice is a plain done"
         return out
 
     def _balance_of(self, s: Session) -> dict[str, Any] | None:

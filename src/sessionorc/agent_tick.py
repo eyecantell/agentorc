@@ -1877,7 +1877,13 @@ class TickMixin:
         and counts all the same. `mark` adds to the entry (rule 8's `ids`, what a start was for).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
         (`agent_common._reported`) — since the new record keeps none of the old one's `progress` (§4.9a, TD-245)."""
-        entry: dict[str, Any] = {"at": now_iso(), "why": why, **agent_common._reported(s), **(mark or {})}
+        now = datetime.now(UTC)
+        entry: dict[str, Any] = {
+            "at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "why": why,
+            **agent_common._reported(s, now),
+            **(mark or {}),
+        }
         history = [*s.restarts, entry]
         address = self._address(s)
         read: dict[str, Any] | None = None
@@ -2302,9 +2308,7 @@ class TickMixin:
         """Each repo's live commit as the promote reading holds it (§6 *Promote*), by the repo's
         name, for a live check's `live` (§4.9b, TD-323): a reading that carries `live_why` — the live
         commit could not be read — names none, and unknown is never live."""
-        return {
-            name: str(r["live"]) for name, r in self._promotes.items() if r.get("live") and not r.get("live_why")
-        }
+        return {name: str(r["live"]) for name, r in self._promotes.items() if r.get("live") and not r.get("live_why")}
 
     @staticmethod
     def _read_repos(
