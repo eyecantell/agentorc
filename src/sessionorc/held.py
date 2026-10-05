@@ -21,7 +21,7 @@ from functools import lru_cache
 from typing import Any
 
 from sessionorc import naming
-from sessionorc.models import PERSON, Session
+from sessionorc.models import PERSON, Session, review_links
 
 GH_TIMEOUT = 30.0
 # How long after the merge a held PR may go without its reader's reply before it is a crossing: the
@@ -67,7 +67,7 @@ def held_paths(files: Iterable[str], review: dict[str, Any] | None) -> list[str]
     which is the case §4.9b says merges as the cadence does."""
     if not review:
         return []
-    globs = list(review.get("held") or ["**"])
+    globs = [g for link in review_links(review) for g in link["held"]]  # every link's: a chain holds their union
     return [f for f in files if any(matches(f, g) for g in globs)]
 
 
@@ -173,7 +173,8 @@ def _paths(c: dict[str, Any]) -> str:
 
 
 def _whose(reader: str) -> str:
-    return "the person's" if reader == "person" else "the techlead's"
+    # `reader` is the older shape's word; a chain (§4.9c, TD-315) has none and is its readers'
+    return {"person": "the person's", "techlead": "the techlead's"}.get(reader, "its readers'")
 
 
 def said(c: dict[str, Any], reader: str) -> str:

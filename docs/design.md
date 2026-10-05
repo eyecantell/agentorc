@@ -6256,6 +6256,9 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   own `review:` writes for a team with no flow, and what every record written before the build
   holds. `normalize_review` takes either, and the host agent checks the shape and stores it, as it
   does today; that a `reader` names a seat of the team is the client's check, made at the compile.
+  **Built** (TD-315 slice 1a): the shape, `review_links` reading either as links, and rule 11
+  holding a chain's PR on the union of its links' paths, read by a reply from any reader its asks
+  named; nothing writes a chain until the compile does (slice 3).
 - **A PR is held by every link whose paths it touches, and is read in the flow's order.** The
   author walks the chain — there is still no mover between stages: it sends `ao msg --kind ask
   --pr <n> <reader>` to the first reader holding the PR, takes the next item, and on that reader's

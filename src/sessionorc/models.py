@@ -511,26 +511,79 @@ def normalize_review(review: Any) -> dict[str, Any] | None:
     `{reader, held, bound}` — `reader` is `techlead` or `person`, `held` a list of path globs
     defaulting to every PR (`**`), `bound` a duration written as a seat's `every:` is (`90m`,
     `2h`), default two hours. A `ValueError` rather than a guess: a malformed setting would hold
-    nothing and say nothing. The one check, read by the config loader and the host agent alike."""
+    nothing and say nothing. The one check, read by the config loader and the host agent alike.
+
+    Or a flow's chain (§4.9c *A review stage any seat may hold*, TD-315 slice 1): `{chain: [{stage,
+    reader, held}, …], bound}`, one link per review stage in the flow's order, `reader` the seat's name
+    as the definition gives it (that it names a seat of the team is the client's check, at the
+    compile), `held` that stage's globs. The older shape means a chain of one (`review_links`)."""
     if review is None:
         return None
     if not isinstance(review, dict):
         raise ValueError(f"review: a mapping of reader, held and bound, not {review!r}")
+    if "chain" in review:
+        return _normalize_chain(review)
     unknown = sorted(str(k) for k in set(review) - {"reader", "held", "bound"})
     if unknown:
         raise ValueError(f"review: unknown key(s) {', '.join(unknown)}; it takes reader, held and bound")
     reader = str(review.get("reader") or "")
     if reader not in REVIEW_READERS:
         raise ValueError(f"review: reader is one of {', '.join(REVIEW_READERS)}, not {reader or 'nothing'!r}")
-    held = review.get("held", ["**"])
+    return {
+        "reader": reader,
+        "held": _review_globs(review.get("held", ["**"]), "review"),
+        "bound": _review_bound(review),
+    }
+
+
+def _review_globs(held: Any, where: str) -> list[str]:
     if isinstance(held, str):
         held = [held]
     if not isinstance(held, list) or not held or not all(isinstance(g, str) and g.strip() for g in held):
-        raise ValueError(f"review: held is a list of path globs, not {held!r}")
+        raise ValueError(f"{where}: held is a list of path globs, not {held!r}")
+    return [g.strip() for g in held]
+
+
+def _review_bound(review: dict[str, Any]) -> str:
     bound = str(review.get("bound") or REVIEW_BOUND).strip()
     if not _REVIEW_DURATION.fullmatch(bound):
         raise ValueError(f"review: bound is a duration such as 90m or 2h, not {bound!r}")
-    return {"reader": reader, "held": [g.strip() for g in held], "bound": bound}
+    return bound
+
+
+def _normalize_chain(review: dict[str, Any]) -> dict[str, Any]:
+    unknown = sorted(str(k) for k in set(review) - {"chain", "bound"})
+    if unknown:
+        raise ValueError(f"review: unknown key(s) {', '.join(unknown)}; a chain takes chain and bound")
+    chain = review.get("chain")
+    if not isinstance(chain, list) or not chain:
+        raise ValueError(f"review: chain is a list of links {{stage, reader, held}}, not {chain!r}")
+    links: list[dict[str, Any]] = []
+    for link in chain:
+        if not isinstance(link, dict):
+            raise ValueError(f"review: a chain's link is a mapping of stage, reader and held, not {link!r}")
+        stray = sorted(str(k) for k in set(link) - {"stage", "reader", "held"})
+        if stray:
+            raise ValueError(f"review: unknown key(s) {', '.join(stray)} on a link; it takes stage, reader and held")
+        stage, reader = str(link.get("stage") or "").strip(), str(link.get("reader") or "").strip()
+        if not stage or not reader:
+            raise ValueError(f"review: a chain's link names its stage and its reader, not {link!r}")
+        if any(x["stage"] == stage for x in links):
+            raise ValueError(f"review: the chain names stage {stage!r} twice")
+        links.append({"stage": stage, "reader": reader, "held": _review_globs(link.get("held", ["**"]), "review")})
+    return {"chain": links, "bound": _review_bound(review)}
+
+
+def review_links(review: Any) -> list[dict[str, Any]]:
+    """A record's `review` as its links, `[{stage, reader, held}]` in the order they read (§4.9c): a
+    chain as it stands, the older `{reader, held}` as a chain of one (its stage `review`), none for none."""
+    if not isinstance(review, dict):
+        return []
+    if isinstance(review.get("chain"), list):
+        return [x for x in review["chain"] if isinstance(x, dict)]
+    if not review.get("reader"):
+        return []
+    return [{"stage": "review", "reader": str(review["reader"]), "held": list(review.get("held") or ["**"])}]
 
 
 _TOKENS = re.compile(r"(\d+(?:\.\d+)?)\s*([kKmM]?)")
