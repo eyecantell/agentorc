@@ -3772,3 +3772,19 @@ Both go away only when the record says who closed it.
 **Done when** `PERSON_ONLY` exists and the test above passes in both directions; no `rpc_` method in `src/sessionorc/agent*.py` carries a hand-written `if not mail.is_person(caller): raise` as its whole gate; `agent_wake.py` holds only waking and the doorbell; `pdm run test` passes with the same count plus the new test's; TD-108 archives with this entry.
 
 **Related:** TD-108 (the design and the split), TD-077 (identity: the gate's strength is the host's mode), TD-057 (the routing tables).
+
+## TD-326: A 3.12 CI flake: the node's record is not seen suspended within ten seconds in `test_link.py`'s supersession test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-1, CI on PR #1052, a docs-only change)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_link.py` (`test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_create_at_the_home_lifts_it`, the `wait_for(lambda: bool(node.sessions[w["id"]].suspended), timeout=10.0)` after *pushed*), the home's push of a suspension to a node (`src/sessionorc/agent_remote.py` / `agent_link.py`)
+
+**Resolved:** 2026-10-05 (PR #1058) — not timing: the link returning between the node's kill and its create had the home push `suspended` to the old record and mark that payload told, so the new record of the same id was never pushed it. `agent_remote._take_supersession` drops the id's `_intent_sent` entry when a node's record supersedes, and `_push_intent` marks an id told only while its record is the one the payload was computed from; `tests/test_link.py` `test_a_suspension_reaches_a_name_retaken_on_a_node_after_the_link_returned` forces the order.
+
+**Why:** on the 3.12 runner, PR #1052's CI (a one-clause change to `docs/design.md`) failed at `tests/test_link.py:1370`: the home's record read suspended (*claimed another session's id*), and the node's never did within ten seconds. A docs-only PR cannot cause it, so it is timing or an ordering the push can lose; TD-063 and TD-078 are the earlier 3.12 flakes of this shape.
+
+**Fix:** reproduce under load (`pytest -p no:randomly --count` or a loop on that test with the CPU busy); read what pushes the suspension to the node and whether it can be dropped when it races the supersession's own push; fix the push if it can be lost, else widen nothing until it is understood.
