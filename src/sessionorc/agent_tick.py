@@ -29,6 +29,7 @@ from sessionorc import cadence as cadence_mod
 from sessionorc import conventions as conventions_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
@@ -1198,17 +1199,28 @@ class TickMixin:
             if root and rel and at is not None:
                 decl = dict(s.out_of_work or {})
 
-                commit = self._live_commits().get(Path(str(root)).name)
+                name = Path(str(root)).name
+                commit = self._live_commits().get(name)
 
                 def both() -> tuple[Any, str, Any]:
                     resolve = ledger_mod.Registry(hosts.local_host().repos())
-                    then, why = ledger_mod.entries_before(root, str(rel), at, resolve=resolve)
+                    # a live check stood in the lane at the declaration when its build was live then
+                    # (§4.9b, §6 rule 6): known when the promote that made today's live commit live
+                    # concluded before it, so the ledger then is read against that commit; unknown,
+                    # it is read without, and a check live now is told once as new
+                    was = promote_mod.last(name) or {}
+                    try:
+                        before = bool(commit) and was.get("sha") == commit and _parse(str(was.get("at"))) <= at
+                    except (ValueError, TypeError):
+                        before = False
+                    live = ledger_mod.LiveReader(root, commit)
+                    then, why = ledger_mod.entries_before(
+                        root, str(rel), at, resolve=resolve, live=live if before else None
+                    )
                     if then is None:
                         return then, why, None
-                    # the tip read as the checkout's reading is, with its live checks' `live` (§4.9b),
-                    # or a live one would read as the checkout's own and be seen untold; the ledger
-                    # at the declaration is read without, so a live check is told once it is live
-                    live = ledger_mod.LiveReader(root, commit)
+                    # the tip read as the checkout's reading is, with its live checks' `live`, or a
+                    # live one would read as the checkout's own and be seen untold
                     return then, why, ledger_mod.entries_before(root, str(rel), None, resolve=resolve, live=live)[0]
 
                 then, why, tip = await asyncio.to_thread(both)

@@ -290,3 +290,49 @@ async def test_a_live_check_whose_build_becomes_live_is_told_once(agent, tmp_pat
         notes = _notes(agent, sid)
         assert len(notes) == 1 and "your lane gained 1 entry since you declared out of work: TD-002" in notes[0]
         await person.call("kill", id=sid)
+
+
+@pytest.mark.parametrize("promoted", ["before", "after"])
+async def test_a_live_check_live_at_the_declaration_is_told_to_nobody(agent, tmp_path, promoted):
+    """The techlead's read of #1051 (§4.9b *told once by rule 6*, §6 rule 6 *the ledger as it stood
+    at the declaration*): when the promote that made today's live commit live concluded before the
+    declaration, the ledger then is read against it, so a check live then stood in the lane and is
+    told to nobody — not after a second `none` either; promoted after the declaration, it is told
+    once."""
+    import json
+
+    from sessionorc import promote
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "docs").mkdir()
+    (repo / "docs" / "technical_debt.md").write_text(
+        "## TD-001: a build\n\n**Kind:** build\n\n## TD-002: a check\n\n**Kind:** live-check #5\n\n"
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "TD-002: the build (#5)", when="2026-09-27T10:00:00Z")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    sha = _git(repo, "rev-parse", "HEAD").strip()
+    agent._promotes["repo"] = {"live": sha}
+    when = "2026-09-27T12:00:00+00:00" if promoted == "before" else "2026-09-27T22:00:00+00:00"
+    promote.repo_dir("repo").mkdir(parents=True, exist_ok=True)
+    (promote.repo_dir("repo") / "last.json").write_text(json.dumps({"sha": sha, "from": None, "at": when}))
+    async with LocalClient() as person:
+        led = [_e("TD-001"), {**_e("TD-002", kind="live-check"), "built": [5], "live": "yes"}]
+        sid = await _finished(agent, person, repo, "w", ["free-pick"], led)
+        agent._repos[str(repo)]["ledger"]["path"] = "docs/technical_debt.md"
+        rec = agent.sessions[sid]
+        await agent._lane_news(rec, now)
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        rec.out_of_work, rec.lane_seen = {"at": "2026-09-27T23:00:00Z", "why": "nothing pickable"}, None
+        await agent._lane_news(rec, now + timedelta(minutes=2))  # a second `none`, after the promote
+        await agent._lane_news(rec, now + timedelta(minutes=3))
+        notes = _notes(agent, sid)
+        if promoted == "before":
+            assert notes == [] and "TD-002" in rec.lane_seen["ids"]
+        else:
+            assert len(notes) == 1 and "gained 1 entry since you declared out of work: TD-002" in notes[0]
+        await person.call("kill", id=sid)
