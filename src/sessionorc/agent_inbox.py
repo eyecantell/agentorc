@@ -12,6 +12,7 @@ from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
     hosts,
     mail,
 )
@@ -70,10 +71,7 @@ class InboxMixin:
     # person inbox: a snooze, a pause and a *Go with it* are the person's, and no session has them.
 
     def _person_entry(self, msg: str, caller: Any, what: str) -> MailEntry:
-        if not mail.is_person(caller):
-            raise RpcError(
-                f"{caller} cannot {what} mail: it is the person's own bookkeeping on their inbox (design §4.10)"
-            )
+        agent_common.person_only(caller, f"{what} mail", "§4.10")
         held = [e for e in self.person_inbox if e.id == msg]
         if not held:
             raise RpcError(f"the person inbox holds no entry {msg}")
@@ -159,11 +157,7 @@ class InboxMixin:
         **A person's only**, refused to every session exactly as `inbox_delete` is and, like it, no
         never-gated read (§4.8a): a session that could dismiss the person's rows could bury its own
         question."""
-        if not mail.is_person(caller):
-            raise RpcError(
-                f"{caller} cannot dismiss the person's rows: dismissing is a person's answer to them "
-                "(design §4.10 *The Inbox is a queue*)"
-            )
+        agent_common.person_only(caller, "dismiss the person's rows", "§4.10 *The Inbox is a queue*")
         ids = [str(x) for x in ([msg] if isinstance(msg, str) else list(msg or [])) if str(x).strip()]
         if not ids:
             raise RpcError("dismiss names the entries to dismiss, by id (design §4.10)")
@@ -220,8 +214,7 @@ class InboxMixin:
         *not now* is kept in the home's own attention store, per record **and row kind** — a
         session's permission and its stalled row are two rows, and snoozing one is not snoozing the
         other. No `until` clears it. A person's only, as every act on the person's Inbox is."""
-        if not mail.is_person(caller):
-            raise RpcError(f"{caller} cannot snooze the person's rows: a snooze is the person's own (design §4.10)")
+        agent_common.person_only(caller, "snooze the person's rows", "§4.10")
         # `promote` (§4.5a *Inbox row: promote*, TD-132): keyed `promote:<repo>`, a repo and not a
         # record, so Snooze is by time alone and a later merge does not wake the row; `work`
         # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`
@@ -274,8 +267,7 @@ class InboxMixin:
         page, handed as a Reply's `refs` are, and the answer is one of them word for word — or,
         where the live look's pair is among them, `Not right:` and the person's words. Anything
         else typed is a Reply."""
-        if not mail.is_person(caller):
-            raise RpcError(f"{caller} cannot edit the board: Snooze and Done are the person's own (design §4.4)")
+        agent_common.person_only(caller, "edit the board", "§4.4")
         root, want = self._board_root(board)
         if action == "reply":
             raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
@@ -350,11 +342,12 @@ class InboxMixin:
         team's techlead takes, or empty where the team defines none — as `board_reply`'s `refs`
         come from the reader. Refused in words: no such repo, no team services it, the team has no
         techlead seat, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`."""
-        if not mail.is_person(caller):
-            raise RpcError(
-                f"{caller} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
-                "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"
-            )
+        agent_common.person_only(
+            caller,
+            "add an entry to the ledger this way — a session writes one on its branch (cadence §2), "
+            "or files `ao finding`",
+            "§4.9 *Add an entry to the ledger*",
+        )
         want = str(repo or "").strip()
         roots = hosts.local_host().repos()
         found = [r for r in roots if want and (want in (Path(r).name, r) or Path(r).resolve() == Path(want).resolve())]
@@ -421,8 +414,7 @@ class InboxMixin:
         written first; a refused send is said in `note` and `mail_refused`, never raised, since
         the line is committed and a second press would write it twice. `sent` is `[{session, id,
         ref}]`, `session` the holder's name."""
-        if not mail.is_person(caller):
-            raise RpcError(f"{caller} cannot reply on the board: a board reply is the person's own (design §4.4)")
+        agent_common.person_only(caller, "reply on the board", "§4.4")
         root, want = self._board_root(board)
         try:
             done = await asyncio.to_thread(board_mod.write_back, root, int(line), text, "reply", None, reply=reply)
@@ -488,8 +480,7 @@ class InboxMixin:
         after its commit, a node's over the link. Returns `{sent: [{session, id, ref}], refused:
         ["<name> (holds <ref>): <why>"]}`, a refused send said, never raised. With `repo` (the
         board's checkout's name) it also writes the trail line, in the result's words (`reply_note`)."""
-        if not mail.is_person(caller):
-            raise RpcError(f"{caller} cannot reply on the board: a board reply is the person's own (design §4.4)")
+        agent_common.person_only(caller, "reply on the board", "§4.4")
         head = " ".join(str(head or "").split())
         if len(head) > BOARD_HEAD_CHARS:
             head = head[: BOARD_HEAD_CHARS - 1].rstrip() + "…"

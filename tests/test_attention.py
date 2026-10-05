@@ -169,7 +169,7 @@ async def test_a_state_rows_snooze_lives_in_the_homes_own_store(agent, tmp_path)
         s = await person.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         sid = s["id"]
         async with LocalClient(caller=sid) as w:
-            with pytest.raises(AgentError, match="a snooze is the person's own"):
+            with pytest.raises(AgentError, match="cannot snooze the person's rows: a person's own act"):
                 await w.call("attention_snooze", id=sid, kind="stalled", until="2026-09-21T00:00:00Z")
         with pytest.raises(AgentError, match="unknown row kind"):
             await person.call("attention_snooze", id=sid, kind="whenever", until="2026-09-21T00:00:00Z")

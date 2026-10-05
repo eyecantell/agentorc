@@ -3712,7 +3712,7 @@ manager controls.** Prior art: [ADR 2026-09-12](decisions/2026-09-12-orchestrato
   `set_grants`: a person at a terminal or the UI always may; a session only if it already
   controls that target. Control is handed on, never seized.
 
-**A person's own act is a named RPC, and the gate is one list (TD-108; the build is TD-317).**
+**A person's own act is a named RPC, and the gate is one list (TD-108; built — TD-317 slice 1).**
 Some RPCs are a person's and no session's, whatever grant or membership the session holds: the
 person's bookkeeping on their Inbox (`inbox_delete`, `inbox_snooze`, `inbox_hand`, `inbox_dismiss`,
 `attention_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it`, and the `thread` read), an

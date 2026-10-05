@@ -13,6 +13,7 @@ from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
     mail,
 )
 from sessionorc.agent_common import (
@@ -1092,11 +1093,7 @@ class MailMixin:
         inboxes. `pruned` says the root itself is held nowhere any more, so the thread starts
         after a gap. A read, marking nothing; **a person's only** — a thread spans other
         sessions' mailboxes, which no session reads (§4.10)."""
-        if not mail.is_person(caller):
-            raise RpcError(
-                f"{caller} cannot read a thread: it is gathered across every session's mailbox, and nobody "
-                "reads another session's inbox (design §4.10)"
-            )
+        agent_common.person_only(caller, "read a thread, gathered across every session's mailbox", "§4.10")
         held = [e for e in self.person_inbox if e.id == msg]
         if not held:
             raise RpcError(f"the person inbox holds no entry {msg}")
@@ -1135,10 +1132,7 @@ class MailMixin:
         answer, and silence is not — and the entry stays for the retention window like any closed
         one; the asker is told by a `system` note that wakes it as a person's reply does. A `note`,
         or anything already closed, is removed outright, as it always was."""
-        if not mail.is_person(caller):
-            raise RpcError(
-                f"{caller} cannot delete mail: an entry is deleted only by a person, in the Inbox panel (design §4.10)"
-            )
+        agent_common.person_only(caller, "delete mail", "§4.10")
         if not id or id == PERSON:
             held = [e for e in self.person_inbox if e.id == msg]
             if not held:

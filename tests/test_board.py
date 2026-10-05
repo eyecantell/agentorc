@@ -235,7 +235,7 @@ async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, 
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
     path = str(repo / board.BOARD)
     async with LocalClient(caller="ao-some-worker") as worker:
-        with pytest.raises(AgentError, match="the person's own"):
+        with pytest.raises(AgentError, match="a person's own act"):
             await worker.call("board_edit", board=path, line=7, text=ITEM, action="done")
     async with LocalClient() as me:
         with pytest.raises(AgentError, match="not the board of a repo this host knows"):
@@ -306,7 +306,7 @@ async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(
         async with LocalClient(caller=w) as worker:
             note = (await worker.call("msg", to="person", text="check this Friday", about="TD-900"))["entry"]
             asked = (await worker.call("msg", to="person", text="which?", kind="ask"))["entry"]
-            with pytest.raises(AgentError, match="the person's own"):
+            with pytest.raises(AgentError, match="a person's own act"):
                 await worker.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=note["id"])
         with pytest.raises(AgentError, match="open ask"):
             await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=asked["id"])
@@ -425,7 +425,7 @@ async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agen
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
     path = str(repo / board.BOARD)
     async with LocalClient(caller="ao-some-worker") as worker:
-        with pytest.raises(AgentError, match="the person's own"):
+        with pytest.raises(AgentError, match="a person's own act"):
             await worker.call("board_reply", board=path, line=7, text=ITEM, reply="x")
     async with LocalClient() as me:
         with pytest.raises(AgentError, match="not the board of a repo this host knows"):
@@ -822,7 +822,7 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
         async with LocalClient(caller=h) as s:
             await s.call("progress", id=h, ref="TD-122")
-        with pytest.raises(AgentError, match="the person's own"):
+        with pytest.raises(AgentError, match="a person's own act"):
             async with LocalClient(caller=h) as s:
                 await s.call("board_reply_hand", head="x", by="p", reply="y", refs=["TD-122"])
         monkeypatch.setattr(agent, "mode", "node")

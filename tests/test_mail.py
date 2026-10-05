@@ -577,7 +577,7 @@ async def test_a_person_deletes_one_copy_and_no_session_may(agent, tmp_path):
         mid = got["entry"]["id"]
         for who in (worker, lead):
             async with LocalClient(caller=who) as c:
-                with pytest.raises(AgentError, match="only by a person"):
+                with pytest.raises(AgentError, match="a person's own act"):
                     await c.call("inbox_delete", id=worker, msg=mid)
         assert (await person.call("get", id=worker))["unread"] == 1
         with pytest.raises(AgentError, match="holds no entry"):
@@ -663,7 +663,7 @@ async def test_a_person_deletes_from_the_person_inbox_and_no_session_may(agent, 
             one = (await c.call("msg", to="person", text="one"))["entry"]["id"]
             two = (await c.call("msg", to="person", text="two", kind="ask"))["entry"]["id"]
             for target in (None, "person"):
-                with pytest.raises(AgentError, match="only by a person"):
+                with pytest.raises(AgentError, match="a person's own act"):
                     await c.call("inbox_delete", msg=one, **({"id": target} if target else {}))
         with pytest.raises(AgentError, match="person inbox holds no entry"):
             await person.call("inbox_delete", msg="m-nope")
@@ -1446,7 +1446,7 @@ async def test_the_persons_own_bookkeeping_is_refused_to_every_session_and_persi
                 ("inbox_resume", {}),
                 ("inbox_go_with_it", {}),
             ):
-                with pytest.raises(AgentError, match="the person's own bookkeeping"):
+                with pytest.raises(AgentError, match="a person's own act"):
                     await c.call(rpc, msg=steer, **kw)
         # a snooze is set, persisted, and cleared by the same RPC with no `until`
         got = await person.call("inbox_snooze", msg=ask, until="2026-09-20T08:00:00Z")

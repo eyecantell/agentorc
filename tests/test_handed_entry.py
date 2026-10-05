@@ -404,7 +404,7 @@ async def test_send_to_reviewer_is_refused_in_words(agent, tmp_path):
             )["entry"]["id"]
             plain = (await c.call("msg", to="person", kind="ask", text="merge?"))["entry"]["id"]
         async with LocalClient(caller=seat) as tl:
-            with pytest.raises(AgentError, match="the person's own bookkeeping"):
+            with pytest.raises(AgentError, match="a person's own act"):
                 await tl.call("inbox_hand", msg=look, seat=seat)
         with pytest.raises(AgentError, match="is not a look"):
             await person.call("inbox_hand", msg=plain, seat=seat)

@@ -295,7 +295,7 @@ async def test_the_press_is_a_persons_and_refused_to_a_session(agent, checkout):
     await park_ticks(agent)
     _register(checkout)
     async with LocalClient(caller="ao-some-worker") as worker:
-        with pytest.raises(AgentError, match="a person's own: refused to a session"):
+        with pytest.raises(AgentError, match="a person's own act, refused to every session"):
             await worker.call("promote", repo="repo")
         with pytest.raises(AgentError, match="a person's own"):
             await worker.call("clear_promote", repo="repo")

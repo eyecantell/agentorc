@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import hosts, mail
+from sessionorc import agent_common, hosts
 from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import RpcError, log
@@ -95,10 +95,7 @@ class PromoteMixin:
         return found[0]
 
     def _promote_person(self, method: str, caller: Any) -> None:
-        if not mail.is_person(caller):
-            raise RpcError(
-                f"{method} is a person's own: refused to a session (design §6 Promote; a worker never promotes)"
-            )
+        agent_common.person_only(caller, f"run {method}", "§6 *Promote*")
         if self.mode != "home":
             raise RpcError(f"{method} runs at the home (design §6 Promote): this host is a node")
 

@@ -154,6 +154,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     closer_of,
     launch_params,  # noqa: F401
     log,  # noqa: F401
+    person_only,  # noqa: F401
     read_checkout,  # noqa: F401
     stat_dir,  # noqa: F401
 )

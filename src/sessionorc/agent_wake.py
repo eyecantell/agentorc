@@ -17,6 +17,7 @@ from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
     defs,
     mail,
     naming,
@@ -474,8 +475,7 @@ class WakeMixin:
         has passed and its reserve priority. `migrate` names a `ui.yml` still on disk, which is no
         longer read. **A person's own**, refused to a session as `set_settings` is: `person:` is
         theirs, and what a session needs of the gate `gate` answers."""
-        if not mail.is_person(caller):
-            raise RpcError("settings is a person's own: refused to a session (design §5 settings.yml)")
+        agent_common.person_only(caller, "read the settings", "§5 settings.yml")
         doc, now = settings_mod.load(), datetime.now(UTC)
         gate = (await self.rpc_gate())["profiles"]
         teams = {
@@ -526,8 +526,7 @@ class WakeMixin:
           clearing that key (or that field of terminal or inbox).
         - `usage`: `{max_age: "1h" | "90m" | "off" | None}` (§6 *A reading the gate can no longer
           trust*, TD-233), None clearing it back to the default hour."""
-        if not mail.is_person(caller):
-            raise RpcError("set_settings is a person's own: refused to a session (design §5 settings.yml)")
+        agent_common.person_only(caller, "change the settings", "§5 settings.yml")
         if reserves is None and teams is None and repos is None and person is None and usage is None:
             raise RpcError("set_settings needs reserves, teams, repos, person or usage (design §5 settings.yml)")
         doc = settings_mod.load()
@@ -613,8 +612,7 @@ class WakeMixin:
         **Members…**'s `edit_members` — as `org: ao-grind +grinder-ao-3`. A person's own, and the
         home's alone (`modes.HOME_EDITS`). `{committed}`: false when nothing changed, the home is no
         work tree, or git failed (logged; the write it follows stands)."""
-        if not mail.is_person(caller):
-            raise RpcError("commit_defs is a person's own: refused to a session (design §4.9)")
+        agent_common.person_only(caller, "commit the definitions", "§4.9")
         if self.mode != "home":
             raise RpcError("commit_defs runs at the home (design §4.9): this host is a node")
         message = " ".join(str(message or "").split())
@@ -640,8 +638,7 @@ class WakeMixin:
         do not ask again and a later one does, and the mark is removed. A person's own, refused to a
         session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`). `{team, cleared,
         ids}`: `cleared` false when no work was waiting."""
-        if not mail.is_person(caller):
-            raise RpcError("clear_work is a person's own: refused to a session (design §6 rule 8)")
+        agent_common.person_only(caller, "clear a team's waiting work", "§6 rule 8")
         if self.mode != "home":
             raise RpcError("clear_work runs at the home (design §6 rule 8): this host is a node")
         team = str(team or "").strip()
@@ -687,8 +684,7 @@ class WakeMixin:
         refused to a session as `clear_work` is, and the home's alone (`modes.HOME_EDITS`): both
         fields are home-owned, a node's member's too. `{id, kind, cleared}`: `cleared` the PRs
         whose mark went, empty when none stood."""
-        if not mail.is_person(caller):
-            raise RpcError("clear_mark is a person's own: refused to a session (design §4.5a)")
+        agent_common.person_only(caller, "dismiss a mark", "§4.5a")
         if self.mode != "home":
             raise RpcError("clear_mark runs at the home (design §6 rules 10 and 11): this host is a node")
         s = self._find(self._addr(id))
@@ -720,8 +716,7 @@ class WakeMixin:
         **A person's own**, refused to a session as `set_settings` is, and the home's alone
         (`modes.HOME_EDITS`); a node's member is closed and created over the link. Every refusal is
         made before anything is touched; the reply is the new record."""
-        if not mail.is_person(caller):
-            raise RpcError("restart is a person's own: refused to a session (design §6 rule 2)")
+        agent_common.person_only(caller, "restart a session", "§6 rule 2")
         if self.mode != "home":
             raise RpcError("restart runs at the home (design §6 rule 2): this host is a node")
         s = self._find(id)
