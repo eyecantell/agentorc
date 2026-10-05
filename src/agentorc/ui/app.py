@@ -678,6 +678,7 @@ def create_app() -> FastAPI:
             doing,
             await work_marks(),
             flow_cache["flows"],  # the page load's reading: a delta reads no plan
+            work_cache["balance"],  # the home's balance marks, read beside `work` (TD-330)
         )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
@@ -826,7 +827,7 @@ def create_app() -> FastAPI:
         """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
         return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
 
-    work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None}
+    work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None, "balance": None}
 
     async def home_reading(fresh: bool = False) -> None:
         now = time.monotonic()
@@ -834,7 +835,12 @@ def create_app() -> FastAPI:
             got: dict[str, Any] = {}
             with contextlib.suppress(Exception):
                 got = dict(await call("host"))
-            work_cache.update(at=now, work=dict(got.get("work") or {}), waiting=dict(got.get("waiting") or {}))
+            work_cache.update(
+                at=now,
+                work=dict(got.get("work") or {}),
+                waiting=dict(got.get("waiting") or {}),
+                balance=dict(got.get("balance") or {}),
+            )
 
     async def home_waiting(fresh: bool = False) -> dict[str, Any]:
         """What each live session waits on (`host`'s `waiting`, §4.9a *Waiting is read, never
@@ -1084,7 +1090,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": (groups := team_groups(vs, strip["teams"], repos, doing, work, flows)),
+                "groups": (
+                    groups := team_groups(
+                        vs, strip["teams"], repos, doing, work, flows, {} if agent_down else (info or {}).get("balance")
+                    )
+                ),
                 "rollup": rollup(groups),
                 "strip": strip,
                 "counts": counts,
@@ -2500,6 +2510,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     sessions=fleet,
                     repos=readings,
                     flows=await asyncio.to_thread(team_flows, org),
+                    host=info,
                 ),
                 "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls")),
                 "you": term,

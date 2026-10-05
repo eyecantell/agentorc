@@ -92,7 +92,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
-| TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open — the page's half of (3) left (#1106) |
 
 ---
 
@@ -1598,21 +1597,3 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** on a scratch home with the switch on, a session going `needs-you` with no page open produces exactly one recorded send after the hold, whose link opens the Inbox on that row; with a page visible it produces none; and the suite passes. **Then a live check that is Paul's** (it needs the Doppler config's name saved on the Settings page and his phone): **Send a test** arrives, and one real `needs-you` reaches him once — TD-092 archives on that.
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
-
-## TD-330: Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-2, carried out of TD-239 when its live check held; each from a techlead read of its slices)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — the page's half of (3) left. Built (PR #1106, grinder-ao-1): (1) `_work_held` keeps a standing balance hold beside an earlier bound as `held.balance` (`_balance_hold`), and §6 rule 8 says `on_work: ask` drops every hold, the balance one included, a later `start` reading the line afresh; (2) written in §6 as one layer deep while nesting is not built; (3)'s home and terminal half — `rpc_host` carries `balance: {<team>: mark}`, every mark, `teamrun.balance_marks(repos, host)` merges it, `ao team list` and `ao team balance` read both. **Left** (`src/agentorc/ui/`, grinder-ao-2's package): the team card (`ui/repo.py`, `team_groups`' `marks`) and the Settings page's **balance** field (`ui/settings_page.py`, `balance_card`) pass the `host` read's `balance` to `balance_marks` (the page already reads `host` for `work`, `app.py` `home_reading`), with the page's UI check; then §6's *not yet the `host` read* clause goes.
-**Location:** `src/sessionorc/agent_tick.py` (`_work_held`, `_work_balance`, `_balance_leads`), `src/sessionorc/agent.py` (`rpc_host`, the `host` read), `src/agentorc/teamrun.py` (`balance_marks`); design §6 *Balance*
-
-**Why:** TD-239 built the rule whole, and its reviews left three cases nobody scheduled. (1) A standing `balance` hold on `work_waiting` is lost whenever another reason takes `held` or strips it (a usage hold, `on_work` set to `ask` and back), so a failing PR reading at that moment starts the team (#799's read). (2) `_balance_leads` reads only the bottom layer of controllers: a team of manager → g1 → w tells g1, and with a second grinder beside g1 tells only the person (#798's read). (3) A mark with an empty `repo` is in no `repos` reading, so the terminal and the page never say it; only the refusal does (#847).
-
-**Fix:** (1) keep the balance hold beside another `held` reason, if TD-227's row shows it matters; (2) a sentence in §6 if nested teams are meant to exist, else nothing; (3) carry `balance` on the `host` read as it carries `work`, and draw it from there. Each is small, and (2) may be only words.
-
-**Done when:** each of the three is fixed or written down in §6 as how it is meant to be.
-
-**Related:** TD-239 (the build), TD-177 (the design), TD-227 (rule 8's holds).

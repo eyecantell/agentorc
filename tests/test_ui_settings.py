@@ -426,6 +426,14 @@ def test_balance_card_reads_the_numbers_and_the_mark():
     assert setmod.team_cards({"t": object()}, {"t": {"balance": {"prs": 2}}}, sessions=fleet, repos=repos)[0][
         "balance"
     ]["mark"]
+    # a mark with no repo: only the home's `host` read carries it (TD-330)
+    bare = {"/r": {"prs": {"open": open_}}}
+    assert setmod.balance_card("t", {"prs": 2}, fleet, bare)["mark"] == ""
+    host = {"balance": {"t": {**mark, "repo": ""}}}
+    assert setmod.balance_card("t", {"prs": 2}, fleet, bare, host)["mark"] == "over its line: 3 open PRs, line 2"
+    assert setmod.team_cards({"t": object()}, {"t": {"balance": {"prs": 2}}}, sessions=fleet, repos=bare, host=host)[0][
+        "balance"
+    ]["mark"]
 
 
 def test_every_page_draws_the_usage_chip(client, subprocess_agent, monkeypatch):

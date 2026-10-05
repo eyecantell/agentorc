@@ -475,6 +475,10 @@ def test_a_team_over_its_line_says_so_on_its_header_and_only_while_live():
     assert "overline" not in ui.templates.get_template("group_head.html").render(g=clear)
     (dead,) = ui.team_groups([{**m, "state": "exited"} for m in ms], (), over, {})
     assert dead["balance_note"] == ""
+    # a mark with no repo is in no checkout's reading: the home's `host` read carries it (TD-330)
+    unhomed = {**mark, "repo": ""}
+    (g,) = ui.team_groups(ms, (), {"/r/samscrape": reading("/r/samscrape")}, {}, balance={ms[0]["team"]: unhomed})
+    assert g["balance_note"] == "over its line: 9 open PRs, line 8"
 
 
 def test_the_repo_pages_rows_keep_their_id_tags_and_columns():

@@ -240,20 +240,25 @@ def usage_cards(
 
 
 def balance_card(
-    name: str, bal: Any, sessions: list[dict[str, Any]] | None, repos: Mapping[str, Any] | None
+    name: str,
+    bal: Any,
+    sessions: list[dict[str, Any]] | None,
+    repos: Mapping[str, Any] | None,
+    host: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """**balance** on a team's card (§4.5a *Settings page: Teams*, §6 *Balance*, TD-239): the switch,
     the three fields as `settings.yml` holds them — a line not drawn is an empty field — and under
     them the repo's numbers as they read now, in `ao team balance`'s lines, so a line is set against
     what it would have done today. `was` is the value as the form would send it, which is how the
     page tells a Save that moved it from one that did not. `mark` is the card's **over its line**
-    note while the home's mark stands."""
+    note while the home's mark stands — from the `repos` reading and the home's `host` read, whose
+    `balance` carries a mark with no `repo` too (TD-330)."""
     bal = {k: bal[k] for k in settings_mod.BALANCE_KEYS if k in bal} if isinstance(bal, Mapping) else {}
     if not bal.get("review"):
         bal.pop("review", None)  # off is no key, as the file reads
     readings = {str(k): v for k, v in (repos or {}).items() if isinstance(v, dict)}
     now = teamrun.balance_now(name, list(sessions or []), readings)
-    mark = teamrun.balance_marks(readings).get(name) if bal else None
+    mark = teamrun.balance_marks(readings, dict(host or {})).get(name) if bal else None
     return {
         "on": bool(bal),
         "prs": str(bal.get("prs") or ""),
@@ -273,6 +278,7 @@ def team_cards(
     sessions: list[dict[str, Any]] | None = None,
     repos: Mapping[str, Any] | None = None,
     flows: Mapping[str, list[dict[str, Any]]] | None = None,
+    host: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """**Teams** (§4.5 screen 8): a card per team the org defines, with the settings a person
     moves — the schedule (drawn disabled until TD-133), the stop time, the reserve priority,
@@ -297,7 +303,7 @@ def team_cards(
                 "schedule": t.get("schedule") or None,
                 "on_work": t.get("on_work") if t.get("on_work") in settings_mod.ON_WORK else "ask",
                 "on_work_set": t.get("on_work") in settings_mod.ON_WORK,
-                "balance": balance_card(name, t.get("balance"), sessions, repos),
+                "balance": balance_card(name, t.get("balance"), sessions, repos, host),
                 "flows": (rows := list((flows or {}).get(name) or [])),
                 "flow": next((r["name"] for r in rows if r.get("current")), ""),
                 "flow_strip": next((r.get("strip") or "" for r in rows if r.get("current")), ""),

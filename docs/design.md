@@ -8943,8 +8943,8 @@ teams:
   checkout's reading carrying `balance: {<team>: mark}` for the marks whose `repo` it is, so a
   client and a session's `ao repo` read it there, and on the home's `host` read as `balance:
   {<team>: mark}`, every mark, one whose `repo` is empty included, which no checkout's reading
-  holds: `ao team list` and `ao team balance` read both (TD-330; the page's team card and Settings
-  field read the `repos` reading alone, not yet the `host` read). The mark goes when no line is crossed.
+  holds: `ao team list`, `ao team balance`, the page's team card and the Settings page's
+  **balance** field read both (TD-330). The mark goes when no line is crossed.
   A crossed line's `value` and `limit` are open pull requests for `prs` and seconds for `oldest`
   and `review`, so a reader writes both sides alike (*oldest PR 3d, line 2d*); a mark still
   crossed keeps its `since` whatever its numbers do. **A reading that failed crosses nothing and clears

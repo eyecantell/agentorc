@@ -225,6 +225,7 @@ def team_groups(
     doing: Mapping[str, Any] | None = None,
     work: Mapping[str, Any] | None = None,
     flows: Mapping[str, Any] | None = None,
+    balance: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -256,7 +257,10 @@ def team_groups(
 
     `flows` is each team's `teamrun.flow_view`, read when the page was drawn and not per delta
     (§4.9c *What is shown*): the header's flow and strip, the lines under it while the definition
-    cannot follow its flow, and, on a live team, *flow changed — Apply* (`flow_head`)."""
+    cannot follow its flow, and, on a live team, *flow changed — Apply* (`flow_head`).
+
+    `balance` is the home's balance marks by team (`host`'s `balance`, §6 *Balance*, TD-330): every
+    mark, one with no `repo` too, which no checkout's reading in `repos` carries."""
     defs = {str(r["name"]): r for r in rows}
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
@@ -264,7 +268,9 @@ def team_groups(
     if not any(t != NO_TEAM for t in by_team):
         return None
     groups: list[dict[str, Any]] = []
-    marks = teamrun.balance_marks({str(k): v for k, v in (repos or {}).items() if isinstance(v, dict)})
+    marks = teamrun.balance_marks(
+        {str(k): v for k, v in (repos or {}).items() if isinstance(v, dict)}, {"balance": balance or {}}
+    )
     for team in sorted(by_team):
         members = sorted(by_team[team], key=card_order)
         manager, manager_elsewhere = None, False
