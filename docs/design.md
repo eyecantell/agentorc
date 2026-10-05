@@ -2723,7 +2723,7 @@ panel and the New-session form stay desktop-width.
 
 **Type scale (TD-130, 2026-09-25, built by TD-144; mockups `Type.dc.html`, `TypeDark.dc.html`, and every artboard
 regenerated at the scale).** The pages set their sizes as **six tokens on `:root`**, theme-
-independent, and no rule outside the token block names a pixel size: **`--t-body` 14 px** —
+independent, and no rule outside the token block names a pixel size: **`--t-body` 15 px** (14 px until Paul's look of 2026-10-04, *bigger*) —
 everything a person reads: body text, a mail body, a board line, a question, a note's text, an
 input, a dialog; line height **`--lh` 1.5**; **`--t-small` 12 px** — small print: an age, a due
 word, a section's count, a button's label (`.btn` 13 px sits between, as `--t-btn`), a field's

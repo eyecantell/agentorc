@@ -32,7 +32,7 @@
      tracked marks only; mono and mono-s the terminal and mono small print. If the page reads too
      large or too small, `--t-body` is the one number to move. The card's heights follow the scale
      so a card stays six rows of one height (§4.5 *The card's anatomy*). */
-  --t-body: 14px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px;
+  --t-body: 15px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px;
   /* the team card's summary (design §4.5a *team card: summary*, TD-176): priority is one hue
      darkened by rank; the kinds and the phases each their own; *opened* and *closed* blocks */
   --p-high: #1e3a8a; --p-medium: #2563eb; --p-low: #93c5fd;
