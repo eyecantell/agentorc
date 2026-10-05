@@ -4561,3 +4561,20 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Resolved:** 2026-10-05 (designed 2026-10-02, PR #934, on Paul's *Go with the form as drawn*; built by TD-284, PRs #945, #948, #949, #950, #951, #952 and #953; its live look closed 2026-10-03 (PR #971) and it was archived in PR #1087: the order, all four kinds, *Resume with changes…* and At / Until seen) — design §4.5 screen 3 *New session*, §4.5a New session **the form**.
 
 **Related:** TD-269 and TD-276 (the Team pick and a seat on call as controller: the same form), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume lands on this form filled in), TD-160 (a person's own session inside a team).
+
+## TD-318: A definition is read at the home — the landing rule loses its node clause, and `ao org` names a repo held only on a node
+
+**Priority:** Low
+**Added:** 2026-10-04 (the designer, from TD-229's open question)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/org.py` (`landing`, `_land`), `src/agentorc/orgcheck.py` (`view`, `check`), `src/agentorc/cli.py` (`cmd_org`), `tests/test_org.py`, `tests/test_cli_org.py`; design §4.9 *A definition is read at the home, and only there* and *Where a repo's team lands*, §4.7 `ao org`.
+
+**Why:** TD-229's build left a question: `org.landing` holds a clause, *else the one linked node whose registry does*, that is tested and that no client reaches, because every definition is read from a checkout in the home's registry. The design now says a definition is read at the home and only there, so the clause is dead code that describes a rule the design does not have; and a repo a node holds that the home does not is silent today, where the person should be told its teams are not read.
+
+**Resolved:** 2026-10-05 (PR #1091) — `org.landing` has two clauses; `orgcheck.held_elsewhere` in `ao org` and `ao org check`; design §4.9 *A definition is read at the home, and only there* and *Where a repo's team lands*, §4.7 `ao org`; pinned by `tests/test_org.py` and `tests/test_cli_org.py`. `rpc_host_repos`'s docstring (`src/sessionorc/agent_remote.py`, a held path) still names the old clause, to be reworded when that file is next touched (grinder-ao-1 told).
+
+**Done when** `landing` has two clauses and its tests say so; with a linked node whose registry holds a repo the home's does not, `ao org` lists it and `ao org check` warns and still exits 0; with that node unreachable both say its registry could not be read; `pdm run test` passes.
+
+**Related:** TD-229 (the aggregate and the question), TD-210 (the design), TD-299 (cm-grind on its container node: the home's checkout for the reading, `place:` for the work).
