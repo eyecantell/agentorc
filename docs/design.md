@@ -5708,7 +5708,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
   per PR. **The queue is the seat's inbox**: a held PR waiting is an unanswered `ask` with `pr`
   set — counted in `asks_waiting`, and in a second structured field on the seat's view,
   **`prs_waiting: {n, oldest, asks}`** (a number, a time and `asks: [{from, pr}]`, each ask's sender
-  and PR in the order they came — never their text, §4.10), which the team's header draws as
+  (in the home's form: a node's session is `id@host`) and PR in the order they came — never their text, §4.10), which the team's header draws as
   **`n` PRs waiting · oldest `<age>`**, and from which `ao team flow` names what a switch leaves with
   the reader (§4.9c; `asks` built — TD-333). The entries themselves are read with
   `ao inbox <seat>`, which a person may always run; the person's own Inbox page draws none of it,
