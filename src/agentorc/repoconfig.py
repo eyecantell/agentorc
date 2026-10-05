@@ -256,6 +256,22 @@ def _stage_default(template: str) -> Path | None:
     return src if src.is_file() else None
 
 
+def _stage_text(stage: Path, read: Reader | None) -> str:
+    """A stage brief's text as `brief.fill` reads a file slot: stripped, `none` when empty. A file of
+    the package is this host's own; a repo flow's is read through `read`, so a node member's is read
+    on its checkout across the link (design §4.4a, TD-309) as `flowdefs.check` read it."""
+    package = Path(str(resources.files("agentorc")))
+    # `flowdefs.PACKAGE_DIR` is resolved and `_stage_default` is not: either spelling is the package's
+    here = read is None or any(stage.is_relative_to(p) for p in (package, package.resolve()))
+    try:
+        text = (_read_here if here else read)(stage)
+    except OSError as e:
+        raise ValueError(f"stage brief {stage} cannot be read ({e.strerror or e})") from None
+    if text is None:
+        raise ValueError(f"stage brief {stage} cannot be read (no such file)")
+    return text.strip() or NO_STAGE
+
+
 def prefixed(prompt_from: dict[str, Any] | None, block: str) -> dict[str, Any] | None:
     """`prompt_from` with the text put in front of the brief (§4.9's Project block) as `prefix`,
     which a replay puts back in front as it is: the block is the org's reach at the start, not a
@@ -360,8 +376,9 @@ class Role:
         A role the package ships no template for takes the repo's brief as the whole brief; None
         for one with neither (`plain`). `read` reads a repo's file — this host's disk by default, or
         another host's checkout across the link (design §4.4a "Teams across hosts", TD-057 step
-        4b.3); a template is always the package's own. `on_call` takes the template's seat shape
-        where the package ships one (`ON_CALL_BRIEFS`: a manager on call, design §6 rule 3, TD-259).
+        4b.3), a repo flow's stage brief with it; a template is always the package's own. `on_call`
+        takes the template's seat shape where the package ships one (`ON_CALL_BRIEFS`: a manager on
+        call, design §6 rule 3, TD-259).
         `flow` is what a member started under a team's current flow is told of it (§4.9c item 5):
         `{flow}` and `{stage}` from it; without one, `none` and the template's `<stem>.stage.md`. A
         designer's template wraps it only under a flow (`FLOW_ONLY_TEMPLATES`, until TD-310).
@@ -395,10 +412,7 @@ class Role:
             stage = flow.stage if flow is not None else _stage_default(template)
             text = text.replace(FLOW_PLACEHOLDER, flow.text if flow is not None else NO_FLOW)
             slots[FLOW_PLACEHOLDER] = {"text": flow.text if flow is not None else NO_FLOW}
-            # a file slot, read as `brief.fill` reads one: stripped, `none` when empty
-            text = text.replace(
-                STAGE_PLACEHOLDER, (stage.read_text(encoding="utf-8").strip() or NO_STAGE) if stage else NO_STAGE
-            )
+            text = text.replace(STAGE_PLACEHOLDER, _stage_text(stage, read) if stage else NO_STAGE)
             slots[STAGE_PLACEHOLDER] = {"file": str(stage)} if stage else {"text": NO_STAGE}
         if self.template is not None and ENTRY_PLACEHOLDER in text:  # the techlead's template alone carries it
             handed = entry_text(*(HANDED_ENTRY[slot] for slot in ENTRY_SLOTS))
