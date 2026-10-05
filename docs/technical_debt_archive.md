@@ -3788,3 +3788,52 @@ Both go away only when the record says who closed it.
 **Why:** on the 3.12 runner, PR #1052's CI (a one-clause change to `docs/design.md`) failed at `tests/test_link.py:1370`: the home's record read suspended (*claimed another session's id*), and the node's never did within ten seconds. A docs-only PR cannot cause it, so it is timing or an ordering the push can lose; TD-063 and TD-078 are the earlier 3.12 flakes of this shape.
 
 **Fix:** reproduce under load (`pytest -p no:randomly --count` or a loop on that test with the CPU busy); read what pushes the suspension to the node and whether it can be dropped when it races the supersession's own push; fix the push if it can be lost, else widen nothing until it is understood.
+
+## TD-320: A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-04 (Paul: *we should make live-checks pickable by grinders so they do not have to wait on a promote*; written by the anchor)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** `src/sessionorc/ledger.py` (`lane_matches`, `_word_matches`: `free-pick` matches `Kind: build` or unwritten only, so a live check matches no lane), `src/agentorc/briefs/grinder.md` (*Out of work*: `--kind build`, and the counts that name *live-check* as excluded), `docs/briefs/grinder-ao-1.md` / `grinder-ao-2.md`, `src/sessionorc/promote.py` / `ao promote status` (what is live), design §4.9 lanes, §6 rule 6, §4.9b *The live copy is read, never pressed*, cadence §2.4 (`Kind`, dev-cadence's)
+
+**Resolved:** 2026-10-05 — designed in TD-320's round, built by TD-323 (PRs #1051, #1053, #1054), whose live check held on 2026-10-05: a grinder took a live check whose build is live and archived it with no anchor step.
+
+**Why:** a built entry becomes `Kind: live-check` and, by the lane rule, nobody's but the anchor's; nothing tells the anchor to run it after a promote. On 2026-10-04 seven of the ledger's High entries were built and waiting this way (TD-052, TD-103, TD-122, TD-190, TD-201, TD-233, TD-249), with four designed entries (TD-188, TD-230, TD-231, TD-245) blocked behind them, while the grinders correctly found nothing of their own at High. The five the anchor ran that night (PR #1032: TD-122, TD-190, TD-201 and TD-249 archived, TD-233 in part) were each a read a grinder may already make under §4.9b: `ao status -v`, the records' `restarts`, the host agent's journal, the transcripts, a headless GET of a page. A live check still needs its build's commit to be live, which is what it checks; what this removes is the wait on the anchor after the promote.
+
+**Fix:** design it. Paul's shape, with the open points the round settles:
+1. A `Kind: live-check` entry is pickable by a grinder's `free-pick` lane once its build's commit is live: the merged PR named on the entry is an ancestor of the live commit (`ao promote status`). Where the entry does not name its PR, or the commit is not live, it is not pickable (the round decides how the entry names its build: a `**Built:**` line, the Status's PR numbers, or `Blocked by`).
+2. The grinder works under §4.9b's rule for the live copy: it reads, never presses; anything needing a press is made on a scratch home (`scripts/look_home.py`), and a live event that has not happened stays open, as TD-233's projection does.
+3. It records what it read on the entry and archives it with `**Resolved:**`, or opens a new entry for what is wrong.
+4. What stays the anchor's or the person's: a check whose *Done when* is a judgement only Paul can make (a look sent as mail, §4.9b), and one that needs the live home's settings changed.
+5. Whether `auto` promote should be on, so main reaches live without a press, is Paul's, and only shortens the wait this leaves.
+6. The grinder brief's *Out of work* counts and `ledger.py`'s query, and cadence §2.4 if the rule belongs in dev-cadence's reader.
+
+**Done when:** a grinder with nothing else to pick takes a live-check entry whose build is live, records the reading and archives it, with no anchor step between the promote and the archive.
+
+**Related:** TD-190, TD-249, TD-201, TD-122 (the checks of 2026-10-04, PR #1032), TD-233 (a live event left open), TD-297 (the presses and live events of 2026-10-03), TD-228 (pickable derived), TD-132 (the promote policy).
+
+## TD-323: Build live checks in the free-pick lane — the build's PR on the `Kind:` line, its `live` reading, the lane, the brief
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-04 (the designer, TD-320's build)
+**Owner:** grinder
+**Kind:** live-check #1054
+**Status:** Resolved
+**Location:** `src/sessionorc/ledger.py` (`_header`, `entries`, `kind_of`, `lane_matches`, `_word_matches`), the repo facts' ledger reading, and the promote reading (`_promotes` in `src/sessionorc/agent.py`, `live` / `live_why` written by `promote.py`), `src/sessionorc/work.py` and `src/agentorc/teamrun.py` (the two other callers of `lane_matches`), `src/agentorc/cli.py` (`ao repo`), `src/agentorc/ui/repo.py`, `src/agentorc/briefs/grinder.md` and the flows' `build.md`, `docs/briefs/grinder-ao-1.md` / `grinder-ao-2.md`, `docs/technical_debt.md` (the header's paragraph and the open live checks), `tests/test_ledger_derived.py`; design §4.9b *A live check is a grinder's once its build is live*, §6 rule 6, §4.4 *Repo facts*. Held paths (`src/sessionorc/**`, `docs/briefs/**`): the techlead reads slices 1 and 2.
+
+**Resolved:** 2026-10-05 (PRs #1051, #1053, #1054; the live check this PR) — it holds: read 2026-10-05 by grinder-ao-1, read-only on the live copy: `ao promote status` gives agentorc live at `cc5cb8e`, of which #1051–#1054 are ancestors; the home rang this grinder, which had declared out of work, at 12:23Z with *your lane gained 17 entries since you declared out of work* — exactly the 17 `Owner: grinder` live checks, while `ao repo --json` reads 12 `Owner: anchor` ones `live: yes` outside the lane; TD-297 (no PR on its `Kind:` line) reads *waits for its build to be live* and is offered to nobody; and this grinder took this entry from that list, read it and archived it here with no anchor step between the promote and the archive.
+
+**Why:** TD-320's design. Built entries wait for the anchor to run their live check after every promote, and designed entries wait behind them; sixteen live checks re-owned to the grinders on 2026-10-04 (PR #1042) say *pickable once TD-320 lands*.
+
+**Fix, in three slices, a PR each:**
+1. **The reading and the lane** (`src/sessionorc`). `entries` reads the `#<n>` after the word of a `**Kind:** live-check` line as a list of PR numbers (`built`; none, or anything else after the word, is no build named — the word itself is read as today) and takes a `live` callable beside `resolve` — PR number → bool — setting `live: "yes" | "no"` on a `Kind: live-check` entry, `no` with no callable, no PR on the line or any PR not live. The home's callable: the commit on the repo's default branch whose subject ends `(#<n>)`, tested `git merge-base --is-ancestor` against `promotes.<repo>.live`, false when either is missing or the promote reading carries `live_why`; read where the ledger is read, so the tick's matches cost no git. `_word_matches`: `free-pick` also matches `kind == "live-check"` with `live == "yes"`; `kind_of` puts such an entry under *pickable*. All three callers of `lane_matches` (rule 6, rule 8's `work.py`, `teamrun`) read entries that carry `live`. Tests: no line, a PR not found, not an ancestor, no promote reading → no lane; live → `free-pick`, and `[free-pick, owner:grinder]` leaves an `Owner: anchor` one out; a build that becomes live is told once by rule 6.
+2. **The briefs** (`src/agentorc/briefs/grinder.md` *Out of work* and the pick list; the flows' `build.md`; this repo's two grinder supplements). The pick list is `ao repo --json`'s pickable entries (which carry `live`), since `scripts/ledger.py` cannot tell a live build; the rule for the live copy (read, never press; a press on a scratch home); the four endings of design §4.9b, each a ledger-only PR; and *the PR that makes an entry a live check writes the build's PR after the word: `**Kind:** live-check #<n>`*. `ao repo` and the Repo page list a live check that is live among the pickable ones, and one that is not with *waits for its build to be live*.
+3. **The ledger** (docs and one test). The header paragraph of `docs/technical_debt.md` says what follows `live-check` on a `Kind:` line, and the pick list's new command; every open `Kind: live-check` entry gets its build's PR there from its Status's PR numbers (the last merged PR of the build; `git log --grep` settles a doubt), whoever owns it — the `Owner:` line is what keeps the anchor's checks the anchor's; and the sixteen entries' *pickable once TD-320 lands* is taken out. `tests/test_ledger.py`'s shape test takes a `Kind:` line whose word is followed by more (today it wants the line to end at the word), in this PR; `python3 scripts/ledger.py --check --since origin/main` passes on the edit, since cadence's script reads a field's first word and no field is added.
+
+**Done when** a grinder with nothing else to pick takes a live-check entry whose build is live, records the reading and archives it, with no anchor step between the promote and the archive (TD-320's *Done when*); a live check whose build is not live is offered to nobody; and the suite passes.
+
+**Related:** TD-320 (the design), TD-228 (pickable derived, the lane words), TD-132 (the promote reading), TD-290/TD-292 (a look), PR #1032 and PR #1042 (the checks of 2026-10-04).
