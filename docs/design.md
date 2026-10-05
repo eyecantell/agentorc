@@ -6060,7 +6060,11 @@ its supplements — is TD-114's remaining cut, which this design widens to *the 
 **A review stage any seat may hold, and a PR read by more than one (TD-314; designed 2026-10-04,
 not built — TD-315, after TD-309).** Paul (2026-10-04): *add/remove a review round*; *roles and
 flows essentially orthogonal*. What TD-307 left to the techlead seat alone is opened here, and
-everything in this paragraph block is designed and not built.
+everything in this paragraph block is designed and not built. Where TD-307's text above speaks of
+the `techlead` seat as the review stage's — the stage's `role` bullet, *Every listed flow must be
+followable* (unstaffed *when the team has no `techlead:` seat*; a seat edited out of the file),
+*the paths its techlead reviews* under *What is the repo's* — it is read, once this is built, as
+the stage's own seat and that stage's path set; TD-315 rewords those sentences when it builds.
 
 - **A review stage names any `seat` role.** It is staffed when the team's definition holds
   **exactly one seat of that role whose trigger is `asks`** — the `techlead:` seat for the role
@@ -6082,7 +6086,8 @@ everything in this paragraph block is designed and not built.
   a review stage's alone, refused on a stage that gives a lane. A path held for one role and not
   another is still not kept (item 2 above): a path is held for what it is, whoever wrote the PR.
 - **The record carries the chain.** Where the current flow holds review stages, every member role
-  of its other stages gets **`review: {chain: [{stage, reader, held}, …], bound}`** — one link for
+  of its other stages — and a person's own session in the team, item 3 above, which takes what a
+  member takes — gets **`review: {chain: [{stage, reader, held}, …], bound}`** — one link for
   each review stage in the flow's order, `reader` the seat's name as the definition gives it,
   `held` that stage's paths — in place of item 2's `{reader: techlead, held}`. The record's older
   shape stays valid and means a chain of one: `{reader: techlead|person, held}` is what a role's
@@ -6134,11 +6139,14 @@ everything in this paragraph block is designed and not built.
   record as it now stands: a link the new flow dropped is no longer asked, a link it added is, and
   a `pass` already given to a stage of the same name stands. A reader holding an open ask at a
   switch that leaves it no longer the last answers `pass`, as `ao pr held --id` then tells it. A
-  review seat whose role has no stage in the current flow is **not sat out**: it is a seat, filled
-  only by an ask, and it answers what it was asked.
+  review seat whose role has no stage in the current flow is **not sat out**: *Members the flow
+  does not use sit out* (above) is a rule for members, which run until wound down, and a seat is
+  none — it is filled only by an ask, costs nothing between them, and answers what it was asked,
+  as a `techlead:` seat under a flow with no review stage already does.
 - **What is shown.** The team header's *n PRs waiting · oldest* already counts every seat's
-  `prs_waiting`. The Repo page's PR standing (§4.5 screen 11) reads every seat's entries, not the
-  techlead's alone, and says the verdicts: *passed by ui-reader-ao-1 · waiting on techlead-ao-1 ·
+  `prs_waiting`. The Repo page's PR standing (§4.5 screen 11) and `ao repo`'s, which the
+  design words as the techlead seat's and the code already reads from every seat of the team,
+  name the reader and say the verdicts in place of *waiting on review* and *reviewed*: *passed by ui-reader-ao-1 · waiting on techlead-ao-1 ·
   40m*, *findings from techlead-ao-1*, *merged by techlead-ao-1*. No control is added.
 
 **One flow per team; more kinds of work are more teams.** A team runs one flow at a time. Different

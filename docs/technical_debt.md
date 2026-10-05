@@ -2858,11 +2858,11 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Kind:** build
 **Status:** Open
 **Blocked by:** TD-309
-**Location:** the flow loader TD-309 builds (a review stage's role and `held:`), `src/agentorc/repoconfig.py` (`held:` as a list or a mapping), `src/sessionorc/models.py` (`REVIEW_READERS`, `normalize_review`, the envelope's `verdict`), `src/sessionorc/mail.py`, `src/agentorc/cli.py` (`ao msg --verdict`, `ao pr held`), the host agent's RPCs (`pr_reads`), the flows' `build.md` and `review.md`, `src/agentorc/ui/repo.py` (`pr_standing`)
+**Location:** the flow loader TD-309 builds (a review stage's role and `held:`), `src/agentorc/repoconfig.py` (`held:` as a list or a mapping), `src/agentorc/org.py` and `src/agentorc/teams.py` (the staffing check, the compile, `ao org check`), `src/sessionorc/models.py` (`REVIEW_READERS`, `normalize_review`, the envelope's `verdict`), `src/sessionorc/mail.py`, `src/agentorc/cli.py` (`ao msg --verdict`, `ao pr held`), the host agent's RPCs (`pr_reads`), the flows' `build.md` and `review.md`, `src/agentorc/ui/repo.py` (`pr_standing`)
 
 **Why:** TD-314's design: under flows a review stage is the techlead seat's alone, so a second review round, or a reader for some paths only, cannot be written.
 
-**Fix:** design §4.9c *A review stage any seat may hold, and a PR read by more than one*. Slices, each a PR; slices 1, 2 and 5 touch `src/sessionorc/**` and wait for the reader:
+**Fix:** design §4.9c *A review stage any seat may hold, and a PR read by more than one*. Slices, each a PR; slices 1 and 2 touch `src/sessionorc/**` and wait for the reader:
 1. **The record and the verdict** — `normalize_review` takes `{chain: [{stage, reader, held}], bound}` beside the older shape (a chain of one); the reply envelope's `verdict` (`pass`, `merged`, `findings`), `ao msg --verdict`, required on a reply to an `ask` carrying `pr` and refused elsewhere.
 2. **`pr_reads {id, pr}`** — the home's structured read (addressee, time, open, last verdict; no text), answered to the author, an addressee and a person; over the link for a node's session as other mail reads are.
 3. **Path sets and the stage** — `held:` as a mapping of named sets in `.agentorc.yml`, a review stage's `held:`, any `seat` role on a review stage with the staffing rule (exactly one seat of the role on `asks`), the *not followable* reasons, the compile writing the chain, `ao org check`.
