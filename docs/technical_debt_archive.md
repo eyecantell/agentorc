@@ -3421,3 +3421,187 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-10-04 (PR #1040; the anchor) — the template side is done: every mechanic is in `src/agentorc/briefs/*.md` and a repo's brief fills the *This repo's rules* slot. agentorc's three member briefs (`manager-ao-1`, `grinder-ao-1`, `grinder-ao-2`) are cut to this repo's own rules in this PR; `designer-ao-1` stays whole, since the designer's template wraps it only under a flow (design §4.9c) and its cut is TD-310's, with ao-grind's `flows:` (techlead-ao-1's read), after a Sonnet read of all twelve briefs on the machine against the templates found restated and stale passages (the `loop`-skill bullet in every grinder brief, *the gate is not live*, *this paragraph wins* over text the template no longer has). What is left is each repo's own cut, ledgered there for its team: samscrape TD-452 (ContractMatch/samscrape#1025), dev-cadence TD-085 (eyecantell/dev-cadence#211), contractmatch TD-049 (ContractMatch/contractmatch#121). Design §4.8 *A repo's brief is a supplement, never a replacement*.
 
 **Related:** TD-113 (the recipe and the `{manager}` placeholder), TD-103 (the manager's mechanical rules on the tick), TD-042 (a brief names no run), TD-075 (the techlead's primer as the first supplement), TD-040 (presets and the override this replaces).
+
+## TD-038: The embedded terminal is a bare xterm.js: default palette, no bundled font, no renderer addon — it reads as black-and-white next to VS Code's terminal
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`, the `new Terminal({...})` options), `src/agentorc/ui/static/app.css` (`.termbox`, `--term`/`--termfg`), `src/agentorc/ui/static/vendor/` (xterm.js, addon-fit only), `src/agentorc/ui/templates/focus.html`
+
+**Why:** the Focus terminal is constructed with `fontFamily: "JetBrains Mono", Menlo, monospace`, `fontSize: 13` and a theme that sets only `background: "#0b0e12"`. Three things follow. (1) No font is bundled or loaded: JetBrains Mono renders only on a client that happens to have it installed; every other browser falls through to Menlo or the platform monospace, which is what a phone or a fresh laptop gets. (2) The ANSI palette is xterm.js's stock one, so Claude Code's colours land, but as the flat default sixteen, with no cursor, selection or bright-colour tuning; the pty bridge already exports `TERM=xterm-256color` (`src/agentorc/ui/pty_bridge.py`), so the colour information is there and unused. (3) Only the fit addon is loaded; xterm.js's DOM renderer draws each cell as an element, which is the blurrier, heavier rendering compared with the WebGL (or canvas) addon VS Code uses. The result is a pane that works but is noticeably less pleasant to read than the same session in VS Code's terminal, which matters because design goal 2 makes driving the session in that pane the product. Design goal 12 says the terminal is dark regardless of theme; that stays — this is about the dark pane's typography and palette, not adding a light one.
+
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — on Focus the pane draws through the WebGL addon (its canvas beside `xterm-link-layer`, a live GL context in headless Chromium) in the bundled JetBrains Mono (`document.fonts` loaded) and the dark palette. The colour match with VS Code's terminal is a side-by-side taste nobody has raised since.
+
+**Related:** design §2 goal 2 (drive the session in place), goal 12 (dark terminal regardless), §4.6 (terminal mechanics); TD-003 (phone layout will inherit the font decision); TD-037 (the Focus mockup's terminal should be redrawn in the same palette when it is regenerated).
+
+## TD-042: A brief that names a run number, a date or a fleet cannot be started twice
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Done 2026-10-04 — see *Resolved*.
+
+**Location:** `docs/briefs/*.md`, `src/agentorc/briefs/` (the package templates), design §4.8 (the preset table's brief column), §4.9 (`brief:` on a lead or member), TD-026 (scheduling)
+
+**Why:** `ao team start` is meant to be the restart as well as the start (§4.9: an exited or closed name holder is superseded). The briefs it hands out were written for one run: `orchestrator-ao-1.md` said "run 2" and "your own stop: 06:30 MDT 2026-09-13", `tdgrind-ao-1.md` said "run 6" and "stop at 05:30 MDT 2026-09-13" and named a four-item lane that was already resolved. The first real `ao team start ao-grind` on 2026-09-13 therefore brought up two sessions whose brief told them to stop immediately, and the grinder did: within 62 seconds it read the lane, found every item merged, wrote an end-of-run summary and stopped taking work. (It sits `idle` at its prompt rather than `exited` — a wrapped-up worker that has not been closed, which is the ordinary end state.) Nothing was broken — the team started exactly as designed — and the result was still an idle fleet, because the brief was a snapshot of a night rather than a description of a job. The orchestrator brief had the same shape in a worse place: it listed its workers by name and suffix (`ao-agentorc-tdgrind-ao-1-4`), which a team definition changes without telling the file.
+
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — ao-grind has started from the same unedited `docs/briefs/` on every day from 2026-09-20 to 2026-10-04 (its members' transcripts by date), and no brief names a run, a date or a fleet (the tests assert it); samscrape's prompts became its own briefs in `docs/briefs/`.
+
+**Related:** design §4.8, §4.9; TD-040 (the team definitions this rides on), TD-026 (scheduling, which owns *when* a worker stops), TD-036.
+
+## TD-058: Stopping the host agent hangs until systemd kills it
+
+**Priority:** Medium
+**Added:** 2026-09-16 (observed by the anchor session restarting the units for TD-052's live check)
+**Status:** Done 2026-10-04 — see *Resolved*.
+
+**Location:** `src/agentorc/ui/app.py` (the UI's shutdown), `src/sessionorc/agent.py` (`HostAgent.serve`: `async with server: await server.serve_forever()`; `serve_until_signal`), `src/agentorc/service.py` (the unit: `KillMode=process`, no `TimeoutStopSec`)
+
+**Why:** on 2026-09-16 21:24 MDT `systemctl --user restart agentorc-agent` sat in `stop-sigterm` for 90 s, then systemd logged `State 'stop-sigterm' timed out. Killing.` and sent SIGKILL (`journalctl --user -u agentorc-agent`). SIGTERM cancels the serve task (TD-024), and leaving `async with server` calls `Server.wait_closed()`, which since Python 3.12 waits for **every open client connection** to finish — and the UI's `subscribe` connection never does, nor does a CLI blocked in the `wait` RPC (TD-052 step 3, which makes long-lived connections the normal case for every lead). So a stop never completes on its own. Nothing is lost today — tmux holds the sessions, the store is written on every change, and the unit restarts — but the socket file is not unlinked by the `finally`, in-flight permission waiters die without an answer, every restart costs 90 s during which hooks queue to disk, and a SIGKILL is the wrong default for a process that will soon hold the org's mail.
+
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — since the restart onto the fix (2026-09-17 05:30; the last SIGKILL, 00:08:56 that night, was a process still on the old code) the journal holds 89 `Stopping agentorc-agent.service` lines and no `timed out` or SIGKILL on either unit; tonight's promote restarts (2026-10-04 19:23:56 and 20:43:53) stopped both units within the second with leads and grinders live.
+
+**Related:** TD-024 (archived: the pending-task traceback on SIGTERM, which made the cancel path clean but did not meet this), TD-052 step 3 (the `wait` RPC's long-lived connections), design §4.4, §4.6.
+
+## TD-095: The Org's cards say the same thing several times, are uneven, and *working* does not stand apart
+
+**Priority:** Medium
+**Added:** 2026-09-21 (the anchor session; asked for by Paul from a screenshot of the live Org page, kept as `docs/mockups/reviews/2026-09-21-org-cards.png`)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** design §4.5 (the card), §4.5a (its rows), `docs/mockups/gen.py`, `src/agentorc/ui/templates/card.html`, `group_head.html`, the state tokens in the stylesheet, `src/sessionorc/gitinfo.py` (it reads the commit, so row 3 can say *detached at `<sha>`* — the page reads *detached HEAD* until that is merged and promoted)
+
+**Why:** Paul, 2026-09-21: *manager-ao-1 is listed multiple times on the same card (there are other redundancies as well). "Working" should probably be green to be more contrasted with the finished/exit states, and we should probably make the card sizes congruent.* What the screenshot shows, as the agenda:
+
+- **One name, four times.** A card's heading is the tool's title and then the session's name beside it — the same word twice when the title is the name (every team member today: *manager-ao-1 manager-ao-1*); the worktree line says it twice more (*wt/manager-ao-1 → manager-ao-1*); and the team's header names the manager again.
+- **The header and the manager's card repeat each other**: the manager's name, its role, its state pill and its whole report line are in the team header and again, in full, on the card directly beneath it.
+- **Badges that say what the group already says**: every card inside the *ao-grind* group wears an `ao-grind` badge; every member says *under manager-ao-1* beneath a header that names the manager; and *kmaster / agentorc* and *claude-code · paul · opus-5* are identical on every card of the team — candidates for the header, shown on a card only where they differ.
+- **An ending said three ways**: an *exited* pill, then *exited · ready to close ✓*; and *finished · unseen*, an *out of work* chip and *ready to close ✓* on one card. One of them is the state, one is the person's next act, and the design should say which is drawn where.
+- **A report that reads as noise**: *#359 → #359 · 1/2 do…* — a reference shown as becoming itself, and truncated.
+- **Uneven cards**: heights differ by what each happens to carry, and the state pill sits under the badges on some cards and at the right of the heading on others (the *No team* group against the team group). A fixed anatomy — the same rows in the same places, empty ones collapsed consistently — and one height per row of the grid.
+- ***Working* does not stand apart**: it is a blue pill, close in weight to the grey *exited* and *finished* ones. Paul's suggestion is green. §4.5's state colours are tokens and mean something (the grid sorts by them), so the change is to the token table, with the contrast checked in both themes and against *needs-you* and *stalled?*, which must stay the loudest.
+- **A group header that misleads**: the *No team* group is headed *samscrape*, and holds sessions of three different directories; whatever that word is drawn from, it is not the group's project.
+
+**Constraints that stand** (none of this session's to change): state and alarm marks are never pressable; colours are tokens; nothing on a card is a control built from what a session wrote; a control not in §4.5a does not exist.
+
+**The mockups, 2026-09-21 (grinder-ao-1, build step 1):** `docs/mockups/gen.py` draws the Org card to §4.5 *The card's anatomy* and its second pass — six fixed rows at one height, the tool's title only where it differs, the mode a word (*interactive* with the `person` mark, *unattended* quiet), the one clock on row 2, `wt/` only when the worktree is not the name and `host / repo` only outside a team's group, the report with a reference once, the slot as one text with *ready to close ✓* its caption, and the quiet foot led by the next act (Allow the one filled button). The team header lost its manager and gained its place and counts by state; **Wind down** replaces the header's *Stop*; the *Urgent first / Pinned* toggle, retired 2026-09-18, is gone from the artboard. The legend (*States & badges*) carries the state tokens under grinder-ao-2's names for the page: `--working` green, `--idle` blue, `--ended` one grey (text `#4b5563`), `--new` for unread; a closed pill is `s-closed`, and green `s-done` is left to Focus. A finished worker (`tdgrind-4`, *idle · unseen* — renamed from *finished · unseen* by Paul, #382 — out of work) is added to the sample team. Not redrawn: the phone artboard's card (TD-003 is Paul's) and the Focus header, which only take the new colours.
+
+**The report line, 2026-09-21 (grinder-ao-1, handed over by grinder-ao-2):** `report_line()` in `src/sessionorc/models.py` — the one formatter for the card and `ao status -v` — drops ` → #N` when the entry's reference is that PR, so it reads `#359 · 1/2 done`; a different PR is still named (`#360 → #361`). `src/sessionorc`, so the anchor merges it.
+
+**Promoted 2026-09-21 18:29 local (the anchor), right after #383 (18:18) and #385 (18:28) merged — the page Paul looks at is this one.** The anchor's own headless look at 1400 px, three cards across: the six rows hold and the foot is quiet, but row 2 and row 4 truncate on a card that narrow — *unattend…*, *paul ·…*, *TD-431~ → #936 …* — so the mode word and the account are the first things cut. Not fixed; for Paul's look and the polish pass after it.
+
+**Resolved:** 2026-10-04 (Paul's look, *Works*; the anchor's read) — every Org card one height (118 px at 1440 and 390 px), each fact once, *unseen* only on an interactive session, the team title at the card name's size, *Tech Lead* as the role label, the usage chip *Claude · paul · week n%*.
+
+**Related:** TD-071 (the Org page review of 2026-09-18 and its look-and-feel pass), TD-074 (the card's title and `doing` line), TD-076 step 3 (role labels), TD-091 (a context gauge would be one more thing on the card).
+
+## TD-097: An empty seat's card says *exited*, which reads as a failure
+
+**Priority:** Medium
+**Added:** 2026-09-21 (the anchor session; from Paul's question the same evening)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** design §4.5 *The card's anatomy* (the slot's endings, the foot's first button), §4.5a (the state pill, the foot), §4.9b (the seat), `src/agentorc/ui/templates/card.html`, `docs/mockups/gen.py`
+
+**Why:** the seat's normal resting state — started per batch, answered, ended — is drawn with the same grey `exited` pill and *exited · ready to close ✓* slot as a crashed worker, so the one card on the page that is behaving exactly as designed looks like the one that failed.
+
+**Resolved:** 2026-10-04 (Paul's look, *Works*; the anchor's read) — an ended seat's card reads *on call*, not *exited*, at the cards' one height, and the team header counts *2 on call · 2 closed*.
+
+**Related:** TD-075 (the seat), TD-095 (the pill is the state), TD-098 (seats with a trigger share the word).
+
+## TD-124: The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-23 (Paul's question; the anchor session)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** design §4.5a (a **keys** row per page, or one row per key naming the control it presses), §4.5 screens 1, 2 and 6, `src/agentorc/ui/static/app.js` (one `keydown` handler, a focus ring on the selected card or row), `app.css` (the ring), the `?` overlay template
+
+**Why:** every act on the Org page and the Inbox is a click, and the person who runs a fleet from the keyboard is the person the pages are for (TD-046 came from the same place: alt-tab, not the mouse).
+
+**Resolved:** 2026-10-04 (Paul's look, *Works*; the anchor's read) — with the mouse untouched, `j`/`k` ring the cards in order (a solid outline, every card tabbable), `?` draws the overlay from the handler's table and `Esc` closes it, and no key sent a request.
+
+**Related:** TD-046 (Pop out, alt-tab), TD-069 (the Inbox's rows), TD-095 (the card's anatomy — the ring must fit it), TD-070 (suggested answers, which keys could pick by number).
+
+## TD-165: Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-25 (the designer, from TD-154's design)
+**Status:** Done 2026-10-04 — see *Resolved*.
+
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`, `model_in_use` — the tail read and the `isSidechain` rule to reuse), `src/agentorc/adapters/` (the contract and a neutral `Transcript` / entry model beside `Usage`), `src/sessionorc/agent.py` (`rpc_tail` is the shape; `NODE_READS`; `_route_read`), `src/agentorc/cli.py` (`cmd_tail`, the `tail` parser), `src/agentorc/skill.md` (the read-only line).
+
+**Why:** the only way to read a finished session today is to resume it (TD-154's *Why*): a live session, a lifecycle event, a close. The file is on the host and the adapter already finds it.
+
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — `ao transcript` reads a closed local record's turns without starting it (`ao-samscrape-manager-sam-1`), `--json` carries `before` (designer-ao-1: `before: 2104641`), and a node's closed record reads through the link (`ao-contractmatch-manager-cm-1@contractmatch`).
+
+**Related:** TD-154 (the design), TD-166 (the page reads this RPC), TD-155 (why a resume misleads today), TD-091 (a manager reading a quiet worker), TD-073 (no tool field name leaves the adapter), TD-057 (`read` and `NODE_READS`).
+
+## TD-195: Build rule 6, new work in a lane: `lane_seen` on a finished member's record, the lane match by the ledger reading's header fields, one `system` note naming the new entries, each told once, through the doorbell
+
+**Priority:** Medium
+**Added:** 2026-09-26 (the designer, from TD-187's design)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** `src/sessionorc/agent.py` (`_keep_running`: a sixth pass beside the nudge's; the `system` note through the path the lapse's note takes), `src/sessionorc/models.py` (`lane_seen` on the record and in `HOME_OWNED`, carried across a supersede as `out_of_work` is and cleared where `out_of_work` is cleared), `src/sessionorc/ledger.py` (the reading already keeps `kind` and `pickable` per entry: a `lane_matches(lane, entry)` beside `kind_of`)
+
+**Why:** TD-187's *Why*: the doorbell rings only for mail, filing an entry sends none, and the manager never sends to a finished member.
+
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — rule 6 fired live, each finished member rung through the doorbell within the tick: the journal's *told of 2 entries new in its lane* (grinder-ao-1 and grinder-ao-2, 2026-10-04 12:41:07), *told of 1* (designer-ao-1 and both grinders, 18:43:58) and *told of 3* (19:33:28), with `lane_seen` written at each declaration.
+
+**Related:** TD-187 (the design), TD-176 (the ledger reader), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-026 (a team that starts on work appearing: not this).
+
+## TD-219: Build Add entry, the form
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-28 (the designer, from TD-180's design)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** `src/agentorc/briefs/` (`entry.md`, new; `techlead.md`), `src/agentorc/teams.py` and `src/agentorc/org.py` (the `entries:` key), `src/agentorc/ui/repo.py`, `src/agentorc/ui/templates/repo.html` and `team_summary.html` (the button), a new form template, `src/agentorc/ui/static/app.js` (the composer's fill: TD-170's Shift+press sets `compose.value`), `src/agentorc/ui/help.py` when a help line is wanted for the button (the wording is this entry's to write, with the doc-bound tests run); design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, **Hand to the techlead**, **Open a session**; mockup `docs/mockups/AddEntry.dc.html`
+
+**Why:** TD-180's *Why*: the person has no way to put an entry in the ledger from a page.
+
+**Resolved:** 2026-10-04 (the anchor's live check; Paul's go to press it) — both paths ran on the live repo page: **Hand to the techlead** filed TD-282 by PR #928, and **Open a session** started `ao-agentorc-entry-3`, whose composer held exactly the words typed with the entry brief under *Told at start* (headless Chromium, `~/ao-shots/td283/`), and which drafted and filed TD-316 by PR #1030. TD-218 is archived; TD-180's design follows on its own.
+
+**Related:** TD-180 (the design), TD-218 (the home's half), TD-173 (a person in the team: the start this one reuses), TD-170 (the composer's fill), TD-176 (the Repo page and the facet).
+
+## TD-282: A test entry from the Add entry button: checks that an entry handed to the techlead seat lands in the ledger
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-02 (Paul, through Add entry; drafted by techlead-ao-1)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** design §4.5a *Add entry form* → **Hand to the techlead**, §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*; `src/agentorc/briefs/entry.md` (what an entry needs); `docs/technical_debt.md` (this file, where the entry must appear)
+
+**Why:** Paul's words, handed through the form: *This is a test TD, making sure the add entry button works properly. Hopefully this will appear in the TD list. No research needed.* The entry exists to exercise the hand-off end to end — the form's `ask` carrying `entry: {repo, type}` fills the techlead seat, the seat drafts the entry and lands it by PR, and reports the outcome — and its value is the check itself: that an entry a person types once on the page appears in the ledger without a session of their own.
+
+**Resolved:** 2026-10-04 — archived as the ledger-only test it was, not by its *Done when*'s look at the Repo page: the hand-off it tested worked end to end, handed through Add entry, drafted by techlead-ao-1 and merged as PR #928 (TD-219).
+
+**Related:** TD-180 (the Add entry design), TD-218 (`entry_add` and the outcome's close), TD-219 (the button and the row).
+
+## TD-180: Add a TD from the UI — the person types a line, an agent asks what it needs and writes the entry
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-26 (Paul: *it will look like the user giving short info, then an agent fleshing it out — asking questions as needed, then generating the TD*)
+**Status:** Done 2026-10-04 — see *Resolved*.
+
+**Why:** a TD reaches the ledger today only through a session. The person tells a session in its terminal, which writes the entry on a branch and opens a PR. The UI has no way in: §4.5a's **Open ledger** row says *an entry is edited in its file, never on the page*, and the Repo page's Technical debt lists are read-only. A thought the person has while looking at the Org or the Repo page has to wait until they open a session and explain it there. Most of what makes an entry good is work the person should not have to do: the next number, the Owner/Kind/Pickable lines, the evidence, the file locations, and the link to the design section and its neighbours. An agent can do all of that, and it only needs the person for the *why* and the choice between options.
+
+**The shape Paul gave:** the person writes a short line (a title, maybe a sentence) → an agent takes it, reads the repo and asks what it cannot find out itself (priority, what "done" means, which of two readings is meant) → it writes the entry in the ledger's template and it lands the way every ledger change does.
+
+**What the design round has to settle:** (a) **the door**: where the press lives (the Repo page's Technical debt heading beside **Open ledger**, the team card, the Org rollup, a Focus header), and what the first form asks: one line, the repo, and maybe a priority. (b) **who fleshes it out**: a new one-shot session started from a role (the *hunter*'s filing, whose **add** phase §4.5 screen 1 already reserves), the repo team's designer or manager taking it as mail, or a short-lived agent with no tmux session. Also what it may read and run, and its profile and spend (§4.9b reserve). (c) **where the questions appear**: as an `ask` in the Inbox (§4.10), the session's own Focus, or a dialog on the page that stays open. How the person answers each one, and what happens if they walk away (the draft is kept, parked, or dropped). (d) **how it lands**: a branch and PR per entry, reviewed as a doc-only PR, or the board write-back's committed **add** (§4.4: on the default branch, never pushed) extended to the ledger. What the next-TD-number race needs (open PRs can hold a number, per the TD-grind memory), and the Summary row that goes with the entry. (e) **the person's check**: whether they see the entry before it is filed, and whether an agent-written entry is marked as such. (f) what §4.5a and the *never on the page* clause become, and the `ao` verb beside it (`ao td add "<line>"` or similar), so an agent and the CLI reach the same path.
+
+**Resolved:** 2026-10-04 — the design landed (PR #711) and its builds are done and checked live: TD-218 archived, TD-219 archived the same day on both paths (see there); §4.9 and §4.5a carry no *not built* for Add entry.
+
+**Related:** design §4.5 screen 11 (the Repo page) and §4.5a **Open ledger**; §4.5 screen 1 (the *add* phase, the hunter); §4.10 (`ask`); §4.4 (the board write-back's **add**, the one precedent for the UI writing a repo file); §4.5a **Put on the board** (a UI form that writes a repo file); TD-126 (a reply back from the board); TD-160 (the hunter role named as *later*).
+
+## TD-187: A member that declared out of work is never woken when its lane gains entries
+
+**Priority:** High (raised from Medium 2026-09-26, Paul: so the designer takes it next)
+**Added:** 2026-09-26 (Paul: *will the designer wake on its own or is it necessary for us to intercede?*)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** design §4.9a (*finished means declared*), §4.10 (the doorbell), `src/agentorc/briefs/manager.md` (*Out of work*: *a finished member is never sent to and never restarted*)
+
+**Why:** designer-ao-1 declared `out_of_work` at 20:49Z on 2026-09-26. Within the next two hours TD-180, 181, 182 and 183 were filed: four `design-first` entries owned by the designer, all pickable. Nothing woke it. The doorbell rings only for new mail (§4.10), filing an entry sends none, and the manager's brief forbids sending to a finished member. The only way in is a person's message. The same happens to a grinder when a grinder-owned entry lands after its `none`. The design says mail is how *there is work now* reaches a finished member (§4.10), but nothing sends that mail.
+
+**Resolved:** 2026-10-04 — the design landed (rule 6, §6) and its build is live: TD-195 archived the same day on rule 6's firings (see there).
+
+**Related:** TD-176 (the ledger reader), TD-103 (the tick's policies), TD-053 (wind-down), TD-186; design §4.9a, §4.10 *The doorbell*.
