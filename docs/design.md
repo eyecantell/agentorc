@@ -1050,7 +1050,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   the item's text**: the edit is refused unless that line still holds that item, open, word for word
   — a board edited since the read has moved its lines. **It is refused, touching nothing, when origin
   cannot be reached** — the fetch, the push, the PR's open or its merge fails (`gh` absent or signed out counts), and the refusal names it: *origin could not be
-  reached (<why>): the edit was not made* (the board is read against origin already, §4.5 screen 6,
+  reached (<why>): the edit was not made*; a merge that reports a failure the forge did not have (a
+  lost reply, a timeout) is a landed edit when the forge reads the PR merged, or else when origin's
+  board is the edit's, so a retried add never writes its line twice (the board is read against origin already, §4.5 screen 6,
   so an edit made offline would be written where nothing reads it) — **when the item is not on
   origin** (a line the checkout alone holds, unpushed: *this line is not on origin yet: push the
   checkout first*), and when origin's line no longer holds that item, open, word for word. The

@@ -873,10 +873,25 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
 def test_a_merge_that_landed_though_the_forge_said_otherwise_is_a_landed_edit(repo, monkeypatch):
     """Review of PR #1036: `gh pr merge` failing after the forge took the merge (a timeout, a lost
     reply) is read from origin — the edit landed — so the press succeeds and a retried add never
-    writes its line twice."""
+    writes its line twice. The forge's word on the PR is not to be had here (`pr view` fails), so it
+    is origin's board that says so."""
     monkeypatch.setenv("FAKE_GH_FAIL", "merge-after")
+    monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
     got = board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
     assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
+    board.write_back(repo, 8, ITEM, "done")
+    assert f"- [x] {ITEM}" in origin_board(repo)
+
+
+def test_a_merge_the_forge_took_while_origins_board_moved_elsewhere_is_a_landed_edit(repo, monkeypatch):
+    """TD-264 (d): the merge's reply lost **and** origin's board changed elsewhere in the same moment —
+    the board differs from the commit's, so only the forge's word on the PR says it landed: a Done
+    is not refused as a moved line, and an add is not refused as unreachable (a retry would write
+    its line twice)."""
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge-after-moved")
+    got = board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
+    assert "A neighbour's edit." in origin_board(repo)
     board.write_back(repo, 8, ITEM, "done")
     assert f"- [x] {ITEM}" in origin_board(repo)
 

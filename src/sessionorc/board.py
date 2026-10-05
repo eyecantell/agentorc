@@ -378,11 +378,13 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
             cp = subprocess.CompletedProcess([], 1, "", str(e))
         if cp.returncode != 0:
             why = _why(cp, "gh pr merge")
-            moved = landed = False
+            # a merge that failed after the forge took it (a timeout, an error on the reply) landed,
+            # and a retried add must not write twice: the forge's own word on the PR first, since
+            # origin's board may have changed elsewhere in the same moment; origin's board else
+            landed = _pr_merged(t, n)
+            moved = False
             with contextlib.suppress(Refused):
-                if _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
-                    # a merge that failed after the forge took it (a timeout, an error on the reply):
-                    # origin's board is the edit's, so it landed — a retried add must not write twice
+                if not landed and _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
                     landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", str(BOARD)).returncode == 0
                     moved = not landed and not still()
             if not landed:
@@ -398,6 +400,25 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
     head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
     _reset(t, want)
     return {"commit": head, "message": msg, "pr": n}
+
+
+def _pr_merged(t: Path, n: int) -> bool:
+    """Whether the forge says pull request `n` is merged; False when it cannot be asked."""
+    gh = shutil.which("gh")
+    if gh is None:
+        return False
+    try:
+        cp = subprocess.run(
+            [gh, "pr", "view", str(n), "--json", "state", "--jq", ".state"],
+            cwd=str(t),
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return cp.returncode == 0 and cp.stdout.strip() == "MERGED"
 
 
 def _git_quiet(t: Path, *args: str) -> None:
