@@ -570,6 +570,7 @@ def compiled(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files:
     try:
         checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
         cfg = repoconfig.load(checkout, read=read)
+        # a listed flow that does not load counts for no sit-out: `_check_flows` refuses the start anyway
         listed = [f for n in team.flows if (f := flowdefs.load(n, cfg, org.roles, read=read)) is not None]
     except (TeamError, ValueError, OSError):
         return None
@@ -710,6 +711,7 @@ def flow_review(
         return False, None
     if flow is None or not flow.usable:
         return False, None
+    # `listed` is the current flow alone: only `.reader` is read here, never `.sits_out`
     c = Compiled(flow=flow, held=list(cfg.held or ()), listed=[flow], techlead=team.techlead is not None)
     stage = flow.stage_of(role) if role else None
     takes = role is None or (stage is not None and not stage.review)
@@ -840,7 +842,8 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             )
         block = project_block(org, team.projects, host, member.home) if reach else ""
         if under is not None and under.sits_out(member.role):
-            # §4.9c: not started at a Start; the switch that winds a live one down is slice 5's
+            # §4.9c: not started at a Start, interactive or not — a definition's member is the team's
+            # to start; what an interactive member is spared is the switch's wind-down (slice 5)
             p.sit_out.extend(member.names())
             continue
         for mname in member.names():
