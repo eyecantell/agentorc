@@ -22,8 +22,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agentorc import flowdefs, repoconfig, teams
 from agentorc import org as orgmod
-from agentorc import repoconfig, teams
 from sessionorc import balance as balance_mod
 from sessionorc import hosts
 from sessionorc import ledger as ledger_mod
@@ -731,9 +731,17 @@ def _record_stage(record: dict[str, Any]) -> tuple[bool, str | None]:
         return False, None
     for src in sources:
         path = src.get("path") if isinstance(src, dict) else None
-        if isinstance(path, str) and (path.endswith(repoconfig.STAGE_SUFFIX) or "flows" in Path(path).parts):
+        if isinstance(path, str) and _is_stage(Path(path)):
             return True, path
     return True, None
+
+
+def _is_stage(path: Path) -> bool:
+    """A template's `<stem>.stage.md`, or a brief of a flow: the package's or a repo's `.agentorc/flows/`."""
+    if path.name.endswith(repoconfig.STAGE_SUFFIX) or path.is_relative_to(flowdefs.PACKAGE_DIR):
+        return True
+    parts = path.parts
+    return any(parts[i : i + 2] == flowdefs.REPO_DIR.parts for i in range(len(parts) - 1))
 
 
 def _short(path: str | None) -> str:

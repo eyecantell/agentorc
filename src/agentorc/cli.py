@@ -1844,7 +1844,7 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             if teamrun.live(teamrun.crew(name, sessions)):  # a stopped team's next start compiles the flow
                 plan = teams.plan(org, name, here, files=teamrun.files_via(call_sync))
                 out["differences"] = [d.as_dict(plan.flow) for d in teamrun.differences(plan, sessions)]
-    except (teams.TeamError, ValueError, OSError) as e:
+    except (teams.TeamError, ValueError, OSError, AgentError) as e:
         if args.flow is None and not args.apply:
             out["differences"], out["unread"] = [], str(e)
         else:
