@@ -247,8 +247,9 @@ class InboxMixin:
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Snooze**, **Done** or **Decide** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
-        the one line edited in the repo's main checkout and committed there with the fixed message,
-        never pushed. `board` must be the board of a checkout this host's repos registry names;
+        the one line edited on origin's head in the host agent's own tree, committed with the fixed
+        message and landed by its own PR (`board.write_back`); the checkout is never written.
+        `board` must be the board of a checkout this host's repos registry names;
         `line` and `text` are what dev-cadence's reader gave the Inbox, and the edit is refused
         unless the line still holds that text. A person's only, as every act on the Inbox is.
 

@@ -372,6 +372,8 @@ def subprocess_agent(tmp_path_factory):
         # `ao` sends AGENTORC_SESSION as the caller (design §4.8); a test run from inside an ao
         # session would otherwise be gated as a session acting on another one
         mp.delenv("AGENTORC_SESSION", raising=False)
+        # the board write-back lands an edit through `gh` (§4.4, TD-264): the child gets the fake
+        mp.setenv("PATH", f"{fake_gh_bin(home / 'fake-bin')}{os.pathsep}{os.environ.get('PATH', '')}")
         proc = subprocess.Popen(
             [sys.executable, str(CHILD), sock_name],
             env=dict(os.environ),
@@ -443,3 +445,36 @@ def run_hook(session: str, payload: dict, wait: str = "5", env: dict[str, str] |
         env=env,
         timeout=30,
     )
+
+
+@pytest.fixture
+def forge(tmp_path, monkeypatch):
+    """A fake `gh` first on `PATH` (`tests/_fake_gh.py`), for the board write-back, which lands an edit
+    on origin by a pull request it opens and squash-merges (design §4.4, TD-264). Returns
+    `with_origin`, which gives a checkout a bare origin holding its `main`."""
+    monkeypatch.setenv("PATH", f"{fake_gh_bin(tmp_path / 'fake-bin')}{os.pathsep}{os.environ.get('PATH', '')}")
+    return with_origin
+
+
+def fake_gh_bin(bin_dir: Path) -> Path:
+    """A directory holding `gh`, the fake forge `tests/_fake_gh.py`, to put first on `PATH`."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    gh = bin_dir / "gh"
+    gh.write_text(f'#!/bin/sh\nexec {sys.executable} {Path(__file__).parent / "_fake_gh.py"} "$@"\n')
+    gh.chmod(0o755)
+    return bin_dir
+
+
+def with_origin(root: Path) -> Path:
+    """Give the checkout `root` a bare origin beside it holding its `main`, and return the origin."""
+    bare = root.parent / f"{root.name}-origin.git"
+
+    def run(*a: str) -> None:
+        subprocess.run(["git", *a], capture_output=True, text=True, check=True)
+
+    run("init", "-q", "--bare", "-b", "main", str(bare))
+    run("-C", str(root), "remote", "add", "origin", str(bare))
+    run("-C", str(root), "push", "-q", "origin", "main")
+    run("-C", str(root), "fetch", "-q", "origin")
+    run("-C", str(root), "remote", "set-head", "origin", "main")
+    return bare

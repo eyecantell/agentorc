@@ -417,7 +417,6 @@ ORIGIN_PHRASES: tuple[tuple[str, str, str | None], ...] = (
     ("fetched; board DIFFERS from", "(local edits not pushed)", "local"),
     ("fetched; board DIFFERS from", "(both sides changed)", "both"),
 )
-ORIGIN_READONLY = "on origin, not in this checkout yet: pull to act on it"
 # the home's pull readings by repo name (`host`'s `pulls`, §6 *Pull*), kept fresh by the app as
 # `work_marks` keeps its marks: what the *behind* note's tail says
 PULLS: dict[str, Any] = {}
@@ -492,7 +491,7 @@ def origin_firsts(rows: Collection[Mapping[str, Any]]) -> set[str]:
     return out
 
 
-templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts, ORIGIN_READONLY=ORIGIN_READONLY)
+templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts)
 
 
 def _synced(root: Path) -> str:

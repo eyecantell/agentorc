@@ -1,25 +1,34 @@
 """Board write-back (design §4.4, TD-069 step 3): **Snooze**, **Done**, **Reply** (TD-142) and
-**Decide** (TD-255) on one item of a repo's `docs/user_attention.md`, made by the host agent and
-committed in that repo's main checkout — and its one **add**, *Put on the board* (TD-140), the
-only line this system ever adds to a board.
+**Decide** (TD-255) on one item of a repo's `docs/user_attention.md`, made by the host agent — and
+its two **adds**, *Put on the board* (TD-140) and an orphaned question's answer (TD-216), the only
+lines this system ever adds to a board.
 
 A board is dev-cadence's file and its items are read by dev-cadence's reader
 (`nudge_user_attention.py --report --json`), which gives each item's line number and text; this
-module only edits the one line it is pointed at, and only when that line still holds the item the
-person was shown. The commit is cadence §4's carve-out for tool-made board edits: one line, one
-commit, a fixed message, on the checkout's default branch, never pushed. Where the checkout is not
-in a state to take that commit — another branch, the board already edited, a merge or rebase under
-way — the edit is refused in words and nothing is touched: the person's click is never turned into
-a dirty file under the anchor session's feet, or a commit on someone's feature branch.
+module only edits the one item it is pointed at, and only while origin's board still holds the item
+the person was shown, open, word for word. **The edit is made on origin's head and landed there**
+(TD-222, built by TD-264): in the host agent's own detached tree for the repo
+(`~/.agentorc/boards/<repo>/tree`), reset to `origin/<default>` at every press, committed with a
+fixed message, pushed on a branch of its own and carried onto the default branch by a pull request
+it opens and squash-merges at once — cadence §4.5's tool-made board edit. The person's checkout is
+never written, so its branch, a dirty file or a rebase under way refuses nothing; it catches up by
+the pull (design §6 *Pull*). Origin unreachable, a line only the checkout holds, and a line that
+moved are each refused in words, with nothing landed.
 """
 
 from __future__ import annotations
 
+import contextlib
 import re
+import shutil
 import subprocess
 import threading
-from datetime import date
+import time
+from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
+
+from sessionorc import paths
 
 BOARD = Path("docs") / "user_attention.md"
 ACTIONS = ("snooze", "done", "reply", "decide")
@@ -162,14 +171,14 @@ def message(text: str, action: str, due: str | None = None, *, answer: str = "")
     return f"agentorc: {what} (session {who})"
 
 
-def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def _git(root: Path, *args: str, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
     """One git call; a git that cannot be run or does not finish is a refusal, never a raw error."""
     try:
         return subprocess.run(
-            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT, check=False
+            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=timeout, check=False
         )
     except subprocess.TimeoutExpired:
-        raise Refused(f"git {args[0]} did not finish in {GIT_TIMEOUT:g} s in {root}") from None
+        raise Refused(f"git {args[0]} did not finish in {timeout:g} s in {root}") from None
     except OSError as e:
         raise Refused(f"git could not be run in {root}: {e}") from None
 
@@ -186,28 +195,10 @@ BUSY = ("index.lock", "MERGE_HEAD", "rebase-merge", "rebase-apply", "CHERRY_PICK
 
 def busy(root: Path) -> list[str]:
     """The git operations under way in the checkout — a merge, rebase, cherry-pick or index lock —
-    by their marker's name; shared by `ready` and the pull (design §6 *Pull*)."""
+    by their marker's name; read by the pull (design §6 *Pull*). A board edit no longer reads it:
+    the edit is made in the host agent's own tree, never in the checkout (§4.4, TD-264)."""
     gitdir = Path(_git(root, "rev-parse", "--absolute-git-dir").stdout.strip())
     return [n for n in BUSY if (gitdir / n).exists()]
-
-
-def ready(root: Path) -> None:
-    """Refused unless the checkout can take the commit without touching anyone's work: on its
-    default branch, the board clean, and no merge, rebase, cherry-pick or index lock under way."""
-    top = _git(root, "rev-parse", "--show-toplevel")
-    if top.returncode != 0:
-        raise Refused(f"{root} is not a git checkout")
-    if under_way := busy(root):
-        raise Refused(f"{root} has a git operation under way ({', '.join(under_way)}): try again once it is finished")
-    branch = _git(root, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
-    want = default_branch(root)
-    if branch != want:
-        raise Refused(
-            f"{root} is on {branch or 'a detached HEAD'}, not {want}: a board edit is committed on {want} only "
-            "(cadence §4), so make it there by hand or once the checkout is back on it"
-        )
-    if _git(root, "status", "--porcelain", "--", str(BOARD)).stdout.strip():
-        raise Refused(f"{root}'s board has uncommitted changes: commit or discard them first, then try again")
 
 
 def author(root: Path) -> str:
@@ -220,11 +211,215 @@ def author(root: Path) -> str:
     return name or "the person"
 
 
+# -- origin's head (design §4.4 *The edit is made on origin's head, and landed there*, TD-264) ----
+
+BOUND = 40.0  # seconds from the fetch to the merge (§4.4)
+MOVED = "that line of the board no longer holds this item: reload the Inbox and try again"
+NOT_ON_ORIGIN = "this line is not on origin yet: push the checkout first"
+PR_BODY = "agentorc's board write-back: one line of the board, at the person's press (cadence §4.5)."
+
+
+def unreachable(why: str) -> Refused:
+    return Refused(f"origin could not be reached ({why}): the edit was not made")
+
+
+class _Clock:
+    """The press's one bound, shared by every git and forge call in it."""
+
+    def __init__(self, bound: float = BOUND) -> None:
+        self.end = time.monotonic() + bound
+
+    def left(self, step: str) -> float:
+        left = self.end - time.monotonic()
+        if left <= 0:
+            raise unreachable(f"{step}: the {BOUND:g} s bound ran out")
+        return min(left, GIT_TIMEOUT)
+
+
+def _why(cp: subprocess.CompletedProcess[str], what: str) -> str:
+    lines = (cp.stderr or cp.stdout or "").strip().splitlines()
+    return f"{what}: {lines[-1][:200] if lines else f'exit {cp.returncode}'}"
+
+
+def tree_dir(root: Path) -> Path:
+    """The host agent's own tree for the repo at `root`: `~/.agentorc/boards/<repo>/tree` (§4.4)."""
+    return paths.home() / "boards" / Path(root).name / "tree"
+
+
+def _tree(root: Path, clock: _Clock) -> tuple[Path, str]:
+    """Fetch origin's default branch and give the tree at its head: kept between presses, made as
+    the rollback's tree is (§6 *A rollback*) when it is missing, and remade once when it cannot be
+    reset. Raises the unreachable refusal when the fetch fails."""
+    if _git(root, "rev-parse", "--show-toplevel").returncode != 0:
+        raise Refused(f"{root} is not a git checkout")
+    want = default_branch(root)
+    if _git(root, "remote", "get-url", "origin").returncode != 0:
+        raise unreachable(f"{root} has no origin")
+    cp = _git(root, "fetch", "-q", "origin", want, timeout=clock.left("git fetch"))
+    if cp.returncode != 0:
+        raise unreachable(_why(cp, "git fetch"))
+    t = tree_dir(root)
+    common = _common_dir(root)
+    why = ""
+    for _ in range(2):
+        if not (t / ".git").exists() or _common_dir(t) != common:
+            # missing, broken, or another clone's of the same name: this checkout's own, made afresh
+            _drop_tree(root, t)
+            t.parent.mkdir(parents=True, exist_ok=True)
+            cp = _git(root, "worktree", "add", "-q", "--detach", str(t), f"origin/{want}", timeout=clock.left("tree"))
+            if cp.returncode != 0:
+                why = _why(cp, "git worktree add")
+                continue
+        cp = _git(t, "reset", "-q", "--hard", f"origin/{want}", timeout=clock.left("tree"))
+        if cp.returncode == 0:
+            return t, want
+        why = _why(cp, "git reset")
+        _drop_tree(root, t)
+    raise Refused(f"the board's own tree {t} cannot be made or reset ({why}): the edit was not made")
+
+
+def _common_dir(root: Path) -> str:
+    cp = _git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    return cp.stdout.strip() if cp.returncode == 0 else ""
+
+
+def _drop_tree(root: Path, t: Path) -> None:
+    if t.exists():
+        _git(root, "worktree", "remove", "--force", str(t))
+        if t.exists():
+            shutil.rmtree(t, ignore_errors=True)
+    _git(root, "worktree", "prune")
+
+
+def _reset(t: Path, want: str) -> None:
+    """The tree back at origin's head after a failure: what it held is never the next press's."""
+    with contextlib.suppress(Refused):
+        _git(t, "reset", "-q", "--hard", f"origin/{want}")
+
+
+def _find(lines: list[str], line: int | None, text: str) -> int | None:
+    """The index of the open item whose text is `text`, word for word: the reader's line first,
+    then the whole file — origin's lines may sit elsewhere than the checkout's (§4.4)."""
+
+    def holds(ln: str) -> bool:
+        m = ITEM_RE.match(ln.rstrip("\n"))
+        return m is not None and m.group("text").strip() == text.strip()
+
+    if isinstance(line, int) and 1 <= line <= len(lines) and holds(lines[line - 1]):
+        return line - 1
+    return next((i for i, ln in enumerate(lines) if holds(ln)), None)
+
+
+def _read_lines(path: Path) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8").splitlines(keepends=True)
+    except OSError as e:
+        raise Refused(f"cannot read {path}: {e}") from None
+
+
+def _gh(t: Path, clock: _Clock, step: str, *args: str) -> subprocess.CompletedProcess[str]:
+    gh = shutil.which("gh")
+    if gh is None:
+        raise unreachable("gh is not installed")
+    try:
+        return subprocess.run(
+            [gh, *args], cwd=str(t), capture_output=True, text=True, timeout=clock.left(step), check=False
+        )
+    except subprocess.TimeoutExpired:
+        raise unreachable(f"{step} did not finish within the bound") from None
+    except OSError as e:
+        raise unreachable(f"gh could not be run: {e}") from None
+
+
+def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -> dict[str, Any]:
+    """Commit the tree's board and land it on `origin/<want>` by the one road the forge's rule
+    allows (§4.4): a branch of the host agent's own, a PR it opens and squash-merges at once. A
+    refused merge closes the PR and deletes the branch, and refuses the press as a moved line when
+    `still()` — origin's board read again — no longer holds the item, else as unreachable."""
+    cp = _git(t, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD), timeout=clock.left("git commit"))
+    if cp.returncode != 0:
+        _reset(t, want)
+        raise Refused(f"the commit failed, and the board is as it was: {_why(cp, 'git commit')}")
+    sha = _git(t, "rev-parse", "HEAD").stdout.strip()
+    branch = f"board/{Path(root).name}/{datetime.now(UTC):%Y%m%d%H%M%S}-{sha[:7]}"
+    pushed = False
+    try:
+        cp = _git(t, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=clock.left("git push"))
+        if cp.returncode != 0:
+            raise unreachable(_why(cp, "git push"))
+        pushed = True
+        cp = _gh(
+            t,
+            clock,
+            "gh pr create",
+            "pr",
+            "create",
+            "--base",
+            want,
+            "--head",
+            branch,
+            "--title",
+            msg,
+            "--body",
+            PR_BODY,
+        )
+        if cp.returncode != 0:
+            raise unreachable(_why(cp, "gh pr create"))
+        url = (cp.stdout or "").strip().splitlines()
+        try:
+            n = int(url[-1].rstrip("/").rsplit("/", 1)[1])
+        except (IndexError, ValueError):
+            raise unreachable(
+                f"gh pr create: no pull request number in {url[-1][:120] if url else 'its output'!r}"
+            ) from None
+        try:
+            cp = _gh(t, clock, "gh pr merge", "pr", "merge", str(n), "--squash")
+        except Refused as e:  # timed out: it may have landed all the same, so it is read below
+            cp = subprocess.CompletedProcess([], 1, "", str(e))
+        if cp.returncode != 0:
+            why = _why(cp, "gh pr merge")
+            moved = landed = False
+            with contextlib.suppress(Refused):
+                if _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
+                    # a merge that failed after the forge took it (a timeout, an error on the reply):
+                    # origin's board is the edit's, so it landed — a retried add must not write twice
+                    landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", str(BOARD)).returncode == 0
+                    moved = not landed and not still()
+            if not landed:
+                _gh_quiet(t, "pr", "close", str(n))
+                raise Refused(MOVED) if moved else unreachable(why)
+    except Refused:
+        if pushed:
+            _git_quiet(t, "push", "-q", "origin", "--delete", branch)
+        _reset(t, want)
+        raise
+    _git_quiet(t, "push", "-q", "origin", "--delete", branch)  # a repo that auto-deletes has done it
+    _git_quiet(t, "fetch", "-q", "origin", want)
+    head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
+    _reset(t, want)
+    return {"commit": head, "message": msg, "pr": n}
+
+
+def _git_quiet(t: Path, *args: str) -> None:
+    with contextlib.suppress(Refused):
+        _git(t, *args)
+
+
+def _gh_quiet(t: Path, *args: str) -> None:
+    gh = shutil.which("gh")
+    if gh is None:
+        return
+    with contextlib.suppress(subprocess.TimeoutExpired, OSError):
+        subprocess.run([gh, *args], cwd=str(t), capture_output=True, text=True, timeout=GIT_TIMEOUT, check=False)
+
+
 def write_back(
     root: str | Path, line: int, text: str, action: str, due: str | None = None, *, reply: str = "", answer: str = ""
-) -> dict[str, str]:
-    """Make one Snooze, Done, Reply or Decide on the board of the checkout `root` and commit it there
-    (§4.4). Returns `{commit, message}`; raises `Refused` with nothing changed."""
+) -> dict[str, Any]:
+    """Make one Snooze, Done, Reply or Decide on the board on origin's head and land it there (§4.4):
+    in the host agent's own tree for the repo of the checkout `root`, which is never written.
+    Returns `{commit, message, pr}` — `commit` origin's head after the merge; raises `Refused`
+    with nothing changed on origin."""
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
@@ -234,30 +429,46 @@ def write_back(
 
 def _write_back(
     root: Path, line: int, text: str, action: str, due: str | None, reply: str = "", answer: str = ""
-) -> dict[str, str]:
-    ready(root)
-    path = root / BOARD
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-    except OSError as e:
-        raise Refused(f"cannot read {path}: {e}") from None
-    if not isinstance(line, int) or not 1 <= line <= len(lines):
-        raise Refused("that line of the board no longer holds this item: reload the Inbox and try again")
-    was = "".join(lines)
+) -> dict[str, Any]:
+    if not isinstance(line, int):
+        raise Refused(MOVED)
+    clock = _Clock()
+    if shutil.which("gh") is None:
+        raise unreachable("gh is not installed")
+    t, want = _tree(root, clock)
+    path = t / BOARD
+    lines = _read_lines(path) if path.exists() else []
+    at = _find(lines, line, text)
+    if at is None:
+        raise Refused(NOT_ON_ORIGIN if _ahead(root, want, line, text) else MOVED)
     by = author(root) if action == "reply" else ""
-    lines[line - 1] = edit_line(lines[line - 1], text, action, due, reply=reply, by=by, answer=answer)
+    lines[at] = edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
     msg = message(text, action, due, answer=answer)
     path.write_text("".join(lines), encoding="utf-8")
-    try:
-        cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))
-    except Refused as e:
-        path.write_text(was, encoding="utf-8")  # the board as it was: a failed commit leaves no dirty file
-        raise Refused(f"the commit failed, and the board is as it was: {e}") from None
-    if cp.returncode != 0:
-        path.write_text(was, encoding="utf-8")
-        why = (cp.stderr or cp.stdout).strip().splitlines()
-        raise Refused(f"the commit failed, and the board is as it was: {why[-1] if why else cp.returncode}")
-    return {"commit": _git(root, "rev-parse", "--short", "HEAD").stdout.strip(), "message": msg}
+
+    def still() -> bool:
+        return _find(_read_origin(t, want), None, text) is not None
+
+    return {**_land(root, t, want, msg, clock, still), "line": at + 1}
+
+
+def _ahead(root: Path, want: str, line: int | None, text: str) -> bool:
+    """Whether the checkout holds the item where origin does not because the checkout's board is
+    *ahead* — an uncommitted edit, or a board commit origin lacks — rather than behind: a checkout
+    that has not pulled still shows a line origin has since done or replied to, which is a moved
+    line, not an unpushed one."""
+    mine = _read_lines(root / BOARD) if (root / BOARD).exists() else []
+    if _find(mine, line, text) is None:
+        return False
+    if _git(root, "status", "--porcelain", "--", str(BOARD)).stdout.strip():
+        return True
+    last = _git(root, "log", "-1", "--format=%H", "--", str(BOARD)).stdout.strip()
+    return bool(last) and _git(root, "merge-base", "--is-ancestor", last, f"origin/{want}").returncode != 0
+
+
+def _read_origin(t: Path, want: str) -> list[str]:
+    cp = _git(t, "show", f"origin/{want}:{BOARD.as_posix()}")
+    return cp.stdout.splitlines(keepends=True) if cp.returncode == 0 else []
 
 
 def item_line(text: str, due: str, today: str, session: str | None, host: str | None, context: str | None) -> str:
@@ -307,11 +518,13 @@ def add(
     context: str | None = None,
     today: str | None = None,
     answer: str | None = None,
-) -> dict[str, str | int]:
+) -> dict[str, Any]:
     """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new line at the top
-    of the open items of the checkout `root`'s board, committed there as `agentorc: board <item
-    head> (from <entry id>)`, never pushed. Refused on the same conditions as an edit, touching
-    nothing. Returns `{commit, message, line}` — `line` the new item's line number.
+    of the open items of the board on origin's head for the checkout `root`'s repo, committed in the
+    host agent's own tree as `agentorc: board <item head> (from <entry id>)` and landed by its own
+    PR, as an edit is; the checkout is never written. Refused on the same conditions as an edit,
+    touching nothing on origin. Returns `{commit, message, pr, line}` — `line` the new item's line
+    number.
 
     With `answer`, the **second add** (§4.4, §4.10 *A question about a reference outlives its asker*,
     TD-216): `text` is the orphaned question's first paragraph and the person's answer follows it on
@@ -324,29 +537,20 @@ def add(
         words = " ".join(str(text or "").split()).rstrip(".") + reply_tail(answer, author(root), today)
     line = item_line(words, due, today, session, host, context)
     with _EDIT:
-        ready(root)
-        path = root / BOARD
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        except OSError as e:
-            raise Refused(f"cannot read {path}: {e}") from None
+        clock = _Clock()
+        if shutil.which("gh") is None:
+            raise unreachable("gh is not installed")
+        t, want = _tree(root, clock)
+        path = t / BOARD
+        lines = _read_lines(path)
         at = _top_of_needs(lines)
         if lines and not lines[-1].endswith("\n") and at == len(lines):
             lines[-1] += "\n"
-        was = "".join(lines)
         lines.insert(at, line)
         head = " ".join(str(text).split()).rstrip(".")
         if len(head) > HEAD_MAX:
             head = head[: HEAD_MAX - 1].rstrip() + "…"
         msg = f"agentorc: {'board' if answer is None else 'answer'} {head} (from {entry})"
         path.write_text("".join(lines), encoding="utf-8")
-        try:
-            cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))
-        except Refused as e:
-            path.write_text(was, encoding="utf-8")
-            raise Refused(f"the commit failed, and the board is as it was: {e}") from None
-        if cp.returncode != 0:
-            path.write_text(was, encoding="utf-8")
-            why = (cp.stderr or cp.stdout).strip().splitlines()
-            raise Refused(f"the commit failed, and the board is as it was: {why[-1] if why else cp.returncode}")
-        return {"commit": _git(root, "rev-parse", "--short", "HEAD").stdout.strip(), "message": msg, "line": at + 1}
+        # an add moves no line, so a refused merge is never a moved line: always the unreachable refusal
+        return {**_land(root, t, want, msg, clock, lambda: True), "line": at + 1}

@@ -11,6 +11,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import with_origin
 from test_ui_inbox import entry, iso, rows
 
 from sessionorc import mail
@@ -144,6 +145,7 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
     )
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "init")
+    with_origin(repo)  # the write-back lands on origin's head (§4.4, TD-264); the child has the fake gh
     home = pathlib.Path(os.environ["AGENTORC_HOME"])
     (home / "repos.txt").write_text(f"{repo}\n")
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
@@ -168,6 +170,7 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
             assert r.status_code == 200, r.text
             got = r.json()
             assert got["note"].startswith("written on the board") and got["board"] and got["closed"] == q
+        _git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up by the pull
         assert ": the DIU one. Context: TD-149." in (repo / "docs" / "user_attention.md").read_text()
         # `ao msg --reply-to` by a person takes the same road, and says where the answer went
         w = call_sync("create", name="asker", dir=str(repo), adapter="shell", argv=["bash", "--norc"])["id"]

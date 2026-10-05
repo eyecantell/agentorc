@@ -24,7 +24,7 @@ def git(root: Path, *args: str) -> str:
 
 
 @pytest.fixture
-def repo(tmp_path) -> Path:
+def repo(tmp_path, forge) -> Path:
     root = tmp_path / "repo"
     (root / "docs").mkdir(parents=True)
     git(root, "init", "-q", "-b", "main")
@@ -34,7 +34,18 @@ def repo(tmp_path) -> Path:
     (root / "other.txt").write_text("x\n")
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "init")
+    forge(root)
     return root
+
+
+def on_origin(root: Path, *args: str) -> str:
+    """What origin's `main` holds after a landed edit (§4.4): fetched, then read."""
+    git(root, "fetch", "-q", "origin")
+    return git(root, *args)
+
+
+def origin_board(root: Path) -> str:
+    return on_origin(root, "show", f"origin/main:{board.BOARD.as_posix()}") + "\n"
 
 
 def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
@@ -62,29 +73,127 @@ def test_the_message_names_the_item_and_the_session_that_raised_it():
     assert board.message("n/a — undated.", "done") == "agentorc: done n/a — undated. (session n/a)"
 
 
-def test_write_back_commits_the_one_line_on_main_and_nothing_else(repo):
+def test_write_back_lands_the_one_line_on_origin_and_leaves_the_checkout_alone(repo):
+    """TD-264 (design §4.4): the edit is made in the host agent's own tree at origin's head and lands
+    there by a PR it opens and squash-merges — one file, the fixed message as its title — and the
+    person's checkout, its own edits included, is never written."""
     (repo / "other.txt").write_text("the anchor's own edit, uncommitted\n")
+    head = git(repo, "rev-parse", "HEAD")
     got = board.write_back(repo, 7, ITEM, "snooze", "2026-10-01")
-    assert git(repo, "log", "-1", "--format=%s") == got["message"] and got["commit"]
-    assert git(repo, "show", "--name-only", "--format=", "HEAD") == str(board.BOARD)
-    assert "Due: 2026-10-01." in (repo / board.BOARD).read_text()
+    assert (
+        got["pr"] == 1 and got["line"] == 7 and got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
+    )
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#1)"
+    assert on_origin(repo, "show", "--name-only", "--format=", "origin/main") == str(board.BOARD)
+    assert "Due: 2026-10-01." in origin_board(repo)
+    assert (repo / board.BOARD).read_text() == BOARD_TEXT and git(repo, "rev-parse", "HEAD") == head
     assert git(repo, "status", "--porcelain") == "M other.txt"  # someone else's edit, untouched
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")  # the PR's branch is deleted
     board.write_back(repo, 8, "n/a — undated.", "done")
-    assert "- [x] n/a — undated." in (repo / board.BOARD).read_text()
+    assert "- [x] n/a — undated." in origin_board(repo)
+    assert board.tree_dir(repo).exists()  # kept between presses
 
 
-@pytest.mark.parametrize("state", ["branch", "dirty", "rebase", "moved"])
-def test_write_back_is_refused_and_touches_nothing_when_the_checkout_cannot_take_it(repo, state):
+@pytest.mark.parametrize("state", ["branch", "dirty", "rebase"])
+def test_the_checkouts_state_refuses_nothing(repo, state):
+    """§4.4: the checkout's branch, a dirty board or a rebase under way refuses nothing now."""
     if state == "branch":
         git(repo, "checkout", "-q", "-b", "td-feature")
     elif state == "dirty":
         (repo / board.BOARD).write_text(BOARD_TEXT + "- [ ] a line being written. Due: 2026-09-30.\n")
     elif state == "rebase":
         (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "rebase-merge").mkdir()
-    before, head = (repo / board.BOARD).read_text(), git(repo, "rev-parse", "HEAD")
-    with pytest.raises(board.Refused):
-        board.write_back(repo, 6 if state == "moved" else 7, ITEM, "done")
-    assert (repo / board.BOARD).read_text() == before and git(repo, "rev-parse", "HEAD") == head
+    before = (repo / board.BOARD).read_text()
+    board.write_back(repo, 7, ITEM, "done")
+    assert f"- [x] {ITEM}" in origin_board(repo) and (repo / board.BOARD).read_text() == before
+
+
+def test_a_line_moved_on_origin_is_found_by_its_text_and_a_line_only_the_checkout_holds_is_named(repo):
+    """§4.4: the reader's line is a hint — origin's item is found by its text wherever it sits; a
+    line the checkout alone holds is *not on origin yet*; an item origin no longer holds open is
+    the moved-line refusal. Nothing lands for either refusal."""
+    (repo / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", "## Needs the user\n\n- [ ] new.\n"))
+    git(repo, "commit", "-qam", "a line above")
+    git(repo, "push", "-q", "origin", "main")
+    got = board.write_back(repo, 7, ITEM, "done")  # the reader read line 7; origin's item is on 8
+    assert got["line"] == 8 and f"- [x] {ITEM}" in origin_board(repo)
+    before = on_origin(repo, "rev-parse", "origin/main")
+    with pytest.raises(board.Refused, match="no longer holds this item"):
+        board.write_back(repo, 8, ITEM, "done")  # done on origin; the checkout, behind, still shows it
+    (repo / board.BOARD).write_text(BOARD_TEXT + "- [ ] unpushed. Due: 2026-09-30.\n")
+    with pytest.raises(board.Refused, match="not on origin yet: push the checkout first"):
+        board.write_back(repo, 9, "unpushed. Due: 2026-09-30.", "done")  # uncommitted
+    git(repo, "commit", "-qam", "unpushed")
+    with pytest.raises(board.Refused, match="not on origin yet: push the checkout first"):
+        board.write_back(repo, 9, "unpushed. Due: 2026-09-30.", "done")  # committed, not pushed
+    assert on_origin(repo, "rev-parse", "origin/main") == before
+
+
+def test_origin_out_of_reach_refuses_the_press_and_lands_nothing(repo, monkeypatch, tmp_path):
+    """§4.4: no `gh`, a PR the forge will not open, an origin that cannot be fetched — each is
+    *origin could not be reached (<why>): the edit was not made*, the tree reset, no branch left."""
+    before = on_origin(repo, "rev-parse", "origin/main")
+    monkeypatch.setenv("FAKE_GH_FAIL", "create")
+    with pytest.raises(board.Refused, match=r"origin could not be reached \(gh pr create: .*\): the edit was not made"):
+        board.write_back(repo, 7, ITEM, "done")
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
+    assert git(board.tree_dir(repo), "status", "--porcelain") == ""
+    assert git(board.tree_dir(repo), "rev-parse", "HEAD") == before
+    monkeypatch.delenv("FAKE_GH_FAIL")
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")  # no gh at all
+    if __import__("shutil").which("gh") is None:
+        with pytest.raises(board.Refused, match="gh is not installed"):
+            board.write_back(repo, 7, ITEM, "done")
+    monkeypatch.undo()
+    git(repo, "remote", "set-url", "origin", str(tmp_path / "gone.git"))
+    with pytest.raises(board.Refused, match=r"origin could not be reached \(git fetch: "):
+        board.write_back(repo, 7, ITEM, "done")
+
+
+def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, monkeypatch, forge):
+    """§4.4: origin moving elsewhere between fetch and merge refuses nothing (the squash lands); a
+    refused merge closes the PR and deletes its branch, and is the moved-line refusal when origin
+    no longer holds the item, else unreachable."""
+    import json
+
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge")
+    with pytest.raises(board.Refused, match=r"origin could not be reached \(gh pr merge: "):
+        board.write_back(repo, 7, ITEM, "done")
+    bare = Path(git(repo, "remote", "get-url", "origin"))
+    assert json.loads((bare / "fake-gh.json").read_text())["prs"]["1"]["state"] == "closed"
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
+    # the line itself moved on origin while the press was out: the merge fails, and says so
+    real = board._land
+
+    def land(root, t, want, msg, clock, still):
+        other = Path(str(t) + "-other")
+        git(repo, "clone", "-q", str(bare), str(other))
+        b = other / board.BOARD
+        b.write_text(b.read_text().replace(f"- [ ] {ITEM}", f"- [x] {ITEM}"))
+        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "done elsewhere")
+        git(other, "push", "-q", "origin", "main")
+        return real(root, t, want, msg, clock, still)
+
+    monkeypatch.setattr(board, "_land", land)
+    with pytest.raises(board.Refused, match="no longer holds this item"):
+        board.write_back(repo, 7, ITEM, "snooze", "2026-10-09")
+    # origin moved elsewhere in between — another file — refuses nothing: the squash lands on it
+    monkeypatch.delenv("FAKE_GH_FAIL")
+
+    def land_elsewhere(root, t, want, msg, clock, still):
+        other = Path(str(t) + "-third")
+        git(repo, "clone", "-q", str(bare), str(other))
+        (other / "other.txt").write_text("moved on\n")
+        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "elsewhere")
+        git(other, "push", "-q", "origin", "main")
+        return real(root, t, want, msg, clock, still)
+
+    monkeypatch.setattr(board, "_land", land_elsewhere)
+    git(repo, "fetch", "-q", "origin")
+    board.write_back(repo, 8, "n/a — undated.", "done")
+    assert (
+        "- [x] n/a — undated." in origin_board(repo) and on_origin(repo, "show", "origin/main:other.txt") == "moved on"
+    )
 
 
 def test_a_failed_commit_leaves_the_board_as_it_was(repo):
@@ -93,7 +202,7 @@ def test_a_failed_commit_leaves_the_board_as_it_was(repo):
     hook.chmod(0o755)
     with pytest.raises(board.Refused, match="no commits today"):
         board.write_back(repo, 7, ITEM, "done")
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT and git(repo, "status", "--porcelain") == ""
+    assert origin_board(repo) == BOARD_TEXT and git(board.tree_dir(repo), "status", "--porcelain") == ""
 
 
 def test_a_commit_that_does_not_finish_leaves_the_board_as_it_was(repo, monkeypatch):
@@ -104,7 +213,7 @@ def test_a_commit_that_does_not_finish_leaves_the_board_as_it_was(repo, monkeypa
     monkeypatch.setattr(board, "GIT_TIMEOUT", 0.5)
     with pytest.raises(board.Refused, match="did not finish"):
         board.write_back(repo, 7, ITEM, "done")
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT
+    assert origin_board(repo) == BOARD_TEXT
 
 
 def test_two_edits_at_once_are_made_one_after_the_other(repo):
@@ -115,9 +224,8 @@ def test_two_edits_at_once_are_made_one_after_the_other(repo):
         a = pool.submit(board.write_back, repo, 7, ITEM, "done")
         b = pool.submit(board.write_back, repo, 8, "n/a — undated.", "done")
         a.result(), b.result()
-    text = (repo / board.BOARD).read_text()
+    text = origin_board(repo)
     assert f"- [x] {ITEM}" in text and "- [x] n/a — undated." in text
-    assert git(repo, "status", "--porcelain") == ""
 
 
 async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, tmp_path):
@@ -133,10 +241,10 @@ async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, 
         with pytest.raises(AgentError, match="not the board of a repo this host knows"):
             await me.call("board_edit", board=str(tmp_path / "elsewhere.md"), line=7, text=ITEM, action="done")
         with pytest.raises(AgentError, match="no longer holds this item"):
-            await me.call("board_edit", board=path, line=8, text=ITEM, action="done")
+            await me.call("board_edit", board=path, line=7, text="something else", action="done")
         got = await me.call("board_edit", board=path, line=7, text=ITEM, action="snooze", due="2026-10-01")
     assert got["action"] == "snooze" and got["message"].startswith("agentorc: snooze Merged")
-    assert git(repo, "log", "-1", "--format=%s") == got["message"]
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
 
 
 def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it(repo):
@@ -150,10 +258,11 @@ def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it
         "- [ ] 2026-09-25 (session `grinder-ao-2` on kmaster) — Check the fetcher Friday. Context: TD-900. "
         "Due: 2026-10-02.\n"
     )
-    text = (repo / board.BOARD).read_text()
+    text = origin_board(repo)
     assert text == BOARD_TEXT.replace(f"- [ ] {ITEM}", line.rstrip("\n") + f"\n- [ ] {ITEM}")
     assert got["line"] == 7 and got["message"] == "agentorc: board Check the fetcher Friday (from m-abc)"
-    assert git(repo, "log", "-1", "--format=%s") == got["message"] and git(repo, "status", "--porcelain") == ""
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+    assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout catches up by the pull
     # no sender, no about: `n/a` and `none`
     assert board.item_line("x", "2026-10-02", "2026-09-25", None, None, None) == (
         "- [ ] 2026-09-25 (n/a) — x. Context: none. Due: 2026-10-02.\n"
@@ -161,26 +270,28 @@ def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it
     for bad in (("", "2026-10-02"), ("two\nlines", "2026-10-02"), ("x", "Friday")):
         with pytest.raises(board.Refused):
             board.add(repo, *bad, entry="m-abc")
-    assert git(repo, "status", "--porcelain") == ""
+    assert on_origin(repo, "rev-list", "--count", "origin/main") == "2"
 
 
 def test_the_add_on_a_board_with_no_items_goes_under_its_heading(repo):
     (repo / board.BOARD).write_text("# User attention\n\n## Needs the user\n\n## Later\n")
     git(repo, "commit", "-qam", "empty")
+    git(repo, "push", "-q", "origin", "main")
     board.add(repo, "First", "2026-10-02", entry="m-1", today="2026-09-25")
-    assert (repo / board.BOARD).read_text().splitlines()[4] == (
-        "- [ ] 2026-09-25 (n/a) — First. Context: none. Due: 2026-10-02."
-    )
+    assert origin_board(repo).splitlines()[4] == ("- [ ] 2026-09-25 (n/a) — First. Context: none. Due: 2026-10-02.")
 
 
-def test_the_add_is_refused_touching_nothing_where_an_edit_is(repo):
-    git(repo, "checkout", "-q", "-b", "feature")
-    with pytest.raises(board.Refused, match="not main"):
-        board.add(repo, "x", "2026-10-02", entry="m-1")
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT
+def test_the_add_is_refused_touching_nothing_where_an_edit_is(repo, monkeypatch):
+    git(repo, "checkout", "-q", "-b", "feature")  # refuses nothing now (§4.4)
+    board.add(repo, "x", "2026-10-02", entry="m-1")
+    before = on_origin(repo, "rev-parse", "origin/main")
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge")
+    with pytest.raises(board.Refused, match="origin could not be reached"):
+        board.add(repo, "y", "2026-10-02", entry="m-2")
+    assert on_origin(repo, "rev-parse", "origin/main") == before
 
 
-async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(agent, repo, tmp_path):
+async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(agent, repo, tmp_path, monkeypatch):
     """TD-140: `board_edit` with `action: add` takes an FYI row — a `note` here — writes the line
     naming its sender and `about`, commits, then dismisses the row; an open question is refused, as
     is an entry the person inbox does not hold, a session, and a refused commit, which leaves the
@@ -201,16 +312,16 @@ async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(
             await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=asked["id"])
         with pytest.raises(AgentError, match="holds no entry m-nope"):
             await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry="m-nope")
-        (repo / board.BOARD).write_text(BOARD_TEXT + "dirty\n")  # a refused commit: the row stays
-        with pytest.raises(AgentError, match="uncommitted changes"):
-            await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=note["id"])
+        with monkeypatch.context() as m:  # a refused landing: the row stays
+            m.setenv("FAKE_GH_FAIL", "create")
+            with pytest.raises(AgentError, match="origin could not be reached"):
+                await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=note["id"])
         assert note["id"] in [e["id"] for e in (await me.call("inbox"))["entries"]]
-        (repo / board.BOARD).write_text(BOARD_TEXT)
         got = await me.call(
             "board_edit", board=path, action="add", text="Check the fetcher", due="2026-10-02", entry=note["id"]
         )
         assert got["dismissed"] == [note["id"]] and got["message"].endswith(f"(from {note['id']})")
-        line = (repo / board.BOARD).read_text().splitlines()[got["line"] - 1]
+        line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] ") and "(session `w` on " in line and "Context: TD-900. Due: 2026-10-02." in line
         assert note["id"] not in [e["id"] for e in (await me.call("inbox"))["entries"]]
         await me.call("kill", id=w)
@@ -223,8 +334,9 @@ def test_the_add_lands_in_needs_the_user_never_above_another_sections_items(repo
         "# User attention\n\n## Needs the user\n\n## In-flight (parked by a session)\n\n- [ ] 2026-09-20 parked.\n"
     )
     git(repo, "commit", "-qam", "parked only")
+    git(repo, "push", "-q", "origin", "main")
     got = board.add(repo, "First", "2026-10-02", entry="m-1", today="2026-09-25")
-    lines = (repo / board.BOARD).read_text().splitlines()
+    lines = origin_board(repo).splitlines()
     assert got["line"] == 5 and lines[4].startswith("- [ ] 2026-09-25 (n/a) — First.")
     assert lines[5] == "## In-flight (parked by a session)"
 
@@ -256,7 +368,7 @@ async def test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dism
         # refused while the first is under way — or, had it already finished, because the row is gone
         refused = str(next(g for g in got if not isinstance(g, dict)))
         assert "already being put on the board" in refused or "holds no entry" in refused
-        assert (repo / board.BOARD).read_text().count("Check it") == 1
+        assert origin_board(repo).count("Check it") == 1
 
         async def refuse(**_):
             from sessionorc.agent import RpcError
@@ -275,26 +387,26 @@ def test_a_reply_is_appended_to_the_items_own_line_signed_and_committed(repo):
     git(repo, "config", "user.name", "Paul")
     got = board.write_back(repo, 7, ITEM, "reply", reply="  rebase it,\nthen merge  ")
     today = __import__("datetime").date.today().isoformat()
-    line = (repo / board.BOARD).read_text().splitlines()[6]
+    line = origin_board(repo).splitlines()[6]
     assert line == f"- [ ] {ITEM} — Paul, {today}: rebase it, then merge"
     assert got["message"] == "agentorc: reply on Merged, live check pending: the doorbell. (session grinder-ao-1)"
-    assert git(repo, "log", "-1", "--format=%s") == got["message"] and git(repo, "status", "--porcelain") == ""
+    assert (
+        on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+        and git(repo, "status", "--porcelain") == ""
+    )
     # the line still holds an open item, so a second reply or a Done finds it by its new text
     board.write_back(repo, 7, line[len("- [ ] ") :], "done")
-    assert (repo / board.BOARD).read_text().splitlines()[6].startswith("- [x] ")
+    assert origin_board(repo).splitlines()[6].startswith("- [x] ")
 
 
 def test_a_reply_is_refused_touching_nothing_where_an_edit_is(repo):
     for args, why in (
         ((7, ITEM, "reply"), "needs its text"),
-        ((8, ITEM, "reply"), "no longer holds this item"),
+        ((8, "not an item", "reply"), "no longer holds this item"),
     ):
         with pytest.raises(board.Refused, match=why):
             board.write_back(repo, *args, reply="" if why == "needs its text" else "x")
-    git(repo, "checkout", "-q", "-b", "feature")
-    with pytest.raises(board.Refused, match="not main"):
-        board.write_back(repo, 7, ITEM, "reply", reply="x")
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT
+    assert origin_board(repo) == BOARD_TEXT
     with pytest.raises(board.Refused, match="no Due: date"):  # the reply's date would become the item's
         board.edit_line("- [ ] x\n", "x", "reply", reply="push Due: 2026-10-01", by="p", today="2026-09-25")
     assert "Due: 2026-10-01" in board.edit_line(f"- [ ] {ITEM}\n", ITEM, "reply", reply="Due: 2026-10-01", by="p")
@@ -321,13 +433,15 @@ async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agen
         with pytest.raises(AgentError, match="is board_reply"):
             await me.call("board_edit", board=path, line=7, text=ITEM, action="reply")
         with pytest.raises(AgentError, match="no longer holds this item"):
-            await me.call("board_reply", board=path, line=8, text=ITEM, reply="x")
+            await me.call("board_reply", board=path, line=8, text="not an item", reply="x")
         with pytest.raises(AgentError, match="names the item's line"):
             await me.call("board_reply", board=path, text=ITEM, reply="x")
         got = await me.call("board_reply", board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
     assert got["action"] == "reply" and got["sent"] == [] and got["note"] == "written on the board"
-    assert git(repo, "log", "-1", "--format=%s") == got["message"] and got["message"].startswith("agentorc: reply on")
-    assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})" and got[
+        "message"
+    ].startswith("agentorc: reply on")
+    assert origin_board(repo).splitlines()[6].endswith(": rebase it")
 
 
 def test_board_refs_are_named_as_a_lease_names_them():
@@ -357,7 +471,7 @@ async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, t
         )
         assert sorted((x["session"], x["ref"]) for x in got["sent"]) == [("both", "#1020"), ("holder", "TD-122")]
         assert got["note"].startswith("written on the board · sent to ") and "holder (holds TD-122)" in got["note"]
-        assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")  # the file half first
+        assert origin_board(repo).splitlines()[6].endswith(": rebase it")  # the file half first
         for sid in (h, both):
             notes = [e for e in (await me.call("inbox", id=sid))["entries"] if e["from"] == "person"]
             assert len(notes) == 1 and notes[0]["kind"] == "note" and notes[0]["handed"]
@@ -406,7 +520,7 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         assert got["message"].startswith("agentorc: answer Which fetcher first?") and got["message"].endswith(
             f"(from {q})"
         )
-        line = (repo / board.BOARD).read_text().splitlines()[got["line"] - 1]
+        line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] ") and "(session `asker` on " in line
         assert "— Which fetcher first? — t, " in line and ": the DIU one. Context: TD-149. Due: " in line
         assert "The reading" not in line  # the first paragraph only
@@ -423,7 +537,7 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         assert (
             got["sent"] == [h] and got["closed_reason"] == "go_with_it" and f"sent to {h} (holds TD-149)" in got["note"]
         )
-        assert ": go with the default: drop it. Context: td-149." in (repo / board.BOARD).read_text()
+        assert ": go with the default: drop it. Context: td-149." in origin_board(repo)
         handed = [e for e in (await me.call("inbox", id=h))["entries"] if e["from"] == "person"]
         assert len(handed) == 1 and handed[0]["handed"] and handed[0]["about"] == "TD-149"
         assert handed[0]["text"].startswith("go with the default: drop it")
@@ -457,9 +571,9 @@ async def test_a_full_closed_askers_mailbox_never_keeps_the_answer_from_the_hold
 
 
 async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_when_the_board_cannot_take_it(
-    agent, repo, tmp_path
+    agent, repo, tmp_path, monkeypatch
 ):
-    """TD-216: a dirty board refuses the press and the entry stays open; a second press while the
+    """TD-216: origin out of reach refuses the press and the entry stays open; a second press while the
     first is in flight is refused; a reply naming another addressee, or a suggested answer that is
     not word for word, is refused; Pause stays refused (no session to hold)."""
     import asyncio
@@ -467,12 +581,12 @@ async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_whe
     _registry(tmp_path, repo)
     async with LocalClient() as me:
         q = await _orphan(me, repo, tmp_path, "Which?", "#702", kind="ask", answers=["this", "that"])
-        (repo / board.BOARD).write_text(BOARD_TEXT + "dirty\n")
-        with pytest.raises(AgentError, match="uncommitted changes"):
-            await me.call("msg", text="this", kind="reply", reply_to=q, answer=0)
+        with monkeypatch.context() as m:
+            m.setenv("FAKE_GH_FAIL", "merge")
+            with pytest.raises(AgentError, match="origin could not be reached"):
+                await me.call("msg", text="this", kind="reply", reply_to=q, answer=0)
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
         assert e["closed_reason"] is None and e["orphaned"]
-        (repo / board.BOARD).write_text(BOARD_TEXT)
         with pytest.raises(AgentError, match="suggested answers"):
             await me.call("msg", text="thus", kind="reply", reply_to=q, answer=0)
         async with LocalClient() as a, LocalClient() as b:
@@ -484,7 +598,7 @@ async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_whe
         assert sum(isinstance(g, dict) for g in got) == 1
         refused = str(next(g for g in got if not isinstance(g, dict)))
         assert "already being answered" in refused or "already closed" in refused
-        assert (repo / board.BOARD).read_text().count(": this. Context: #702.") == 1
+        assert origin_board(repo).count(": this. Context: #702.") == 1
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
         assert e["answer"] == 0
 
@@ -521,7 +635,7 @@ async def test_a_refused_note_to_the_holder_is_said_beside_the_committed_line_an
         assert e["closed_reason"] == "replied" and "its mailbox is full" in e["outcome"]["text"]
         with pytest.raises(AgentError, match="already closed"):
             await me.call("msg", text="again", kind="reply", reply_to=q)
-        assert (repo / board.BOARD).read_text().count(": this one. Context: TD-5.") == 1
+        assert origin_board(repo).count(": this one. Context: TD-5.") == 1
         await me.call("kill", id=h)
 
 
@@ -611,17 +725,20 @@ def test_a_reply_and_a_decide_compose_in_either_order(tmp_path):
 def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
     (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {ASKED}\n")
     git(repo, "commit", "-qam", "asked")
+    git(repo, "push", "-q", "origin", "main")
     got = board.write_back(repo, 9, ASKED, "decide", answer="Keep it")
     assert got["message"] == "agentorc: decide Which window?: Keep it (session grinder-ao-1)"
-    assert git(repo, "log", "-1", "--format=%s") == got["message"] and git(repo, "status", "--porcelain") == ""
-    assert board.DECIDED_RE.search((repo / board.BOARD).read_text().splitlines()[8]).group("text") == "Keep it"
-    before, head = (repo / board.BOARD).read_text(), git(repo, "rev-parse", "HEAD")
-    for line, state in ((9, "decided"), (6, "moved"), (7, "dirty")):
-        if state == "dirty":
-            (repo / board.BOARD).write_text(before + "- [ ] a line being written.\n")
+    assert (
+        on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+        and git(repo, "status", "--porcelain") == ""
+    )
+    assert board.DECIDED_RE.search(origin_board(repo).splitlines()[8]).group("text") == "Keep it"
+    head = on_origin(repo, "rev-parse", "origin/main")
+    git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up (§6 *Pull*)
+    for line, text in ((9, ASKED), (6, "not an item")):  # already decided; moved
         with pytest.raises(board.Refused):
-            board.write_back(repo, line, ASKED if line != 7 else ITEM, "decide", answer="Keep it")
-        assert git(repo, "rev-parse", "HEAD") == head
+            board.write_back(repo, line, text, "decide", answer="Keep it")
+        assert on_origin(repo, "rev-parse", "origin/main") == head
 
 
 async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo, tmp_path):
@@ -629,6 +746,7 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
     and words where the pair is among them; anything else is a Reply, and a session is refused."""
     (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {ASKED}\n- [ ] {LOOK}\n")
     git(repo, "commit", "-qam", "asked")
+    git(repo, "push", "-q", "origin", "main")
     path, answers, pair = str(repo / board.BOARD), ["Keep it", "Lift it"], ["Works", "Not right: <what>"]
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
@@ -652,7 +770,7 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
         got = await me.call("board_edit", board=path, line=10, text=LOOK, action="decide",
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip
         assert got["answer"] == "Not right: the ring is amber"
-    lines = (repo / board.BOARD).read_text().splitlines()
+    lines = origin_board(repo).splitlines()
     assert board.DECIDED_RE.search(lines[8]).group("text") == "Keep it"
     assert board.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber"
 
@@ -705,7 +823,7 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         monkeypatch.setitem(agent.home_link, "up", False)
         got = await agent.rpc_board_reply(board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
         assert got["sent"] == [] and "mail is the home's: kmaster (home) is unreachable" in got["note"]
-        assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")
+        assert origin_board(repo).splitlines()[6].endswith(": rebase it")
         forwarded = []
 
         async def forward(rid, name, params, caller):
@@ -717,7 +835,7 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
 
         monkeypatch.setattr(agent, "_forward", forward)
         monkeypatch.setitem(agent.home_link, "up", True)
-        line = (repo / board.BOARD).read_text().splitlines()[6][len("- [ ] ") :]
+        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
         got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="and push", refs=["TD-122"])
         assert got["note"] == "written on the board · sent to holder (holds TD-122)"
         assert [(n, p["head"], p["reply"], c) for n, p, c in forwarded] == [
@@ -726,3 +844,14 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         assert not [e for e in agent.sessions[h].inbox if e.from_ == "person"]  # the node's store untouched
         monkeypatch.setattr(agent, "mode", "home")
         await me.call("kill", id=h)
+
+
+def test_a_merge_that_landed_though_the_forge_said_otherwise_is_a_landed_edit(repo, monkeypatch):
+    """Review of PR #1036: `gh pr merge` failing after the forge took the merge (a timeout, a lost
+    reply) is read from origin — the edit landed — so the press succeeds and a retried add never
+    writes its line twice."""
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge-after")
+    got = board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
+    board.write_back(repo, 8, ITEM, "done")
+    assert f"- [x] {ITEM}" in origin_board(repo)
