@@ -209,6 +209,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _shot_seen,  # noqa: F401
     _synced,  # noqa: F401
     _trail_rows,  # noqa: F401
+    as_written_back,
     board_answered,  # noqa: F401
     board_argv,  # noqa: F401
     board_body,  # noqa: F401
@@ -255,6 +256,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
     unclosed_mark,  # noqa: F401
+    unreached,
     with_standings,
     work_held,  # noqa: F401
     work_ids,  # noqa: F401
@@ -262,6 +264,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     work_questions,  # noqa: F401
     work_rows,  # noqa: F401
     work_started,  # noqa: F401
+    written_back_argv,
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     DOER_WIDTH,  # noqa: F401
@@ -348,6 +351,12 @@ def read_boards(run: Any = subprocess.run, *, fetch: bool = False, board: str = 
     report, why = None, ""
     if fetch:
         report, why = _run_reader(run, argv, BOARD_FETCH_TIMEOUT)
+        # the read after a press, stopped — by our bound, or by the reader's own (*fetch skipped*): the
+        # board as the write-back left it on origin, where the host agent's tree still holds it
+        # (§4.5 screen 6 (3), TD-264), before the checkout's
+        if board and unreached(report) and (back := written_back_argv(board)) is not None:
+            got, _ = _run_reader(run, back, BOARD_TIMEOUT)
+            report = as_written_back(got, board) if got is not None else report
         if report is None:
             argv = [a for a in argv if a != "--fetch"]
     if report is None:

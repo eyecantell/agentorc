@@ -563,6 +563,51 @@ def board_argv(roots: Collection[str | Path], *, fetch: bool = False, only: str 
     return argv, ""
 
 
+def unreached(report: Any) -> bool:
+    """Whether a fetching read did not reach origin: stopped or failed (no report), or each board it
+    read says *fetch skipped* — the reader's own bound on its fetch (§4.5 screen 6)."""
+    boards = report.get("boards") if isinstance(report, dict) else None
+    if not isinstance(boards, list):
+        return True
+    return bool(boards) and all(
+        isinstance(b, dict) and origin_case(str(b.get("source") or ""), str(b.get("fetch_note") or "")) == "unreached"
+        for b in boards
+    )
+
+
+def written_back_argv(board: str) -> list[str] | None:
+    """The plain read of one board as the write-back left it (§4.5 screen 6 (3), TD-264): the board in
+    the host agent's own tree (`board.tree_dir`), which a press resets to origin's head once its PR
+    has merged — read in place of the checkout's when the fetching read after that press is stopped,
+    so the row is drawn as the press left it and not as the checkout held it before. None when there
+    is no such tree here, or its board is the checkout's word for word (the plain read is then the same)."""
+    path = Path(board)
+    if path.parts[-len(BOARD_FILE.parts) :] != BOARD_FILE.parts:
+        return None
+    root = Path(*path.parts[: -len(BOARD_FILE.parts)])
+    tree = board_mod.tree_dir(root) / BOARD_FILE
+    try:
+        if not tree.is_file() or tree.read_bytes() == path.read_bytes():
+            return None
+    except OSError:
+        return None
+    script = board_reader([root])
+    if script is None:
+        return None
+    return [sys.executable, str(script), "--report", "--json", "--board", str(tree)]
+
+
+def as_written_back(report: dict[str, Any], board: str) -> dict[str, Any]:
+    """`report`, read from the write-back's tree, named as the checkout's board it stands for: its
+    board, root and label the checkout's, and read from origin — the tree is origin's head after the
+    press — so the row carries the *behind* note until the checkout pulls (§4.5a **origin note**)."""
+    root = Path(*Path(board).parts[: -len(BOARD_FILE.parts)])
+    for b in report.get("boards") or ():
+        if isinstance(b, dict):
+            b.update(board=board, root=str(root), label=root.name, source="origin", fetch_note=None)
+    return report
+
+
 def _same_ref(a: Any, b: Any) -> bool:
     """One reference, as the host agent stores it (`normalize_ref`: `td-27` is `TD-027`)."""
     try:
