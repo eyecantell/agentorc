@@ -251,7 +251,7 @@ def test_neither_writes_a_file_or_calls_anything_that_changes_a_record(world, ca
     capsys.readouterr()
     after = {p: p.stat().st_mtime_ns for p in tmp_path.rglob("*") if p.is_file() and ".git" not in p.parts}
     assert after == before
-    assert set(calls) <= {"host_repos", "host_files", "host_dir"}  # reads, when anything is asked at all
+    assert set(calls) <= {"host_repos", "host_files", "host_dir", "settings"}  # reads, when anything is asked at all
 
 
 def test_a_place_on_a_host_whose_registry_cannot_be_asked_is_one_lack_not_two(world, capsys):

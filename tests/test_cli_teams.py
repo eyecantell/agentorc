@@ -391,7 +391,8 @@ def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
     assert [p for m, p in calls if m == "host_dir"] == [{"host": "devenv", "dir": checkout}]  # once per checkout
     assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
     assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
-    order = [m for m, _ in calls if m not in ("repos", "host_files")]  # the lane reading's, before (TD-265)
+    # the lane reading's, before (TD-265), and the org's read of the flow setting (§4.9c)
+    order = [m for m, _ in calls if m not in ("repos", "host_files", "settings")]
     assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
 
 
@@ -1847,6 +1848,8 @@ def _td_world(world, monkeypatch, *, seat=True):
     handed = []
 
     def fake(method, **params):
+        if method == "settings":  # the org's read of each team's flow (§4.9c): none picked
+            return {"teams": {}}
         assert method == "entry_add", method
         handed.append(params)
         if not params["teams"]:
