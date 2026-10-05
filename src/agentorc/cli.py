@@ -431,12 +431,13 @@ def _project_block(project: str | None, cfg: repoconfig.RepoConfig, directory: p
     return block
 
 
-def _team_slots(args: argparse.Namespace) -> dict[str, str]:
+def _team_slots(args: argparse.Namespace, cfg: repoconfig.RepoConfig | None = None) -> dict[str, Any]:
     """`ao new --team` with a role's brief (TD-253): the team's seat, its manager and the seat's
     primer for the brief's `{techlead}`, `{manager}` and `{context}` slots, as a team start fills
     them (`teams.brief_ids`) — stored in `prompt_from`, so every replay of the record names them
     too (design §6 rule 7). Nothing for no team, an undefined one, or an org that cannot be read:
-    `_team_defaults` says which on stderr, and each slot then reads `none`."""
+    `_team_defaults` says which on stderr, and each slot then reads `none`. With the repo's `cfg`, the
+    team's current flow for the role too (design §4.9c, TD-309): `{flow}` and `{stage}`."""
     name = getattr(args, "team", None) or ""
     if not name or not (getattr(args, "role", None) or getattr(args, "brief", None)):
         return {}  # no brief to fill: the org is not read for it
@@ -444,7 +445,7 @@ def _team_slots(args: argparse.Namespace) -> dict[str, str]:
         org, _notes = _org_notes()
     except ValueError:
         return {}
-    return teams.brief_ids(org, name, hosts.local_host().name)
+    return teams.brief_ids(org, name, hosts.local_host().name, getattr(args, "role", None), cfg)
 
 
 def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
@@ -481,7 +482,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         supplement = brief or None
         # what the brief was made from goes with it (design §6 rule 7); a typed --prompt fills nothing
         prompt, prompt_from = (
-            (args.prompt, None) if args.prompt else role.compose(lane, supplement=supplement, **_team_slots(args))
+            (args.prompt, None) if args.prompt else role.compose(lane, supplement=supplement, **_team_slots(args, cfg))
         )
         # TD-114's transition (design §4.8): a whole brief given as a supplement repeats the template
         for heading in repoconfig.repeated_headings(prompt or "") if supplement else []:

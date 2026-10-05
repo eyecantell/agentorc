@@ -279,3 +279,23 @@ def test_the_designer_is_a_preset_whose_template_wraps_it_only_under_a_flow(tmp_
     assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "design.md")}
     with pytest.raises(ValueError, match="designer needs a brief outside a flow"):
         repoconfig.resolve_role(repoconfig.RepoConfig(), "designer").compose()
+
+
+def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path):  # noqa: F811
+    # §4.9c item 5, TD-309 slice 2a: `ao new --team` and the form's Team pick (`teams.brief_ids` with
+    # the role and its repo) fill `{flow}` and `{stage}` from the team's current flow
+    root = tmp_path / "agentorc"
+    (root / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    cfg = repoconfig.load(root)
+    org = _with(tmp_path, flows=["build-review", "build"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    ids = teams.brief_ids(org, "ao-grind", HOST, "grinder", cfg)
+    seat = ids["techlead"]
+    assert seat and ids["flow"].text == (
+        f"build-review: **build** (grinder) → review ({seat}, on src/sessionorc/**) → you, through {seat}."
+    )
+    text, made = repoconfig.resolve_role(cfg, "grinder").compose(**ids)
+    assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "build-review" / "build.md")}
+    assert f"ask --pr <n> {seat}" in text
+    # without the role and repo, or for a team with no flows, nothing of a flow: `{flow}` reads none
+    assert "flow" not in teams.brief_ids(org, "ao-grind", HOST)
+    assert "flow" not in teams.brief_ids(_with(tmp_path, flows=[]), "ao-grind", HOST, "grinder", cfg)

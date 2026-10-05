@@ -1631,9 +1631,17 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     preset = repoconfig.resolve_role(cfg, role.strip())
                     # a Team pick names the team's seat and manager in the brief, as a team start
                     # does for its members (`teams.brief_ids`, TD-253); `none` each without one
-                    ids = await asyncio.to_thread(team_brief_ids, team.strip()) if team.strip() else {}
+                    read = (
+                        teams.reader_on(files_on(call, asyncio.get_running_loop()), away, Path(cfg.root or dir))
+                        if away
+                        else None
+                    )
+                    ids = (
+                        await asyncio.to_thread(team_brief_ids, team.strip(), preset.name, cfg, read)
+                        if team.strip()
+                        else {}
+                    )
                     if away:
-                        read = teams.reader_on(files_on(call, asyncio.get_running_loop()), away, Path(cfg.root or dir))
                         brief, made_from = await asyncio.to_thread(preset.compose, refs or None, read=read, **ids)
                     else:
                         brief, made_from = preset.compose(refs or None, **ids)

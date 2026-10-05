@@ -736,12 +736,18 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def team_brief_ids(team: str) -> dict[str, str]:
+def team_brief_ids(
+    team: str,
+    role: str | None = None,
+    cfg: repoconfig.RepoConfig | None = None,
+    read: repoconfig.Reader | None = None,
+) -> dict[str, Any]:
     """What New session's **Team** pick gives a role's brief (design §4.9 *A person in the team*,
     TD-253): `teams.brief_ids` over the org the picker lists — the `{techlead}`, `{manager}` and
-    `{context}` slots; nothing for a team no definition names."""
+    `{context}` slots, and the team's current flow for `role` in `cfg`'s repo (§4.9c, TD-309);
+    nothing for a team no definition names."""
     org, _notes = org_here()
-    return teams.brief_ids(org, team, host_name())
+    return teams.brief_ids(org, team, host_name(), role, cfg, read=read)
 
 
 def team_reader(team: str, directory: str, cfg: repoconfig.RepoConfig | None = None) -> dict[str, Any]:

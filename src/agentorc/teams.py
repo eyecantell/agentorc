@@ -342,21 +342,62 @@ def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> s
     return _session_id(org, team, team.manager.name, team.manager.home, host, here)
 
 
-def brief_ids(org: orgmod.Org, name: str, here: str) -> dict[str, str]:
+def current_flow(team: orgmod.TeamDef) -> str | None:
+    """The flow `team` runs now (design §4.9c *A team lists its flows*): the first of `flows:` — the
+    setting `teams.<team>.flow` that turns it is TD-309 slice 4's — or None for a team with no flow."""
+    return team.flows[0] if team.flows else None
+
+
+def flow_for(
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    cfg: repoconfig.RepoConfig,
+    role: str | None,
+    techlead: str = "",
+    *,
+    read: repoconfig.Reader | None = None,
+) -> repoconfig.UnderFlow | None:
+    """What a session of `role` in `team` is told of the team's current flow (§4.9c item 5): its
+    `{flow}` line and its stage brief, for `Role.compose(flow=…)`. None for a team with no flow, and
+    for one whose current flow is not there or not usable — the start refuses such a team; a single
+    session started into it composes as with no flow. `cfg` is the team's repo, whose `held:` the
+    review stage names."""
+    name = current_flow(team)
+    flow = flowdefs.load(name, cfg, org.roles, read=read) if name else None
+    if flow is None or not flow.usable:
+        return None
+    return flowdefs.under(flow, role, techlead=techlead, held=cfg.held or ())
+
+
+def brief_ids(
+    org: orgmod.Org,
+    name: str,
+    here: str,
+    role: str | None = None,
+    cfg: repoconfig.RepoConfig | None = None,
+    *,
+    read: repoconfig.Reader | None = None,
+) -> dict[str, Any]:
     """What a brief's `{techlead}`, `{manager}` and `{context}` slots take for a session started
     into the team `name` outside a team start — `ao new --team` and the New session form's Team
     pick (design §4.9 *A person in the team*, TD-253) — as `plan` fills them for its members: the
     ids the seat and the manager take (`seat_id`, `manager_id`) and the seat's primer. Empty for a
-    team the org does not define, which stays a badge, so each slot reads `none`."""
+    team the org does not define, which stays a badge, so each slot reads `none`. With the `role`
+    and the repo's `cfg`, and a team that lists flows, `flow` too: what the member is told of its
+    team's current flow (`flow_for`), so `{flow}` and `{stage}` read as a start's would."""
     team = org.teams.get(name)
     if team is None:
         return {}
     host = team.host or here
-    return {
+    ids: dict[str, Any] = {
         "techlead": seat_id(org, team, host, here),
         "manager": manager_id(org, team, host, here),
         "context": (team.techlead.context or "") if team.techlead is not None else "",
     }
+    # the team's current flow (§4.9c, TD-309 slice 2a), where the caller names the role and its repo
+    if role and cfg is not None and (flow := flow_for(org, team, cfg, role, ids["techlead"], read=read)):
+        ids["flow"] = flow
+    return ids
 
 
 def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
