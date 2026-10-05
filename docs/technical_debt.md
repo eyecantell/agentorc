@@ -145,7 +145,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | In progress — the node rebuilt with Claude Code; the credential steps are Paul's |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
+| TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-308 | A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written | Low | Built — PR #1015 |
+| TD-309 | Build flows (design §4.9c): the loader, stage briefs and the three brief layers, the team's `flows:` and the `flow` setting, the compile, `ao team flow` and Apply with the relaunch, the card's strip and marks | Medium | Open |
+| TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Open |
+| TD-313 | Build role directories (the org's and a repo's) and the org's flow directories, with the home's history tracking them — design §4.9c, the second part of the flows build | Low | Open |
+| TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Open |
 
 ---
 
@@ -2738,6 +2743,23 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-299 (teams in containers), TD-057 step 5 (mail across hosts), TD-301 (the node's hooks).
 
+## TD-307: Each repo wires a team's path by hand, so a team gets the path it remembered: flows defined once, named by a team
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-04 (Paul: *our current example is for a TD, which is something like [designer if needed]->[grinder + ui review if needed]->[techlead]->[escalate to me if needed] but I believe each repo is currently having to define this separately. It seems prudent/easier to have the flow defined once then reused, and to give the ability to create more flows*; then *flows would be per team* and *lets iterate with fable on the design*; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-04 (the anchor session with Fable review rounds; Paul's read of the first draft adopted the same day): design §4.9c *Flows* (new), §4.9 the team's `flows:` key and *A person in the team*'s union, §4.7 `ao org` / `ao org check`, §4.5a *team groups* (the flow on the header), §5 `.agentorc.yml` (`held:`, `flows:`, a team's `flow:`), §6 rule 7 (an unnamed placeholder of a template replays from `<stem>.<slot>.md`, else `none`; the relaunch mark), rules 8 and 9 (a sat-out member passed over), the glossary's *flow* and *stage*. Settled: (a) a flow is per team, opt-in, named, defined in the package (`td`, `build-review`, `build`), the org's or a repo's `.agentorc/` directories (a repo's for its own teams), replaced whole, and usable only when whole; (b) a stage is `name`, `role` (a `worker`, or the `techlead` seat for a review stage), `lane`, `brief` — the techlead's stage is `review`; (b1) a member's brief is three layers: role template (mechanics), stage brief (the path), repo supplement (repo facts); `designer` becomes a preset; (b5) roles and flows orthogonal: a role's `kind` (`worker`, `seat`, `manager`, `plain`) is all a stage asks; under a flow a role's own `review:` is set aside; a flow and a defined role are each a directory of whole files (package, `~/.agentorc/`, `<repo>/.agentorc/`), so a page can create them later; a review stage is the `techlead` seat's until TD-314; (b4) a team lists `flows:` and the current one is the setting `teams.<team>.flow`; a switch or an edit applies itself — sit-outs, starts, and relaunches that replace the launch record under rule 7's conditions; (b2) a team that cannot staff its flow is told so everywhere it is read and its Start refused, naming the flows it could follow — never a skipped stage; *if needed* is the entry's (the design-first lane, the held paths), never the team's; (b3) the person is every flow's last word, shown (*→ you, through the seat*), not a stage; (c) the flow compiles at start into lanes, the reader, `entries.feature` and the `{flow}` and `{stage}` brief slots — the host agent never sees it, and the record gains only the home-owned `relaunch` mark and `closed_for`'s `flow` word; (d) a review stage with nothing held is unstaffed, so naming a flow never holds every path; (e) the UI check and escalation stay §4.9b's, not stage keys; (f) roles and profiles are already defined once, and what a repo still repeats is TD-114's brief cut. The design is PR #1012. **Next:** the build is TD-309, then TD-310; TD-313 when a team first needs a role directory or an org flow.
+**Blocked by:** TD-309, TD-310, TD-313
+**Location:** design §4.9c; `src/agentorc/org.py` (`TEAM_KEYS`, `TeamDef.entry_role`, `_entries_resolve`), `src/agentorc/repoconfig.py`, `src/agentorc/teams.py`, `src/sessionorc/brief.py`
+
+**Why:** a team's path is assembled from pieces each repo writes by hand — a `design-first` lane on the designer, `free-pick` on the grinders, owner words, `review: {reader: techlead, held: […]}` on each worker role, `entries: {feature: designer}` — and nothing says they are one path. agentorc, samscrape and contractmatch each restate `reader: techlead`; `samscrape-grind` has no design stage; a new team or a second kind of path means wiring it all again.
+
+**Fix:** design §4.9c — done 2026-10-04; build in TD-309, move the repos in TD-310.
+
+**Related:** TD-114 (the brief cut, the other half of the copying), TD-209/TD-229 (the repo's own definitions), TD-180 (`entries:`), TD-214 (owner words), TD-093 (the reader).
+
 ## TD-308: A trail row says *resolved* where the home can tell how: *pushed*, *answered in the terminal*, *the limit reset* are never written
 
 **Priority:** Low
@@ -2755,3 +2777,77 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** an unpushed row that ends by a push leaves *resolved: pushed* in FYI.
 
 **Related:** TD-079 (the trail), TD-088 (`_ended_by`), TD-297.
+
+## TD-309: Build flows: design §4.9c
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-04 (the build of TD-307's design; the anchor session)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/flows/` (new: `td/`, `build-review/`, `build/`, each a `flow.yml` and its stage briefs), `src/agentorc/org.py` (`TEAM_KEYS` gains `flows`; the team's kind checks; `TeamDef.entry_role`, `_entries_resolve`), `src/agentorc/repoconfig.py` (top-level `held:`; `load` reads `<root>/.agentorc/flows/`; `PRESETS` gains `designer`; `kind` on `ROLE_KEYS` and every preset, refused in an overlay), `src/agentorc/teams.py` (the compile: lanes, the reader — a role's own `review:` set aside under a flow —, `team_review`, `brief_ids`'s `{flow}` and `{stage}`, the sit-outs), `src/agentorc/teamrun.py` (`lanes`, the *cannot be followed* refusal, Apply), `src/agentorc/briefs/*.md` (the path paragraphs out to the stage briefs and `<role>.stage.md`; `designer.md` new; the two slots), `src/sessionorc/brief.py` (`fill`: an unnamed placeholder of a template base from `<stem>.<slot>.md`, else `none`), `src/sessionorc/settings.py` (`TEAM_KEYS` gains `flow`), the host agent (the `relaunch` RPC and its sit-out form, the launch record replaced and `brief` re-recorded, the `relaunch` mark as rule 7's second trigger, `closed_for: {why: sit_out}` and `work.wound_down` / rule 8 passing over it), `src/agentorc/orgcheck.py`, `src/agentorc/cli.py` (`ao team flow`), `src/agentorc/ui` (the New session Role pick's row in §4.5a still lists only *grinder, hunter, manager*: brought up to the presets), the team card (flow strip, Flow pick, Apply, the marks) and the Settings page's Teams card
+
+**Why:** TD-307's design.
+
+**Fix:** design §4.9c, in slices that each keep `pdm run test` green: (1) the loader and validation — flow directories in the package and a repo's `.agentorc/flows/` (`flow.yml` and its briefs, `../` and `package:` references), `kind` on every preset and the stage's and the team's kind checks, resolution over the package and the repo only (the org's directories are TD-313's), a review stage only the `techlead` seat's, resolution order, a flow *usable* only when whole, `flows:` on a team, *cannot be followed*, unknown names and stray keys refused; (2a) "under a flow" reaches every compose: `teams.brief_ids` gains the team's current flow (`teams.<team>.flow` via the agent's settings read), and `cli._team_slots` and the New session form's Team pick pass it; (2) the three brief layers — the stage briefs and `<role>.stage.md` written from today's template paragraphs (the words unchanged), `designer.md`, the `{flow}` and `{stage}` slots, and `brief.fill`'s default pass (§6 rule 7); (3) the compile at start — lanes (member > stage > preset), the reader where something is held (never a `review:` with no `held:`; set aside under a flow with no review stage), the person's union, `entries.feature`, the sit-outs, the refusal at `ao team start` and Start, **Members…** guarding a listed flow's roles; the pre-start lane reading reads the compiled lane; (4) the setting `teams.<team>.flow`, `ao team flow`, the card's Flow pick and the Settings field; (5) the switch — the client's difference reading and Apply, the `relaunch` RPC (the launch record replaced, an absent key removed, `brief` re-recorded, the mark, rule 7's conditions and retry under `why: flow`, a `restart` under the mark never *early*, a node member told and restarted on its word) and its sit-out form (`closed_for: {why: sit_out}`, `wound_down`, `work.finished` and rule 8 passing over it); (6) `ao org` / `ao org check` (their role-directory half waits for TD-313), `ao team list --json`, the card's flow strip and marks.
+
+**Not here:** role directories and the org's flow directories, with the home's tracking of them, are TD-313. Also not here: a plain **Members…** remove already leaves the team unreadable as wound down (a closed member with no declaration); the sit-out mark could cover it too, but that is its own entry if wanted.
+
+**Done when:** on a scratch repo and home in the suite: a team with `flows: [td, build-review]`, a top-level `held:` and no lanes, `review:` or `entries:` written starts the records a hand-wired team starts, its briefs carrying `{flow}` and the stage briefs; a switch to `build-review` sits the designer out, relaunches the idle grinders and tells a working one, and leaves a PR already asked of the techlead with it; an edit to a stage brief is *brief changed*; a team listing a flow it cannot staff is refused in the shared words; a flow naming a missing brief, or a role of the wrong kind, is *not usable*; a repo flow naming `package:td/review.md` gets `td`'s words; an interactive member is left running; a seat's next fill after a switch to `build` reads no review brief; a **Members…** add raises no *flow changed*; a team with no `flows:` starts exactly as before, its designer included. The real teams' move is TD-310's; role directories and org flows are TD-313's.
+
+**Related:** TD-307 (the design), TD-310 (the repos' move after the promote).
+
+## TD-310: Move the repos onto flows once TD-309 is live
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (TD-307's migration; the anchor session)
+**Owner:** anchor
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-309
+**Location:** this repo's `.agentorc.yml`; samscrape's, contractmatch's and dev-cadence's (each in its own repo, by its own PR)
+
+**Why:** after TD-309 every team still writes what its flow would fill; nothing is wrong, but the copying TD-307 exists to remove stays until each repo deletes it. A repo that writes `held:` or `flows:` before the live copy knows the keys breaks every read of its file (`repoconfig` refuses an unknown top-level key), so this waits on the promote, not the merge.
+
+**Fix:** after the promote that makes TD-309 live (and, for contractmatch, after its node is provisioned from that wheel): drop `repoconfig.compose`'s no-flow carve-out for `designer` once every designer brief in use is a supplement (agentorc's is the only one), so the template wraps a designer everywhere; in each repo, list the team's flows (ao-grind `[td, build-review]`; samscrape-grind and cm-grind `[build-review, build]`; dc-grind `[build]`, and `build-review` once it writes `held:`), write the top-level `held:`, delete each key `ao org check` names as the flow's same value, cut the path out of its supplements (TD-114's cut, widened), make agentorc's `designer-ao-1.md` the designer template's supplement, and start the team once to see the `{flow}` and `{stage}` lines. agentorc's is this repo's PR; the others are filed in their own ledgers.
+
+**Done when:** each of the four teams lists flows it can follow and `ao org check` names no *same value* key for any of them.
+
+**Related:** TD-307, TD-309.
+
+## TD-313: Build role directories and the org's flow directories (design §4.9c, the second part)
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-04 (TD-307's design, split from TD-309 on the Sonnet review: the first build ships what a team needs to run a flow, this one what a person needs to define a role or an install-wide flow; the anchor session)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-309
+**Location:** `src/agentorc/org.py` (`org.load` reads `~/.agentorc/flows/` and `~/.agentorc/roles/` beside the overlay), `src/agentorc/repoconfig.py` (`load` reads `<root>/.agentorc/roles/`; `resolve_role` gains the definition layer — the org's over a repo's, whole; a directory taking a preset's name refused; `role.yml`'s keys and `template.md`, `template_on_call.md` for a `manager` kind; a key-only role refused, in the same build as nothing else since `designer` is already a preset by TD-309), the readers `role_names`, `roles`, `ui/app.py` `_roles_for` and `/api/roles`, `cli.py` `ao roles`, `org._entries_resolve`, `teams.team_roles`; `src/sessionorc/defs.py` (`TRACKED`, `IGNORE`, `commit_defs`: the org's `flows/` and `roles/`); `ao org` (a shadowed repo role directory said); the node rule (an org flow or role not followable by a node team)
+
+**Why:** TD-307's design defines roles and flows as directories so a person — and later a page — can add one without splicing YAML. TD-309 builds the package's and a repo's flows, which is all the four teams need; defining a role, or an install-wide flow, waits for this.
+
+**Fix:** design §4.9c *Where flows and roles live*, *More flows, and more roles*, *A flow is usable only when it is whole* (a role directory's half), and the TD-313 clauses of its *Done when*.
+
+**Done when:** a role directory under `~/.agentorc/roles/` is used by an org flow with no other file changed, and a `hunt` flow in the org's directory starts a hunter and a grinder with their lanes and briefs from it; `git -C ~/.agentorc log` shows both.
+
+**Related:** TD-307 (the design), TD-309 (the first part), TD-314 (any seat role in a review stage).
+
+## TD-314: A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-04 (TD-307's design, from Paul's *add/remove a review round* and *roles and flows essentially orthogonal*; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9c (*Roles and flows are orthogonal*), §4.9b *The reader* (`review: {reader, held}`), `sessionorc.models` (`REVIEW_READERS`, `normalize_review`), `ao pr held`
+
+**Why:** under flows (TD-307) a review stage may only name the team's `techlead:` seat, because the held-PR machinery knows two readers, `techlead` and `person`, one `held:` list per record and one reader per PR. A flow that wants a second review round — a UI or security reader before the techlead, or a different reader on some paths — cannot be written, and a seat role a person defines cannot hold a review stage, which is the one place roles and flows are not yet apart.
+
+**Fix:** design it: a review stage naming any `seat` role, with its own paths (a path set the repo names, `held:` by name); a PR held by more than one stage passed from one reader to the next in the flow's order, each reader's *merged* or *findings* on the PR's thread; how the builder's brief and `ao pr held` say whose turn it is; what a switch does to a PR mid-chain.
+
+**Related:** TD-307 (flows), TD-093 (the reader), TD-291 (the UI check, which is the builder's today).
