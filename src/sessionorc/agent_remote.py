@@ -867,6 +867,10 @@ class RemoteMixin:
                 old.superseded_by = self._address(new)
                 self._remote_store(host).save(old)
         mine[rid] = new
+        # the node's record is a new one too: what it was last told under this id was told to the
+        # record it replaced, so the intent goes again whole — else a mark pushed to the old record
+        # before the name was retaken reads as told and never reaches the new one (TD-326)
+        self._intent_sent.get(host, {}).pop(rid, None)
         log.info("link from %s: %s supersedes %s", host, rid, ", ".join(str(x["id"]) for x in told))
         return True
 
