@@ -85,7 +85,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-264 | Build the board write-back on origin's head: the host agent's own tree, the PR it opens and squash-merges, the refusals, and every row actionable | Medium | Built — PR #1036; live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-277 | The New session form asks for its fields in the order the code grew them: Host is fixed text, Directory, Where, Project and Team are five coupled picks, Adapter repeats the Profile, the warnings show when nothing applies, and Until and At show for an interactive session | Medium | Designed 2026-10-02 — the form in a person's order, Profile as the one tool pick, a worktree-first Where, a Role pick that retires the Unattended switch; Paul looked and said go with it; the build is TD-284 |
-| TD-280 | The Inbox's keys and find: `r` for Reply on a ringed row, and the words a find matched marked in the rows it shows | Low | Built (#942), live look pending |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a look sent as mail — a steer or an ask, in Steering or Needs you — no longer a `watch` | Medium | Designed 2026-10-03 — build TD-292 (TD-291 built) |
 | TD-292 | Build the mail half of a look: the briefs' three cases as a steer or an ask, `--shot` and the envelope's `shots`, screenshots and the pair on the row, Send to reviewer | Medium | The board row's pair built (#975); the briefs (#980); `--shot` (#983); the row (#982); `inbox_hand` (#990); the button open |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
@@ -1489,24 +1488,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when:** §4.5a's New session rows describe the reworked form, Paul has looked at the mockup, and the build entries are on the ledger with a `Blocked by:` line.
 
 **Related:** TD-269 and TD-276 (the Team pick and a seat on call as controller: the same form), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume lands on this form filled in), TD-160 (a person's own session inside a team).
-
-## TD-280: The Inbox's keys and find: `r` for Reply, and the matched words marked
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox: TD-135's find *works, it would be nice to have the matching words highlighted*; TD-124's keys *works, would be nice to have r for reply as well*)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built — PR #942 (`r` presses a board row's Reply too; the find marks its words, `AO.findSplit` / `AO.markFind`); merged, live look pending on `docs/user_attention.md`.
-**Location:** `src/agentorc/ui/static/app.js` (the Inbox's keys and the rail's find), `src/agentorc/ui/help.py` (the keys list), design §4.5a's Inbox keys
-
-**Why:** `j` / `k` ring a row and `x` dismisses, but replying still needs the mouse; a find that matched two words in a forty-line row leaves the reader to look for them.
-
-**Fix:** `r` on a ringed row opens its Reply composer (board row or message; nothing on a row with no Reply), listed under `?` and in /help; a find marks each matched word in the rows it shows (`<mark>`, escaped), the marks going with the find. A one-line §4.5a addition for the key.
-
-**Done when:** `j` then `r` opens Reply on that row, and a find of two words shows both marked.
-
-**Related:** TD-124 (the keys), TD-135 (the find), TD-279 (the row's text, where the marks land).
 
 ## TD-290: A UI change goes to the person unchecked — the grinder verifies it, a reviewer only if needed, and what is left is a `look`
 

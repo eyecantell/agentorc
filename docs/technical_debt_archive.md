@@ -4448,3 +4448,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** Settings' top bar carries the usage chip as the Org's does, and every page that omits it has a stated reason.
 
 **Related:** TD-122 (the usage chip), TD-233 (its age), TD-148 (the Settings page).
+
+## TD-280: The Inbox's keys and find: `r` for Reply, and the matched words marked
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox: TD-135's find *works, it would be nice to have the matching words highlighted*; TD-124's keys *works, would be nice to have r for reply as well*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (the Inbox's keys and the rail's find), `src/agentorc/ui/help.py` (the keys list), design §4.5a's Inbox keys
+
+**Why:** `j` / `k` ring a row and `x` dismisses, but replying still needs the mouse; a find that matched two words in a forty-line row leaves the reader to look for them.
+
+**Resolved:** 2026-10-05 (built by PR #942; its live look closed on 2026-10-03, PR #971 (the anchor's look agents, on Paul's word; the line is in `docs/user_attention_archive.md`): *Works* — `r` opens the board row's Reply, and the find marks rows and details in both themes) — the composer's *re:* quote that still showed raw markdown was TD-296 (4), fixed.
+
+**Done when:** `j` then `r` opens Reply on that row, and a find of two words shows both marked.
+
+**Related:** TD-124 (the keys), TD-135 (the find), TD-279 (the row's text, where the marks land).
