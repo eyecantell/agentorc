@@ -1078,9 +1078,12 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                 others = [f["name"] for f in r["flows"] if not f["current"]]
                 also = f"  (also lists {', '.join(others)})" if others else ""
                 print(f"{'':<{w}}  flow: {r['flow']} — {now.get('strip') or '—'}{also}")
+                unread = next((f["unread"] for f in r["flows"] if f.get("unread")), "")
                 for line in [r["flow_note"], *(f["cannot"] for f in r["flows"])]:
                     if line:
                         print(f"{'':<{w}}  {line}")
+                if unread:  # a node's checkout this host cannot read: not judged here
+                    print(f"{'':<{w}}  flows not read from here: {unread}")
         # a repo's definition the org file's wins over, and a name two repos define (§4.9)
         for name, files in org.shadowed.items():
             for f in files:
@@ -1817,6 +1820,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             )
         if note:
             print(note)
+        if unread := next((r["unread"] for r in rows if r.get("unread")), ""):
+            print(f"flows not read from here: {unread}")
         w = max(len(r["name"]) for r in rows)
         for r in rows:
             mark = "*" if r["current"] else " "

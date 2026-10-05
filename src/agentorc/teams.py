@@ -370,10 +370,12 @@ def flow_unlisted(team: orgmod.TeamDef) -> str:
 def flow_rows(
     org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files: Files | None = None
 ) -> list[dict[str, Any]]:
-    """Each flow `team` lists, in order, for `ao team flow <team>` (design §4.7, §4.9c): `{name,
-    current, strip, cannot}` — `strip` the stages and the person, as the card's flow strip reads
-    (*design → build → review → you, through techlead-ao-1*), and `cannot` why the team cannot use it
-    (not found, not usable, cannot be followed), "" when it can."""
+    """Each flow `team` lists, in order, for `ao team flow <team>` and `ao team list` (design §4.7,
+    §4.9c): `{name, current, strip, cannot}` — `strip` the stages and the person, as the card's flow
+    strip reads (*design → build → review → you, through techlead-ao-1*), and `cannot` why the team
+    cannot use it (not found, not usable, cannot be followed), "" when it can. A team whose repo
+    cannot be read from here (a node's checkout with no `files` to reach it) is not judged: each row
+    carries `unread`, the reason, and no `cannot`."""
     if not team.flows:
         return []
     now = current_flow(team)
@@ -382,7 +384,8 @@ def flow_rows(
         checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
         cfg = repoconfig.load(checkout, read=read)
     except (TeamError, ValueError, OSError) as e:
-        return [{"name": n, "current": n == now, "strip": "", "cannot": str(e).strip(chr(34))} for n in team.flows]
+        why = str(e).strip(chr(34))
+        return [{"name": n, "current": n == now, "strip": "", "cannot": "", "unread": why} for n in team.flows]
     staffed = {m.role for m in team.members if m.team is None and m.role}
     out: list[dict[str, Any]] = []
     for name in team.flows:

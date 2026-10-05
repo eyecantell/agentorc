@@ -574,3 +574,13 @@ def test_ao_org_lists_every_flow_and_check_fails_on_one_not_usable(world, tmp_pa
     repo_flow(root, "broken", [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "gone.md"}])
     assert cli.main(["org", "check"]) == 1
     assert "lacking: flow broken (" in capsys.readouterr().out
+
+
+def test_a_flow_file_that_cannot_be_read_is_a_problem_of_the_flow_not_a_crash(tmp_path):
+    """Review of #1068: `ao org` and its check list every flow, so one bad file is that flow's problem."""
+    d = repo_flow(tmp_path, "bad", [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"}])
+    (d / "flow.yml").write_bytes(b"stages: \xff\xfe\n")
+    (tmp_path / ".agentorc" / "flows" / "stray.txt").write_text("not a flow\n")
+    rows = {f["name"]: f for f in flowdefs.visible([tmp_path])}
+    assert not rows["bad"]["usable"] and "could not be read" in rows["bad"]["problems"][0]
+    assert "stray.txt" not in rows and all(rows[n]["usable"] for n in flowdefs.BUILTIN)

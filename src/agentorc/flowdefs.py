@@ -276,11 +276,17 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
             cfg = repoconfig.load(where)
         except (OSError, ValueError):
             continue
-        for d in sorted(p for p in base.iterdir() if (p / FILE).is_file()):
+        try:
+            dirs = sorted(p for p in base.iterdir() if (p / FILE).is_file())
+        except OSError:  # unreadable, or gone since `is_dir`: nothing of it can be listed
+            continue
+        for d in dirs:
             row: dict[str, Any] = {"name": d.name, "source": str(d), "usable": False, "problems": []}
             if d.name in BUILTIN:
                 row["shadowed"] = f"not read: {d.name} is a built-in's name, and the built-in is the flow"
-            elif (flow := load(d.name, cfg, overlay)) is not None:
+            elif (flow := load(d.name, cfg, overlay)) is None:  # `_read_here` reads an unreadable file as none
+                row["problems"] = [f"flow {d.name}: its {FILE} could not be read ({d / FILE})"]
+            else:
                 row.update(usable=flow.usable, problems=list(flow.problems))
             out.append(row)
     return out

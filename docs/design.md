@@ -3360,9 +3360,9 @@ whether each is usable, `ao org check` fails on a flow that is not usable (a sta
 role that does not resolve, a lane word unknown, two stages of one role) and on a team listing a flow
 it cannot see or follow (*td cannot be followed by samscrape-grind: no designer — add a designer, or
 drop td from flows:*), and warns, per team, on each key the team writes that its current flow would fill with
-the same value — what a repo may now delete (built by TD-309 slice 6a but that warning: `ao org`'s flows
-list the built-ins and this host's registered checkouts', and the check fails on a flow nobody lists that is not
-usable, a listed one being that team's start refusal). On a
+the same value — what a repo may now delete. As built (TD-309 slice 6a): `ao org` lists the built-ins and the flows of this
+host's registered checkouts; the check fails on a flow that is not usable only where no team lists it, since a
+listed one is already that team's start refusal; the warning on keys a flow would fill the same is not built yet. On a
 node both refuse and name the home. It
 reads and writes nothing; a session may run it. As built: a
 team the org file defines has no landing rule, so its line says its own `host:`, or *no host: —
