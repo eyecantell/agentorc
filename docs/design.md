@@ -5358,16 +5358,19 @@ team has one, the techlead answers it or passes it up, and the person is the top
   day, not built — TD-323).** A built entry whose *Done when* only the running system can show
   becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
   after every promote, and seven High entries stood that way on 2026-10-04.
-  - **The entry names its build.** The PR that makes an entry a live check writes one header
-    line, **`**Built:** #<n>`** — the last merged PR of the build, or several — beside `Owner:`
-    and `Kind:`. It is a line of this repo's ledger and of agentorc's reader; cadence's script
-    does not read it, and `Blocked by:` is not used for it, since that line is cadence's and an
-    item it cannot read is a block for good.
+  - **The entry names its build on its `Kind:` line.** The PR that makes an entry a live check
+    writes **`**Kind:** live-check #<n>`** — the kind's word, then the last merged PR of the
+    build, or several. Both readers take a field's first word as its value and leave the rest of
+    the line alone, so cadence's script reads `live-check` as before; agentorc's reader also
+    reads the `#<n>` after that one word. It is not a field of its own — a header field the
+    ledger's `Fields:` line does not declare fails cadence's check on the edit that adds it, and
+    a declared field takes fixed words — and not an item of `Blocked by:`, which is cadence's
+    line, where an item its script cannot read blocks for good.
   - **Live is read, never declared.** A PR is live when its squash commit on the default branch
     (the commit whose subject ends `(#<n>)`) is an ancestor of the repo's live commit, the
     home's promote reading (`promotes.<repo>.live`, §6 *Promote*). The home reads it with the
     ledger, at the repo facts' cadence (§4.4), and keeps `live: yes | no` on the entry's reading.
-    **Unknown is never live**: no `Built:` line, a PR whose commit is not found, a live commit
+    **Unknown is never live**: no PR on the `Kind:` line, a PR whose commit is not found, a live commit
     that cannot be read, or a repo with no `promote:` block — each reads `no`, and the entry is
     where it was before this rule.
   - **The lane.** A pickable live check that reads `live: yes` matches `free-pick` (§6 rule 6),
