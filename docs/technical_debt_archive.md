@@ -3858,3 +3858,21 @@ Both go away only when the record says who closed it.
 **Remaining:** one live Focus → Close in a browser, confirming one banner line and no further `/term/` attempts in the UI journal. That is now the *whole* of what is left: the two rules behind it are tested (above), so what the browser adds is that the banner is written where a person can see it and that nothing else in the page reopens the socket — which no probe can show, because the probe has no page.
 
 **Related:** TD-023 (`pane` flag), design §4.5 error rule and §4.5a Focus **Kill** / **Close**, the browser mechanics bullet on reconnect with backoff.
+
+## TD-144: Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (TD-130's design, a cloud session with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** **Paul's look, 2026-10-04: bigger.** What is left is a build: raise `--t-body` in `src/agentorc/ui/static/app.css` (14px today; 15px the first step) and nothing else, the cards' one height kept at 1440 and 390 px, with the page's UI check (design §4.9b); then archive. Seen live: no pixel size outside `:root`, every card one height, no horizontal scroll at 390 px. **Built 2026-09-25** (PR #559, `grinder-ao-2`): the tokens, every literal replaced, the heights, `tests/test_css.py`; three calls against the map are in design-history §4.5 (`.toast` and `.keys` small, `.warn` body, the caption one `--lh` line). What is left is the *Done when*'s last clause — Paul's read of the live page after the promote (board line); then this and TD-130 archive. Was: open — designed, nothing built. Design: §4.5 *Type scale*; mockups `Type.dc.html`, `TypeDark.dc.html` and the regenerated artboards (`docs/mockups/gen.py` already carries the scale). **Next:** built; Paul's live look.
+
+**Location:** `src/agentorc/ui/static/app.css` (the token block on `:root`, every `font-size:` and `font:` literal, the card's row heights, the control heights), `src/agentorc/ui/templates/*.html` (any inline `font-size`), `tests/test_screen.py` or a new `tests/test_css.py` (no pixel size outside the token block).
+
+**Why:** every page is read for minutes at a time, and today the text a person actually reads is set smaller than the body; a size chosen for density is paid in every reading (TD-130).
+
+**Resolved:** 2026-10-05 (PR #1063; built 2026-09-25 by PR #559) — the tokens on `:root`, every size literal replaced, the card's heights on `--row` / `--row1` / `--slot` / `--foot`, `tests/test_css.py`; after Paul's look of 2026-10-04 (*bigger*) `--t-body` is 15 px. The lasting content is design §4.5 *Type scale* and `src/agentorc/ui/static/app.css`'s token block; Paul's read of the live page is TD-130's *Done when*.
+
+**Done when** the pages read at the new scale in both themes with no rule outside `:root` naming a pixel size; every Org card is still one height and six rows at 1440 and at 390 px; the Inbox column, the rail and the Focus page fit as before; `pdm run test` and `pdm run lint` pass; and **Paul has read the live page after the promote and said the size is right** — if not, `--t-body` moves and nothing else does. TD-130 archives with his word.
+
+**Related:** TD-130 (the design), TD-095 (the card's anatomy: six rows of one height), TD-082 (the Inbox column), TD-137 (the narrow layout, which uses the same tokens), TD-127 (the fold, whose lead is `--t-body`).
