@@ -666,7 +666,7 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             # §4.9b *The reader* (TD-093): checked by the one function the host agent also applies,
             # so a typo is a line naming the key when the file is read, never a PR nobody holds
             try:
-                out[k] = normalize_review(v)
+                out[k] = normalize_review(v, chain=False)
             except ValueError as e:
                 raise ValueError(f"{here}.{e}") from None
         elif k == "context":
@@ -758,7 +758,7 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             # every layer through the one check — the org's `roles:` is checked when read too (TD-149), and
             # `normalize_review` is idempotent, so a second pass over its output changes nothing
             try:
-                role.review = normalize_review(block["review"])
+                role.review = normalize_review(block["review"], chain=False)
             except ValueError as e:
                 raise ValueError(f"{src} roles.{name}.{e}") from None
         if "context" in block:

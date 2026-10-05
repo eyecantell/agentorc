@@ -46,6 +46,9 @@ def test_a_chain_of_review_stages_is_checked_and_reads_as_links():
         {"stage": "review", "reader": "techlead", "held": ["**"]}
     ]
     assert review_links(None) == [] and review_links({}) == []
+    # a role's `review:` in a file never writes one: the chain is the compile's (review of #1120)
+    with pytest.raises(ValueError, match="written by a flow's compile"):
+        normalize_review(chain, chain=False)
     for bad in (
         {"chain": []},  # no link
         {"chain": "techlead"},
@@ -72,8 +75,15 @@ def test_a_role_preset_carries_review_to_the_create(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {reader: nobody}\n")
     with pytest.raises(ValueError, match=r"grinder\.review: reader is one of"):
         repoconfig.load(tmp_path)
+    # a chain is a flow's compile's, never a file's (TD-315, review of #1120)
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {chain: [{stage: r, reader: x}]}\n")
+    with pytest.raises(ValueError, match=r"grinder\.review: a role's review takes reader"):
+        repoconfig.load(tmp_path)
     # `org.yml`'s layer reaches `resolve_role` unchecked by the loader: the same check applies there
     (tmp_path / ".agentorc.yml").write_text("")
+    org_chain = {"grinder": {"review": {"chain": [{"stage": "r", "reader": "x"}]}}}
+    with pytest.raises(ValueError, match=r"org roles\.grinder\.review: a role's review takes reader"):
+        repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder", org_chain)
     with pytest.raises(ValueError, match=r"org roles\.grinder\.review: reader is one of"):
         repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder", {"grinder": {"review": {"reader": "x"}}})
     assert repoconfig.resolve_role(

@@ -506,7 +506,7 @@ WRAPUP_PROMPT = (
 _REVIEW_DURATION = re.compile(r"[1-9]\d*[mhd]")
 
 
-def normalize_review(review: Any) -> dict[str, Any] | None:
+def normalize_review(review: Any, *, chain: bool = True) -> dict[str, Any] | None:
     """A role preset's `review:` (design §4.9b *The reader*, TD-093) as the record keeps it:
     `{reader, held, bound}` — `reader` is `techlead` or `person`, `held` a list of path globs
     defaulting to every PR (`**`), `bound` a duration written as a seat's `every:` is (`90m`,
@@ -516,12 +516,17 @@ def normalize_review(review: Any) -> dict[str, Any] | None:
     Or a flow's chain (§4.9c *A review stage any seat may hold*, TD-315 slice 1): `{chain: [{stage,
     reader, held}, …], bound}`, one link per review stage in the flow's order, `reader` the seat's name
     as the definition gives it (that it names a seat of the team is the client's check, at the
-    compile), `held` that stage's globs. The older shape means a chain of one (`review_links`)."""
+    compile), `held` that stage's globs. The older shape means a chain of one (`review_links`). A chain
+    is the compile's to write, never a role's `review:` in a file: `chain=False` is the config loader's."""
     if review is None:
         return None
     if not isinstance(review, dict):
         raise ValueError(f"review: a mapping of reader, held and bound, not {review!r}")
     if "chain" in review:
+        if not chain:
+            raise ValueError(
+                "review: a role's review takes reader, held and bound; a chain is written by a flow's compile"
+            )
         return _normalize_chain(review)
     unknown = sorted(str(k) for k in set(review) - {"reader", "held", "bound"})
     if unknown:
