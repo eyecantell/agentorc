@@ -104,9 +104,13 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
             if name in slots:
                 continue
             beside = Path(base).with_name(f"{Path(base).stem}.{name[1:-1]}.md")
-            value = "none"
-            if beside.is_file():
+            # read as every source is — as merged inside a checkout — and one that is not there, there,
+            # is no file beside: `none`, never a guess from the working tree
+            try:
                 got, sha = read(str(beside), merged)
+            except Unreadable:
+                value = "none"
+            else:
                 sources.append({"path": str(beside), "sha": sha})
                 value = got.strip() or "none"
             text = text.replace(name, value)
