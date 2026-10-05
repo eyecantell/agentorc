@@ -4285,3 +4285,21 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home with a registry root carrying dev-cadence's scripts, a member's `done` with a failing PR gets one fixed line and, on the second fail, the Inbox row; a held PR merged with no reply from the seat writes `held_missed`, one line and one FYI; a member started before a new `docs/cadence-changes.md` entry landed gets one `system` note naming it and a member started after gets none; an idle member owing an outcome is nudged about it once; a dropped lease is told once; the manager template names none of the four jobs.
 
 **Related:** TD-247 (the design), TD-103 (the first move of policy to the tick), TD-093 (the reader, `review`), TD-079 (outcomes), TD-187 / TD-195 (rule 6), TD-118 (the round's cost), TD-050 (the cadence check's `review` row reads the first line), TD-259 (the seat).
+
+## TD-279: A board row on the Inbox prints its line as raw text, and a long line has no fold
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's walk of the Inbox, TD-138's look: *messages are still poorly formatted*, with a screenshot of the Org walk's row: a forty-line paragraph with `**`, `*` and backticks printed as typed)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/inbox.html`, `src/agentorc/ui/static/app.js` (a board row's body), `src/agentorc/ui/inbox.py`; design §4.5 screen 6, TD-138 (a message's first paragraph and *details*)
+
+**Why:** board lines are written in the board's markdown (bold head, italics, code spans), and the row prints them as text, so the head the writer bolded is not bold and the marks are noise. TD-138 folds a message after its first paragraph; a board line is one paragraph, so a page walk prints whole, and three of them fill the screen.
+
+**Resolved:** 2026-10-05 (built by PR #933; its live look closed *Works* on 2026-10-03, PR #971 — the anchor's look agents on Paul's word, the line now in `docs/user_attention_archive.md`) — design §4.5a *Inbox board row: text*; `render.fold_head`, `inbox.board_text`. Pinned by `tests/test_ui_board.py`.
+
+**Done when:** the Org walk's row reads as a bold head, a sentence and *details*, with no `**` or backtick on the page.
+
+**Related:** TD-138 (a message's fold), TD-255 (the row's answers), TD-270 (hovers as lists).
