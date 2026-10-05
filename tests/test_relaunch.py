@@ -87,6 +87,38 @@ async def test_a_relaunch_replaces_the_launch_record_and_the_tick_restarts_on_it
 
 
 @pytest.mark.integration
+async def test_a_relaunch_of_a_record_a_failed_brief_restart_left_closed_restarts_it(agent, tmp_path):
+    """TD-334, the techlead's read of #1099: the tick closed a member for `brief` and the replay failed, so
+    the record stands closed with the `brief` mark; the person's Apply clears `brief_changed` and marks
+    `relaunch`, and rule 7 retries it under `flow` rather than leaving it closed for good."""
+    await park_ticks(agent)
+    repo = _repo(tmp_path)
+    _merge(repo, "first {lane}\n")
+    made = _made_from(tmp_path, repo)
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    async with LocalClient() as person:
+        params = {"name": "m", "dir": str(work_dir), "unattended": True, "supervised": True, **SHELL}
+        sid = (await person.call("create", prompt="old", prompt_from=made, lane=["TD-1"], **params))["id"]
+        await person.call("kill", id=sid)
+        rec = agent.sessions[sid]
+        failed = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+        rec.state, rec.closed_at = "closed", failed
+        rec.closed_for = {"why": "brief", "closed_at": failed}
+        rec.restarts = [{"at": failed, "why": "brief", "error": "create: boom"}]
+        rec.brief_changed = {"at": failed, "paths": ["/r/b.md"]}
+        rec.git = {"dirty": 0, "unpushed": 0}
+        await person.call("relaunch", id=sid, launch={"prompt": "composed", "prompt_from": made, "lane": ["TD-9"]})
+        assert rec.brief_changed is None and rec.relaunch
+        await agent._keep_running(datetime.now(UTC))
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["brief", "flow"]
+        assert new.state != "closed" and new.relaunch is None and new.lane == ["TD-009"]
+        with contextlib.suppress(Exception):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
 async def test_a_relaunch_is_a_persons_and_refused_touching_nothing(agent, tmp_path):
     await park_ticks(agent)
     params = {"dir": str(tmp_path), **SHELL}

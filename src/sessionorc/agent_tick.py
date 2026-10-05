@@ -761,7 +761,9 @@ class TickMixin:
             return
         if s.out_of_work or s.restart_wanted:
             return  # it declared: rule 2 or the team's next start is what starts it
-        closed_by_tick = self._closed_by_tick(s, why)
+        # either trigger's failed restart is retried under the one that stands now: a person's Apply on a
+        # record a `brief` restart left closed clears `brief_changed`, and the mark it left is `brief` (TD-334)
+        closed_by_tick = self._closed_by_tick(s, "brief") or self._closed_by_tick(s, "flow")
         if not closed_by_tick:
             if s.state != "idle" or s.confidence != "hook" or s.pending:
                 return
