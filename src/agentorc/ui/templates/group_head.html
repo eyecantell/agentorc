@@ -23,6 +23,12 @@
 {% if g.counts %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}</span>{% endif %}
 {% elif g.counts %}<span class="meta counts">· {{ g.counts | join(' · ') }}</span>{% endif %}
 {% endif %}
+{#- design §4.5a *team groups* (§4.9c, TD-309): the flow the team runs and its strip — its stages in
+    order and the person last, as the brief's `{flow}` lines read — and, on a live team whose records
+    differ from what that flow compiles to, *flow changed* and **Apply** (`ao team flow <team> --apply`),
+    the members it would change in the mark's title. Read when the page was drawn, not per delta #}
+{% if g.team and g.flow %}<span class="meta flowstrip" title="the flow this team runs (design §4.9c): its stages in order, and the person last">· flow: {{ g.flow }}{% if g.flow_strip %} — {{ g.flow_strip }}{% endif %}</span>
+{% if g.flow_changed %}<span class="meta flowchanged" title="{% for d in g.flow_changed %}{{ d.line }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">flow changed</span><button class="btn sm ghost" data-flow-apply="{{ g.team }}" title="apply {{ g.flow }} to the running team, as ao team flow {{ g.team }} --apply: the members whose lane, reader or stage brief differ are relaunched, one the flow has no stage for sits out, one it needs is started" data-confirm="Apply {{ g.flow }} to {{ g.team }}? {{ g.flow_changed | map(attribute='line') | join('; ') }}.">Apply</button>{% endif %}{% endif %}
 {# design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, which the
    fold hides — so drawn only while folded (CSS), on any team (TD-194); display only, the mail stays
    where it is (§4.10) #}
@@ -72,6 +78,8 @@
 {#- design §4.5a *team groups* ***not concluded:*** (§6 rule 9, TD-240, built by TD-241): on a live,
     defined team that is not concluded, why there is no Start — one clause per unattended session
     that keeps it from the home's reading, from the records; display only #}
+{#- …and under it, while the definition cannot follow its flow, the reason and the flows it could (§4.9c) #}
+{% for line in g.flow_lines %}<div class="meta flowcannot">{{ line }}</div>{% endfor %}
 {% if g.team and g.defined and g.not_concluded %}<div class="meta notconcluded" title="{{ help_title('not-concluded') }}">not concluded: {{ g.not_concluded | join(' · ') }}</div>{% endif %}
 {#- design §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark in its own numbers,
     amber, display only — the line is moved on the Settings page #}

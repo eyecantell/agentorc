@@ -1056,19 +1056,12 @@ def cmd_team_list(args: argparse.Namespace) -> int:
     here = hosts.local_host().name
     for r in rows:
         t = org.teams.get(r["name"])
+        # …and, live, its records against its current flow — *flow changed — Apply* (§4.9c *Switching*)
+        r.update(teamrun.flow_view(call_sync, org, r["name"], here, sessions))
         if t is None or not t.flows:
-            r.update(flow=None, flows=[], flow_note="", differences=[])
             continue
-        host = t.host or here
-        r.update(
-            flow=teams.current_flow(t), flows=teams.flow_rows(org, t, host, here), flow_note=teams.flow_unlisted(t)
-        )
-        # §4.9c *Switching*: a live team's records against its current flow — *flow changed — Apply*
-        r["differences"] = []
-        with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError):  # said by the flows' lines
-            r["differences"] = teamrun.flow_changed(call_sync, org, t.name, here, sessions)
         with contextlib.suppress(teams.TeamError, ValueError, OSError):
-            r["entries"]["feature"] = teams.entry_role(org, t, "feature", host, here)
+            r["entries"]["feature"] = teams.entry_role(org, t, "feature", t.host or here, here)
 
     def prose() -> None:
         if not rows:

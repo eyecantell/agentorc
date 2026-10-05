@@ -818,6 +818,29 @@ def flow_changed(
     return [d.as_dict(plan.flow) for d in differences(plan, sessions)]
 
 
+def flow_view(
+    call: Call, org: orgmod.Org, name: str, here: str, sessions: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """A team's flows as every client that reads a team shows them (design §4.9c *What is shown*,
+    *Switching*; `ao team list`, the Org page's team header): `flow`, the current one or None for a
+    team that lists none; `flows`, `teams.flow_rows`; `flow_note`, `teams.flow_unlisted`; and
+    `differences`, a live team's records against its current flow (`flow_changed`) — empty where the
+    plan fails, which the flows' own lines say. Reads files: once per page load or listing, never
+    per delta."""
+    t = org.teams.get(name)
+    if t is None or not t.flows:
+        return {"flow": None, "flows": [], "flow_note": "", "differences": []}
+    out: dict[str, Any] = {
+        "flow": teams.current_flow(t),
+        "flows": teams.flow_rows(org, t, t.host or here, here),
+        "flow_note": teams.flow_unlisted(t),
+        "differences": [],
+    }
+    with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError):  # said by the flows' lines
+        out["differences"] = flow_changed(call, org, name, here, sessions)
+    return out
+
+
 def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """What a switch leaves with a reader (design §4.9c *What a switch leaves alone*): each open PR
     `ask` at a session of the team, from the reader's `prs_waiting.asks` (§4.9b, TD-333) in the order
@@ -853,10 +876,11 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
     refused, is skipped and said; the others are applied. Returns `{team, flow, applied, skipped}`,
     each entry `{name, act, line}`, and `stays`, the PRs already asked of a reader, which stay its
     (`stays_with`); nothing applied for a stopped team, whose next start compiles the flow."""
+    team = teams.find(org, name)
     sessions = call("list")
     stays = stays_with(name, sessions)
     if not live(crew(name, sessions)):  # a stopped team: its next start compiles the flow
-        flow = teams.current_flow(org.teams[name])
+        flow = teams.current_flow(team)
         return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays}
     plan = teams.plan(org, name, host, files=files_via(call))
     diffs = differences(plan, sessions)
