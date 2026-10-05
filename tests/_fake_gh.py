@@ -2,8 +2,8 @@
 records a pull request against the bare origin the working directory's `origin` names, `pr merge
 --squash` squashes its branch onto the base there by pushing, as GitHub would, `pr view` reads its
 state, and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after`
-merges and fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after.
-State lives beside the bare origin."""
+merges and fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after;
+`FAKE_GH_VIEW_FAIL` makes `pr view` fail. State lives beside the bare origin."""
 
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:2] == ["pr", "view"]:
         pr = state["prs"].get(argv[2])
-        if pr is None:
+        if pr is None or os.environ.get("FAKE_GH_VIEW_FAIL"):
             print("no pull requests found", file=sys.stderr)
             return 1
         print(pr["state"].upper())  # what `--json state --jq .state` prints
