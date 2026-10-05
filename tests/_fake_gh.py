@@ -1,7 +1,9 @@
 """A stand-in for the forge's `gh` in the board write-back's tests (design §4.4, TD-264): `pr create`
 records a pull request against the bare origin the working directory's `origin` names, `pr merge
---squash` squashes its branch onto the base there by pushing, as GitHub would, and `pr close` closes
-it. `FAKE_GH_FAIL=create|merge` makes that step fail. State lives beside the bare origin."""
+--squash` squashes its branch onto the base there by pushing, as GitHub would, `pr view` reads its
+state, and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after`
+merges and fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after.
+State lives beside the bare origin."""
 
 from __future__ import annotations
 
@@ -59,9 +61,25 @@ def main(argv: list[str]) -> int:
                 return 1
         pr["state"] = "merged"
         state_file.write_text(json.dumps(state))
-        if fail == "merge-after":  # merged, and the reply lost: what a timeout looks like
+        if fail == "merge-after-moved":  # merged, then origin's board changed elsewhere at once
+            with tempfile.TemporaryDirectory() as tmp:
+                work = str(Path(tmp) / "w")
+                git("clone", "-q", "-b", pr["base"], origin, work)
+                board = Path(work) / "docs" / "user_attention.md"
+                board.write_text(board.read_text() + "\nA neighbour's edit.\n")
+                ident = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+                git(*ident, "commit", "-q", "-am", "a neighbour", cwd=work)
+                git("push", "-q", "origin", pr["base"], cwd=work)
+        if fail.startswith("merge-after"):  # merged, and the reply lost: what a timeout looks like
             print("Post https://api.github.com/graphql: context deadline exceeded", file=sys.stderr)
             return 1
+        return 0
+    if argv[:2] == ["pr", "view"]:
+        pr = state["prs"].get(argv[2])
+        if pr is None:
+            print("no pull requests found", file=sys.stderr)
+            return 1
+        print(pr["state"].upper())  # what `--json state --jq .state` prints
         return 0
     if argv[:2] == ["pr", "close"]:
         state["prs"][argv[2]]["state"] = "closed"
