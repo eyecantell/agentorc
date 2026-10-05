@@ -110,7 +110,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-318 | A definition is read at the home: take the landing rule's unreachable node clause out of `org.landing`, and have `ao org` and `ao org check` name a repo held only on a node | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Open |
 | TD-327 | A timed-out `ao wait` says *nothing unread — end your turn* while mail an earlier wait reported is still unread | Low | Open |
-| TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Open |
+| TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Host half built |
 | TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
 | TD-331 | `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps | Low | Open |
@@ -1977,7 +1977,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-05 (grinder-ao-1, found pressing TD-152's live check on a scratch home)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Host half built 2026-10-05 (grinder-ao-1, PR #1089): on a `scheduled` record `rpc_kill` is Cancel (`_cancel_start`, so `ao team stop --now` still stops a member not yet started), `rpc_set_mode` to interactive is refused until it runs, and `rpc_suspend` is refused in words; §6 *Start time* says so. Test in `tests/test_start_time.py`. **Left:** the card's `more ▾` on a scheduled record offers only Start now and Cancel (`src/agentorc/ui/`, grinder-ao-2's package).
 **Location:** `src/sessionorc/agent.py` (`rpc_set_mode`, `rpc_kill`: neither looks at `scheduled`; `rpc_close` does, and cancels), `src/sessionorc/agent_tick.py` (the scheduled start, `_replay(s, "start", …)` from the launch record), `src/agentorc/ui/` (the card's `more ▾` on a `scheduled` record), design §6 *Start time*, §4.5a *starts* note, §9 invariant 5
 
 **Why:** a `scheduled` record has no pane and has run nothing. The design gives it three acts: `ao at` (move it, or `now`), and Cancel (`ao close`), which forgets it. Two acts designed for a live session are taken on it anyway. Seen 2026-10-05 on a scratch home (hookstub adapter, `origin/main` c98d5620):
