@@ -1078,7 +1078,17 @@ def test_a_members_flow_mark_says_what_a_switch_did_or_left_on_it(monkeypatch):
     assert mark(id="d", sit_out={"at": "x"}) == "sits out under build"
     assert mark(id="d", state="closed", closed_for={"why": "sit_out"}) == "sits out under build"
     assert mark(id="p") == "sits out under build — close it yourself"
-    assert mark(id="n@devenv", host="devenv") == "flow changed"
+    assert mark(id="n@devenv", host="devenv", state="unreachable") == "flow changed"  # Apply skipped it
+    assert mark(id="n@devenv", host="devenv", state="idle") is None  # Apply reaches it: nothing to keep
+    monkeypatch.setitem(cards.FLOW_ACTS, "d", "start")
+    assert mark(id="d", state="closed", closed_for={"why": "sit_out"}) is None  # the flow starts it again
+    del cards.FLOW_ACTS["d"]
+    # winding down is what it does, ahead of its doing line; the other marks only where none stands
+    v = {"state": "working", "pending": {}, "doing": {"text": "pushing", "age": ""}, "ready_ok": False}
+    v.update(out_of_work=None, restart_wanted=None, waiting=None, open_work=None, seat=None, brief_changed=None)
+    sat = {"text": "sits out under build", "full": "x", "first": True}
+    assert cards.card_slot({**v, "flow_mark": sat})["text"] == "sits out under build"
+    assert cards.card_slot({**v, "flow_mark": {"text": "flow changed", "full": "x"}})["text"] == "pushing"
     assert mark(id="n2@devenv", host="devenv", relaunch={"at": "x"}, state="idle") == cards.NODE_RESTART
     assert mark(id="n2@devenv", host="devenv", relaunch={"at": "x"}, state="working") is None  # it is told
     assert mark(id="h", host="kmaster", relaunch={"at": "x"}, state="idle") is None  # the home's tick restarts it

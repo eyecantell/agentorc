@@ -340,7 +340,8 @@ def compact_line(v: dict[str, Any]) -> str:
         # an ending, and the last reference after it with its PR's mark (TD-193): *Grinder · exited ·
         # TD-066 → #158 merged*, so a wound-down team's cards say what each member left
         what = " · ".join(x for x in (str(slot.get("text") or v.get("state") or ""), v.get("report_ref") or "") if x)
-    elif isinstance(v.get("flow_mark"), dict):  # what a switch did or left on it (§4.5a, TD-309)
+    elif isinstance(v.get("flow_mark"), dict) and str(v["flow_mark"]["text"]).startswith("sits out"):
+        # what a switch did or left on it (§4.5a, TD-309): a node's longer marks leave its claim the line
         what = str(v["flow_mark"]["text"])
     else:
         claims = [p for p in v.get("progress") or [] if isinstance(p, dict) and p.get("status") == "claimed"]

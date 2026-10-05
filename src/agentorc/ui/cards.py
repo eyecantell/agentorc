@@ -535,22 +535,23 @@ NODE_RESTART = "flow changed — restarts when it next works or at the team's ne
 def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
     """A member's flow mark (design §4.5a *flow changed — Apply*, §4.9c *Switching*): *sits out under
     <flow>* on a member the flow sits out — winding down (`sit_out`) or closed for it (`closed_for:
-    {why: sit_out}`), its card kept until Forget — and *— close it yourself* on a person's session it
-    would sit out, which nothing winds down; *flow changed* on a node member Apply skipped; and on an
+    {why: sit_out}`), its card kept until Forget, unless the flow now starts it again — and *— close it
+    yourself* on a person's session it would sit out, which nothing winds down; *flow changed* on a
+    node member whose host is not answering, which Apply skips; and on an
     idle node member relaunched, which the tick does not restart, *flow changed — restarts when it
     next works or at the team's next Start*. None otherwise; a mark, never pressable."""
     flow = FLOWS.get(str(s.get("team") or "")) or "its flow"
     closed_for = s.get("closed_for") if isinstance(s.get("closed_for"), dict) else {}
     act = FLOW_ACTS.get(str(s.get("id") or ""))
     node = bool(here and s.get("host") and s.get("host") != here)
-    if s.get("sit_out") or closed_for.get("why") == "sit_out":
+    if (s.get("sit_out") or closed_for.get("why") == "sit_out") and act != "start":  # one the flow starts again: no
         text = f"sits out under {flow}"
         why = "the team's flow has no stage for its role — its card stays until Forget"
-        return {"text": text, "full": f"{text}: {why}"}
+        return {"text": text, "full": f"{text}: {why}", "first": True}  # ahead of `doing`: winding down is what it does
     if act == "left":
         text = f"sits out under {flow} — close it yourself"
         return {"text": text, "full": f"{text}: a person's session is never wound down by a switch (design §4.9c)"}
-    if node and act:
+    if node and act and s.get("state") == "unreachable":  # Apply skipped it: its host was not answering
         why = f"its record differs from {flow} — Apply on the team card"
         return {"text": "flow changed", "full": f"flow changed: {why}"}
     if node and s.get("relaunch") and s.get("state") == "idle":
@@ -724,11 +725,14 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             "idle with its work open: the host agent nudged it once, twenty minutes into this stretch, and it "
             "is still idle — yours or its manager's to judge (design §6)"
         )
-    elif d.get("flow_mark"):
-        # the flow's mark (§4.5a **flow changed — Apply**, TD-309): what a switch did or left on this member
-        kind, text, full = "lim", d["flow_mark"]["text"], d["flow_mark"]["full"]
+    elif (d.get("flow_mark") or {}).get("first"):
+        # winding down for a switch (§4.5a **flow changed — Apply**, TD-309): what it is doing now is that
+        text, full = d["flow_mark"]["text"], d["flow_mark"]["full"]
     elif d["doing"]:
         kind, text = "doing", d["doing"]["text"]
+    elif d.get("flow_mark"):
+        # the flow's other marks (TD-309): a mark, not a state, so only where no `doing` line stands
+        text, full = d["flow_mark"]["text"], d["flow_mark"]["full"]
     elif d.get("brief_changed"):
         # rule 7's mark (§4.5a **brief changed**, TD-217): not an ending — it stands on a working member
         # — so it takes the slot only where no `doing` line does, in place of the tail
