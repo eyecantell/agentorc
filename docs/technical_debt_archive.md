@@ -4689,3 +4689,17 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Related:** TD-258 (rule 10's build), TD-176 (the repo reading).
 
 **Resolved:** 2026-10-05 (PR #1103) — the repo's PR reading keeps each PR's head (`reports.PR_FIELDS` gains `headRefOid`, the row's `head`) and rule 10 reads head and state there first (`cadence.head_from`), asking `gh pr view` only for a PR the reading lacks; a closed PR's entry carries `closed` and is settled as a merged one is (`cadence.settled`), one found closed at the head it was read at marked without a second run; `tests/test_cadence_policy.py`; design §6 rule 10.
+
+## TD-333: A reader's held PR asks are a count alone, so `ao team flow` cannot say what a switch leaves with it
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-05 (grinder-ao-1, carved out of TD-309's Left at grinder-ao-2's note)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/models.py` (`Session.prs_waiting`); design §4.9b *The reader*, §4.9c *Switching*
+
+**Why:** §4.9c says `ao team flow` prints what a switch leaves with a reader (*grinder-ao-1's PR #1020 stays with techlead-ao-1*), but the home's only reading of a seat's queue was `prs_waiting: {n, oldest}`, a count and a time, so the client had nothing to name.
+
+**Resolved:** 2026-10-05 (PR #1110) — `prs_waiting` carries `asks: [{from, pr}]`, each open PR `ask` the seat holds, by sender and PR in the order they came, never the text; design §4.9b says so. Tests in `tests/test_review.py`. The client's line in `ao team flow` stays TD-309's (grinder-ao-2).
