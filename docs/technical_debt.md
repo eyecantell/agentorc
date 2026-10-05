@@ -33,7 +33,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Rolled out 2026-10-03 — dev-cadence TD-080 synced (#962) and every worktree hydrated; closes at the first worker note seen in its own PR |
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
 | TD-064 | Claude Code's own session-to-session messages reach an agentorc session around the mail gates, and an unattended session blocks on their approval prompt until a person answers | Medium | Built — live check pending |
-| TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
 | TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 built 2026-09-23 (PR #499); 8 is Paul's canvas |
 | TD-075 | Every question a worker has goes to the person: a go-between — the lead, or a session beside it, on a stronger model — could answer what is already written down and steering, and pass up the rest with a recommendation | Medium | Partly done |
@@ -116,6 +115,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Open |
 | TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
+| TD-331 | `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps | Low | Open |
 
 ---
 
@@ -475,23 +475,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** an unattended session started by agentorc cannot be stopped by another Claude Code session's message, and §4.10 names the channel and the policy.
 
 **Related:** TD-052 (mail), design §9 invariant 13, ADR 2026-09-16 (why agentorc builds its own messaging rather than using Claude Code's — this is the other half of that decision: what to do about theirs).
-
-## TD-067: Standing up a team has no operator's guide — for a person, and for the Claude session Paul tells to do it
-
-**Priority:** Medium
-**Added:** 2026-09-17 (Paul: *"My most likely cadence will be telling an llm (in this case claude) to implement/stand up a team using ao. Do we have plans for documentation that supports that flow as well as the user who wants to do it manually?"*)
-**Owner:** grinder
-**Kind:** live-check #302
-**Status:** **Re-owned 2026-10-04 (Paul): the live check is a grinder's, a press on a scratch home (`scripts/look_home.py`), never the live copy.** The press: a fresh Claude session with no context stands up a team for a scratch project from `ao team --skill` alone, and a person from the README alone. Open — **written 2026-09-20 (`tdgrind-ao-2`, PR #302); its *done when* is a live test and is Paul's.** The precondition was met: TD-057 3c.2 and 4a landed (#211, #213), so every command exists — what had not happened was Paul *running* them, which is a board item of his and never was a blocker on writing what the code does. Built: `src/agentorc/team_skill.md`, the recipe — the node, the project and the team definition, the roles and their briefs, `ao team list / start / status / stop`, and a section for an agent told to do it; **`ao team --skill`** prints it, as an `argparse.Action` so it exits during parsing and needs neither a host agent nor `team`'s required subcommand; the README section points at it; `docs/briefs/README.md` is cut to the one case it still owns (a single worker by hand, and the membership pitfall) and says so at the top. It ships **in the package** beside `skill.md`, because it has to print inside a container node with no checkout of this repo, and a copy under `docs/` would drift — a test asserts there is none. **Six claims were wrong before a test or the fact-check caught them, and are right in the file** — which is the argument for the fact-check rule, on a document more than anywhere: `lead: person` is refused (`lead: {role: person}` is the form); `ao status -v` prints grants, team, project, `under`, members, stop time, title, model, report, findings, out-of-work, `doing` and unread mail, not a role or a lane; **`{team: other-team}` — a nested team — parses and is refused at `start`**, so the recipe says so instead of presenting it as a feature; a `profile:` must already be declared in `~/.agentorc/profiles.yml` or `start` refuses it, which the draft never mentioned while its own example named `grind`; exit 3 is *could not reach one* and says which of two things happened, since TD-086 item 2; and §9 invariant 9's *nothing keys on the badge* has one exception — the mail gate's sideways edge — which lands precisely on the `lead: {role: person}` case this recipe walks through. **Still Paul's, on the board:** the entry's *done when* is a live test — a fresh Claude session on kmaster given `ao team --skill` and *stand up a grind team for contractmatch*, standing it up without reading design.md — which needs an attended run and a real node, neither of which an unattended session may do. **Design review 2026-09-22:** the briefs README still describes the hand-launch path as if teams did not exist (TD-109 lists it with the other housekeeping). **Next:** written; the *done when* is Paul's attended run.
-**Location:** `README.md` (a "Stand up a team" section, or a `docs/guide/` file it links), `src/agentorc/cli.py` (`skill_text`, `ao --skill`), `docs/briefs/README.md`
-
-**Why:** what exists is written for someone else. README "Run it" installs one host and stops. `docs/briefs/README.md` launches workers and a lead **by hand** with `ao new` and `ao control … add`, which `ao team start` (§4.9, 2026-09-13) replaced — it is still right for a one-off worker and wrong as the way in. Design §4.9 is the spec of `org.yml` and a repo's `.agentorc.yml`, for a designer. `ao --skill` tells an agent how to behave *inside* a session and says nothing about setting one up. So a person has to read the design, and a Claude session told "stand up a grind team for contractmatch" has to read it too and guess — the flow Paul says is his most likely one.
-
-**Fix:** one recipe, written once, with two doors. (1) The **operator's guide** in the repo: the `nodes:` entry and `ao host up` for a container node (3c), the project and team definition in `org.yml` or the repo's `.agentorc.yml` with `host:` (4a), the roles and briefs a repo needs (`docs/briefs/`, `.agentorc.yml` `roles:`), `ao team list` / `start` / `status` / `stop`, what a lead is and how to read `ao status -v`, and the one-time person's steps (a profile's login, the node's `env` file) — each step a command and what it prints, not prose. (2) The same text **printed by the CLI**, on the pattern `ao --skill` set (TD-019): `ao team --skill` (or `ao --skill setup`; decide and say so), so Paul's cadence is `ao team --skill` and "stand up a grind team for repo X" and the Claude session self-serves from the tool rather than from memory of the design. The guide's text is the source; the README section is a pointer, as it is for `ao --skill`. `docs/briefs/README.md` is cut down to the one case it still owns — a worker launched by hand, and the membership pitfall — and points at the guide.
-
-**Done when** a Claude Code session on kmaster with no prior context, given `ao team --skill` and the sentence "stand up a grind team for contractmatch", writes the definition, starts the team and reports its `ao team status` without reading design.md; and a person can do the same from the README section alone.
-
-**Related:** TD-057 (3c.2, 4a — the steps the guide waits on), TD-019 (`ao --skill`), design §4.7, §4.9, §4.4a; `docs/briefs/README.md`.
 
 ## TD-070: Neither an `ask` nor a board item can offer its expected answers — the person types every reply from scratch
 
@@ -2088,4 +2071,22 @@ The design sentence goes in §6 *Start time*, beside Cancel, in the same PR. The
 **Done when:** each of the three is fixed or written down in §6 as how it is meant to be.
 
 **Related:** TD-239 (the build), TD-177 (the design), TD-227 (rule 8's holds).
+
+## TD-331: `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-1, found pressing TD-067's live check on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/team_skill.md` (the roles table, *members:*, the profile paragraph, the start step), `tests/test_team_skill.py` if one binds the roles
+
+**Why:** a Claude session with no context stood a team up from `ao team --skill` alone (TD-067, archived), and reported where the text was wrong or made it guess. Checked against the code: (1) *Six are built in —* but `ao roles` lists seven: `designer` is missing from the table. (2) The *members:* bullet names `role`, `count`, `name`; `org.MEMBER_KEYS` also takes `profile`, `home`, `lane`, `brief`, `grants`, `unattended` and `team`, so the session put the profile in a `roles:` overlay rather than guess. (3) Nothing says that `ao team start` does not check a profile's login: start succeeded and every session went `needs-you` on Claude Code's first-run screen, found only after the start — the recipe should say so, or how to check before. (4) Nothing says whether a repo's `.agentorc.yml` and the `.gitignore` line are committed before the start; members work in worktrees cut from the checkout, so the session guessed *commit on main*. (5) `ao team list` prints *(on call)* after the manager, which the recipe never explains. Smaller: `ao team start --anyway` is in `--help` and not the recipe, and how to find this host's name for `org.yml` (`local.name` in `hosts.yml`) is not said.
+
+**Fix:** correct the count and add `designer`'s row; list the member keys as the manager's are; one sentence each on the login check, the commit, and *on call*. Check each against the code as TD-067's fact-check did.
+
+**Done when:** the five points read right in `ao team --skill`, each checked against the code.
+
+**Related:** TD-067 (the recipe, archived), TD-329 (a member's shell profile starts Claude Code).
 
