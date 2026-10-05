@@ -107,6 +107,7 @@ HOME_OWNED = frozenset(
         "brief",
         "brief_changed",
         "relaunch",
+        "sit_out",
         "seat",
         "seat_due",
         "seat_count",
@@ -495,6 +496,13 @@ class SendEntry:
 
 REVIEW_READERS = ("techlead", "person")
 REVIEW_BOUND = "2h"  # §4.9b *The reader*: a read of a diff, unless the preset says otherwise
+# The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`, §4.9c a sit-out): the card, the CLI
+# (`agentorc.teams` re-exports it) and the home's sit-out send the same words.
+WRAPUP_PROMPT = (
+    "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
+    "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
+    "idle), then stop."
+)
 _REVIEW_DURATION = re.compile(r"[1-9]\d*[mhd]")
 
 
@@ -1005,6 +1013,10 @@ class Session:
     # this record's launch record (`relaunch`); gone at the next create, which writes a launch record of
     # its own. The home's.
     relaunch: dict[str, Any] | None = None
+    # A sit-out under way (§4.9c *Switching*, TD-309 slice 5b): `{at}` once a person's Apply sent the
+    # wrap-up to a member the team's flow no longer uses; the tick closes it once settled and writes
+    # `closed_for: {why: sit_out}`. Gone at the next create. The home's.
+    sit_out: dict[str, Any] | None = None
     # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.

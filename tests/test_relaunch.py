@@ -15,10 +15,11 @@ from conftest import park_ticks
 from test_brief_replay import _made_from, _merge, _repo
 
 from agentorc.ending import closer_words
-from sessionorc import paths
+from sessionorc import paths, work
 from sessionorc.agent import RESTART_SETTLE
 from sessionorc.agent_common import FLOW_CLAUSE
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import WRAPUP_PROMPT
 
 SHELL = {"adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
 
@@ -128,3 +129,95 @@ async def test_a_relaunched_member_is_told_on_its_replies_and_its_restart_is_nev
         assert not (clientmod.last_mail or {}).get("brief")  # declared: the clause is not repeated
         agent.sessions[w].relaunch = None
     clientmod.last_mail = None
+
+
+# -- slice 5b: the sit-out form -------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+async def test_a_sit_out_sends_the_wrap_up_and_the_tick_closes_and_marks_it_once_settled(agent, tmp_path):
+    await park_ticks(agent)
+    params = {"dir": str(tmp_path), **SHELL}
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="d", unattended=True, supervised=True, prompt="p", **params))["id"]
+        rec = agent.sessions[sid]
+        view = await person.call("relaunch", id=sid, sit_out=True)
+        assert view["sit_out"]["at"] and rec.wrapup_at  # the wrap-up, as Members… remove sends it
+        assert rec.sends[-1].text == WRAPUP_PROMPT
+        again = await person.call("relaunch", id=sid, sit_out=True)  # said twice: nothing more is sent
+        assert again["sit_out"] == view["sit_out"] and len(rec.sends) == 1
+        with pytest.raises(AgentError, match="sat out by its team's flow"):  # nor relaunched while it sits out
+            await person.call("relaunch", id=sid, launch={"prompt": "x"})
+        # settled with work left: it stays open, tick after tick, with no restart and no mark
+        _idle(rec)
+        rec.git = {"dirty": 1, "unpushed": 0}
+        now = datetime.now(UTC)
+        await agent._keep_running(now)
+        assert rec.state == "idle" and rec.closed_for is None and rec.restarts == []
+        # pushed: closed by the tick and marked, never started again
+        rec.git = {"dirty": 0, "unpushed": 0}
+        await agent._keep_running(now + timedelta(seconds=1))
+        assert rec.state == "closed" and rec.closed_for == {"why": "sit_out", "closed_at": rec.closed_at}
+        assert work.sat_out(rec) and rec.restarts == [] and rec.closer["why"] == "sit_out"
+        assert closer_words(rec.view()) == "closed by the tick · flow sat it out"
+        rec.restart_wanted = {"at": "2026-10-05T07:00:00Z", "why": "x"}  # a declaration from its wrap-up
+        rec.relaunch = {"at": "2026-10-05T07:00:00Z"}
+        await agent._keep_running(now + RESTART_SETTLE + timedelta(seconds=2))
+        assert agent.sessions[sid] is rec and rec.state == "closed" and rec.restarts == []  # rules 2 and 7 pass
+        with contextlib.suppress(Exception):
+            await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_sit_out_of_an_exited_member_is_marked_as_it_stands_and_never_crash_restarted(agent, tmp_path):
+    await park_ticks(agent)
+    params = {"dir": str(tmp_path), **SHELL}
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="e", unattended=True, supervised=True, prompt="p", **params))["id"]
+        rec = agent.sessions[sid]
+        await person.call("relaunch", id=sid, sit_out=True)
+        rec.state, rec.pane, rec.exit_code, rec.since = "exited", True, 0, "2026-10-05T08:00:00Z"
+        await agent._keep_running(datetime.now(UTC))
+        assert rec.closed_for == {"why": "sit_out", "closed_at": "2026-10-05T08:00:00Z"}
+        assert agent.sessions[sid] is rec and rec.restarts == []  # rule 1 never restarts it
+        with contextlib.suppress(Exception):
+            await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_sit_out_is_refused_touching_nothing(agent, tmp_path):
+    from sessionorc.models import Pending
+
+    await park_ticks(agent)
+    params = {"dir": str(tmp_path), **SHELL}
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="a", unattended=True, supervised=True, prompt="p", **params))["id"]
+        mine = (await person.call("create", name="c", supervised=True, prompt="p", **params))["id"]
+        seat = (await person.call("create", name="t", unattended=True, supervised=True, prompt="p", **params))["id"]
+        agent.sessions[seat].seat = {"trigger": "asks"}
+        refusals = [
+            ({"id": sid, "launch": {"prompt": "x"}}, "takes no launch"),
+            ({"id": mine}, "interactive"),
+            ({"id": seat}, "is a seat"),
+        ]
+        for kw, words in refusals:
+            with pytest.raises(AgentError, match=words):
+                await person.call("relaunch", sit_out=True, **kw)
+        agent.sessions[sid].pending = Pending(kind="question", text="q")
+        with pytest.raises(AgentError, match="the wrap-up could not be sent"):
+            await person.call("relaunch", id=sid, sit_out=True)
+        assert all(agent.sessions[x].sit_out is None and not agent.sessions[x].sends for x in (sid, mine, seat))
+        agent.sessions[sid].pending = None
+        for x in (sid, mine, seat):
+            with contextlib.suppress(Exception):
+                await person.call("kill", id=x)
+
+
+@pytest.mark.unit
+def test_a_sat_out_member_is_passed_over_by_wound_down_and_finished():
+    out = {"at": "2026-10-05T07:00:00Z", "why": "x"}
+    sat = {"name": "designer-1", "closed_for": {"why": "sit_out", "closed_at": "t"}}
+    assert work.wound_down([{"name": "grinder-1", "out_of_work": out}, sat]) == out["at"]
+    grinder = {"id": "g", "name": "grinder-1", "unattended": True, "state": "idle", "out_of_work": out}
+    gone = {**sat, "id": "d", "unattended": True, "state": "closed", "restart_wanted": out}
+    assert work.finished([grinder, gone])["why"] == []  # its restart word is not read: the flow sat it out

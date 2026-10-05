@@ -35,7 +35,7 @@ def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> s
     seen = [
         d if isinstance(d := s.get("out_of_work"), dict) else {}
         for s in sessions
-        if s.get("name") not in seats and not closed_finished(s)
+        if s.get("name") not in seats and not closed_finished(s) and not sat_out(s)
     ]
     if not seen or not all(d.get("at") for d in seen):
         return None
@@ -48,6 +48,14 @@ def closed_finished(record: Any) -> bool:
     """Whether a record is a manager rule 9 closed (design §6): `closed_for: {why: finished}`."""
     mark = record.get("closed_for") if isinstance(record, Mapping) else getattr(record, "closed_for", None)
     return isinstance(mark, Mapping) and mark.get("why") == "finished"
+
+
+def sat_out(record: Any) -> bool:
+    """Whether a record is a member its team's flow sat out (design §4.9c *Switching*): `closed_for: {why:
+    sit_out}`. Rules 1, 2 and 7 never recreate it, rule 9 and `wound_down` pass over it whatever it
+    declared, and rule 8 watches none of its lanes."""
+    mark = record.get("closed_for") if isinstance(record, Mapping) else getattr(record, "closed_for", None)
+    return isinstance(mark, Mapping) and mark.get("why") == "sit_out"
 
 
 def crew(records: Iterable[Session]) -> list[Session]:
@@ -177,6 +185,8 @@ def finished(
     restart = False
     why: list[str] = []
     for r in mine:
+        if sat_out(r):
+            continue  # the flow sat it out (§4.9c): passed over whatever it declared
         name, state = str(_f(r, "name") or _f(r, "id")), str(_f(r, "state"))
         live = state not in DEAD
         if r is manager or _f(r, "seat") is not None or _f(r, "name") in seats:

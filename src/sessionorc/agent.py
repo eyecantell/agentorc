@@ -43,6 +43,7 @@ from sessionorc import (
 )
 from sessionorc import balance as balance_mod
 from sessionorc import spend as spend_mod
+from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
 from sessionorc.agent_common import (  # re-exported: callers and tests read these from the agent
     _CSI,  # noqa: F401
@@ -181,6 +182,7 @@ from sessionorc.models import (
     GRANTS,
     PERSON,
     PROGRESS_STATUSES,
+    WRAPUP_PROMPT,
     FindingEntry,
     MailEntry,
     ProgressEntry,
@@ -1494,7 +1496,9 @@ class HostAgent(
         log.info("%s restarted by the person from its launch record", self._address(new))
         return self._view(new)
 
-    async def rpc_relaunch(self, id: str, launch: dict[str, Any] | None = None, caller: Any = None) -> dict[str, Any]:
+    async def rpc_relaunch(
+        self, id: str, launch: dict[str, Any] | None = None, sit_out: bool = False, caller: Any = None
+    ) -> dict[str, Any]:
         """A person's Apply, one member (design §4.9c *Switching*, TD-309 slice 5): the client composed
         the member under the team's current flow and hands its launch here — `prompt`, `prompt_from`,
         `lane`, `review` (`RELAUNCH_KEYS`), each replaced as handed and an absent one removed, the rest
@@ -1504,12 +1508,20 @@ class HostAgent(
         new record, and a create under the name clears the mark. **A person's own**, refused to a
         session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`); never an interactive
         session, and never one with no launch record. Nothing is touched before every check passes;
-        the reply is the record."""
+        the reply is the record.
+
+        **`sit_out: true`** is its other form (slice 5b): a member the flow no longer uses is wound
+        down as **Members…**'s remove winds one down — the wrap-up sent now, a working member finishing
+        what it holds — but by the home, which writes `sit_out: {at}` and, once the member is settled,
+        closes it itself and marks it `closed_for: {why: sit_out}` (the tick's `_sit_out_close`). It
+        takes no launch; never a seat (rule 3 fills one when it is due) or a scheduled record."""
         agent_common.person_only(caller, "relaunch a session", "§4.9c")
         if self.mode != "home":
             raise RpcError("relaunch runs at the home (design §4.9c): this host is a node")
         s = self._find(id)
         rule = "(design §4.9c *Switching*)"
+        if sit_out:
+            return await self._sit_out(s, launch, rule)
         if not isinstance(launch, dict):
             raise RpcError(f"relaunch needs the member's composed launch {rule}")
         stray = sorted(k for k in launch if k not in RELAUNCH_KEYS)
@@ -1523,6 +1535,8 @@ class HostAgent(
             raise RpcError(f"{s.name} is interactive: its lane and brief are the person's, never relaunched {rule}")
         if s.superseded_by:
             raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to relaunch {rule}")
+        if s.sit_out or work_mod.sat_out(s):
+            raise RpcError(f"{s.name} is sat out by its team's flow: a create under the name starts it again {rule}")
         address = self._address(s)
         try:
             if not s.supervised:
@@ -1543,6 +1557,39 @@ class HostAgent(
         self._save(s)
         await self._push_changes()
         log.info("%s relaunched by the person: its launch record replaced", address)
+        return self._view(s)
+
+    async def _sit_out(self, s: Session, launch: Any, rule: str) -> dict[str, Any]:
+        """`relaunch`'s sit-out form: refused, touching nothing, on a launch handed with it, an interactive
+        record, a superseded one, a seat or a scheduled one, and when the wrap-up cannot be sent (a
+        pending prompt, a link down); said again of a record already sitting out, it does nothing more."""
+        if launch is not None:
+            raise RpcError(f"a sit-out takes no launch: the member stops, it is not composed again {rule}")
+        if not s.unattended:
+            raise RpcError(f"{s.name} is interactive: a team act never stops a person's session {rule}")
+        if s.superseded_by:
+            raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to sit out {rule}")
+        if s.seat is not None:
+            raise RpcError(f"{s.name} is a seat: rule 3 fills it when it is due, and a flow never sits one out {rule}")
+        if s.state == "scheduled":
+            raise RpcError(f"{s.name} is scheduled and has not started: Cancel it instead {rule}")
+        if s.sit_out or work_mod.sat_out(s):
+            return self._view(s)
+        if s.state not in ("exited", "closed"):
+            try:
+                if s.host == self.host:
+                    await self.rpc_send(s.id, WRAPUP_PROMPT, wrapup=True)
+                else:
+                    await self._route_act("send", {"id": s.id, "text": WRAPUP_PROMPT, "wrapup": True}, None, s.host)
+            except Exception as e:  # noqa: BLE001 — said to the person who pressed, nothing marked
+                raise RpcError(
+                    f"{s.name}: the wrap-up could not be sent ({str(e) or type(e).__name__}), "
+                    f"so it is not sat out {rule}"
+                ) from None
+        s.sit_out = {"at": now_iso()}
+        self._save(s)
+        await self._push_changes()
+        log.info("%s sat out by the person's Apply: the wrap-up sent", self._address(s))
         return self._view(s)
 
     def _restart_check(self, s: Session, now: datetime) -> dict[str, Any]:
