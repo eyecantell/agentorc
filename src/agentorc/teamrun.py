@@ -863,10 +863,16 @@ def pick_flow(
 ) -> dict[str, Any]:
     """The **Flow** pick, and the Settings page's **flow** on Save (§4.5a, §4.9c *Switching*): checked
     as `flow_preview` checks it, written to `teams.<team>.flow` through `set_settings` — a person's
-    own — and applied at once (`apply`), as `ao team flow <team> <flow>` does. Returns `apply`'s."""
+    own — and applied at once (`apply`), as `ao team flow <team> <flow>` does. Returns `apply`'s; an
+    apply that fails once the pick is written says so in `not_applied`, never as a refusal, since
+    the setting stands and **Apply** finishes it."""
     flow_preview(call, org, name, here, flow, call("list"))
     got = call("set_settings", teams={name: {"flow": flow}})
-    return apply(call, orgmod.with_settings(org, (got or {}).get("teams")), name, here, caller=caller)
+    try:
+        return apply(call, orgmod.with_settings(org, (got or {}).get("teams")), name, here, caller=caller)
+    except (teams.TeamError, ValueError, OSError, AgentError) as e:
+        why = f"flow set to {flow}, but not applied — {str(e).strip(chr(34))}: Apply on the team card tries again"
+        return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": [], "not_applied": why}
 
 
 def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:

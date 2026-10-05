@@ -1038,9 +1038,29 @@ def test_the_settings_pages_flow_is_written_and_applied_on_save(world, client):
     rows.append({"name": "td", "current": False, "strip": "", "cannot": "td cannot be followed by ao-grind"})
     (card,) = setmod.team_cards(uiapp.org_here()[0].teams, {}, flows={"ao-grind": rows})
     assert card["flow"] == "build-review" and card["flow_strip"] == "build → review → you" and card["flows"] == rows
-    no = client.post("/api/settings/teams", json={"team": "ao-grind", "flow": "td"})
+    no = client.post("/api/settings/teams", json={"team": "ao-grind", "flow": "td", "reserve": "5"})
     assert no.status_code == 400 and no.json()["detail"].startswith("flow not set — td cannot be followed")
+    assert not [m for m, _ in fleet.calls if m == "set_settings"]  # refused before anything was written
     _flow_org(tmp_path, ["build-review", "build"])
     got = client.post("/api/settings/teams", json={"team": "ao-grind", "flow": "build"}).json()
     assert ("set_settings", {"teams": {"ao-grind": {"flow": "build"}}}) in fleet.calls
     assert got["ok"] and {d["name"]: d["act"] for d in got["apply"]["applied"]}["grind-1"] == "relaunch"
+
+
+def test_a_pick_written_and_not_applied_says_so_and_is_no_refusal(world, client, monkeypatch):
+    """The pick is written before the apply: an apply that fails then leaves the setting standing, so
+    the answer says *flow set, but not applied* rather than refusing — the page keeps the new pick."""
+    from agentorc import teamrun
+
+    tmp_path, fleet = world
+    _flow_org(tmp_path, ["build-review", "build"])
+
+    def boom(*_a, **_k):
+        raise teamrun.teams.TeamError("kmaster is not answering")
+
+    monkeypatch.setattr(teamrun, "apply", boom)
+    got = client.post("/api/teams/ao-grind/flow", json={"flow": "build"})
+    assert got.status_code == 200 and ("set_settings", {"teams": {"ao-grind": {"flow": "build"}}}) in fleet.calls
+    assert got.json()["not_applied"] == (
+        "flow set to build, but not applied — kmaster is not answering: Apply on the team card tries again"
+    )

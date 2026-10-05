@@ -2601,15 +2601,22 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if not change and flow is None:
             raise HTTPException(400, "teams: send until, reserve, on_work, balance or flow")
         got: dict[str, Any] = {}
-        if change:
-            got = await call("set_settings", teams={team: change})
-        if flow is not None:  # **flow**: written and applied at once, as the team card's Flow pick (§4.9c)
+        org = org_here()[0]
+        if flow is not None:  # **flow**: checked before anything is written, so a refusal saves nothing
             if hosts.is_node():
                 raise HTTPException(409, node_org_note())
+            fleet = await call("list")
             try:
-                applied = await asyncio.to_thread(teamrun.pick_flow, rpc, org_here()[0], team, host_name(), flow)
+                await asyncio.to_thread(teamrun.flow_preview, rpc, org, team, host_name(), flow, fleet)
             except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
                 raise HTTPException(400, f"flow not set — {str(e).strip(chr(34))}") from None
+        if change:
+            got = await call("set_settings", teams={team: change})
+        if flow is not None:  # …then written and applied at once, as the team card's Flow pick (§4.9c)
+            try:
+                applied = await asyncio.to_thread(teamrun.pick_flow, rpc, org, team, host_name(), flow)
+            except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
+                raise HTTPException(400, f"the rest saved; flow not set — {str(e).strip(chr(34))}") from None
             got = {**got, "apply": applied}
         return answer(got)
 

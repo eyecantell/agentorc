@@ -1192,7 +1192,12 @@
       sec.dataset.manager = g.manager || "";
       sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
-      if (g.html) {
+      // a header whose **Flow** pick is open or in flight is left as it is until the pick settles
+      // (§4.5a, TD-309): a swap would close the menu, or redraw the old flow under a pick being applied
+      const picking = head && [...head.querySelectorAll("[data-flow-pick]")].some((p) => p.disabled || p === document.activeElement);
+      if (g.html && picking) {
+        // the next delta after the pick draws it
+      } else if (g.html) {
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
         head.innerHTML = g.html;
         AO.applyHelpMarks(head);  // the header's *i* panel comes back as this browser left it
@@ -1423,9 +1428,10 @@
       });
       let o = {}; try { o = await r.json(); } catch (e) {}
       if (!r.ok) throw new Error(o.detail || r.statusText);
-      sel.dataset.was = flow;
+      sel.dataset.was = flow;  // written, whether or not it applied: the setting is what the header reads
       AO.toast(`${name}: flow set to ${flow}`, true);
       [...(o.applied || []), ...(o.skipped || []), ...(o.stays || [])].forEach((d) => AO.toast(`${name}: ${d.line}`, true));
+      if (o.not_applied) AO.toast(`${name}: ${o.not_applied}`);
     } catch (e) {
       sel.value = sel.dataset.was;
       AO.toast(`${name}: ${e.message}`);
@@ -3784,8 +3790,11 @@
         say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
         const ap = (got && got.apply) || null;
         if (ap) [...(ap.applied || []), ...(ap.skipped || []), ...(ap.stays || [])].forEach((d) => AO.toast(`${body.team}: ${d.line}`, true));
+        if (ap && ap.not_applied) AO.toast(`${body.team}: ${ap.not_applied}`);
         if (section === "you" && AO.termChan) { AO.termChan.postMessage(body.terminal); AO.setTermLook(body.terminal); }
-        if (section === "teams") setTimeout(() => location.reload(), ap ? 4000 : 600);  // a switch's toasts are read first  // the stop time is drawn in this host's clock by the server
+        if (ap && f.elements.flow) f.elements.flow.dataset.was = body.flow;  // saved: a second Save does not send it again
+        // the stop time is drawn in this host's clock by the server; a switch's toasts are read first
+        if (section === "teams") setTimeout(() => location.reload(), ap ? 4000 : 600);
       } catch (err) { say(f, err.message, true); }
     });
     page.addEventListener("click", async (e) => {
