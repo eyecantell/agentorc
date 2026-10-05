@@ -400,7 +400,14 @@ def flow_rows(
             row["cannot"] = f"not usable — {'; '.join(flow.problems)}"
         else:
             row["strip"] = flowdefs.strip(flow, techlead=techlead)
-            if reasons := flowdefs.unfollowable(flow, staffed, techlead=team.techlead is not None, held=cfg.held or ()):
+            if reasons := flowdefs.unfollowable(
+                flow,
+                staffed,
+                techlead=team.techlead is not None,
+                held=cfg.held or (),
+                team=team.name,
+                node=host if host != here else "",
+            ):
                 row["cannot"] = flowdefs.cannot_follow(name, team.name, reasons)
         out.append(row)
     return out
@@ -426,6 +433,8 @@ def flow_for(
     except OSError:  # a node's checkout that did not answer: no flow read, never a crash past the form
         return None
     if flow is None or not flow.usable:
+        return None
+    if read is not None and flow.place == "org":  # another host's team: an org flow is not followable there
         return None
     return flowdefs.under(flow, role, techlead=techlead, held=cfg.held or ())
 
@@ -575,12 +584,19 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             raise TeamError(f"{where}: flows: {name}: {str(e).strip(chr(34))}") from None
         if flow is None:
             raise TeamError(
-                f"{where}: flows: no flow {name!r} — not a built-in ({', '.join(flowdefs.BUILTIN)}) and no "
-                f"{flowdefs.REPO_DIR / name}/ in {home}"
+                f"{where}: flows: no flow {name!r} — not a built-in ({', '.join(flowdefs.BUILTIN)}), no "
+                f"{flowdefs.org_dir() / name}/ and no {flowdefs.REPO_DIR / name}/ in {home}"
             )
         if flow.problems:
             raise TeamError(f"{where}: flows: {name} is not usable — {'; '.join(flow.problems)}")
-        reasons = flowdefs.unfollowable(flow, staffed, techlead=team.techlead is not None, held=cfg.held or ())
+        reasons = flowdefs.unfollowable(
+            flow,
+            staffed,
+            techlead=team.techlead is not None,
+            held=cfg.held or (),
+            team=team.name,
+            node=host if host != here else "",
+        )
         if reasons:
             raise TeamError(flowdefs.cannot_follow(name, team.name, reasons))
 

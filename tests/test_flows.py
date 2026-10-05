@@ -162,6 +162,58 @@ def test_flows_on_a_team_is_a_list_of_names_each_once(tmp_path):
         orgmod._team("t", {"projects": ["p"], "flows": "td"}, "teams.t", source=tmp_path)
 
 
+@pytest.mark.unit
+def test_an_org_flow_is_found_over_a_repos_and_never_over_a_built_in(tmp_path, monkeypatch):
+    # §4.9c *Where flows and roles live* (TD-313): the org's `~/.agentorc/flows/<name>/` over a
+    # repo's, whole; a directory taking a built-in's name is never read, in either place
+    home = tmp_path / "home"
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    hunt = [{"name": "find", "role": "hunter", "lane": ["free"], "brief": "find.md"}]
+    repo_flow(tmp_path / "r", "hunt", hunt, {"find.md": "the repo's find words\n"})
+    assert flowdefs.find("hunt", tmp_path / "r").place == "repo"
+    org_flow = flowdefs.org_dir() / "hunt"
+    assert org_flow == home / "flows" / "hunt"
+    org_flow.mkdir(parents=True)
+    (org_flow / "flow.yml").write_text(yaml.safe_dump({"stages": hunt}))
+    (org_flow / "find.md").write_text("the org's find words\n")
+    got = flowdefs.load("hunt", cfg_with(tmp_path / "r"))
+    assert got.place == "org" and got.dir == org_flow and got.usable, got.problems
+    assert got.stages[0].path == org_flow / "find.md"
+    # without a repo too: an org flow is every team's
+    assert flowdefs.find("hunt").place == "org"
+    (flowdefs.org_dir() / "td").mkdir()
+    (flowdefs.org_dir() / "td" / "flow.yml").write_text("stages: []\n")
+    assert flowdefs.find("td").place == "package"
+    rows = {(r["name"], r["source"]): r for r in flowdefs.visible([tmp_path / "r"])}
+    assert rows[("hunt", str(org_flow))]["usable"]
+    assert "the org's flow hunt" in rows[("hunt", str(tmp_path / "r" / ".agentorc" / "flows" / "hunt"))]["shadowed"]
+    assert "built-in's name" in rows[("td", str(flowdefs.org_dir() / "td"))]["shadowed"]
+    (flowdefs.org_dir() / ".hidden").mkdir()
+    (flowdefs.org_dir() / ".hidden" / "flow.yml").write_text("stages: []\n")
+    assert ".hidden" not in {r["name"] for r in flowdefs.visible([])}  # never found, so never listed
+
+
+@pytest.mark.unit
+def test_an_org_flow_cannot_be_followed_by_a_team_on_a_node(tmp_path, monkeypatch):
+    # §4.9c: a node team's briefs are read on the node, and the org's directories are the home's
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    d = flowdefs.org_dir() / "hunt"
+    d.mkdir(parents=True)
+    (d / "flow.yml").write_text("stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n")
+    (d / "find.md").write_text("find\n")
+    hunt = flowdefs.load("hunt", cfg_with(tmp_path))
+    assert flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind") == []
+    why = flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind", node="contractmatch")
+    # and a member started under it reads its stage brief as a flow's, so no *flow changed* is raised
+    from agentorc import teamrun
+
+    assert teamrun._is_stage(d / "find.md")
+    assert flowdefs.cannot_follow("hunt", "cm-grind", why) == (
+        "hunt cannot be followed by cm-grind: an org flow, and cm-grind runs on contractmatch — define it in "
+        "the repo, or drop hunt from flows:"
+    )
+
+
 def _with(tmp_path: Path, **team) -> orgmod.Org:
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
     doc["teams"]["ao-grind"].update(team)
@@ -354,6 +406,19 @@ def test_an_edit_to_a_stage_brief_is_brief_changed(tmp_path):
     (flow_dir / "build.md").write_text("other build words\n")
     assert brief.changed(was)[0] == [str(flow_dir / "build.md")]
     assert "other build words" in brief.fill(made)[0]
+
+
+def test_a_session_started_into_a_node_team_under_an_org_flow_composes_as_with_no_flow(world, tmp_path):  # noqa: F811
+    # review of TD-313 slice 1: `ao new --team` and the form reach a node's checkout through `read`;
+    # an org flow is not followable there, so `{flow}` reads none rather than a brief from the wrong host
+    d = flowdefs.org_dir() / "hunt"
+    d.mkdir(parents=True)
+    (d / "flow.yml").write_text("stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n")
+    (d / "find.md").write_text("find\n")
+    org = _with(tmp_path, flows=["hunt"])
+    team, cfg = org.teams["ao-grind"], repoconfig.load(tmp_path / "agentorc")
+    assert teams.flow_for(org, team, cfg, "hunter").stage == d / "find.md"
+    assert teams.flow_for(org, team, cfg, "hunter", read=lambda p: None) is None
 
 
 def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_path):  # noqa: F811

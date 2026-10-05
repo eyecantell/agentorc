@@ -2,7 +2,7 @@
 
 A flow is a directory holding `flow.yml` — an ordered list of stages, each a role, the lane it gives
 and its stage brief — and the briefs beside it. This module finds a flow by name (the package's
-built-ins, then a repo's `.agentorc/flows/<name>/`; the org's directories are TD-313's), reads it,
+built-ins, then the org's `~/.agentorc/flows/<name>/`, then a repo's `.agentorc/flows/<name>/`), reads it,
 and says whether it is **usable** (whole: every brief present, every role resolved and of the kind
 its stage wants) and whether a team can **follow** it (its members staff every stage). It reads and
 judges; it writes nothing, and nothing here starts a session.
@@ -19,12 +19,14 @@ from typing import Any
 import yaml
 
 from agentorc import repoconfig
+from sessionorc import paths
 from sessionorc.models import LANE_WORDS, owner_word
 
 PACKAGE_DIR = Path(__file__).resolve().parent / "flows"
 REPO_DIR = Path(".agentorc") / "flows"
 FILE = "flow.yml"
 BUILTIN = ("td", "build-review", "build")
+ORG_SUB = "flows"  # the org's flow directories: `~/.agentorc/flows/<name>/` (§4.9c, TD-313)
 FLOW_KEYS = ("stages",)
 STAGE_KEYS = ("name", "role", "lane", "brief")
 PACKAGE_REF = "package:"
@@ -159,16 +161,27 @@ def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: P
     return flow
 
 
+def org_dir() -> Path:
+    """The org's flow directories (design §4.9c *Where flows and roles live*, TD-313): the home's
+    `flows/`, every team's to use and kept in the home's history beside `org.yml`."""
+    return paths.home() / ORG_SUB
+
+
 def find(name: str, repo_root: Path | None = None, *, read: repoconfig.Reader | None = None) -> Flow | None:
-    """The flow called `name` for a team of the repo at `repo_root`: a built-in (`td`,
-    `build-review`, `build`, the package's), else the repo's `.agentorc/flows/<name>/` read through
-    `read` (this host's disk by default, a node's checkout across the link). None: no such flow.
-    A repo directory that takes a built-in's name is never read — the built-in is the flow."""
+    """The flow called `name` for a team of the repo at `repo_root`, resolved as a team's name is —
+    the org's over a repo's (§4.9c): a built-in (`td`, `build-review`, `build`, the package's), else
+    the org's `~/.agentorc/flows/<name>/`, read on this host, else the repo's
+    `.agentorc/flows/<name>/` read through `read` (this host's disk by default, a node's checkout
+    across the link). None: no such flow. A directory that takes a built-in's name is never read —
+    the built-in is the flow — and a repo's that takes an org flow's name is shadowed by it."""
     if name in BUILTIN:
         d = PACKAGE_DIR / name
         return parse(name, "package", d, _read_here(d / FILE), PACKAGE_DIR)
     if not name or "/" in name or name.startswith("."):
         return None
+    org = org_dir()
+    if (org / name / FILE).is_file():
+        return parse(name, "org", org / name, _read_here(org / name / FILE), org)
     if repo_root is None:
         return None
     base = Path(repo_root).expanduser() / REPO_DIR
@@ -205,7 +218,9 @@ def check(
     for st in flow.stages:
         key = f"{where}: stage {st.name}"
         if st.path is not None:
-            reader = _read_here if flow.place == "package" or st.path.is_relative_to(PACKAGE_DIR) else read
+            # the package's and the org's files are this host's own; a repo's is read where its checkout is
+            here = flow.place in ("package", "org") or st.path.is_relative_to(PACKAGE_DIR)
+            reader = _read_here if here else read
             try:
                 text = (reader or _read_here)(st.path)
             except (OSError, UnicodeDecodeError) as e:  # a node's checkout across the link that did not answer
@@ -255,11 +270,11 @@ def load(
 
 def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Every flow the org can see on this host (§4.7 `ao org`, §4.9c *What is shown*): the package's
-    built-ins, then each registered checkout's `.agentorc/flows/<name>/`, each `{name, source,
-    usable, problems}` — `source` `package` or the flow's directory. A repo directory that takes a
-    built-in's name is listed with `shadowed` set, as `find` never reads it; a checkout whose
-    `.agentorc.yml` cannot be read is skipped (`with_repos` names it). The org's own directories are
-    TD-313's."""
+    built-ins, then the org's `~/.agentorc/flows/<name>/`, then each registered checkout's
+    `.agentorc/flows/<name>/`, each `{name, source, usable, problems}` — `source` `package` or the
+    flow's directory. A directory that takes a built-in's name, and a repo's that takes an org flow's,
+    is listed with `shadowed` set, as `find` never reads it; a checkout whose `.agentorc.yml` cannot
+    be read is skipped (`with_repos` names it). An org flow is judged against the package's roles."""
     out: list[dict[str, Any]] = []
     package_cfg = repoconfig.load_text(None, PACKAGE_DIR)
     for name in BUILTIN:
@@ -267,6 +282,22 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
         if flow is not None:
             check(flow, package_cfg, overlay)
             out.append({"name": name, "source": "package", "usable": flow.usable, "problems": list(flow.problems)})
+    org = org_dir()
+    try:
+        org_names = (
+            sorted(p.name for p in org.iterdir() if not p.name.startswith(".") and (p / FILE).is_file())
+            if org.is_dir()
+            else []
+        )
+    except OSError:
+        org_names = []
+    for name in org_names:
+        row = {"name": name, "source": str(org / name), "usable": False, "problems": []}
+        if name in BUILTIN:
+            row["shadowed"] = f"not read: {name} is a built-in's name, and the built-in is the flow"
+        elif (flow := load(name, package_cfg, overlay)) is not None:
+            row.update(usable=flow.usable, problems=list(flow.problems))
+        out.append(row)
     for root in roots:
         where = Path(root).expanduser()
         base = where / REPO_DIR
@@ -284,6 +315,8 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
             row: dict[str, Any] = {"name": d.name, "source": str(d), "usable": False, "problems": []}
             if d.name in BUILTIN:
                 row["shadowed"] = f"not read: {d.name} is a built-in's name, and the built-in is the flow"
+            elif d.name in org_names:
+                row["shadowed"] = f"not read: the org's flow {d.name} ({org / d.name}) is the flow"
             elif (flow := load(d.name, cfg, overlay)) is None:  # `_read_here` reads an unreadable file as none
                 row["problems"] = [f"flow {d.name}: its {FILE} could not be read ({d / FILE})"]
             else:
@@ -292,12 +325,24 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
     return out
 
 
-def unfollowable(flow: Flow, staffed: Collection[str], *, techlead: bool, held: Collection[str]) -> list[str]:
+def unfollowable(
+    flow: Flow,
+    staffed: Collection[str],
+    *,
+    techlead: bool,
+    held: Collection[str],
+    team: str = "",
+    node: str = "",
+) -> list[str]:
     """Why a team cannot follow `flow` (§4.9c *Every listed flow must be followable*), in the shared
-    words' middle part, or [] when it can: a member stage whose role the team starts no member of; the
-    review stage when the team has no `techlead:` seat, or when nothing would be held (its repos
-    write no `held:`). `staffed` is the roles the definition's members take."""
+    words' middle part, or [] when it can: an org flow, for a team that runs on the node `node` (its
+    briefs are read there, and the org's directories are the home's, §4.4a); a member stage whose role
+    the team starts no member of; the review stage when the team has no `techlead:` seat, or when
+    nothing would be held (its repos write no `held:`). `staffed` is the roles the definition's
+    members take."""
     out: list[str] = []
+    if node and flow.place == "org":
+        out.append(f"an org flow, and {team} runs on {node} — define it in the repo")
     for st in flow.stages:
         if st.review:
             if not techlead:
