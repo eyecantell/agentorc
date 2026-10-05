@@ -1535,6 +1535,8 @@ class HostAgent(
             raise RpcError(f"{s.name} is interactive: its lane and brief are the person's, never relaunched {rule}")
         if s.superseded_by:
             raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to relaunch {rule}")
+        if s.sit_out or work_mod.sat_out(s):
+            raise RpcError(f"{s.name} is sat out by its team's flow: a create under the name starts it again {rule}")
         address = self._address(s)
         try:
             if not s.supervised:

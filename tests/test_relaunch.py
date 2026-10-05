@@ -146,6 +146,8 @@ async def test_a_sit_out_sends_the_wrap_up_and_the_tick_closes_and_marks_it_once
         assert rec.sends[-1].text == WRAPUP_PROMPT
         again = await person.call("relaunch", id=sid, sit_out=True)  # said twice: nothing more is sent
         assert again["sit_out"] == view["sit_out"] and len(rec.sends) == 1
+        with pytest.raises(AgentError, match="sat out by its team's flow"):  # nor relaunched while it sits out
+            await person.call("relaunch", id=sid, launch={"prompt": "x"})
         # settled with work left: it stays open, tick after tick, with no restart and no mark
         _idle(rec)
         rec.git = {"dirty": 1, "unpushed": 0}
