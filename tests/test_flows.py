@@ -334,6 +334,27 @@ def test_a_node_members_repo_stage_brief_is_read_on_its_checkout(tmp_path):
         repoconfig.resolve_role(cfg, "grinder").compose(read=read, flow=flowdefs.under(mine, "grinder"))
 
 
+@pytest.mark.unit
+def test_an_edit_to_a_stage_brief_is_brief_changed(tmp_path):
+    # TD-309's *Done when*: `{stage}` is a file slot, so rule 7 reads an edit to it as it reads one to
+    # the repo's brief (design §6 rule 7, §4.9c *Briefs*)
+    from sessionorc import brief
+
+    flow_dir = tmp_path / ".agentorc" / "flows" / "mine"
+    flow_dir.mkdir(parents=True)
+    (flow_dir / "flow.yml").write_text("stages:\n  - {name: build, role: grinder, lane: [free-pick], brief: build.md}\n")
+    (flow_dir / "build.md").write_text("build words\n")
+    cfg = repoconfig.load(tmp_path)
+    mine = flowdefs.load("mine", cfg)
+    assert mine is not None and mine.usable, mine.problems
+    _, made = repoconfig.resolve_role(cfg, "grinder").compose(flow=flowdefs.under(mine, "grinder"))
+    was = brief.record(made)
+    assert was is not None and brief.changed(was)[0] == []
+    (flow_dir / "build.md").write_text("other build words\n")
+    assert brief.changed(was)[0] == [str(flow_dir / "build.md")]
+    assert "other build words" in brief.fill(made)[0]
+
+
 def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_path):  # noqa: F811
     # review of TD-309 slice 2a: a node's checkout that does not answer is never a 500 past the form
     root = tmp_path / "agentorc"
@@ -697,6 +718,22 @@ def test_a_team_running_its_flow_reads_no_difference(world, tmp_path, capsys, mo
     assert json.loads(capsys.readouterr().out)["differences"] == []
     assert cli.main(["team", "flow", "ao-grind"]) == 0
     assert "flow changed" not in capsys.readouterr().out
+
+
+def test_a_live_add_under_the_flow_raises_no_flow_changed(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    # TD-309's *Done when*: **Members…** Add starts the member with the current flow's compiled lane,
+    # reader and stage brief (§4.5a *Members dialog*), so the team still reads as running its flow
+    from agentorc import cli, teamrun
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="grinder")
+    (made,) = got["created"]
+    (create,) = [p for m, p in state["calls"] if m == "create"]
+    assert teamrun.stage_of(create["prompt_from"]).endswith("flows/td/build.md")
+    rec = next(s for s in state["sessions"] if s["id"] == made["id"])
+    rec.update(brief={"sources": [{"path": teamrun.stage_of(create["prompt_from"])}]})
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
 
 
 def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_moved(
