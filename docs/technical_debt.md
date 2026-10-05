@@ -146,6 +146,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-316 | `ao host rebuild` replaces a node's container and ends the team sessions inside without a word: refuse, or wind the team down first | Medium | Open |
 | TD-317 | Build the person-only gate: `mail.PERSON_ONLY`, one check opening each of the 25 RPCs, the test that holds list and code together; and move `agent_wake.py`'s passengers to where they belong | Low | Open |
+| TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Open — design-first |
+| TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Open — design-first |
 
 ---
 
@@ -2727,3 +2729,48 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-108 (the design and the split), TD-077 (identity: the gate's strength is the host's mode), TD-057 (the routing tables).
 
+## TD-320: A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-04 (Paul: *we should make live-checks pickable by grinders so they do not have to wait on a promote*; written by the anchor)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — Paul's decision, not yet designed. **Next:** the designer designs it; a build entry follows.
+**Location:** `src/sessionorc/ledger.py` (`lane_matches`, `_word_matches`: `free-pick` matches `Kind: build` or unwritten only, so a live check matches no lane), `src/agentorc/briefs/grinder.md` (*Out of work*: `--kind build`, and the counts that name *live-check* as excluded), `docs/briefs/grinder-ao-1.md` / `grinder-ao-2.md`, `src/sessionorc/promote.py` / `ao promote status` (what is live), design §4.9 lanes, §6 rule 6, §4.9b *The live copy is read, never pressed*, cadence §2.4 (`Kind`, dev-cadence's)
+
+**Why:** a built entry becomes `Kind: live-check` and, by the lane rule, nobody's but the anchor's; nothing tells the anchor to run it after a promote. On 2026-10-04 seven of the ledger's High entries were built and waiting this way (TD-052, TD-103, TD-122, TD-190, TD-201, TD-233, TD-249), with four designed entries (TD-188, TD-230, TD-231, TD-245) blocked behind them, while the grinders correctly found nothing of their own at High. The five the anchor ran that night (PR #1032: TD-122, TD-190, TD-201 and TD-249 archived, TD-233 in part) were each a read a grinder may already make under §4.9b: `ao status -v`, the records' `restarts`, the host agent's journal, the transcripts, a headless GET of a page. A live check still needs its build's commit to be live, which is what it checks; what this removes is the wait on the anchor after the promote.
+
+**Fix:** design it. Paul's shape, with the open points the round settles:
+1. A `Kind: live-check` entry is pickable by a grinder's `free-pick` lane once its build's commit is live: the merged PR named on the entry is an ancestor of the live commit (`ao promote status`). Where the entry does not name its PR, or the commit is not live, it is not pickable (the round decides how the entry names its build: a `**Built:**` line, the Status's PR numbers, or `Blocked by`).
+2. The grinder works under §4.9b's rule for the live copy: it reads, never presses; anything needing a press is made on a scratch home (`scripts/look_home.py`), and a live event that has not happened stays open, as TD-233's projection does.
+3. It records what it read on the entry and archives it with `**Resolved:**`, or opens a new entry for what is wrong.
+4. What stays the anchor's or the person's: a check whose *Done when* is a judgement only Paul can make (a look sent as mail, §4.9b), and one that needs the live home's settings changed.
+5. Whether `auto` promote should be on, so main reaches live without a press, is Paul's, and only shortens the wait this leaves.
+6. The grinder brief's *Out of work* counts and `ledger.py`'s query, and cadence §2.4 if the rule belongs in dev-cadence's reader.
+
+**Done when:** a grinder with nothing else to pick takes a live-check entry whose build is live, records the reading and archives it, with no anchor step between the promote and the archive.
+
+**Related:** TD-190, TD-249, TD-201, TD-122 (the checks of 2026-10-04, PR #1032), TD-233 (a live event left open), TD-297 (the presses and live events of 2026-10-03), TD-228 (pickable derived), TD-132 (the promote policy).
+
+## TD-321: A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-04 (the anchor, from the live check of TD-249; Paul chose to count the work rather than split every slice into its own entry)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — **Next:** the designer settles how a slice's merge is recorded; a build entry follows.
+**Location:** `src/sessionorc/agent_common.py` (`_reported`: a run's `done` is its `progress` entries with status `done`; `_restart_reading`: the third-run `repeat` test on `left`; `_new_done`, `_counted`), `src/sessionorc/agent_tick.py` (`_derive_reports_inner`: a derived entry is refused where the session declared the same reference), design §4.9a *Inside the ceiling* (*Repeated work is the person's at once*), §9 invariant 10
+
+**Why:** grinder-ao-2 ran TD-309 across restarts on 2026-10-04 and 2026-10-05: its run to 01:01:33Z left TD-309 claimed, and its run to 01:36:51Z merged slices 2 (#1025) and 2a (#1027) and again left TD-309, yet that `restarts` entry reads `done: []`. A slice's PR closes no entry, so no `done` progress is declared, and the derived `done` for the PR is likely refused because the run holds a declared claim on the same reference (`models.py` `_note_review` keeps it only as `review_pr`); for #1027, merged 25 seconds before the restart, the derivation's slow cadence may simply not have run, but #1025 merged seven minutes before it. The record therefore sees two runs that did nothing on TD-309, and by `_restart_reading` a third run that leaves TD-309 is a **repeat**, marked early and sent to the person, though each run landed real work. Every entry built *in slices a PR each* (the ledger's usual shape: TD-249 had seven) is exposed. Splitting each slice into its own entry would avoid it but costs numbers, a designer step per slice, and the shared context of slices one grinder holds; Paul chose to count the work.
+
+**Fix:** design it, keeping §4.9a's rule that repeated work is the person's:
+1. A merged PR from the run's branch that names a reference the run holds claimed counts as done work in the run's `done` (a `{ref, pr}` pair, perhaps marked as a slice), whether the session declared it or the tick derived it. The round decides whether `ao progress` gains a declared form (`done <ref> --pr N --slice`) or the derivation is allowed beside a declared claim.
+2. `_new_done` and `_counted` then see the slice as new work, so the run is neither early nor a repeat and its restart does not count toward the ceiling.
+3. A third run that leaves the same reference **with no merged PR** is still a repeat.
+4. Tests: three runs on one entry, each merging a slice, are never marked a repeat; three runs merging nothing are.
+
+**Done when:** a grinder that lands one slice per run across three restarts on one entry is restarted each time without a repeat mark, and a run that merges nothing on its third pass still reaches the person.
+
+**Related:** TD-249 (the restart reading; its live check, PR #1032), TD-245 (the design), TD-309 (the entry it was seen on), TD-297 (the mark's live event).
