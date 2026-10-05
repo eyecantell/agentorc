@@ -1029,9 +1029,10 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   road and nothing to probe. The commit is authored as the tree's git identity, the checkout's,
   which must be one the forge links to an account: the ruleset asks an extra approval of an unattributed change, which nobody can give a PR of their own (TD-264 verifies this on the first live press). The identity is read where the checkout is and handed to the tree's commit, so one an `includeIf "gitdir:…"` gives the checkout's path alone still authors it. A squash merge is a merge: origin moving in between refuses
   nothing unless the board line itself moved, and then the PR is closed, its branch deleted, and
-  the press refused as a moved line is. A squash the forge refuses while origin moved under it and the item still holds — a
+  the press refused as a moved line is. A squash the forge says it did not merge while origin's board changed under it and the item still holds — a
   neighbouring line's change, which git cannot merge beside the edit — closes that PR and deletes its branch, and the press is made
-  once more on origin's new head, inside the same forty seconds; a second refusal is the unreachable one. Cadence §4.6's audit (`check_cadence.py --since`) skips a PR's squash by its `(#n)` subject and
+  once more on origin's new head, inside the same forty seconds; a second refusal is the unreachable one, and so is a refusal the
+  forge cannot be asked about or one while only another file moved. Cadence §4.6's audit (`check_cadence.py --since`) skips a PR's squash by its `(#n)` subject and
   reads it as a merged PR, which fails for want of a review comment: the tool-made board PR is
   dev-cadence's to recognise — by its subject, the fixed message, and its one-file, one-line diff —
   as the board-edit carve-out it is, with §4.5's sentence, on the board for Paul. The person's

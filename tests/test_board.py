@@ -967,3 +967,35 @@ def test_the_trees_commit_is_authored_by_the_identity_the_checkout_resolves(repo
     board.write_back(repo, 7, ITEM, "done")
     assert f"- [x] {ITEM}" in origin_board(repo)
     assert seen and "user.name=Inc" in seen[0] and "user.email=inc@example.com" in seen[0]
+
+
+def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board(repo, monkeypatch, tmp_path):
+    """Review of #1096: the press is made again only on the forge's own word that the PR did not merge
+    **and** a change to origin's board. A forge that cannot be asked, with the add landed and the
+    board moved after it, is the unreachable refusal and never a second line; a merge refused while
+    only another file moved is refused once, with one PR."""
+    import json
+
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge-after-moved")
+    monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
+    with pytest.raises(board.Refused, match="origin could not be reached"):
+        board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    assert origin_board(repo).count("Once only") == 1
+    monkeypatch.delenv("FAKE_GH_VIEW_FAIL")
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge")
+    real, calls = board._land, []
+
+    def land(root, t, want, msg, clock, still):
+        calls.append(msg)
+        other = tmp_path / f"other-{len(calls)}"
+        git(repo, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
+        (other / "other.txt").write_text(f"moved {len(calls)}\n")
+        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "elsewhere")
+        git(other, "push", "-q", "origin", "main")
+        return real(root, t, want, msg, clock, still)
+
+    monkeypatch.setattr(board, "_land", land)
+    with pytest.raises(board.Refused, match="origin could not be reached"):
+        board.write_back(repo, 8, "n/a — undated.", "done")
+    bare = Path(git(repo, "remote", "get-url", "origin"))
+    assert len(calls) == 1 and len(json.loads((bare / "fake-gh.json").read_text())["prs"]) == 2

@@ -418,13 +418,19 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
             # a merge that failed after the forge took it (a timeout, an error on the reply) landed,
             # and a retried add must not write twice: the forge's own word on the PR first, since
             # origin's board may have changed elsewhere in the same moment; origin's board else
-            landed = _pr_merged(t, n)
+            state = _pr_state(t, n)
+            landed = state == "MERGED"
             moved = shifted = False
             with contextlib.suppress(Refused):
                 if not landed and _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
                     landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", str(BOARD)).returncode == 0
                     moved = not landed and not still()
-                    shifted = _git(t, "rev-parse", f"origin/{want}").stdout.strip() != base
+                    # the forge's own word that it did not merge, and origin's board changed under it: never a
+                    # retry on a forge that could not be asked (an add might write twice) or a move elsewhere
+                    shifted = (
+                        state in ("OPEN", "CLOSED")
+                        and _git(t, "diff", "--quiet", base, f"origin/{want}", "--", str(BOARD)).returncode != 0
+                    )
             if not landed:
                 _gh_quiet(t, "pr", "close", str(n))
                 if moved:
@@ -443,11 +449,12 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
     return {"commit": head, "message": msg, "pr": n}
 
 
-def _pr_merged(t: Path, n: int) -> bool:
-    """Whether the forge says pull request `n` is merged; False when it cannot be asked."""
+def _pr_state(t: Path, n: int) -> str | None:
+    """The forge's word on pull request `n` — `OPEN`, `CLOSED` or `MERGED` — or None when it cannot be
+    asked."""
     gh = shutil.which("gh")
     if gh is None:
-        return False
+        return None
     try:
         cp = subprocess.run(
             [gh, "pr", "view", str(n), "--json", "state", "--jq", ".state"],
@@ -458,8 +465,9 @@ def _pr_merged(t: Path, n: int) -> bool:
             check=False,
         )
     except (subprocess.TimeoutExpired, OSError):
-        return False
-    return cp.returncode == 0 and cp.stdout.strip() == "MERGED"
+        return None
+    state = cp.stdout.strip()
+    return state if cp.returncode == 0 and state in ("OPEN", "CLOSED", "MERGED") else None
 
 
 def _git_quiet(t: Path, *args: str) -> None:
