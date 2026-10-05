@@ -118,7 +118,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-258 | Build the manager's mechanical jobs as tick policies: rule 10 the cadence check, rule 11 merged without its read, rule 12 conventions relayed, rule 4's owed clause, rule 6's dropped lease, the two Inbox rows | Medium | Partly done — every slice built; the live look of slice 5's rows is left |
 | TD-259 | Build the manager on call: `on_call` on `manager:`, the `team` trigger with `seat_due.by`, `idle_open` and `seat_filled`, the sweep's seat exception, the card's slot and the Inbox row, the manager brief as a seat's, the first look on dc-grind | Medium | In progress — slices 1–5 built and the default flipped to on call; slice 6, the first look on dc-grind after a promote, is left |
 | TD-262 | A card says *closed by you* for every closed session, whoever closed it: dc-grind's manager wound its own team down 40 s after a start and all three cards named the person | Medium | Designed 2026-10-01 — the build is TD-265 |
-| TD-264 | Build the board write-back on origin's head: the host agent's own tree, the PR it opens and squash-merges, the refusals, and every row actionable | Medium | Open — Paul chose origin's head; the road through the ruleset is steered; dev-cadence's §4.5 change merged (#205); pickable |
+| TD-264 | Build the board write-back on origin's head: the host agent's own tree, the PR it opens and squash-merges, the refusals, and every row actionable | Medium | Built — PR pending; live look pending |
 | TD-265 | Build the closer: `closer` on the record from the close's caller or the tick's rule, the card's and `ao status -v`'s words, the declaration after the ending, the team card's who / how soon / why, and the Start's lane line with its Start anyway / Cancel confirm | Medium | Built (#919, #922, #923, #926): live look pending |
 | TD-269 | The New session form's Team pick ticks no controller when the team's manager is on call: the picker lists live control holders only, and a manager on call is closed | Medium | Designed 2026-10-02 — the picker lists a seat on call by its id, the Team pick ticks it, the empty note names a team start; the build is TD-276 |
 | TD-276 | Build the on-call controller: the New session form and `ao new --team` list and tick a seat on call holding `control` by its id, and the empty note's new words | Medium | Built (#914); live look pending |
@@ -148,6 +148,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-317 | Build the person-only gate: `mail.PERSON_ONLY`, one check opening each of the 25 RPCs, the test that holds list and code together; and move `agent_wake.py`'s passengers to where they belong | Low | Open |
 | TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Open — design-first |
 | TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Open — design-first |
+| TD-322 | The pull's note quotes git's last stderr line, which for a failed fetch can be *and the repository exists.* | Low | Open |
 
 ---
 
@@ -2206,7 +2207,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-01 (the designer, TD-222's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — **2026-10-04 (the anchor):** nothing blocks it now: the cadence §4.5 change it waited on is dev-cadence's TD-083, handed there on Paul's word 2026-10-03 and merged the same day (eyecantell/dev-cadence#205). Paul chose origin's head (2026-10-01, the steer named in TD-222); the same night the anchor found a direct push to `main` refused by the repo's ruleset, so the commit lands by a PR the host agent opens and squash-merges at once (§4.4; the second steer named in TD-222 — a reply choosing a ruleset bypass reshapes step (2) before TD-222's PR merges); waits on that steer's bound and on the dev-cadence change to cadence §4.5 and to §4.6's audit (which skips a PR's squash and would fail a board PR for want of a review), on the board
+**Status:** Built 2026-10-04 (grinder-ao-1, PR pending): `board.py` makes every edit and both adds in `~/.agentorc/boards/<repo>/tree` at `origin/<default>`'s head and lands it by a PR the host agent opens and squash-merges (`_tree`, `_land`, the forty-second `_Clock`); the refusals in §4.4's words; the page's rows read from origin are live and the read after a press fetches; tests on a bare origin with a fake `gh` (`tests/_fake_gh.py`, the `forge` fixture); seen on a scratch home (the PR's UI check). **Left:** (a) the first live press — the *Done when* — checks that the forge attributes the squash to the tree's git identity and the ruleset asks no extra approval: a look to Paul after the merge; (b) a stopped fetching read after a press draws the checkout's line rather than the write-back's result (§4.5 screen 6 (3)).
 **Location:** `src/sessionorc/board.py` (`ready`, `_write_back`, `add`, the `_EDIT` lock; the tree: `promote.make_tree` and `drop_tree` as the pattern), `src/sessionorc/agent.py` (`rpc_board_edit`, `rpc_board_reply`), `src/agentorc/ui/` (the Inbox and Repo page rows: the disabled state goes; the read after a press), design §4.4 *Board write-back*, §4.5 screen 6, §4.5a *origin note*, *Reply*, *Decide*
 
 **Why:** design §4.4 *Board write-back* (TD-222): a commit made in the person's checkout sits there until the anchor pushes, so every press leaves the checkout ahead of origin, the next merged board change makes the two differ both ways, and a row the page read from origin cannot be acted on at all (TD-208). On origin's head the edit is where every host reads it, and the checkout is only ever behind, which TD-263's pull cures.
@@ -2774,3 +2775,18 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a grinder that lands one slice per run across three restarts on one entry is restarted each time without a repeat mark, and a run that merges nothing on its third pass still reaches the person.
 
 **Related:** TD-249 (the restart reading; its live check, PR #1032), TD-245 (the design), TD-309 (the entry it was seen on), TD-297 (the mark's live event).
+## TD-322: The pull's note quotes git's last stderr line, which for a failed fetch can be *and the repository exists.*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-1, the scratch home of TD-264's UI check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/promote.py` (`_git`: `(cp.stderr …).splitlines()[-1]`), the pull's reading (`pull`, `fetch_why`), the Inbox's *behind* note tail (§4.5 screen 6, §6 *Pull*)
+
+**Why:** on a scratch home whose fixture repo had no origin when the home's pull first ran, the board's origin note read *read from origin/main: this checkout has not pulled it yet — it could not be pulled: git fetch: and the repository exists.* — git's fetch error is several lines (*'origin' does not appear to be a git repository … Please make sure you have the correct access rights and the repository exists.*), and `promote._git` keeps the last, which says nothing about what went wrong.
+
+**Fix:** keep git's first `fatal:`/`error:` line (as `_git_why` in the same module already does), not the last; a test with a remote that does not exist.
+
+**Related:** TD-263 (the pull), TD-264 (where it was seen).
