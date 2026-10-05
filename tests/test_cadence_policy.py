@@ -98,11 +98,16 @@ class _Gh:
     """What `gh` and the script would say, and what was asked of them."""
 
     def __init__(self, monkeypatch):
-        self.heads: dict[int, tuple[str, bool] | None] = {}
+        self.heads: dict[int, tuple[str, str] | None] = {}
         self.verdicts: dict[int, dict | None] = {}
         self.ran: list[int] = []
-        monkeypatch.setattr(cadence, "head", lambda root, pr, **kw: self.heads.get(pr))
+        self.asked: list[int] = []
+        monkeypatch.setattr(cadence, "head", self._head)
         monkeypatch.setattr(cadence, "check", self._check)
+
+    def _head(self, root, pr, **kw):
+        self.asked.append(pr)
+        return self.heads.get(pr)
 
     def _check(self, root, pr, **kw):
         self.ran.append(pr)
@@ -155,7 +160,7 @@ async def test_a_pass_writes_the_entry_and_nothing_else(agent, composerstubs, tm
         _done(rec, "TD-257", 842)
         await agent._cadence_pass([rec])
         assert rec.checks == [] and gh.ran == [], "gh gave no head: no reading"
-        gh.heads[842], gh.verdicts[842] = ("aaa", False), None
+        gh.heads[842], gh.verdicts[842] = ("aaa", "open"), None
         await agent._cadence_pass([rec])
         assert rec.checks == [] and gh.ran == [842], "the script gave no reading (exit 2): no entry"
         gh.verdicts[842] = PASS
@@ -165,10 +170,10 @@ async def test_a_pass_writes_the_entry_and_nothing_else(agent, composerstubs, tm
         assert "told" not in c and "row" not in c and "merged" not in c
         await agent._cadence_pass([rec])
         assert gh.ran == [842, 842], "read at that head already: the script is not run again"
-        gh.heads[842] = ("bbb", False)
+        gh.heads[842] = ("bbb", "open")
         await agent._cadence_pass([rec])
         assert gh.ran == [842, 842, 842] and rec.checks[0]["sha"] == "bbb", "the head moved: read again"
-        gh.heads[842] = ("bbb", True)
+        gh.heads[842] = ("bbb", "merged")
         await agent._cadence_pass([rec])
         assert rec.checks[0]["merged"] is True
         gh.heads[842] = None  # a merged PR's settled read asks nothing more, not even its head
@@ -187,7 +192,7 @@ async def test_a_fail_types_the_line_once_and_a_second_fail_marks_the_row(agent,
         rec = await _member(agent, person, tmp_path, root)
         await agent.rpc_hook(rec.id, state="idle")
         _done(rec, "TD-257", 842)
-        gh.heads[842], gh.verdicts[842] = ("aaa", False), FAIL
+        gh.heads[842], gh.verdicts[842] = ("aaa", "open"), FAIL
         await agent._cadence_pass([rec])
         await agent._keep_running(now)
         lines = await _submitted(agent, rec.id)
@@ -203,13 +208,13 @@ async def test_a_fail_types_the_line_once_and_a_second_fail_marks_the_row(agent,
         assert rec.checks[0]["row"] and gh.ran == [842, 842]
         await agent._keep_running(now)
         assert len(await _submitted(agent, rec.id)) == 1, "the second fail is the row's, not another line"
-        gh.verdicts[842], gh.heads[842] = UNKNOWN, ("bbb", False)
+        gh.verdicts[842], gh.heads[842] = UNKNOWN, ("bbb", "open")
         await agent._cadence_pass([rec])
         await agent._cadence_pass([rec])
         assert gh.ran == [842] * 4 and rec.checks[0]["row"], "an unknown is read again each cadence, no mark moved"
         await agent._keep_running(now)
         assert len(await _submitted(agent, rec.id)) == 1, "and nothing is told"
-        gh.verdicts[842], gh.heads[842] = PASS, ("ccc", False)
+        gh.verdicts[842], gh.heads[842] = PASS, ("ccc", "open")
         await agent._cadence_pass([rec])
         assert "row" not in rec.checks[0] and rec.checks[0]["verdict"] == "pass", "a later pass removes the row"
         # a derived `done` is written anew at every derivation: its date is no new report
@@ -230,7 +235,7 @@ async def test_a_merged_fail_marks_the_row_at_once_and_one_pr_is_read_a_run(
         await agent.rpc_hook(rec.id, state="idle")
         _done(rec, "TD-257", 842)
         _done(rec, "TD-258", 843)
-        gh.heads = {842: ("aaa", True), 843: ("bbb", False)}
+        gh.heads = {842: ("aaa", "merged"), 843: ("bbb", "open")}
         gh.verdicts = {842: FAIL, 843: PASS}
         await agent._cadence_pass([rec])
         assert gh.ran == [842] and [c["pr"] for c in rec.checks] == [842], "one PR per run"
@@ -252,7 +257,7 @@ async def test_who_is_read_and_who_is_told(agent, composerstubs, tmp_path, monke
     bare = tmp_path / "bare"
     bare.mkdir()
     agent._repos[str(bare)] = {}
-    gh.heads[842], gh.verdicts[842] = ("aaa", False), FAIL
+    gh.heads[842], gh.verdicts[842] = ("aaa", "open"), FAIL
     async with LocalClient() as person:
         unread = {
             "noscript": {"repo": str(bare)},
@@ -328,7 +333,7 @@ async def test_dismiss_takes_the_row_off_and_its_snooze_with_it(agent, tmp_path,
     agent.sessions[rec.id] = rec
     _done(rec, "TD-257", 842)
     _done(rec, "TD-258", 843)
-    gh.heads = {842: ("aaa", True), 843: ("bbb", True)}
+    gh.heads = {842: ("aaa", "merged"), 843: ("bbb", "merged")}
     gh.verdicts = {842: FAIL, 843: FAIL}
     await agent._cadence_pass([rec])
     await agent._cadence_pass([rec])
@@ -395,3 +400,49 @@ def test_the_cadence_clause_rides_the_unread_line_or_stands_alone(capsys):
     cli.unread_line(args)
     assert capsys.readouterr().out == f"[agentorc] ({over}; {fails}) — finish the entry in hand, then declare\n"
     clientmod.last_mail = None
+
+
+def test_head_from_reads_the_repo_readings_open_and_recent_prs():
+    reading = {
+        "open": [{"number": 842, "head": "aaa", "state": "open"}, {"number": 9, "head": "", "state": "open"}],
+        "recent": [
+            {"number": 843, "head": "bbb", "state": "closed"},
+            {"number": 844, "head": "ccc", "state": "merged"},
+        ],
+    }
+    assert cadence.head_from(reading, 842) == ("aaa", "open")
+    assert cadence.head_from(reading, 843) == ("bbb", "closed") and cadence.head_from(reading, 844) == ("ccc", "merged")
+    assert cadence.head_from(reading, 9) is None, "a reading written before it kept heads: gh is asked"
+    assert cadence.head_from(reading, 1) is None and cadence.head_from({"error": "x"}, 842) is None
+    assert cadence.settled({"closed": True}) and cadence.settled({"merged": True}) and not cadence.settled({})
+
+
+@pytest.mark.integration
+async def test_a_closed_pr_settles_and_an_open_ones_head_comes_from_the_repo_reading(
+    agent, composerstubs, tmp_path, monkeypatch
+):
+    """TD-332: a PR closed unmerged is marked settled, as a merged one is, and its head is not asked
+    for again; an open PR's head is read from the repo's PR reading, `gh` asked only for one the
+    reading lacks."""
+    await park_ticks(agent)
+    gh, root = _Gh(monkeypatch), _root(agent, tmp_path)
+    async with LocalClient() as person:
+        rec = await _member(agent, person, tmp_path, root)
+        _done(rec, "TD-257", 842)
+        gh.heads[842], gh.verdicts[842] = ("aaa", "open"), FAIL
+        await agent._cadence_pass([rec])
+        assert gh.asked == [842] and gh.ran == [842]
+        gh.heads[842] = ("aaa", "closed")  # closed at the head it was read at: settled, not read again
+        await agent._cadence_pass([rec])
+        assert rec.checks[0]["closed"] is True and gh.ran == [842] and gh.asked == [842, 842]
+        await agent._cadence_pass([rec])
+        assert gh.asked == [842, 842], "a closed PR's settled read asks nothing more, not even its head"
+        # an open PR the repo reading holds: its head is read there, and gh is not asked
+        _done(rec, "TD-258", 843)
+        agent._repos[root] = {"prs": {"open": [{"number": 843, "head": "ddd", "state": "open"}], "recent": []}}
+        gh.verdicts[843] = PASS
+        await agent._cadence_pass([rec])
+        await agent._cadence_pass([rec])
+        assert gh.asked == [842, 842] and gh.ran == [842, 843]
+        assert cadence.entry_of(rec.checks, 843)["sha"] == "ddd"
+        await person.call("kill", id=rec.id)

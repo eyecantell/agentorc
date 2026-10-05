@@ -8469,9 +8469,12 @@ code and needs no grant; a session doing the same work does.
      or a root without the script — a repo not on dev-cadence — gives no reading), one PR per
      run; its exit of 2 (no such PR) ends the reading, and an `unknown` verdict is kept and read
      again on the next cadence, nothing told. The entry keeps the head it was read at, so a PR
-     whose head moved is read again: the head and whether the PR is merged are one `gh pr view`
-     before the script, and a head `gh` cannot give is no reading. A merged PR's head no longer
-     moves, so its entry carries `merged` and a settled read of it stands with nothing asked,
+     whose head moved is read again: the head and the PR's state are read from the repo's PR reading
+     (§4.4 *Repo facts*: its open PRs and those it saw close, each with its head), so a PR is asked
+     no more often than that reading reads it, and only a PR the reading lacks is one `gh pr view`
+     before the script; a head neither can give is no reading. A merged PR's head no longer
+     moves, and nor does one closed unmerged, so its entry carries `merged` or `closed` (a PR found
+     closed at the head it was read at is marked so with no second run) and a settled read of it stands with nothing asked,
      until the member's own new `done` names the PR (a derived entry is written anew at every
      derivation, so its date is no report). Of the PRs waiting, the one longest unread is looked at first.
      A pass takes `told` away with `row`, so a fail after it is a first fail again. **`pass`** writes the entry and nothing else. **`fail`**

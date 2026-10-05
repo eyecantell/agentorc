@@ -268,7 +268,7 @@ def _when(v: Any) -> datetime | None:
         return None
 
 
-PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft"
+PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft"
 
 
 def _gh_prs(directory: Path | str, args: list[str], timeout: float) -> list[dict[str, Any]] | str:
@@ -300,6 +300,7 @@ def _gh_prs(directory: Path | str, args: list[str], timeout: float) -> list[dict
                 "url": str(p.get("url") or ""),
                 "state": str(p.get("state") or "").lower(),  # open · closed · merged
                 "branch": str(p.get("headRefName") or ""),
+                "head": str(p.get("headRefOid") or ""),  # rule 10 reads an open PR's head here (TD-332)
                 "author": str(author.get("login") or "") if isinstance(author, dict) else "",
                 "draft": bool(p.get("isDraft")),
                 "created": p.get("createdAt") or None,

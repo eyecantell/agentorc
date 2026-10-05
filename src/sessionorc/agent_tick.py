@@ -983,8 +983,8 @@ class TickMixin:
                         dones[e.pr] = max(dones.get(e.pr, ""), e.at if e.source == "declared" else "")
                 for pr, done_at in dones.items():
                     old = cadence_mod.entry_of(s.checks, pr)
-                    if old and old.get("merged") and not cadence_mod.stale(old, done_at):
-                        continue  # a merged PR's head no longer moves: the read stands
+                    if cadence_mod.settled(old) and not cadence_mod.stale(old, done_at):
+                        continue  # a merged or closed PR's head no longer moves: the read stands
                     due.append((str((old or {}).get("at") or ""), s, pr, done_at))
             due.sort(key=lambda d: (d[0], d[2]))
             scripted: dict[str, bool] = {}
@@ -994,23 +994,28 @@ class TickMixin:
                     scripted[root] = await asyncio.to_thread(cadence_mod.has_script, root)
                 if not scripted[root]:
                     continue
-                head = await asyncio.to_thread(cadence_mod.head, root, pr)
+                # the repo reading's head first (TD-332): `gh` is asked only for a PR that reading lacks
+                head = cadence_mod.head_from((self._repos.get(root) or {}).get("prs"), pr)
+                if head is None:
+                    head = await asyncio.to_thread(cadence_mod.head, root, pr)
                 if head is None:
                     continue
-                sha, merged = head
+                sha, state = head
+                merged, closed = state == "merged", state == "closed"
                 old = cadence_mod.entry_of(s.checks, pr)
-                if (
-                    old
-                    and not cadence_mod.stale(old, done_at)
-                    and old.get("sha") == sha
-                    and bool(old.get("merged")) == merged
-                ):
-                    continue
+                if old and not cadence_mod.stale(old, done_at) and old.get("sha") == sha:
+                    if bool(old.get("merged")) == merged and bool(old.get("closed")) == closed:
+                        continue
+                    if closed and not old.get("merged"):
+                        # closed unmerged at the head it was read at: the read stands, settled
+                        old["closed"] = True
+                        self._save(s)
+                        continue
                 got = await asyncio.to_thread(cadence_mod.check, root, pr)
                 if got is None or not self._is_record(s) or not self._cadence_member(s):
                     continue
                 old = cadence_mod.entry_of(s.checks, pr)
-                new = cadence_mod.record(old, pr, sha, merged, got, now_iso())
+                new = cadence_mod.record(old, pr, sha, merged, got, now_iso(), closed=closed)
                 s.checks = [*(c for c in s.checks if c.get("pr") != pr), new]
                 log.info("%s: PR #%s read by the cadence check: %s", self._address(s), pr, cadence_mod.said(new))
                 self._save(s)

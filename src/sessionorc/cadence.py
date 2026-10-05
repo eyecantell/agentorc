@@ -26,9 +26,13 @@ def has_script(root: Path | str) -> bool:
     return (Path(root) / SCRIPT).is_file()
 
 
-def head(root: Path | str, pr: int, timeout: float = 20.0) -> tuple[str, bool] | None:
-    """The PR's head commit and whether it is merged, or None when `gh` could not say (no such PR,
-    no network): an entry keeps the head it was read at, so a PR whose head moved is read again."""
+STATES = ("open", "merged", "closed")
+
+
+def head(root: Path | str, pr: int, timeout: float = 20.0) -> tuple[str, str] | None:
+    """The PR's head commit and its state — `open`, `merged` or `closed` — or None when `gh` could not
+    say (no such PR, no network): an entry keeps the head it was read at, so a PR whose head moved is
+    read again."""
     try:
         cp = subprocess.run(
             ["gh", "pr", "view", str(pr), "--json", "headRefOid,state"],
@@ -43,9 +47,30 @@ def head(root: Path | str, pr: int, timeout: float = 20.0) -> tuple[str, bool] |
     except json.JSONDecodeError:
         return None
     sha = out.get("headRefOid") if isinstance(out, dict) else None
-    if not isinstance(sha, str) or not sha:
+    state = str(out.get("state") or "").lower() if isinstance(out, dict) else ""
+    if not isinstance(sha, str) or not sha or state not in STATES:
         return None
-    return sha, out.get("state") == "MERGED"
+    return sha, state
+
+
+def head_from(reading: Any, pr: int) -> tuple[str, str] | None:
+    """The PR's head and state from the repo's PR reading (`reports.pr_reading`, kept by the home's
+    repo pass): its open PRs and every PR it saw close in the month — so a PR is asked of `gh` no
+    more often than that reading reads it (TD-332). None for a reading that failed, or one that does
+    not hold the PR or its head (a reading older than the PR, or written before it kept heads)."""
+    if not isinstance(reading, dict) or "error" in reading:
+        return None
+    for row in (*(reading.get("open") or []), *(reading.get("recent") or [])):
+        if isinstance(row, dict) and row.get("number") == pr:
+            sha, state = str(row.get("head") or ""), str(row.get("state") or "")
+            return (sha, state) if sha and state in STATES else None
+    return None
+
+
+def settled(old: dict[str, Any] | None) -> bool:
+    """Whether an entry's PR no longer moves — merged, or closed unmerged — so its read stands until a
+    new `done` names the PR (TD-332: a closed one was asked for its head on every pass)."""
+    return bool(old and (old.get("merged") or old.get("closed")))
 
 
 def check(root: Path | str, pr: int, timeout: float = 120.0) -> dict[str, Any] | None:
@@ -91,8 +116,11 @@ def stale(old: dict[str, Any] | None, done_at: str) -> bool:
     return old is None or old.get("verdict") == "unknown" or done_at > str(old.get("at") or "")
 
 
-def record(old: dict[str, Any] | None, pr: int, sha: str, merged: bool, got: dict[str, Any], at: str) -> dict[str, Any]:
-    """The entry one read leaves: `{pr, at, sha, verdict, failed}`, `merged` once the PR is, and
+def record(
+    old: dict[str, Any] | None, pr: int, sha: str, merged: bool, got: dict[str, Any], at: str, *, closed: bool = False
+) -> dict[str, Any]:
+    """The entry one read leaves: `{pr, at, sha, verdict, failed}`, `merged` once the PR is (`closed`
+    once it is closed unmerged), and
     the marks. **`pass`** removes `row` and `told`. **`fail`** on a merged PR — which no re-report
     cures — or read again after the member was told (`told`, whatever was read in between but a
     pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark.
@@ -100,6 +128,8 @@ def record(old: dict[str, Any] | None, pr: int, sha: str, merged: bool, got: dic
     new: dict[str, Any] = {"pr": pr, "at": at, "sha": sha, "verdict": got["verdict"], "failed": list(got["failed"])}
     if merged:
         new["merged"] = True
+    elif closed:
+        new["closed"] = True
     for key in ("told", "row", "read_by"):
         if old and old.get(key):
             new[key] = old[key]

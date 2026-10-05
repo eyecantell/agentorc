@@ -4651,3 +4651,23 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Resolved:** 2026-10-05 (PR #1100) — `teams._launch` refuses a profile whose adapter is `profiles.SHELL_ADAPTER` for any team session, and `Launch.create_params` sends the profile's adapter; design §4.9 *Starting and stopping*; tests in `tests/test_cli_teams.py`.
 
 **Done when:** a team start never records a profile whose adapter differs from the session's.
+
+## TD-332: A PR whose cadence read is settled but not merged is read again with `gh pr view` every pass
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-2, carried out of TD-258 when its live check held; from the review of PR #868)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_cadence_pass`), `src/sessionorc/cadence.py` (`head`, `stale`)
+
+**Why:** rule 10 asks `gh pr view` for an open PR's head on every pass while a `done` names it, to see whether the head moved, even when its last read is settled. A PR closed unmerged is asked for the record's whole life, because only a merged PR's read stands. At the team's scale it is a handful of calls every five minutes; it would show up on a repo with many open PRs or long-lived records.
+
+**Fix:** mark a closed PR settled, as a merged one is (`head` already reads `state`), and if the open ones' calls show up, read heads from the repo's `gh pr list` reading (`_refresh_repos`) instead of one view each.
+
+**Done when:** a closed PR's head is not asked for again, and an open one's is asked no more often than the repo reading reads it.
+
+**Related:** TD-258 (rule 10's build), TD-176 (the repo reading).
+
+**Resolved:** 2026-10-05 (PR #PRNUM) — the repo's PR reading keeps each PR's head (`reports.PR_FIELDS` gains `headRefOid`, the row's `head`) and rule 10 reads head and state there first (`cadence.head_from`), asking `gh pr view` only for a PR the reading lacks; a closed PR's entry carries `closed` and is settled as a merged one is (`cadence.settled`), one found closed at the head it was read at marked without a second run; `tests/test_cadence_policy.py`; design §6 rule 10.
