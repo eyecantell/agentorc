@@ -162,6 +162,51 @@ def test_flows_on_a_team_is_a_list_of_names_each_once(tmp_path):
         orgmod._team("t", {"projects": ["p"], "flows": "td"}, "teams.t", source=tmp_path)
 
 
+@pytest.mark.unit
+def test_an_org_flow_is_found_over_a_repos_and_never_over_a_built_in(tmp_path, monkeypatch):
+    # §4.9c *Where flows and roles live* (TD-313): the org's `~/.agentorc/flows/<name>/` over a
+    # repo's, whole; a directory taking a built-in's name is never read, in either place
+    home = tmp_path / "home"
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    hunt = [{"name": "find", "role": "hunter", "lane": ["free"], "brief": "find.md"}]
+    repo_flow(tmp_path / "r", "hunt", hunt, {"find.md": "the repo's find words\n"})
+    assert flowdefs.find("hunt", tmp_path / "r").place == "repo"
+    org_flow = flowdefs.org_dir() / "hunt"
+    assert org_flow == home / "flows" / "hunt"
+    org_flow.mkdir(parents=True)
+    (org_flow / "flow.yml").write_text(yaml.safe_dump({"stages": hunt}))
+    (org_flow / "find.md").write_text("the org's find words\n")
+    got = flowdefs.load("hunt", cfg_with(tmp_path / "r"))
+    assert got.place == "org" and got.dir == org_flow and got.usable, got.problems
+    assert got.stages[0].path == org_flow / "find.md"
+    # without a repo too: an org flow is every team's
+    assert flowdefs.find("hunt").place == "org"
+    (flowdefs.org_dir() / "td").mkdir()
+    (flowdefs.org_dir() / "td" / "flow.yml").write_text("stages: []\n")
+    assert flowdefs.find("td").place == "package"
+    rows = {(r["name"], r["source"]): r for r in flowdefs.visible([tmp_path / "r"])}
+    assert rows[("hunt", str(org_flow))]["usable"]
+    assert "the org's flow hunt" in rows[("hunt", str(tmp_path / "r" / ".agentorc" / "flows" / "hunt"))]["shadowed"]
+    assert "built-in's name" in rows[("td", str(flowdefs.org_dir() / "td"))]["shadowed"]
+
+
+@pytest.mark.unit
+def test_an_org_flow_cannot_be_followed_by_a_team_on_a_node(tmp_path, monkeypatch):
+    # §4.9c: a node team's briefs are read on the node, and the org's directories are the home's
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    d = flowdefs.org_dir() / "hunt"
+    d.mkdir(parents=True)
+    (d / "flow.yml").write_text("stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n")
+    (d / "find.md").write_text("find\n")
+    hunt = flowdefs.load("hunt", cfg_with(tmp_path))
+    assert flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind") == []
+    why = flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind", node="contractmatch")
+    assert flowdefs.cannot_follow("hunt", "cm-grind", why) == (
+        "hunt cannot be followed by cm-grind: an org flow, and cm-grind runs on contractmatch — define it in "
+        "the repo, or drop hunt from flows:"
+    )
+
+
 def _with(tmp_path: Path, **team) -> orgmod.Org:
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
     doc["teams"]["ao-grind"].update(team)
