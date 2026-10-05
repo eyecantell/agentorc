@@ -304,3 +304,21 @@ async def test_a_repo_over_the_teams_balance_line_holds_the_start_as_the_fifth_b
     monkeypatch.setattr(seat, "prs_waiting", lambda home=None: {"n": 1, "oldest": waited})
     got = await held({"review": True})
     assert got["why"] == "balance" and got["crossed"][0]["line"] == "review" and replays.calls == []
+
+
+async def test_a_member_its_flow_sat_out_is_not_replayed_by_a_start(agent, tmp_path, monkeypatch):
+    """§4.9c *Switching*, the techlead's read of #1101: a sat-out member did not end by the team's own
+    ending, so a start by rule 8 passes over it — not replayed and not counted in `of` — though the
+    team reads wound down with it."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    sat = {"why": "sit_out", "closed_at": "2026-10-05T07:00:00Z"}
+    later = await _settled(
+        agent, tmp_path,
+        _rec("grinder-ao-1"),
+        _rec("designer-ao", out_of_work=None, closed_for=sat, sit_out={"at": "2026-10-05T06:00:00Z"}),
+    )  # fmt: skip
+    await agent._work_marks(later)
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1"] and replays.calls[0][2]["of"] == 1

@@ -1548,7 +1548,8 @@ class TickMixin:
     def _work_replays(self, records: list[Session], now: datetime) -> list[Session]:
         """What a start by rule 8 replays: the team's crew records that ended — the wound-down reading
         has every one that is not a seat declared — seats included, none superseded, suspended, at
-        its ceiling or without a launch record (no launch record, no start: the rule never invents a
+        its ceiling, sat out by the team's flow (§4.9c: not started until a flow that uses it returns)
+        or without a launch record (no launch record, no start: the rule never invents a
         team). A seat's `fill` entries are not counted toward `RESTART_CEILING`, as rule 3 never counts
         them (the techlead's read of #792). The records other ones name as a controller come first, so
         the lead is up before its members, as a person's start makes it."""
@@ -1556,6 +1557,8 @@ class TickMixin:
         for r in work_mod.crew(records):
             if r.state not in work_mod.DEAD or r.superseded_by or r.suspended or r.restart_ceiling:
                 continue
+            if work_mod.sat_out(r):
+                continue  # it did not end by the team's own ending: its flow sat it out (§4.9c)
             recent = agent_common._counted(r.restarts, now, fills=False)
             if len(recent) >= RESTART_CEILING:
                 continue

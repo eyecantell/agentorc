@@ -6114,8 +6114,9 @@ edit anywhere:
   machinery writes `closed_for: {why: flow}` with a `restarts` entry and is retried by
   `_closed_by_tick` until its replay lands, and the sit-out writes no `restarts` entry and is never
   retried, so the two are never read for each other — a relaunch whose close or replay failed is read
-  by rules 8 and 9 as any failed tick restart is, not as sat out. Between the press and that close
-  the record carries **`sit_out: {at}`** (home-owned; gone at the next create, as `relaunch` is): the
+  by rules 8 and 9 as any failed tick restart is, not as sat out. From the press on
+  the record carries **`sit_out: {at}`** (home-owned; it stands after the mark, until the next create, as `relaunch` does — so a
+  person's Close of a sat-out record, which clears `closed_for`, is marked again on the next tick): the
   tick closes it with rule 9's own close — `idle`, its git fields known and showing nothing
   uncommitted or unpushed, a node's only while its link is up — with the closer's word `sit_out`,
   and then marks it; one left with work stays open, the Inbox row it is after any wrap-up, until its
@@ -8223,7 +8224,7 @@ code and needs no grant; a session doing the same work does.
      `slots` name `{repo}`), any placeholder of `base` (lower-case letters alone between `{` and `}`)
      the record's `slots` do not name is filled from the file beside `base` named `<base's
      stem>.<slot>.md` where there is one, else `none`, so a template that gains a slot never replays
-     it literally (§4.9c item 5); and, once TD-309 builds the switch, a record carrying **`relaunch: {at}`** (§4.9c *Switching*) is
+     it literally (§4.9c item 5); and a record carrying **`relaunch: {at}`** (§4.9c *Switching*; built — TD-309 slice 5a) is
      restarted under this rule's conditions as one carrying `brief_changed` is; the host agent knows a file and a slot and no role, template or team, and
      still never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a
