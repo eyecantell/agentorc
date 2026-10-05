@@ -92,9 +92,23 @@ not mix:
   A team may contain teams. — *proposed* (ADR 2026-09-13).
 - **project** — a named set of one or more repos that belong together. — *proposed* (ADR
   2026-09-13).
+- **flow** — the path a team's work takes through its roles, and the words that describe it, defined
+  once and reused by every team that lists it: an ordered list of **stages**, each a role, the lane
+  it gives and its **stage brief** (the built-in `td`: design → build → review, then the person, who
+  is no stage). A team lists the flows it may run; which one it runs now is a setting the person
+  turns, and a switch applies itself. Per team, never per entry; nothing keys on it at runtime.
+  *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; design §4.9c, TD-307).
+- **stage** — one step of a flow: a role, the lane it gives that role's members, and the stage brief
+  that tells them the path from that step's side; a team that lists a flow staffs every stage of it.
+  A stage is not a phase (*design · grind · review*, derived from claims) and not a state. —
+  *proposed* 2026-10-04 (design §4.9c).
+- **sits out** — what a member is while its team's current flow has no stage for its role but another
+  of the team's flows does: not started, or wound down at a switch, its card saying so until a flow
+  that uses it is current again. — *proposed* 2026-10-04 (design §4.9c).
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
-  profile. Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `manager`,
-  `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; neither old name resolves, TD-107). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
+  profile, and a **kind** (`worker`, `seat`, `manager`, `plain`) — the one fact a flow asks of it
+  (design §4.9c, TD-307). Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `designer`, `techlead`, `auditor`, `manager`,
+  `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; neither old name resolves, TD-107). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
 - **look** — a message to the person that names screenshots: a builder's question about a
   merged change to a page, for the one thing its checks and the techlead could not settle. A
   `steer` with the default *Works* where the techlead leaned (under *Steering*; it lapses to

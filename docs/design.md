@@ -2853,7 +2853,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). **Each matched word is marked** in the rows it shows — the text, its *details* and its replies — as a highlight that reads in both themes, the marks going with the find (TD-280; text only, nothing built from a row's words). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
 | Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; built 2026-09-25 — TD-136): one mail entry whole, reached from the row's text and its *whole entry ›* link, and from `Enter` on the ringed row (a trail row's *re* is not a link yet). **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
 | Settings page | **Usage**: a reserve field per profile per window, **Save** per profile card | §4.5 screen 8 (TD-100 (4); built — TD-148). Each field takes what `ao gate` takes — `30`, `10/day`, empty to clear — and shows the line it makes today beside it before the press lands; **Save** calls `set_settings {profile, reserves}` for that card, the person's alone, and the card says *applies on the next tick*. A label the adapter has not reported is refused with the reported ones named, in place, as the CLI does. Cards are grouped under their account as the chip is (TD-122); a profile absent from the file shows empty fields, not zeros. A **metered** profile's card (§4.2a; TD-128, reconciled 2026-09-25; built — TD-151 slice 5) carries the same fields for `day`, `week` and `month` — the home's labels — each taking an **amount** as `ao gate` does (`$5`, `20M tok`, empty to clear) and refusing a percent by naming the billing, with the account's spend beside it as the chip draws it, *spent $3.20 · 64% · resets 00:00*; its badge reads *account <account> · <tool> · metered · $3 in / $15 out per M*, a priceless profile's *· metered · tokens*, and its foot names `profiles.yml`, by hand, with **Open file**, as a definition's card does. Cards on one metered account share the spend and keep their own amounts, as subscription cards share a reading and keep their own reserves. **The reading's age** (TD-230; built — TD-233 slices 1 and 4): beside each window's reading on a profile's card, under its line, its age and source as the chip's hover gives them — *58% · read 7m ago, asked of the endpoint*, *unknown since 22:21 (was 88%)* past three hours or the window's reset — and, after the line, what the gate reads when the reading is past `max_age` while unattended sessions work, *→ line 95% · projected 96%*, or *· no rate to project by*; and one field above the accounts' cards, since the setting is one for every account, **trust a reading for** (`usage.max_age`: an age such as `90m`, `off` to never project, empty for the default `1h`), written through `set_settings` and refused in place out of its bounds |
-| Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **when work appears**, **balance**, **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **balance** (TD-177; designed 2026-09-29, built 2026-09-30 — TD-239 slice 4) is a switch and three fields — *open PRs above* `n`, *oldest open longer than* `d`, *the reader's queue past its bound* (a tick box) — written to `teams.<team>.balance` (§6 *Balance*); off, the key is absent; turned on, the fields start at 10, `2d` and ticked, and a field left empty is a line not drawn; under them, the repo's numbers as they read now, so the line is set against what it would have done today — `ao team balance`'s three lines (`teamrun.balance_rows`), and above them the mark while one stands, and *no live member: a team with none is not read* where that is so; the lines are written whole, and only when a Save moved them, a switch on with no line drawn refused in place. **when work appears** (TD-214; designed 2026-09-28, built — TD-227 slice 3) is a picker of three, *ask me · start the team · do nothing*, written to `teams.<team>.on_work` (§6 rule 8) when the pick moves, *ask me* marked *default* while the key is absent; its note says what each of the three does, the picked one first — *wound down — ask me: an Inbox row asks when its lanes gain entries · start the team: the home starts it · do nothing: it waits for Start or its schedule* (TD-286). **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
+| Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **when work appears**, **balance**, **flow** (TD-307; not built — TD-309: a pick of the team's `flows:`, applied on Save as the card's Flow pick applies), **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **balance** (TD-177; designed 2026-09-29, built 2026-09-30 — TD-239 slice 4) is a switch and three fields — *open PRs above* `n`, *oldest open longer than* `d`, *the reader's queue past its bound* (a tick box) — written to `teams.<team>.balance` (§6 *Balance*); off, the key is absent; turned on, the fields start at 10, `2d` and ticked, and a field left empty is a line not drawn; under them, the repo's numbers as they read now, so the line is set against what it would have done today — `ao team balance`'s three lines (`teamrun.balance_rows`), and above them the mark while one stands, and *no live member: a team with none is not read* where that is so; the lines are written whole, and only when a Save moved them, a switch on with no line drawn refused in place. **when work appears** (TD-214; designed 2026-09-28, built — TD-227 slice 3) is a picker of three, *ask me · start the team · do nothing*, written to `teams.<team>.on_work` (§6 rule 8) when the pick moves, *ask me* marked *default* while the key is absent; its note says what each of the three does, the picked one first — *wound down — ask me: an Inbox row asks when its lanes gain entries · start the team: the home starts it · do nothing: it waits for Start or its schedule* (TD-286). **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
 | Settings page | **Repos**: the promote's **auto** switch, the **pull** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no auto switch and says why. **pull** (§6 *Pull*; TD-222, designed 2026-10-01, built 2026-10-02 — TD-263) on every card, `promote:` block or not: on when `repos.<repo>.pull` is absent, written through `set_settings`, and beside it the last pass's reading for the checkout — *current*, *last pulled <age> · n commits*, *waiting: <name> is mid-turn*, *refused: <why>*, *off* — so a checkout that is not following origin says why here |
 | Settings page | **You**: `open_in` (preset, template or none), terminal **size** and **face**; **Reset this browser** | *yours everywhere*, written to `person:` through `set_settings`: `open_in` as §5 defines it (`vscode`, `none`, or `{label, url}`, the same refusals, a bad template named in place and the default kept); the terminal's **size** (a number of pixels, bounded 8–32 as `set_settings` bounds it) and **face** (a typed or picked `font-family` name; `monospace` is always appended and ligatures stay off — goal 12), applied to every open terminal without a reload. *this browser*: the theme, *mine* and the folds as they stand, display with their own controls where they already have one, and **Reset this browser**, which clears every `ao.*` key of this browser's `localStorage` after a confirm and reloads — a new control, browser-local, writing nothing anywhere else |
 | Settings page | **Open file** | the editor button with a file's path in place of a session directory (§5 `person.open_in`): `{path}` the file, `{remote}` the host as before; drawn on every file card (hosts, profiles, org, each repo's `.agentorc.yml`, and the home's `settings.yml` itself, read-only there) and absent under `open_in: none`; on a card whose values are set here but whose definition is a file's — a team's card, a metered profile's card — the file is named at the card's head, *defined in org.yml* / *billing and prices in profiles.yml*, with **Open file** beside it, so the button is not read as one more setting (TD-286) |
@@ -2906,12 +2906,14 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: new worktree / the checkout itself | **Where** is worktree-first: **Worktree `<name>` · new** is selected for a git repo, its line the path and branch it will make; under it *or one nobody is in:* lists the repo's existing worktrees that hold no live session and no agent the adapters can see, as chips, and a press puts that name in Name; a typed Name that matches one says *reuses the worktree `<name>`*. **The checkout itself** is the second choice, selected by default only for *another directory…* and for a shell; when it is occupied it is greyed with the grey pill *in use by `<name>`* — the *directory field → occupancy* row's reading, said on the choice and never as a warning, since the form has already picked the worktree. For a git repo the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, greys *The checkout itself* with *in use by `<name>`* and keeps the worktree picked (the create RPC refuses the same way) |
-| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; any team folds, live or not, and by its header too (TD-183, row *team card: fold*), a team with something live opening unfolded; between the header and the cards sits the **summary** (its own row, below: the Repo, TDs in motion and Answer needed / Doing facets; on a team with nothing live it is drawn with the cards, behind the fold — TD-181), the header carrying no state chips since the member cards say it (TD-176, 2026-09-26), and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. **Concluded** is the home's reading of *finished* (§6 rule 9, TD-240; designed 2026-09-29; built 2026-09-30 — TD-241 slice 1, `sessionorc.work.finished`, which `teamrun.concluded` returns where it holds) with one word more: a team whose members have all declared `restart_wanted` reads *concluded · restart wanted*. On a live team that is not concluded a line (built 2026-09-30 — TD-241 slice 2: the definition's row carries the reading's `why` as `not_concluded`) under the header's counts says **why there is no Start** — *not concluded: grinder-dc-1 working · grinder-dc-2 idle, not declared · manager-dc-1 working* — one clause per unattended session that keeps it from the reading, from the records, so a person who wants to start it sees what to wait for or close. A **concluded** team is drawn like a stopped one **and is never folded by the page** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*; since TD-183 it opens unfolded, and a person who folds it has read it); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live member carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — its seats (§4.9b) are absent or `idle` (a seat never declares; a `working` seat is answering somebody) and its manager is `idle`, declared or not; a dead member that crashed or wants a restart blocks it, and the rest of the dead are passed over (§6 rule 9 *Which members count*). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is offered and the team opens unfolded (above, row *team card: fold*); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. Until then a team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own. **Who for what** (TD-162; built — TD-171) is not on the header (TD-252): the lines are in the team's help panel, under the ***i*** mark (row ***i*** mark, below) |
+| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), the flow it runs (*flow: td*) and its **flow strip**: its stages in order and the person last — *design → build → review → you, through techlead-ao-1*, as the brief's `{flow}` lines read — the **Flow** pick and *flow changed — Apply* (rows below), and, under the header while the definition cannot follow it, the reason and the flows it could (*td cannot be followed by samscrape-grind: no designer — add a designer, or drop td from flows:*; §4.9c, TD-307, not built — TD-309), its marks (the needs-you count, *answered for you*) and its controls, and not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*, TD-095); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the live count — the control sits on the thing it stops (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition, the sessions' cards are folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together (TD-156 (f): it sat at the other end of the header as *n sessions — show*, and was not found); one click, remembered per team in the browser; any team folds, live or not, and by its header too (TD-183, row *team card: fold*), a team with something live opening unfolded; between the header and the cards sits the **summary** (its own row, below: the Repo, TDs in motion and Answer needed / Doing facets; on a team with nothing live it is drawn with the cards, behind the fold — TD-181), the header carrying no state chips since the member cards say it (TD-176, 2026-09-26), and a definition no session carries is the same card, empty. Order: teams with something live, *No team*, teams with nothing live. *No team* is a plain section, not a card. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. **Concluded** is the home's reading of *finished* (§6 rule 9, TD-240; designed 2026-09-29; built 2026-09-30 — TD-241 slice 1, `sessionorc.work.finished`, which `teamrun.concluded` returns where it holds) with one word more: a team whose members have all declared `restart_wanted` reads *concluded · restart wanted*. On a live team that is not concluded a line (built 2026-09-30 — TD-241 slice 2: the definition's row carries the reading's `why` as `not_concluded`) under the header's counts says **why there is no Start** — *not concluded: grinder-dc-1 working · grinder-dc-2 idle, not declared · manager-dc-1 working* — one clause per unattended session that keeps it from the reading, from the records, so a person who wants to start it sees what to wait for or close. A **concluded** team is drawn like a stopped one **and is never folded by the page** (TD-156 (b): its idle sessions wait for a person's Close, and a folded card read as *already closed*; since TD-183 it opens unfolded, and a person who folds it has read it); every team's header counts *n ready to close* beside the states — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A team is concluded when every live member carrying its badge is `idle` and has declared — `out_of_work` or `restart_wanted` on the record — its seats (§4.9b) are absent or `idle` (a seat never declares; a `working` seat is answering somebody) and its manager is `idle`, declared or not; a dead member that crashed or wants a restart blocks it, and the rest of the dead are passed over (§6 rule 9 *Which members count*). *Concluded* is the team's word, not a member's: a member is *finished* only by `out_of_work` (§4.9a, *finished means declared, not gone*), and one that wants a restart is by its own word not finished — the manager's wind-down test keeps that meaning; the page's concluded test takes either word, since either says the run is over. The state check is part of the test: the fields are cleared only by a later declared claim, so a session that declared and then took a turn is `working` with the word still on its record, and the team is not concluded. A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the fold is offered and the team opens unfolded (above, row *team card: fold*); the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. Until then a team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6, TD-100) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own. **Who for what** (TD-162; built — TD-171) is not on the header (TD-252): the lines are in the team's help panel, under the ***i*** mark (row ***i*** mark, below) |
 | team card | **fold**: the header | (TD-183; built — TD-194) a click anywhere on a team card's header row that is not one of its controls, links or marks folds the card to that row, and a click on a folded row opens it — **any team, live, concluded or stopped**; the header shows the pointer and a hover tint, and the press is on `click` with no text selected, so a name can still be copied. The **▸ n sessions** button stays where TD-156 (f) put it, beside Start or Wind down, on every team with sessions: it is the same press, the control a keyboard and a screen reader reach (`aria-expanded`, `aria-controls` the card's body), and the header's click is its mouse target grown to the row. Folded, the card is the header alone: the summary and the members are hidden, nothing is unloaded, and deltas keep arriving. **Default and memory**: a team with something live, and a concluded one, opens unfolded; a team with nothing live opens folded; a press writes the choice, `fold:<team>` in the browser's storage, and a stored choice wins over the default whatever the team's state becomes — cleared by Settings' *Reset this browser*. **A folded live team's row** reads the counts by state in place of the session count (the chips the summary replaced return while the cards that say it are hidden), its marks — the needs-you count, *n ready to close*, *answered for you*, *PRs waiting*, ✉ n (row *team header ✉ n*, now on any folded team) — and its controls, Wind down and Stop now included. A member in `needs-you` puts the amber ring on the row (§4.5 screen 1 *Colour*), and **the row is not unfolded for it**: the fold is the person's, and the need is counted on the row, in the rollup and in the Inbox. **Keys** (row *Org: keys*): a folded team's header takes the place of its cards in the ring; `f` folds the team of the ringed card and the ring moves to its header; `f` or `Enter` on a ringed header opens it, the ring staying on the header. The filter is unchanged: a team none of whose sessions match is hidden, folded or not. *No team* is a section, not a card, and does not fold. Client-side, nothing written on any record |
+| team card | **Flow** pick | (TD-307, §4.9c; designed 2026-10-04, not built — TD-309) beside the flow strip on a team that lists more than one flow: the team's `flows:`, the current marked, each it cannot follow disabled with the reason; a pick writes `teams.<team>.flow` through `set_settings` and applies it at once (§4.9c *Switching*), its confirm naming who sits out, who starts and who is relaunched, and what a switch leaves (*grinder-ao-1's PR #1020 stays with techlead-ao-1*). A person's own; not on a node (§4.4a), as Settings is not |
+| team card | **flow changed — Apply** | (TD-307, §4.9c; not built — TD-309) a mark beside the flow strip on a live team whose records differ from what its current flow compiles to (lane, `review`, the stage brief, who should run); **Apply** applies it, as `ao team flow <team> --apply`. Beside it, on a member: *sits out under <flow>* (its card stays until Forget, as a removed member's does; an interactive member, never wound down, reads *sits out under <flow> — close it yourself*), and *flow changed — restarts when it next works* on a node member the tick does not restart. The *cannot be followed* mark (*td cannot be followed by samscrape-grind: no designer — add a designer, or drop td from flows:*) sits under the header while the definition lists a flow its members cannot follow |
 | card, Inbox row | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Org rollup's, a team header's): there the summary above says what the glyphs were for, and the word and colour carry the state (TD-176; Paul, 2026-09-26: *are those icons serving a real purpose?*). The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ◇ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*, TD-026; built — TD-152). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph |
 | Org | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.agentorc.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above); the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, an idle seat, or the idle manager (TD-240; built 2026-09-30 — TD-241 slice 1) — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it. **What the lanes hold, before the start** (TD-262, designed 2026-10-01; built 2026-10-02 — TD-265 slice 4, `teamrun.lanes`, read by `ao team start`, the page's `/api/teams/<t>/lanes` on the press and its `start`; the empty-lane shape is Paul's, the same day): the confirm — and the first line `ao team start` prints — reads each member's lane against its ledger as rules 6 and 8 read it (`ledger.lane_matches` over the pickable entries) and says what it found, *grinder: 3 pickable · designer: 0*; when every lane is empty the press opens a confirm of its own instead of starting — a modal that explains, *nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts*, the lane line under it, and offers **Start anyway** and **Cancel** (Paul, 2026-10-01: *a confirmation modal pop-up explaining and offering to start anyway or cancel*; the steer's default had warned and started, the alternative refused until a flag) — Start anyway runs the start as any Start does, since the person may know what the ledger does not (a brief that makes its own work, an entry about to land). `ao team start` prints the same line and stops there — a refusal, exit 1, `{"error": …}` under `--json` — unless `--anyway` is given: the terminal's Start anyway. A ledger that cannot be read is said and counts as unknown, never as empty, and opens no confirm. On a concluded team whose lanes are empty there is one confirm, not two: the Start anyway dialog carries the closes as its second line (*it first closes …*), in place of the one-line confirm a concluded team's Start shows on its own. dc-grind on 2026-10-01 — started, wound down by its manager forty seconds later because the grinder found nothing pickable, every card reading *closed by you* — is the case |
 | Org | team card: **Members…** | (TD-163; designed 2026-09-25, built 2026-09-26 — TD-172) beside Start on a stopped team and beside Wind down on a live one: the dialog of §4.9 *Add or remove a member from the team card* — the definition's manager, techlead seat and member entries, each with the session holding it, **Add member** and **Remove**. Absent on *No team*; on a team defined in a repo's `.agentorc.yml`, drawn disabled (the next row) |
-| Members dialog | **Add member** / **Remove** | **Add member**: role, name (defaulted to the team's pattern with the first number no name of the team holds, never an existing member's — TD-268) and lane, then one press: `org.yml` edited as text in place (a `count:` bumped, or one member line appended), re-parsed, and on a live team the member created under the manager as `ao team start` creates one — refused with the reason when the edit cannot be one line, when the name it would add is one the team's definition already holds (*`<team>` already has `<name>`*, the file untouched), or the file fails to parse, the bytes restored. **Remove**: a confirm naming the file edit and, on a live member, the wind-down it sends (Wrap up's, never a kill); the record stays a card until Forget. A definition that already names one session twice says so under the list, and Remove on either line takes the line out and leaves the session to the other. The manager and the techlead seat carry no Remove. A person's act, through the UI process, never the host agent (§4.4a: the org file is the clients') |
+| Members dialog | **Add member** / **Remove** | **Add member**: role, name (defaulted to the team's pattern with the first number no name of the team holds, never an existing member's — TD-268) and lane, then one press: `org.yml` edited as text in place (a `count:` bumped, or one member line appended), re-parsed, and on a live team the member created under the manager as `ao team start` creates one — refused with the reason when the edit cannot be one line, when the name it would add is one the team's definition already holds (*`<team>` already has `<name>`*, the file untouched), or the file fails to parse, the bytes restored. **Remove**: a confirm naming the file edit and, on a live member, the wind-down it sends (Wrap up's, never a kill); the record stays a card until Forget. A definition that already names one session twice says so under the list, and Remove on either line takes the line out and leaves the session to the other. The manager and the techlead seat carry no Remove. A person's act, through the UI process, never the host agent (§4.4a: the org file is the clients'). Under a team that lists flows (§4.9c *Every listed flow must be followable*; TD-307, not built — TD-309): **Remove** refuses the last member of a role a listed flow's stage needs (*td needs a designer: drop td from flows: first*); **Add** leaves the lane line out unless one is typed (a written `lane:` would win over the stage's for good, and `ao org check` names it where it equals the stage's), starts the member with the current flow's compiled lane, reader and stage brief, so a live add raises no *flow changed* on its siblings, and writes but does not start a member of a role the current flow does not use, which sits out |
 | Org | team card: **Members…** on a repo-defined team | designed 2026-09-28 (TD-210; built 2026-09-29 — TD-229 slice 4; §4.9 *The org is an aggregate*): drawn disabled on a team whose definition's source is a repo's `.agentorc.yml`, its reason beside it — *defined in `<repo>`'s .agentorc.yml — changed by PR* — with **Open file** through the person's `open_in` (absent under `none`); the dialog opens for a team of the org file as before, and the edit itself (`edit_members`) refuses a repo's file. The source is the definition's own field, as `ao team list` prints it |
 | Org | team card: **Forget all** | on a team with nothing live, in the header's right-hand cluster with Start and its **▸ n sessions** fold (TD-156 (f): a team card's buttons together): one confirm, then the Forget each card carries — the same `remove` — on every `exited` and `closed` card of the team, and nothing else — never an on-call seat's, which offers no Forget while the definition names it. The confirm lists the cards and **names apart every card carrying the dirty / unpushed flag: those are not forgotten** — Forget keeps the worktree and drops the record that points at it, and unpushed work would lose its only pointer — so such a card is forgotten one at a time, by its own Forget, with the flag in view; a suspended record is refused as its own Forget is (§4.8a). Absent on a team with something live: Wind down or Stop now first — and on one whose every card carries the flag, since it would forget nothing. The Forgets run one after another, each refusal a toast in the agent's words and the rest going on (TD-071 item 1). Live, stopped, concluded and wound down are read over the team's **unattended** sessions, and Wind down's and Stop now's confirm name a person's session in the team apart — *your session main-ao stays: a team act never stops an interactive session* — and leave it alone (§4.9 *A person in the team*, TD-160; built — TD-173) |
 | Org | team header **✉ n** | display only: on a folded team's header (any folded team, live or not — TD-183, built by TD-194), the sum of its folded sessions' unread counts — the count each card's **unread** chip shows, which the fold hides; nothing at zero, and gone while the team is unfolded or a filter shows its cards. The mail stays where it is: unread never ages out (§4.10 *The lifecycle of an entry*), and a start under the same name moves the old record's mail to the new session (§4.10, TD-081), so what a folded team holds unread is what its next run reads first. Unfold to read or dismiss it (TD-071 item 2) |
@@ -3335,7 +3337,13 @@ reading as a verdict, exit 1 when something is lacking, each lack on a line: a r
 checkout that is not there, a team whose role names a profile `profiles.yml` does not hold, a
 brief that is not in the checkout, a name defined twice, a team whose definition names one session twice (TD-268), a `place:` naming no linked host, a
 team in `settings.yml` that no definition names (a repo renamed its team); and, as warnings
-that do not fail it, a registered checkout off its default branch or holding changes. On a
+that do not fail it, a registered checkout off its default branch or holding changes. Once flows
+are built (§4.9c, TD-309), `ao org` also lists every flow the org can see with its source and
+whether each is usable, `ao org check` fails on a flow that is not usable (a stage brief missing, a
+role that does not resolve, a lane word unknown, two stages of one role) and on a team listing a flow
+it cannot see or follow (*td cannot be followed by samscrape-grind: no designer — add a designer, or
+drop td from flows:*), and warns, per team, on each key the team writes that its current flow would fill with
+the same value — what a repo may now delete. On a
 node both refuse and name the home. It
 reads and writes nothing; a session may run it. As built: a
 team the org file defines has no landing rule, so its line says its own `host:`, or *no host: —
@@ -3347,6 +3355,15 @@ checked by planning its start (`teams.plan`, which creates nothing), so a team i
 first thing its start would refuse, in the start's own words. Two more warnings than the list
 above: a `place:` naming a team no registered repo defines (§4.9's note), and a registered
 checkout git cannot read. The default branch is the clone's `origin/HEAD`, `main` where unset.
+
+**`ao team flow <team> [<flow> | --apply]`** (TD-307, §4.9c; designed 2026-10-04, not built —
+TD-309): with no argument, prints the team's flows, the current one, its flow strip, whether the
+team can follow each, and, for a live team, how its records differ from what the current flow
+compiles to, by member; with a flow, writes `teams.<team>.flow` through `set_settings` — refused to
+a session and for a flow the team does not list, by the client, as a team's name is — and then
+applies it as `--apply` does; `--apply` applies the definition as it reads now (the sit-outs, the
+starts and the relaunches of §4.9c *Switching*), printing one line per member and what it leaves
+(*grinder-ao-1's PR #1020 stays with techlead-ao-1*).
 
 **Teams (§4.9, TD-040).** `ao team start <name>` launches a definition from `~/.agentorc/org.yml`
 or the repo's `.agentorc.yml` — every check first, then the manager, then each member with
@@ -3823,7 +3840,10 @@ and monochrome inside the role badge, so the state tile stays the one coloured t
 The built-ins carry `manager: flag`, `grinder: wrench`, `hunter: search`. **A card's layout does
 not vary by role** — that would be the first thing to key on one — and the card already differs
 by role without a rule, because it draws whichever channels are non-empty. The built-ins ship
-with the package; a repo may redefine any of them or add its own (§5, TD-040):
+with the package; a repo may redefine any of them or add its own (§5, TD-040); each carries a
+**`kind:`** — `worker`, `seat`, `manager` or `plain`, `worker` where unwritten — which is all a flow
+asks of a role, and a role defined whole outside the package is a directory of `role.yml` and
+`template.md` (§4.9c, TD-307; not built — `kind` TD-309, role directories TD-313):
 `agentorc.repoconfig` reads the file, the templates are `agentorc/briefs/<role>.md` with the
 `{lane}`, `{techlead}` and `{manager}` placeholders (`{context}` and `{entry}` in the techlead's — `{entry}` takes the package's `entry.md`, what a new ledger entry needs, §4.9 *Add an entry to the ledger*; `{repo}` in every one), a repo's `roles.<name>` overrides per key over the built-in, and the record
 carries `role` and the repo's `ledger:` (so the derived-report tick reads the right file without
@@ -3893,8 +3913,10 @@ shorter than a night, the PR opened at once and merged at the bound unless answe
 scope and spending** are an `ask` with two to four suggested answers, and the entry waits. The
 three are the mail kinds the Inbox already draws (§4.5a, §4.10), so the person's part is a press,
 batched by the Inbox and answered whenever they open it; Focus on the member is the live
-conversation when one is wanted. It is a role a repo or `org.yml` defines with its own brief, not a
-preset; `director` keeps
+conversation when one is wanted. It is a preset since flows (TD-307, §4.9c; not built — TD-309):
+the built-in `td` names it, so the package ships `designer.md` with its mechanics and a repo's
+designer brief is its supplement under a flow, and its whole brief in a team with no flow; until then it is a role a repo or `org.yml` defines with its own
+brief; `director` keeps
 its name (its members are managers, and *director > manager > worker* reads as a line). The
 older words — `orchestrator` and `lead` for the manager, `orchestrate` for `control` — resolve to
 nothing: there has been no release and one user, so there is no renamed-roles table, no
@@ -3922,10 +3944,10 @@ from a grinder before the composer opens. The built-ins carry defaults, from §4
 `techlead` — *a PR on a held path, the architecture, or a question that is answered somewhere in
 the docs — an `ask` fills the seat*; `grinder` — *its own card only: the entry it holds, a
 finding on its PR*; `hunter` — *an area to look at; it files, never fixes*; `auditor` — *what its
-trigger counts: the last n PRs, the period*; `plain` — none. A role a repo or `org.yml` defines
-with its own brief and no preset — `designer` is one (*Role names*, above) — carries its own line
-in its `roles:` entry, or has none: for ao-grind's designer, *a design-first entry, a control's
-shape, a screen* is the line to write there. Overridable in `org.yml` and the repo's `.agentorc.yml` as
+trigger counts: the last n PRs, the period*; `plain` — none. A role defined outside the package
+(a role directory, §4.9c; until TD-313, a `roles:` entry with its own brief) carries its own line,
+or has none; `designer`, a preset since flows, carries *a design-first entry, a control's shape, a
+screen*. Overridable in `org.yml` and the repo's `.agentorc.yml` as
 `label:` is, resolved where the icon is, drawn as text, escaped. **It is the definition's line,
 never the session's**: a session may not rewrite it (`ao doing` is the session's own words about
 now, §4.8; this is what the job is for), in the spirit of §9 invariant 9 — a preset sets defaults
@@ -4383,7 +4405,9 @@ is no second membership list: a team's members at runtime are the sessions whose
 name its manager (§4.8); the definition only says how to start them.
 
 **Where definitions live.** One org-level file per UI host, `~/.agentorc/org.yml`, beside
-`profiles.yml` and `hosts.yml`, holding `projects:`, `teams:` and an optional org-wide `roles:`.
+`profiles.yml` and `hosts.yml`, holding `projects:`, `teams:` and an optional org-wide `roles:`;
+the org's own flows and defined roles sit beside it as directories, `~/.agentorc/flows/` and
+`~/.agentorc/roles/` (§4.9c; TD-307, not built — TD-313).
 A project spans repos and a team may span projects, so what spans belongs in no one repo's
 `.agentorc.yml`; that remainder is per install (the ADR of 2026-09-13 says *one org per install*;
 TD-210 amends it: a team of one repo is defined in the repo, *The org is an aggregate*, below), so its file is. A repo's `.agentorc.yml` may also
@@ -4460,7 +4484,7 @@ repo. The org a client sees is the union:
 
 **What is left at the home has a history** (TD-210; built — TD-229 slice 5). `org.yml`, `profiles.yml` and
 `settings.yml` stay files under `~/.agentorc/`, where every reader finds them, and at the home
-the directory becomes a git work tree that tracks those three and ignores the rest: sessions,
+the directory becomes a git work tree that tracks those three — and, once flows are built, the org's `flows/` and `roles/` directories (§4.9c; TD-313) — and ignores the rest: sessions,
 runs and mail are state, and `hosts.yml` is this machine's own name and links, which another
 machine must not inherit. **The home's host agent is the one committer**, so two writers never
 meet on the index: it commits after its own `set_settings` (*settings: usage_gate.grind.week
@@ -4534,7 +4558,7 @@ defaulted to the only one otherwise), `profile` (overrides the role's), **`on_ca
 `true` makes the manager a seat filled on §6 rule 3's `team` trigger and closed when it
 has acted, §6 *What is left is judgement*; `false`, a standing session that rounds on `ao wait`;
 the default is `true` from the build (Paul, 2026-10-01: *flip the default to on call at the build; every team
-goes on call at its next Start*), a team keeping the shape it was started with until its next Start (`org.ON_CALL_DEFAULT`, flipped 2026-10-01 — TD-259, once the tick read `team` and the mail sweep spared a question to a closed seat, slices 2 and 3); the default is the `manager` role's alone, whose template has a seat's shape (`repoconfig.ON_CALL_BRIEFS`) — another role named as manager is a seat only where its definition says `on_call: true`; and a manager is read as a seat from its record's `seat`, never from the definition alone, so a standing manager started before the definition read *on call* is drawn, counted and concluded as the session it is (`teamrun._seat_of`); refused beside `role: person`, which starts nothing to
+goes on call at its next Start*), a team keeping the shape it was started with until its next Start (`org.ON_CALL_DEFAULT`, flipped 2026-10-01 — TD-259, once the tick read `team` and the mail sweep spared a question to a closed seat, slices 2 and 3); the default is the `manager` role's alone, whose template has a seat's shape (`repoconfig.ON_CALL_BRIEFS`) — another `manager`-kind role named as manager is a seat only where its definition says `on_call: true`; and a manager is read as a seat from its record's `seat`, never from the definition alone, so a standing manager started before the definition read *on call* is drawn, counted and concluded as the session it is (`teamrun._seat_of`); refused beside `role: person`, which starts nothing to
 fill, and refused on a member, where `MEMBER_KEYS` would otherwise inherit it), and the same `lane`, `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
 often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
 template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
@@ -4551,6 +4575,14 @@ ledger*, below); either key may be left out and reads `techlead`; a role nothing
 preset, not the org's `roles:`, not a role the repo's own file defines for its own teams, not one
 the team's definition starts — is an error naming it when the definition is read, as an unknown key
 is. `ao team list --json` carries each team's `entries` with both types said.
+
+`flows` (on the team, TD-307; designed 2026-10-04, not built — TD-309): the flows the team may run,
+the first its default; which one it runs now is `teams.<team>.flow` in `settings.yml` (§5), a setting
+the person turns, and the current flow gives its members' default lanes, its workers' reader, its
+`entries.feature` default, its briefs' `{flow}` and `{stage}` slots, and which members sit out
+(§4.9c). Absent, the team has no flow and starts as it does today; every flow it lists must be usable,
+or the definition is refused saying why, and followable by its members, or the team's Start is
+refused and its card says why (§4.9c).
 
 Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
 `name` (the prefix; default the role), `home`, `lane`, `brief` (the repo's supplement to the role's template, §4.8),
@@ -4575,7 +4607,7 @@ badges the session, with one line saying there is no reach to describe.
 start <name>` resolves the definition, then checks *everything before launching anything*: every
 checkout exists on this host, every role and profile resolves, and every session name is free
 under §4.1's rule — a live holder refuses the whole start and names it, so there is never half a
-team; a holder a person suspended over an identity alarm (§4.8a) refuses it for the same reason;
+team (a member the team's current flow sits out is not started, and is no half: §4.9c); a holder a person suspended over an identity alarm (§4.8a) refuses it for the same reason;
 exited or closed holders are superseded as §4.1 says, which makes `ao team start`
 after a night's exit the restart too. Then it creates the manager (its grants, profile and mode —
 the role's `control`, the host's profile and unattended, unless the definition overrides any of
@@ -4623,7 +4655,9 @@ session form had no Team field, and nothing said what a team act does to a perso
   with `--team <team>` (the CLI or the form) whose role carries no `review:` of its own takes the
   team's: `reader: techlead` when the team's definition holds a techlead seat, and `held:` the
   union of the `held:` lists of the team's member roles — a person in the team is held to the
-  paths its workers are held to, no more. Filled at start onto the record's `review`, as a
+  paths its workers are held to, no more. Once flows are built (§4.9c item 3, TD-309) the union
+  also takes the repos' top-level `held:`, and the reader comes from the current flow's `techlead`
+  stage — none under a flow without one. Filled at start onto the record's `review`, as a
   member's is from its role (`ao team start`), and read only there (§4.9b: whether a PR is held
   keys on the record's `review` and the PR's paths). A role's own `review:` wins, so `org.yml`
   may still say `plain: {review: …}`; a team without a techlead seat gives none, and the form
@@ -5566,6 +5600,543 @@ team has one, the techlead answers it or passes it up, and the person is the top
   questions asked, answered with a source, passed up, overruled, lapsed; fills, and what they
   cost — and moving the manager and the grinders to a cheap profile is the step after, inside
   that node.
+
+### 4.9c Flows: the path an entry takes through a team
+
+**TD-307; designed 2026-10-04, not built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Paul (2026-10-04): *our current example is for a TD, which is
+something like [designer if needed] → [grinder + ui review if needed] → [techlead] → [escalate to me
+if needed], but I believe each repo is currently having to define this separately. It seems
+prudent to have the flow defined once then reused, and to give the ability to create more flows*;
+*flows would be per team*. On the first draft: *"read" comes across too passive, the techlead is
+doing real work*; *is the escalation to me (when needed) inferred?*; *it seems odd to say a team is
+going to use a flow but then does not staff the right roles — have an alert that the flow cannot be
+followed and change it or choose a different flow*. On the second: *my concern is that we do all of
+this work to define flows and then we have to hand-jam any changes anyway. Would it make more sense
+to keep a set of briefs with each flow so that a team could switch flows on the fly? It makes sense
+that a flow would have to be well-defined before being usable.* And on the third: *the high level
+goal is to be able to define roles, and use those roles in flows. We will likely end up with a small
+list of roles and flows, and flows will naturally need certain types of roles, but outside of that
+the two should be essentially orthogonal. Eventually we will let people create additional
+roles/flows through the UI but that does not have to happen yet. We just want the design to be able
+to handle it.*
+
+**Terms used below.** A **flow** is a team's path: an ordered list of **stages**, each a role, the
+lane it gives and its **stage brief** (the words that tell the stage's members the path). A flow is
+**usable** when it is whole — every brief present, every role resolved and of the kind its stage
+wants. A team lists the flows it may run; the one it runs now is its **current flow**, a setting. A
+listed flow is **followable** by a team when its members can staff every stage. A member whose role
+has a stage only in another listed flow **sits out** under the current one. **Apply** brings a live
+team's sessions in line with its current flow. A role's **kind** (`worker`, `seat`, `manager`,
+`plain`) is all a stage asks of it.
+
+**What was there.** The path existed only as pieces each repo wired by hand: a `design-first`
+lane on a designer member and a `free-pick` lane on the grinders (§6 rule 6), owner words on both
+(TD-214), `review: {reader: techlead, held: […]}` on each worker role in the repo's file (§4.9,
+TD-209), `entries: {feature: designer}` on the team (*Add an entry to the ledger*), and the words
+that describe the path spread over the package's role templates (the grinder's held-PR paragraph)
+and each repo's supplements (agentorc's grinder brief restates it). Nothing said these were one
+path, so a team got the path it remembered to wire, and changing the path meant editing every
+place that described it.
+
+**A flow is a path and its words, defined once.** A flow is an ordered list of **stages**; each
+stage names a role, the lane it gives, and **its brief** — the words that say what the stage takes,
+how it ends and where its work goes next. A team lists the flows it may run and runs one of them at
+a time; which one is a setting the person turns, and turning it applies itself. So a change to the
+path is a change to a flow — its stages or its stage briefs — or a switch to another flow, and never
+an edit to a repo's prose.
+
+**Roles and flows are orthogonal, and a role's kind is their whole interface.** A **role** says how
+a session works in agentorc — its template's mechanics, its profile, grants, icon, label, message
+line, prompts and context bound (§4.8) — and nothing of any path. A **flow** says the path — its
+stages, their lanes and their briefs — and names roles only by name. What a flow needs of a role is
+one fact, its **kind**: a new role key, **`kind:`**, one of
+
+- **`worker`** — a member that takes a lane and declares (`grinder`, `hunter`, `designer`); the
+  default for a role that writes none;
+- **`seat`** — filled when its trigger fires and never declares (§4.9b: `techlead`, `auditor`);
+- **`manager`** — the team's `manager:`; and **`plain`** — a person's own session.
+
+The kind is checked where a team is read too, not only where a flow is: a definition's `manager:`
+names a `manager` role (or `person`), each `members:` entry naming a role a `worker` (a nested
+`{team: …}` member names none), each `seats:` entry and the `techlead:` seat a `seat`, and each
+`entries:` value a `worker` or a `seat` — so a page that offers roles for a slot offers the kind the slot takes,
+and a role a person defines is placed by its kind alone. **`kind` is a definition's key**: written
+in a preset or a role directory's `role.yml`, and refused in the `roles:` overlays of `org.yml` and
+`.agentorc.yml`, so no install or repo changes what a flow may ask of a role it did not define.
+
+A stage that gives a lane names a `worker` role; a stage that gives none is a **review stage** and
+names a `seat` role; `manager` and `plain` roles are in no stage. **Today one seat can hold a review
+stage: the team's `techlead:` seat** (role `techlead`), because the held-PR machinery knows two
+readers, `techlead` and `person` (§4.9b *The reader*); a review stage naming another seat role is
+refused when the flow is read, naming TD-314, the design of a review stage any seat role may hold,
+and of a PR passed from one reader to the next. So a new role is usable in every flow whose stages
+want its kind, and a new flow in every team whose members have the kinds it wants — the two are
+written apart and meet only at a stage's `role:` and its kind. **A role knows nothing of flows**:
+under a flow, a role's own `review:` is set aside (the flow says what waits, item 2 below) and its
+default `lane` is only the last fallback; a team with no flow reads both as it does today.
+
+**Where flows and roles live: each a directory, whole.** A flow is a directory holding **`flow.yml`**
+(its stages) and its stage briefs; a role defined outside the package is a directory holding
+**`role.yml`** (its `ROLE_KEYS`, `kind` among them) and **`template.md`** (its mechanics, with the
+template slots), which makes it a peer of a preset. They live in three places, resolved as a team's
+name is (§4.9 *The org is an aggregate*) — the org's over a repo's over the package's, so an install
+overrides a repo's without a PR:
+
+- **the package**: `agentorc/flows/<name>/` for the built-in flows; the built-in roles stay the
+  presets they are (`org.PRESETS`, `agentorc/briefs/<role>.md`), `kind` added to each;
+- **the org**: `~/.agentorc/flows/<name>/` and `~/.agentorc/roles/<name>/`, every team's to use, kept
+  in the home's history beside the three files it already tracks (§4.9 *What is left at the home has
+  a history*), committed by the home as `org.yml` is;
+- **a repo**: `<repo>/.agentorc/flows/<name>/` and `<repo>/.agentorc/roles/<name>/`, its own teams'
+  only (two repos may each define one name, since neither sees the other's), changed by PR.
+
+A flow's or a role's name is its directory's. **Each is replaced whole, never merged by key**: two
+stage lists have no one merge, and a role defined in two places is the org's. **A directory may not
+take a preset's name** — refused when read and by `ao org check` — since a preset is the package's
+and is redefined by key only (§4.8); nor may a flow directory take a built-in flow's name (`td`,
+`build-review`, `build`): a repo or an install that wants other words defines its own flow under its
+own name, so a built-in's stage briefs are never a repo's prose by another road. A repo's role
+directory the org's shadows is said by `ao org`, as a shadowed team is. What layers by key is unchanged and is not a definition:
+`org.yml`'s `roles:` overlay (a role's profile for this install) and a repo's `.agentorc.yml`
+`roles:` (its supplement brief, §4.8), each over the role wherever it is defined. The two orders
+differ on purpose — definitions resolve the org's over a repo's, whole; overlays lay the repo's over
+the org's, per key (`repoconfig.resolve_role`) — and are not to be unified. **A `roles:` key naming
+no preset and no directory is refused** when the file is read (*unknown role*, naming the
+directories that would define it): an overlay is not a definition. Until TD-313 is promoted a key
+with a `brief:` still defines a role as today, and `designer`, the one such role in use, becomes a preset in TD-309, before TD-313 refuses key-only roles. A key-only role is read as kind `worker` (it writes no `kind`, and an overlay may not), so it can never be a manager or a seat: the team's kind checks refuse it there. The YAML files keep no `flows:` key: a flow is found by its directory.
+**An org flow or role is not usable by a team on a node** (§4.4a): a node team's roles and briefs
+are read on the node, and the org's directories are the home's; such a team is told so as *not
+followable* (*hunt cannot be followed by cm-grind: an org flow, and cm-grind runs on contractmatch —
+define it in the repo*; likewise a repo flow of cm-grind's naming an org role, *security is an org
+role*). Whether a node team can follow a flow is read as its start reads the node — the client
+asks the node's files (`teams.Files`, `host_files`) for the repo's flow and role directories and the
+briefs, so a repo-local flow or role the node's checkout does not hold yet (a branch not merged
+there) is *not followable* by name, and a node that does not answer reads *unknown*, never
+followable. A package flow rides the wheel and a repo's the checkout, so both reach a
+node; copying the org's directories to nodes is left until a node team needs one.
+
+**Made to be edited from a page, later.** Nothing here builds a page that creates a role or a flow,
+but the shape is the one such a page needs: a role or a flow is a directory of whole files, so a page
+writes, replaces or removes whole files and never splices a line into a shared YAML file as
+**Members…** must (§4.9); the checks of *A flow is usable only when it is whole* (below) are the
+form's errors, in the words `ao org check` prints; the org's directories are the home's to commit,
+as `commit_defs` commits `org.yml` today; and a repo's are a PR's, drawn read-only as a repo-defined
+team's **Members…** is. When that page is designed it adds controls, not a format. **Until then a
+person creates a flow or a role by writing its directory** — under `~/.agentorc/` at once, or in a
+repo by PR (Paul, 2026-10-04: the page need not come yet). **The build is in two parts**: TD-309
+builds the package's flows, a repo's flow directories, `kind` on the presets and the team-side kind
+checks — all a team needs to run `td`, `build-review` and `build` or a repo's own flow — and TD-313
+builds role directories (the org's and a repo's) and the org's flow directories with their history
+tracking, when a team first needs one.
+
+A built-in flow's `flow.yml`:
+
+```yaml
+# agentorc/flows/td/flow.yml — design → build → review; briefs beside it
+stages:
+  - {name: design, role: designer, lane: [design-first, "owner:designer"], brief: design.md}
+  - {name: build,  role: grinder,  lane: [free-pick, "owner:grinder"],     brief: build.md}
+  - {name: review, role: techlead,                                          brief: review.md}
+
+# agentorc/flows/build-review/flow.yml — build → review
+stages:
+  - {name: build,  role: grinder,  lane: [free-pick, "owner:grinder"],     brief: build.md}
+  - {name: review, role: techlead,                                          brief: ../td/review.md}
+
+# agentorc/flows/build/flow.yml — build only, nothing reviewed
+stages:
+  - {name: build,  role: grinder,  lane: [free-pick, "owner:grinder"],     brief: build.md}
+```
+
+A stage is one mapping in `stages:` — `name`, `role`, `lane`, `brief` and nothing else, a stray key
+refused naming it as in a team, a stray top-level key in `flow.yml` likewise:
+
+- **`name`**: the stage's word, unique in the flow, shown in the brief's `{flow}` lines, the card's
+  flow strip and `ao team list`, and read by no rule (item 4 below finds the design stage by its
+  lane, not its name). It is not a phase: the phases of §4.4 *Repo facts* (*add · design · grind ·
+  review*) are derived from claims and PRs as they are today, though the built-ins' *design* and
+  *review* name the same moments the phases do.
+- **`role`**: a role by name, whose kind fits the stage: a `worker` where the stage gives a lane,
+  the `techlead` seat where it gives none (above). Two stages of one role are refused when the flow
+  is read: a member would have two lanes.
+- **`lane`**: the lane words (§6 rule 6, or the role's own lane shape, §4.8's table: a hunter's
+  area or `free`) the stage gives each member of its role; required on a worker's stage, absent on a
+  review stage (a seat has no lane, §4.8).
+- **`brief`**: the stage brief, a Markdown file, relative to the flow's directory; `../<flow>/<file>`
+  reaches a sibling flow's brief **in the same place** (package, org or one repo), and
+  **`package:<flow>/<file>`** reaches a built-in flow's brief from any place — the package is
+  versioned with the code that reads it, so a reference into it cannot drift as a copy would. A brief
+  never reaches into the org's flows from a repo, or into another repo's. Required: a stage with no
+  brief is no stage.
+
+**"If needed" is the entry's, never the team's.** Every stage of a team's flow is the team's;
+which entries pass through it is said by what the stage reads: only a `design-first` entry is in
+the design stage's lane, so a debt entry starts at build; only a PR on a held path waits for the
+review (§4.9b), so a PR elsewhere merges at build. How a stage *ends* is not configured: each ends
+on the fact the home already reads for it — a design entry when it is archived with build entries
+naming it in `Blocked by:`, a build claim when its PR merges, a review when the reader answers
+(§4.9b). There is no mover between stages.
+
+**The person is the last word of every flow, and is not a stage.** What reaches the person is
+§4.9b's route for every team, flow or none: a member's `steer` or `ask` goes to the techlead seat,
+which answers what is written down and passes the rest up with a recommendation; a designer's
+obvious / steer / ask split (§4.8 *Role names*) reaches the person directly; a held PR unread past
+its bound goes to the person. A flow cannot change that route, so it is no key. It is shown instead:
+the `{flow}` lines and the card's flow strip end with **→ you**, and say how the team's questions
+get there (*through techlead-ao-1*, or *directly* where the team has no seat).
+
+**A brief has three layers, each with one job.** What a member is handed is its role's template,
+its stage's brief and its repo's supplement, and each says only what the others cannot:
+
+1. **The role template** (the package's, §4.8): the mechanics of being that role in agentorc — the
+   round and `ao wait`, the declarations, the claim as a lease, mail's kinds and outcomes, the usage
+   gate, permission triage, the never-list. **Nothing about the path**: the grinder template's
+   held-PR paragraph (send the reader an `ask --pr`, take the next item, never merge a held PR) moves
+   to `td`'s and `build-review`'s build briefs, and what the techlead template says of reading a held
+   PR moves to the review brief; what the techlead does for every team — answer a steer, check a
+   claim, pass the rest up, draft a handed entry — stays. One path rule stays in the grinder
+   template because it is about a PR already sent, whatever the flow is now: *a PR you have asked a
+   reader about is the reader's to merge* (*Switching*, below). The template gains two slots: **`{flow}`**,
+   the generated path lines, and **`{stage}`**, the stage brief's text. **The path a team with no
+   flow is told** — today's words, moved out of the template — ships beside it as
+   **`<role>.stage.md`** (`grinder.stage.md`, `techlead.stage.md`), and is that team's `{stage}`.
+2. **The stage brief** (the flow's): the path from this stage's side — what it takes and from whom,
+   how it ends, where the work goes next and how it is handed there. `td/build.md` says a PR on a
+   held path waits for the review and how to ask it; `build/build.md` says every PR merges on the
+   gate and nothing waits. It may use `{techlead}`, `{manager}` and `{lane}`, filled as in a template.
+3. **The repo's supplement** (§4.8's `{repo}` slot): the repo's facts and nothing of the path — its
+   first reads, its gate command, its standing rules, what is never deployed, how its UI is checked
+   before a page PR (TD-291's paragraph stays in agentorc's supplement: the check is the repo's
+   tooling, run before any PR, whatever the flow). `ao team --skill`'s recipe says so, and TD-310
+   cuts the path out of the three repos' supplements by hand.
+
+**The designer gets a template.** The design stage is the built-in `td`'s, so its role cannot be
+one only a repo describes: the package ships **`designer.md`**, the mechanics of the seat a repo
+defines today in its own whole brief (the lane, declaring a design, the obvious / steer / ask split
+by mail, merging nothing on a held path), with the template slots; `designer` joins the presets
+(`org.PRESETS`), and §4.8 *Role names* no longer calls it a role a repo defines with its own brief.
+**The template wraps a designer only under a flow**: a designer member of a team with no `flows:` is
+started as today, its repo's brief (`roles.designer.brief`, agentorc's `designer-ao-1.md`) the whole
+brief and no template around it, so no team's designer reads its mechanics twice; a team that lists
+flows reads that brief as the template's supplement, and TD-310 cuts agentorc's `designer-ao-1.md`
+to a supplement in the same PR that lists ao-grind's flows. Where it is decided: `repoconfig.compose` takes whether the member is
+started under a flow (the team's current flow, which the client knows at every compose) and, for
+`designer` alone, leaves `template` empty when it is not — **until TD-310**, which cuts every
+designer brief in use to a supplement and drops the carve-out, so the template then wraps a designer
+everywhere — so until then `ao new --role designer` with no team, or a team with no `flows:`,
+composes exactly as today, and one with no brief at all is refused as
+today (*designer needs a brief outside a flow*). The preset carries the default lane `[design-first,
+"owner:designer"]`, no icon and no label (so no designer card's badge changes at the build), and the
+message line §4.8 gives it (*a design-first entry, a control's shape, a screen*) — the one visible
+change at the build, a line in the composer where a designer showed none.
+
+**A flow is usable only when it is whole.** When a flow is read, every stage's brief must be a
+file that exists, every role must resolve — a preset, an org role, or a role of the repo the flow is
+defined in (a repo's flow may name the org's and the package's roles; the org's flow names no repo's)
+— and be of the kind its stage wants, every lane word must be one §6 rule 6 knows or one its stage's role's lane shape takes (§4.8's table: a hunter's area or `free`), a word neither knows refused, and no two stages
+may share a role; a role defined in a directory is whole by the same test (its `role.yml` read as a
+`roles:` entry is, its `kind` known, its `template.md` present); a flow that fails any of these is **not usable**, named with every reason by `ao org check`,
+listed by `ao org` as *not usable*, and no team may list it — a team that does is refused when its
+definition is read. The built-ins are tested whole in the package's suite.
+
+**A team lists its flows, and the person picks one.** A team carries **`flows: [<name>, …]`** (a new
+key in `org.TEAM_KEYS`): the flows it may run, the first its default. Which one it runs now is
+**`teams.<team>.flow`** in `settings.yml` (§5) — a setting, because choosing among flows the
+definition already allows redefines nothing (ADR 2026-09-25 §5) — set by the team card's **Flow**
+pick, the Settings page's Teams card and `ao team flow <team> <flow>` (§4.7), all through
+`set_settings`, a person's own; absent, the first of `flows:`. A value naming a flow the team does
+not list is refused by the client that writes it, as a team's name is (the agent takes the key and
+reads no definition, `settings.TEAM_KEYS` gaining `flow`); a value it cannot honour — one the
+definition no longer lists — reads as
+the first, said on the card. **A flow is opt-in**: a team with no `flows:` has no flow, and starts as
+every team starts before this build — its definition's lanes, `review:` and `entries:` as written,
+`{flow}` and `{stage}` reading `none` (`{techlead}` still names the seat its questions go to).
+
+**Every listed flow must be followable.** A member stage is unstaffed when the definition starts no
+member of its role; the review stage when the team has no `techlead:` seat, **or when nothing would
+be held**: the team's repos write no `held:` (below) — a review with no paths would hold every path
+(§4.9: *one with no `held:` holds every path*), and under a flow a role's own `review:` holds
+nothing (item 2). A team that lists a flow with an unstaffed stage is **not followable**,
+said in every place the team is read, with what would make it so: *build-review cannot be followed
+by dc-grind: nothing held — write held:, or drop build-review from flows:*. `ao team start` and the page's
+**Start** refuse it with those words and start nothing (§4.9 *Starting and stopping*: never half a
+team); `ao org check` fails on it; the team card carries it as a mark under its header until the
+definition changes; and **Members…** refuses to remove the last member of a role a listed flow's
+stage needs, naming the flow (*td needs a designer: drop td from flows: first*); the seat carries no
+Remove there, and a seat edited out of the file leaves every listed flow with a `techlead` stage
+not followable. A live team whose file is edited out of a flow by hand
+keeps running — nothing stops a session over a definition — and its next Start is refused.
+
+**Members the flow does not use sit out.** A member whose role is a stage's role in **another** of
+the team's listed flows, and in no stage of the current one, **sits out**: not started at a Start,
+wound down at a switch (below), its card reading *sits out under build-review* until the flow
+that uses it returns. **An interactive member is never sat out by anyone but the person** (§9
+invariant 5): a switch leaves it running and its card reads *sits out under build-review — close it
+yourself*; it is not wound down, not marked, and not counted as the flow's. It keeps the lane it
+started with — what a person's own session picks is the person's — until they close it. A member whose role is a stage role in none of the team's flows (a hunter,
+an auditor seat) is outside the flows and runs with its own role's lane, `{flow}` reading the path
+with *you stand outside it*; its `review:`, under a flow, is set aside as every role's is. The definition stays the pool of
+members; the flow says which of them work.
+
+**What a flow compiles to: fields the start already writes.** The flow is read by the clients
+(`ao team start`, `ao team flow`, `ao new --team`, the New session form's Team pick, the pre-start
+lane reading, the card's **Apply**), like the rest of a definition (§4.9 *Where definitions live*),
+and turned into what a team start already fills. The host agent never sees a flow, and the record
+gains no flow field: a member's stage is its role (§9 invariant 9).
+
+1. **Lanes.** A member's lane is, first to last: its own `lane:` in the definition, its stage's
+   `lane`, its role's default lane (the preset's, §4.8). The pre-start lane reading and its
+   empty-lane confirm (TD-262, `teamrun.lanes`) read this compiled lane, not the written one.
+2. **The reader is the flow's.** Under a flow, every role's own `review:` — wherever its resolved
+   role writes it: the preset, the org file's overlay, the repo's file — is **set aside**, and said
+   once at start when one is (*grinder's review: set aside — the flow says what waits*): what waits
+   for whom is the path, and the path is the flow's. When the current flow holds a review stage,
+   every member role of its other stages gets `review: {reader: techlead, held: <the repos'
+   held:>}`, where *the repos' `held:`* is the union of the `held:` lists of the team's repos
+   (`Org.team_repos`; every team today is one repo) — never a `review:` with no `held:`, which
+   `normalize_review` reads as every path (an empty list it refuses), and the stage is unstaffed
+   where there is no `held:` to give (above). When it holds none, no role gets a reader. A team with
+   no flow reads every `review:` as it does today. Under a flow every member stage's role is held on
+   the same paths: a path held for one role only (today's per-role `review.held`) is not kept, and a
+   repo that needs it waits for TD-314's path sets — none of the four repos does today.
+3. **A person in the team** (§4.9 *A person in the team*, whose union sentence points here) takes
+   the reader the current flow gives: `reader: techlead` and the repos' `held:` when the flow has a
+   review stage, no reader when it has none. A team with no flow keeps today's union.
+4. **Entries.** `entries.feature` defaults to the role of the current flow's stage whose `lane`
+   holds `design-first`, when it has one; otherwise it stays the `techlead` it is today
+   (`TeamDef.entry_role`; `org._entries_resolve` checks the names). The team's own `entries:` wins.
+5. **The brief.** Every role template, `designer.md` included, gains **`{flow}`** and **`{stage}`**
+   (`entry.md` is no brief's base). `{flow}` is filled with the current flow's path in two to five
+   generated lines — the stages in order by role, the member's own stage marked, the seat by its
+   id, and the person last: *This team's flow (td): design (designer) → **build** (grinder) → review
+   (techlead-ao-1, on src/sessionorc/**, docs/briefs/**) → you, through techlead-ao-1.* No member's
+   id is in it, so a member added or removed changes no sibling's brief — the review's paths are the ones this member's PRs are held on (its
+   compiled `review.held`), for a seat or the manager the repos' `held:`. `{stage}` is handed as a
+   **file slot** (`{file: <the stage brief's path>}`, §6 rule 7), so an edit to a stage brief is
+   read again at every replay and marks the member *brief changed* as an edited supplement does;
+   `{flow}` is a text slot, as `{lane}` is. A member outside the flows reads *you stand outside it*
+   in `{flow}` and `none` in `{stage}`, as does the manager; the techlead seat reads the review
+   stage's brief where the flow has one, and `none` where it has not. A session with no team, or a
+   team with no flow, reads `none` in `{flow}` and its role's `<role>.stage.md` in `{stage}` (for a
+   role defined in a directory, `template.stage.md` beside its `template.md`; `none`
+   where the package ships none). **A replay of a record whose `prompt_from` names neither** — every
+   record written before the build — is told what it was told before: the build makes
+   `sessionorc.brief.fill`, on a record whose `base` is the package's template — its `slots` name
+   `{repo}`, which only a template fills — read `base`'s text before any slot is filled for the
+   package's placeholder shape — lower-case letters between `{` and `}` with nothing else — and fill
+   each one `slots` does not name from **the file beside `base` named `<base's stem>.<slot>.md`**
+   when there is one (`grinder.stage.md` for `{stage}`; the stem is the installed file's, so
+   `manager_on_call.md` looks for `manager_on_call.stage.md`, and finds none, `none`), else with
+   `none`. The host agent still knows a file and a slot and no role, flow or team: the default is a
+   file convention. The default pass reads `base` alone, so a brace word that arrives in a slot's
+   text (a supplement's, a stage brief's, the primer's) is never touched by it — though a later
+   slot's plain replacement still replaces a slot's name wherever an earlier slot's text wrote it,
+   as it does today; that hazard is not this design's and is named, not removed. A side effect, wanted: a techlead
+   record written before `{entry}` existed (TD-219) replays it as `none` rather than the literal.
+   The same sentence goes into §6 rule 7.
+
+**Switching, and editing a flow, apply themselves.** Two changes reach a running team without a hand
+edit anywhere:
+
+- **An edit to a stage brief** is a file change, and §6 rule 7 already acts on it: the home reads the
+  `{stage}` file as it reads a supplement, marks each member whose brief it is *brief changed* after
+  `BRIEF_SETTLE`, restarts the idle ones and tells the working ones on their `ao` replies. A
+  built-in's brief changes at a promote, as a template does; an org flow's when its file is saved;
+  a repo flow's when its PR merges (read as merged, `origin/<default>`).
+- **A switch of flow** (the setting), and **an edit to a flow's stages or to the definition** that
+  changes what the start would compile, change lanes, readers and who works — which no replay
+  recomposes, since the host agent never reads a flow. The client composes them: whenever a client
+  reads a live team (the Org page, `ao team list`, `ao team flow`) it compiles the team's current
+  flow and compares it, member by member, with the records — lane, `review`, the `{stage}` file's
+  path in `prompt_from`, and who should be running (never `{flow}`'s text, which names no member,
+  and never a key the definition writes, which wins over the flow and so never differs from it; an
+  interactive member is compared on nothing — its lane and brief are the person's). A
+  team that differs reads **flow changed — Apply** on its card, a mark beside the flow strip, and `ao
+  team flow <team>` with no flow name prints the differences by member. The switch's confirm says
+  what changes for the person too: who sits out, who starts, who is relaunched, what is left with
+  the reader, and, where the new flow has no design stage, that **Add entry**'s *feature* now opens a
+  techlead (item 4). **`ao team flow <team> <flow>` and the
+  Flow pick write the setting and then Apply at once**; **Apply** (the card's button, `ao team flow
+  <team> --apply`) applies what the definition says now. Applying is, per member: a member the flow
+  now sits out (never an interactive one, above) is **wound down** as **Members…**'s remove winds one down (the wrap-up and a stop
+  now; a `working` member finishes what it holds) — but by the home, from a sit-out form of the
+  same RPC (`relaunch {id, sit_out: true}`, below): the home sends the wrap-up as **Members…**'s
+  remove does and, when its own wrap-up close lands, writes **`closed_for: {why: sit_out, closed_at}`**
+  as rule 9 writes `finished` (`work.closed_finished`); `wound_down` (`sessionorc.work`) skips a
+  record so marked as it skips a `finished` one, rule 9's `finished` passes over it whatever it
+  declared (rules 1, 2 and 7 never recreate it), and §6 rule 8 watches no lane of it — its last lane
+  is not the team's work while the flow does not use it, and a design-first entry filed then raises
+  no *team start* row. The word is `sit_out`, never `flow`: a relaunch's own close under rule 7's
+  machinery writes `closed_for: {why: flow}` with a `restarts` entry and is retried by
+  `_closed_by_tick` until its replay lands, and the sit-out writes no `restarts` entry and is never
+  retried, so the two are never read for each other — a relaunch whose close or replay failed is read
+  by rules 8 and 9 as any failed tick restart is, not as sat out.
+
+  A member the flow now uses that is not live is **started** as **Members…**'s add starts one (`controllers: [manager]`, the anchor rule, its
+  compiled lane, reader and brief).
+
+  A live member whose lane, reader or brief differ is **relaunched**: **its launch record is replaced**. The client hands the home its newly composed
+  launch — `prompt`, `prompt_from`, `lane`, `review`, each replaced as handed and an absent one
+  removed (a switch to `build` takes `review` off), the rest of `LAUNCH_KEYS` standing — in one **`relaunch {id, launch}`** RPC, a person's own (refused to
+  a session, as `set_settings` is); the home writes it as the record's launch record
+  (`launch/<id>.json`; `launch/<id>@<host>.json` for a node member, kept at the home as every node
+  launch record is), **re-records `brief` from the new `prompt_from`** (`brief.record`, as a create
+  does) and clears `brief_changed`, so rule 7 watches the new stage brief and not the old, and marks
+  the record **`relaunch: {at}`** (home-owned). From then on **every**
+  replay — rules 1, 2, 3 and 7 and the person's `restart` — reads the new launch record, as each
+  already reads the launch record; nothing else learns of a relaunch, and a create under the name by
+  anyone clears the mark, since a create writes a launch record. The one new behaviour is the
+  restart the mark asks for, **under rule 7's conditions** and through rule 7's own machinery, with
+  the mark as a second trigger beside `brief_changed`: a close or replay that failed is retried
+  through `_closed_by_tick` under `why: flow` as `brief` is, and a member's `restart` word said while
+  the mark stands is never *early*, as one said under `brief_changed` is not (§6 rule 2): a hook-confirmed idle member holding no
+  claim in progress, with nothing uncommitted or unpushed, is closed and created again by the tick,
+  `restarts: [{why: flow}]`, under the ceiling; a working member is told on its `ao` replies (*your
+  team's flow changed — finish what you hold, then `ao progress restart --why "flow changed"`*) and
+  rule 2 restarts it on its word. **A seat** is never restarted for it: the relaunch replaces its
+  launch record — its `prompt` and `prompt_from` with the rest — and nothing more, and its next fill,
+  a replay of that record, reads the new prompt. An interactive session is never relaunched. **A
+  member on a node** is told on its `ao` replies and restarted by rule 2 on its word, as on the home —
+  the client composes a node member's launch from the node's files as a start does (`teams.Files`
+  over the link: the node's checkout for the repo's supplement and a repo flow's briefs, the wheel the
+  node runs for the templates and the built-ins), and a replay creates over the link; with the link
+  down, Apply skips that member and says so (*grinder-cm-1: contractmatch is not answering — applied
+  to the others*), and the card keeps *flow changed* on it — and only the tick's own idle restart is
+  withheld, as rule 7's is (*not on a node yet*); an idle node member's card says *flow changed —
+  restarts when it next works or at the team's next Start*. The launch is opaque to the host agent:
+  its fields are ones it already stores, and it learns one word, `flow`, as a `why` — as it knows
+  `brief` and `wanted` — and no flow's shape.
+- **What a switch leaves alone.** A claim a member holds is its own until it is done or dropped, and
+  a relaunch replays nothing of it but the lease (§4.8). **A PR already asked of a reader stays the
+  reader's**: the ask is on its thread, the seat still answers it, and the grinder template's rule
+  above — *a PR you have asked a reader about is the reader's to merge* — is the builder's, whatever
+  flow it now runs; only PRs opened after the switch follow the new flow. A design entry a designer
+  held when it sat out is released with its lease at the wind-down; it is in no lane under the new
+  flow and waits, as a design-first entry waits today in a repo with no designer, until a flow with a
+  design stage is current again. A person's own session in the team (§4.9 *A person in the team*)
+  took its reader from the flow at its start and is never relaunched: it keeps that reader until it
+  is started again. `ao team flow` prints what it leaves: *grinder-ao-1's PR #1020 stays with
+  techlead-ao-1*.
+
+**What is the repo's: `held:`.** A repo's `.agentorc.yml` gains one top-level key, **`held:`**, the
+paths its techlead reviews before a PR on them merges (`["src/sessionorc/**", "docs/briefs/**"]` for
+agentorc). It is the repo's knowledge, so a flow never carries it; it replaces writing the same
+list in each role's `review:`, which a team with no flow still reads and a team under a flow sets
+aside (item 2).
+
+**What is shown.** The team card's header names its current flow and its **flow strip**
+(*design → build → review → you, through techlead-ao-1*), the **Flow** pick beside it when the team
+lists more than one, the *not followable* mark, *flow changed — Apply* when the records differ, and
+*sits out under <flow>* on a member that sits out. `ao team list` and its `--json` carry `flows`,
+`flow`, the differences and why a flow cannot be followed; `ao org` lists every flow the org can see
+with its source and whether it is usable (§4.7); `ao org check` says, per team,
+which keys it writes that its current flow would fill with the same value — what a repo may delete
+(a lane compares in its written order, which is its pick order; a `held:` list as a set).
+
+**More flows, and more roles.** A new flow is a directory, in the org's or a repo's place:
+
+```yaml
+# ~/.agentorc/flows/hunt/flow.yml — a hunter files, a grinder fixes, nothing reviewed
+stages:
+  - {name: find,  role: hunter,  lane: [free],      brief: find.md}
+  - {name: build, role: grinder, lane: [free-pick], brief: build.md}
+```
+
+A new role is a directory too — `~/.agentorc/roles/security/role.yml` holding `{kind: worker, icon:
+shield, label: security, profile: grind}` and its `template.md` — and is usable at once in any flow
+whose stage wants a worker. A flow that wants a built-in's words for a stage names its brief as
+`package:td/review.md`, so a repo's `[build, review]` with its own build words and `td`'s review
+words copies no prose. **`role.yml`** takes the `ROLE_KEYS` and `kind`, and refuses `brief:` (a
+defined role's mechanics are its `template.md`; a repo's supplement for it is that repo's overlay's
+`brief:`); a role of kind `manager` may ship `template_on_call.md` beside its template, used when the
+team's manager is `on_call: true` as `manager_on_call.md` is for the preset (`ON_CALL_BRIEFS`),
+and without one it can be a standing manager only. Profiles are untouched: per host in `profiles.yml`, a role's profile in
+the org file's overlay or its own `role.yml`. What a repo still repeats of the package — mechanics in
+its supplements — is TD-114's remaining cut, which this design widens to *the path, too*.
+
+**One flow per team; more kinds of work are more teams.** A team runs one flow at a time. Different
+kinds of work on one repo — building the ledger's entries, checking production, a UI-design pass —
+are different teams on that repo, each with its own flow, and they hand work on **through the
+ledger**, which is already the queue every team reads and where a claim is a lease. A *prod-check*
+team whose flow is one stage — a hunter whose lane is the area it probes — files what it finds as
+ledger entries, and the TD team's grinders pick them up like any other; neither team knows of the
+other, and a TD team that wound down is woken by those filings as §6 rule 8 wakes any team whose
+lanes gain work (its `on_work`). Two teams on a repo cost little: their managers and techlead seats are on call (§6 rule 3,
+TD-259), filled only when something needs them, and each team keeps its own schedule, stop time and
+reserve (§5 `teams.<team>`), so a nightly prod check runs on a small reserve beside the day's
+building. A `balance:` line on either team reads the repo's open PRs, the other team's included
+(§6 *Balance*), so it is set with both in mind. What they do not share is the techlead seat: each team's held PRs are read by its own,
+both reading the repo's one primer; if one reader for every held PR on a repo ever matters, the
+step is teams sharing a seat, not one team running several flows. Add entry hands to the first team
+that services the repo, as it does (§4.9 *Add an entry to the ledger*).
+
+**Migration.** A flow is opt-in, so a team whose file is unchanged lists none and is told what it
+is told today: the path paragraphs leave the templates for `<role>.stage.md`, which fills a no-flow
+team's `{stage}` at a start and a pre-build record's at a replay, so the words a member reads are the
+same words in the same place. The promote changes every template, so §6 rule 7 marks every member's
+brief changed and restarts the idle ones; their `{flow}` reads `none` until the team is next started
+or applied by a client (a member on a node replays its stored prompt whole, and keeps its pre-build
+text until it is created again). **Each repo
+moves after the promote**, never before: `repoconfig` refuses an unknown top-level key (*is not a
+`.agentorc.yml` key*), so a `held:` or a team's `flows:` written before the live copy knows it
+breaks every read of that file — cm-grind's node included, provisioned from the same wheel (§4.4a).
+Then, in its own PR, each repo writes `held:` (which, under a flow, replaces its roles' `review:`
+lists: samscrape's `docs/briefs/**` and contractmatch's `docs/briefs/**` and
+`workers-api/migrations/**` move up, and the roles' `review:` keys are then deleted, as `ao org
+check` names them), lists its flows (ao-grind `[td,
+build-review]`; samscrape-grind and cm-grind `[build-review, build]`; dc-grind `[build]`, and
+`build-review` once it writes `held:`), deletes what `ao org check` names, and cuts the path out of
+its supplements. The built-ins' lanes carry `owner:grinder`; an owner word narrows a lane only
+where an entry writes an `Owner:` line (§6 rule 6: an entry with none matches), and the ledgers of
+samscrape, contractmatch and dev-cadence write none, so their grinders pick exactly what
+`free-pick` picks today; a repo whose ledger later writes `Owner:` lines keeps a member `lane:` of
+its own if it wants the old reach, since a member's lane wins. Under `build` a seat reads no review brief: dc-grind's techlead, which today reads
+the held-PR words of its template, no longer does — intended, since under `build` nothing is held and
+the seat answers questions only.
+
+Rejected: **an engine that moves an entry from stage to stage** — the host agent would key on a
+stage, which is a role by another name (§9 invariant 9, §4.8 *capabilities, not roles*), and it
+would take the judgement the designer's obvious / steer / ask split and the techlead's filter
+exist for; the facts that end a stage are already read. **A flow per entry** (Paul: per team).
+**Stages merged by key across layers** (two lists have no one merge). **The UI check and escalation
+as stage keys** (the check's tooling is the repo's, TD-291, and a key would not make one exist for
+another repo's UI; escalation is §4.9b's route for every team). **`flow` and `stage` on the record**
+(a stage on the record is a role badge twice; the relaunch carries fields the record already has).
+**A stage a team may skip** (`optional`, the first draft's: Paul preferred the flow said plainly and
+changed). **`td` as every team's default** (opt-in needs no skipping). **`read` for the techlead's
+stage** (Paul: too passive). **The flow as a definition key alone** (the second draft's `flow:`: a
+switch was a file edit and a restart — Paul: *we do all of this work to define flows and then we
+have to hand-jam any changes anyway*). **Per-repo stage briefs** (a repo's own words for a built-in's
+stage would be the path described per repo again; a repo that needs different words defines its own
+flow). **Copying a built-in's stage brief into a repo flow** (the per-repo prose Paul wanted gone;
+`package:` reaches it instead — an earlier round cut `package:` as a second path scheme before the
+built-in names were reserved, which left a copy as the only road). **Flows and defined roles as keys of `org.yml` and `.agentorc.yml`** (the third draft's: a
+page that made one would splice a block into a shared file, which **Members…** already refuses to do
+beyond one line; a directory of whole files is what a page can write). **A role's `review:` winning
+over the flow** (the third draft's: it left the path partly on the role, and roles and flows were not
+apart). **Any seat role in a review stage, now** (the held-PR machinery knows one reader seat;
+TD-314 designs more). **Several flows running at once on one team** (asked 2026-10-04: a prod-check flow beside `td`): it
+would need a rule for which flow an entry belongs to, a binding of each member to one flow, a
+followability over a set, and switches per flow — each of which is *which team* when a team runs one
+flow; the ledger already hands work between teams, and a shared seat is the smaller step if one
+reader per repo is wanted. **A switch that waits for every member to idle** (a busy member would hold the team's path;
+each member moves when it can, and the card shows who has not).
+
+**Done when** `ao team start ao-grind` with `flows: [td, build-review]`, a top-level `held:`, and
+none of the lanes, `review:` readers or `entries:` written in agentorc's `.agentorc.yml` (and its
+`designer-ao-1.md` cut to a supplement) starts the same records it starts today, its members' briefs carrying the `{flow}` lines ending *→ you* and
+`td`'s stage briefs; `ao team flow ao-grind build-review` winds the designer down, relaunches the
+idle grinders with `build-review/build.md`, tells a working one, and leaves a PR already asked of
+the techlead with the techlead; an edit to `td/build.md` reaches the grinders as *brief changed*;
+`samscrape-grind` listing `td` is refused with *no designer*; a flow naming a `worker` role in a
+review stage, or a `hunter` where its stage has no lane, is *not usable*; a flow whose stage names a
+missing brief is *not usable* in `ao org check`; a repo's `[build, review]` flow naming
+`package:td/review.md` starts with `td`'s review words; a switch leaves an interactive member
+running with *close it yourself*; and, with TD-313, a role directory under `~/.agentorc/roles/` is
+used by an org flow with no other file changed and a `hunt` flow in the org's directory starts a
+hunter and a grinder with their lanes and briefs from it; the techlead seat's next fill after a switch to
+`build` reads no review brief; and a **Members…** add of a grinder raises no *flow changed* on its
+siblings.
 
 ### 4.10 Messages between sessions
 
@@ -6706,6 +7277,7 @@ teams:                                        # per team, by the name org.yml or
     until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
     reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
     on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
+    flow: build-review                        # §4.9c (TD-307; not built — TD-309): which of the team's flows: it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
   agentorc: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .agentorc.yml); §6 *Pull*: the checkout follows origin, on when absent (TD-222)
@@ -6778,8 +7350,10 @@ roles:                                # §4.8 presets; every key optional, built
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
+held: ["src/sessionorc/**"]           # §4.9c (TD-307, not built — TD-309): the paths a review stage holds (the `build` flow holds nothing)
+                                      # this repo's own flows and roles are directories in .agentorc/, not keys (§4.9c)
 teams:                                # §4.9: the repo's own teams, aggregated into the org (TD-210); org.yml wins a name
-  grind: {manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
+  grind: {flows: [build], manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]   # read by nothing yet
 commands:                             # read by nothing yet
   - name: test        ; run: pdm run test
@@ -7309,7 +7883,12 @@ code and needs no grant; a session doing the same work does.
      the org's reach at the start and no brief's file — and the launch record keeps it; a prompt a
      person typed whole (`ao new --prompt`, the form's Opening prompt) sends none. A replay — rules 1, 2 and 3, and this one — fills `base`'s slots
      from those files and texts, plain replacement of the slot's name and nothing else, and hands
-     that to `create`; the host agent knows a file and a slot and no role, template or team, and
+     that to `create` — and, once TD-309 is built, where `base` is the package's template (its
+     `slots` name `{repo}`), any placeholder of `base` (lower-case letters alone between `{` and `}`)
+     the record's `slots` do not name is filled from the file beside `base` named `<base's
+     stem>.<slot>.md` where there is one, else `none`, so a template that gains a slot never replays
+     it literally (§4.9c item 5); and a record carrying **`relaunch: {at}`** (§4.9c *Switching*) is
+     restarted under this rule's conditions as one carrying `brief_changed` is; the host agent knows a file and a slot and no role, template or team, and
      still never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a
      running team's brief; the template is the installed package's, so it is what was promoted.
@@ -7349,7 +7928,9 @@ code and needs no grant; a session doing the same work does.
      `on_work` and `clear_work` built — TD-227 slice 2; the start built — slice 4, its fifth bound with TD-239; the row, the card's note, `ao team on-work`, `ao team list`'s words and the Settings page's picker built — slice 3). A
      team that winds down closes its members, so rule 6 has nobody to tell: ao-grind wound down
      at 2026-09-28T06:56Z, its designer's lane gained ten entries over the day, and the team sat
-     until a person saw the page. The tick keeps `lane_seen` for a member that is gone as it
+     until a person saw the page. A member the current flow sits out (`closed_for: {why: sit_out}`,
+     §4.9c; TD-309) is passed over: no lane of it is watched, and `wound_down` skips it as it skips a
+     `finished` one. The tick keeps `lane_seen` for a member that is gone as it
      does for a live one, and reads a team as **wound down** as its card does (§4.5a *wound
      down* note), over the team's **unattended** sessions as the card's reading is (§4.9 *A
      person in the team*): none of them live, and every one that is not a seat — the record's
@@ -7482,7 +8063,9 @@ code and needs no grant; a session doing the same work does.
      holds an open `ask` or `steer` from it about a reference — **blocks it too**, declared or
      not, its clause naming the reference and the bound, so `finished` reads the person inbox's
      open entries beside the records; any other dead
-     record is passed over, as *concluded* passes it over now. `restart` is true when any
+     record is passed over, as *concluded* passes it over now; and a record the current flow sat out
+     (`closed_for: {why: sit_out}`, §4.9c; TD-309) is passed over whatever it declared — rules 1, 2 and 7
+     never recreate it, so a `restart_wanted` on it would otherwise block the reading for good. `restart` is true when any
      counted member carries `restart_wanted`: the page reads *concluded · restart wanted* then,
      mixed with declarations of `out_of_work` or not, as it does today, and **the tick winds
      down only a team whose `restart` is false** — one that wants another run is rule 2's.
@@ -8410,6 +8993,18 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       computing the facts while the manager still acts (a round per event, and a session that must
       exist); sends and closes on the tick with creates left to the manager (leaves the restarts,
       the cases that matter). Build is TD-103; TD-104 folds into it.
+
+- [x] Flows (2026-10-04, TD-307): Paul asked for the TD path — designer if needed, grinder with a UI
+      check if needed, techlead, the person if needed — defined once and reused, and for more paths;
+      *per team*. **Decided**: a named flow of stages — a role, its lane and its stage brief each —
+      that owns the words describing the path; a team lists the flows it may run and the person picks
+      one as a setting, and a switch or an edit applies itself (relaunch under rule 7's conditions);
+      no engine, no record flow field, the UI check and the route to the person unchanged and shown
+      as every flow's last word (§4.9c). Opt-in; a flow usable only when whole; a team that cannot
+      staff a listed flow is told so and refused, never skipped (Paul, on the first and second
+      drafts). Roles and flows orthogonal, meeting only at a role's `kind`; each flow and each
+      defined role a directory of whole files, so a page can create them later (Paul, on the third).
+      Reviewed in Fable rounds.
 
 ## 11. References
 
