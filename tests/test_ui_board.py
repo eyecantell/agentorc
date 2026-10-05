@@ -1706,3 +1706,55 @@ def test_a_block_with_nothing_to_press_is_folded_shut_and_no_block_draws_as_befo
     for d in ({}, {"detail": []}, {"detail": "- **Context:** x"}, {"detail": [1, 2]}):
         rows, html = rows_html(tmp_path, monkeypatch, {**plain, **d})
         assert rows[0]["detail"] == "" and '<details class="fold"' not in html
+
+
+@pytest.mark.unit
+def test_the_standing_says_whom_a_reply_reaches_before_the_press():
+    """design §4.5a *Inbox board row: standing* (TD-142): a live lease on one of the item's refs is
+    *still on <ref> — <holder> holds it*; else a live record the item's session names is *moved on*;
+    else *gone*; an item with no session and no refs draws nothing."""
+    from agentorc.ui.inbox import board_standing
+
+    now = datetime(2026, 9, 22, 12, tzinfo=UTC)
+    lease = {"ref": "TD-122", "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
+    row = {"repo": "agentorc", "refs": ["TD-9", "TD-122"], "session": "grinder-ao-1"}
+    holder = {"id": "ao-x-2", "name": "grinder-ao-2", "state": "working", "progress": [lease]}
+    named = {"id": "ao-x-1", "name": "grinder-ao-1", "state": "idle", "progress": []}
+    got = board_standing(row, [named, holder], now)
+    assert got == {
+        "word": "still on",
+        "holder": "grinder-ao-2",
+        "ref": "TD-122",
+        "text": "still on TD-122 — grinder-ao-2 holds it",
+    }
+    assert board_standing(row, [named], now)["text"] == "moved on"
+    assert board_standing(row, [{**named, "state": "exited"}], now)["text"] == "gone"
+    # an expired lease, or a closed holder, holds nothing
+    old = {**holder, "progress": [{**lease, "at": (now - timedelta(days=2)).isoformat()}]}
+    assert board_standing(row, [old], now)["text"] == "gone"
+    assert board_standing(row, [{**holder, "state": "closed"}], now)["text"] == "gone"
+    assert board_standing({"repo": "agentorc", "refs": [], "session": ""}, [holder], now) is None
+
+
+@pytest.mark.unit
+def test_the_row_draws_its_standing_and_hands_its_refs_to_reply(tmp_path, monkeypatch):
+    host(tmp_path, monkeypatch)
+    from agentorc.ui.app import board_rows, inbox_sections, templates, with_standings
+    from agentorc.ui.inbox import board_horizon
+
+    now = datetime(2026, 9, 22, 12, tzinfo=UTC)
+    lease = {"ref": "TD-122", "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
+    holder = {"id": "ao-x-2", "name": "grinder-ao-2", "state": "working", "progress": [lease]}
+    due = {**item(4, "**Rebase it.** Context: TD-122. Due: 2026-09-20.", "2026-09-20", "2d overdue")}
+    due.update(session="grinder-ao-1", refs=["TD-122"])
+    ahead = {**item(5, "**Later.** Due: 2026-09-25.", "2026-09-25", ""), "session": "grinder-ao-1", "refs": []}
+    ahead["overdue_days"] = None
+    rows = board_rows(report(tmp_path / "agentorc", due, ahead))
+    s = inbox_sections([], now=now, boards=rows, fleet=[holder])
+    html = templates.get_template("inbox_rows.html").render(rows=s["needs"], section="needs")
+    assert "grinder-ao-1 · still on TD-122 — grinder-ao-2 holds it" in html
+    assert "data-refs='[\"TD-122\"]'" in html and "mailed to grinder-ao-2 (holds TD-122)" in html
+    # the horizon's coming-up rows carry theirs too; the cache's rows are never written to
+    hz = with_standings(board_horizon(rows, "all"), [holder], now)
+    assert [r["standing"]["text"] for r in hz["ahead"]] == ["gone"]
+    assert all("standing" not in r for r in rows)

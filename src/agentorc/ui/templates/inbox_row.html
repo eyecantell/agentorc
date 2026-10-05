@@ -655,6 +655,13 @@
   <span class="ref" title="{{ e.board }}">{{ e.repo }}</span>
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-board">board</span>
+  {#- §4.5a *Inbox board row: standing* (TD-142): where a Reply goes, said before the press, beside
+      the sender's name — *still on TD-122 — grinder-ao-2 holds it*, *moved on* or *gone* — from the
+      records the page holds; a word, never a control. Under *Waiting on them* the *waiting on …*
+      line says it instead. -#}
+  {%- if e.standing and section != 'waiting' %}
+  <span class="st boardstanding" title="where a Reply goes: always the board line; mailed as well to a live session holding the lease on one of its references">{% if e.session %}{{ e.session }} · {% endif %}{{ e.standing.text }}</span>
+  {%- endif %}
   <span class="grow"></span>
   <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
 </div>
@@ -732,7 +739,7 @@
   {%- if not waits %}<button class="btn sm ghost" disabled title="{{ ORIGIN_READONLY }}">Snooze</button>{% endif %}
   <button class="btn sm" disabled title="{{ ORIGIN_READONLY }}">Done</button>
   {%- else %}
-  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-name="{{ e.repo }}'s board" title="your words appended to this line of the board — one commit, never pushed; the line stays due">Reply</button>
+  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo }}'s board" title="your words appended to this line of the board — one commit, never pushed; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
   {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
       steer row's words and place; the one press records the default — the same `decide`. -#}
   {%- if gwi %}<button class="btn sm ghost" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo }}'s board as your decision.">Go with it</button>{% endif %}

@@ -185,6 +185,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     WORKS,  # noqa: F401
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
+    _board_holder,  # noqa: F401
+    _board_named,  # noqa: F401
     _civil,  # noqa: F401
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
@@ -214,6 +216,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_line,  # noqa: F401
     board_reader,  # noqa: F401
     board_rows,  # noqa: F401
+    board_standing,  # noqa: F401
+    board_standings,  # noqa: F401
     board_text,  # noqa: F401
     board_waiting_on,  # noqa: F401
     board_waits,  # noqa: F401
@@ -247,6 +251,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
     unclosed_mark,  # noqa: F401
+    with_standings,
     work_held,  # noqa: F401
     work_ids,  # noqa: F401
     work_note,  # noqa: F401
@@ -1132,7 +1137,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         rel = (r.get("ledger") or {}).get("path") or ""
         ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
         # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)
-        hz = horizon_of((await board_view())[0], str(r.get("root") or ""))
+        hz = with_standings(horizon_of((await board_view())[0], str(r.get("root") or "")), sessions, now)
         boards = hz["due"]
         ctx = {
             "r": r,
@@ -2568,6 +2573,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if agent_down
             else await board_view()
         )
+        hz = with_standings(hz, fleet)
         sections = inbox_sections(
             got["entries"],
             states=states,
@@ -2720,6 +2726,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "why": str(e.detail),
             }
         hz, board_note = await board_view()
+        hz = with_standings(hz, fleet)
         sections = inbox_sections(
             got["entries"],
             states=states,

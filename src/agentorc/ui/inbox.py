@@ -1109,20 +1109,77 @@ def board_waiting_on(r: Mapping[str, Any], records: Collection[Mapping[str, Any]
     grinder-ao-2 — holds TD-122*), else a live record the item's `session` names, else the next
     session to read the repo's board. Read from the fleet the page already holds, as
     `orphan_standing` reads it for mail; display only."""
+    holder, ref = _board_holder(r, records, now)
+    if holder:
+        return f"waiting on {holder} — holds {ref}"
+    named = _board_named(r, records)
+    if named:
+        return f"waiting on {named}"
+    return f"waiting on the next session to read {r.get('repo') or 'its repo'}'s board"
+
+
+def _board_holder(r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime) -> tuple[str, str]:
+    """The first live record with an unexpired declared lease on one of a board row's `refs`, as
+    `(name, ref)` — the session `board_reply` hands its note to — or `("", "")`."""
     for ref in r.get("refs") or ():
         held = mail_mod.lease_holders(str(ref), records, now)
         if held:
-            return f"waiting on {held[0].get('name') or held[0].get('id')} — holds {ref}"
+            return str(held[0].get("name") or held[0].get("id") or ""), str(ref)
+    return "", ""
+
+
+def _board_named(r: Mapping[str, Any], records: Collection[Mapping[str, Any]]) -> str:
+    """The name of a live record the board row's `session` names (its name, its id, or its tool's
+    session id by the board's eight-character prefix), or empty."""
     sess = str(r.get("session") or "")
-    if sess:
-        for rec in records:
-            if not isinstance(rec, Mapping) or rec.get("state") in mail_mod._NOT_LIVE:
-                continue
-            if sess in (rec.get("name"), rec.get("id")) or (
-                len(sess) >= 8 and str(rec.get("adapter_id") or "").startswith(sess)
-            ):
-                return f"waiting on {rec.get('name') or rec.get('id')}"
-    return f"waiting on the next session to read {r.get('repo') or 'its repo'}'s board"
+    if not sess:
+        return ""
+    for rec in records:
+        if not isinstance(rec, Mapping) or rec.get("state") in mail_mod._NOT_LIVE:
+            continue
+        if sess in (rec.get("name"), rec.get("id")) or (
+            len(sess) >= 8 and str(rec.get("adapter_id") or "").startswith(sess)
+        ):
+            return str(rec.get("name") or rec.get("id") or "")
+    return ""
+
+
+def board_standing(
+    r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime
+) -> dict[str, str] | None:
+    """A board row's **standing** (design §4.5a *Inbox board row: standing*, TD-142): where a Reply
+    will go, said before the press — *still on TD-122 — grinder-ao-2 holds it* while a live record
+    holds an unexpired declared lease on one of the item's `refs` (Reply mails it), else *moved on*
+    while a live record carries the item's `session` name, else *gone*. `word` is `still on`,
+    `moved on` or `gone`; `holder` and `ref` name the lease. None for an item the reader gave no
+    `session` and no `refs`: nothing is known, so nothing is drawn. Read from the records the page
+    already holds; display only — the home reads the leases again at the press."""
+    if not r.get("session") and not r.get("refs"):
+        return None
+    holder, ref = _board_holder(r, records, now)
+    if holder:
+        return {"word": "still on", "holder": holder, "ref": ref, "text": f"still on {ref} — {holder} holds it"}
+    word = "moved on" if _board_named(r, records) else "gone"
+    return {"word": word, "holder": "", "ref": "", "text": word}
+
+
+def board_standings(
+    rows: Collection[dict[str, Any]], records: Collection[Mapping[str, Any]], now: datetime | None = None
+) -> list[dict[str, Any]]:
+    """`rows` as copies carrying their `standing` (`board_standing`) — copies, because the board
+    rows are the page's cache, read again by the next request."""
+    at = now or datetime.now(UTC)
+    return [{**r, "standing": board_standing(r, records, at)} if r.get("row") == "board" else r for r in rows]
+
+
+def with_standings(
+    hz: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime | None = None
+) -> dict[str, Any]:
+    """A board horizon (`board_horizon`, `horizon_of`) whose drawn rows — due, coming up and the
+    *not shown* fold — carry their `standing`; the answered rows under *Waiting on them* say
+    *waiting on …* instead and are left as they are."""
+    at = now or datetime.now(UTC)
+    return {**hz, **{k: board_standings(hz.get(k) or (), records, at) for k in ("due", "ahead", "hidden")}}
 
 
 def board_detail(it: Mapping[str, Any]) -> str:
@@ -1592,7 +1649,7 @@ def inbox_sections(
             # a copy: the board rows are the page's cache, read again by the next request
             out["waiting"].append({**r, "waiting_on": board_waiting_on(r, fleet, at)})
         else:
-            out["needs"].append(r)
+            out["needs"].append({**r, "standing": board_standing(r, fleet, at)})
     out["needs"].sort(key=_needs_key)
     out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
     out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("answered_at") or e.get("at") or ""))
