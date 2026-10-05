@@ -95,7 +95,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
-| TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
 | TD-332 | A PR whose cadence read is settled but not merged is read again with `gh pr view` every pass | Low | Open |
 
@@ -1659,22 +1658,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** on a scratch home with the switch on, a session going `needs-you` with no page open produces exactly one recorded send after the hold, whose link opens the Inbox on that row; with a page visible it produces none; and the suite passes. **Then a live check that is Paul's** (it needs the Doppler config's name saved on the Settings page and his phone): **Send a test** arrives, and one real `needs-you` reaches him once — TD-092 archives on that.
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
-
-## TD-329: A team member whose `profile:` names a shell profile starts Claude Code
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-2, found pressing TD-099's live check on a scratch home)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — **decided 2026-10-05 (techlead-ao-1's answer to grinder-ao-2's steer, mail `m-354be66e09a0`):** refuse at `teams.plan` a member or manager whose profile's adapter is the shell's, in the words `ao team start`, Start and `ao org check` share, and say so in design §4.9 in the same PR; **and** `Launch.create_params` sends the profile's own adapter, not `profiles.DEFAULT_ADAPTER`, so no record names a profile whose tool it is not running. The test of *an agent's* is `adapter` is not the shell's, as §4.1's anchor rule scopes it, never keyed on a role. A refusal that needs more than `plan` and its three callers is said on that thread first.
-**Location:** `src/agentorc/teams.py` (`Launch.create_params`: `"adapter": profiles.DEFAULT_ADAPTER`), `src/agentorc/profiles.py` (`Profile.adapter`), design §4.2a (a profile names its adapter), §4.9
-
-**Why:** a team definition's member `{role: grinder, profile: sh}`, where `profiles.yml` gives `sh` `adapter: shell`, was started by `ao team start` as a `claude-code` session with the profile `sh` on its record, and sat on Claude Code's first-run screens. Every create a team start makes sends the default adapter whatever the profile says, so the record names a profile whose tool it is not running. The New session form already derives the adapter from the profile (`ui/app.py` `profile_adapter`, TD-284 slice 2); a team start does not.
-
-**Fix:** derive the create's `adapter` from the member's profile as the form does, or refuse at `teams.plan` a member whose profile's adapter is not an agent's (a team member runs a brief, which a shell cannot), in the words `ao org check` and Start share. Which of the two is a design call: a shell member has no use today, so refusing is the conservative reading.
-
-**Done when:** a team start never records a profile whose adapter differs from the session's.
 
 ## TD-330: Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo
 
