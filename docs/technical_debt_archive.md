@@ -4188,3 +4188,26 @@ Both go away only when the record says who closed it.
 **Resolved:** 2026-10-05 (designed 2026-09-28, PR #719; built by TD-226, PRs #757 and #777; live check held: PR #1075 — `ao promote --back` pressed on two scratch homes, live went back and `ao promote status` and the Inbox row read *rolled back from*) — design §6 *A rollback*, §4.7 (`--sha`, `--back`, `ao promote clear`), §5 `promote:`, §4.5a *Inbox row: promote*; the glossary's *rollback*.
 
 **Related:** TD-132 (the promote), TD-062 (why the live copy is promoted, not edited), #666.
+
+## TD-214: A wound-down team never starts again when its lanes gain work
+
+**Priority:** Medium
+**Added:** 2026-09-28 (Paul: *it looks like the dc-grind and ao-grind teams both have work to do but are both idle — should they restart automatically?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-09-28 (the designer, PR #721; the steer to Paul is `m-9bcd1abd8d1a`, bound 2026-09-29 10:14 MDT): design §6 *Keeping a team running* rule 8 (**Work for a team that wound down**) and rule 6 (the first write at the declaration, the `owner:` lane word), §4.9a, §5 `teams.<team>.on_work`, §4.7 `ao team on-work`, §4.5a *Inbox row: team start*, *work waiting* note and the Settings page's Teams row; the glossary. The default is `ask`; `start` is the person's setting. The owner words themselves are `org.yml`'s, on the board for Paul. Closes with TD-227. **Built by TD-227** (PRs #784 and #788 and the slices its Status names), whose live check held on 2026-10-05 (PR #1079); archived with it.
+**Blocked by:** TD-227
+**Location:** design §6 (*Keeping a team running*, rule 6), §4.9a (wind-down), `src/sessionorc/agent_tick.py` (rule 6: `lane_seen`), the team's Start (`agentorc.teamrun`), TD-133 (schedules)
+
+**Why:** ao-grind wound down at 2026-09-28T06:56Z. Every member had declared out of work, so the manager closed them and exited. Over the next day the designer's lane gained entries (TD-198, 199, 203, 206, 207, 208, 210, 212, 213, and TD-180 once answered), and nothing started the team again; Paul noticed at the Org page and the anchor pressed Start. Three gaps:
+1. **Nothing restarts a wound-down team.** Start is a person's press or `ao team start`; the schedule that could press it (TD-133) is designed and not built, and it is a clock, not a response to work.
+2. **Rule 6 (TD-195) cannot reach a closed member.** It tells a *live* finished member its lane gained work. The wind-down closes the members, so the rule has nobody to tell.
+3. **Rule 6's first reading counts today's backlog as seen.** When TD-195 went live with the promote of `9a023752`, its first tick (15:00:19Z) wrote each finished member's `lane_seen` as every entry then matching its lane, as §6 says, *written on the first tick after the declaration*. The designer's ten entries were thus recorded as seen and would never have been told: nine filed after its declaration of 2026-09-27T14:27Z (TD-198 to TD-213), and TD-180, filed earlier but made pickable again by Paul's answer on 2026-09-28. The rule is right from here on; it was wrong for the backlog it went live on. Also: `free-pick` matches by `Pickable` and `Kind` but not `Owner`, so grinder-ao-1's `lane_seen` holds TD-159, an anchor evaluation.
+
+dc-grind is the other case: its grinder is live, idle and truly out of work (four entries wait on Paul's decisions), which is working as designed.
+
+**Fix:** design (1) a team-level rule: when a wound-down team's lanes (its members' lane words matched against the ledger reading, as rule 6 does) gain an entry filed or made pickable after the wind-down, the home starts the team again, the same sequence as Start. Bounded by the usage gate, the team's stop time, a per-day start budget, and a person's *hold* on the team, and saying so on the team card (*restarted: TD-213 filed*). Or it puts a *Start?* row in the Inbox instead, if an automatic start is too much; the round decides which, maybe per team. (2) `lane_seen`'s first write takes the declaration's time: entries filed, or made pickable, after `out_of_work.at` are new even if the first tick is later. (3) The lane match keys on `Owner` as well (the grinder's lane is `Owner: grinder`, the designer's `Owner: designer`). Then the build. Done when an entry filed into a wound-down team's lane starts the team (or asks the person to) within a tick or two, and a promote that turns rule 6 on does not swallow the backlog.
+
+**Resolved:** 2026-10-05 (designed 2026-09-28, PR #721; built by TD-227, PRs #784 and #788 and the slices its Status names; live check held: PR #1079 — on a scratch home an entry merged into a wound-down team's lane drew the *team start* row under *Needs you*, and `on_work: start` started the team with the card saying why. Not pressed there, as TD-227's `Resolved:` says: a promote that turns the rule on telling a finished member of what was filed since it declared, a rollout's one-time event) — design §6 *Keeping a team running* rules 6 and 8, §4.9a, §5 `teams.<team>.on_work`, §4.7 `ao team on-work`, §4.5a *Inbox row: team start*.
+
+**Related:** TD-187 / TD-195 (rule 6), TD-133 (schedules), TD-053 (the wind-down), TD-213 (the wind-down drops the person's questions), TD-199 (a running member keeps its start brief).
