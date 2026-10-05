@@ -36,6 +36,7 @@ def repo_flow(root: Path, name: str, stages: list[dict], briefs: dict[str, str] 
 def test_every_preset_has_a_kind_and_an_overlay_may_not_write_one(tmp_path):
     kinds = {n: repoconfig.resolve_role(cfg_with(tmp_path), n).kind for n in repoconfig.PRESETS}
     assert kinds == {
+        "designer": "worker",
         "grinder": "worker",
         "hunter": "worker",
         "manager": "manager",
@@ -46,9 +47,7 @@ def test_every_preset_has_a_kind_and_an_overlay_may_not_write_one(tmp_path):
     with pytest.raises(ValueError, match=r"grinder.kind: a role's kind is its definition's"):
         cfg_with(tmp_path, "roles:\n  grinder: {kind: seat}\n")
     # a key-only role writes no kind and is a worker
-    assert (
-        repoconfig.resolve_role(cfg_with(tmp_path, "roles:\n  designer: {brief: d.md}\n"), "designer").kind == "worker"
-    )
+    assert repoconfig.resolve_role(cfg_with(tmp_path, "roles:\n  scout: {brief: d.md}\n"), "scout").kind == "worker"
 
 
 def test_held_is_a_top_level_list_of_paths(tmp_path):
@@ -77,11 +76,9 @@ def test_the_built_in_flows_read_as_the_design_writes_them(tmp_path):
     }
     assert got["build-review"].stages[1].path == flowdefs.PACKAGE_DIR / "td" / "review.md"
     assert all(s.path is not None and s.path.is_file() for f in got.values() for s in f.stages)
-    # `build` and `build-review` are usable anywhere; `td` wherever a `designer` role resolves
+    # all three are usable anywhere: `designer` is a preset (slice 2)
     plain = cfg_with(tmp_path)
-    assert flowdefs.load("build", plain).usable and flowdefs.load("build-review", plain).usable
-    assert flowdefs.load("td", cfg_with(tmp_path, "roles:\n  designer: {brief: d.md}\n")).usable
-    assert "unknown role 'designer'" in flowdefs.load("td", plain).problems[0]
+    assert all(flowdefs.load(n, plain).usable for n in flowdefs.BUILTIN)
 
 
 # ── a repo's flow ────────────────────────────────────────────────────────────────────────────────
@@ -190,12 +187,9 @@ def test_a_team_listing_a_flow_it_can_follow_plans_and_one_it_cannot_is_refused(
         teams.plan(orgmod.load(), "ao-grind", HOST)
     # `build` needs no seat and holds nothing
     teams.plan(_with(tmp_path, flows=["build"]), "ao-grind", HOST)
-    # td: no designer resolves in this repo — not usable; defined, but no member of it — not followable
-    with pytest.raises(teams.TeamError, match=r"td is not usable — .*unknown role 'designer'"):
-        teams.plan(_with(tmp_path, flows=["td"], techlead=techlead), "ao-grind", HOST)
-    (root / ".agentorc.yml").write_text("held: [src/sessionorc/**]\nroles:\n  designer: {brief: docs/d.md}\n")
+    # td: a designer resolves (a preset), but the team starts no member of it — not followable
     with pytest.raises(teams.TeamError, match=r"td cannot be followed by ao-grind: no designer — add one to members:"):
-        teams.plan(orgmod.load(), "ao-grind", HOST)
+        teams.plan(_with(tmp_path, flows=["td"], techlead=techlead), "ao-grind", HOST)
     # an unknown flow
     with pytest.raises(teams.TeamError, match=r"flows: no flow 'hunt'"):
         teams.plan(_with(tmp_path, flows=["hunt"]), "ao-grind", HOST)
@@ -218,3 +212,70 @@ def test_a_team_with_no_flows_plans_as_before_and_its_slots_take_their_kind(worl
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     with pytest.raises(teams.TeamError, match="entries.feature takes a worker or a seat, and 'manager' is a manager"):
         teams.plan(orgmod.load(), "ao-grind", HOST)
+
+
+@pytest.mark.unit
+def test_every_template_carries_the_path_slots_and_the_path_words_moved_beside_it():
+    # §4.9c *A brief has three layers*: every role template gains `{flow}` and `{stage}`; the path
+    # words a team with no flow is told ship as `<role>.stage.md` and fill its `{stage}`
+    for name, preset in repoconfig.PRESETS.items():
+        if preset.get("brief"):
+            text = (Path(repoconfig.__file__).parent / "briefs" / preset["brief"]).read_text()
+            assert "{flow}" in text and "{stage}" in text, name
+    cfg = repoconfig.RepoConfig()
+    text, made = repoconfig.resolve_role(cfg, "grinder").compose(techlead="ao-r-techlead-1")
+    assert "**This team's flow:** none" in text
+    assert "Never merge a held PR yourself" in text and "ask --pr <n> ao-r-techlead-1" in text
+    assert "a PR you have asked a reader about is the reader's to merge" in text  # stays in the template
+    assert made["slots"]["{stage}"] == {"file": str(Path(repoconfig.__file__).parent / "briefs" / "grinder.stage.md")}
+    assert list(made["slots"])[:3] == ["{repo}", "{flow}", "{stage}"]  # before the slots a stage brief may use
+    text, _ = repoconfig.resolve_role(cfg, "techlead").compose()
+    assert "### A held PR" in text
+    text, made = repoconfig.resolve_role(cfg, "hunter").compose()  # the package ships no hunter.stage.md
+    assert made["slots"]["{stage}"] == {"text": "none"} and "{stage}" not in text
+
+
+@pytest.mark.unit
+def test_under_a_flow_a_member_reads_its_path_line_and_its_stage_brief():
+    td = flowdefs.find("td")
+    held = ["src/sessionorc/**", "docs/briefs/**"]
+    line = flowdefs.path_line(td, "grinder", techlead="ao-r-techlead-1", held=held)
+    assert line == (
+        "td: design (designer) → **build** (grinder) → review (ao-r-techlead-1, on src/sessionorc/**, "
+        "docs/briefs/**) → you, through ao-r-techlead-1."
+    )
+    assert flowdefs.path_line(td, "manager").endswith("→ you, directly. You stand outside it.")
+    cfg = repoconfig.RepoConfig()
+    text, made = repoconfig.resolve_role(cfg, "grinder").compose(
+        techlead="ao-r-techlead-1", flow=flowdefs.under(td, "grinder", techlead="ao-r-techlead-1", held=held)
+    )
+    assert f"**This team's flow:** {line}" in text
+    assert "A `design-first` entry is the design stage's" in text and "ask --pr <n> ao-r-techlead-1" in text
+    assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "build.md")}
+    assert made["slots"]["{flow}"] == {"text": line}
+    # the techlead reads the review stage's brief; under `build` it reads none
+    _, made = repoconfig.resolve_role(cfg, "techlead").compose(flow=flowdefs.under(td, "techlead"))
+    assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "review.md")}
+    text, made = repoconfig.resolve_role(cfg, "techlead").compose(
+        flow=flowdefs.under(flowdefs.find("build"), "techlead")
+    )
+    assert made["slots"]["{stage}"] == {"text": "none"} and "### A held PR" not in text
+
+
+@pytest.mark.unit
+def test_the_designer_is_a_preset_whose_template_wraps_it_only_under_a_flow(tmp_path):
+    # §4.9c *The designer gets a template*: outside a flow its repo's brief is the whole brief (until
+    # TD-310), and with none it is refused; under a flow the template wraps that brief as a supplement
+    designer = repoconfig.PRESETS["designer"]
+    assert designer["kind"] == "worker" and designer["lane"] == ["design-first", "owner:designer"]
+    assert "icon" not in designer and "label" not in designer
+    (tmp_path / "d.md").write_text("the repo's designer brief, {techlead}\n")
+    cfg = repoconfig.load_text("roles: {designer: {brief: d.md}}\n", tmp_path)
+    role = repoconfig.resolve_role(cfg, "designer")
+    text, made = role.compose(techlead="T")
+    assert text == "the repo's designer brief, T\n" and made["base"] == str(tmp_path / "d.md")
+    text, made = role.compose(techlead="T", flow=flowdefs.under(flowdefs.find("td"), "designer", techlead="T"))
+    assert made["base"].endswith("briefs/designer.md") and "the repo's designer brief, T" in text
+    assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "design.md")}
+    with pytest.raises(ValueError, match="designer needs a brief outside a flow"):
+        repoconfig.resolve_role(repoconfig.RepoConfig(), "designer").compose()

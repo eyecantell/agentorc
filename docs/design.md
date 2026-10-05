@@ -5603,7 +5603,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
 
 ### 4.9c Flows: the path an entry takes through a team
 
-**TD-307; designed 2026-10-04, part built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Built (TD-309 slice 1): the package's three flows and a repo's flow directories read and judged usable (`agentorc.flowdefs`), `kind` on the presets, the top-level `held:`, `flows:` on a team, the slots' kind checks, and a start refused — `ao org check` failing — on a listed flow that is unknown, not usable or cannot be followed. `designer` is not a preset yet, so `td` is usable only where a repo defines that role; the briefs' slots, the compile, the setting and the switch are not built. Paul (2026-10-04): *our current example is for a TD, which is
+**TD-307; designed 2026-10-04, part built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Built (TD-309 slice 1): the package's three flows and a repo's flow directories read and judged usable (`agentorc.flowdefs`), `kind` on the presets, the top-level `held:`, `flows:` on a team, the slots' kind checks, and a start refused — `ao org check` failing — on a listed flow that is unknown, not usable or cannot be followed. Built (TD-309 slice 2): the three brief layers — every role template carries `{flow}` and `{stage}`, the path words a team with no flow is told ship as `grinder.stage.md` and `techlead.stage.md`, `designer` is a preset with its template (wrapping a designer only under a flow), `flowdefs.under` makes a member's `{flow}` line and stage brief for `Role.compose`, and `brief.fill` fills a pre-build record's new slots from the file beside its template. No client composes under a flow yet: the current flow reaching every compose (slice 2a), the compile, the setting and the switch are not built, so every team reads `none` in `{flow}`. Paul (2026-10-04): *our current example is for a TD, which is
 something like [designer if needed] → [grinder + ui review if needed] → [techlead] → [escalate to me
 if needed], but I believe each repo is currently having to define this separately. It seems
 prudent to have the flow defined once then reused, and to give the ability to create more flows*;
@@ -5908,7 +5908,7 @@ gains no flow field: a member's stage is its role (§9 invariant 9).
 5. **The brief.** Every role template, `designer.md` included, gains **`{flow}`** and **`{stage}`**
    (`entry.md` is no brief's base). `{flow}` is filled with the current flow's path in two to five
    generated lines — the stages in order by role, the member's own stage marked, the seat by its
-   id, and the person last: *This team's flow (td): design (designer) → **build** (grinder) → review
+   id, and the person last, after the template's *This team's flow:*: *td: design (designer) → **build** (grinder) → review
    (techlead-ao-1, on src/sessionorc/**, docs/briefs/**) → you, through techlead-ao-1.* No member's
    id is in it, so a member added or removed changes no sibling's brief — the review's paths are the ones this member's PRs are held on (its
    compiled `review.held`), for a seat or the manager the repos' `held:`. `{stage}` is handed as a
@@ -7883,11 +7883,11 @@ code and needs no grant; a session doing the same work does.
      the org's reach at the start and no brief's file — and the launch record keeps it; a prompt a
      person typed whole (`ao new --prompt`, the form's Opening prompt) sends none. A replay — rules 1, 2 and 3, and this one — fills `base`'s slots
      from those files and texts, plain replacement of the slot's name and nothing else, and hands
-     that to `create` — and, once TD-309 is built, where `base` is the package's template (its
+     that to `create` — and, where `base` is the package's template (its
      `slots` name `{repo}`), any placeholder of `base` (lower-case letters alone between `{` and `}`)
      the record's `slots` do not name is filled from the file beside `base` named `<base's
      stem>.<slot>.md` where there is one, else `none`, so a template that gains a slot never replays
-     it literally (§4.9c item 5); and a record carrying **`relaunch: {at}`** (§4.9c *Switching*) is
+     it literally (§4.9c item 5); and, once TD-309 builds the switch, a record carrying **`relaunch: {at}`** (§4.9c *Switching*) is
      restarted under this rule's conditions as one carrying `brief_changed` is; the host agent knows a file and a slot and no role, template or team, and
      still never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a

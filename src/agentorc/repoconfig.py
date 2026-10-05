@@ -115,6 +115,20 @@ ENTRY_PLACEHOLDER = "{entry}"
 # A template's shape for a seat on call (design §6 *What is left is judgement, and a seat holds it*,
 # TD-247): the manager's, which reads one `seat_due` and ends, where `manager.md` rounds on `ao wait`.
 ON_CALL_BRIEFS = {"manager.md": "manager_on_call.md"}
+# A team's path (design §4.9c *A brief has three layers*, TD-309): `{flow}` the generated path lines,
+# `{stage}` the stage brief's text, handed as a file slot so an edit to it is *brief changed* (§6 rule
+# 7). A session with no flow reads `none` in `{flow}` and its template's `<stem>.stage.md` — the path
+# words a team with no flow is told, moved out of the template — in `{stage}`, `none` where the
+# package ships none.
+FLOW_PLACEHOLDER = "{flow}"
+STAGE_PLACEHOLDER = "{stage}"
+NO_FLOW = "none"
+NO_STAGE = "none"
+STAGE_SUFFIX = ".stage.md"
+# The one role whose template wraps it only under a flow (§4.9c *The designer gets a template*): until
+# TD-310 cuts every designer brief in use to a supplement, a designer started outside a flow is its
+# repo's brief whole, as before the build.
+FLOW_ONLY_TEMPLATES = ("designer",)
 ENTRY_SLOTS = ("{repo}", "{type}", "{ledger}")
 HANDED_ENTRY = {
     "{repo}": "the repo its `entry` names",
@@ -135,6 +149,16 @@ def entry_text(repo: str, type_: str, ledger: str) -> str:
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
 # None names a profile: profile names are the person's (§4.2a, §4.9).
 PRESETS: dict[str, dict[str, Any]] = {
+    # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
+    # label, so no designer card's badge changes at the build.
+    "designer": {
+        "kind": "worker",
+        "brief": "designer.md",
+        "lane": ["design-first", "owner:designer"],
+        "grants": [],
+        "context": WORKER_CONTEXT,
+        "message": "a design-first entry, a control's shape, a screen",
+    },
     "grinder": {
         "kind": "worker",
         "brief": "grinder.md",
@@ -215,6 +239,22 @@ def repeated_headings(text: str) -> list[str]:
             key = m.group(2).strip()
             seen[key] = seen.get(key, 0) + 1
     return [h for h, n in seen.items() if n > 1]
+
+
+@dataclass(frozen=True)
+class UnderFlow:
+    """What a member started under a flow is told of it (design §4.9c item 5): `text`, the `{flow}`
+    lines (`flowdefs.under` makes them), and `stage`, its stage brief's file — None where the flow
+    gives its role no stage (a manager, a member outside the flows, a seat with no review stage)."""
+
+    text: str
+    stage: Path | None = None
+
+
+def _stage_default(template: str) -> Path | None:
+    """`<stem>.stage.md` beside the installed template, the `{stage}` of a session with no flow."""
+    src = Path(str(resources.files("agentorc").joinpath("briefs", Path(template).stem + STAGE_SUFFIX)))
+    return src if src.is_file() else None
 
 
 def prefixed(prompt_from: dict[str, Any] | None, block: str) -> dict[str, Any] | None:
@@ -310,6 +350,7 @@ class Role:
         manager: str | None = None,
         supplement: str | None = None,
         on_call: bool = False,
+        flow: UnderFlow | None = None,
     ) -> tuple[str | None, dict[str, Any] | None]:
         """The opening prompt this role gives a session: its template with `{repo}` filled from the
         repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114) — `supplement`, a path,
@@ -322,6 +363,9 @@ class Role:
         another host's checkout across the link (design §4.4a "Teams across hosts", TD-057 step
         4b.3); a template is always the package's own. `on_call` takes the template's seat shape
         where the package ships one (`ON_CALL_BRIEFS`: a manager on call, design §6 rule 3, TD-259).
+        `flow` is what a member started under a team's current flow is told of it (§4.9c item 5):
+        `{flow}` and `{stage}` from it; without one, `none` and the template's `<stem>.stage.md`. A
+        designer's template wraps it only under a flow (`FLOW_ONLY_TEMPLATES`, until TD-310).
 
         Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
         `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
@@ -333,8 +377,12 @@ class Role:
         extra = supplement or own
         slots: dict[str, dict[str, str]] = {}
         template = ON_CALL_BRIEFS.get(self.template, self.template) if on_call and self.template else self.template
+        if flow is None and self.name in FLOW_ONLY_TEMPLATES:
+            template = None
         if template is None:
             if not extra:
+                if self.name in FLOW_ONLY_TEMPLATES:
+                    raise ValueError(f"{self.name} needs a brief outside a flow (design §4.9c)")
                 return None, None
             text = self._read(extra, read)
             base = str(self._path(extra))
@@ -345,6 +393,14 @@ class Role:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
+            stage = flow.stage if flow is not None else _stage_default(template)
+            text = text.replace(FLOW_PLACEHOLDER, flow.text if flow is not None else NO_FLOW)
+            slots[FLOW_PLACEHOLDER] = {"text": flow.text if flow is not None else NO_FLOW}
+            # a file slot, read as `brief.fill` reads one: stripped, `none` when empty
+            text = text.replace(
+                STAGE_PLACEHOLDER, (stage.read_text(encoding="utf-8").strip() or NO_STAGE) if stage else NO_STAGE
+            )
+            slots[STAGE_PLACEHOLDER] = {"file": str(stage)} if stage else {"text": NO_STAGE}
         if self.template is not None and ENTRY_PLACEHOLDER in text:  # the techlead's template alone carries it
             handed = entry_text(*(HANDED_ENTRY[slot] for slot in ENTRY_SLOTS))
             text = text.replace(ENTRY_PLACEHOLDER, handed)

@@ -459,3 +459,25 @@ async def test_every_reply_to_a_member_whose_brief_changed_carries_the_clause(ag
         assert not (clientmod.last_mail or {}).get("brief")
         agent.sessions[w].brief_changed = None
     clientmod.last_mail = None
+
+
+@pytest.mark.unit
+def test_a_template_record_from_before_a_slot_existed_reads_the_file_beside_its_base(tmp_path):
+    # design §6 rule 7, §4.9c item 5: a record whose slots predate `{stage}` and `{flow}` is told what
+    # it was told before — `<stem>.stage.md` beside the template, `none` where there is no such file
+    base = tmp_path / "grinder.md"
+    base.write_text("base: {repo} | {stage} | {flow} | {lane}\n")
+    (tmp_path / "grinder.stage.md").write_text("held words for {lane}\n")
+    sup = tmp_path / "sup.md"
+    sup.write_text("repo {stage}\n")  # a brace word in a slot's text is never the default pass's
+    made = {"base": str(base), "slots": {"{repo}": {"file": str(sup)}, "{lane}": {"text": "TD-1"}}}
+    text, sources = brief.fill(made)
+    assert text == "base: repo {stage} | held words for TD-1 | none | TD-1\n"
+    assert [s["path"] for s in sources] == [str(base), str(tmp_path / "grinder.stage.md"), str(sup)]
+    # a slot the record names is filled from it, never from the file beside
+    made["slots"]["{stage}"] = {"text": "S"}
+    sup.write_text("repo\n")  # (a later slot still replaces its name in an earlier one's text: named, not this pass's)
+    assert brief.fill(made)[0] == "base: repo | S | none | TD-1\n"
+    # a base no template made (its slots never name `{repo}`) is left as it is
+    whole = {"base": str(base), "slots": {"{lane}": {"text": "TD-1"}}}
+    assert brief.fill(whole)[0] == "base: {repo} | {stage} | {flow} | TD-1\n"

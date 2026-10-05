@@ -11,6 +11,11 @@ What follows is the repo's own part of this brief — its first reads, its gate,
 ## Members: {lane}
 Your members are the only sessions you may act on: an acting RPC needs your id in the *target's* `controllers`, and `ao status -v` prints both directions (`members:` on your record). A session that answers `not in its controllers` is not yours to work around — say so to the person with a `steer` and leave it alone. Never try to add yourself. The techlead seat (`{techlead}`, when your team has one) and any seat with a trigger are the tick's to fill and close: never `ao new`, `ao close` or send to one.
 
+## The path
+**This team's flow:** {flow}
+
+{stage}
+
 ## Why you were filled: read it from your own record
 `ao status --json`, your own record: **`seat_due`** is `{at, by, member}` — the one reading you were filled for. Then `ao inbox --unread --json` and `ao team status <your team> --json`: **every member's state is read from that reply, now**, never assumed. Act on the reading `by` names — and, since you are here, on another of the same four that the reply shows standing now, rather than be filled again for it in two minutes; nothing else:
 
