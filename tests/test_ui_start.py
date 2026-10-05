@@ -5,6 +5,7 @@ to `set_start`."""
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -80,3 +81,7 @@ def test_the_card_carries_the_note_and_start_now_and_cancel():
     html = uiapp.templates.get_template("card.html").render(s=v, help_title=lambda k: k, role_svg=lambda *a: "")
     assert 'class="meta startnote"' in html and 'data-act="start" data-id="ao-r-w" data-at="now"' in html
     assert "Cancel w&#39;s start?" in html or "Cancel w's start?" in html
+    # TD-328: those two alone — nothing runs, so nothing else under `more ⋯` has anything to act on
+    menu = html[html.index('<div class="menu">') : html.index("</div>", html.index('<div class="menu">'))]
+    assert sorted(set(re.findall(r'data-act="([a-z-]+)"', menu))) == ["close", "start"]
+    assert "data-copy" not in menu and "Message…" not in menu

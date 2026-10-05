@@ -73,6 +73,9 @@
        session, else nothing (the composer's Send is it); then the plain ones; **more ▾** at the
        right holds what is rarely pressed, Kill last and red, as the card's foot does (§4.5a). #}
     <div class="row gap" id="facts">
+      {#- a scheduled record has run nothing: its acts are the banner's, Start now and Cancel, and the
+          host agent refuses the rest (§6 *Start time*, TD-328) — so the line draws none of them -#}
+      {% if s.state != 'scheduled' %}
       <button class="btn sm next{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."
               title="{{ help_title('close') }}">Close session</button>
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
@@ -87,6 +90,7 @@
       <button class="btn sm link" data-act="wrapup" data-id="{{ s.id }}"
               title="{{ help_title('wrap-up') }}">Wrap up</button>
       <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" title="a shell session in this session's directory">⌘ Open shell here</button>
+      {% endif %}
       {% if s.editor %}<a class="btn sm link editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
       {# design §4.5a Focus header **Transcript** (TD-166): the Transcript page in a new tab, on any
          state; only for a record holding a tool session id — a shell has nothing to read. Always in
@@ -94,6 +98,7 @@
       <a class="btn sm link{% if not s.adapter_id %} hidden{% endif %}" id="ftranscript" href="/transcript/{{ s.id }}" target="_blank" rel="noopener"
          title="what this session said and did, read from its tool's file without resuming it (design §4.5 screen 9)">☰ Transcript</a>
       <span class="grow"></span>
+      {% if s.state != 'scheduled' %}
       <details class="more">
         <summary class="btn sm link" title="more">more ▾</summary>
         <div class="menu">
@@ -113,6 +118,7 @@
           <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
         </div>
       </details>
+      {% endif %}
       {#- design §4.5a the ***i*** mark (TD-157, built by TD-167): after the header's Kill, the group
           Wrap up, Kill, Close and Message…; its panel opens under the acts line -#}
       {% import "help_mark.html" as hm %}{{ hm.mark('focus', 'focus') }}
