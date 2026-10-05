@@ -3459,7 +3459,7 @@ Both go away only when the record says who closed it.
 
 **Why:** on 2026-09-16 21:24 MDT `systemctl --user restart agentorc-agent` sat in `stop-sigterm` for 90 s, then systemd logged `State 'stop-sigterm' timed out. Killing.` and sent SIGKILL (`journalctl --user -u agentorc-agent`). SIGTERM cancels the serve task (TD-024), and leaving `async with server` calls `Server.wait_closed()`, which since Python 3.12 waits for **every open client connection** to finish — and the UI's `subscribe` connection never does, nor does a CLI blocked in the `wait` RPC (TD-052 step 3, which makes long-lived connections the normal case for every lead). So a stop never completes on its own. Nothing is lost today — tmux holds the sessions, the store is written on every change, and the unit restarts — but the socket file is not unlinked by the `finally`, in-flight permission waiters die without an answer, every restart costs 90 s during which hooks queue to disk, and a SIGKILL is the wrong default for a process that will soon hold the org's mail.
 
-**Resolved:** 2026-10-04 (the anchor's live check, read-only) — since #176/#177 the journal holds 87 `Stopping agentorc-agent.service` lines and no `timed out` or SIGKILL on either unit; tonight's promote restarts (2026-10-04 19:23:56 and 20:43:53) stopped both units within the second with leads and grinders live.
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — since the restart onto the fix (2026-09-17 05:30; the last SIGKILL, 00:08:56 that night, was a process still on the old code) the journal holds 89 `Stopping agentorc-agent.service` lines and no `timed out` or SIGKILL on either unit; tonight's promote restarts (2026-10-04 19:23:56 and 20:43:53) stopped both units within the second with leads and grinders live.
 
 **Related:** TD-024 (archived: the pending-task traceback on SIGTERM, which made the cancel path clean but did not meet this), TD-052 step 3 (the `wait` RPC's long-lived connections), design §4.4, §4.6.
 
@@ -3544,7 +3544,7 @@ Both go away only when the record says who closed it.
 
 **Why:** TD-187's *Why*: the doorbell rings only for mail, filing an entry sends none, and the manager never sends to a finished member.
 
-**Resolved:** 2026-10-04 (the anchor's live check, read-only) — rule 6 fired live: the journal's *told of 2 entries new in its lane* (grinder-ao-1 and grinder-ao-2, 2026-10-04 12:41:07), *told of 1* (designer-ao-1 and both grinders, 18:43:58) and *told of 3* (19:33:28), with `lane_seen` written at each declaration.
+**Resolved:** 2026-10-04 (the anchor's live check, read-only) — rule 6 fired live, each finished member rung through the doorbell within the tick: the journal's *told of 2 entries new in its lane* (grinder-ao-1 and grinder-ao-2, 2026-10-04 12:41:07), *told of 1* (designer-ao-1 and both grinders, 18:43:58) and *told of 3* (19:33:28), with `lane_seen` written at each declaration.
 
 **Related:** TD-187 (the design), TD-176 (the ledger reader), TD-103 (the tick's rules), TD-186 (the restart rules' races), TD-026 (a team that starts on work appearing: not this).
 
@@ -3572,6 +3572,36 @@ Both go away only when the record says who closed it.
 
 **Why:** Paul's words, handed through the form: *This is a test TD, making sure the add entry button works properly. Hopefully this will appear in the TD list. No research needed.* The entry exists to exercise the hand-off end to end — the form's `ask` carrying `entry: {repo, type}` fills the techlead seat, the seat drafts the entry and lands it by PR, and reports the outcome — and its value is the check itself: that an entry a person types once on the page appears in the ledger without a session of their own.
 
-**Resolved:** 2026-10-04 — the test entry did its job: handed through Add entry, drafted by techlead-ao-1 and merged as PR #928 (TD-219).
+**Resolved:** 2026-10-04 — archived as the ledger-only test it was, not by its *Done when*'s look at the Repo page: the hand-off it tested worked end to end, handed through Add entry, drafted by techlead-ao-1 and merged as PR #928 (TD-219).
 
 **Related:** TD-180 (the Add entry design), TD-218 (`entry_add` and the outcome's close), TD-219 (the button and the row).
+
+## TD-180: Add a TD from the UI — the person types a line, an agent asks what it needs and writes the entry
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-26 (Paul: *it will look like the user giving short info, then an agent fleshing it out — asking questions as needed, then generating the TD*)
+**Status:** Done 2026-10-04 — see *Resolved*.
+
+**Why:** a TD reaches the ledger today only through a session. The person tells a session in its terminal, which writes the entry on a branch and opens a PR. The UI has no way in: §4.5a's **Open ledger** row says *an entry is edited in its file, never on the page*, and the Repo page's Technical debt lists are read-only. A thought the person has while looking at the Org or the Repo page has to wait until they open a session and explain it there. Most of what makes an entry good is work the person should not have to do: the next number, the Owner/Kind/Pickable lines, the evidence, the file locations, and the link to the design section and its neighbours. An agent can do all of that, and it only needs the person for the *why* and the choice between options.
+
+**The shape Paul gave:** the person writes a short line (a title, maybe a sentence) → an agent takes it, reads the repo and asks what it cannot find out itself (priority, what "done" means, which of two readings is meant) → it writes the entry in the ledger's template and it lands the way every ledger change does.
+
+**What the design round has to settle:** (a) **the door**: where the press lives (the Repo page's Technical debt heading beside **Open ledger**, the team card, the Org rollup, a Focus header), and what the first form asks: one line, the repo, and maybe a priority. (b) **who fleshes it out**: a new one-shot session started from a role (the *hunter*'s filing, whose **add** phase §4.5 screen 1 already reserves), the repo team's designer or manager taking it as mail, or a short-lived agent with no tmux session. Also what it may read and run, and its profile and spend (§4.9b reserve). (c) **where the questions appear**: as an `ask` in the Inbox (§4.10), the session's own Focus, or a dialog on the page that stays open. How the person answers each one, and what happens if they walk away (the draft is kept, parked, or dropped). (d) **how it lands**: a branch and PR per entry, reviewed as a doc-only PR, or the board write-back's committed **add** (§4.4: on the default branch, never pushed) extended to the ledger. What the next-TD-number race needs (open PRs can hold a number, per the TD-grind memory), and the Summary row that goes with the entry. (e) **the person's check**: whether they see the entry before it is filed, and whether an agent-written entry is marked as such. (f) what §4.5a and the *never on the page* clause become, and the `ao` verb beside it (`ao td add "<line>"` or similar), so an agent and the CLI reach the same path.
+
+**Resolved:** 2026-10-04 — the design landed (PR #711) and its builds are done and checked live: TD-218 archived, TD-219 archived the same day on both paths (see there); §4.9 and §4.5a carry no *not built* for Add entry.
+
+**Related:** design §4.5 screen 11 (the Repo page) and §4.5a **Open ledger**; §4.5 screen 1 (the *add* phase, the hunter); §4.10 (`ask`); §4.4 (the board write-back's **add**, the one precedent for the UI writing a repo file); §4.5a **Put on the board** (a UI form that writes a repo file); TD-126 (a reply back from the board); TD-160 (the hunter role named as *later*).
+
+## TD-187: A member that declared out of work is never woken when its lane gains entries
+
+**Priority:** High (raised from Medium 2026-09-26, Paul: so the designer takes it next)
+**Added:** 2026-09-26 (Paul: *will the designer wake on its own or is it necessary for us to intercede?*)
+**Status:** Done 2026-10-04 — see *Resolved*.
+**Location:** design §4.9a (*finished means declared*), §4.10 (the doorbell), `src/agentorc/briefs/manager.md` (*Out of work*: *a finished member is never sent to and never restarted*)
+
+**Why:** designer-ao-1 declared `out_of_work` at 20:49Z on 2026-09-26. Within the next two hours TD-180, 181, 182 and 183 were filed: four `design-first` entries owned by the designer, all pickable. Nothing woke it. The doorbell rings only for new mail (§4.10), filing an entry sends none, and the manager's brief forbids sending to a finished member. The only way in is a person's message. The same happens to a grinder when a grinder-owned entry lands after its `none`. The design says mail is how *there is work now* reaches a finished member (§4.10), but nothing sends that mail.
+
+**Resolved:** 2026-10-04 — the design landed (rule 6, §6) and its build is live: TD-195 archived the same day on rule 6's firings (see there).
+
+**Related:** TD-176 (the ledger reader), TD-103 (the tick's policies), TD-053 (wind-down), TD-186; design §4.9a, §4.10 *The doorbell*.
