@@ -1,6 +1,7 @@
 """The person's own bookkeeping on their inbox (TD-108 step 1): design §4.10 and TD-069 step 0 — snooze,
 dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgent` inherits (delete is mail's,
-`agent_mail.py`). Moved as written; the state it reads is the agent's.
+`agent_mail.py`), and the person's Dismiss on the Inbox's work-waiting and mark rows (`rpc_clear_work`,
+`rpc_clear_mark`, from `agent_wake.py` in TD-317 slice 2). Moved as written; the state it reads is the agent's.
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ from sessionorc import (
     mail,
 )
 from sessionorc import board as board_mod
+from sessionorc import cadence as cadence_mod
+from sessionorc import held as held_mod
 from sessionorc.agent_common import (
     ENTRY_TYPES,
     LEASE_TTL,
@@ -865,3 +868,77 @@ class InboxMixin:
         if since is None:
             return True
         return _parse(since) + mail.MAIL_RETENTION > now
+
+    async def rpc_clear_work(self, team: str = "", caller: Any = None) -> dict[str, Any]:
+        """Dismiss's half of the **Inbox row: team start** (design §6 rule 8, §4.5a, TD-227): the ids
+        of the team's `work_waiting` are added to each named member's `lane_seen`, so those entries
+        do not ask again and a later one does, and the mark is removed. A person's own, refused to a
+        session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`). `{team, cleared,
+        ids}`: `cleared` false when no work was waiting."""
+        agent_common.person_only(caller, "clear a team's waiting work", "§6 rule 8")
+        if self.mode != "home":
+            raise RpcError("clear_work runs at the home (design §6 rule 8): this host is a node")
+        team = str(team or "").strip()
+        if not team:
+            raise RpcError("clear_work needs the team whose work to dismiss")
+        teams = self._host_rec.get("teams") or {}
+        rec = teams.get(team) or {}
+        mark = rec.get("work_waiting")
+        if not isinstance(mark, dict):
+            return {"team": team, "cleared": False, "ids": []}
+        named = mark.get("members") if isinstance(mark.get("members"), dict) else {}
+        # a question ends once (§6 rule 8 *A question's end is work*, TD-274): its reference is not
+        # lane news, and is not written to `lane_seen`
+        asked = {(str(q.get("name")), str(q.get("ref"))) for q in mark.get("questions") or [] if isinstance(q, dict)}
+        for r in self._graph().values():
+            ids = named.get(r.name)
+            if r.team != team or r.superseded_by or r.lane_seen is None or not isinstance(ids, list):
+                continue
+            held = list(r.lane_seen.get("ids") or [])
+            if add := [str(i) for i in ids if str(i) not in held and (r.name, str(i)) not in asked]:
+                r.lane_seen = {**r.lane_seen, "at": now_iso(), "ids": [*held, *add]}
+                self._save(r)
+        rec.pop("work_waiting", None)
+        if not rec:
+            teams.pop(team, None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+        await self._push_changes()
+        ids = sorted({str(i) for v in named.values() if isinstance(v, list) for i in v})
+        log.info("rule 8: %s's work waiting dismissed by the person: %s", team, ", ".join(ids))
+        return {"team": team, "cleared": True, "ids": ids}
+
+    async def rpc_clear_mark(
+        self, id: str, kind: str = "", pr: int | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """Dismiss's half of the two rows the tick's reads raise (design §4.5a, §6 rules 10 and 11,
+        TD-258). `kind: cadence` with `pr` takes `row` off that PR's `checks` entry — the entry
+        stays as the record of the read, and a fail read later, at a new head or after a new `done`, is the row again —
+        and the row's snooze with it; `kind: held` marks every standing `held_missed` entry
+        `dismissed`, kept so that its PR is never read as a crossing again. A person's own,
+        refused to a session as `clear_work` is, and the home's alone (`modes.HOME_EDITS`): both
+        fields are home-owned, a node's member's too. `{id, kind, cleared}`: `cleared` the PRs
+        whose mark went, empty when none stood."""
+        agent_common.person_only(caller, "dismiss a mark", "§4.5a")
+        if self.mode != "home":
+            raise RpcError("clear_mark runs at the home (design §6 rules 10 and 11): this host is a node")
+        s = self._find(self._addr(id))
+        addr = self._address(s)
+        if kind == "cadence":
+            if isinstance(pr, bool) or not isinstance(pr, int):
+                raise RpcError("clear_mark cadence needs the PR whose row to dismiss")
+            s.checks, stood = cadence_mod.dismiss(s.checks, pr)
+            cleared = [pr] if stood else []
+            if self.attention_snoozed.pop(f"{addr}|cadence:{pr}", None) is not None:
+                self.attention_store.save(self.trail, self.attention_snoozed)
+        elif kind == "held":
+            s.held_missed, cleared = held_mod.dismiss(s.held_missed, now_iso())
+        else:
+            raise RpcError(f"unknown mark {kind!r}; the marks a person dismisses are: cadence, held")
+        if cleared:
+            self._save(s)
+            await self._push_changes()
+            log.info("%s: %s row dismissed by the person: %s", addr, kind, ", ".join(f"#{n}" for n in cleared))
+        return {"id": addr, "kind": kind, "cleared": cleared}
