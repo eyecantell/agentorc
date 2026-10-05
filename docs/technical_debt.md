@@ -95,7 +95,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
-| TD-332 | A PR whose cadence read is settled but not merged is read again with `gh pr view` every pass | Low | Open |
 
 ---
 
@@ -1657,22 +1656,3 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when:** each of the three is fixed or written down in §6 as how it is meant to be.
 
 **Related:** TD-239 (the build), TD-177 (the design), TD-227 (rule 8's holds).
-
-## TD-332: A PR whose cadence read is settled but not merged is read again with `gh pr view` every pass
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-2, carried out of TD-258 when its live check held; from the review of PR #868)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — a cost to watch, not yet seen: nobody has counted the calls.
-**Location:** `src/sessionorc/agent_tick.py` (`_cadence_pass`), `src/sessionorc/cadence.py` (`head`, `stale`)
-
-**Why:** rule 10 asks `gh pr view` for an open PR's head on every pass while a `done` names it, to see whether the head moved, even when its last read is settled. A PR closed unmerged is asked for the record's whole life, because only a merged PR's read stands. At the team's scale it is a handful of calls every five minutes; it would show up on a repo with many open PRs or long-lived records.
-
-**Fix:** mark a closed PR settled, as a merged one is (`head` already reads `state`), and if the open ones' calls show up, read heads from the repo's `gh pr list` reading (`_refresh_repos`) instead of one view each.
-
-**Done when:** a closed PR's head is not asked for again, and an open one's is asked no more often than the repo reading reads it.
-
-**Related:** TD-258 (rule 10's build), TD-176 (the repo reading).
-
