@@ -132,10 +132,12 @@ def test_a_repo_flow_is_found_by_its_directory_and_reaches_package_and_sibling_b
             "two stages name the role 'grinder'",
         ),
         ([], "", "non-empty list"),
+        ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "."}], "", "name a file"),
+        ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "sub"}], "", "is not a file"),
     ],
 )
 def test_a_flow_that_is_not_whole_is_not_usable_and_says_why(tmp_path, stages, extra, says):
-    repo_flow(tmp_path, "f", stages, {"b.md": "brief"}, extra)
+    repo_flow(tmp_path, "f", stages, {"b.md": "brief", "sub/x.md": "a directory's file"}, extra)
     f = flowdefs.load("f", cfg_with(tmp_path))
     assert not f.usable and any(says in p for p in f.problems), f.problems
 

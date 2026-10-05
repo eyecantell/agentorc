@@ -68,9 +68,11 @@ class Flow:
 
 
 def _read_here(path: Path) -> str | None:
+    """A file's text, or None for anything that is not a readable text file (missing, a directory,
+    not UTF-8): a flow's brief that cannot be read is a reason it is not usable, never a crash."""
     try:
         return path.read_text(encoding="utf-8")
-    except FileNotFoundError:
+    except (OSError, UnicodeDecodeError):
         return None
 
 
@@ -85,6 +87,8 @@ def _brief_path(ref: str, flow_dir: Path, place_root: Path) -> tuple[Path | None
             return None, f"brief {ref!r}: `package:` takes <flow>/<file>"
         return PACKAGE_DIR / rest, ""
     rel = Path(ref)
+    if not rel.parts or rel.parts[-1] in (".", ".."):
+        return None, f"brief {ref!r}: name a file"
     if rel.is_absolute():
         return None, f"brief {ref!r}: relative to the flow's directory, never absolute"
     parts = rel.parts
@@ -202,8 +206,13 @@ def check(
         key = f"{where}: stage {st.name}"
         if st.path is not None:
             reader = _read_here if flow.place == "package" or st.path.is_relative_to(PACKAGE_DIR) else read
-            if (reader or _read_here)(st.path) is None:
-                flow.problems.append(f"{key}: its brief {st.brief!r} is not a file ({st.path})")
+            try:
+                text = (reader or _read_here)(st.path)
+            except (OSError, UnicodeDecodeError) as e:  # a node's checkout across the link that did not answer
+                flow.problems.append(f"{key}: its brief {st.brief!r} could not be read ({e})")
+            else:
+                if text is None:
+                    flow.problems.append(f"{key}: its brief {st.brief!r} is not a file ({st.path})")
         if not st.role:
             continue
         try:

@@ -467,7 +467,10 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             raise TeamError(f"{where}: entries.{t} takes a worker or a seat, and {rname!r} is a {kind} (design §4.9c)")
     staffed = {m.role for m in team.members if m.team is None and m.role}
     for name in team.flows:
-        flow = flowdefs.load(name, cfg, org.roles, read=read)
+        try:
+            flow = flowdefs.load(name, cfg, org.roles, read=read)
+        except (OSError, ValueError) as e:  # its flow.yml across the link, unreadable
+            raise TeamError(f"{where}: flows: {name}: {str(e).strip(chr(34))}") from None
         if flow is None:
             raise TeamError(
                 f"{where}: flows: no flow {name!r} — not a built-in ({', '.join(flowdefs.BUILTIN)}) and no "
