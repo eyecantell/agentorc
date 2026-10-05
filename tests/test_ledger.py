@@ -155,7 +155,7 @@ DECLARED, DECLARED_FLAGS = _script().declared(OPEN.read_text())
 OWNERS = set(DECLARED.get("owner", ()))
 KINDS = set(DECLARED.get("kind", ()))
 HEADER = re.compile(
-    r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)\n",
+    r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)(?P<rest>[^\n]*)\n",
     re.M,
 )
 
@@ -188,6 +188,12 @@ def test_every_open_entry_carries_the_header_in_order_with_known_values():
         assert m, f"{id_}: Owner and Kind go together, in that order, right after Added"
         assert m["owner"] in OWNERS, f"{id_}: unknown Owner {m['owner']!r} (one of {sorted(OWNERS)})"
         assert m["kind"] in KINDS, f"{id_}: unknown Kind {m['kind']!r} (one of {sorted(KINDS)})"
+        # TD-323: a live check names its build after the word (`live-check #<n>`, design §4.9b); no
+        # other kind is followed by anything
+        rest = m["rest"].strip()
+        assert not rest or (m["kind"] == "live-check" and re.fullmatch(r"#\d+(?:[ ,]+#\d+)*", rest)), (
+            f"{id_}: after the Kind's word only a live check's build PRs (#<n>), read {rest!r}"
+        )
 
 
 def test_no_entry_writes_a_pickable_line():
