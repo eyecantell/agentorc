@@ -120,6 +120,31 @@ class AttentionMixin:
         del self.trail[agent_common.TRAIL_KEEP :]
         self.attention_store.save(self.trail, self.attention_snoozed)
 
+    def _trail_reply(self, repo: str, head: str, by: str, reply: str, how: str) -> None:
+        """A board **Reply** (§4.5a *Inbox board row → Reply*, TD-142): the trail's one entry that is
+        not a record's ending — no `sid`, `kind` *board reply*, `how` the press's own result
+        (*written on the board · sent to …*), never coalesced, since each reply is its own words."""
+        stamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        self.trail.insert(
+            0,
+            {
+                "id": "t-" + secrets.token_hex(6),
+                "sid": "",
+                "name": repo,
+                "team": "",
+                "kind": "board reply",
+                "text": _clean(f"{head} — {by}: {reply}")[: mail.DEFAULT_CAP],
+                "since": stamp,
+                "resolved_at": stamp,
+                "how": how,
+                "count": 1,
+                "first": stamp,
+                "last": stamp,
+            },
+        )
+        del self.trail[agent_common.TRAIL_KEEP :]
+        self.attention_store.save(self.trail, self.attention_snoozed)
+
     def _attention_gone(self, s: Session, how: str) -> None:
         """A record **leaving the graph** — forgotten, or replaced in place by a new session that
         took its name (`_take_name`) — writes its live rows' endings here rather than on the next

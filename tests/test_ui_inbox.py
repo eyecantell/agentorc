@@ -1647,6 +1647,21 @@ def test_the_trail_puts_a_row_that_resolved_without_you_into_fyi():
 
 
 @pytest.mark.unit
+def test_a_board_reply_on_the_trail_says_where_it_went_and_not_that_it_resolved():
+    """§4.5a *Inbox board row → Reply* (TD-142): the trail says what the press's result said, and
+    never the state row's *left the Inbox without you answering it* — the person did answer."""
+    t = {"id": "t-2", "sid": "", "name": "agentorc", "team": "", "kind": "board reply",
+         "text": "Merged, live check pending — Paul: rebase it", "since": "2026-10-04T11:00:00Z",
+         "resolved_at": "2026-10-04T11:00:00Z", "how": "written on the board · sent to w1 (holds TD-122)",
+         "count": 1, "first": "2026-10-04T11:00:00Z", "last": "2026-10-04T11:00:00Z"}  # fmt: skip
+    html = rows("fyi", sections_of([], trail=[t])["fyi"])
+    assert "replied: written on the board · sent to w1 (holds TD-122)" in html and "resolved:" not in html
+    assert "you replied on the board; the line stays open until it is carried out" in html
+    assert "without you answering it" not in html and "rebase it" in html
+    assert 'title="the repo whose board was replied on">agentorc<' in html  # no record: the repo names it
+
+
+@pytest.mark.unit
 def test_a_state_row_can_be_snoozed_and_a_snoozed_one_is_in_no_section_and_no_count():
     """§4.5a **Inbox row: state** / §4.10: `stalled?` and unpushed work are the two rows not on the
     tool's clock, so they are the two that may be set aside. The snooze is the home's, keyed on the
