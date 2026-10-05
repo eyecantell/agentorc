@@ -149,16 +149,6 @@ def entry_text(repo: str, type_: str, ledger: str) -> str:
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
 # None names a profile: profile names are the person's (§4.2a, §4.9).
 PRESETS: dict[str, dict[str, Any]] = {
-    # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
-    # label, so no designer card's badge changes at the build.
-    "designer": {
-        "kind": "worker",
-        "brief": "designer.md",
-        "lane": ["design-first", "owner:designer"],
-        "grants": [],
-        "context": WORKER_CONTEXT,
-        "message": "a design-first entry, a control's shape, a screen",
-    },
     "grinder": {
         "kind": "worker",
         "brief": "grinder.md",
@@ -211,6 +201,15 @@ PRESETS: dict[str, dict[str, Any]] = {
         "label": "Auditor",
         "context": WORKER_CONTEXT,
         "message": "what its trigger counts: the last n PRs, the period",
+    },
+    # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
+    # label, so no designer card's badge changes at the build.
+    "designer": {
+        "kind": "worker",
+        "brief": "designer.md",
+        "lane": ["design-first", "owner:designer"],
+        "grants": [],
+        "message": "a design-first entry, a control's shape, a screen",
     },
     "plain": {"kind": "plain", "brief": None, "lane": [], "grants": [], "icon": None},
 }
