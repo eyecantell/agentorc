@@ -185,6 +185,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     WORKS,  # noqa: F401
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
+    _board_holder,  # noqa: F401
+    _board_named,  # noqa: F401
     _civil,  # noqa: F401
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
@@ -214,6 +216,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_line,  # noqa: F401
     board_reader,  # noqa: F401
     board_rows,  # noqa: F401
+    board_standing,  # noqa: F401
+    board_standings,  # noqa: F401
     board_text,  # noqa: F401
     board_waiting_on,  # noqa: F401
     board_waits,  # noqa: F401
