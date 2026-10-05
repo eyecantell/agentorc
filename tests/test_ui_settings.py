@@ -336,7 +336,7 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         # the definition's file at the card's head, not a foot under Save (TD-286)
         card = page[page.index('data-team="sett-team"') :]
         card = card[: card.index("</form>")]
-        assert card.index('defined in <span class="mono">org.yml</span>') < card.index("stop time")
+        assert card.index("defined in <span class=\"mono\">org.yml</span>") < card.index("stop time")
         assert "setfoot" not in card
         bad = client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "maybe"})
         assert bad.status_code == 400 and "ask, start or off" in bad.json()["detail"]
