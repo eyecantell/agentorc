@@ -108,7 +108,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-318 | A definition is read at the home: take the landing rule's unreachable node clause out of `org.landing`, and have `ao org` and `ao org check` name a repo held only on a node | Low | Open |
-| TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Open |
+| TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slice 1 built |
 | TD-327 | A timed-out `ao wait` says *nothing unread — end your turn* while mail an earlier wait reported is still unread | Low | Open |
 | TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Open |
 | TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
@@ -1938,7 +1938,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-04 (the designer, TD-092's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 built 2026-10-05 (grinder-ao-1, PR #1086): `notify.telegram` in `settings.py` (`parse_telegram`, `notify`, `telegram`) and through `set_settings` and the `settings` read; `sessionorc/notify.py` (the lines, the links, the Doppler child's `__main__`); `agent_notify.py`'s `_notify_pass` on the tick at the home (the state rows, the alarm slot, an open `ask`; `notify.HOLD`, `notify.BURST`; `notified` on the attention store) and `_notify_send` / `_notify_run`, the last send as `notify` on the `host` read. Built beyond the design and now in §4.10: a row whose hold ended more than `NOTIFY_LATE` (5 min) before the home could tell it is never told, so the switch turned on or a long outage sends no backlog. Tests in `tests/test_notify.py`. **Next:** slice 2.
 **Location:** `src/sessionorc/settings.py` (`notify:`), a new `src/sessionorc/notify.py` (the lines, and the child's `__main__`), `src/sessionorc/agent_attention.py` (`_note_attention`: a row beginning), `agent_mail.py` (an `ask` reaching the person inbox, a `blocked` outcome), `agent_tick.py` (the restart and team-start marks), `agent_inbox.py` (`notify_test`), `modes.py` (`HOME_EDITS`), `mail.py` (`PERSON_ONLY`, once TD-317 has it), `src/agentorc/ui/` (the Settings page's card, the poll's `watching`, the Inbox's `?row=`), `src/agentorc/ui/help.py`, `tests/`; design §4.10 *Told on Telegram when nobody is looking*, §5 `notify:`, §4.5a **You**: **Telegram**. Held path (`src/sessionorc/**`): the techlead reads slices 1 and 2.
 
 **Why:** TD-092's design: a `needs-you` session or an `ask` sits in the Inbox until somebody opens the page, and Paul chose Telegram to be told.

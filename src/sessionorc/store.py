@@ -85,23 +85,31 @@ class AttentionStore:
     One file holding two things that belong to the **home** rather than to any record: `trail`, the
     endings of the state rows the Inbox showed, newest first; and `snoozed`, a person's *not now*
     per record and row kind. Written whole on every change; a missing or unreadable file is an
-    empty trail and no snoozes, never a crash — the same rule the person inbox follows."""
+    empty trail and no snoozes, never a crash — the same rule the person inbox follows.
+
+    A third, `notified` (§4.10 *Told on Telegram when nobody is looking*, TD-319): the rows the home
+    told the person about, `{row key: when}`, held on the store itself and written with every save, so
+    a restart does not tell a standing row twice. A key leaves when its row ends."""
 
     def __init__(self, path: Path | None = None):
         self.path = path or paths.attention_file()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.notified: dict[str, str] = {}
 
     def load(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             trail = [d for d in raw.get("trail", []) if isinstance(d, dict) and d.get("id")]
             snoozed = {str(k): str(v) for k, v in (raw.get("snoozed") or {}).items() if v}
+            told = raw.get("notified") or {}
+            self.notified = {str(k): str(v) for k, v in told.items() if v} if isinstance(told, dict) else {}
             return trail, snoozed
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
             return [], {}
 
     def save(self, trail: list[dict[str, Any]], snoozed: dict[str, str]) -> None:
-        _atomic_write(self.path, json.dumps({"trail": trail, "snoozed": snoozed}, indent=1))
+        doc = {"trail": trail, "snoozed": snoozed, **({"notified": self.notified} if self.notified else {})}
+        _atomic_write(self.path, json.dumps(doc, indent=1))
 
 
 class UsageStore:

@@ -8,11 +8,11 @@ key is the usage gate's reserves, per profile, per window label as the adapter n
     usage_gate:
       grind: {"5h": 30, wk: {per_day: 10}}
 
-Five keys (§5 *The settings a person moves*, TD-146, TD-233): `usage_gate`, `usage` (`max_age`),
-`teams`, `repos` and `person`. Each has a reader here that drops whatever is not valid — a hand edit can put anything
-in the file, and a malformed entry must act on nothing — and a `parse_*` that raises, which is what
-`set_settings` validates a write with. `person:` is the person's own and reaches no policy: the gate
-and the tick read the file by key and never that one.
+Six keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319): `usage_gate`, `usage` (`max_age`),
+`teams`, `repos`, `person` and `notify` (`telegram`). Each has a reader here that drops whatever is not
+valid — a hand edit can put anything in the file, and a malformed entry must act on nothing — and a
+`parse_*` that raises, which is what `set_settings` validates a write with. `person:` is the person's
+own and reaches no policy: the gate and the tick read the file by key and never that one.
 
 A **reserve** is what a person keeps back for their own interactive work, and the gate's **line**
 is computed from it, never typed: a flat percent `30` makes the line `100 − 30`; a percent per day
@@ -536,6 +536,57 @@ def parse_board_show(v: Any) -> str:
         f"inbox.board_show is next:<n> (n from {BOARD_SHOW_NEXT[0]} to {BOARD_SHOW_NEXT[1]}), due, "
         f"<n>d (n from {BOARD_SHOW_DAYS[0]} to {BOARD_SHOW_DAYS[1]}) or all, not {v!r}"
     )
+
+
+# -- notify: telegram (§5 `notify:`, §4.10 *Told on Telegram when nobody is looking*, TD-319) ----------
+
+NOTIFY_KEYS = ("telegram",)
+TELEGRAM_KEYS = ("on", "secrets", "link")
+_SECRETS = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+_LINK = re.compile(r"https?://[^\s/]+(/\S*)?")
+
+
+def parse_telegram(value: Any, drop: bool = False) -> dict[str, Any]:
+    """`notify.telegram`: `on` (true or false), `secrets` — the Doppler `project/config` that holds
+    `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, a name and never a value — and `link`, the
+    `http(s)://` address the person's phone reaches the UI at, kept without a trailing slash."""
+
+    def on(b: Any) -> bool:
+        if not isinstance(b, bool):
+            raise ValueError(f"telegram.on is true or false, not {b!r}")
+        return b
+
+    def secrets(s: Any) -> str:
+        if not isinstance(s, str) or not _SECRETS.fullmatch(s.strip()):
+            raise ValueError(f"telegram.secrets is a Doppler project/config like samscrape/prd, not {s!r}")
+        return s.strip()
+
+    def link(u: Any) -> str:
+        if not isinstance(u, str) or not _LINK.fullmatch(u.strip()):
+            raise ValueError(f"telegram.link is an http:// or https:// address, not {u!r}")
+        return u.strip().rstrip("/")
+
+    return _each(_fields(value, TELEGRAM_KEYS, "telegram", drop), {"on": on, "secrets": secrets, "link": link}, drop)
+
+
+def notify(doc: dict[str, Any]) -> dict[str, Any]:
+    """`notify:` as kept: `{telegram: {on?, secrets?, link?}}`, every field that is not valid dropped."""
+    raw = doc.get("notify")
+    tg = raw.get("telegram") if isinstance(raw, dict) else None
+    try:
+        got = parse_telegram(tg, drop=True) if tg is not None else {}
+    except ValueError:
+        got = {}
+    return {"telegram": got} if got else {}
+
+
+def telegram(doc: dict[str, Any]) -> dict[str, Any] | None:
+    """The switch as the tick reads it: `{secrets, link}` when `on` is true and secrets are set, else
+    None — absent, off, or a hand edit with no secrets sends nothing."""
+    tg = notify(doc).get("telegram") or {}
+    if tg.get("on") is not True or not tg.get("secrets"):
+        return None
+    return {"secrets": tg["secrets"], "link": tg.get("link") or ""}
 
 
 def team_extra(doc: dict[str, Any], team: str) -> int:

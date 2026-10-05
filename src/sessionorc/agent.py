@@ -165,6 +165,7 @@ from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_inbox import InboxMixin
 from sessionorc.agent_link import LinkMixin
 from sessionorc.agent_mail import MailMixin
+from sessionorc.agent_notify import NotifyMixin
 from sessionorc.agent_promote import PromoteMixin
 from sessionorc.agent_remote import RemoteMixin
 from sessionorc.agent_serve import ServeMixin
@@ -223,6 +224,7 @@ class HostAgent(
     PromoteMixin,
     SpendMixin,
     AttentionMixin,
+    NotifyMixin,
     WakeMixin,
     HookMixin,
     SettingsMixin,
@@ -286,6 +288,11 @@ class HostAgent(
         # sid → how its current row will have ended, when the home knows better than *resolved*:
         # written by the act that ended it (`decide`, `identity_ack`, a resume, a forget).
         self._attention_how: dict[str, str] = {}
+        # Told on Telegram (§4.10, TD-319): when each recent message went, for the burst's window, and
+        # the last send's result for the `host` read — in memory: a restart forgets both, and `notified`
+        # (on the attention store) is what keeps a standing row from being told twice
+        self._notify_sent: list[datetime] = []
+        self._notify_last: dict[str, Any] = {}
         self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
         self._id_host_dirty = False  # counts moved since the last write; the tick writes them
         self.identity_tally: dict[str, int] = defaultdict(int)
@@ -671,6 +678,7 @@ class HostAgent(
             out["promotes"] = self._promotes_view()
             out["pulls"] = self._pulls_view()
             out["waiting"] = work.waiting_of(self.person_inbox)
+            out["notify"] = self._notify_view()
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())
