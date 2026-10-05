@@ -613,7 +613,14 @@ def create_app() -> FastAPI:
 
         def read() -> dict[str, Any]:
             o = org or org_here()[0]  # fresh, as the page's strip reads it: not the deltas' cached definitions
-            return {n: teamrun.flow_view(rpc, o, n, here, sessions) for n, t in o.teams.items() if t.flows}
+            out: dict[str, Any] = {}
+            for n, t in o.teams.items():
+                if t.flows:
+                    try:  # one team that fails to read costs its own header the flow, not every team's
+                        out[n] = teamrun.flow_view(rpc, o, n, here, sessions)
+                    except Exception:  # noqa: BLE001
+                        log.debug("team %s: its flows were not read", n, exc_info=True)
+            return out
 
         try:
             flow_cache["flows"] = await asyncio.to_thread(read)
@@ -2266,7 +2273,8 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await asyncio.to_thread(teamrun.apply, rpc, org, name, host_name())
         except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
             raise _team_http(e) from None
-        await h.flow_views(await call("list"), org)
+        with contextlib.suppress(HTTPException):  # applied either way: a failed re-read is the next page load's
+            await h.flow_views(await call("list"), org)
         return JSONResponse({"ok": True, **got})
 
     # design §4.9 *Add or remove a member from the team card*, §4.5a *team card: Members…* and the
