@@ -39,6 +39,7 @@ from sessionorc import (
     mail,
     naming,
     paths,
+    work,
 )
 from sessionorc import balance as balance_mod
 from sessionorc import spend as spend_mod
@@ -159,6 +160,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     read_checkout,  # noqa: F401
     stat_dir,  # noqa: F401
 )
+from sessionorc.agent_hook import HookMixin
 from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_inbox import InboxMixin
 from sessionorc.agent_link import LinkMixin
@@ -166,10 +168,11 @@ from sessionorc.agent_mail import MailMixin
 from sessionorc.agent_promote import PromoteMixin
 from sessionorc.agent_remote import RemoteMixin
 from sessionorc.agent_serve import ServeMixin
+from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_spend import SpendMixin
 from sessionorc.agent_tick import TickMixin
 from sessionorc.agent_wake import WakeMixin
-from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
+from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, work_left
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     GRANTS,
@@ -221,6 +224,8 @@ class HostAgent(
     SpendMixin,
     AttentionMixin,
     WakeMixin,
+    HookMixin,
+    SettingsMixin,
     InboxMixin,
     MailMixin,
     IdentityMixin,
@@ -621,6 +626,59 @@ class HostAgent(
 
     async def rpc_list(self) -> list[dict[str, Any]]:
         return self._views()
+
+    async def rpc_recent_dirs(self) -> list[str]:
+        p = paths.recent_dirs_file()
+        return p.read_text().splitlines() if p.is_file() else []
+
+    async def rpc_repos(self) -> dict[str, dict[str, Any]]:
+        """The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), keyed by the
+        checkout's path: what the team card's Repo facet, the rollup and the Repo page draw, with
+        `balance` beside a reading whose repo a team is over its line in (§6 *Balance*). The home's;
+        a node forwards it (§4.4a)."""
+        return {root: v for root in self._repos if (v := self._repo_view(root)) is not None}
+
+    async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
+        """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty
+        `ao doing` calls, oldest first — `{team, id, text, at}` each; one team's with `team`. The
+        home's; a node forwards it (§4.4a). A read, and not the `doing` RPC, which writes the line."""
+        rings = self.doing_log.rings
+        if team is not None:
+            return {team: list(rings.get(team, []))}
+        return {t: list(r) for t, r in rings.items()}
+
+    async def rpc_adapters(self) -> list[str]:
+        return adapters.names()
+
+    async def rpc_ping(self) -> str:
+        return "pong"
+
+    async def rpc_host(self) -> dict[str, Any]:
+        """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
+        whether the home can be reached — which a client on a node needs before it labels what it
+        shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
+        promote's readings per repo (`promotes`, §6 *Promote*), the pull's (`pulls`, §6 *Pull*) and
+        each wound-down team's `work_waiting` as the `host` record holds it (`work: {<team>: mark}`,
+        §6 rule 8), which is what draws the Inbox's team start row and the card's note; and what
+        each live session waits on (`waiting: {<sender>: [{id, ref, bound}]}`, `work.waiting_of`
+        over the person inbox, §4.9a *Waiting is read, never declared*, TD-274) — references and
+        bounds, never the questions' text — which a session's `ao team status` cannot read for
+        itself, since nobody reads the person inbox but a person."""
+        out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
+        out["built_from"], out["started_at"] = dict(self.build), self.started_at
+        if self.mode == "home":
+            out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
+            out["promotes"] = self._promotes_view()
+            out["pulls"] = self._pulls_view()
+            out["waiting"] = work.waiting_of(self.person_inbox)
+            out["work"] = {
+                team: dict(rec["work_waiting"])
+                for team, rec in sorted((self._host_rec.get("teams") or {}).items())
+                if isinstance(rec, dict) and isinstance(rec.get("work_waiting"), dict)
+            }
+        else:
+            out["link"] = dict(self.home_link)
+        return out
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
         return self._view(self._find(id), bookkeeping=True)  # one record: its tallies and wakes ride along
@@ -1373,6 +1431,118 @@ class HostAgent(
         self._asker_gone(s, self._address(s))  # its open questions to the person close with it (§4.10)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
+
+    async def rpc_restart(self, id: str, caller: Any = None) -> dict[str, Any]:
+        """A person's restart (design §6 rule 2 *A person's restart*, TD-250): what the tick would not
+        do — an `early` or a `repeat` declaration, a member at its ceiling, one a person closed —
+        said in one press and then done the tick's way. The record is closed if it is still there,
+        under the tick's own test (`gitinfo.work_left`), and created again from its launch record,
+        the prompt refilled as rule 7's replay refills it. The new record starts fresh: no marks,
+        and `restarts` the one entry `{at, why: person}`, which never counts toward the ceiling.
+        **A person's own**, refused to a session as `set_settings` is, and the home's alone
+        (`modes.HOME_EDITS`); a node's member is closed and created over the link. Every refusal is
+        made before anything is touched; the reply is the new record."""
+        agent_common.person_only(caller, "restart a session", "§6 rule 2")
+        if self.mode != "home":
+            raise RpcError("restart runs at the home (design §6 rule 2): this host is a node")
+        s = self._find(id)
+        now = datetime.now(UTC)
+        params = self._restart_check(s, now)
+        entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
+        read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
+        if s.state == "idle":
+            if s.host == self.host:
+                await self.rpc_close(s.id)
+            else:
+                await self._route_act("close", {"id": s.id}, None, s.host)
+        try:
+            if s.host == self.host:
+                view = await self.rpc_create(**params)
+            else:
+                view = await self._route_act("create", {**params, "host": s.host}, None, s.host)
+        except Exception as e:  # noqa: BLE001 — said to the person who pressed, whatever it was
+            log.warning("%s: the person's restart failed: %s", s.id, e)
+            raise RpcError(
+                f"the restart of {s.name} failed: {str(e) or type(e).__name__} — it is {s.state} and its "
+                "marks stand; Restart again, or Resume with changes… (design §6 rule 2)"
+            ) from None
+        rid, _h = naming.split_address(str((view or {}).get("id") or ""))
+        new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
+        if new is None or new is s:
+            return view  # a node's record the home has not been told of yet: the create's own reply
+        new.restarts = [entry]
+        new.restart_wanted = new.restart_ceiling = new.restart_blocked = None
+        new.brief = read  # the files as this restart read them (as `_replay` writes it)
+        self._save(new)
+        await self._push_changes()
+        log.info("%s restarted by the person from its launch record", self._address(new))
+        return self._view(new)
+
+    def _restart_check(self, s: Session, now: datetime) -> dict[str, Any]:
+        """`restart`'s refusals, each by name (design §6 rule 2 *A person's restart*), and the launch
+        record as `create`'s arguments when none applies. Nothing is changed here."""
+        rule = "(design §6 rule 2)"
+        if s.seat is not None:
+            raise RpcError(f"{s.name} is a seat: rule 3 fills it when it is due, and Resume is the way to it {rule}")
+        if s.suspended:
+            raise RpcError(
+                f"{s.name} is suspended over an identity alarm: only a person's Resume or Forget lifts that, "
+                f"and a restart is neither (design §4.8a)"
+            )
+        if s.superseded_by:
+            raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to restart {rule}")
+        if s.state == "scheduled":
+            raise RpcError(f"{s.name} is scheduled and has not started: `ao at {s.id} now` starts it {rule}")
+        if s.state not in ("idle", "exited", "closed"):
+            raise RpcError(
+                f"{s.name} is {s.state}: a restart is of a session that is idle, exited or closed — wait, or "
+                f"Wrap up {rule}"
+            )
+        try:
+            if not s.supervised:
+                raise RpcError("not supervised")
+            launch = self._read_launch(self._address(s))
+        except RpcError:
+            raise RpcError(
+                f"{s.name} has no launch record, so nothing says how it was started: Resume with changes… "
+                f"is the way back {rule}"
+            ) from None
+        scope = s.repo or s.dir
+        for r in self._graph().values():
+            live = r.state not in ("exited", "closed") and not r.superseded_by
+            if r is not s and live and r.host == s.host and r.name == s.name and (r.repo or r.dir) == scope:
+                raise RpcError(f"{s.name} is the name of {self._address(r)}, which is {r.state}: one of a name {rule}")
+        if s.host == self.host:
+            # the create finds what it supersedes at the name's own id: a record under a suffixed id
+            # (tmux held the base when it started) is not there, and the create would refuse after the close
+            base = naming.base_id(s.dir, s.repo, str(launch.get("name") or ""))
+            if self.sessions.get(base) is not s:
+                raise RpcError(
+                    f"{s.name} ({s.id}) does not hold its launch record's name, {launch.get('name')!r} ({base}): "
+                    f"Resume with changes… is the way back {rule}"
+                )
+        until = launch.get("run_until")
+        try:
+            passed = bool(until) and now >= _parse(str(until))
+        except ValueError:
+            passed = False
+        if passed:
+            raise RpcError(f"{s.name}: its stop time has passed — Resume with changes… {rule}")
+        profile, team = str(launch.get("profile") or ""), str(launch.get("team") or "")
+        if self._profile_gated(profile, now, team):
+            raise RpcError(
+                f"{s.name}: its profile {profile or '(default)'} is over its usage line, and the gate would pause "
+                f"what the press started — `ao gate` prints the lines {rule}"
+            )
+        if s.host != self.host and s.host not in self._link_muxes:
+            raise RpcError(f"{s.name} runs on {s.host}, whose link is down: a restart waits for it (design §4.4a)")
+        if left := work_left(s.git):
+            raise RpcError(
+                f"{s.name} has {left}: a restart closes a session only with its work committed and pushed {rule}"
+            )
+        # `keep_mail`: the new record is a new record, so its inbox and outbox move as a seat's fill moves
+        # them. Its own open questions to the person end with the close of an idle one, as at any close.
+        return {**launch, "supervised": True, "keep_mail": True}
 
     async def rpc_remove(self, id: str, caller: Any = None) -> None:
         s = self._get(id)
