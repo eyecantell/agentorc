@@ -85,7 +85,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-292 | Build the mail half of a look: the briefs' three cases as a steer or an ask, `--shot` and the envelope's `shots`, screenshots and the pair on the row, Send to reviewer | Medium | Built (#975, #980, #982, #983, #987, #990, #1007); live check waiting on the first look a builder sends |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | In progress — the node rebuilt with Claude Code; the credential steps are Paul's |
-| TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Built — PR #993; the check waits on a look from a node |
+| TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-309 | Build flows (design §4.9c): the loader, stage briefs and the three brief layers, the team's `flows:` and the `flow` setting, the compile, `ao team flow` and Apply with the relaunch, the card's strip and marks | Medium | Slices 1–3, 4a, 5 and 6a built; the page's Flow pick and Settings field (4b), the card's strip and marks (6b) left |
@@ -1471,9 +1471,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Priority:** Low
 **Type:** debt
 **Added:** 2026-10-03 (grinder-ao-2, TD-292 slice 3)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built — PR #993 (`sessionorc.shots`, `host_shot` and the link's `shot`; the row's `?host=` and the route reading there). The *Done when* waits on the first look from a member on a node (TD-299 places one).
+**Owner:** anchor
+**Kind:** live-check #993
+**Status:** **A live check waiting on an event (grinder-ao-1, 2026-10-05):** #993 is live, and its *Done when* needs a look sent by a member running on a node, which no grinder can cause — TD-299 places the first such member; whoever reads the home's Inbox after that look reads its thumbnails there. Built — PR #993 (`sessionorc.shots`, `host_shot` and the link's `shot`; the row's `?host=` and the route reading there). The *Done when* waits on the first look from a member on a node (TD-299 places one).
 **Location:** `src/sessionorc/shots.py` (the one reading), `src/sessionorc/agent_remote.py` (`host_shot`), `src/sessionorc/agent_link.py` (the link's `shot`), `src/agentorc/ui/inbox.py` (`shot_root`, `shot_bytes`, `look_shots` with the sender's host), `src/agentorc/ui/app.py` (`repo_shot`, `?host=`); design §4.4a *A look's screenshots on another host*, §4.5a **Inbox row: a look** (*through the host whose registry holds the repo*)
 
 **Why:** the row (#982) serves a screenshot only from a checkout in this host's registry. A look sent by a member running on a node (TD-299, `place:`) names a repo that the node's registry holds and the home's does not, so the row draws the file names and no images.
