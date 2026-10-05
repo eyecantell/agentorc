@@ -336,7 +336,7 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         # the definition's file at the card's head, not a foot under Save (TD-286)
         card = page[page.index('data-team="sett-team"') :]
         card = card[: card.index("</form>")]
-        assert card.index("defined in <span class=\"mono\">org.yml</span>") < card.index("stop time")
+        assert card.index('defined in <span class="mono">org.yml</span>') < card.index("stop time")
         assert "setfoot" not in card
         bad = client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "maybe"})
         assert bad.status_code == 400 and "ask, start or off" in bad.json()["detail"]
@@ -424,6 +424,14 @@ def test_balance_card_reads_the_numbers_and_the_mark():
     off = setmod.balance_card("t", None, fleet, repos)
     assert not off["on"] and off["was"] == "null" and off["mark"] == "" and off["now"][0] == "open PRs: 3 (no line)"
     assert setmod.team_cards({"t": object()}, {"t": {"balance": {"prs": 2}}}, sessions=fleet, repos=repos)[0][
+        "balance"
+    ]["mark"]
+    # a mark with no repo: only the home's `host` read carries it (TD-330)
+    bare = {"/r": {"prs": {"open": open_}}}
+    assert setmod.balance_card("t", {"prs": 2}, fleet, bare)["mark"] == ""
+    host = {"balance": {"t": {**mark, "repo": ""}}}
+    assert setmod.balance_card("t", {"prs": 2}, fleet, bare, host)["mark"] == "over its line: 3 open PRs, line 2"
+    assert setmod.team_cards({"t": object()}, {"t": {"balance": {"prs": 2}}}, sessions=fleet, repos=bare, host=host)[0][
         "balance"
     ]["mark"]
 
