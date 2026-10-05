@@ -518,11 +518,13 @@ def add(
     context: str | None = None,
     today: str | None = None,
     answer: str | None = None,
-) -> dict[str, str | int]:
+) -> dict[str, Any]:
     """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new line at the top
-    of the open items of the checkout `root`'s board, committed there as `agentorc: board <item
-    head> (from <entry id>)`, never pushed. Refused on the same conditions as an edit, touching
-    nothing. Returns `{commit, message, line}` — `line` the new item's line number.
+    of the open items of the board on origin's head for the checkout `root`'s repo, committed in the
+    host agent's own tree as `agentorc: board <item head> (from <entry id>)` and landed by its own
+    PR, as an edit is; the checkout is never written. Refused on the same conditions as an edit,
+    touching nothing on origin. Returns `{commit, message, pr, line}` — `line` the new item's line
+    number.
 
     With `answer`, the **second add** (§4.4, §4.10 *A question about a reference outlives its asker*,
     TD-216): `text` is the orphaned question's first paragraph and the person's answer follows it on

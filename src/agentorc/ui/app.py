@@ -2816,8 +2816,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "board":
             # design §4.5a **Due strip / Inbox board row** → **Snooze ▾** and **Done** on a board row
-            # (§4.4 *Board write-back*, TD-069 step 3): the host agent edits the one line and commits
-            # it in the repo's main checkout. The row hands back what the reader gave it — the board,
+            # (§4.4 *Board write-back*, TD-069 step 3): the host agent edits the one line on origin's
+            # head and lands it there by its own PR (TD-264). The row hands back what the reader gave it — the board,
             # the line and its text — and the agent refuses the edit when that line has moved on.
             what = str(body.get("action") or "")
             if what == "reply":
