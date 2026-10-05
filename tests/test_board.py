@@ -905,3 +905,97 @@ async def test_the_home_writes_the_trail_line_a_node_handed_it(agent):
     assert (t["name"], t["sid"], t["how"], t["text"]) == ("cm", "", "written on the board", "A line. — Paul: go on")
     await agent.rpc_board_reply_hand(head="B", by="Paul", reply="x", refs=["TD-999"])  # no repo: no line
     assert len([t for t in agent.trail if t["kind"] == "board reply"]) == 1
+
+
+def _push_elsewhere(repo: Path, other: Path, edit) -> None:
+    """Another writer's commit on origin's board, made between the press's fetch and its merge."""
+    git(repo, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
+    b = other / board.BOARD
+    b.write_text(edit(b.read_text()))
+    git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "a neighbour")
+    git(other, "push", "-q", "origin", "main")
+
+
+@pytest.mark.parametrize("press", ["done", "add"])
+def test_a_squash_refused_for_a_neighbouring_lines_change_is_made_again_on_origins_new_head(
+    repo, monkeypatch, tmp_path, press
+):
+    """TD-264 (c), §4.4: origin moving in between refuses nothing unless the item's own line moved —
+    so a squash the forge refuses because a neighbouring line changed (git cannot merge adjacent
+    lines) is made once more on origin's new head, and both edits stand."""
+    real, calls = board._land, []
+    # the line beside the edit: the next item for a Done on the first, the first item for an add above it
+    near, edited = ("- [ ] n/a — undated.", "n/a — undated, edited.") if press == "done" else (ITEM, "Look again.")
+
+    def land(root, t, want, msg, clock, still):
+        calls.append(msg)
+        if len(calls) == 1:
+            new = f"{near} {edited}" if press == "add" else f"- [ ] {edited}"
+            _push_elsewhere(repo, tmp_path / "other", lambda s: s.replace(near, new))
+        return real(root, t, want, msg, clock, still)
+
+    monkeypatch.setattr(board, "_land", land)
+    if press == "done":
+        board.write_back(repo, 7, ITEM, "done")
+        assert f"- [x] {ITEM}" in origin_board(repo)
+    else:
+        board.add(repo, "Next to it", "2026-10-02", entry="m-1", today="2026-09-25")
+        assert origin_board(repo).count("Next to it") == 1
+    assert len(calls) == 2 and edited in origin_board(repo)
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
+
+
+def test_the_trees_commit_is_authored_by_the_identity_the_checkout_resolves(repo, monkeypatch, tmp_path):
+    """TD-264 (c), §4.4: the commit is the checkout's identity — one an `includeIf "gitdir:…"` gives
+    the checkout's path alone, which the tree's own path does not reach, included."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global"))
+    inc = tmp_path / "ident.gitconfig"
+    inc.write_text("[user]\n\tname = Inc\n\temail = inc@example.com\n")
+    git(repo, "config", "--unset", "user.name")
+    git(repo, "config", "--unset", "user.email")
+    git(repo, "config", "user.useConfigOnly", "true")  # no identity guessed from the host
+    git(repo, "config", f"includeIf.gitdir:{repo}/.git.path", str(inc))
+    seen = []
+    real = board._git
+
+    def spy(root, *args, **kw):
+        if "commit" in args:
+            seen.append(args)
+        return real(root, *args, **kw)
+
+    monkeypatch.setattr(board, "_git", spy)
+    board.write_back(repo, 7, ITEM, "done")
+    assert f"- [x] {ITEM}" in origin_board(repo)
+    assert seen and "user.name=Inc" in seen[0] and "user.email=inc@example.com" in seen[0]
+
+
+def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board(repo, monkeypatch, tmp_path):
+    """Review of #1096: the press is made again only on the forge's own word that the PR did not merge
+    **and** a change to origin's board. A forge that cannot be asked, with the add landed and the
+    board moved after it, is the unreachable refusal and never a second line; a merge refused while
+    only another file moved is refused once, with one PR."""
+    import json
+
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge-after-moved")
+    monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
+    with pytest.raises(board.Refused, match="origin could not be reached"):
+        board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    assert origin_board(repo).count("Once only") == 1
+    monkeypatch.delenv("FAKE_GH_VIEW_FAIL")
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge")
+    real, calls = board._land, []
+
+    def land(root, t, want, msg, clock, still):
+        calls.append(msg)
+        other = tmp_path / f"other-{len(calls)}"
+        git(repo, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
+        (other / "other.txt").write_text(f"moved {len(calls)}\n")
+        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "elsewhere")
+        git(other, "push", "-q", "origin", "main")
+        return real(root, t, want, msg, clock, still)
+
+    monkeypatch.setattr(board, "_land", land)
+    with pytest.raises(board.Refused, match="origin could not be reached"):
+        board.write_back(repo, 8, "n/a — undated.", "done")
+    bare = Path(git(repo, "remote", "get-url", "origin"))
+    assert len(calls) == 1 and len(json.loads((bare / "fake-gh.json").read_text())["prs"]) == 2
