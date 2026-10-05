@@ -38,3 +38,5 @@
 - [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — pickable is derived from Blocked by and no Pickable line is written; name the build entries (2026-10-01)
 - [Steer replies land on the board](steer-replies-land-on-the-board.md) — Paul's Reply to a steer reaches main's board via the anchor, not a new run's inbox; grep the board for each open steer id before merging at a bound
 - [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write; never chain `git commit` after an edit script
+- [Never count the unread inbox](never-count-the-unread-inbox.md) — `ao inbox --unread` marks entries read; save it to a file, never pipe it through `jq length`; check open questions from the full inbox before stopping
+- [Stop a scratch home by its pid](stop-a-scratch-home-by-its-pid.md) — `pkill -f`/`pgrep -f` on look_home args kills the tool's own shell; `ps | grep '[l]ook…'`, then kill the number
