@@ -302,6 +302,38 @@ def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path): 
     assert "flow" not in teams.brief_ids(_with(tmp_path, flows=[]), "ao-grind", HOST, "grinder", cfg)
 
 
+@pytest.mark.unit
+def test_a_node_members_repo_stage_brief_is_read_on_its_checkout(tmp_path):
+    # TD-309 (2): a repo flow's stage brief for a node member is read across the link with the rest of
+    # its compose, never from this host's disk; a `package:` brief is this host's own, as `check` reads
+    node = tmp_path / "on-node"  # the node's checkout: nothing of it is on this disk
+    there = {
+        node / ".agentorc" / "flows" / "mine" / "flow.yml": (
+            "stages:\n  - {name: build, role: grinder, lane: [free-pick], brief: build.md}\n"
+            "  - {name: review, role: techlead, brief: 'package:td/review.md'}\n"
+        ),
+        node / ".agentorc" / "flows" / "mine" / "build.md": "the node's own build words\n",
+    }
+
+    def read(path: Path) -> str | None:
+        if not Path(path).is_relative_to(node):
+            raise OSError(f"{path} is outside the checkout")
+        return there.get(Path(path))
+
+    cfg = repoconfig.load_text("held: [src/**]\n", node)
+    mine = flowdefs.load("mine", cfg, read=read)
+    assert mine is not None and mine.usable, mine.problems
+    text, made = repoconfig.resolve_role(cfg, "grinder").compose(read=read, flow=flowdefs.under(mine, "grinder"))
+    assert "the node's own build words" in text
+    assert made["slots"]["{stage}"] == {"file": str(node / ".agentorc" / "flows" / "mine" / "build.md")}
+    _, made = repoconfig.resolve_role(cfg, "techlead").compose(read=read, flow=flowdefs.under(mine, "techlead"))
+    assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "review.md")}
+    # a node that stops answering between the check and the compose refuses the member, by its file
+    del there[node / ".agentorc" / "flows" / "mine" / "build.md"]
+    with pytest.raises(ValueError, match="stage brief .*build.md cannot be read"):
+        repoconfig.resolve_role(cfg, "grinder").compose(read=read, flow=flowdefs.under(mine, "grinder"))
+
+
 def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_path):  # noqa: F811
     # review of TD-309 slice 2a: a node's checkout that does not answer is never a 500 past the form
     root = tmp_path / "agentorc"
