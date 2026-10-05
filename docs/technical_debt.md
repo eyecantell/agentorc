@@ -135,7 +135,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-317 | Build the person-only gate: `mail.PERSON_ONLY`, one check opening each of the 25 RPCs, the test that holds list and code together; and move `agent_wake.py`'s passengers to where they belong | Low | Open |
 | TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Open — design-first |
 | TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Open — design-first |
-| TD-322 | The pull's note quotes git's last stderr line, which for a failed fetch can be *and the repository exists.* | Low | Open |
 
 ---
 
@@ -2510,18 +2509,3 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a grinder that lands one slice per run across three restarts on one entry is restarted each time without a repeat mark, and a run that merges nothing on its third pass still reaches the person.
 
 **Related:** TD-249 (the restart reading; its live check, PR #1032), TD-245 (the design), TD-309 (the entry it was seen on), TD-297 (the mark's live event).
-## TD-322: The pull's note quotes git's last stderr line, which for a failed fetch can be *and the repository exists.*
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-04 (grinder-ao-1, the scratch home of TD-264's UI check)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/promote.py` (`_git`: `(cp.stderr …).splitlines()[-1]`), the pull's reading (`pull`, `fetch_why`), the Inbox's *behind* note tail (§4.5 screen 6, §6 *Pull*)
-
-**Why:** on a scratch home whose fixture repo had no origin when the home's pull first ran, the board's origin note read *read from origin/main: this checkout has not pulled it yet — it could not be pulled: git fetch: and the repository exists.* — git's fetch error is several lines (*'origin' does not appear to be a git repository … Please make sure you have the correct access rights and the repository exists.*), and `promote._git` keeps the last, which says nothing about what went wrong.
-
-**Fix:** keep git's first `fatal:`/`error:` line (as `_git_why` in the same module already does), not the last; a test with a remote that does not exist.
-
-**Related:** TD-263 (the pull), TD-264 (where it was seen).
