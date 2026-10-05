@@ -481,6 +481,10 @@ async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, t
             assert notes[0]["text"].startswith("board: Merged, live check pending: the doorbell.\n\n")
             assert notes[0]["text"].endswith(": rebase it")
         assert not [e for e in (await me.call("inbox", id=idle))["entries"] if e["from"] == "person"]
+        # the trail says what the result says (§4.5a *Inbox board row → Reply*): one entry, no record
+        trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
+        assert len(trail) == 1 and trail[0]["how"] == got["note"] and trail[0]["sid"] == ""
+        assert trail[0]["name"] == repo.name and trail[0]["text"].endswith(": rebase it")
         for sid in (h, both, idle):
             await me.call("kill", id=sid)
 

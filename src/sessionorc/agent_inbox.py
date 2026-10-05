@@ -430,6 +430,8 @@ class InboxMixin:
             note += " · sent to " + ", ".join(f"{x['session']} (holds {x['ref']})" for x in sent)
         if refused:
             note += " · not sent to " + "; ".join(refused)
+        if self.mode == "home":  # the trail is the home's, beside the person inbox (§4.10)
+            self._trail_reply(root.name, head, by, reply, note)  # it says what the result says
         return {
             "board": str(want),
             "line": int(line),
