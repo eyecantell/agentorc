@@ -795,6 +795,24 @@ def test_start_with_a_team_badges_the_session_and_fills_the_teams_reader(world, 
     assert made["review"] == {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
 
 
+def test_under_a_flow_the_form_gives_a_persons_session_the_flows_reader(world, client):
+    """§4.9c items 2 and 3 (TD-309 slice 3a): a team running `build-review` holds a person's session
+    on the repos' `held:`, not the union of its roles' own `review:`, and the line under the picker
+    says so."""
+    tmp_path, fleet = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(techlead={"name": "tl-ao"}, flows=["build-review"])
+    doc["roles"] = {"grinder": {"review": {"reader": "techlead", "held": ["src/agentorc/**"]}}}
+    write_org(tmp_path, doc)
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
+    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "agentorc")}).json()
+    assert got["line"] == "held PRs read by ao-agentorc-tl-ao on docs/briefs/**, src/sessionorc/**"
+    data = {"name": "me", "dir": str(tmp_path / "agentorc"), "team": "ao-grind"}
+    assert client.post("/new", data=data, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert made["review"] == {"reader": "techlead", "held": ["docs/briefs/**", "src/sessionorc/**"], "bound": "2h"}
+
+
 def test_start_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_brief(world, client):
     """TD-253: the form's Team pick fills the brief's `{techlead}` and `{manager}` slots, stored in
     `prompt_from`; with no team each reads `none`."""

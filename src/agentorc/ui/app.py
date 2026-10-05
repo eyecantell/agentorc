@@ -1662,8 +1662,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         profile = profile or (preset.profile if preset else None) or ""
         adapter = adapter or profile_adapter(profile)
         review = preset.review if preset else None
-        if team.strip() and adapter != "shell" and review is None:
-            review = (await asyncio.to_thread(team_reader, team.strip(), dir.strip(), cfg if away else None))["review"]
+        if team.strip() and adapter != "shell":
+            got = await asyncio.to_thread(
+                team_reader, team.strip(), dir.strip(), cfg if away else None, preset.name if preset else None
+            )
+            if got.get("flow") or review is None:  # under a flow the flow's reader, its own set aside (§4.9c)
+                review = got["review"]
         text = prompt.strip() or brief
         # what the brief was made from (design §6 rule 7, TD-217): only when the brief is the preset's
         made_from = None if prompt.strip() else made_from
@@ -1898,8 +1902,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except (KeyError, ValueError) as e:
             raise HTTPException(400, str(e).strip('"')) from None
         review = preset.review
-        if team and review is None:  # a role's own `review:` wins, else the team's reader (§4.9)
-            review = (await asyncio.to_thread(team_reader, team, root))["review"]
+        if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
+            got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
+            if got.get("flow") or review is None:
+                review = got["review"]
         s = await call(
             "create",
             name=plan["name"],

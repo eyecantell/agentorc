@@ -623,6 +623,13 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
             defaults["controllers"] = [mid]
             if teamrun.on_call(held) and not getattr(args, "json", False):
                 print(f"under {held.get('name') or mid} · on call: whoever fills the seat may act on it")
+    flowed, reader = teams.flow_review(org, team, cfg, role)
+    if flowed:
+        # §4.9c items 2 and 3: under the team's flow its reader, whatever the role's own `review:`
+        defaults["review"] = reader
+        if reader is None:
+            return f"no reader: team {name}'s flow {teams.current_flow(team)} holds nothing for this role"
+        return f"held PRs read by team {name}'s techlead on {', '.join(reader['held'])} (ao pr held <n>)"
     if defaults.get("review") is None:
         defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
         if defaults["review"] is None:

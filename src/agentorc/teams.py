@@ -127,6 +127,7 @@ class Launch:
     review: dict[str, Any] | None = None  # who reads its PRs, from its role (design §4.9b *The reader*)
     context_bound: int | None = None  # tokens past which rule 5 tells it to end its run (§4.8, TD-190)
     prompt_from: dict[str, Any] | None = None  # what `prompt` was made from (§6 rule 7, TD-217)
+    set_aside: bool = False  # its role's own `review:` was set aside under the team's flow (§4.9c item 2)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -181,6 +182,9 @@ class Plan:
     """Briefs that name one run (TD-042). Said out loud, like `out_of_reach`; never a refusal."""
     notes: list[str] = field(default_factory=list)
     """Other things the start says and starts anyway: a techlead seat without its primer (§4.9b)."""
+    flow: str | None = None  # the flow the team runs now, compiled into the launches (§4.9c); None: no flow
+    sit_out: list[str] = field(default_factory=list)
+    """Members not started: their role is a stage of another listed flow and of none of the current one (§4.9c)."""
 
     @property
     def launches(self) -> list[Launch]:
@@ -294,6 +298,7 @@ def _brief(
     techlead: str = "",
     context: str = "",
     manager: str = "",
+    flow: repoconfig.UnderFlow | None = None,
 ) -> tuple[str | None, dict[str, Any] | None]:
     """The role's template with the member's `brief:` in its `{repo}` slot — in place of the role's
     own `roles.<name>.brief`, never beside it (design §4.8, TD-114) — and `{lane}`, `{techlead}`,
@@ -309,6 +314,7 @@ def _brief(
         manager=manager,
         supplement=supplement,
         on_call=isinstance(member, orgmod.ManagerDef) and member.on_call,
+        flow=flow,
     )
 
 
@@ -527,6 +533,52 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             raise TeamError(flowdefs.cannot_follow(name, team.name, reasons))
 
 
+@dataclass
+class Compiled:
+    """A team's current flow as a start compiles it (design §4.9c *What a flow compiles to*): the
+    flow, the union of its repos' `held:`, and every listed flow read, for the sit-outs."""
+
+    flow: flowdefs.Flow
+    held: list[str]
+    listed: list[flowdefs.Flow]
+    techlead: bool  # the team has a `techlead:` seat
+
+    @property
+    def reader(self) -> dict[str, Any] | None:
+        """The reader a member stage's role gets (item 2): the techlead on the repos' `held:` when the
+        flow holds a review stage the team can staff — never a `review:` with no `held:`, which would
+        hold every path — else None."""
+        if self.flow.review_stage is None or not self.techlead or not self.held:
+            return None
+        return {"reader": "techlead", "held": sorted(self.held), "bound": REVIEW_BOUND}
+
+    def sits_out(self, role: str) -> bool:
+        """A member of `role` sits out: its role is a member stage's of another listed flow and of no
+        stage of the current one (§4.9c *Members the flow does not use sit out*)."""
+        if self.flow.stage_of(role) is not None:
+            return False
+        return any(f.stage_of(role) is not None for f in self.listed if f.name != self.flow.name)
+
+
+def compiled(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files: Files | None) -> Compiled | None:
+    """The team's current flow, read against its home repo, or None: a team with no `flows:`, or one
+    whose current flow is missing, unreadable or not usable — which `_check_flows` refuses in its
+    own words, so nothing here raises."""
+    name = current_flow(team)
+    if name is None:
+        return None
+    try:
+        checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
+        cfg = repoconfig.load(checkout, read=read)
+        listed = [f for n in team.flows if (f := flowdefs.load(n, cfg, org.roles, read=read)) is not None]
+    except (TeamError, ValueError, OSError):
+        return None
+    flow = next((f for f in listed if f.name == name), None)
+    if flow is None or not flow.usable:
+        return None
+    return Compiled(flow=flow, held=list(cfg.held or ()), listed=listed, techlead=team.techlead is not None)
+
+
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
     *,
     org: orgmod.Org,
@@ -545,6 +597,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     context: str = "",
     manager: str = "",
     seat: bool = False,
+    under: Compiled | None = None,
 ) -> Launch:
     where = f"team {team.name}: {name}"
     checkout, read = _checkout(org, team, home, host, here, files, where)
@@ -559,10 +612,21 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     if role.kind != want:
         slot = "manager:" if lead else "a seat" if seat else "a member"
         raise TeamError(f"{where}: {slot} takes a {want} role, and {role_name!r} is a {role.kind} (design §4.9c)")
+    # §4.9c item 1: a member's lane is its own `lane:`, else its stage's, else its role's
+    stage = under.flow.stage_of(role.name) if under is not None else None
     if isinstance(member, orgmod.SeatDef):
         lane: list[str] = []  # a seat has no lane, whatever its role's (§4.9b): its area is its brief's
+    elif member is not None and member.lane:
+        lane = list(member.lane)
     else:
-        lane = list(member.lane) if member is not None and member.lane else list(role.lane)
+        lane = list(stage.lane) if stage is not None and stage.lane else list(role.lane)
+    # §4.9c item 2: under a flow every role's own `review:` is set aside, and a member stage's role
+    # takes the flow's reader; a seat, the manager and a member outside the flows take none
+    review = dict(role.review) if role.review else None
+    if under is not None:
+        member_stage = stage is not None and not stage.review and not lead and not seat
+        review = under.reader if member_stage else None
+    told = flowdefs.under(under.flow, role.name, techlead=techlead, held=under.held) if under is not None else None
     grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
     # Profile precedence (§4.9 "Roles gain a profile"), lowest first: the package's built-ins,
     # `org.yml`'s `roles:` and the repo's `.agentorc.yml` (those three inside `resolve_role`), the
@@ -574,7 +638,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager)
+        prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager, told)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
@@ -597,10 +661,11 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         trigger=_trigger(member) if seat or (lead and member.on_call) else None,
         ledger=cfg.ledger,
         host=host if host != here else "",
-        review=dict(role.review) if role.review else None,
+        review=review,
         # a seat takes no default bound (§4.8 *The bound has two layers*): only one its role's definition wrote
         context_bound=None if seat and role.context_default else role.context_bound,
         prompt_from=prompt_from,
+        set_aside=under is not None and bool(role.review),
     )
 
 
@@ -623,6 +688,32 @@ def team_review(team: orgmod.TeamDef, roles: dict[str, Any]) -> dict[str, Any] |
     if not held:
         return None
     return {"reader": "techlead", "held": sorted(held), "bound": REVIEW_BOUND}
+
+
+def flow_review(
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    cfg: repoconfig.RepoConfig,
+    role: str | None = None,
+    *,
+    read: repoconfig.Reader | None = None,
+) -> tuple[bool, dict[str, Any] | None]:
+    """The reader a session started into `team` outside a start takes under the team's current flow
+    (design §4.9c items 2 and 3): `(True, reader)` when the team runs a usable flow — a person's
+    session (`role` None) and a member stage's role take the flow's reader, any other role none, its
+    own `review:` set aside — else `(False, None)`, and the caller keeps today's rule. `cfg` is the
+    team's repo."""
+    name = current_flow(team)
+    try:
+        flow = flowdefs.load(name, cfg, org.roles, read=read) if name else None
+    except (OSError, ValueError):
+        return False, None
+    if flow is None or not flow.usable:
+        return False, None
+    c = Compiled(flow=flow, held=list(cfg.held or ()), listed=[flow], techlead=team.techlead is not None)
+    stage = flow.stage_of(role) if role else None
+    takes = role is None or (stage is not None and not stage.review)
+    return True, c.reader if takes else None
 
 
 def team_roles(team: orgmod.TeamDef, cfg: repoconfig.RepoConfig, overlay: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -665,6 +756,8 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
     p.techlead_id = tid = seat_id(org, team, host, here)
     p.manager_id = mid = manager_id(org, team, host, here)
     ctx = (team.techlead.context or "") if team.techlead is not None else ""  # the primer (§4.9b)
+    under = compiled(org, team, host, here, files)  # §4.9c: the current flow, compiled into every launch
+    p.flow = under.flow.name if under is not None else None
     if team.manager.role != orgmod.PERSON:
         p.lead = _launch(
             org=org,
@@ -682,6 +775,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             techlead=tid,
             context=ctx,
             manager=mid,
+            under=under,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()
     if team.techlead is not None:
@@ -705,6 +799,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             techlead=tid,
             context=ctx,
             manager=mid,
+            under=under,
             seat=True,
         )
         missing = _primer_missing(seat, p.techlead.dir, host, here, files)
@@ -733,6 +828,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                 techlead=tid,
                 context=ctx,
                 manager=mid,
+                under=under,
                 seat=True,
             )
         )
@@ -743,6 +839,10 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                 f"(design §4.9: the flat case ships first) — start it on its own with `ao team start {member.team}`"
             )
         block = project_block(org, team.projects, host, member.home) if reach else ""
+        if under is not None and under.sits_out(member.role):
+            # §4.9c: not started at a Start; the switch that winds a live one down is slice 5's
+            p.sit_out.extend(member.names())
+            continue
         for mname in member.names():
             if mname in seen:
                 raise TeamError(f"team {team.name}: two sessions would be called {mname!r} — a name is one session")
@@ -764,9 +864,17 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                     techlead=tid,
                     context=ctx,
                     manager=mid,
+                    under=under,
                 )
             )
     _check_flows(org, team, host, here, files)
+    if under is not None:
+        # §4.9c item 2: a role's own `review:` set aside under a flow is said once, at start
+        aside = sorted({x.role for x in p.launches if x.set_aside})
+        for role in aside:
+            p.notes.append(f"{role}'s review: set aside — the flow says what waits")
+        if p.sit_out:
+            p.notes.append(f"{', '.join(p.sit_out)}: sits out under {under.flow.name}")
     # One line per finding, not per session: a team's members share a brief, and four copies of
     # the same sentence is how a warning gets ignored.
     by_finding: dict[str, list[str]] = {}

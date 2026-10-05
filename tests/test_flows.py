@@ -312,3 +312,91 @@ def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_p
 
     team = org.teams["ao-grind"]
     assert teams.flow_for(org, team, cfg, "grinder", read=down) is None
+
+
+# ── the compile at start (TD-309 slice 3a) ──────────────────────────────────────────────────────────
+
+
+def _team_doc(tmp_path: Path) -> dict:
+    return yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+
+
+def _write(tmp_path: Path, doc: dict) -> orgmod.Org:
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    return orgmod.load()
+
+
+def test_a_start_under_a_flow_compiles_lanes_the_reader_and_the_path(world, tmp_path):  # noqa: F811
+    """§4.9c *What a flow compiles to*: a member's lane is its own, else its stage's; a member stage's
+    role takes the techlead on the repos' `held:`, its own `review:` set aside and said once; a
+    seat, the manager and a member outside the flows take none; each brief carries the path."""
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    del t["members"][0]["lane"]  # the grinders take the stage's lane
+    doc["roles"]["grinder"]["review"] = {"reader": "techlead", "held": ["src/agentorc/**"]}
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    assert p.flow == "build-review" and not p.sit_out
+    grinders = [x for x in p.members if x.role == "grinder"]
+    assert [x.lane for x in grinders] == [["free-pick", "owner:grinder"]] * 2
+    reader = {"reader": "techlead", "held": ["docs/briefs/**", "src/sessionorc/**"], "bound": teams.REVIEW_BOUND}
+    assert all(x.review == reader for x in grinders)
+    hunter = next(x for x in p.members if x.role == "hunter")
+    assert hunter.lane == ["ui"] and hunter.review is None  # outside the flows: its own lane, no reader
+    assert p.techlead.review is None and p.lead.review is None
+    assert "grinder's review: set aside — the flow says what waits" in p.notes
+    seat = p.techlead_id
+    assert f"build-review: **build** (grinder) → review ({seat}, on src/sessionorc/**, docs/briefs/**)" in (
+        grinders[0].prompt
+    )
+    assert p.techlead.prompt_from["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "review.md")}
+    assert "You stand outside it." in hunter.prompt and "You stand outside it." in p.lead.prompt
+    # `build` has no review stage: nobody gets a reader
+    t["flows"] = ["build"]
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    assert p.flow == "build" and all(x.review is None for x in p.launches)
+    # no flows: today's start, the role's own `review:` kept and the written lane
+    t["flows"] = []
+    t["members"][0]["lane"] = "free-pick"
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    assert p.flow is None and not any("set aside" in n for n in p.notes)
+    assert next(x for x in p.members if x.role == "grinder").review["held"] == ["src/agentorc/**"]
+
+
+def test_a_member_the_current_flow_does_not_use_sits_out(world, tmp_path):  # noqa: F811
+    """§4.9c *Members the flow does not use sit out*: a designer, a stage of `td` and of no stage of
+    `build-review`, is not started while `build-review` is current, and is under `td`."""
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    assert p.sit_out == ["designer-ao"] and "designer-ao" not in [x.name for x in p.launches]
+    assert "designer-ao: sits out under build-review" in p.notes
+    assert "hunt" in [x.name for x in p.members]  # outside every flow: runs
+    t["flows"] = ["td", "build-review"]
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    designer = next(x for x in p.members if x.name == "designer-ao")
+    assert not p.sit_out and designer.review == {
+        "reader": "techlead",
+        "held": ["src/sessionorc/**"],
+        "bound": teams.REVIEW_BOUND,
+    }
+
+
+def test_a_session_started_into_a_team_takes_the_flows_reader(world, tmp_path):  # noqa: F811
+    """§4.9c items 2 and 3 outside a start: a person's session and a member stage's role take the
+    flow's reader; a role with no member stage takes none; a team with no flow keeps today's rule."""
+    root = tmp_path / "agentorc"
+    (root / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    cfg = repoconfig.load(root)
+    org = _with(tmp_path, flows=["build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    team = org.teams["ao-grind"]
+    reader = {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": teams.REVIEW_BOUND}
+    assert teams.flow_review(org, team, cfg) == (True, reader)
+    assert teams.flow_review(org, team, cfg, "grinder") == (True, reader)
+    assert teams.flow_review(org, team, cfg, "hunter") == (True, None)
+    bare = _with(tmp_path, flows=[])
+    assert teams.flow_review(bare, bare.teams["ao-grind"], cfg) == (False, None)
