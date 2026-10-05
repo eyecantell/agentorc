@@ -349,9 +349,58 @@ def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> s
 
 
 def current_flow(team: orgmod.TeamDef) -> str | None:
-    """The flow `team` runs now (design §4.9c *A team lists its flows*): the first of `flows:` — the
-    setting `teams.<team>.flow` that turns it is TD-309 slice 4's — or None for a team with no flow."""
-    return team.flows[0] if team.flows else None
+    """The flow `team` runs now (design §4.9c *A team lists its flows*): the person's pick,
+    `teams.<team>.flow` (`orgmod.with_settings` puts it on the team), where the team lists it; else the
+    first of `flows:` — or None for a team with no flow."""
+    if not team.flows:
+        return None
+    return team.flow if team.flow in team.flows else team.flows[0]
+
+
+def flow_unlisted(team: orgmod.TeamDef) -> str:
+    """What the card and `ao team flow` say when the setting names a flow the definition no longer
+    lists (§4.9c: it *reads as the first, said on the card*), or ""."""
+    if not team.flow or team.flow in team.flows:
+        return ""
+    if not team.flows:
+        return f"teams.{team.name}.flow is {team.flow}, and {team.name} lists no flows: — it runs none"
+    return f"teams.{team.name}.flow is {team.flow}, which {team.name} does not list — it runs {team.flows[0]}"
+
+
+def flow_rows(
+    org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files: Files | None = None
+) -> list[dict[str, Any]]:
+    """Each flow `team` lists, in order, for `ao team flow <team>` (design §4.7, §4.9c): `{name,
+    current, strip, cannot}` — `strip` the stages and the person, as the card's flow strip reads
+    (*design → build → review → you, through techlead-ao-1*), and `cannot` why the team cannot use it
+    (not found, not usable, cannot be followed), "" when it can."""
+    if not team.flows:
+        return []
+    now = current_flow(team)
+    techlead = seat_id(org, team, team.host or here, here) if team.techlead is not None else ""
+    try:
+        checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
+        cfg = repoconfig.load(checkout, read=read)
+    except (TeamError, ValueError, OSError) as e:
+        return [{"name": n, "current": n == now, "strip": "", "cannot": str(e).strip(chr(34))} for n in team.flows]
+    staffed = {m.role for m in team.members if m.team is None and m.role}
+    out: list[dict[str, Any]] = []
+    for name in team.flows:
+        row: dict[str, Any] = {"name": name, "current": name == now, "strip": "", "cannot": ""}
+        try:
+            flow = flowdefs.load(name, cfg, org.roles, read=read)
+        except (OSError, ValueError) as e:
+            flow, row["cannot"] = None, str(e).strip(chr(34))
+        if flow is None:
+            row["cannot"] = row["cannot"] or f"no flow {name!r}"
+        elif flow.problems:
+            row["cannot"] = f"not usable — {'; '.join(flow.problems)}"
+        else:
+            row["strip"] = flowdefs.strip(flow, techlead=techlead)
+            if reasons := flowdefs.unfollowable(flow, staffed, techlead=team.techlead is not None, held=cfg.held or ()):
+                row["cannot"] = flowdefs.cannot_follow(name, team.name, reasons)
+        out.append(row)
+    return out
 
 
 def flow_for(

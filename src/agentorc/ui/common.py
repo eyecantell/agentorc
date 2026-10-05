@@ -682,7 +682,8 @@ def org_here() -> tuple[orgmod.Org, list[str]]:
         org = orgmod.load()
     except ValueError as e:
         return orgmod.Org(path=orgmod.org_file()), [str(e)]
-    return orgmod.with_repos(org, hosts.local_host().repos(), repos_of=repos_of)
+    org, notes = orgmod.with_repos(org, hosts.local_host().repos(), repos_of=repos_of)
+    return orgmod.with_home_settings(org), notes  # the flow each team runs now (§4.9c, `teams.<team>.flow`)
 
 
 def projects_view() -> list[dict[str, Any]]:

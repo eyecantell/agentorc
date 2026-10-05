@@ -81,6 +81,11 @@ def world(tmp_path, monkeypatch):
             return state["host"]
         if method == "repos":  # the home's repo readings, with the balance marks (§6 *Balance*)
             return state.get("repos", {})
+        if method == "set_settings":  # `ao team flow` (§4.9c): written as the home writes `settings.yml`
+            for n, f in params["teams"].items():
+                state.setdefault("teams", {}).setdefault(n, {}).update(f)
+            (tmp_path / "home" / "settings.yml").write_text(yaml.safe_dump({"teams": state["teams"]}))
+            return {"teams": state["teams"]}
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
         if method == "host_dir":
@@ -1624,6 +1629,21 @@ def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_
     got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="designer")
     assert got["created"] == [] and "sits out under build-review: not started" in got["text"]
     assert not creates(state)
+
+
+def test_a_live_add_reads_the_flow_the_person_picked(world):
+    """§4.9c *the person picks one*: with `td` first and `build-review` picked in the home's
+    `settings.yml`, Add sits a designer out as it does where `build-review` is first (review of #1066)."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {flow: build-review}}\n")
+    started(state)
+    got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="designer")
+    assert got["created"] == [] and "sits out under build-review: not started" in got["text"]
 
 
 def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(world):

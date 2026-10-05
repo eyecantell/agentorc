@@ -930,7 +930,7 @@ def add_member(
     before = _names(orgmod.load(path), name)
     did = orgmod.edit_members(path, name, add={"role": role, "name": member, "lane": lane or []})
     _commit(call, f"org: {name} {did}")
-    org = orgmod.load(path)
+    org = orgmod.with_home_settings(orgmod.load(path))  # under the picked flow (§4.9c)
     new = [n for n in _names(org, name) if n not in before]
     up = live(crew(name, call("list")))
     out: dict[str, Any] = {"team": name, "did": did, "created": [], "text": f"org.yml: {did}"}
@@ -970,7 +970,7 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, h
     its record stays a card until Forget. A member not live: the definition only. Under a team that
     lists flows, the last member of a role a listed flow's stage needs is refused, naming the flow
     (§4.9c), the file untouched; `host` is where the team's checkout is read."""
-    org = orgmod.load(path)
+    org = orgmod.with_home_settings(orgmod.load(path))  # under the picked flow (§4.9c)
     team = teams.find(org, name)
     if not 0 <= index < len(team.members):
         raise teams.TeamError(f"team {name} has no member entry {index + 1} — reload and try again")
