@@ -1184,8 +1184,9 @@ class Session:
 
     def prs_waiting(self, *, home: str | None = None) -> dict[str, Any] | None:
         """Design §4.9b *The reader* (TD-093): of `asks_waiting`, the `ask`s that carry a `pr` —
-        `{n, oldest}`, a number and the oldest one's time, never their text. None when there are
-        none, so a header draws nothing."""
+        `{n, oldest, asks}`, a number, the oldest one's time and `asks: [{from, pr}]`, each one's
+        sender and PR in the order they came (TD-333), never their text. None when there are none,
+        so a header draws nothing."""
         storing = home or self.host
         mine = (self.id, self.host or storing)
 
@@ -1194,7 +1195,7 @@ class Session:
             return sid, host or storing
 
         held = [
-            e.at
+            e
             for e in self.inbox
             if e.open
             and e.kind == "ask"
@@ -1202,7 +1203,10 @@ class Session:
             and not e.passed_up
             and any(where(x) == mine for x in e.to)
         ]
-        return {"n": len(held), "oldest": min(held)} if held else None
+        if not held:
+            return None
+        asks = [{"from": e.from_, "pr": e.pr} for e in sorted(held, key=lambda e: e.at)]
+        return {"n": len(held), "oldest": min(e.at for e in held), "asks": asks}
 
     def mail_marks(self) -> dict[str, Any]:
         """What a card and an `ao` reply say about this session's mail without a body: open `ask`s

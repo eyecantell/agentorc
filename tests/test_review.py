@@ -80,9 +80,25 @@ async def test_review_rides_the_record_and_pr_rides_an_ask(agent, tmp_path):
             await wc.call("msg", to=tl, text="rebase or merge?", kind="ask")  # a question, not a PR
         assert q["pr"] == 12
         seen = await person.call("get", id=tl)
-        assert seen["asks_waiting"] == 2 and seen["prs_waiting"] == {"n": 1, "oldest": q["at"]}
+        assert seen["asks_waiting"] == 2 and seen["prs_waiting"] == {
+            "n": 1,
+            "oldest": q["at"],
+            "asks": [{"from": w, "pr": 12}],
+        }
+        # each ask's sender and PR, in the order they came, and never the text (TD-333): what a switch
+        # of flow leaves with this reader (§4.9c)
+        w2 = await mk("w2", team="t", unattended=True, review={"reader": "techlead"})
+        async with LocalClient(caller=w2) as w2c:
+            q2 = (await w2c.call("msg", to=tl, text="#13: green", kind="ask", pr=13))["entry"]
+        seen = await person.call("get", id=tl)
+        assert seen["prs_waiting"] == {
+            "n": 2,
+            "oldest": q["at"],
+            "asks": [{"from": w, "pr": 12}, {"from": w2, "pr": 13}],
+        }
         async with LocalClient(caller=tl) as tc:
             await tc.call("msg", reply_to=q["id"], kind="reply", text="merged #12")
+            await tc.call("msg", reply_to=q2["id"], kind="reply", text="merged #13")
         assert (await person.call("get", id=tl))["prs_waiting"] is None
 
 
@@ -107,7 +123,11 @@ async def test_a_second_ask_is_a_reply_to_the_readers_findings_and_the_queue_hol
                 await wc.call("msg", to=tl, text="#12: fixed", kind="ask", pr=12, thread=first["id"])
             again = (await wc.call("msg", reply_to=found["id"], text="#12: fixed", kind="ask", pr=12))["entry"]
             assert again["root"] == first["id"] and again["pr"] == 12 and again["to"] == [tl]
-            assert (await person.call("get", id=tl))["prs_waiting"] == {"n": 1, "oldest": again["at"]}
+            assert (await person.call("get", id=tl))["prs_waiting"] == {
+                "n": 1,
+                "oldest": again["at"],
+                "asks": [{"from": w, "pr": 12}],
+            }
             await tc.call("msg", reply_to=again["id"], kind="reply", text="merged #12")
         assert (await person.call("get", id=tl))["prs_waiting"] is None
         for sid in (w, tl):
