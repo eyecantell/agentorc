@@ -4670,4 +4670,4 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 
 **Related:** TD-258 (rule 10's build), TD-176 (the repo reading).
 
-**Resolved:** 2026-10-05 (PR #PRNUM) — the repo's PR reading keeps each PR's head (`reports.PR_FIELDS` gains `headRefOid`, the row's `head`) and rule 10 reads head and state there first (`cadence.head_from`), asking `gh pr view` only for a PR the reading lacks; a closed PR's entry carries `closed` and is settled as a merged one is (`cadence.settled`), one found closed at the head it was read at marked without a second run; `tests/test_cadence_policy.py`; design §6 rule 10.
+**Resolved:** 2026-10-05 (PR #1103) — the repo's PR reading keeps each PR's head (`reports.PR_FIELDS` gains `headRefOid`, the row's `head`) and rule 10 reads head and state there first (`cadence.head_from`), asking `gh pr view` only for a PR the reading lacks; a closed PR's entry carries `closed` and is settled as a merged one is (`cadence.settled`), one found closed at the head it was read at marked without a second run; `tests/test_cadence_policy.py`; design §6 rule 10.
