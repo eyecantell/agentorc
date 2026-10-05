@@ -3307,7 +3307,7 @@ under the Agent call before them).
 
 **Reporting (§4.8, §4.9a).** Each is a small RPC on the calling session's own record — `--id`
 for another's, since the channels are ungated:
-- `ao progress claim TD-027`, `ao progress done TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`;
+- `ao progress claim TD-027`, `ao progress done TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao progress done TD-027 --pr 59 --slice` for a merged PR that leaves the entry claimed (§4.8, TD-321; not built — TD-325);
 - `ao progress none --why "..."` — the session found no work it may pick (§4.9a, TD-053);
 - `ao progress restart --why "..."` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*, TD-083);
 - `ao finding TD-029 --priority low`;
@@ -3627,7 +3627,19 @@ reference, kept while that PR is open and cleared once it merges or is closed un
 (re-checked by number after the session has moved to its next branch; only the tick writes it, and
 an RPC's derived entry over a declared one is refused whole, as ever) — so the Focus panel reads
 *in review* for a claim whose PR was opened without `--pr` (§4.5a *Reports*, TD-150); the claim's
-status, `pr` and `why` stay the session's. A derived claim records the branch it came from,
+status, `pr` and `why` stay the session's. **A slice that merged is kept beside the claim too
+(TD-321; designed 2026-10-04, not built — TD-325)**: an entry built *in slices, a PR each* stays
+claimed while its PRs merge one by one, and a merged PR that closes no entry was, until this
+rule, work the record never saw. The claim carries **`slices: [{pr, at, source}]`**, one item per
+merged PR on its reference, written two ways and held once per `pr`: the session says it —
+**`ao progress done <ref> --pr <n> --slice`**, which leaves the claim `claimed` and is refused
+without a `--pr` or on a reference the session holds no declared claim on — and the tick adds
+the merged PR of a derived `done` on the claim's reference, `source: derived`, where the session
+did not — the derived entry itself is refused beside the claim, as ever. Neither touches the
+claim's status, `pr` or `why`, so invariant 10 stands as written: the list is beside the claim,
+as `review_pr` is. The Focus panel prints the list after the claim (*claimed · slices #1025,
+#1027*, each number a link from the field), and §4.9a reads it as work done (*A slice is work
+done*). A derived claim records the branch it came from,
 and once the session has moved off that branch the claim is looked up one last time by branch
 name: a PR from it makes the claim real, and no PR at all **retires** it — the one delete in
 either channel, the only way a claim that never grew a PR leaves a record (TD-045). That last
@@ -5185,7 +5197,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   ceiling counts, and never a repeat — or whose run
   **leaves a claim that both of the last two runs also left** (the reference is in the `left`
   of both of the last two `restarts` entries: this is the third run on it with nothing reported
-  `done`; slices reported `done` with a new `pr` are not left), is written with
+  `done`; a reference with a new slice this run is not left — *A slice is work done*, below), is written with
   **`restart_wanted.repeat: {ref}`** beside **`early: true`**, so every reader of `early` —
   the tick, the card, the row — stands as it is: nobody acts on it, and the Inbox row says which
   entry repeats (*repeats TD-229: reported done by an earlier run too* / *claimed and left three
@@ -5193,6 +5205,23 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   and `decided`),
   so `ao status --json` shows what decided it and `ao status -v` prints the row's words. A run that declares `restart` past the
   bound with new work each time, however short, is restarted by rule 2 within a tick.
+  **A slice is work done** (TD-321; Paul, 2026-10-04, chose to count the work rather than make
+  every slice an entry; designed that day, not built — TD-325). grinder-ao-2 ran TD-309 across
+  three runs on 2026-10-04 and 05, merged slices 2 and 2a in the second (#1025, #1027), and its
+  `restarts` entry read `done: []`: a slice closes no entry, so nothing was declared `done`, and
+  the tick's derived `done` is refused beside a declared claim. A third run leaving TD-309
+  would have been a *repeat*. So **a run's `done` holds its slices**: each item of a claim's
+  `slices` (§4.8) written since the record's `created` is in `_reported`'s `done` as
+  `{ref, pr, slice: true}`, declared or derived alike — a merged pull request is work done
+  whoever read it — and is **new** by the one test above, the pair no `restarts` entry in the
+  window holds. **A reference with a new slice this run is not left**: it is out of the run's
+  `left`, so the third-run test reads three runs that merged nothing on it, which is what it
+  was written to catch, and a run that lands a slice each time is never early, never a repeat
+  and never counted toward the ceiling. A run that landed a slice and is followed by runs that
+  land none is a repeat one run later than before: the third run in a row that merges nothing. A slice the tick derives again after a replay (the new
+  record sits on the old branch) is a pair an earlier entry already holds: not new, so it
+  neither lifts *early* nor takes the reference out of `left`. The *reported done by an earlier
+  run too* test still reads only what the run declared, a declared slice included.
   **What counts toward the ceiling.** A wanted restart that carried new work does **not**
   count toward `RESTART_CEILING`: the ceiling guards a crash loop and a loop with manners, and
   a bound under one entry's cost (below) would otherwise reach it in an afternoon of merged
