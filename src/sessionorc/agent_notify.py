@@ -1,8 +1,10 @@
-"""Told on Telegram when nobody is looking (design §4.10, TD-319 slice 1): the home's pass over the rows
-that newly stop a session — a state row `permission`, `question` or `needs`, an identity alarm, an
-open `ask` in the person inbox — telling each once it has stood `notify.HOLD`, is still there and is
-not snoozed, bounded by `notify.BURST`; and the send, a detached child under Doppler. A mixin
-`HostAgent` inherits; the state it reads is the agent's.
+"""Told on Telegram when nobody is looking (design §4.10, TD-319 slices 1 and 2): the home's pass over
+the rows that newly stop a session or a team — a state row `permission`, `question` or `needs`, an
+identity alarm, an open `ask` in the person inbox, an outcome reported `blocked`, a record the tick
+could not restart, a wound-down team whose lanes gained work under `on_work: ask` — telling each once
+it has stood `notify.HOLD`, is still there, is not snoozed and was not on a visible page, bounded by
+`notify.BURST`; the send, a detached child under Doppler; and `notify_test`. A mixin `HostAgent`
+inherits; the state it reads is the agent's.
 """
 
 from __future__ import annotations
@@ -11,45 +13,98 @@ import asyncio
 import contextlib
 import os
 import signal
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sessionorc import notify
+from sessionorc import agent_common, notify
 from sessionorc import settings as settings_mod
-from sessionorc.agent_common import _parse, log
+from sessionorc.agent_common import RpcError, _parse, log
 from sessionorc.mail import PERSON
 from sessionorc.models import now_iso, reference_of
 
 
+@dataclass(frozen=True)
+class _Row:
+    began: str
+    line: str
+    link: str  # the Inbox's row key, or a mail id when `mail`
+    snooze: str  # the attention store's snooze key, or a mail id when `mail`
+    mail: bool = False
+
+
+def _restart_at(s: Any) -> str:
+    """When the restart row (§4.5a **Inbox row: restart**) began, or "" for none: the page's
+    `restart_mark` read from the same fields — a ceiling, a hold by work left, an early wanted."""
+    if s.superseded_by:
+        return ""
+    for mark in (s.restart_ceiling, s.restart_blocked):
+        if isinstance(mark, dict):
+            return str(mark.get("at") or "")
+    wanted = s.restart_wanted
+    if isinstance(wanted, dict) and wanted.get("early") and s.state in ("idle", "exited"):
+        return str(wanted.get("at") or "")
+    return ""
+
+
+def _work_ids(mark: dict[str, Any]) -> list[str]:
+    members = mark.get("members") if isinstance(mark.get("members"), dict) else {}
+    ids = [str(i) for v in members.values() if isinstance(v, list) for i in v]
+    ids += [str(q.get("ref")) for q in mark.get("questions") or [] if isinstance(q, dict) and q.get("ref")]
+    return list(dict.fromkeys(ids))
+
+
 class NotifyMixin:
-    def _notify_rows(self) -> dict[str, tuple[str, str]]:
-        """Every row standing now that is told when it stops someone: `{key: (began, line)}`. The key
-        is the row's snooze key — `<address>|<kind>` for a record's row, `<mail id>` for a question —
-        and `line` is built from structured fields alone (§4.10 *What a message says*)."""
+    def _notify_rows(self) -> dict[str, _Row]:
+        """Every row standing now that is told when it stops someone, by a key of its own; each `line`
+        built from structured fields alone (§4.10 *What a message says*)."""
         graph = self._graph()
-        rows: dict[str, tuple[str, str]] = {}
+        rows: dict[str, _Row] = {}
         for key, (kind, began, _text) in self._attention.items():
             sid, slot = key.split("|", 1)
             s = graph.get(sid)
             if s is None:
                 continue
+            name, team = s.name or sid, s.team or ""
             if slot == "state" and kind in notify.STATE_KINDS:
-                rows[f"{sid}|{kind}"] = (began, notify.state_line(s.name or sid, s.team or "", kind))
+                k = f"{sid}|{kind}"
+                rows[k] = _Row(began, notify.state_line(name, team, kind), k, k)
             elif slot == "alarm" and kind == "alarm":
-                rows[f"{sid}|alarm"] = (began, notify.alarm_line(s.name or sid, s.team or ""))
+                k = f"{sid}|alarm"
+                rows[k] = _Row(began, notify.alarm_line(name, team), k, k)
+        for sid, s in graph.items():
+            if at := _restart_at(s):
+                k = f"{sid}|restart"
+                rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
         for e in self.person_inbox:
-            if e.kind != "ask" or not e.open or e.from_ == PERSON:
+            if e.from_ == PERSON:
                 continue
             s = graph.get(e.from_)
-            name, team = (s.name, s.team or "") if s is not None else (e.from_, e.team or "")
-            rows[e.id] = (e.passed_up or e.at, notify.ask_line(name or e.from_, team, reference_of(e.about) or ""))
+            name, team = (s.name or e.from_, s.team or "") if s is not None else (e.from_, e.team or "")
+            ref = reference_of(e.about) or ""
+            if e.kind == "ask" and e.open:
+                rows[e.id] = _Row(e.passed_up or e.at, notify.ask_line(name, team, ref), e.id, e.id, mail=True)
+            outcome = e.outcome or {}
+            if outcome.get("state") == "blocked":
+                k = f"blocked:{e.id}"
+                line = notify.blocked_line(name, team, ref)
+                rows[k] = _Row(str(outcome.get("at") or ""), line, e.id, e.id, mail=True)
+        doc = settings_mod.load()
+        on_work = {name: t.get("on_work") for name, t in settings_mod.teams(doc).items()}
+        for team, rec in (self._host_rec.get("teams") or {}).items():
+            mark = rec.get("work_waiting") if isinstance(rec, dict) else None
+            if not isinstance(mark, dict) or mark.get("held") or on_work.get(team, "ask") != "ask":
+                continue  # under `on_work: start` a held mark is the home's own wait, and nobody's stop
+            if ids := _work_ids(mark):
+                k = f"work:{team}"
+                rows[k] = _Row(str(mark.get("at") or ""), notify.work_line(team, len(ids)), k, f"{k}|work")
         return rows
 
-    def _notify_snoozed(self, key: str, now: datetime) -> bool:
-        if "|" in key:
-            until = self.attention_snoozed.get(key)
+    def _notify_snoozed(self, row: _Row, now: datetime) -> bool:
+        if row.mail:
+            until = next((e.snoozed_until for e in self.person_inbox if e.id == row.snooze), None)
         else:
-            until = next((e.snoozed_until for e in self.person_inbox if e.id == key), None)
+            until = self.attention_snoozed.get(row.snooze)
         if not until:
             return False
         with contextlib.suppress(ValueError, TypeError):
@@ -70,35 +125,68 @@ class NotifyMixin:
         tg = settings_mod.telegram(settings_mod.load())
         due: list[tuple[str, str]] = []
         if tg is not None:
-            for key, (began, line) in sorted(rows.items(), key=lambda kv: kv[1][0]):
+            for key, row in sorted(rows.items(), key=lambda kv: kv[1].began):
                 if key in store.notified:
                     continue
                 try:
-                    stood = now - _parse(began)
+                    stood = now - _parse(row.began)
                 except (ValueError, TypeError):
                     continue
-                if stood < notify.HOLD or stood > notify.HOLD + notify.LATE or self._notify_snoozed(key, now):
+                if stood < notify.HOLD or stood > notify.HOLD + notify.LATE or self._notify_snoozed(row, now):
                     continue  # not yet; or a backlog, never told (§4.10 *newly*); or the person's *not now*
-                link = notify.mail_link(tg["link"], key) if "|" not in key else notify.row_link(tg["link"], key)
-                due.append((key, notify.message(line, link)))
+                link = notify.mail_link(tg["link"], row.link) if row.mail else notify.row_link(tg["link"], row.link)
+                due.append((key, notify.message(row.line, link)))
+        watched = self._notify_watched_at is not None and now - self._notify_watched_at <= notify.WATCHED
         texts: list[str] = []
         stamp = now_iso()
         for key, text in due:
-            store.notified[key] = stamp  # told, or held back by the burst: never told afterwards
-            sent = [t for t in self._notify_sent if now - t < notify.BURST_WINDOW]
-            self._notify_sent = sent
-            if len(sent) < notify.BURST:
+            # told, or on a visible page, or held back by the burst: in each case never told afterwards
+            store.notified[key] = stamp
+            if watched:
+                continue  # it was on a screen, where the top bar's count rose (§4.10 *Looking*)
+            self._notify_sent = [t for t in self._notify_sent if now - t < notify.BURST_WINDOW]
+            if self._notify_quiet_until is not None and now < self._notify_quiet_until:
+                continue
+            if len(self._notify_sent) < notify.BURST:
                 texts.append(text)
-                self._notify_sent.append(now)
-            elif len(sent) == notify.BURST:
+            else:
+                # the seventh is *and more*, and nothing more until ten minutes have passed with nothing sent
                 texts.append(notify.MORE)
-                self._notify_sent.append(now)
+                self._notify_quiet_until = now + notify.BURST_WINDOW
+            self._notify_sent.append(now)
         if gone or due:
             store.save(self.trail, self.attention_snoozed)
         if texts and tg is not None:
             task = asyncio.create_task(self._notify_send(tg["secrets"], texts))
             self._bg.add(task)
             task.add_done_callback(self._bg.discard)
+
+    def _notify_watching(self, now: datetime) -> None:
+        """A person's `inbox` read from a visible page (§4.10 *Looking*): kept in memory only."""
+        self._notify_watched_at = now
+
+    async def rpc_notify_test(self, caller: Any = None) -> dict[str, Any]:
+        """**Send a test** (§4.5a **You**: **Telegram**, §4.10): one message now with the saved
+        secrets and link, whatever `on` says — *agentorc · a test from <home>* and the Inbox's
+        address — answering the send's result in words. A person's own (`mail.PERSON_ONLY`), at the
+        home alone (`modes.HOME_EDITS` forwards it from a node)."""
+        agent_common.person_only(caller, "send a Telegram test", "§4.10")
+        if self.mode != "home":
+            raise RpcError("notify_test runs at the home (design §4.10): this host is a node")
+        tg = settings_mod.notify(settings_mod.load()).get("telegram") or {}
+        if not tg.get("secrets"):
+            raise RpcError(
+                "notify.telegram.secrets is not set: save the Doppler project/config that holds "
+                "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID first (design §4.10)"
+            )
+        link = f"{tg['link']}/inbox" if tg.get("link") else ""
+        why = await self._notify_run(tg["secrets"], notify.message(notify.test_line(self.home or self.host), link))
+        at = now_iso()
+        if why is None:
+            self._notify_last["last_ok"] = at
+            return {"sent": True, "at": at, "result": f"sent at {at}"}
+        self._notify_last["last_error"] = {"at": at, "reason": why}
+        return {"sent": False, "at": at, "result": f"the send failed: {why}"}
 
     async def _notify_send(self, secrets: str, texts: list[str]) -> None:
         """The messages, one child each, in order; the last result kept for the `host` read. A failure

@@ -3727,8 +3727,9 @@ person's bookkeeping on their Inbox (`inbox_delete`, `inbox_snooze`, `inbox_hand
 `attention_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it`, and the `thread` read), an
 identity alarm's answers (`identity_ack`, `identity_log`, `suspend`), the board and the ledger from
 the page (`board_edit`, `board_reply`, `board_reply_hand`, `entry_add`), the home's settings and
-definitions (`settings`, `set_settings`, `commit_defs`), and the presses that start, clear or undo
-(`promote`, `clear_promote`, `clear_work`, `clear_mark`, `restart`, `forget_host`).
+definitions (`settings`, `set_settings`, `commit_defs`), the Telegram card's **Send a test**
+(`notify_test`, §4.10), and the presses that start, clear or undo (`promote`, `clear_promote`,
+`clear_work`, `clear_mark`, `restart`, `forget_host`).
 
 - **Each keeps its own wire name.** There is no one `inbox_act {entry, action}`: a method's name is
   what routes it. §4.4a's offline table and its sets (`HOME_EDITS`, `MAILBOX`,
@@ -7062,8 +7063,9 @@ follow, and they bind every row kind, mail and state alike:
 4. **An answer is followed to its outcome.** Below.
 
 **Told on Telegram when nobody is looking (TD-092; Paul, 2026-10-04: *we use telegram elsewhere,
-make sense to keep using it here*; designed that day; the send and the state, alarm and question rows
-built — TD-319 slice 1, the other rows, the watching signal and the page not yet).** The Inbox waits for a
+make sense to keep using it here*; designed that day; the home's half built — TD-319 slices 1 and 2,
+every row, the watching signal and `notify_test`; the Settings card and the Inbox's `?row=` landing not
+yet, slice 3).** The Inbox waits for a
 page to be opened, and an unattended team whose one question sits behind a closed tab is a team that
 waits. When the person has turned it on, the **home** sends one Telegram message for a row that
 newly stops a session or a team until they answer.
@@ -7089,7 +7091,8 @@ newly stops a session or a team until they answer.
   keeps what it told beside the attention trail (`notified`, a row's key and when), a key leaves
   when its row ends, and a row that ends and begins again is a new row. **Bounded**: past
   `NOTIFY_BURST` (6 messages in ten minutes) the next one reads *and more need you — open the
-  Inbox*, and nothing further is sent until the window clears; the rows held back are not told
+  Inbox*, and nothing further is sent until ten minutes after that line — the window cleared of
+  everything sent before it; the rows held back are not told
   afterwards. **A backlog is not told**: a row whose hold ended more than `NOTIFY_LATE` (5 min)
   before the home could tell it — one standing before the switch was turned on, or through a home
   that was down for longer than a restart takes — is never told, so turning the switch on or a

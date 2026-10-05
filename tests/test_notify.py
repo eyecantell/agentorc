@@ -315,3 +315,146 @@ async def test_a_child_past_its_time_is_killed_with_its_group(agent, monkeypatch
     monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
     monkeypatch.setattr(notify, "CHILD_SECONDS", 0.3)
     assert await agent._notify_run("p/c", "x") == "no answer in 0.3 s"
+
+
+# -- slice 2: the other rows, the watching signal, Send a test -------------------------------------
+
+
+async def test_a_blocked_outcome_a_restart_row_and_a_team_with_work_are_told(agent, sent, tmp_path):
+    _on(link="")
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="exited", since=_z(t0))
+    s.restart_ceiling = {"at": _z(t0), "count": 3}
+    q = MailEntry(
+        id="m-q1", from_=s.id, to=["person"], at=_z(t0 - timedelta(hours=1)), kind="ask", text="w", about="TD-142"
+    )
+    q.closed_at, q.closed_reason = _z(t0), "replied"
+    q.outcome = {"state": "blocked", "text": "the box is down", "at": _z(t0), "by": s.id}
+    agent.person_inbox.append(q)
+    teams = agent._host_rec.setdefault("teams", {})
+    teams["cm-grind"] = {
+        "work_waiting": {"at": _z(t0), "repo": "/r", "members": {"a": ["TD-1", "TD-2"], "b": ["TD-2", "TD-3"]}}
+    }
+    teams["held-grind"] = {"work_waiting": {"at": _z(t0), "members": {"a": ["TD-9"]}, "held": {"why": "gate"}}}
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        texts = sorted(t for _, t in sent)
+        assert texts == [
+            "agentorc · cm-grind wound down and has work: 3 entries",
+            "agentorc · grinder-x-1 (x-grind) reports blocked · TD-142",
+            "agentorc · x-grind: grinder-x-1 was not restarted",
+        ], texts
+        assert "the box is down" not in "".join(texts)
+    finally:
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id != "m-q1"]
+        teams.pop("cm-grind", None)
+        teams.pop("held-grind", None)
+        agent.sessions.pop(s.id, None)
+
+
+async def test_a_row_whose_hold_ends_while_a_page_is_visible_is_not_told_then_or_later(agent, sent, tmp_path):
+    _on()
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="needs-you", since=_z(t0), pending=Pending(kind="question", text="q"))
+    try:
+        async with LocalClient() as person:
+            await person.call("inbox", watching=True)  # the page's poll, visible
+        agent._notify_watched_at = t0 + timedelta(seconds=10)
+        await _pass(agent, t0 + timedelta(seconds=61))
+        await _pass(agent, t0 + timedelta(minutes=4))
+        assert sent == []
+        # once nobody looks for longer than NOTIFY_WATCHED, a new row is told
+        s.state, s.pending = "idle", None
+        await _pass(agent, t0 + timedelta(minutes=5))
+        t1 = t0 + timedelta(minutes=6)
+        s.state, s.since, s.pending = "needs-you", _z(t1), Pending(kind="question", text="q")
+        await _pass(agent, t1 + timedelta(seconds=61))
+        assert len(sent) == 1
+    finally:
+        agent._notify_watched_at = None
+        agent.sessions.pop(s.id, None)
+
+
+async def test_after_and_more_nothing_until_ten_minutes_pass(agent, sent, tmp_path):
+    _on()
+    t0 = datetime.now(UTC)
+    ids = []
+    try:
+        for i in range(7):
+            sid = f"ao-x-a{i}"
+            ids.append(sid)
+            _session(
+                agent,
+                tmp_path,
+                sid=sid,
+                name=f"a{i}",
+                state="needs-you",
+                since=_z(t0),
+                pending=Pending(kind="question", text="q"),
+            )
+        await _pass(agent, t0 + timedelta(seconds=61))
+        assert [t.split("\n")[0] for _, t in sent][-1] == notify.MORE and len(sent) == 7
+        # nine minutes on, the first six have not all left the window: still nothing
+        t1 = t0 + timedelta(minutes=9)
+        _session(
+            agent,
+            tmp_path,
+            sid="ao-x-b",
+            name="b",
+            state="needs-you",
+            since=_z(t1),
+            pending=Pending(kind="question", text="q"),
+        )
+        ids.append("ao-x-b")
+        await _pass(agent, t1 + timedelta(seconds=61))
+        assert len(sent) == 7
+        t2 = t0 + timedelta(minutes=12)
+        _session(
+            agent,
+            tmp_path,
+            sid="ao-x-c",
+            name="c",
+            state="needs-you",
+            since=_z(t2),
+            pending=Pending(kind="question", text="q"),
+        )
+        ids.append("ao-x-c")
+        await _pass(agent, t2 + timedelta(seconds=61))
+        assert sent[-1][1].startswith("agentorc · c (x-grind) needs you: question") and len(sent) == 8
+    finally:
+        for sid in ids:
+            agent.sessions.pop(sid, None)
+        agent._notify_quiet_until = None
+        agent._notify_sent.clear()
+
+
+async def test_send_a_test_is_the_persons_and_sends_whatever_on_says(agent, sent, tmp_path):
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="notify.telegram.secrets is not set"):
+            await person.call("notify_test")
+        settings_mod.save({"notify": {"telegram": {"on": False, "secrets": "samscrape/prd", "link": "http://k:1"}}})
+        got = await person.call("notify_test")
+        assert got["sent"] is True and got["result"].startswith("sent at")
+        assert sent[-1][0] == "samscrape/prd" and sent[-1][1].startswith("agentorc · a test from ")
+        assert sent[-1][1].endswith("\nhttp://k:1/inbox")
+        assert (await agent.rpc_host())["notify"]["last_ok"] == got["at"]
+        sid = (
+            await person.call(
+                "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"]
+            )
+        )["id"]
+        try:
+            async with LocalClient(caller=sid) as itself:
+                with pytest.raises(AgentError, match="a person's own"):
+                    await itself.call("notify_test")
+                await itself.call("inbox", watching=True)  # a session's read never says it is watching
+            assert agent._notify_watched_at is None
+        finally:
+            await person.call("kill", id=sid)
+            await person.call("remove", id=sid)
+
+
+def test_notify_test_is_a_persons_and_the_homes():
+    from sessionorc import mail, modes
+
+    assert "notify_test" in mail.PERSON_ONLY and "notify_test" in modes.HOME_EDITS

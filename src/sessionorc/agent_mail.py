@@ -993,7 +993,12 @@ class MailMixin:
         return {"id": PERSON, "msg": id, "passed_up": at, "recommend": rec, "answers": picks}
 
     async def rpc_inbox(
-        self, id: str | None = None, unread: bool = False, caller: Any = None, sent: bool = False
+        self,
+        id: str | None = None,
+        unread: bool = False,
+        caller: Any = None,
+        sent: bool = False,
+        watching: bool = False,
     ) -> dict[str, Any]:
         """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
         that read — and nothing else — sets `read_at` (lifecycle stage 2: delivered into a turn).
@@ -1004,7 +1009,13 @@ class MailMixin:
 
         `sent` (design §4.9b, TD-075 step 4) reads the **outbox** instead — a session's own, and a
         person any session's, exactly as the inbox is read — and marks nothing: it is what the
-        session itself sent, so there is nothing to have read. The person inbox keeps no outbox."""
+        session itself sent, so there is nothing to have read. The person inbox keeps no outbox.
+
+        `watching` (§4.10 *Told on Telegram*, *Looking*; TD-319): the person's read from a page whose
+        document is visible, which the home keeps the time of — a row whose hold ends soon after is
+        not told. A session's read never says so."""
+        if watching and mail.is_person(caller):
+            self._notify_watching(datetime.now(UTC))
         if sent:
             return self._sent(id, caller)
         if mail.is_person(caller):
