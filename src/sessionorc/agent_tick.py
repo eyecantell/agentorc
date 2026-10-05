@@ -802,6 +802,10 @@ class TickMixin:
                 self._save(s)
                 await self._push_changes()
                 return
+        elif not self._closed_by_tick(s, why):
+            # a retry taken from the other trigger's mark: the mark follows the trigger it is replayed under,
+            # just before the replay, so a replay that fails again is taken again next tick (TD-334)
+            self._mark_closed(s, why)
         await self._replay(s, why)
 
     @staticmethod

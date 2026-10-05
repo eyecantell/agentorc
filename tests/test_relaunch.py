@@ -110,9 +110,25 @@ async def test_a_relaunch_of_a_record_a_failed_brief_restart_left_closed_restart
         rec.git = {"dirty": 0, "unpushed": 0}
         await person.call("relaunch", id=sid, launch={"prompt": "composed", "prompt_from": made, "lane": ["TD-9"]})
         assert rec.brief_changed is None and rec.relaunch
-        await agent._keep_running(datetime.now(UTC))
+        # the retry fails as well: the mark follows the trigger it was replayed under, so the next tick takes
+        # it again rather than leaving the record closed for good (the techlead's read of #1116)
+        real = agent.rpc_create
+
+        async def boom(**kw):
+            raise RuntimeError("create: boom again")
+
+        agent.rpc_create = boom
+        try:
+            await agent._keep_running(datetime.now(UTC))
+        finally:
+            agent.rpc_create = real
+        assert agent.sessions[sid] is rec and rec.state == "closed"
+        assert [(r["why"], bool(r.get("error"))) for r in rec.restarts] == [("brief", True), ("flow", True)]
+        assert rec.closed_for == {"why": "flow", "closed_at": failed}  # a person's later Close still never matches
+        later = datetime.now(UTC) + RESTART_SETTLE + timedelta(seconds=1)
+        await agent._keep_running(later)
         new = agent.sessions[sid]
-        assert new is not rec and [r["why"] for r in new.restarts] == ["brief", "flow"]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["brief", "flow", "flow"]
         assert new.state != "closed" and new.relaunch is None and new.lane == ["TD-009"]
         with contextlib.suppress(Exception):
             await person.call("kill", id=sid)

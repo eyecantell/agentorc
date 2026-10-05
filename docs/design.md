@@ -6151,7 +6151,8 @@ edit anywhere:
   restart the mark asks for, **under rule 7's conditions** and through rule 7's own machinery, with
   the mark as a second trigger beside `brief_changed`: a close or replay that failed is retried
   through `_closed_by_tick` under `why: flow` as `brief` is — a restart either trigger left closed is
-  retried under the one that stands now, so a relaunch of a record a failed `brief` restart left closed
+  retried under the one that stands now, its mark moved to that trigger just before the replay so a
+  retry that fails is taken again, and a relaunch of a record a failed `brief` restart left closed
   restarts it under `flow` (TD-334) — and a member's `restart` word said while
   the mark stands is never *early*, as one said under `brief_changed` is not (§6 rule 2): a hook-confirmed idle member holding no
   claim in progress, with nothing uncommitted or unpushed, is closed and created again by the tick,
