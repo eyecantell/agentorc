@@ -4617,3 +4617,21 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Done when:** on a scheduled record, `ao mode … interactive` and `ao kill` no longer leave a record the design does not describe (refused, or carried as the design says); the card offers only the scheduled acts; design §6 says so; and the suite passes.
 
 **Related:** TD-152 (the start time, where it was found), TD-026 (the design), §9 invariant 5.
+
+## TD-331: `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-1, found pressing TD-067's live check on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/team_skill.md` (the roles table, *members:*, the profile paragraph, the start step), `tests/test_team_skill.py` if one binds the roles
+
+**Why:** a Claude session with no context stood a team up from `ao team --skill` alone (TD-067, archived), and reported where the text was wrong or made it guess. Checked against the code: (1) *Six are built in —* but `ao roles` lists seven: `designer` is missing from the table. (2) The *members:* bullet names `role`, `count`, `name`; `org.MEMBER_KEYS` also takes `profile`, `home`, `lane`, `brief`, `grants`, `unattended` and `team`, so the session put the profile in a `roles:` overlay rather than guess. (3) Nothing says that `ao team start` does not check a profile's login: start succeeded and every session went `needs-you` on Claude Code's first-run screen, found only after the start — the recipe should say so, or how to check before. (4) Nothing says whether a repo's `.agentorc.yml` and the `.gitignore` line are committed before the start; members work in worktrees cut from the checkout, so the session guessed *commit on main*. (5) `ao team list` prints *(on call)* after the manager, which the recipe never explains. Smaller: `ao team start --anyway` is in `--help` and not the recipe, and how to find this host's name for `org.yml` (`local.name` in `hosts.yml`) is not said.
+
+**Resolved:** 2026-10-05 (PR #TBD) — `src/agentorc/team_skill.md`: seven roles with `designer`'s row (`repoconfig.PRESETS`); the member keys as `org.MEMBER_KEYS` has them; `on_call` and *(on call)* explained (`org.ON_CALL_DEFAULT`, design §6 *A manager on call*); the login `ao team start` does not check, and how to check it; commit and push before the start, since a worktree is cut from `origin/HEAD` (`gitinfo` worktree add); `--anyway`; this machine's name in `hosts.yml` or `hostname -s`.
+
+**Done when:** the five points read right in `ao team --skill`, each checked against the code.
+
+**Related:** TD-067 (the recipe, archived), TD-329 (a member's shell profile starts Claude Code).

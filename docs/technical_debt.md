@@ -97,7 +97,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
 | TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
-| TD-331 | `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps | Low | Open |
 | TD-332 | A PR whose cadence read is settled but not merged is read again with `gh pr view` every pass | Low | Open |
 
 ---
@@ -1694,24 +1693,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when:** each of the three is fixed or written down in §6 as how it is meant to be.
 
 **Related:** TD-239 (the build), TD-177 (the design), TD-227 (rule 8's holds).
-
-## TD-331: `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-1, found pressing TD-067's live check on a scratch home)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/team_skill.md` (the roles table, *members:*, the profile paragraph, the start step), `tests/test_team_skill.py` if one binds the roles
-
-**Why:** a Claude session with no context stood a team up from `ao team --skill` alone (TD-067, archived), and reported where the text was wrong or made it guess. Checked against the code: (1) *Six are built in —* but `ao roles` lists seven: `designer` is missing from the table. (2) The *members:* bullet names `role`, `count`, `name`; `org.MEMBER_KEYS` also takes `profile`, `home`, `lane`, `brief`, `grants`, `unattended` and `team`, so the session put the profile in a `roles:` overlay rather than guess. (3) Nothing says that `ao team start` does not check a profile's login: start succeeded and every session went `needs-you` on Claude Code's first-run screen, found only after the start — the recipe should say so, or how to check before. (4) Nothing says whether a repo's `.agentorc.yml` and the `.gitignore` line are committed before the start; members work in worktrees cut from the checkout, so the session guessed *commit on main*. (5) `ao team list` prints *(on call)* after the manager, which the recipe never explains. Smaller: `ao team start --anyway` is in `--help` and not the recipe, and how to find this host's name for `org.yml` (`local.name` in `hosts.yml`) is not said.
-
-**Fix:** correct the count and add `designer`'s row; list the member keys as the manager's are; one sentence each on the login check, the commit, and *on call*. Check each against the code as TD-067's fact-check did.
-
-**Done when:** the five points read right in `ao team --skill`, each checked against the code.
-
-**Related:** TD-067 (the recipe, archived), TD-329 (a member's shell profile starts Claude Code).
 
 ## TD-332: A PR whose cadence read is settled but not merged is read again with `gh pr view` every pass
 

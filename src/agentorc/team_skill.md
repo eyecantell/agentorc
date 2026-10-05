@@ -71,7 +71,8 @@ projects:
       contractmatch: {kmaster: ~/contractmatch, contractmatch: /home/kmaster/contractmatch}
 ```
 
-The key under a repo is a **host name**, and the value that host's checkout. A team's sessions are
+The key under a repo is a **host name**, and the value that host's checkout. This machine's
+name is `local: {name: …}` in `~/.agentorc/hosts.yml`, else its short hostname (`hostname -s`). A team's sessions are
 started in the checkouts of the repos of its projects, so a missing entry for the host the team
 runs on is what `ao team start` refuses on.
 
@@ -90,7 +91,11 @@ teams:
 ```
 
 - **`manager:`** — always a mapping. `role` (default `manager`), `name` (default `<team>-lead`), and
-  optionally `home`, `profile`, `lane`, `brief`, `grants`, `unattended`. **`manager: {role: person}`**
+  optionally `home`, `profile`, `lane`, `brief`, `grants`, `unattended`, `on_call`. **A `manager`-role
+  manager is on call by default** (design §6 *A manager on call*): no manager session stands while
+  the team runs; the home starts one when a member needs a reading no policy makes (a question to
+  it, a permission, a `stalled?` member, one idle with open work) and it is closed once it has acted. `ao team list` marks it
+  *manager: <name> (on call)*. `on_call: false` keeps a standing manager instead. **`manager: {role: person}`**
   means *the person manages*: no manager session is started. (`manager: person`, the bare string, is
   refused — *teams.<name>.manager must be a mapping, not str*.) `lead:`, its name until
   2026-09-20 (TD-076), is refused as an unknown key.
@@ -102,7 +107,9 @@ teams:
   first (`{context}`); `ao team start` says so, and starts anyway, when it is missing. See
   *A techlead's primer* below before the first start with a seat.
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
-  sessions are `<name>-1`, `<name>-2`, …
+  sessions are `<name>-1`, `<name>-2`, … Each also takes, as the manager does, `home`, `profile`,
+  `lane`, `brief`, `grants` and `unattended` — so a member's `profile:` goes on its line, not in a
+  `roles:` overlay — and `team` (below); any other key is refused.
   **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
   built** (design §4.9: the flat case ships first). Write the teams flat and start each on its own
   until it is. The trap is that `ao team list` accepts it and only `ao team start` refuses it,
@@ -132,9 +139,14 @@ waits for, design §4.9c), and `unattended`, `ready_when` and
 session works in `<repo>/.claude/worktrees/<name>`, and a repo that does not ignore it leaves
 nested checkouts that a `git add -A` in the main checkout stages as gitlinks.
 
+**Commit and push both before the start.** The definition is read from the checkout as it is on
+disk, but each session's worktree is cut from `origin/HEAD` after a fetch, so a `.agentorc.yml`,
+a `.gitignore` line or a brief that is only in the main checkout's working tree is missing from
+every member's worktree.
+
 ## 4. Say what the roles are
 
-A role is a preset: a brief, a lane, grants, a profile, an icon. Six are built in —
+A role is a preset: a brief, a lane, grants, a profile, an icon. Seven are built in —
 
 | role | brief | grants |
 |---|---|---|
@@ -143,6 +155,7 @@ A role is a preset: a brief, a lane, grants, a profile, an icon. Six are built i
 | `hunter` | the package's `hunter.md` | none |
 | `techlead` | the package's `techlead.md` | none |
 | `auditor` | the package's `auditor.md` | none |
+| `designer` | the package's `designer.md` | none |
 | `plain` | none | none |
 
 (`lead` and `orchestrator`, the manager's old names, are unknown roles.)
@@ -179,6 +192,9 @@ profiles:
 With no file at all there is one implicit profile, `default`, on the tool's own config directory —
 so a team that names none works, and a team that names `grind` needs the block above **and** a
 `claude` login inside that `config_dir`, which is a person's one-time step and nobody else's.
+**`ao team start` does not check that login**: a profile with none starts every session on the
+tool's first-run screen, each `needs-you`. Check it before the first start — `claude` run with
+`CLAUDE_CONFIG_DIR` set to that `config_dir` opens signed in, or on the login screen.
 
 Check what resolves, from inside the repo:
 
@@ -255,7 +271,8 @@ ao team status cm-grind      # each member with its state, lane and report line
 `ao team start` is **all or nothing**: every check runs before any session is created, so a bad
 definition costs you nothing. A name a **live** session already holds refuses the whole start; a
 name an exited or closed session holds is **superseded**, which is what makes `start` the restart
-too. `-p/--profile` overrides the profile for every session in the team.
+too. `-p/--profile` overrides the profile for every session in the team. A start whose every
+member's lane holds nothing to pick is refused, saying so; `--anyway` starts it all the same.
 
 Then, per session:
 
