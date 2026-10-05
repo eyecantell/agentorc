@@ -306,6 +306,38 @@ async def test_a_repo_over_the_teams_balance_line_holds_the_start_as_the_fifth_b
     assert got["why"] == "balance" and got["crossed"][0]["line"] == "review" and replays.calls == []
 
 
+async def test_a_balance_hold_another_bound_displaces_is_kept_beside_it(agent, tmp_path, monkeypatch):
+    """§6 rule 8 (TD-330 (1), #799's read): a usage hold that takes `held` from a standing balance hold
+    keeps it beside itself, so the reading failing when the usage hold lifts holds the start as before,
+    rather than starting a team that was over its line; a reading under the line then lifts it."""
+    await park_ticks(agent)
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    later = await _settled(agent, tmp_path, _rec("manager-ao", lane=["TD-900"]), _rec("grinder-ao-1"))
+    repo = str(tmp_path)
+    born = _iso(later - timedelta(hours=1))
+    prs = {"open": [{"number": 700 + i, "created": born} for i in range(3)], "at": born}
+    agent._repos[repo]["prs"] = prs
+    settings_mod.save({"teams": {"g": {"on_work": "start", "balance": {"prs": 2}}}})
+
+    async def held() -> dict | None:
+        await agent._work_marks(later)
+        return (_team_rec(agent).get("work_waiting") or {}).get("held")
+
+    over = await held()
+    assert over["why"] == "balance"
+    monkeypatch.setattr(agent, "_profile_over", lambda profile, now, team="": {"resets": "2026-10-06T00:00:00Z"})
+    got = await held()
+    assert got["why"] == "usage" and got["balance"] == over, "the balance hold is kept beside the usage one"
+    assert await held() == got, "and stands unchanged while the usage hold does"
+    monkeypatch.setattr(agent, "_profile_over", lambda profile, now, team="": None)
+    agent._repos[repo]["prs"] = {"error": "gh: offline"}
+    assert await held() == over and replays.calls == [], "a reading that cannot be told lifts no hold"
+    agent._repos[repo]["prs"] = {**prs, "open": prs["open"][:1]}
+    assert await held() is None
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1", "manager-ao"], "under the line: the team started"
+
+
 async def test_a_member_its_flow_sat_out_is_not_replayed_by_a_start(agent, tmp_path, monkeypatch):
     """§4.9c *Switching*, the techlead's read of #1101: a sat-out member did not end by the team's own
     ending, so a start by rule 8 passes over it — not replayed and not counted in `of` — though the

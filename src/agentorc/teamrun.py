@@ -143,15 +143,21 @@ def can_control(sessions: list[dict[str, Any]], sid: str) -> dict[str, Any] | No
     return s if s is not None and (s["state"] not in DEAD or on_call(s)) else None
 
 
-def balance_marks(repos: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def balance_marks(repos: dict[str, dict[str, Any]], host: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
     """The teams over their line, `{team: mark}`, from the `repos` reading (design §6 *Balance*,
-    TD-239): each checkout's reading carries the marks whose `repo` it is."""
+    TD-239): each checkout's reading carries the marks whose `repo` it is. `host` is the home's `host`
+    read, whose `balance` carries every mark — one with no `repo` too, which no checkout's reading
+    holds (TD-330); an older home's read has none."""
     out: dict[str, dict[str, Any]] = {}
     for r in repos.values():
         marks = r.get("balance") if isinstance(r, dict) else None
         for team, mark in (marks if isinstance(marks, dict) else {}).items():
             if isinstance(mark, dict):
                 out.setdefault(str(team), mark)
+    marks = (host or {}).get("balance")
+    for team, mark in (marks if isinstance(marks, dict) else {}).items():
+        if isinstance(mark, dict):
+            out.setdefault(str(team), mark)
     return out
 
 

@@ -8318,7 +8318,9 @@ code and needs no grant; a session doing the same work does.
        registry root its records name, either crossing counting as for a live team, and `review`
        against the queue its ended seats keep. A reading that cannot be told writes no new hold
        and lifts none, and a standing hold whose repo, lines and limits are unchanged is kept as
-       it stands, so its numbers are the crossing's.
+       it stands, so its numbers are the crossing's. A standing balance hold that an earlier bound
+       displaces is kept beside it, as `held.balance`, and read as the standing hold once that bound
+       lifts, so a reading that fails at that moment does not start a team that was over its line (TD-330).
        A bound that holds writes **`held: {why}`** on `work_waiting` — `usage` with the `profile`
        and, when the reading has one, the window's `resets`, so the row says when the hold lifts,
        `until` with the instant, `day` with the `count`, `early` with the last start, `balance`
@@ -8924,7 +8926,10 @@ teams:
   `work_waiting` (TD-227; the mark built), which is `host.json` in the home, `{teams: {<team>: {balance}}}`,
   kept across a restart so a mark keeps its `since` — served with the `repos` reading, each
   checkout's reading carrying `balance: {<team>: mark}` for the marks whose `repo` it is, so a
-  client and a session's `ao repo` read it there, and the mark goes when no line is crossed.
+  client and a session's `ao repo` read it there, and on the home's `host` read as `balance:
+  {<team>: mark}`, every mark, one whose `repo` is empty included, which no checkout's reading
+  holds: `ao team list` and `ao team balance` read both (TD-330; the page's team card and Settings
+  field read the `repos` reading alone, not yet the `host` read). The mark goes when no line is crossed.
   A crossed line's `value` and `limit` are open pull requests for `prs` and seconds for `oldest`
   and `review`, so a reader writes both sides alike (*oldest PR 3d, line 2d*); a mark still
   crossed keeps its `since` whatever its numbers do. **A reading that failed crosses nothing and clears
@@ -8970,6 +8975,9 @@ teams:
   down loses its mark with nobody to tell, and neither the manager nor the person is sent a
   clearing. The manager is the controller the team's unattended, non-seat members share, read
   from those that control no teammate, each address in the home's form (a node's member's is `id@host`); a team a person leads has none, and only the person is told.
+  Nested teams are not built (§4.9), so this reading is one layer deep by design: a team in which
+  a member leads members of its own tells the controller those bottom members share, which is that
+  member and not the manager above it, and where two leads' members share none, only the person.
   When the mark goes, each member whose claim was refused is rung
   with *the line is clear again: pick as your lane says*, within its wake budget, and its
   `balance_refused` removed — an exited one's is removed with nothing sent.

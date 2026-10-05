@@ -1035,16 +1035,19 @@ def cmd_team_list(args: argparse.Namespace) -> int:
     rows = teamrun.rows(org, call_sync("list"), asked)
     # the home's `work_waiting` marks (§6 rule 8), as ids per team; an agent without the reading has none
     waiting: dict[str, int] = {}
+    home: dict[str, Any] = {}
     with contextlib.suppress(AgentError, AgentUnavailable):
-        for team, mark in (call_sync("host").get("work") or {}).items():
+        home = call_sync("host")
+        for team, mark in (home.get("work") or {}).items():
             members = mark.get("members") if isinstance(mark, dict) and isinstance(mark.get("members"), dict) else {}
             waiting[team] = len({str(i) for ids in members.values() if isinstance(ids, list) for i in ids})
     for r in rows:
         r["work_waiting"] = waiting.get(r["name"], 0) if not r["live"] and r["wound_down"] else 0
-    # the home's `balance` marks (§6 *Balance*), from the `repos` reading; an agent without it has none
+    # the home's `balance` marks (§6 *Balance*), from the `repos` reading and the `host` read, which alone
+    # carries a mark with no repo (TD-330); an agent without either has none
     marks: dict[str, dict[str, Any]] = {}
     with contextlib.suppress(AgentError, AgentUnavailable):
-        marks = teamrun.balance_marks(call_sync("repos"))
+        marks = teamrun.balance_marks(call_sync("repos"), home)
     for r in rows:
         r["balance"] = marks.get(r["name"]) if r["live"] else None
     # the team's flows (§4.9c *What is shown*, TD-309 slice 6): each listed flow, the current one, its
@@ -1882,7 +1885,10 @@ def cmd_team_balance(args: argparse.Namespace) -> int:
     repos = call_sync("repos")
     now = teamrun.balance_now(name, call_sync("list"), repos)
     # the mark is the tick's, written on its next pass: said only while the team still has a line
-    mark = teamrun.balance_marks(repos).get(name) if bal else None
+    home: dict[str, Any] = {}
+    with contextlib.suppress(AgentError, AgentUnavailable):
+        home = call_sync("host")
+    mark = teamrun.balance_marks(repos, home).get(name) if bal else None
 
     def prose() -> None:
         if bal:
