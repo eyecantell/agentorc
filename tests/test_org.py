@@ -675,33 +675,12 @@ def test_place_is_read_and_is_for_a_repos_team_only(tmp_path):
         org.load(write(tmp_path, dict(ORG, place=["sam-grind"])))
 
 
-def test_the_landing_rule_place_then_here_then_the_one_node(tmp_path):
-    reg = {"devenv": ["/workspaces/sam"], "lab": ["/srv/other"], "box": ["/w/sam"]}
-    asked: list[str] = []
-
-    def repos_of(host: str) -> list[str]:
-        asked.append(host)
-        if host == "down":
-            raise OSError("down did not answer")
-        return reg[host]
-
-    # `place:` wins, and nothing is asked; so does this host's own registry
-    assert org.landing("t", "sam", {"t": "lab"}, "kmaster", True, ["devenv"], repos_of) == ("lab", "place")
-    assert org.landing("t", "sam", {}, "kmaster", True, ["devenv"], repos_of) == ("kmaster", "registered here")
-    assert asked == []
-    # else the one linked node whose registry holds the repo
-    assert org.landing("t", "sam", {}, "kmaster", False, ["devenv", "lab"], repos_of) == (
-        "devenv",
-        "registered on devenv",
-    )
-    # on several nodes and no `place:`: refused, naming them
-    with pytest.raises(ValueError, match=r"several nodes \(devenv, box\) and `place:` names none"):
-        org.landing("t", "sam", {}, "kmaster", False, ["devenv", "lab", "box"], repos_of)
-    with pytest.raises(ValueError, match="no linked host's registry holds its repo sam"):
-        org.landing("t", "sam", {}, "kmaster", False, ["lab"], repos_of)
-    # a registry that cannot be told is unknown, never *no repos*: devenv holding it does not decide
-    with pytest.raises(ValueError, match=r"cannot be told .* down \(down did not answer\)"):
-        org.landing("t", "sam", {}, "kmaster", False, ["devenv", "down"], repos_of)
+def test_the_landing_rule_is_place_then_here():
+    """§4.9 *Where a repo's team lands* (TD-318): two clauses — a definition is read at the home, so
+    a team `place:` does not name lands on this host, and no other host's registry is asked."""
+    assert org.landing("t", {"t": "lab"}, "kmaster") == ("lab", "place")
+    assert org.landing("t", {"u": "lab"}, "kmaster") == ("kmaster", "registered here")
+    assert org.landing("t", {}, "kmaster") == ("kmaster", "registered here")
 
 
 def test_a_repos_team_lands_here_unless_place_names_it(tmp_path, monkeypatch):

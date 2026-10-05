@@ -12,7 +12,7 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
-from agentorc import flowdefs, teams
+from agentorc import flowdefs, repoconfig, teams
 from agentorc import org as orgmod
 from sessionorc import board, defs, gitinfo, paths
 from sessionorc import settings as settings_mod
@@ -22,7 +22,7 @@ GIT_TIMEOUT = 5.0
 
 def where(org: orgmod.Org, team: orgmod.TeamDef, here: str) -> tuple[str, str]:
     """The host a team lands on and why, in `ao org`'s words: a repo's team by the landing rule
-    (*place*, *registered here*, *registered on <node>*), the org file's by its own `host:` or,
+    (*place*, *registered here*), the org file's by its own `host:` or,
     with none, the host a start runs on. A landing that cannot be told is `("", <the reason>)`."""
     if team.name in org.unlanded:
         return "", org.unlanded[team.name]
@@ -65,10 +65,51 @@ def remainder(home: Path | None = None) -> dict[str, Any]:
     return {"home": str(home), "tree": tree, "files": files}
 
 
-def view(org: orgmod.Org, here: str, home: Path | None = None, roots: Collection[str] = ()) -> dict[str, Any]:
+def held_elsewhere(
+    roots: Collection[str], linked: Collection[str], repos_of: orgmod.ReposOf | None
+) -> tuple[list[dict[str, str]], list[str]]:
+    """The repos a linked host's registry holds that this one's does not (design §4.9 *A definition
+    is read at the home, and only there*, TD-318): `([{host, repo, path}], notes)`, a repo being its
+    checkout's directory name, as `_land` reads it. A host whose registry cannot be read (`OSError`:
+    unreachable, a build without the `repos` link method) is a note, never read as holding nothing."""
+    mine = {Path(str(r)).name for r in roots}
+    found: list[dict[str, str]] = []
+    notes: list[str] = []
+    for host in linked:
+        try:
+            if repos_of is None:
+                raise OSError("nothing here asks a host for its registry")
+            theirs = repos_of(host)
+        except OSError as e:
+            notes.append(f"{host}: its registry could not be read ({e})")
+            continue
+        for path in theirs:
+            repo = Path(str(path)).name
+            if repo not in mine and not any(f["host"] == host and f["repo"] == repo for f in found):
+                found.append({"host": host, "repo": repo, "path": str(path)})
+    return found, notes
+
+
+def held_line(row: dict[str, str], here: str) -> str:
+    """The words `ao org` and its check give a repo held only on a node (§4.9)."""
+    return (
+        f"{row['repo']} — held only on {row['host']}: its {repoconfig.FILE} is not read; register a checkout at {here}"
+    )
+
+
+def view(
+    org: orgmod.Org,
+    here: str,
+    home: Path | None = None,
+    roots: Collection[str] = (),
+    linked: Collection[str] = (),
+    repos_of: orgmod.ReposOf | None = None,
+) -> dict[str, Any]:
     """The org as the clients aggregate it: each team with its source file, its repos, the host it
     lands on and why; the names a repo's definition lost to the org file's (`shadowed`) and the
-    ones two repos define (`refused`); then the remainder's files with their last commit."""
+    ones two repos define (`refused`); then the remainder's files with their last commit, and each
+    repo a linked host holds that this one does not (`held_elsewhere`, with its `unread` notes)."""
+    elsewhere, unread = held_elsewhere(roots, linked, repos_of)
     rows = []
     for name in sorted(org.teams):
         team = org.teams[name]
@@ -88,6 +129,8 @@ def view(org: orgmod.Org, here: str, home: Path | None = None, roots: Collection
         "refused": dict(org.refused),
         "flows": flowdefs.visible(roots, org.roles),  # every flow the org can see here (§4.9c)
         "remainder": remainder(home),
+        "held_elsewhere": elsewhere,
+        "unread": unread,
     }
 
 
@@ -119,6 +162,7 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     *,
     files: teams.Files | None = None,
     settings: dict[str, Any] | None = None,
+    repos_of: orgmod.ReposOf | None = None,
 ) -> dict[str, Any]:
     """`ao org check`: the aggregate as a verdict — `{ok, lacks, warnings}`, `ok` false when
     anything is lacking. `notes` are `with_repos`' own (a repo file that cannot be read, a name
@@ -132,8 +176,10 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     twice; a team whose definition names one session twice (TD-268); a `place:` naming no linked
     host; a team in `settings.yml` no definition names. A
     warning, which does not fail it: a registered checkout off its default branch or holding
-    changes, a `place:` naming a team no registered repo defines, and, per team under a flow, each
-    key it writes that the flow would fill with the same value (`teams.flow_redundant`)."""
+    changes, a `place:` naming a team no registered repo defines, a repo a linked host's registry
+    holds that this one's does not (or a linked registry that could not be read; `repos_of` asks),
+    and, per team under a flow, each key it writes that the flow would fill with the same value
+    (`teams.flow_redundant`)."""
     lacks: list[str] = []
     warnings: list[str] = []
 
@@ -147,6 +193,9 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
             lack(f"{root}: a registered checkout that is not there — remove its line from the registry, or clone it")
         else:
             warnings.extend(checkout_warnings(path))
+    elsewhere, unread = held_elsewhere(roots, linked, repos_of)
+    warnings.extend(held_line(row, here) for row in elsewhere)
+    warnings.extend(unread)
     placed_nowhere = {t for t in org.place if t not in org.teams and t not in org.refused}
     for note in notes:
         if any(note.startswith(f"place.{t}:") for t in placed_nowhere):

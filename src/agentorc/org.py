@@ -230,7 +230,7 @@ class Org:
     refused: dict[str, str] = field(default_factory=dict)
     # where a repo-defined team lands when no repo may say (§4.9 *Where a repo's team lands*): team → host
     place: dict[str, str] = field(default_factory=dict)
-    # where each repo-defined team lands and why: team → (host, *place* | *registered here* | *registered on <node>*)
+    # where each repo-defined team lands and why: team → (host, *place* | *registered here*)
     landed: dict[str, tuple[str, str]] = field(default_factory=dict)
     # a repo-defined team whose landing cannot be told, which no start goes past: team → why
     unlanded: dict[str, str] = field(default_factory=dict)
@@ -352,49 +352,14 @@ def merge_repo_teams(
     return merged
 
 
-def landing(  # noqa: PLR0913 — the rule's own inputs, each one a clause of it
-    team: str,
-    repo: str,
-    place: dict[str, str],
-    here: str,
-    here_holds: bool,
-    nodes: Collection[str] = (),
-    repos_of: ReposOf | None = None,
-) -> tuple[str, str]:
+def landing(team: str, place: dict[str, str], here: str) -> tuple[str, str]:
     """Where a repo-defined team lands, and why (design §4.9 *Where a repo's team lands*): `place:`
-    when it names the team; else this host when its registry holds the repo; else the one linked
-    node whose registry does. `(host, why)`, the why in `ao org`'s words.
-
-    Raises `ValueError` where the start is refused: the repo on several nodes and no `place:`
-    (naming them), on none, or a node whose registry cannot be told — that is *unknown*, never
-    *no repos*, since reading it as empty would land the team on another node."""
+    when it names the team, else this host — a definition is read at the home and only there, from a
+    checkout its registry holds (§4.9 *A definition is read at the home*). `(host, why)`, the why in
+    `ao org`'s words."""
     if place.get(team):
         return place[team], "place"
-    if here_holds:
-        return here, "registered here"
-    on: list[str] = []
-    unknown: list[str] = []
-    for node in nodes:
-        try:
-            if repos_of is None:
-                raise OSError("nothing here asks a node for its registry")
-            if _named(repos_of(node), repo):
-                on.append(node)
-        except OSError as e:
-            unknown.append(f"{node} ({e})")
-    if unknown:
-        raise ValueError(
-            f"team {team}: where it lands cannot be told — {here}'s registry does not hold {repo}, and the "
-            f"registry of {', '.join(unknown)} could not be read; name its host under `place:` in org.yml"
-        )
-    if len(on) == 1:
-        return on[0], f"registered on {on[0]}"
-    if not on:
-        raise ValueError(f"team {team}: no linked host's registry holds its repo {repo} — nothing to land on")
-    raise ValueError(
-        f"team {team}: its repo {repo} is registered on several nodes ({', '.join(on)}) and `place:` names "
-        f"none — add `place: {{{team}: <host>}}` to org.yml (design §4.9 *Where a repo's team lands*)"
-    )
+    return here, "registered here"
 
 
 def _named(repos: Collection[str], repo: str) -> list[str]:
@@ -412,8 +377,7 @@ def _land(org: Org, base: Collection[str], here: str, repos_of: ReposOf | None) 
         if team.source is None or team.source == org.path or len(team.projects) != 1:
             continue  # the org file's own: its `host:` places it
         repo = team.projects[0]
-        # the definition was read from a checkout in this host's registry, so this host holds it
-        host, why = landing(team.name, repo, org.place, here, here_holds=True)
+        host, why = landing(team.name, org.place, here)
         org.landed[team.name] = (host, why)
         if host == here:
             continue

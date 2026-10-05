@@ -94,7 +94,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-313 | Build role directories (the org's and a repo's) and the org's flow directories, with the home's history tracking them — design §4.9c, the second part of the flows build | Low | Open |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
-| TD-318 | A definition is read at the home: take the landing rule's unreachable node clause out of `org.landing`, and have `ao org` and `ao org check` name a repo held only on a node | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slice 1 built |
 | TD-327 | A timed-out `ao wait` says *nothing unread — end your turn* while mail an earlier wait reported is still unread | Low | Open |
 | TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Host half built |
@@ -1642,28 +1641,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when:** on a scratch home, a team under a repo flow `build → ui-review (held: ui) → review (held: core)` with a `ui-reader` seat: a PR touching both sets is asked of the ui reader first, `ao pr held` names it, its `pass` moves the turn to the techlead, which merges and answers `merged`; a PR touching `core` alone goes to the techlead only; a reply to a PR's ask with no verdict is refused; a record with the older `review` shape behaves as before; a switch to `build-review` with an ask open at the ui reader leaves that ask answered and the techlead's link still to read. When built, §4.9c's and the pointers' *designed, not built* marks come off.
 
 **Related:** TD-314 (the design), TD-307 and TD-309 (flows), TD-313 (role directories, for a review seat role that is no preset), TD-093 (the reader).
-
-## TD-318: A definition is read at the home — the landing rule loses its node clause, and `ao org` names a repo held only on a node
-
-**Priority:** Low
-**Added:** 2026-10-04 (the designer, from TD-229's open question)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/org.py` (`landing`, `_land`), `src/agentorc/orgcheck.py` (`view`, `check`), `src/agentorc/cli.py` (`cmd_org`), `tests/test_org.py`, `tests/test_cli_org.py`; design §4.9 *A definition is read at the home, and only there* and *Where a repo's team lands*, §4.7 `ao org`.
-
-**Why:** TD-229's build left a question: `org.landing` holds a clause, *else the one linked node whose registry does*, that is tested and that no client reaches, because every definition is read from a checkout in the home's registry. The design now says a definition is read at the home and only there, so the clause is dead code that describes a rule the design does not have; and a repo a node holds that the home does not is silent today, where the person should be told its teams are not read.
-
-**Fix, one PR (`src/agentorc/**`, no held path):**
-1. `org.landing` returns `place:`'s host when it names the team, else this host: the `nodes` and `repos_of` arguments, the `here_holds` flag and the three refusals of the node clause go, with their tests; `_land` keeps asking a placed host's registry for the repo's path there (`repos_of`), unchanged.
-2. `orgcheck.view` gains, per linked host, the registry entries whose directory name no entry of this host's registry has (`repos_via` over `host_repos`, as `_land` asks), and `ao org` prints each under the remainder: *held only on `<node>`: its .agentorc.yml is not read; register a checkout at `<home>`*. `orgcheck.check` adds the same line as a **warning**, which does not fail it. A host whose registry cannot be read (`OSError`: unreachable, or a build without the `repos` link method) is one note, *`<node>`: its registry could not be read*, and never read as holding nothing.
-3. The design's two *not built — TD-318* marks (§4.9, §4.7) become *built*, and the dated line goes to `docs/design-history.md` §4.9.
-
-`rpc_host_repos`'s docstring (`src/sessionorc/agent_remote.py`) still gives the node clause as the reason it exists; it is reworded when that file is next touched (a held path, so not in this PR), and the comments in `org.py` that name the clause go with step 1.
-
-**Done when** `landing` has two clauses and its tests say so; with a linked node whose registry holds a repo the home's does not, `ao org` lists it and `ao org check` warns and still exits 0; with that node unreachable both say its registry could not be read; `pdm run test` passes.
-
-**Related:** TD-229 (the aggregate and the question), TD-210 (the design), TD-299 (cm-grind on its container node: the home's checkout for the reading, `place:` for the work).
 
 ## TD-319: Build the Telegram channel — the home tells the person what newly stops a session or a team
 
