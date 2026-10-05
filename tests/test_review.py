@@ -7,7 +7,7 @@ import pytest
 
 from agentorc import repoconfig, teams
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import normalize_review
+from sessionorc.models import normalize_review, review_links
 
 
 def test_a_review_setting_is_checked_and_filled_in():
@@ -27,6 +27,43 @@ def test_a_review_setting_is_checked_and_filled_in():
             normalize_review(bad)
 
 
+def test_a_chain_of_review_stages_is_checked_and_reads_as_links():
+    """§4.9c *A review stage any seat may hold* (TD-315 slice 1): the record carries `{chain: [{stage,
+    reader, held}], bound}`; the older shape is a chain of one."""
+    chain = {"chain": [{"stage": "ui-review", "reader": "ui-reader", "held": "src/agentorc/ui/**"},
+                       {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]}]}  # fmt: skip
+    got = normalize_review(chain)
+    assert got == {
+        "chain": [
+            {"stage": "ui-review", "reader": "ui-reader", "held": ["src/agentorc/ui/**"]},
+            {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]},
+        ],
+        "bound": "2h",
+    }
+    assert normalize_review(got) == got, "idempotent, as the loader and the host agent each pass it"
+    assert review_links(got) == got["chain"]
+    assert review_links({"reader": "techlead", "held": ["**"], "bound": "2h"}) == [
+        {"stage": "review", "reader": "techlead", "held": ["**"]}
+    ]
+    assert review_links(None) == [] and review_links({}) == []
+    # a role's `review:` in a file never writes one: the chain is the compile's (review of #1120)
+    with pytest.raises(ValueError, match="written by a flow's compile"):
+        normalize_review(chain, chain=False)
+    for bad in (
+        {"chain": []},  # no link
+        {"chain": "techlead"},
+        {"chain": [{"stage": "review"}]},  # no reader
+        {"chain": [{"reader": "techlead"}]},  # no stage
+        {"chain": [{"stage": "a", "reader": "x"}, {"stage": "a", "reader": "y"}]},  # one stage twice
+        {"chain": [{"stage": "a", "reader": "x", "held": []}]},
+        {"chain": [{"stage": "a", "reader": "x", "merges": True}]},
+        {"chain": [{"stage": "a", "reader": "x"}], "reader": "techlead"},  # the two shapes mixed
+        {"chain": [{"stage": "a", "reader": "x"}], "bound": "soon"},
+    ):
+        with pytest.raises(ValueError, match="review"):
+            normalize_review(bad)
+
+
 def test_a_role_preset_carries_review_to_the_create(tmp_path):
     (tmp_path / ".agentorc.yml").write_text(
         "roles:\n  grinder:\n    review: {reader: techlead, held: [src/sessionorc/**]}\n"
@@ -38,8 +75,15 @@ def test_a_role_preset_carries_review_to_the_create(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {reader: nobody}\n")
     with pytest.raises(ValueError, match=r"grinder\.review: reader is one of"):
         repoconfig.load(tmp_path)
+    # a chain is a flow's compile's, never a file's (TD-315, review of #1120)
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {chain: [{stage: r, reader: x}]}\n")
+    with pytest.raises(ValueError, match=r"grinder\.review: a role's review takes reader"):
+        repoconfig.load(tmp_path)
     # `org.yml`'s layer reaches `resolve_role` unchecked by the loader: the same check applies there
     (tmp_path / ".agentorc.yml").write_text("")
+    org_chain = {"grinder": {"review": {"chain": [{"stage": "r", "reader": "x"}]}}}
+    with pytest.raises(ValueError, match=r"org roles\.grinder\.review: a role's review takes reader"):
+        repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder", org_chain)
     with pytest.raises(ValueError, match=r"org roles\.grinder\.review: reader is one of"):
         repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder", {"grinder": {"review": {"reader": "x"}}})
     assert repoconfig.resolve_role(

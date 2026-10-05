@@ -1580,7 +1580,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-04 (the designer, TD-314's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1a built (PR #1120, grinder-ao-1): the record's chain shape, `review_links`, rule 11 holding a chain's PR on the union of its links' paths. Slice 1's verdict waits on the techlead's answer to who must give one (a session's reply only, or the person's too).
 **Blocked by:** TD-309
 **Location:** the flow loader TD-309 builds (a review stage's role and `held:`), `src/agentorc/repoconfig.py` (`held:` as a list or a mapping), `src/agentorc/org.py` and `src/agentorc/teams.py` (the staffing check, the compile, `ao org check`), `src/sessionorc/models.py` (`REVIEW_READERS`, `normalize_review`, the envelope's `verdict`), `src/sessionorc/mail.py`, `src/agentorc/cli.py` (`ao msg --verdict`, `ao pr held`), the host agent's RPCs (`pr_reads`), the flows' `build.md` and `review.md`, `src/agentorc/ui/repo.py` (`pr_standing`)
 

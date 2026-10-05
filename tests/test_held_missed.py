@@ -88,6 +88,24 @@ def test_the_fixed_words():
     assert held.note(c, "techlead", "ao-x-w").startswith("ao-x-w: PR #845 touched held paths")
 
 
+def test_a_chain_holds_the_union_of_its_links_paths_and_is_said_as_its_readers():
+    """TD-315 slice 1: a record carrying a flow's chain holds every link's paths, and its reader is
+    any the PR's asks named — the older shape's words stay as they were."""
+    links = [
+        {"stage": "ui-review", "reader": "ui", "held": ["src/agentorc/ui/**"]},
+        {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]},
+    ]
+    chain = {"chain": links, "bound": "2h"}
+    files = ["src/agentorc/ui/app.py", "src/sessionorc/held.py", "docs/design.md"]
+    assert held.held_paths(files, chain) == ["src/agentorc/ui/app.py", "src/sessionorc/held.py"]
+    s = _rec()
+    s.review = chain
+    _ask(s, "ao-x-ui")
+    _reply(s, "ao-x-ui")
+    assert held.read_by(s, 845) == "ao-x-ui"
+    assert "without its readers' read" in held.said({"pr": 845, "paths": ["src/sessionorc/held.py"]}, "")
+
+
 def test_the_read_of_a_pr_gives_its_files_and_its_merge(monkeypatch):
     import json
     import subprocess
