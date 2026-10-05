@@ -4170,3 +4170,21 @@ Both go away only when the record says who closed it.
 **Done when:** on a scratch home, an entry merged into a wound-down team's lane puts a *team start* row in the Inbox within `WORK_SETTLE` and two ticks, the same under `on_work: start` starts the team and the card says why, and a promote that turns the rule on tells a finished member of what was filed since it declared.
 
 **Related:** TD-214 (the design), TD-195 (rule 6), TD-133 (the schedule, whose replay slice 4 shares: whichever is built first writes it), TD-223 (what pickable means where the header has no lines).
+
+## TD-212: `ao promote --sha` is refused — design the rollback
+
+**Priority:** Medium
+**Added:** 2026-09-28 (Paul, answering grinder-ao-1's board line of 2026-09-27: *add a design TD for ao promote --sha*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-09-28 (the designer, PR #719; the steer to Paul is `m-4ceaaf71206c`, bound 2026-09-29 10:08 MDT): design §6 *A rollback* (which commit, the detached worktree, the preconditions, what the repo may refuse, the hold, what it does not reach), §4.7 (`--sha`, `--back`, `ao promote clear`), §5 `promote:` (`run` makes live the tree it is started in), §4.5a *Inbox row: promote* (the held row), the glossary's *rollback*. Of the entry's three ways, (a) the scratch worktree; (b) the kept wheel and (c) the quicker revert were turned down, the history says why. Closes with TD-226. **Built by TD-226** (PRs #757 and #777), whose live check held on 2026-10-05 (PR #1075); archived with it.
+**Blocked by:** TD-226
+**Location:** design §4.7 (`ao promote`), §6 *Promote*, `src/sessionorc/promote.py` and the promote's `run` (TD-132, the build #666 refuses `--sha`)
+
+**Why:** design §4.7 promised `ao promote --sha <commit>`, a promote of an older commit, which is the rollback. TD-132's build (#666, grinder-ao-1) refuses it: the promote's `run` installs the checkout's tree, and precondition (1) holds that tree at main's head, so an older commit has no way to reach `run`. The techlead, reading #666, asked for it on the board since it narrows what the design promised. Today a rollback is a revert merged to main and then a press, which is slow when the live copy is broken (TD-062's 31 minutes).
+
+**Fix:** design how an older commit reaches the install: (a) `run` installs from a scratch worktree at the commit (`git worktree add --detach`) instead of the main checkout; (b) install the wheel the last promote wrote to `~/.agentorc/wheels/` (kept per commit, so a rollback needs no build); (c) keep the refusal and make the revert PR a one-press path. Also: what the live reading says after a rollback (*live is older than main*, not *behind*), whether the automatic promote then leaves it alone until a newer main, and what `ao promote --sha` refuses (a commit not on main, one older than the last schema change). Then the build TD. Done when a person can put the live copy back on the previous commit in one command and the page says it is a rollback.
+
+**Resolved:** 2026-10-05 (designed 2026-09-28, PR #719; built by TD-226, PRs #757 and #777; live check held: PR #1075 — `ao promote --back` pressed on two scratch homes, live went back and `ao promote status` and the Inbox row read *rolled back from*) — design §6 *A rollback*, §4.7 (`--sha`, `--back`, `ao promote clear`), §5 `promote:`, §4.5a *Inbox row: promote*; the glossary's *rollback*.
+
+**Related:** TD-132 (the promote), TD-062 (why the live copy is promoted, not edited), #666.
