@@ -181,3 +181,23 @@ def test_a_team_given_the_repo_with_nothing_live_keeps_its_facets(tmp_path, monk
     html = c.get("/repo/samscrape").text
     assert "serviced by" in html and "no team services this repo" not in html
     assert "TDs in motion (1)" in html and "stopped for the night" in html and "Technical debt (7 open)" in html
+
+
+def test_a_live_check_row_says_whether_its_build_is_live(tmp_path, monkeypatch):
+    """TD-323 slice 2 (design §4.9b *A live check is a grinder's once its build is live*): a live
+    check whose build is live is among the pickable rows, marked *live check* with its build's PR;
+    one whose build is not is under *other*, saying it waits; a build's row says neither."""
+    root = str(tmp_path / "samscrape")
+    r = reading(root)
+    r["ledger"]["entries"] += [
+        {"id": "TD-320", "title": "check the lane", "for_page": "pickable", "priority": "high", "owner": "grinder", "kind": "live-check", "built": [1051], "live": "yes"},
+        {"id": "TD-321", "title": "check the slices", "for_page": "other", "priority": "low", "owner": "grinder", "kind": "live-check", "built": [1060, 1061], "live": "no"},
+    ]  # fmt: skip
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    row = html[html.index('id="TD-320"') :]
+    assert row[: row.index("</div>")].count("· live check #1051</span>") == 1
+    assert 'data-list="pickable"' in html[html.index('id="TD-320"') - 200 : html.index('id="TD-320"') + 100]
+    row = html[html.index('id="TD-321"') :]
+    assert "· waits for its build to be live #1060 #1061</span>" in row[: row.index("</div>")]
+    row = html[html.index('id="TD-301"') :]
+    assert "live" not in row[: row.index("</div>")]

@@ -430,6 +430,38 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["repo", "nope"]) != 0
 
 
+def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):
+    """TD-323 slice 2 (design §4.9b): a live check whose build is live is among the pickable lines,
+    marked *live check* with its build's PR, in the pick order; one whose build is not live is a
+    `live-check` line saying it waits; one the person judges (*for you*) is on neither."""
+    from agentorc import cli
+
+    def e(i, page, prio, live, built, owner="grinder"):
+        return {"id": i, "title": f"check {i}", "for_page": page, "priority": prio, "owner": owner,
+                "kind": "live-check", "live": live, "built": built}  # fmt: skip
+
+    entries = [
+        {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "medium", "kind": "build"},
+        e("TD-020", "pickable", "high", "yes", [1051]),
+        e("TD-021", "other", "low", "no", []),
+        e("TD-022", "other", "high", "no", [7, 8]),
+        e("TD-023", "for-you", "high", "no", [9], owner="paul"),
+    ]
+    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+    )
+    monkeypatch.chdir(repo)
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "pickable     TD-020  High    grinder      live check #1051: check TD-020" in out
+    assert out.index("pickable     TD-020") < out.index("pickable     TD-010")
+    assert "live-check   TD-022  High    grinder      waits for its build to be live (#7 #8): check TD-022" in out
+    assert "live-check   TD-021  Low     grinder      waits for its build to be live (no PR on its Kind: line)" in out
+    assert out.index("live-check   TD-022") < out.index("live-check   TD-021") and "TD-023" not in out
+    assert "a build" in out and "live check #" not in out.split("TD-010")[1].split("\n")[0]
+
+
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
     """Review of PR #595: a read that raises (not a `gh` outage — a surprise) is that checkout's
     error, its last reading kept; the other checkouts are read; and the clock does not advance past

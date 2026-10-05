@@ -1432,6 +1432,26 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
+def _repo_list(e: dict[str, Any]) -> str:
+    """Which of `ao repo`'s lists an entry is on: the page's kind, and `live-check` for a live check
+    whose build is not live yet, which the page has under *other* (design §4.9b, TD-323)."""
+    if e.get("kind") == "live-check" and e.get("for_page") == "other" and e.get("live") != "yes":
+        return "live-check"
+    return str(e.get("for_page") or "")
+
+
+def _live_mark(e: dict[str, Any]) -> str:
+    """The words before a live check's title (design §4.9b, TD-323): *live check* where its build is
+    live, so a pick says it is a read and not a build, and *waits for its build to be live* where not,
+    each naming the build's PRs from its `Kind:` line."""
+    if e.get("kind") != "live-check":
+        return ""
+    prs = " ".join(f"#{n}" for n in e.get("built") or [])
+    if e.get("live") == "yes":
+        return f"live check {prs}: "
+    return f"waits for its build to be live ({prs or 'no PR on its Kind: line'}): "
+
+
 def _pick_key(e: dict[str, Any]) -> tuple[int, int]:
     """Where an entry sits in cadence's pick order (§2.11): its priority, then debt before a feature."""
     return PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)), int(e.get("type") == "feature")
@@ -1573,8 +1593,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
                 if st := (r.get("standing") or {}).get(str(p["number"])):
                     print(f"         {st}")
-            for kind in ("pickable", "design-first"):
-                ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
+            for kind in ("pickable", "design-first", "live-check"):
+                ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
                 # the pick order is cadence's (design §4.4 *Repo facts*, §4.8 *Choosing in a free-pick
                 # lane*, TD-202, TD-228): High, then Medium, then Low, then an entry with none; debt
                 # before a feature within a priority; ties in file order (a stable sort)
@@ -1584,7 +1604,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # whose it is (TD-228): pickable reads no owner, so the line says the entry's
                     # `Owner:` and a lane's reader passes over what is not its own
                     owner = str(e.get("owner") or "") or "-"
-                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {e['title']}")
+                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")

@@ -125,8 +125,9 @@ def pr_standing(entries: Collection[dict[str, Any]], now: datetime) -> dict[int,
 def ledger_lists(r: Mapping[str, Any], motion: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     """**Technical debt** (§4.5 screen 11): the open entries in four lists by the page's kind, each
     row id, title, priority and owner, *held by <name>* when a member claims it and *blocked by …*
-    from the entry's `blocked_by` (§4.4 *Repo facts*), sorted by priority then id; `fold` the rows
-    past the fold."""
+    from the entry's `blocked_by` (§4.4 *Repo facts*), and a live check *live check* or *waits for
+    its build to be live* with its build's PRs (§4.9b, TD-323; the template's), sorted by priority
+    then id; `fold` the rows past the fold."""
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
     out = []
