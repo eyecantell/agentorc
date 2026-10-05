@@ -127,6 +127,10 @@ CONTEXT_AGAIN = timedelta(minutes=20)
 BRIEF_SETTLE = timedelta(minutes=10)
 # Rule 7's clause on every `ao` reply to a member whose record carries `brief_changed` (TD-217 slice 4)
 BRIEF_CLAUSE = 'your brief changed — finish what you hold, then `ao progress restart --why "brief changed"`'
+# and its second trigger's (§4.9c *Switching*, TD-309 slice 5), to a member whose record carries `relaunch`
+FLOW_CLAUSE = 'your team\'s flow changed — finish what you hold, then `ao progress restart --why "flow changed"`'
+# What a relaunch replaces in a launch record (§4.9c): each as handed, an absent one removed; the rest stands
+RELAUNCH_KEYS = ("prompt", "prompt_from", "lane", "review")
 # A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
 # who did what, so it is allowed more than `doing`'s 200 characters.
 ROUND_LINE_CAP = 500

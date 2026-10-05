@@ -725,14 +725,19 @@ class TickMixin:
         nothing, and has its git fields known and showing nothing uncommitted or unpushed is closed
         and replayed by the tick itself, `why: brief`, under the ceiling as every replay is. Never a
         seat, an interactive session, one past its stop time, into a wrap-up, a gate pause or a
-        suspension, and not on a node yet. A working member is told on its `ao` replies instead."""
-        if not (s.brief_changed and s.supervised and s.unattended) or s.seat is not None:
+        suspension, and not on a node yet. A working member is told on its `ao` replies instead.
+
+        Its second trigger (§4.9c *Switching*, TD-309 slice 5): a record a person's Apply relaunched
+        carries `relaunch`, and is restarted the same way under `why: flow` — the replay reads the
+        launch record the relaunch wrote."""
+        why = "brief" if s.brief_changed else "flow" if s.relaunch else ""
+        if not (why and s.supervised and s.unattended) or s.seat is not None:
             return
         if s.superseded_by or s.suspended or s.gated or s.host != self.host:
             return
         if s.out_of_work or s.restart_wanted:
             return  # it declared: rule 2 or the team's next start is what starts it
-        closed_by_tick = self._closed_by_tick(s, "brief")
+        closed_by_tick = self._closed_by_tick(s, why)
         if not closed_by_tick:
             if s.state != "idle" or s.confidence != "hook" or s.pending:
                 return
@@ -754,24 +759,24 @@ class TickMixin:
             if not s.restart_ceiling:
                 recent = agent_common._counted(s.restarts, now)
                 s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
-                log.warning("%s: the brief changed at its restart ceiling — it is a person's now", s.id)
+                log.warning("%s: the %s changed at its restart ceiling — it is a person's now", s.id, why)
                 self._save(s)
                 await self._push_changes()
             return
-        log.info("%s: its brief changed and it is idle with its work pushed: restarting it", s.id)
+        log.info("%s: its %s changed and it is idle with its work pushed: restarting it", s.id, why)
         if s.state == "idle":
             try:
-                await self.rpc_close(s.id, closer={"by": "tick", "why": "brief"})
-                self._mark_closed(s, "brief")
+                await self.rpc_close(s.id, closer={"by": "tick", "why": why})
+                self._mark_closed(s, why)
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
-                    self._mark_closed(s, "brief")
-                s.restarts = [*s.restarts, {"at": now_iso(), "why": "brief", "error": f"close: {e}"}]
-                log.warning("%s: the close before a brief restart failed: %s", s.id, e)
+                    self._mark_closed(s, why)
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": why, "error": f"close: {e}"}]
+                log.warning("%s: the close before a %s restart failed: %s", s.id, why, e)
                 self._save(s)
                 await self._push_changes()
                 return
-        await self._replay(s, "brief")
+        await self._replay(s, why)
 
     @staticmethod
     def _mark_closed(s: Session, why: str) -> None:
@@ -784,7 +789,7 @@ class TickMixin:
     @staticmethod
     def _closed_by_tick(s: Session, why: str) -> bool:
         """A `closed` record the tick itself closed and failed to replay (`why` rule 2's `wanted` or rule
-        7's `brief`): it carries the tick's mark for that rule and the close the mark names is still the
+        7's `brief` or `flow`): it carries the tick's mark for that rule and the close the mark names is still the
         record's (`closed_at` unchanged), and the last `restarts` entry is that rule's and carries
         `error` — both failure paths, the close's and the replay's, write one. Any other close clears the
         mark or writes a new `closed_at`, so a person's Close is never undone (design §6 rule 2; TD-235

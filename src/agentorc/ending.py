@@ -9,8 +9,15 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-# the tick's four closes (§6): rule 9's, rule 2's, rule 7's and rule 3's — rule 8's start closes nothing
-TICK_WHY = {"finished": "team finished", "wanted": "for a restart", "brief": "brief changed", "seat": "seat done"}
+# the tick's closes (§6): rule 9's, rule 2's, rule 7's two (its brief, its team's flow, §4.9c) and rule 3's —
+# rule 8's start closes nothing
+TICK_WHY = {
+    "finished": "team finished",
+    "wanted": "for a restart",
+    "brief": "brief changed",
+    "flow": "flow changed",
+    "seat": "seat done",
+}
 
 
 def closer_words(s: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:

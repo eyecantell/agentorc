@@ -106,6 +106,7 @@ HOME_OWNED = frozenset(
         "context_sent_at",
         "brief",
         "brief_changed",
+        "relaunch",
         "seat",
         "seat_due",
         "seat_count",
@@ -1000,6 +1001,10 @@ class Session:
     # as merged, for `BRIEF_SETTLE`; gone at the next create, or when the files read as recorded
     # again. The home's.
     brief_changed: dict[str, Any] | None = None
+    # Rule 7's second trigger (§4.9c *Switching*, TD-309 slice 5): `{at}` once a person's Apply replaced
+    # this record's launch record (`relaunch`); gone at the next create, which writes a launch record of
+    # its own. The home's.
+    relaunch: dict[str, Any] | None = None
     # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.
