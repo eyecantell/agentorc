@@ -95,7 +95,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
-| TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Host half built |
 | TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 | TD-330 | Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo | Low | Open |
 | TD-331 | `ao team --skill` says six roles where there are seven, and leaves a reader guessing at four steps | Low | Open |
@@ -1661,31 +1660,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** on a scratch home with the switch on, a session going `needs-you` with no page open produces exactly one recorded send after the hold, whose link opens the Inbox on that row; with a page visible it produces none; and the suite passes. **Then a live check that is Paul's** (it needs the Doppler config's name saved on the Settings page and his phone): **Send a test** arrives, and one real `needs-you` reaches him once — TD-092 archives on that.
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
-
-## TD-328: A scheduled record takes Switch to interactive and Kill as if it were live
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-1, found pressing TD-152's live check on a scratch home)
-**Owner:** grinder
-**Kind:** build
-**Status:** Host half built 2026-10-05 (grinder-ao-1, PR #1089): on a `scheduled` record `rpc_kill` is Cancel (`_cancel_start`, so `ao team stop --now` still stops a member not yet started), `rpc_set_mode` to interactive is refused until it runs, and `rpc_suspend` is refused in words; §6 *Start time* says so. Test in `tests/test_start_time.py`. **Left:** the card's `more ▾` on a scheduled record offers only Start now and Cancel (`src/agentorc/ui/`, grinder-ao-2's package).
-**Location:** `src/sessionorc/agent.py` (`rpc_set_mode`, `rpc_kill`: neither looks at `scheduled`; `rpc_close` does, and cancels), `src/sessionorc/agent_tick.py` (the scheduled start, `_replay(s, "start", …)` from the launch record), `src/agentorc/ui/` (the card's `more ▾` on a `scheduled` record), design §6 *Start time*, §4.5a *starts* note, §9 invariant 5
-
-**Why:** a `scheduled` record has no pane and has run nothing. The design gives it three acts: `ao at` (move it, or `now`), and Cancel (`ao close`), which forgets it. Two acts designed for a live session are taken on it anyway. Seen 2026-10-05 on a scratch home (hookstub adapter, `origin/main` c98d5620):
-1. **Switch to interactive** (`ao mode <id> interactive`) is accepted: the record reads `unattended: false`, `scheduled`. At the instant the tick starts it from the launch record, and the new record comes up `unattended: true`. The person's switch is silently undone, and a policy has started a session the person made interactive. §6 *Start time* refuses exactly that on purpose: `--at` without `--unattended` is refused (invariant 5).
-2. **Kill** (`ao kill <id>`) answers *killed* and leaves the record `exited`, `supervised: true`, `start_at` still set, `restarts: []`. The card shows an exited session that never ran. The restart policy leaves it alone and the scheduled start never takes it (watched for 30 s past the kill, with the instant 30 min out).
-The card's `more ▾` on a scheduled record offers both, beside Start now and Cancel. It also offers Wrap up, Message…, Open shell here and Pop out. `ao send` is refused there already: before a kill the record has no pane, and after one it reads *has exited*.
-
-**Fix:** on a `scheduled` record, refuse what has nothing to act on, and name what does.
-- `set_mode`: refuse with *not started: `ao at` moves it, Cancel forgets it; switch it once it runs*. If the design would rather keep the switch, carry it into the start so it is not lost, and refuse the start of an interactive record as `--at` is refused.
-- `kill`: refuse with *nothing runs — Cancel forgets it*, or treat it as Cancel.
-
-The design sentence goes in §6 *Start time*, beside Cancel, in the same PR. The card's `more ▾` on a scheduled record shows only what a scheduled record takes: Start now and Cancel, with Focus's banner. That half is `src/agentorc/ui/`, grinder-ao-2's package. Tests: `set_mode` and `kill` on a scheduled record are refused (or behave as the design chooses), and a record switched before its instant starts the way the design says.
-
-**Done when:** on a scheduled record, `ao mode … interactive` and `ao kill` no longer leave a record the design does not describe (refused, or carried as the design says); the card offers only the scheduled acts; design §6 says so; and the suite passes.
-
-**Related:** TD-152 (the start time, where it was found), TD-026 (the design), §9 invariant 5.
 
 ## TD-329: A team member whose `profile:` names a shell profile starts Claude Code
 

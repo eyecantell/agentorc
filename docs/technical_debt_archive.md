@@ -4596,3 +4596,24 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** a timed-out `ao wait` from a session with unread mail prints the unread line and not *nothing unread*; with none it prints the end-the-turn line as today; the suite passes.
 
 **Related:** TD-153 (the line), TD-057 (where it was seen), design §4.10.
+
+## TD-328: A scheduled record takes Switch to interactive and Kill as if it were live
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-1, found pressing TD-152's live check on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_set_mode`, `rpc_kill`: neither looks at `scheduled`; `rpc_close` does, and cancels), `src/sessionorc/agent_tick.py` (the scheduled start, `_replay(s, "start", …)` from the launch record), `src/agentorc/ui/` (the card's `more ▾` on a `scheduled` record), design §6 *Start time*, §4.5a *starts* note, §9 invariant 5
+
+**Why:** a `scheduled` record has no pane and has run nothing. The design gives it three acts: `ao at` (move it, or `now`), and Cancel (`ao close`), which forgets it. Two acts designed for a live session are taken on it anyway. Seen 2026-10-05 on a scratch home (hookstub adapter, `origin/main` c98d5620):
+1. **Switch to interactive** (`ao mode <id> interactive`) is accepted: the record reads `unattended: false`, `scheduled`. At the instant the tick starts it from the launch record, and the new record comes up `unattended: true`. The person's switch is silently undone, and a policy has started a session the person made interactive. §6 *Start time* refuses exactly that on purpose: `--at` without `--unattended` is refused (invariant 5).
+2. **Kill** (`ao kill <id>`) answers *killed* and leaves the record `exited`, `supervised: true`, `start_at` still set, `restarts: []`. The card shows an exited session that never ran. The restart policy leaves it alone and the scheduled start never takes it (watched for 30 s past the kill, with the instant 30 min out).
+The card's `more ▾` on a scheduled record offers both, beside Start now and Cancel. It also offers Wrap up, Message…, Open shell here and Pop out. `ao send` is refused there already: before a kill the record has no pane, and after one it reads *has exited*.
+
+**Resolved:** 2026-10-05 (PR #1089 the host half, grinder-ao-1; PR #TBD the card, grinder-ao-2) — on a `scheduled` record `rpc_kill` is Cancel, `rpc_set_mode` to interactive and `rpc_suspend` are refused (§6 *Start time*, `tests/test_start_time.py`), and the card's `more ⋯` holds Start now and Cancel alone (§4.5a **starts** note, `card.html`, `tests/test_ui_start.py`; seen on a scratch home, `docs/mockups/reviews/2026-10-05-td328-scheduled-more.png`).
+
+**Done when:** on a scheduled record, `ao mode … interactive` and `ao kill` no longer leave a record the design does not describe (refused, or carried as the design says); the card offers only the scheduled acts; design §6 says so; and the suite passes.
+
+**Related:** TD-152 (the start time, where it was found), TD-026 (the design), §9 invariant 5.
