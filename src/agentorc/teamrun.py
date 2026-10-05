@@ -937,6 +937,13 @@ def add_member(
         out["text"] += " — the team is stopped: its next Start brings the member" if not up else ""
         return out
     plan = teams.plan(org, name, host, files=files_via(call))
+    sits = [n for n in new if n in plan.sit_out]
+    if sits:
+        # §4.9c *Members the flow does not use sit out*: written, not started under the current flow
+        out["text"] += f" — {', '.join(sits)} sits out under {plan.flow}: not started"
+        new = [n for n in new if n not in sits]
+        if not new:
+            return out
     lead = next((s for s in up if s.get("name") == plan.manager_id or s.get("id") == plan.manager_id), None)
     lead_id = str(lead["id"]) if lead else ""
     for x in [m for m in plan.members if m.name in new]:

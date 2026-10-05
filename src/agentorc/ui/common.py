@@ -750,7 +750,9 @@ def team_brief_ids(
     return teams.brief_ids(org, team, host_name(), role, cfg, read=read)
 
 
-def team_reader(team: str, directory: str, cfg: repoconfig.RepoConfig | None = None) -> dict[str, Any]:
+def team_reader(
+    team: str, directory: str, cfg: repoconfig.RepoConfig | None = None, role: str | None = None
+) -> dict[str, Any]:
     """The reader a person's session in `team` gets when its role has none (design §4.9 *A person in
     the team*): `{review, line}` — `teams.team_review` over the member roles resolved in
     `directory`'s repo (`cfg`, when it was read on another host: §4.4a *The New session form on
@@ -763,6 +765,15 @@ def team_reader(team: str, directory: str, cfg: repoconfig.RepoConfig | None = N
         cfg = cfg or repoconfig.discover(directory or os.getcwd())
     except ValueError as e:
         return {"review": None, "line": f"⚠ {e}"}
+    # §4.9c items 2 and 3 (TD-309): under the team's current flow the flow says who reads, and
+    # `flow` tells the caller a role's own `review:` is set aside
+    flowed, review = teams.flow_review(org, t, cfg, role)
+    if flowed:
+        if review is None:
+            return {"review": None, "line": f"no reader: the flow {teams.current_flow(t)} holds nothing", "flow": True}
+        here = host_name()
+        seat = teams.seat_id(org, t, t.host or here, here) or t.techlead.name
+        return {"review": review, "line": f"held PRs read by {seat} on {', '.join(review['held'])}", "flow": True}
     review = teams.team_review(t, teams.team_roles(t, cfg, org.roles))
     if review is None:
         seatless = t.techlead is None

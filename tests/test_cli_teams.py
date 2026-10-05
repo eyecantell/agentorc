@@ -1611,6 +1611,21 @@ def test_members_on_a_stopped_team_edit_the_definition_only(world):
     assert [m.role for m in orgmod.load(path).teams["ao-grind"].members] == ["grinder"]
 
 
+def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_out(world):
+    """§4.5a Members dialog under flows (TD-309 slice 3a review): Add writes a designer while
+    `build-review` is current, and says it sits out rather than starting it."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    started(state)
+    got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="designer")
+    assert got["created"] == [] and "sits out under build-review: not started" in got["text"]
+    assert not creates(state)
+
+
 def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(world):
     tmp_path, state = world
     path = _flow_org(tmp_path)
