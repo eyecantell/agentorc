@@ -854,6 +854,14 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         await agent.rpc_board_reply(board=path, line=7, text=line, reply="thanks", refs=[])
         assert forwarded[-1][1]["refs"] == [] and forwarded[-1][1]["repo"] == repo.name
         assert not [t for t in agent.trail if t["kind"] == "board reply"]
+
+        async def broken(rid, name, params, caller):
+            return {"id": rid, "error": "link dropped"}
+
+        monkeypatch.setattr(agent, "_forward", broken)  # a failed hand with nobody to mail: nothing to say
+        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
+        got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="once more", refs=[])
+        assert got["note"] == "written on the board"
         monkeypatch.setitem(agent.home_link, "up", False)  # down, and nobody to mail: nothing to say
         line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
         got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="again", refs=None)

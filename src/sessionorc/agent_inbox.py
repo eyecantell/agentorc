@@ -465,6 +465,9 @@ class InboxMixin:
         params = {"head": head, "by": by, "reply": reply, "refs": refs, "repo": repo}
         out = await self._forward(0, "board_reply_hand", params, None)
         if "error" in out:
+            if not board_refs(refs):  # nobody to mail: only the trail line was lost (review of #1043)
+                log.info("board reply: the trail line was not written at %s: %s", self.home, out["error"])
+                return [], []
             return [], [f"mail is the home's: {out['error']}"]
         got = out.get("result") or {}
         return list(got.get("sent") or ()), list(got.get("refused") or ())
