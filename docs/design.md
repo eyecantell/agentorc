@@ -3422,7 +3422,7 @@ has no composer to fill.
 message to a session's inbox rather than typing into its pane, and is refused unless the graph
 permits it — the caller's controllers, its members, or a session sharing its team or a controlled
 target. An `ask` to the person takes no `--bound` (TD-069). A message to the person whose first paragraph is long, or which has no paragraph break, sends with a one-line warning (§4.10 *How a message to a person is written*, TD-127). `--outcome` and `--thread` are TD-079;
-`--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093); `--verdict pass|merged|findings` on the reply to one is designed 2026-10-04 and not built (§4.9c *A review stage any seat may hold*, TD-314; TD-315). `--shot <path>` (TD-290; built 2026-10-03, TD-292 slice 2), up to four times, names a screenshot and makes the message a **look**: it rides only on a `steer` or an `ask` to the person, each path must be a `.png` directly under `docs/mockups/reviews/` of the sender's repo, and the envelope carries them as `shots` (§4.10 *A look*); a file in the sender's checkout is sent as its repo-relative path, however it was typed. `ao msg person "…"` addresses the org's person inbox,
+`--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093); `--verdict pass|merged|findings` on the reply to one (designed 2026-10-04, TD-314; built — TD-315 slice 1b) is required of a session's such reply and refused on any other message (§4.9c *A review stage any seat may hold*). `--shot <path>` (TD-290; built 2026-10-03, TD-292 slice 2), up to four times, names a screenshot and makes the message a **look**: it rides only on a `steer` or an `ask` to the person, each path must be a `.png` directly under `docs/mockups/reviews/` of the sender's repo, and the envelope carries them as `shots` (§4.10 *A look*); a file in the sender's checkout is sent as its repo-relative path, however it was typed. `ao msg person "…"` addresses the org's person inbox,
 ungated. **Every `ao msg` reply ends with when each addressee will read it** (§4.10 *When it is read*, TD-158, built by TD-168) — a last line per addressee, `<id>: <sentence>` — the same sentence the composer shows, one per addressee, `read_when` under `--json`; from a session it also says when the addressee's wake budget is spent, since a session's message refills nothing. ungated. `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because
 it is its own. **`ao inbox --thread <id>`** (TD-129; built — TD-136 slice 1) is the person's read of one
 thread whole: the `thread` RPC, person-only, gathers every entry sharing the named entry's `root`
@@ -6274,7 +6274,11 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   against it on my paths, and I did not merge it; `merged` — I am the last reader and merged it;
   `findings` — the text says what, and the author fixes and asks again on the same thread. Such a
   reply without a verdict is refused, naming the three; `--verdict` on any other reply is refused.
-  The one-reader case takes it too, so the Repo page's standing can say what a read came to. **A
+  The one-reader case takes it too, so the Repo page's standing can say what a read came to.
+  **Built** (TD-315 slice 1b): the envelope's `verdict` and `ao msg --verdict`, required of a
+  session's reply and not of the person's, whose word on a PR past its bound is a word, not a
+  verdict (*The bound and the person*, below), nor of the home's own messages; the techlead's
+  stage brief and `td`'s `review.md` say it, ahead of slice 5's words. **A
   `pass` stands for the PR**: commits pushed after it for a later reader's findings do not send
   the PR back, and a later reader that sees its fix reach into an earlier reader's paths says so
   in its findings, which the author then asks of that reader again, on its thread. Judgement, not

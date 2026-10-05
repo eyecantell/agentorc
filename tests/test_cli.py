@@ -1205,6 +1205,27 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
     call_sync("kill", id=worker)
 
 
+def test_msg_verdict_rides_a_readers_reply_to_a_prs_ask(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """§4.9c (TD-315 slice 1): `ao msg --reply-to <id> --verdict merged` carries the word; the home
+    refuses the reply without it, and argparse a word that is none of the three."""
+    w = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="t")["id"]
+    tl = call_sync("create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="t")["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", w)
+    assert cli.main(["--json", "msg", "--kind", "ask", "--pr", "12", tl, "#12 is green"]) == 0
+    asked = json.loads(capsys.readouterr().out)["entry"]["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", tl)
+    assert cli.main(["msg", "--reply-to", asked, "merged #12"]) == 1
+    assert "--verdict" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main(["msg", "--reply-to", asked, "--verdict", "lgtm", "merged #12"])
+    capsys.readouterr()
+    assert cli.main(["--json", "msg", "--reply-to", asked, "--verdict", "merged", "merged #12"]) == 0
+    assert json.loads(capsys.readouterr().out)["entry"]["verdict"] == "merged"
+    monkeypatch.delenv("AGENTORC_SESSION")
+    for sid in (w, tl):
+        call_sync("kill", id=sid)
+
+
 def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-069 step 0 (design §4.10 *What a person is asked*): `ao msg --kind steer --default` sends
     the line the session will go with; `ao msg person --kind ask --bound` is refused and the

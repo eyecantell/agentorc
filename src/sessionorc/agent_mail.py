@@ -29,6 +29,7 @@ from sessionorc.models import (
     MAIL_KINDS,
     PERSON,
     SYSTEM,
+    VERDICTS,
     MailEntry,
     Session,
     Tally,
@@ -89,6 +90,7 @@ class MailMixin:
         source: str | None = None,
         pr: Any = None,
         shots: Any = None,
+        verdict: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -129,6 +131,7 @@ class MailMixin:
                 source,
                 pr,
                 shots,
+                verdict,
             )
         except RpcError as e:
             if key:
@@ -228,6 +231,7 @@ class MailMixin:
         source: str | None = None,
         pr: Any = None,
         shots: Any = None,
+        verdict: Any = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -392,6 +396,21 @@ class MailMixin:
             if text != replied.answers[answer]:
                 raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
             picked = answer
+        # -- a reader's verdict on a PR's ask (§4.9c, TD-315 slice 1): a word, never read from the text ----
+        reads_pr = kind == "reply" and replied is not None and replied.kind == "ask" and replied.pr is not None
+        three = " | ".join(VERDICTS)
+        if verdict is not None:
+            if not reads_pr:
+                raise RpcError(
+                    f"a verdict rides only on a reply to an ask that carries a PR (design §4.9c), not this {kind}"
+                )
+            if verdict not in VERDICTS:
+                raise RpcError(f"a verdict is one of {three}, not {verdict!r} (design §4.9c)")
+        elif reads_pr and sender != PERSON:
+            raise RpcError(
+                f"a reply to PR #{replied.pr}'s ask says what the read came to: --verdict {three} — pass, nothing "
+                "against it and not merged; merged, you merged it; findings, the text says what (design §4.9c)"
+            )
         if not named:
             raise RpcError("a message names its addressees: there is no broadcast (design §4.10)")
         if len(named) > mail.RECIPIENT_CAP:
@@ -564,6 +583,7 @@ class MailMixin:
         entry.answers = list(picks)  # data the sender proposed, on the envelope (§4.10, TD-070)
         entry.answer = picked
         entry.pr = pr
+        entry.verdict = verdict
         entry.shots = looks
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
         if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
