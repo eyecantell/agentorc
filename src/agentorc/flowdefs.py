@@ -284,7 +284,11 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
             out.append({"name": name, "source": "package", "usable": flow.usable, "problems": list(flow.problems)})
     org = org_dir()
     try:
-        org_names = sorted(p.name for p in org.iterdir() if (p / FILE).is_file()) if org.is_dir() else []
+        org_names = (
+            sorted(p.name for p in org.iterdir() if not p.name.startswith(".") and (p / FILE).is_file())
+            if org.is_dir()
+            else []
+        )
     except OSError:
         org_names = []
     for name in org_names:

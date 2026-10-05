@@ -743,8 +743,11 @@ def _record_stage(record: dict[str, Any]) -> tuple[bool, str | None]:
 
 
 def _is_stage(path: Path) -> bool:
-    """A template's `<stem>.stage.md`, or a brief of a flow: the package's or a repo's `.agentorc/flows/`."""
+    """A template's `<stem>.stage.md`, or a brief of a flow: the package's, the org's `~/.agentorc/flows/`
+    or a repo's `.agentorc/flows/`."""
     if path.name.endswith(repoconfig.STAGE_SUFFIX) or path.is_relative_to(flowdefs.PACKAGE_DIR):
+        return True
+    if path.is_relative_to(flowdefs.org_dir()):
         return True
     parts = path.parts
     return any(parts[i : i + 2] == flowdefs.REPO_DIR.parts for i in range(len(parts) - 1))

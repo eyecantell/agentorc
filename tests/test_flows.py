@@ -201,6 +201,10 @@ def test_an_org_flow_cannot_be_followed_by_a_team_on_a_node(tmp_path, monkeypatc
     hunt = flowdefs.load("hunt", cfg_with(tmp_path))
     assert flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind") == []
     why = flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind", node="contractmatch")
+    # and a member started under it reads its stage brief as a flow's, so no *flow changed* is raised
+    from agentorc import teamrun
+
+    assert teamrun._is_stage(d / "find.md")
     assert flowdefs.cannot_follow("hunt", "cm-grind", why) == (
         "hunt cannot be followed by cm-grind: an org flow, and cm-grind runs on contractmatch — define it in "
         "the repo, or drop hunt from flows:"
@@ -399,6 +403,19 @@ def test_an_edit_to_a_stage_brief_is_brief_changed(tmp_path):
     (flow_dir / "build.md").write_text("other build words\n")
     assert brief.changed(was)[0] == [str(flow_dir / "build.md")]
     assert "other build words" in brief.fill(made)[0]
+
+
+def test_a_session_started_into_a_node_team_under_an_org_flow_composes_as_with_no_flow(world, tmp_path):  # noqa: F811
+    # review of TD-313 slice 1: `ao new --team` and the form reach a node's checkout through `read`;
+    # an org flow is not followable there, so `{flow}` reads none rather than a brief from the wrong host
+    d = flowdefs.org_dir() / "hunt"
+    d.mkdir(parents=True)
+    (d / "flow.yml").write_text("stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n")
+    (d / "find.md").write_text("find\n")
+    org = _with(tmp_path, flows=["hunt"])
+    team, cfg = org.teams["ao-grind"], repoconfig.load(tmp_path / "agentorc")
+    assert teams.flow_for(org, team, cfg, "hunter").stage == d / "find.md"
+    assert teams.flow_for(org, team, cfg, "hunter", read=lambda p: None) is None
 
 
 def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_path):  # noqa: F811

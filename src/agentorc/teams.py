@@ -434,6 +434,8 @@ def flow_for(
         return None
     if flow is None or not flow.usable:
         return None
+    if read is not None and flow.place == "org":  # another host's team: an org flow is not followable there
+        return None
     return flowdefs.under(flow, role, techlead=techlead, held=cfg.held or ())
 
 
