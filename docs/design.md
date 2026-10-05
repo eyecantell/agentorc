@@ -3913,10 +3913,9 @@ shorter than a night, the PR opened at once and merged at the bound unless answe
 scope and spending** are an `ask` with two to four suggested answers, and the entry waits. The
 three are the mail kinds the Inbox already draws (§4.5a, §4.10), so the person's part is a press,
 batched by the Inbox and answered whenever they open it; Focus on the member is the live
-conversation when one is wanted. It is a preset since flows (TD-307, §4.9c; not built — TD-309):
+conversation when one is wanted. It is a preset since flows (TD-307, §4.9c; built by TD-309 slice 2):
 the built-in `td` names it, so the package ships `designer.md` with its mechanics and a repo's
-designer brief is its supplement under a flow, and its whole brief in a team with no flow; until then it is a role a repo or `org.yml` defines with its own
-brief; `director` keeps
+designer brief is its supplement under a flow, and its whole brief in a team with no flow; `director` keeps
 its name (its members are managers, and *director > manager > worker* reads as a line). The
 older words — `orchestrator` and `lead` for the manager, `orchestrate` for `control` — resolve to
 nothing: there has been no release and one user, so there is no renamed-roles table, no
@@ -5603,7 +5602,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
 
 ### 4.9c Flows: the path an entry takes through a team
 
-**TD-307; designed 2026-10-04, part built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Built (TD-309 slice 1): the package's three flows and a repo's flow directories read and judged usable (`agentorc.flowdefs`), `kind` on the presets, the top-level `held:`, `flows:` on a team, the slots' kind checks, and a start refused — `ao org check` failing — on a listed flow that is unknown, not usable or cannot be followed. Built (TD-309 slice 2): the three brief layers — every role template carries `{flow}` and `{stage}`, the path words a team with no flow is told ship as `grinder.stage.md` and `techlead.stage.md`, `designer` is a preset with its template (wrapping a designer only under a flow), `flowdefs.under` makes a member's `{flow}` line and stage brief for `Role.compose`, and `brief.fill` fills a pre-build record's new slots from the file beside its template. No client composes under a flow yet: the current flow reaching every compose (slice 2a), the compile, the setting and the switch are not built, so every team reads `none` in `{flow}`. Paul (2026-10-04): *our current example is for a TD, which is
+**TD-307; designed 2026-10-04, part built — TD-309 builds it, TD-313 adds role directories and the org's flows, TD-310 moves the repos onto it.** Built (TD-309 slice 1): the package's three flows and a repo's flow directories read and judged usable (`agentorc.flowdefs`), `kind` on the presets, the top-level `held:`, `flows:` on a team, the slots' kind checks, and a start refused — `ao org check` failing — on a listed flow that is unknown, not usable or cannot be followed. Built (TD-309 slice 2): the three brief layers — every role template carries `{flow}` and `{stage}`, the path words a team with no flow is told ship as `grinder.stage.md` and `techlead.stage.md`, `designer` is a preset with its template (wrapping a designer only under a flow), `flowdefs.under` makes a member's `{flow}` line and stage brief for `Role.compose`, and `brief.fill` fills a pre-build record's new slots from the file beside its template. Built (slice 2a): `ao new --team` and the New session form's Team pick compose under the team's current flow (`teams.brief_ids` with the role and its repo, `teams.flow_for`), the first of `flows:` until the setting is built. A team start does not compose under a flow yet: the compile, the setting and the switch are not built, so a started member reads `none` in `{flow}`. Paul (2026-10-04): *our current example is for a TD, which is
 something like [designer if needed] → [grinder + ui review if needed] → [techlead] → [escalate to me
 if needed], but I believe each repo is currently having to define this separately. It seems
 prudent to have the flow defined once then reused, and to give the ability to create more flows*;

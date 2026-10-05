@@ -812,6 +812,24 @@ def test_start_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_br
     assert slots["{techlead}"] == {"text": "none"} and slots["{manager}"] == {"text": "none"}
 
 
+def test_start_with_a_team_that_lists_flows_composes_under_its_current_flow(world, client):
+    """TD-309 slice 2a (design §4.9c item 5): the form's Team pick hands the role's brief the team's
+    current flow — `{flow}` its line, `{stage}` its stage brief as a file slot."""
+    tmp_path, fleet = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "tl-ao"}
+    doc["teams"]["ao-grind"]["flows"] = ["build-review"]
+    write_org(tmp_path, doc)
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    data = {"name": "grind-9", "dir": str(tmp_path / "agentorc"), "role": "grinder", "team": "ao-grind"}
+    assert client.post("/new", data=data, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    slots = made["prompt_from"]["slots"]
+    assert slots["{stage}"]["file"].endswith("flows/build-review/build.md")
+    assert slots["{flow}"]["text"].startswith("build-review: **build** (grinder) → review (ao-agentorc-tl-ao")
+    assert "**This team's flow:** build-review: **build**" in made["prompt"]
+
+
 def test_start_with_a_role_hands_create_what_its_brief_was_made_from(world, client):
     """TD-217 slice 1 (design §6 rule 7): the form's preset brief goes with `prompt_from`, which filled
     again gives the prompt; a prompt the person typed fills nothing and sends none."""
