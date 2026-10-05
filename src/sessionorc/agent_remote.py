@@ -723,14 +723,14 @@ class RemoteMixin:
                 }
                 payload = json.dumps(item, sort_keys=True)
                 if sent.get(rid) != payload:
-                    out.append((rid, payload, item))
+                    out.append((rid, payload, item, r))
             for rid in [x for x in sent if x not in recs]:
                 del sent[rid]
             if not out:
                 continue
             try:
                 async with asyncio.timeout(agent_common.REPORT_WRITE):
-                    await mux.notify("intent", records=[item for _, _, item in out])
+                    await mux.notify("intent", records=[item for _, _, item, _ in out])
             except link.LinkClosed:
                 continue
             except link.LinkError as e:  # refused here, unreadable there: start the link over (TD-066)
@@ -740,8 +740,11 @@ class RemoteMixin:
             except TimeoutError:
                 mux.close(f"an intent push could not be written within {agent_common.REPORT_WRITE:g} s")
                 continue
-            for rid, payload, _ in out:  # marked as told only once it went
-                sent[rid] = payload
+            for rid, payload, _, r in out:  # marked as told only once it went
+                # and only while the record is the one it was told of: a supersession taken during
+                # the write cleared this id's entry, and must not see it written back (TD-326)
+                if self.remote.get(host, {}).get(rid) is r:
+                    sent[rid] = payload
 
     def _note_build(self, host: str, build: str) -> None:
         """What the node says it runs, kept on its link state — and, for a container node, whether
