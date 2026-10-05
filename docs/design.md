@@ -8321,6 +8321,10 @@ code and needs no grant; a session doing the same work does.
        it stands, so its numbers are the crossing's. A standing balance hold that an earlier bound
        displaces is kept beside it, as `held.balance`, and read as the standing hold once that bound
        lifts, so a reading that fails at that moment does not start a team that was over its line (TD-330).
+       Under `on_work: ask` the rule starts nothing, so it holds nothing back: the mark drops every
+       hold, the balance one with it, and a later `start` reads the line afresh, a failed reading
+       writing no new hold. A person's turn of `on_work` is the person's own start or stop, and is
+       meant to be read so.
        A bound that holds writes **`held: {why}`** on `work_waiting` — `usage` with the `profile`
        and, when the reading has one, the window's `resets`, so the row says when the hold lifts,
        `until` with the instant, `day` with the `count`, `early` with the last start, `balance`
