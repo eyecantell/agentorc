@@ -3408,3 +3408,16 @@ Both go away only when the record says who closed it.
 **Done when:** a session from **Open a session** reads idle with **Send** in its composer until a turn runs, and the composer holds the person's words with the brief readable elsewhere.
 
 **Related:** TD-219 (Add entry), TD-155 (Resume reads idle, never working, within a tick), TD-047 (the composer's Steer).
+
+## TD-114: A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together
+
+**Priority:** High
+**Added:** 2026-09-22 (the anchor session; Paul's question the same evening — *is there a reason all of the boilerplate ao information is kept in each repo vs being kept here?* — and his second: whether a full override should stay)
+**Status:** Done 2026-10-04 — the template holds the mechanics, every repo's brief is a supplement, and agentorc's are cut (see *Resolved*); steps (1) and (2) were done 2026-09-22.
+**Location:** design §4.8, §4.9, §4.7; `src/agentorc/repoconfig.py` (`REPO_PLACEHOLDER`, `brief_text(repo=…)`), `src/agentorc/briefs/*.md` (the slot and the precedence sentence), `src/agentorc/teams.py` (`_launch` passes the `brief:` text as the supplement), `src/agentorc/cli.py` (`ao new --brief`), `src/agentorc/team_skill.md` (what a supplement contains), `docs/briefs/manager-ao-1.md` and `grinder-ao-1.md` (cut to supplements), `tests/test_repoconfig.py`, `tests/test_cli_teams.py`
+
+**Why:** every rule about agentorc in a repo's file is a rule the package cannot update, read by a model that then judges it; the same rule in the template moves with the build and is read the same way by every team on the host.
+
+**Resolved:** 2026-10-04 (PR #1040; the anchor) — the template side is done: every mechanic is in `src/agentorc/briefs/*.md` and a repo's brief fills the *This repo's rules* slot. agentorc's three member briefs (`manager-ao-1`, `grinder-ao-1`, `grinder-ao-2`) are cut to this repo's own rules in this PR; `designer-ao-1` stays whole, since the designer's template wraps it only under a flow (design §4.9c) and its cut is TD-310's, with ao-grind's `flows:` (techlead-ao-1's read), after a Sonnet read of all twelve briefs on the machine against the templates found restated and stale passages (the `loop`-skill bullet in every grinder brief, *the gate is not live*, *this paragraph wins* over text the template no longer has). What is left is each repo's own cut, ledgered there for its team: samscrape TD-452 (ContractMatch/samscrape#1025), dev-cadence TD-085 (eyecantell/dev-cadence#211), contractmatch TD-049 (ContractMatch/contractmatch#121). Design §4.8 *A repo's brief is a supplement, never a replacement*.
+
+**Related:** TD-113 (the recipe and the `{manager}` placeholder), TD-103 (the manager's mechanical rules on the tick), TD-042 (a brief names no run), TD-075 (the techlead's primer as the first supplement), TD-040 (presets and the override this replaces).
