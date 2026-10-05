@@ -2413,7 +2413,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (the designer, TD-108's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 built — PR #TBD (`mail.PERSON_ONLY`, `agent_common.person_only` first in each of the 25, `tests/test_person_only.py`; the refusals' words in one shape, the tests that matched the old words moved). **Left:** slice 2, the passengers.
+**Status:** Slice 1 built — PR #1049 (`mail.PERSON_ONLY`, `agent_common.person_only` first in each of the 25, `tests/test_person_only.py`; the refusals' words in one shape, the tests that matched the old words moved). **Left:** slice 2, the passengers.
 **Location:** `src/sessionorc/mail.py` (`PERSON_ONLY`, beside `is_person` and `ACTING_RPCS`), `src/sessionorc/agent_common.py` (the check), `agent_identity.py`, `agent_inbox.py` (`_person_entry`), `agent_mail.py`, `agent_promote.py` (`_promote_person`), `agent_link.py`, `agent_wake.py`, `agent.py`, `tests/`; design §4.8 *A person's own act is a named RPC, and the gate is one list*. Held path (`src/sessionorc/**`): the techlead reads each slice.
 
 **Why:** TD-108's design. The 25 person-only RPCs are gated by 18 `is_person` checks written into the RPCs and two helpers (`_person_entry` for five, `_promote_person` for two), and nothing says which RPCs they are: a new one that forgets its check is found by a review or not at all. And `agent_wake.py` (999 lines) still holds what followed the wake section in the old file — the hook's entry, the settings RPCs, the small reads — so its name says a quarter of what is in it.
