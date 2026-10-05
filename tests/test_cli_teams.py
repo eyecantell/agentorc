@@ -1617,6 +1617,7 @@ def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_
     tmp_path, state = world
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
     (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
     started(state)
