@@ -37,6 +37,16 @@ from sessionorc.models import (
 BOARD_HEAD_CHARS = 200
 
 
+def reply_note(sent: list[dict[str, str]], refused: list[str]) -> str:
+    """A board Reply's result in words (§4.5a *Inbox board row → Reply*), which the trail says too."""
+    note = "written on the board"
+    if sent:
+        note += " · sent to " + ", ".join(f"{x['session']} (holds {x['ref']})" for x in sent)
+    if refused:
+        note += " · not sent to " + "; ".join(refused)
+    return note
+
+
 def board_refs(refs: list[str] | None) -> list[str]:
     """The board reader's `refs` as a lease names them (§4.8): `TD-122` canonical, and the reader's
     `PR #1020` the `#1020` a claim on a PR number is. In order, each once; an unreadable one dropped."""
@@ -424,14 +434,9 @@ class InboxMixin:
         h = board_mod.HEAD_RE.search(text)
         head = " ".join((h.group("head") if h else text).split())
         by = await asyncio.to_thread(board_mod.author, root)
-        sent, refused = await self._board_reply_mail(head, by, reply, refs)
-        note = "written on the board"
-        if sent:
-            note += " · sent to " + ", ".join(f"{x['session']} (holds {x['ref']})" for x in sent)
-        if refused:
-            note += " · not sent to " + "; ".join(refused)
-        if self.mode == "home":  # the trail is the home's, beside the person inbox (§4.10)
-            self._trail_reply(root.name, head, by, reply, note)  # it says what the result says
+        # the mail half and the trail line are the home's, served there with the same words
+        sent, refused = await self._board_reply_mail(head, by, reply, refs, root.name)
+        note = reply_note(sent, refused)
         return {
             "board": str(want),
             "line": int(line),
@@ -443,34 +448,43 @@ class InboxMixin:
         }
 
     async def _board_reply_mail(
-        self, head: str, by: str, reply: str, refs: list[str] | None
+        self, head: str, by: str, reply: str, refs: list[str] | None, repo: str
     ) -> tuple[list[dict[str, str]], list[str]]:
-        """The mail half where it is served (§4.4a): the mailbox, the lease records and the
-        `handed` mark are the home's, so a node that wrote the board hands this half to the home
-        as `board_reply_hand`, and mails nobody while the link is down, saying so. The file half
+        """The mail half where it is served (§4.4a): the mailbox, the lease records, the `handed`
+        mark and the trail are the home's, so a node that wrote the board hands this half to the
+        home as `board_reply_hand` — with no refs too, for the trail line (§4.5a) — and mails
+        nobody while the link is down, saying so when there was someone to mail. The file half
         stays where the repos registry holds the repo (§4.4)."""
-        if not board_refs(refs):
-            return [], []
         if self.mode == "home":
-            got = await self.rpc_board_reply_hand(head=head, by=by, reply=reply, refs=refs)
+            got = await self.rpc_board_reply_hand(head=head, by=by, reply=reply, refs=refs, repo=repo)
             return got["sent"], got["refused"]
         if not self.home_reachable():
+            if not board_refs(refs):
+                return [], []
             return [], [f"mail is the home's: {self.home} (home) is unreachable from {self.host}"]
-        out = await self._forward(0, "board_reply_hand", {"head": head, "by": by, "reply": reply, "refs": refs}, None)
+        params = {"head": head, "by": by, "reply": reply, "refs": refs, "repo": repo}
+        out = await self._forward(0, "board_reply_hand", params, None)
         if "error" in out:
             return [], [f"mail is the home's: {out['error']}"]
         got = out.get("result") or {}
         return list(got.get("sent") or ()), list(got.get("refused") or ())
 
     async def rpc_board_reply_hand(
-        self, head: str = "", by: str = "", reply: str = "", refs: list[str] | None = None, caller: Any = None
+        self,
+        head: str = "",
+        by: str = "",
+        reply: str = "",
+        refs: list[str] | None = None,
+        repo: str = "",
+        caller: Any = None,
     ) -> dict[str, Any]:
         """A board reply's mail half (§4.5a *Inbox board row → Reply*, TD-142 slice 2), served at
         the home (`modes.HOME_EDITS`): one `note` from the person, `about` the ref and marked
         `handed`, to each live lease holder on the line's `refs` — a holder of two refs mailed
         once, about the first. The person's alone, as `board_reply` is; `board_reply` calls it
         after its commit, a node's over the link. Returns `{sent: [{session, id, ref}], refused:
-        ["<name> (holds <ref>): <why>"]}`, a refused send said, never raised."""
+        ["<name> (holds <ref>): <why>"]}`, a refused send said, never raised. With `repo` (the
+        board's checkout's name) it also writes the trail line, in the result's words (`reply_note`)."""
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot reply on the board: a board reply is the person's own (design §4.4)")
         head = " ".join(str(head or "").split())
@@ -503,6 +517,8 @@ class InboxMixin:
                 sent.append({"session": (r.name if r is not None else "") or name, "id": to, "ref": ref})
         if sent:
             await self._push_changes()
+        if repo:
+            self._trail_reply(repo, head, by, words, reply_note(sent, refused))
         return {"sent": sent, "refused": refused}
 
     async def _board_add(

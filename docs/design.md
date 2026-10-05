@@ -1589,7 +1589,7 @@ nodes:
   container is touched each asks the home for the node's records that are not `exited` or
   `closed`, and with any it refuses, exits non-zero and names them by team, the container left as
   it was. With none it goes on as above. Two ways on: `--wind-down` runs `ao team stop` for each
-  team with a session there (the wrap-up prompt and its wait, §4.9a), closes each session on the
+  team with a session there (the wrap-up prompt and its wait, §4.9a; each wait `--timeout`, 300 s), closes each session on the
   node that then settled clean and pushed, and goes on once the node holds no live record — it
   refuses before sending anything when a session there carries no team or is a person's, and
   refuses after, naming them, when one is left open; `--force` is the old behaviour said aloud,
@@ -6930,7 +6930,8 @@ follow, and they bind every row kind, mail and state alike:
    the home knows its own `decide`s, so who answered is always known). `text` is cleaned and capped as
    a `doing` line is. One entry is not a record's ending: a board **Reply** (§4.5a *Inbox board row →
    Reply*) writes one of kind *board reply*, no record, the repo for its name, `how` the press's result,
-   never coalesced. FYI lists the trail; **Dismiss** removes an entry early; a row offers
+   never coalesced — at the home, where a node that served the Reply hands it with the mail half
+   (`board_reply_hand`), with no holder to mail as well. FYI lists the trail; **Dismiss** removes an entry early; a row offers
    **Open** only while the record it names still exists — after a resume the trail names the record
    that ended, and says *resumed*. **Bounded like the identity alarms (§4.8a):** a repeat of the
    same `{id, kind, how}` inside the retention window is one entry with a `count` and its first and
