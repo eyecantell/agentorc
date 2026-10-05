@@ -72,26 +72,18 @@ def parse_open_in(raw: object) -> OpenIn:
 
 
 WHERE = "settings.yml person.open_in"
-_read: dict[str, Any] = {"person": {}, "migrate": [], "teams": {}}  # the last `settings` answer's parts
+_read: dict[str, Any] = {"person": {}, "migrate": []}  # the last `settings` answer's two parts
 
 
 def set_read(answer: dict[str, Any] | None) -> None:
-    """Keep the agent's `settings` answer (design §5): its `person`, its `migrate` lines and its
-    `teams` (the flow each runs, §4.9c). None — the agent down, or too old to answer — keeps the last
-    one, so a blip never flips the button."""
+    """Keep the agent's `settings` answer (design §5): its `person` and its `migrate` lines. None —
+    the agent down, or too old to answer — keeps the last one, so a blip never flips the button."""
     if not isinstance(answer, dict):
         return
     person = answer.get("person")
     migrate = answer.get("migrate")
-    teams = answer.get("teams")
     _read["person"] = dict(person) if isinstance(person, dict) else {}
     _read["migrate"] = [str(m) for m in migrate] if isinstance(migrate, list) else []
-    _read["teams"] = dict(teams) if isinstance(teams, dict) else {}
-
-
-def teams() -> dict[str, Any]:
-    """The home's `teams:` settings as last read (§5): what `orgmod.with_settings` puts on the org."""
-    return _read["teams"]
 
 
 def open_in() -> OpenIn:

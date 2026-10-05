@@ -50,6 +50,7 @@ import yaml
 
 from agentorc import repoconfig
 from sessionorc import hosts, paths
+from sessionorc import settings as settings_mod
 from sessionorc.models import GRANTS
 
 DEFAULT_MANAGER_ROLE = "manager"
@@ -535,6 +536,13 @@ def with_settings(org: Org, teams: Mapping[str, Any] | None) -> Org:
     out = copy.copy(org)
     out.teams = {n: dataclasses.replace(t, flow=picked[n]) if n in picked else t for n, t in org.teams.items()}
     return out
+
+
+def with_home_settings(org: Org) -> Org:
+    """`with_settings` from the home's own `settings.yml`, read here: a client that reads the org runs
+    on the home (a node reads no org, §4.4a), and the agent's `settings` read is a person's own — so a
+    session's `ao new --team` or a lead's start would otherwise compile a flow the person did not pick."""
+    return with_settings(org, settings_mod.teams(settings_mod.load()))
 
 
 # ── parsing ───────────────────────────────────────────────────────────────────────────────────

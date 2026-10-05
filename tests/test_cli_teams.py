@@ -81,11 +81,10 @@ def world(tmp_path, monkeypatch):
             return state["host"]
         if method == "repos":  # the home's repo readings, with the balance marks (§6 *Balance*)
             return state.get("repos", {})
-        if method == "settings":  # the home's `teams:` (§5), whose `flow` picks a team's flow (§4.9c)
-            return {"teams": state.get("teams", {})}
-        if method == "set_settings":
+        if method == "set_settings":  # `ao team flow` (§4.9c): written as the home writes `settings.yml`
             for n, f in params["teams"].items():
                 state.setdefault("teams", {}).setdefault(n, {}).update(f)
+            (tmp_path / "home" / "settings.yml").write_text(yaml.safe_dump({"teams": state["teams"]}))
             return {"teams": state["teams"]}
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
@@ -391,8 +390,7 @@ def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
     assert [p for m, p in calls if m == "host_dir"] == [{"host": "devenv", "dir": checkout}]  # once per checkout
     assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
     assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
-    # the lane reading's, before (TD-265), and the org's read of the flow setting (§4.9c)
-    order = [m for m, _ in calls if m not in ("repos", "host_files", "settings")]
+    order = [m for m, _ in calls if m not in ("repos", "host_files")]  # the lane reading's, before (TD-265)
     assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
 
 
@@ -1633,6 +1631,21 @@ def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_
     assert not creates(state)
 
 
+def test_a_live_add_reads_the_flow_the_person_picked(world):
+    """§4.9c *the person picks one*: with `td` first and `build-review` picked in the home's
+    `settings.yml`, Add sits a designer out as it does where `build-review` is first (review of #1066)."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {flow: build-review}}\n")
+    started(state)
+    got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="designer")
+    assert got["created"] == [] and "sits out under build-review: not started" in got["text"]
+
+
 def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(world):
     tmp_path, state = world
     path = _flow_org(tmp_path)
@@ -1848,8 +1861,6 @@ def _td_world(world, monkeypatch, *, seat=True):
     handed = []
 
     def fake(method, **params):
-        if method == "settings":  # the org's read of each team's flow (§4.9c): none picked
-            return {"teams": {}}
         assert method == "entry_add", method
         handed.append(params)
         if not params["teams"]:

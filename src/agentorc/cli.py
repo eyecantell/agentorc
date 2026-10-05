@@ -754,11 +754,7 @@ def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
             "(design §4.4a: decided, not built)"
         )
     org, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
-    # the flow each team runs now is the home's setting (§4.9c, `teams.<team>.flow`); an agent that is
-    # down or too old to answer leaves every team on the first of its `flows:`
-    with contextlib.suppress(AgentError, AgentUnavailable):
-        org = orgmod.with_settings(org, call_sync("settings").get("teams"))
-    return org, notes
+    return orgmod.with_home_settings(org), notes  # the flow each team runs now (§4.9c, `teams.<team>.flow`)
 
 
 def _org_here() -> orgmod.Org:

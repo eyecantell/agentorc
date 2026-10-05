@@ -482,7 +482,7 @@ def test_the_person_picks_a_listed_flow_and_an_unlisted_pick_reads_as_the_first(
     assert orgmod.with_settings(org, {"ao-grind": {"on_work": "ask"}}) is org  # no pick: the org as read
 
 
-def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsys):  # noqa: F811
+def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     """`ao team flow <team> [<flow>]` (design §4.7): the flows, the current marked, each strip and why
     one cannot be followed; a pick of a listed flow is written through `set_settings`, any other refused."""
     from agentorc import cli
@@ -509,6 +509,10 @@ def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsy
     assert got["flow"] == "build-review" and [r["current"] for r in got["flows"]] == [False, False, True]
     assert cli.main(["team", "flow", "ao-grind"]) == 0  # read back from the home's setting
     assert capsys.readouterr().out.splitlines()[-1].startswith("* build-review ")
+    # a session's `ao` reads the pick as the person's does: the file, not the person-only `settings` read
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-grinder-ao-1")
+    assert teams.current_flow(cli._org_here().teams["ao-grind"]) == "build-review"
+    monkeypatch.delenv("AGENTORC_SESSION")
     del doc["teams"]["ao-grind"]["flows"]
     _write(tmp_path, doc)
     assert cli.main(["team", "flow", "ao-grind"]) != 0
