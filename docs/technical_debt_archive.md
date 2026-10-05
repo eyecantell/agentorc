@@ -4466,3 +4466,98 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** `j` then `r` opens Reply on that row, and a find of two words shows both marked.
 
 **Related:** TD-124 (the keys), TD-135 (the find), TD-279 (the row's text, where the marks land).
+
+## TD-154: Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-25 (raised by Paul: he resumed the designer to read what it had done)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-09-25 (the designer): design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript**, the *Transcript* row and the Resumable **Resume** row, §4.3 `read_transcript`, §4.4a *Reads of a pane, and of a transcript*, §4.7 *Transcript*, the glossary's *transcript*, mockup `Transcript.dc.html` (the Focus artboards gain the button). Settled: (a) a folded read-only page, VS Code beside it for the raw file — the raw file alone is not a reading surface; (b) `ao transcript <id> [-n N] [--before OFFSET] [--raw]`; (c) the record's own `adapter_id` / `dir` / `adapter` / `profile` locate it, so a superseded `closed` record still reads its own run, and a row with no record passes the tool session id and directory instead; (d) served on the record's host, a node's through `read` (`NODE_READS` gains `transcript`), never copied. The build is TD-165 and TD-166; this entry archives with them. The design is PR #558; the page-against-raw-file choice went to Paul as a steer (the shape is his to prefer), and #558 merges at its bound (12 h from 2026-09-25 18:50 MDT) unless he says otherwise — the next designer run merges it if this one has ended. **Next:** designed; the build is TD-165 (the adapter's read, the RPC, the node read, the CLI) and TD-166 (the page and the button).
+**Blocked by:** TD-166
+
+**Location:** design §4.5a (*Focus (exited / closed)*, *Resumable*, the Focus header), §4.3 (`transcript_path` on the adapter contract — Claude Code's answer is the JSONL under `~/.claude/projects/`, already read for the model and the resume id), `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`), `src/agentorc/ui/` (a page or panel), `src/agentorc/cli.py` (`ao transcript <id>`).
+
+**Why:** the only way a person can read what a finished session did is to resume it, which is the wrong tool three times over: it creates a live session and a record (and today leaves the record reading `working`, TD-155), it is a lifecycle event a manager may act on, and it has to be closed again. Resuming a Claude Code session spends no tokens until a prompt is sent, so the cost is not money; it is a live thing the person did not want. The transcript is a file on the host that the adapter already locates; a read of it is a read, gated by nobody (§9 invariant 11). The raw file is one JSON object per line, so *open in VS Code* on the file alone (the §2 jump-out, `vscode://file/<path>`) is not a reading surface — it is the escape hatch beside one.
+
+**What the design round has to settle:** (a) **the surface** — a read-only **Transcript** page in the UI (turns folded: prompt, assistant text, tool calls collapsed to their first line, the way the pane shows them) reached from the Focus header on any state and from each Resumable row, with *open in VS Code* beside it for the raw file; or the raw file only; (b) **`ao transcript <id> [--raw] [-n N]`**, the same rendering on the CLI, which is what a lead reading a quiet worker (TD-091's moment) would use; (c) **which record** — an exited record holds `adapter_id`; a `closed` and a superseded one (Resume replaces in place, TD-081) should still reach the transcript they came from; (d) **the multi-host case** — the file is on the record's host, read through the node as `tail` is (§4.4a), never copied to the home; (e) the mockup.
+
+**Done when** Paul can read the designer's last run from its exited card without a session starting, and `ao transcript designer-ao-1` prints it.
+
+**Resolved:** 2026-10-05 (designed 2026-09-25, PR #558; built by TD-165 — live check 2026-10-04: `ao transcript` reads a closed record without starting it, a node's through the link — and TD-166, PR #707; TD-166's live look closed 2026-10-03 (PR #971) and was archived in PR #1087: the page's turns, VS Code on the raw file, no session started. *earlier turns*, offered on no live record at the look, is TD-297's to read) — design §4.5 screen 9 *Transcript*, §4.5a *Focus header* **Transcript**, §4.3 `read_transcript`, §4.7 *Transcript*.
+
+**Related:** TD-081 (Resume, what this is not), TD-145 (a Resume's record), TD-155 (why a resume misleads today), TD-091 (context near its limit: the other reader of the transcript), §4.5a *Resumable*, §4.3 `transcript_path`.
+
+## TD-262: A card says *closed by you* for every closed session, whoever closed it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, for Paul: *I restarted the dc team but it says it was closed by me*)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-265
+**Status:** **Designed 2026-10-01** (the designer, PR #895; the steer to Paul on the Start's empty-lane warning is `m-4799b48b919b`, bound 2026-10-02 05:39 MDT). Design: §4.4 (the record's `closer`, read from the call's envelope or the tick's rule, carried to a node), §4.5 *The card's anatomy* row 5 (b) (the words: *closed by you*, *closed by <session>*, *closed itself*, *closed by the tick · <why>*, *closed*; the declaration kept after the ending), §4.5a **doing** row, *wound down* note (who, *after 40 s*, the manager's reason), the team card's **Start** (what the lanes hold; empty lanes open a confirm with **Start anyway** and **Cancel** — Paul's reply of 2026-10-01 to the steer, over the default that warned and started and the refusal a flag gets past; `ao team start --anyway`), §4.7 (`ao status -v`), §4.9a (*The manager runs the stop itself*). The build is TD-265.
+**Location:** `src/agentorc/ui/cards.py` (the slot: `state == "closed"` → *closed by you*, and its hover *closed by you at …*), `src/sessionorc/agent.py` (`rpc_close`: writes `closed_at` and clears `closed_for`, and takes no caller), design §4.5 *The card's anatomy* row 5 (b) and §4.5a's **doing** row (the ending *closed by you*), the team stop that closes members (`ao team stop --close`)
+
+**Why:** Paul started dc-grind on 2026-10-01 at 22:05:19Z. Forty seconds later `manager-dc-1` ran `ao team stop dc-grind --close --timeout 90`, because `grinder-dc-1` had found nothing pickable on dev-cadence's ledger, and the two members closed at 22:05:59Z and the manager, by its own `ao close`, at 22:06:00Z (its run log, `~/.agentorc/runs/ao-dev-cadence-manager-dc-1-20261001T220519Z.log`). Every card then read *closed by you*, so the page told the person he had closed a team he had just started, and nothing on it said the manager had, or why. The slot's text is fixed for the state: `rpc_close` records when and not who, the same RPC serves a person's Close, a manager's `ao team stop --close` and the tick's close, and only some of the tick's closes leave a mark of their own (`closed_for`: a restart under rule 2 or 7, rule 9's manager), so its other closes read *closed by you* as well.
+
+**Fix:** design first. (1) **The record names the closer**: the close RPC takes who asked — the person (the UI, or `ao` outside a session), a session by name (`ao` inside one, as `ao msg` knows its sender), or the tick with its rule — and a team stop hands its caller to each member's close; a manager's own `ao close` after the stop names itself. (2) **The slot says it**: *closed by you*, *closed by manager-dc-1*, *closed by the tick*, with the time in the hover; a record with no closer (every one written before this) reads *closed*. (3) **A team stopped by its own manager says why where the person looks**: the reason it gave (`ao progress none --why …`, or the wind-down report) on the team card or the manager's slot, so a start that ends in under a minute explains itself; decide whether a start of a team with nothing pickable should say so before it starts anything (§6 rule 8 already reads the lanes for a wound-down team). The design PR words §4.5 row 5 (b) and §4.5a's **doing** row, and files the build entry.
+
+**Done when:** the design names the closer field and the slot's words, and a build entry exists; built, a team closed by its manager reads *closed by <manager>* on each card and a person's Close reads *closed by you*.
+
+**Resolved:** 2026-10-05 (designed 2026-10-01, PR #895; built by TD-265, PRs #919, #922, #923 and #926; its live look closed 2026-10-03 (PR #971) and it was archived in PR #1087: *closed by the tick · team finished* seen. The other closers' words and the Start's *Nothing to pick* are TD-297's to read) — design §4.4 (the record's `closer`), §4.5 *The card's anatomy* row 5 (b), §4.5a the team card's **Start**, §4.7.
+
+**Related:** TD-241 (the card's *by the tick* on a wound-down team), TD-256 (rule 9 announces a team whose last member a person closed — it reads the same missing fact), TD-259 (the manager on call, whose first look is on dc-grind), TD-095 (the card's anatomy), TD-156 (an unattended member is closed by its team).
+
+## TD-269: The New session form's Team pick ticks no controller when the team's manager is on call
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-01 (the anchor, from Paul's walk of the Org: TD-173's live look — after picking **Team: ao-grind** and a directory, Controllers still read *No session holds the control grant yet, so nothing could act on this one…*)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-276
+**Status:** **Designed 2026-10-02** (the designer, PR #911; obvious from §6 rule 3 — a seat's grant and id survive its close, a fill supersedes it at the same id — so landed with a note to Paul). Design: §4.5a New session **Controllers** picker (a seat on call holding `control` is a candidate beside the live holders, drawn *manager-ao-1 · on call*, the recorded controller its id; the empty note's new words name a team start) and **Team** picker (ticks the manager live or on call), §4.9 *A person in the team*, §4.7 *A person in the team* (`ao new --team`), §6 rule 3 (the cross-reference). Settled: a person's session in such a team has a controller from the start — the seat — and the manager that fills it holds the session without any later grant; no new field, no new RPC. The build is TD-276.
+**Location:** `src/agentorc/ui/app.py` (the New session page: `control_holders` are sessions holding `control` whose state is not `closed` or `exited`), `src/agentorc/ui/templates/new.html` (the Controllers picker and its empty note), design §4.5a New session **Team** and **Controllers**, §6 rule 3 *A manager on call is a seat of this rule* (TD-259)
+
+**Why:** TD-173 built: pick a team and its manager is ticked under Controllers, so a person's own session in a team is the manager's to stop and steer. Since TD-259 every manager is on call by default — closed until something fills its seat — and the picker lists live holders only, so on a team started today the list is empty and the form says no session holds the grant. A person's session joined that way has no controller, and the manager that fills its seat later does not gain it.
+
+**Fix:** design first. Say what the Controllers picker shows for a team whose manager is a seat on call: the seat by name (*manager-ao-1 · on call*), ticked, with the controller recorded by the name the seat fills under, so the manager that comes holds the session — or say that a person's own session in such a team has no controller and what the form tells the person. The empty note's words change either way: today's tell the person to grant control from a Focus header, which is not what is missing.
+
+**Done when:** the design says which, the form says it, and a session started from the form in a team with an on-call manager is controlled as the design says once the seat fills.
+
+**Resolved:** 2026-10-05 (designed 2026-10-02, PR #911; built by TD-276, PR #914; its live look closed 2026-10-03 (PR #971) and it was archived in PR #1087: the on-call pill and the note seen. The Team pick that left the manager unticked on another repo's form was TD-296 (8), fixed) — design §4.5a New session **Controllers** and **Team** pickers, §4.9 *A person in the team*, §6 rule 3.
+
+**Related:** TD-173 (the Team field), TD-259 (the manager on call), TD-160 (a person's own session inside a team), TD-097 (a seat's card).
+
+## TD-277: The New session form asks for its fields in the order the code grew them — rework it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-02 (the anchor, from Paul's notes on the New session page: *Looks like we need to rework the new session screen … The idea is half-baked, lets bake it*)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-284
+**Status:** **Designed 2026-10-02** (the designer, PR #934; Paul's look at the mockup asked as `m-aa25175efd5e`; Paul, 2026-10-02: *Go with the form as drawn*). Design: §4.5 screen 3 *The form reworked as one thing*, §4.5a New session **the reworked form** (one row) and the Unattended switch row's retirement; mockup `NewSessionReworked.dc.html` beside the shipped `NewSession.dc.html`, shot as `docs/mockups/reviews/2026-10-02-td277-new-session-before.png` and `-after.png`. Settled, by Paul's nine notes: (1) Host is a pick when more than one is defined, and adding one is a `nodes:` entry written in `hosts.yml` (`ao host up` brings a container node up, it writes none), the file named on the form with Open file; (2) a project is added in `org.yml`, named the same way; (3) the Directory field is asked only under Repo's *another directory…*, and a typed path is checked; (4) the Adapter field goes — Profile is the one tool pick, *shell* closing its list; (5) no fixed warning block, an occupied checkout is a greyed choice with its reason, ⚠ only when Start is disabled; (6) Name is first; (7) Profile says *tool · account · model* and names `profiles.yml`; (8) worktree-first: a new worktree named as the session, the existing ones nobody is in as chips, the checkout itself second; (9) one Role pick beginning with *Interactive*, a role presumed unattended, *run it under me instead* for a person's own session in a team, At and Until under an unattended pick only. No editor for hosts, projects or profiles is designed: a file and Open file each. The build is TD-284.
+**Location:** `src/agentorc/ui/templates/new.html` (the form), `src/agentorc/ui/static/app.js` (`AO.newSession`: the occupancy note, the Project and Team narrowing, the Role refresh), `src/agentorc/ui/app.py` (the page's context), design §4.5a *New session*, §4.2a *Profiles*, §4.9 *Project* and *Team*, §6 *Start time* and *Until*, §9 invariant 2
+
+**Why:** each field was added by its own TD (Project by §4.9, Team by TD-173, Role and Grants by §4.8, Until by TD-026, At by TD-152, Controllers by TD-036), so the form reads as the code grew rather than as a person starts a session. Paul's notes, with what the code says today:
+
+1. **Host** is fixed text: the local host's name. `hosts.yml` defines a node (contractmatch's container) the form never offers, and nothing on the page adds a host (`hosts.yml` by hand, `ao host up`). Should it be a pick when more than one host is defined, and does adding one belong here?
+2. **Project** comes from `org.yml`'s `projects:`, hand-edited; no page adds one. A project already holds more than one repo, each with a checkout per host, so project and repo are independent; today every project has one. How is a project added, and from where?
+3. **Directory** is asked even when **Where** is *New worktree*, where it only names the repo; nothing checks that a typed path exists.
+4. **Adapter** is code (`agentorc/adapters/claude_code/`, `sessionorc/adapters.py`'s shell), not configuration, so a new one is a build. Every profile in `profiles.yml` already names its adapter, so the form asks twice and the two can disagree.
+5. **The two warnings.** The occupancy note (*⚠ in use by … a new worktree is selected instead*) reads as an error for what the form already fixed, and the fixed *⚠ One agent session per directory …* block shows on every visit. Draw each only when it applies, and in words that are not an alarm when nothing is wrong.
+6. **Name** sits fifth; it belongs first or second, beside Host.
+7. **Profile** picks the tool, account and model the session starts with (`profiles.yml`: `default`, `grind` on Opus, `grind-sonnet`, `grind-fable`); the form does not say so, and nothing on the page creates one.
+8. **Team, repo, worktree and directory are coupled.** A directory should be inside the picked project's repos; a team should bring its repo and its checkouts; a directory pick and a worktree pick exclude each other. Paul's half-baked idea, to bake: assume a worktree; list the existing ones nobody is in; the worktree's name is the session's name; a typed name is a new worktree, or the existing one of that name. *This directory* stays for a shell and for a directory outside any repo.
+9. **Until** and **At** apply to an unattended session only and show for every one. Paul's proposal: one pick between *Interactive* and each unattended role defined, a role presumed unattended, which also retires the Unattended checkbox; Until and At show once an unattended pick is made. The design says whether any role is ever wanted interactive (the techlead seat, a person's own session in a team, §4.9 *A person in the team*) and, if so, how the form says it.
+
+**Fix:** design first. Settle the form as one thing: the field order (Name and Host first); Host as a pick when more than one is defined; one place for the tool (Profile, Adapter derived or dropped); the worktree-first shape of item 8, with Project and Team narrowing it; the Interactive / role pick of item 9 with Until and At under it; the two warnings drawn only when they apply; where adding a host, a project and a profile lives (here, the Org page, the Settings page, or a file named on the form). Draw it as a mockup (`docs/mockups/gen.py`) for Paul's review, then name the build entries.
+
+**Done when:** §4.5a's New session rows describe the reworked form, Paul has looked at the mockup, and the build entries are on the ledger with a `Blocked by:` line.
+
+**Resolved:** 2026-10-05 (designed 2026-10-02, PR #934, on Paul's *Go with the form as drawn*; built by TD-284, PRs #945, #948, #949, #950, #951, #952 and #953; its live look closed 2026-10-03 (PR #971) and it was archived in PR #1087: the order, all four kinds, *Resume with changes…* and At / Until seen) — design §4.5 screen 3 *New session*, §4.5a New session **the form**.
+
+**Related:** TD-269 and TD-276 (the Team pick and a seat on call as controller: the same form), TD-173 (the Team field), TD-152 and TD-026 (At and Until), TD-036 (Controllers), TD-081 (Resume lands on this form filled in), TD-160 (a person's own session inside a team).
