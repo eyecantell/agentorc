@@ -1593,7 +1593,7 @@ nodes:
   node that then settled clean and pushed, and goes on once the node holds no live record — it
   refuses before sending anything when a session there carries no team or is a person's, and
   refuses after, naming them, when one is left open; `--force` is the old behaviour said aloud,
-  printing the sessions it ended. A home it cannot reach is a refusal too, since the check cannot
+  printing the sessions it ended; the two are one or the other. A home it cannot reach is a refusal too, since the check cannot
   be made; `--force` still goes on. `ao host up` needs neither: it reuses the container. `volatile: true`
   is right for one the person stops: the supervisor then never starts the container itself — a
   stopped, paused or gone one is *left as the person left it* on the card — and still starts the

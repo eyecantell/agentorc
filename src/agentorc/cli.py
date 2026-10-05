@@ -2650,9 +2650,13 @@ def _clear_node(args: argparse.Namespace) -> tuple[list[dict[str, Any]] | None, 
     # session on the node, then close each that settled with nothing to lose
     ids = [s["id"] for s in containers.live_on_node(call_sync("list"), name)]
     teamrun.wait_settled(call_sync, ids, args.timeout)
+    closed = []
     for s in containers.live_on_node(call_sync("list"), name):
         if s["state"] in teamrun.SETTLED and not work_left(s.get("git")):
             call_sync("close", id=s["id"])
+            closed.append(s["id"])
+    if closed:
+        print(f"{name}: wound down and closed: {', '.join(closed)}", file=sys.stderr)
     left = containers.live_on_node(call_sync("list"), name)
     if left:
         msg = (
@@ -3200,15 +3204,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["up", "rebuild", "forget", "status"])
     p.add_argument("name", help="the `nodes:` entry in hosts.yml with a `container:` block")
     p.add_argument("--purge", action="store_true", help="forget: also delete the node's volume (its run logs)")
-    p.add_argument(
+    ends = p.add_mutually_exclusive_group()
+    ends.add_argument(
         "--wind-down",
         action="store_true",
         help="rebuild/forget: stop each team with a session on the node first, then go on once none is live",
     )
-    p.add_argument(
+    ends.add_argument(
         "--force", action="store_true", help="rebuild/forget: end the node's live sessions as they are, and say which"
     )
-    p.add_argument("--timeout", type=float, default=300.0, help="--wind-down: seconds to wait for them (default: 300)")
+    p.add_argument(
+        "--timeout",
+        type=float,
+        default=300.0,
+        help="--wind-down: seconds each wait for them may take — per team, then once for the node (default: 300)",
+    )
     p.set_defaults(fn=cmd_host)
 
     p = add("pr", help="whether a PR waits for this session's reader (design §4.9b *The reader*)")

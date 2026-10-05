@@ -150,3 +150,9 @@ def test_wind_down_refuses_before_sending_anything_for_a_session_no_team_stops(w
     assert run("rebuild", "cm", "--wind-down") == 1
     assert stops == [] and world["touched"] == []
     assert stray["id"] in json.loads(capsys.readouterr().out)["sessions"]
+
+
+def test_wind_down_and_force_are_one_or_the_other(world):
+    with pytest.raises(SystemExit):
+        run("rebuild", "cm", "--wind-down", "--force")
+    assert world["touched"] == []
