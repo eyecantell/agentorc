@@ -7060,7 +7060,8 @@ follow, and they bind every row kind, mail and state alike:
 4. **An answer is followed to its outcome.** Below.
 
 **Told on Telegram when nobody is looking (TD-092; Paul, 2026-10-04: *we use telegram elsewhere,
-make sense to keep using it here*; designed that day, not built — TD-319).** The Inbox waits for a
+make sense to keep using it here*; designed that day; the send and the state, alarm and question rows
+built — TD-319 slice 1, the other rows, the watching signal and the page not yet).** The Inbox waits for a
 page to be opened, and an unattended team whose one question sits behind a closed tab is a team that
 waits. When the person has turned it on, the **home** sends one Telegram message for a row that
 newly stops a session or a team until they answer.
@@ -7087,7 +7088,10 @@ newly stops a session or a team until they answer.
   when its row ends, and a row that ends and begins again is a new row. **Bounded**: past
   `NOTIFY_BURST` (6 messages in ten minutes) the next one reads *and more need you — open the
   Inbox*, and nothing further is sent until the window clears; the rows held back are not told
-  afterwards.
+  afterwards. **A backlog is not told**: a row whose hold ended more than `NOTIFY_LATE` (5 min)
+  before the home could tell it — one standing before the switch was turned on, or through a home
+  that was down for longer than a restart takes — is never told, so turning the switch on or a
+  long outage sends nothing about rows the person could already have seen.
 - **What a message says: who and what kind, never what a session wrote.** One line from structured
   fields and a link: *agentorc · grinder-ao-1 (ao-grind) needs you: permission*; *… asks you a
   question · TD-229*; *… reports blocked · TD-142*; *identity alarm on …*; *ao-grind: grinder-ao-2
@@ -7569,7 +7573,7 @@ session is never woken by mail at all.
   next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a
   *definition* — what a team, a repo, a host or a profile *is* — stays in its own file above and
   below this bullet; a *setting* is a value the person turns without redefining anything, and every
-  such value lives here, under six keys (`usage:`, the fifth, since TD-233 slice 4; `notify:`, the sixth, designed with TD-092 and not built — TD-319):
+  such value lives here, under six keys (`usage:`, the fifth, since TD-233 slice 4; `notify:`, the sixth, designed with TD-092 and read since TD-319 slice 1):
 
 ```yaml
 usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
@@ -7591,7 +7595,7 @@ person:                                       # the person's own — nothing her
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a, TD-164; default on)
   inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (TD-207; built — TD-220: drawn by the Inbox and the Repo page, picked on the Settings page's You)
-notify:                                       # §4.10 *Told on Telegram when nobody is looking* (TD-092; not built — TD-319): read by the home's tick
+notify:                                       # §4.10 *Told on Telegram when nobody is looking* (TD-092; TD-319 slice 1): read by the home's tick
   telegram: {on: false,                       # the one switch; absent or false, nothing is sent
              secrets: "samscrape/prd",        # the Doppler project/config holding TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID — a name, never a value
              link: "http://kmaster:8765"}     # how the person's phone reaches the UI (§4.5b); the row's address is appended

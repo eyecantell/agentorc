@@ -114,6 +114,10 @@ class TickMixin:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         self._note_attention(snapshot_at)
+        try:
+            self._notify_pass(snapshot_at)
+        except Exception:  # noqa: BLE001 — telling the person is never worth a tick
+            log.exception("the Telegram pass failed")
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
         await self._refresh_context(snapshot_at)

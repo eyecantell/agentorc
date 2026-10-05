@@ -144,6 +144,7 @@ class SettingsMixin:
             "repos": settings_mod.repos(doc),
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             "person": settings_mod.person(doc),
+            "notify": settings_mod.notify(doc),
             "migrate": [],
         }
         if settings_mod.ui_yml().exists():
@@ -160,6 +161,7 @@ class SettingsMixin:
         repos: dict[str, Any] | None = None,
         person: dict[str, Any] | None = None,
         usage: dict[str, Any] | None = None,
+        notify: dict[str, Any] | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
         """Write the home's `settings.yml` (design §5, §4.7 `ao gate` / `ao team until` / `ao team
@@ -180,10 +182,14 @@ class SettingsMixin:
         - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?}}`, a None
           clearing that key (or that field of terminal or inbox).
         - `usage`: `{max_age: "1h" | "90m" | "off" | None}` (§6 *A reading the gate can no longer
-          trust*, TD-233), None clearing it back to the default hour."""
+          trust*, TD-233), None clearing it back to the default hour.
+        - `notify`: `{telegram: {on?, secrets?, link?} | None}` (§4.10 *Told on Telegram when nobody is
+          looking*, TD-319), a field set to None cleared; `on: true` with no secrets is refused."""
         agent_common.person_only(caller, "change the settings", "§5 settings.yml")
-        if reserves is None and teams is None and repos is None and person is None and usage is None:
-            raise RpcError("set_settings needs reserves, teams, repos, person or usage (design §5 settings.yml)")
+        if all(v is None for v in (reserves, teams, repos, person, usage, notify)):
+            raise RpcError(
+                "set_settings needs reserves, teams, repos, person, usage or notify (design §5 settings.yml)"
+            )
         doc = settings_mod.load()
         before = copy.deepcopy(doc)
         before_teams = settings_mod.teams(doc)
@@ -239,7 +245,10 @@ class SettingsMixin:
                     raise RpcError(f"usage.max_age: {e}") from None
             doc["usage"] = kept
             out["usage"] = {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)}
-        for key in ("teams", "repos", "person", "usage"):
+        if notify is not None:
+            doc["notify"] = self._notify_change(doc.get("notify"), notify)
+            out["notify"] = settings_mod.notify(doc)
+        for key in ("teams", "repos", "person", "usage", "notify"):
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
@@ -251,7 +260,7 @@ class SettingsMixin:
                     (before_teams.get(str(name)) or {}).get("until"),
                     (after.get(str(name)) or {}).get("until"),
                 )
-        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person") if k in doc]
+        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person", "notify") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
         # detached, as the tick's hand-edit commit is: a wedged git must not hold Save up to its
@@ -260,6 +269,42 @@ class SettingsMixin:
         self._bg.add(task)
         task.add_done_callback(self._bg.discard)
         return out
+
+    @staticmethod
+    def _notify_change(current: Any, notify: Any) -> dict[str, Any]:
+        """`set_settings`'s `notify` half: `{telegram: {on?, secrets?, link?} | None}` laid over what
+        the file holds, each field checked, a None clearing it; the result refused when it is switched
+        on with no secrets to send with (§4.10, TD-319)."""
+        if not isinstance(notify, dict) or not notify:
+            raise RpcError("set_settings: notify is {telegram: {on, secrets, link}} (design §5 settings.yml)")
+        if unknown := sorted(set(map(str, notify)) - set(settings_mod.NOTIFY_KEYS)):
+            raise RpcError(f"notify: unknown key {', '.join(unknown)} (known: {', '.join(settings_mod.NOTIFY_KEYS)})")
+        kept = dict(current) if isinstance(current, dict) else {}
+        fields = notify["telegram"]
+        if fields is None:
+            kept.pop("telegram", None)
+            return kept
+        if not isinstance(fields, dict):
+            raise RpcError("notify.telegram: a mapping of on, secrets, link, or null to remove it")
+        if unknown := sorted(set(map(str, fields)) - set(settings_mod.TELEGRAM_KEYS)):
+            known = ", ".join(settings_mod.TELEGRAM_KEYS)
+            raise RpcError(f"notify.telegram: unknown key {', '.join(unknown)} (known: {known})")
+        try:
+            parsed = settings_mod.parse_telegram({k: v for k, v in fields.items() if v is not None})
+        except ValueError as e:
+            raise RpcError(f"notify.{e}") from None
+        tg = settings_mod.notify({"notify": kept}).get("telegram", {})
+        tg = {**{k: v for k, v in tg.items() if fields.get(k, ...) is not None}, **parsed}
+        if tg.get("on") and not tg.get("secrets"):
+            raise RpcError(
+                "notify.telegram.secrets: switching Telegram on needs the Doppler project/config that holds "
+                "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (design §4.10)"
+            )
+        if tg:
+            kept["telegram"] = tg
+        else:
+            kept.pop("telegram", None)
+        return kept
 
     async def rpc_commit_defs(self, message: str = "", caller: Any = None) -> dict[str, Any]:
         """Commit the home's definition files with the act's words (design §4.9 *What is left at the
