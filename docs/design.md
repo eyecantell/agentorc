@@ -724,8 +724,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   entry has one: *for you* (`Owner: paul`, `Kind: decision`, or blocked by a decision),
   *design-first* (`Kind: design-first`, blocked by another entry or not: it is the designer's
   list, less what waits on the person, which the first test took),
-  *pickable* (pickable, `Kind: build` or none: work a grinder can start — and, once TD-323 is
-  built, a live check whose build is live, §4.9b), else *other* (a
+  *pickable* (pickable, `Kind: build` or none: work a grinder can start — and a live check
+  whose build is live, §4.9b; built — TD-323 slice 1), else *other* (a
   build that is blocked, a live check that waits for its build to be live, an evaluation). **A written `Pickable:` line is not read**: a ledger that still
   carries one is read as if it did not, as the script reads the line as a field that overrides
   nothing (cadence §2.12), so the home and the script differ by no entry. What nothing blocks
@@ -5384,8 +5384,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
 
   **A live check is a grinder's once its build is live (TD-320; Paul, 2026-10-04: *we should
   make live-checks pickable by grinders so they do not have to wait on a promote*; designed that
-  day, not built — TD-323).** A built entry whose *Done when* only the running system can show
-  becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
+  day; the reading and the lane built — TD-323 slice 1, the briefs and the ledger's lines not
+  yet).** A built entry whose *Done when* only the running system can show becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
   after every promote, and seven High entries stood that way on 2026-10-04.
   - **The entry names its build on its `Kind:` line.** The PR that makes an entry a live check
     writes **`**Kind:** live-check #<n>`** — the kind's word, then the last merged PR of the
@@ -8057,8 +8057,8 @@ code and needs no grant; a session doing the same work does.
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      with pickable derived (§4.4 *Repo facts*, TD-223; built — TD-228 slice 1), `design-first`
      is a pickable entry with `Kind: design-first`, and `free-pick` a pickable entry whose kind
-     is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; not built —
-     TD-323; §4.9b *A live check is a grinder's once its build is live*) — so an evaluation, a
+     is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; built —
+     TD-323 slice 1; §4.9b *A live check is a grinder's once its build is live*) — so an evaluation, a
      decision and a live check whose build is not live match no lane, and a
      ledger with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.

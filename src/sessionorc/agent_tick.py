@@ -29,6 +29,7 @@ from sessionorc import cadence as cadence_mod
 from sessionorc import conventions as conventions_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
@@ -1198,12 +1199,29 @@ class TickMixin:
             if root and rel and at is not None:
                 decl = dict(s.out_of_work or {})
 
+                name = Path(str(root)).name
+                commit = self._live_commits().get(name)
+
                 def both() -> tuple[Any, str, Any]:
                     resolve = ledger_mod.Registry(hosts.local_host().repos())
-                    then, why = ledger_mod.entries_before(root, str(rel), at, resolve=resolve)
+                    # a live check stood in the lane at the declaration when its build was live then
+                    # (§4.9b, §6 rule 6): known when the promote that made today's live commit live
+                    # concluded before it, so the ledger then is read against that commit; unknown,
+                    # it is read without, and a check live now is told once as new
+                    was = promote_mod.last(name) or {}
+                    try:
+                        before = bool(commit) and was.get("sha") == commit and _parse(str(was.get("at"))) <= at
+                    except (ValueError, TypeError):
+                        before = False
+                    live = ledger_mod.LiveReader(root, commit)
+                    then, why = ledger_mod.entries_before(
+                        root, str(rel), at, resolve=resolve, live=live if before else None
+                    )
                     if then is None:
                         return then, why, None
-                    return then, why, ledger_mod.entries_before(root, str(rel), None, resolve=resolve)[0]
+                    # the tip read as the checkout's reading is, with its live checks' `live`, or a
+                    # live one would read as the checkout's own and be seen untold
+                    return then, why, ledger_mod.entries_before(root, str(rel), None, resolve=resolve, live=live)[0]
 
                 then, why, tip = await asyncio.to_thread(both)
                 if s.out_of_work != decl or s.lane_seen is not None:
@@ -2102,7 +2120,8 @@ class TickMixin:
             prev = {r: self._repos.get(r) or {} for r in todo}
             # a checkout read for the first time gets the whole reading at once, not in five minutes
             full = {r for r in todo if due or r not in self._repos}
-            got = await asyncio.to_thread(self._read_repos, todo, prev, full, roots) if todo else {}
+            live = self._live_commits()
+            got = await asyncio.to_thread(self._read_repos, todo, prev, full, roots, live) if todo else {}
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             for root in todo:
@@ -2279,14 +2298,27 @@ class TickMixin:
                 out[root] = None
         return out
 
+    def _live_commits(self) -> dict[str, str]:
+        """Each repo's live commit as the promote reading holds it (§6 *Promote*), by the repo's
+        name, for a live check's `live` (§4.9b, TD-323): a reading that carries `live_why` — the live
+        commit could not be read — names none, and unknown is never live."""
+        return {
+            name: str(r["live"]) for name, r in self._promotes.items() if r.get("live") and not r.get("live_why")
+        }
+
     @staticmethod
     def _read_repos(
-        roots: list[str], prev: dict[str, dict[str, Any]], full: set[str], registry: list[str] | None = None
+        roots: list[str],
+        prev: dict[str, dict[str, Any]],
+        full: set[str],
+        registry: list[str] | None = None,
+        live: dict[str, str] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
         the rest carried from `prev`. One checkout's read that raises keeps its last reading with
-        the error beside it and never costs the others theirs."""
+        the error beside it and never costs the others theirs. `live` is `_live_commits`: a live
+        check's build is read against its repo's (§4.9b)."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
@@ -2297,7 +2329,8 @@ class TickMixin:
         for root in roots:
             old = prev.get(root) or {}
             try:
-                out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote, resolve)
+                reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
+                out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote, resolve, reader)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
                 log.exception("reading the repo facts of %s failed", root)
                 why = f"the read failed: {type(e).__name__}"
@@ -2319,13 +2352,14 @@ class TickMixin:
         now: datetime,
         by_remote: dict[str, dict[str, Any]],
         resolve: ledger_mod.Resolve | None = None,
+        live: ledger_mod.Live | None = None,
     ) -> dict[str, Any]:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read."""
         stamp = now.isoformat()
         remote = reports._git(root, "remote", "get-url", "origin") if due else None
         remote = (remote or "").strip() if due else str(old.get("remote") or "")
-        led = ledger_mod.reading(root, now, with_history=due, resolve=resolve)
+        led = ledger_mod.reading(root, now, with_history=due, resolve=resolve, live=live)
         old_led = old.get("ledger") or {}
         if "error" in led:
             led = {**old_led, "error": led["error"], "failed_at": stamp}
