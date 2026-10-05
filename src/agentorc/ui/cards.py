@@ -15,7 +15,7 @@ from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
 from agentorc.ending import NO_CLOSER, closer_words, waiting_words
 from agentorc.org import MANAGER_WHEN
-from sessionorc import identity, mail, work
+from sessionorc import hosts, identity, mail, work
 from sessionorc.adapters import short_model
 from sessionorc.agent_common import CLOSED_KEEP
 from sessionorc.models import (
@@ -316,6 +316,7 @@ def view(
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )
     d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
+    d["flow_mark"] = flow_mark(s, hosts.local_host().name) if s.get("team") else None
     d["waiting"] = waiting_view((waits or {}).get(s.get("id")))
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
@@ -522,6 +523,41 @@ def _middle(text: str, width: int) -> str:
     return f"{text[: keep - keep // 2]}…{text[len(text) - keep // 2 :]}"
 
 
+# design §4.5a team card **flow changed — Apply** (§4.9c *Switching*, TD-309): what the page read of each
+# team's flow when it was last drawn — the flow it runs, by team, and the members whose records differ
+# from it, by id, each `act` (`teamrun.differences`). Set by the app's `flow_views`, read by `flow_mark`
+# on every card a delta draws, since a delta reads no plan (as `inbox.PULLS` is)
+FLOWS: dict[str, str] = {}
+FLOW_ACTS: dict[str, str] = {}
+NODE_RESTART = "flow changed — restarts when it next works or at the team's next Start"
+
+
+def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
+    """A member's flow mark (design §4.5a *flow changed — Apply*, §4.9c *Switching*): *sits out under
+    <flow>* on a member the flow sits out — winding down (`sit_out`) or closed for it (`closed_for:
+    {why: sit_out}`), its card kept until Forget — and *— close it yourself* on a person's session it
+    would sit out, which nothing winds down; *flow changed* on a node member Apply skipped; and on an
+    idle node member relaunched, which the tick does not restart, *flow changed — restarts when it
+    next works or at the team's next Start*. None otherwise; a mark, never pressable."""
+    flow = FLOWS.get(str(s.get("team") or "")) or "its flow"
+    closed_for = s.get("closed_for") if isinstance(s.get("closed_for"), dict) else {}
+    act = FLOW_ACTS.get(str(s.get("id") or ""))
+    node = bool(here and s.get("host") and s.get("host") != here)
+    if s.get("sit_out") or closed_for.get("why") == "sit_out":
+        text = f"sits out under {flow}"
+        why = "the team's flow has no stage for its role — its card stays until Forget"
+        return {"text": text, "full": f"{text}: {why}"}
+    if act == "left":
+        text = f"sits out under {flow} — close it yourself"
+        return {"text": text, "full": f"{text}: a person's session is never wound down by a switch (design §4.9c)"}
+    if node and act:
+        why = f"its record differs from {flow} — Apply on the team card"
+        return {"text": "flow changed", "full": f"flow changed: {why}"}
+    if node and s.get("relaunch") and s.get("state") == "idle":
+        return {"text": NODE_RESTART, "full": f"{NODE_RESTART}: the tick does not restart a member on a node"}
+    return None
+
+
 def brief_changed_view(bc: Any) -> dict[str, str] | None:
     """Design §4.5a **brief changed** chip (§6 rule 7, TD-217): the fixed words, and on hover the
     files that changed by name and when — paths the home read, nothing a session wrote. A mark,
@@ -670,6 +706,8 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             full = f"{text} at {d['closed_at']} · {d['closed_keep']}" if d.get("closed_at") else text
             if text == "closed":
                 full += f" — {NO_CLOSER}"
+            if fm := d.get("flow_mark"):  # *sits out under <flow>*: the card stays until Forget (§4.5a)
+                text, full = fm["text"], f"{fm['full']} · {full}"
         if said := _declared(d):
             # a record that declared keeps the declaration after its ending: it is what explains it
             text, full = f"{text} — {said[0]}", f"{full} — {said[1]}"
@@ -686,6 +724,9 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             "idle with its work open: the host agent nudged it once, twenty minutes into this stretch, and it "
             "is still idle — yours or its manager's to judge (design §6)"
         )
+    elif d.get("flow_mark"):
+        # the flow's mark (§4.5a **flow changed — Apply**, TD-309): what a switch did or left on this member
+        kind, text, full = "lim", d["flow_mark"]["text"], d["flow_mark"]["full"]
     elif d["doing"]:
         kind, text = "doing", d["doing"]["text"]
     elif d.get("brief_changed"):
