@@ -990,6 +990,8 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
     for name in ("techlead.md", "manager.md", "grinder.md", "designer.md"):  # the designer a preset since TD-309
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
+    designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
+    assert SHAPE in designer.read_text(encoding="utf-8")  # whole until a flow wraps it (§4.9c, TD-310)
 
 
 @pytest.mark.unit
