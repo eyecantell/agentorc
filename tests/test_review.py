@@ -141,8 +141,14 @@ async def test_review_rides_the_record_and_pr_rides_an_ask(agent, tmp_path):
             "asks": [{"from": w, "pr": 12}, {"from": w2, "pr": 13}],
         }
         async with LocalClient(caller=tl) as tc:
-            await tc.call("msg", reply_to=q["id"], kind="reply", text="merged #12")
-            await tc.call("msg", reply_to=q2["id"], kind="reply", text="merged #13")
+            # a reader's reply to a PR's ask says what it came to (§4.9c, TD-315): refused without a verdict
+            with pytest.raises(AgentError, match="--verdict pass | merged | findings"):
+                await tc.call("msg", reply_to=q["id"], kind="reply", text="merged #12")
+            with pytest.raises(AgentError, match="a verdict is one of"):
+                await tc.call("msg", reply_to=q["id"], kind="reply", text="merged #12", verdict="lgtm")
+            got = (await tc.call("msg", reply_to=q["id"], kind="reply", text="merged #12", verdict="merged"))["entry"]
+            assert got["verdict"] == "merged"
+            await tc.call("msg", reply_to=q2["id"], kind="reply", text="merged #13", verdict="merged")
         assert (await person.call("get", id=tl))["prs_waiting"] is None
 
 
@@ -161,7 +167,11 @@ async def test_a_second_ask_is_a_reply_to_the_readers_findings_and_the_queue_hol
         tl = await mk("tl", team="t", unattended=True)
         async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
             first = (await wc.call("msg", to=tl, text="#12: green, reviewed", kind="ask", pr=12))["entry"]
-            found = (await tc.call("msg", reply_to=first["id"], kind="reply", text="the mark is read twice"))["entry"]
+            found = (
+                await tc.call(
+                    "msg", reply_to=first["id"], kind="reply", text="the mark is read twice", verdict="findings"
+                )
+            )["entry"]
             assert (await person.call("get", id=tl))["prs_waiting"] is None, "answered: the PR is the author's"
             with pytest.raises(AgentError, match="name `person` as the addressee"):
                 await wc.call("msg", to=tl, text="#12: fixed", kind="ask", pr=12, thread=first["id"])
@@ -172,7 +182,34 @@ async def test_a_second_ask_is_a_reply_to_the_readers_findings_and_the_queue_hol
                 "oldest": again["at"],
                 "asks": [{"from": w, "pr": 12}],
             }
-            await tc.call("msg", reply_to=again["id"], kind="reply", text="merged #12")
+            await tc.call("msg", reply_to=again["id"], kind="reply", text="merged #12", verdict="merged")
         assert (await person.call("get", id=tl))["prs_waiting"] is None
+        for sid in (w, tl):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_verdict_rides_only_on_a_reply_to_a_prs_ask_and_the_person_needs_none(agent, tmp_path):
+    """§4.9c *The reader's answer carries a verdict* (TD-315 slice 1): `--verdict` on any other message
+    is refused, and the person's word on a PR's ask — past its bound it is theirs — needs none."""
+    async with LocalClient() as person:
+
+        async def mk(n: str, **kw):
+            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            return (await person.call("create", **params))["id"]
+
+        w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
+        tl = await mk("tl", team="t", unattended=True)
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            with pytest.raises(AgentError, match="a verdict rides only on a reply"):
+                await wc.call("msg", to=tl, text="#12 is green", kind="ask", pr=12, verdict="pass")
+            plain = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="a verdict rides only on a reply"):
+                await tc.call("msg", reply_to=plain["id"], kind="reply", text="rebase", verdict="pass")
+            got = (await tc.call("msg", reply_to=plain["id"], kind="reply", text="rebase"))["entry"]
+            assert got["verdict"] is None, "a question that is no PR's is answered as before"
+            asked = await wc.call("msg", to="person", text="#14: the reader did not answer", kind="ask", pr=14)
+        said = (await person.call("msg", reply_to=asked["entry"]["id"], kind="reply", text="merge it"))["entry"]
+        assert said["verdict"] is None, "the person's word ends it: a word, not a verdict"
         for sid in (w, tl):
             await person.call("kill", id=sid)

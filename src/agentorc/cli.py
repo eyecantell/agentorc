@@ -2421,6 +2421,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "source": args.source,
         # design §4.9b *The reader* (TD-093): the PR a held author's `ask` puts in front of its reader
         "pr": args.pr,
+        # design §4.9c (TD-315): what a reader's reply to a PR's ask came to; the home checks it
+        "verdict": args.verdict,
         # design §4.10 *A look* (TD-292): repo-relative, so the page finds them on origin's default
         "shots": [_shot_path(x) for x in args.shot] if args.shot else None,
     }
@@ -3332,6 +3334,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cites", help="a conflict: the `sends` ids it cannot reconcile, comma-separated")
     p.add_argument(
         "--pr", type=int, metavar="N", help="an ask: the pull request it puts in front of its reader (design §4.9b)"
+    )
+    p.add_argument(
+        "--verdict",
+        choices=("pass", "merged", "findings"),
+        help="a reply to a PR's ask: what the read came to — required there, refused elsewhere (design §4.9c)",
     )
     # design §4.10 *Suggested answers* (TD-070): the likely answers on a question, and how a reply
     # picks one of them by the number `ao inbox` prints.

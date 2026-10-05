@@ -329,6 +329,10 @@ class MailEntry:
     # author's `ask` puts in front of its reader, an integer so a row can link it and a header can
     # count it — the text stays the author's summary. Only an `ask` carries one.
     pr: int | None = None
+    # A reader's verdict (design §4.9c *The reader's answer carries a verdict*, TD-315 slice 1): on a
+    # reply to an `ask` that carries `pr`, one of `VERDICTS` — a word on the envelope, never read out
+    # of the text. Required of a session's such reply, refused on any other.
+    verdict: str | None = None
     # A look's screenshots (design §4.10 *A look*, TD-292): repo-relative paths of `.png` files under
     # `docs/mockups/reviews/` of the sender's repo, in the order sent, at most `mail.SHOTS_MAX`. Only a
     # `steer` or an `ask` to the person carries them, and one that does is a look; drawn only as file
@@ -495,6 +499,9 @@ class SendEntry:
 
 
 REVIEW_READERS = ("techlead", "person")
+# What a reader's reply to a PR's `ask` came to (design §4.9c, TD-315): nothing against it on my paths
+# and not merged; I am the last reader and merged it; the text says what, and the author asks again.
+VERDICTS = ("pass", "merged", "findings")
 REVIEW_BOUND = "2h"  # §4.9b *The reader*: a read of a diff, unless the preset says otherwise
 # The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`, §4.9c a sit-out): the card, the CLI
 # (`agentorc.teams` re-exports it) and the home's sit-out send the same words.
