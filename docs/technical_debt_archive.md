@@ -4703,3 +4703,17 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Why:** §4.9c says `ao team flow` prints what a switch leaves with a reader (*grinder-ao-1's PR #1020 stays with techlead-ao-1*), but the home's only reading of a seat's queue was `prs_waiting: {n, oldest}`, a count and a time, so the client had nothing to name.
 
 **Resolved:** 2026-10-05 (PR #1110) — `prs_waiting` carries `asks: [{from, pr}]`, each open PR `ask` the seat holds, by sender and PR in the order they came, never the text; design §4.9b says so. Tests in `tests/test_review.py`. The client's line in `ao team flow` stays TD-309's (grinder-ao-2).
+
+## TD-334: A relaunch of a member a failed `brief` restart left closed never restarts it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-1, from the techlead's read of #1099, left in TD-309's Status)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_brief_restart`, `_closed_by_tick`); design §4.9c *Switching*, §6 rule 7
+
+**Why:** the tick closes a member for a `brief` restart and the replay fails, leaving it `closed` with `closed_for: {why: brief}`; a person's Apply then relaunches it, clearing `brief_changed` and marking `relaunch`, so rule 7 reads `why: flow` and `_closed_by_tick(s, "flow")` does not match the `brief` mark — the record stays closed, never restarted. The mirror case (a failed `flow` restart, then a brief change) is the same.
+
+**Resolved:** 2026-10-05 (PR #1116) — `_brief_restart` retries a restart either trigger left closed, under the trigger that stands now, moving the mark (`_mark_closed`, `closed_at` unchanged) to that trigger just before the replay so a retry that fails again is taken again (the techlead's read of #1116); design §4.9c says so. Test: `tests/test_relaunch.py::test_a_relaunch_of_a_record_a_failed_brief_restart_left_closed_restarts_it`.
