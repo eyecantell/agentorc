@@ -362,6 +362,10 @@ class IdentityMixin:
                 f"{s.id} is {s.state} — there is nothing to stop; Forget it, or resume it, "
                 "which is what lifts a suspension anyway (design §4.8a)"
             )
+        if s.state == "scheduled":
+            raise RpcError(
+                f"{s.id} has not started — there is nothing to stop; Cancel forgets it (design §6 Start time)"
+            )
         s.suspended = {"at": now_iso(), "by": PERSON, "why": str(why or _alarm_words(s))}
         self._save(s)
         # The mark is the home's and the kill is the pane's host's. A suspension ends no row, so

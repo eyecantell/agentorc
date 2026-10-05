@@ -7794,7 +7794,9 @@ code and needs no grant; a session doing the same work does.
   on a node whose link is down waits and is looked at again on the next tick, as a restart does.
   Before the instant, `ao at <session> <when>` moves it, `ao at <session> now` starts it at once,
   and **Cancel** (§4.5a; `ao close` on a scheduled record) forgets the record — nothing ran, so
-  there is nothing to keep — and frees the slot. `--at` with `--until` gives a stop time after the
+  there is nothing to keep — and frees the slot; **Kill** on a scheduled record is the same Cancel
+  (so `ao team stop --now` stops a member not yet started), and **Switch to interactive** is
+  refused until it runs, since the start is a policy's act. `--at` with `--until` gives a stop time after the
   start, parsed together and refused when the stop is not after the start. **Refused**: `--at`
   without `--unattended` (a start nobody is at the keyboard for is unattended by definition, and a
   scheduled start is a policy's act — §9 invariant 5 keeps those off an interactive session), an
