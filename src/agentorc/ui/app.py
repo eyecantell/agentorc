@@ -2277,6 +2277,39 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await h.flow_views(await call("list"), org)
         return JSONResponse({"ok": True, **got})
 
+    @app.get("/api/teams/{name}/flow")
+    async def api_team_flow_preview(name: str, flow: str):
+        """The team card's **Flow** pick, before it writes (§4.5a, §4.9c): what the pick would do —
+        who sits out, who starts, who is relaunched, and the PRs that stay with a reader — for its
+        confirm; refused for a flow the team does not list or cannot follow."""
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        sessions = await call("list")
+        try:
+            got = await asyncio.to_thread(teamrun.flow_preview, rpc, org, name, host_name(), flow, sessions)
+        except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
+            raise _team_http(e) from None
+        return JSONResponse(got)
+
+    @app.post("/api/teams/{name}/flow")
+    async def api_team_flow_pick(name: str, request: Request):
+        """The team card's **Flow** pick (§4.5a, §4.9c *Switching*; TD-309 slice 4b): `{flow}` written to
+        `teams.<team>.flow` and applied at once, as `ao team flow <team> <flow>` does. A person's own,
+        and not on a node, as Settings is not."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        try:
+            got = await asyncio.to_thread(teamrun.pick_flow, rpc, org, name, host_name(), str(body.get("flow") or ""))
+        except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
+            raise _team_http(e) from None
+        h.settings_at["at"] = 0.0  # the next page reads the person's settings again (TD-174)
+        with contextlib.suppress(HTTPException):  # applied either way: a failed re-read is the next page load's
+            await h.flow_views(await call("list"))
+        return JSONResponse({"ok": True, **got})
+
     # design §4.9 *Add or remove a member from the team card*, §4.5a *team card: Members…* and the
     # *Members dialog* (TD-163, built by TD-172): the one control that edits a definition from the
     # page — `org.yml`, as text, through the UI process, never the host agent (§4.4a: the org file
@@ -2440,7 +2473,13 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 "profiles_file": str(profiles_mod.profiles_file()),
-                "teams": setmod.team_cards(org.teams, got.get("teams"), sessions=fleet, repos=readings),
+                "teams": setmod.team_cards(
+                    org.teams,
+                    got.get("teams"),
+                    sessions=fleet,
+                    repos=readings,
+                    flows=await asyncio.to_thread(team_flows, org),
+                ),
                 "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls")),
                 "you": term,
                 "browser_keys": setmod.BROWSER_KEYS,
@@ -2503,6 +2542,15 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         text = str(body.get("max_age") or "").strip()
         return answer(await call("set_settings", usage={"max_age": text or None}))
 
+    def team_flows(org: orgmod.Org) -> dict[str, list[dict[str, Any]]]:
+        """Each team's `teams.flow_rows` for the Settings page's **flow** pick (§4.5a, §4.9c), a team
+        whose repo this host cannot read having rows that judge nothing (`unread`). A node draws none:
+        the org is the home's (§4.4a)."""
+        if hosts.is_node():
+            return {}
+        here = host_name()
+        return {n: teams.flow_rows(org, t, t.host or here, here) for n, t in org.teams.items() if t.flows}
+
     @app.post("/api/settings/teams")
     async def settings_teams(request: Request):
         """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?, on_work?, balance?}` —
@@ -2549,9 +2597,21 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         "balance draws at least one line: open PRs, the oldest or the reader's queue — or turn it off",
                     )
             change["balance"] = bal
-        if not change:
-            raise HTTPException(400, "teams: send until, reserve, on_work or balance")
-        return answer(await call("set_settings", teams={team: change}))
+        flow = str(body.get("flow") or "") if "flow" in body else None
+        if not change and flow is None:
+            raise HTTPException(400, "teams: send until, reserve, on_work, balance or flow")
+        got: dict[str, Any] = {}
+        if change:
+            got = await call("set_settings", teams={team: change})
+        if flow is not None:  # **flow**: written and applied at once, as the team card's Flow pick (§4.9c)
+            if hosts.is_node():
+                raise HTTPException(409, node_org_note())
+            try:
+                applied = await asyncio.to_thread(teamrun.pick_flow, rpc, org_here()[0], team, host_name(), flow)
+            except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
+                raise HTTPException(400, f"flow not set — {str(e).strip(chr(34))}") from None
+            got = {**got, "apply": applied}
+        return answer(got)
 
     @app.post("/api/settings/repos")
     async def settings_repos(request: Request):

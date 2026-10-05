@@ -818,9 +818,7 @@ def flow_changed(
     return [d.as_dict(plan.flow) for d in differences(plan, sessions)]
 
 
-def flow_view(
-    call: Call, org: orgmod.Org, name: str, here: str, sessions: list[dict[str, Any]]
-) -> dict[str, Any]:
+def flow_view(call: Call, org: orgmod.Org, name: str, here: str, sessions: list[dict[str, Any]]) -> dict[str, Any]:
     """A team's flows as every client that reads a team shows them (design §4.9c *What is shown*,
     *Switching*; `ao team list`, the Org page's team header): `flow`, the current one or None for a
     team that lists none; `flows`, `teams.flow_rows`; `flow_note`, `teams.flow_unlisted`; and
@@ -839,6 +837,36 @@ def flow_view(
     with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError):  # said by the flows' lines
         out["differences"] = flow_changed(call, org, name, here, sessions)
     return out
+
+
+def flow_preview(
+    call: Call, org: orgmod.Org, name: str, here: str, flow: str, sessions: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """What a pick of `flow` would do to a team (design §4.5a team card **Flow** pick, whose confirm
+    names who sits out, who starts and who is relaunched, and what a switch leaves; §4.9c
+    *Switching*): `{team, flow, differences, stays}`, read against `flow` as if picked. Refused, in
+    `teams.TeamError`, for a flow the team does not list or one it cannot follow — the pick draws
+    those disabled, with the reason."""
+    t = teams.find(org, name)
+    if flow not in t.flows:
+        raise teams.TeamError(f"team {name} lists {', '.join(t.flows) or 'no flows'}, not {flow!r} (design §4.9c)")
+    picked = orgmod.with_settings(org, {name: {"flow": flow}})
+    rows = teams.flow_rows(picked, picked.teams[name], t.host or here, here, files=files_via(call))
+    if cannot := next((r["cannot"] for r in rows if r["name"] == flow), ""):
+        raise teams.TeamError(cannot)
+    diffs = flow_changed(call, picked, name, here, sessions)
+    return {"team": name, "flow": flow, "differences": diffs, "stays": stays_with(name, sessions)}
+
+
+def pick_flow(
+    call: Call, org: orgmod.Org, name: str, here: str, flow: str, *, caller: str | None = None
+) -> dict[str, Any]:
+    """The **Flow** pick, and the Settings page's **flow** on Save (§4.5a, §4.9c *Switching*): checked
+    as `flow_preview` checks it, written to `teams.<team>.flow` through `set_settings` — a person's
+    own — and applied at once (`apply`), as `ao team flow <team> <flow>` does. Returns `apply`'s."""
+    flow_preview(call, org, name, here, flow, call("list"))
+    got = call("set_settings", teams={name: {"flow": flow}})
+    return apply(call, orgmod.with_settings(org, (got or {}).get("teams")), name, here, caller=caller)
 
 
 def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
