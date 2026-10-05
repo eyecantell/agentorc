@@ -818,6 +818,25 @@ def flow_changed(
     return [d.as_dict(plan.flow) for d in differences(plan, sessions)]
 
 
+def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """What a switch leaves with a reader (design §4.9c *What a switch leaves alone*): each open PR
+    `ask` at a session of the team, from the reader's `prs_waiting.asks` (§4.9b, TD-333) in the order
+    they came — `{from, pr, reader, line}`, the line *grinder-ao-1's PR #1020 stays with
+    techlead-ao-1*. The sender is named by its record where this home lists it, else by its address."""
+    names = {str(s["id"]): str(s.get("name") or s["id"]) for s in sessions if s.get("id")}
+    out: list[dict[str, Any]] = []
+    for s in badged(name, sessions):
+        waiting = s.get("prs_waiting")
+        if s.get("superseded_by") or not isinstance(waiting, dict):
+            continue
+        reader = str(s.get("name") or s.get("id"))
+        for a in waiting.get("asks") or []:
+            sender = names.get(str(a.get("from")), str(a.get("from")))
+            line = f"{sender}'s PR #{a.get('pr')} stays with {reader}"
+            out.append({"from": a.get("from"), "pr": a.get("pr"), "reader": reader, "line": line})
+    return out
+
+
 def relaunch_params(x: teams.Launch) -> dict[str, Any]:
     """The `relaunch` RPC's `launch`: the four keys it replaces, an absent one sent as None so the
     home removes it (a switch to `build` takes `review` off)."""
@@ -829,15 +848,18 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
     current flow, read its records against it, and per member sit it out, start it or relaunch it —
     a person's own, since the home's `relaunch` is. A member that cannot be reached, or whose call is
     refused, is skipped and said; the others are applied. Returns `{team, flow, applied, skipped}`,
-    each entry `{name, act, line}`; nothing for a stopped team, whose next start compiles the flow."""
+    each entry `{name, act, line}`, and `stays`, the PRs already asked of a reader, which stay its
+    (`stays_with`); nothing applied for a stopped team, whose next start compiles the flow."""
     sessions = call("list")
+    stays = stays_with(name, sessions)
     if not live(crew(name, sessions)):  # a stopped team: its next start compiles the flow
-        return {"team": name, "flow": teams.current_flow(org.teams[name]), "applied": [], "skipped": []}
+        flow = teams.current_flow(org.teams[name])
+        return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays}
     plan = teams.plan(org, name, host, files=files_via(call))
     diffs = differences(plan, sessions)
     lead = next((s for s in live(badged(name, sessions)) if plan.manager_id in (s.get("name"), s.get("id"))), None)
     lead_id = str(lead["id"]) if lead else ""
-    out: dict[str, Any] = {"team": name, "flow": plan.flow, "applied": [], "skipped": []}
+    out: dict[str, Any] = {"team": name, "flow": plan.flow, "applied": [], "skipped": [], "stays": stays}
     for d in diffs:
         row = d.as_dict(plan.flow)
         rec = d.record or {}
