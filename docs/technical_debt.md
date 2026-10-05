@@ -135,6 +135,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Designed 2026-10-04 (a claim's `slices`, declared with `--slice` or derived at the merge, counted as the run's done) — the build is TD-325 |
 | TD-323 | Build live checks in the free-pick lane: the build's PR on the `Kind:` line and its `live` reading, `lane_matches`, the grinder brief's pick list and four endings, the PR written on the open live checks | High | Open |
 | TD-325 | Build slices as done work: `slices` on a claim, `ao progress done --pr N --slice`, the tick's write at a merge, `_reported` and the repeat test, the Reports panel, the grinder brief | Medium | Open |
+| TD-326 | A 3.12 CI flake: the node's record is not seen suspended within ten seconds in `test_link.py`'s supersession test | Low | Open |
 
 ---
 
@@ -2513,3 +2514,17 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Related:** TD-321 (the design), TD-249 and TD-245 (the restart reading), TD-150 (`review_pr`), TD-309 (the entry it was seen on).
 
+
+## TD-326: A 3.12 CI flake: the node's record is not seen suspended within ten seconds in `test_link.py`'s supersession test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-04 (grinder-ao-1, CI on PR #1052, a docs-only change)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — seen once; passed on 3.13 in the same run and on every local run of the branch it came from.
+**Location:** `tests/test_link.py` (`test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_create_at_the_home_lifts_it`, the `wait_for(lambda: bool(node.sessions[w["id"]].suspended), timeout=10.0)` after *pushed*), the home's push of a suspension to a node (`src/sessionorc/agent_remote.py` / `agent_link.py`)
+
+**Why:** on the 3.12 runner, PR #1052's CI (a one-clause change to `docs/design.md`) failed at `tests/test_link.py:1370`: the home's record read suspended (*claimed another session's id*), and the node's never did within ten seconds. A docs-only PR cannot cause it, so it is timing or an ordering the push can lose; TD-063 and TD-078 are the earlier 3.12 flakes of this shape.
+
+**Fix:** reproduce under load (`pytest -p no:randomly --count` or a loop on that test with the CPU busy); read what pushes the suspension to the node and whether it can be dropped when it races the supersession's own push; fix the push if it can be lost, else widen nothing until it is understood.
