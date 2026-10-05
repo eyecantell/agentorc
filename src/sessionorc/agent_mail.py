@@ -530,7 +530,7 @@ class MailMixin:
                         f"{', '.join(owed[: mail.OUTCOMES_OWED_MAX])} (design §4.10 *Outcomes*)",
                         owed=owed,
                     )
-            self._check_person_depth(sender)
+            self._check_person_depth(sender, question=kind in ASK_KINDS)
             if kind == "ask":
                 # One line of advice from the home, not a gate — the per-sender depth is the gate
                 # (design §4.10 "Which to send is the brief's to teach"): counted before this send.
@@ -543,7 +543,7 @@ class MailMixin:
         # than let an answer steer a team unseen.
         fyi = bool(src) and replied is not None and PERSON not in named
         if fyi:
-            self._check_person_depth(sender)
+            self._check_person_depth(sender, question=False)
         if mail.MAILBOX_DEPTH is not None:
             for sid in named:
                 if sid != PERSON and records[sid].unread() >= mail.MAILBOX_DEPTH:
@@ -790,21 +790,25 @@ class MailMixin:
             e for r in self._graph().values() for e in r.holds(msg_id)
         ]
 
-    def _check_person_depth(self, sender: str) -> None:
-        """The person inbox's depth and per-sender depth (design §4.10): it fills exactly when the
-        person has been away, so the refusal is a redirect to the channel with a `Due:` date.
+    def _check_person_depth(self, sender: str, *, question: bool) -> None:
+        """The person inbox's depths (design §4.10 *The numbers*): it fills exactly when the person
+        has been away, so the refusal is a redirect to the channel with a `Due:` date.
 
-        From 2026-09-19 (TD-069) they count **every entry that is unread or is an open `ask` or
-        `steer`** — one set, each entry once — so reading the page frees no slot an unanswered
-        question still holds, and one worker cannot fill the Inbox with asks that never lapse."""
-        counted = [e for e in self.person_inbox if not e.read_at or e.open]
+        Two counts from 2026-10-04 (TD-324), each with its depth and per-sender depth: a question
+        (an `ask`, a `steer`, a `conflict`, a pass-up) is counted against the **open questions**, so
+        one worker cannot fill the Inbox with asks that never lapse; anything else against the
+        **FYIs**, every other entry still there, so a seat's notes never stop its next question."""
+        if question:
+            counted = [e for e in self.person_inbox if e.open]
+            depth, per, what = mail.PERSON_INBOX_DEPTH, mail.PERSON_SENDER_DEPTH, "open questions"
+        else:
+            counted = [e for e in self.person_inbox if not e.open]
+            depth, per, what = mail.PERSON_FYI_DEPTH, mail.PERSON_FYI_SENDER_DEPTH, "FYIs"
         full = None
-        if mail.PERSON_INBOX_DEPTH is not None and len(counted) >= mail.PERSON_INBOX_DEPTH:
-            full = f"the person inbox holds {mail.PERSON_INBOX_DEPTH} entries unread or unanswered"
-        elif mail.PERSON_SENDER_DEPTH is not None and (
-            sum(1 for e in counted if e.from_ == sender) >= mail.PERSON_SENDER_DEPTH
-        ):
-            full = f"the person inbox holds {mail.PERSON_SENDER_DEPTH} entries unread or unanswered from {sender}"
+        if depth is not None and len(counted) >= depth:
+            full = f"the person inbox holds {depth} {what}"
+        elif per is not None and sum(1 for e in counted if e.from_ == sender) >= per:
+            full = f"the person inbox holds {per} {what} from {sender}"
         if full:
             raise RpcError(
                 f"{full}: the person is away — write the line on user_attention.md with a Due: date, "
@@ -975,7 +979,7 @@ class MailMixin:
                 f"a question carries at most four answers, the recommendation among them: {len(picks)} given "
                 "(design §4.10)"
             )
-        self._check_person_depth(e.from_)  # it is the asker's question in the person inbox
+        self._check_person_depth(e.from_, question=True)  # it is the asker's question in the person inbox
         at = now_iso()
         rec = {"by": me.id, "text": line}
         up = self._copy(e)

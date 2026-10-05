@@ -30,13 +30,19 @@ THREAD_BOUND: int | None = 40  # entries per thread before a send is refused; me
 PAIR_BOUND: int | None = 300  # reply-less entries between one pair inside PAIR_WINDOW; measured: 48 in 8 h
 PAIR_WINDOW = timedelta(hours=24)  # the rolling window a reply-less pair is counted in
 MAILBOX_DEPTH: int | None = 100  # unread entries an inbox holds before a send to it is refused; measured: 19
-# The person inbox's depths count, from 2026-09-19 (TD-069), every entry that is unread **or** an
-# open `ask` or `steer` — one set, each entry once — so reading the page frees no slot an
-# unanswered question still holds, and one worker cannot fill it with questions that never lapse.
-PERSON_INBOX_DEPTH: int | None = 200  # entries the org's person inbox holds before a send is refused
+# The person inbox's depths are two counts from 2026-10-04 (TD-324), each with its own figures.
+# **Questions** — the open `ask`s, `steer`s and `conflict`s (`MailEntry.open`) — refuse a question to
+# the person, and a pass-up, so one worker cannot fill the Inbox with questions that never lapse.
+PERSON_INBOX_DEPTH: int | None = 200  # open questions the person inbox holds before one more is refused
 # …and of those, how many one sender may hold there: 100 since 2026-09-28 (Paul), 20 before, when a
 # techlead seat's replies to the person were refused for a day with every one of its 20 slots held
 PERSON_SENDER_DEPTH: int | None = 100
+# **FYIs** — every other entry still in the person inbox: notes, replies, the answered-FYI, a closed
+# question — refuse any other send to the person. A person's read marks nothing, so an FYI counts
+# until retention or a Dismiss takes it; until 2026-10-04 they counted against the questions'
+# figures, and a seat's 100 notes stopped its verdicts and escalations reaching the person (Paul).
+PERSON_FYI_DEPTH: int | None = 1000  # Paul's figure
+PERSON_FYI_SENDER_DEPTH: int | None = 500  # so one looping sender leaves the others room
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down

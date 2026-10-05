@@ -134,7 +134,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-320 | A live check waits for the anchor after every promote: let a grinder pick one once its build's commit is live | High | Designed 2026-10-04 (the build's PR on the `Kind:` line, live read by the home, `free-pick` takes it) — the build is TD-323 |
 | TD-321 | A merged slice PR on an entry still claimed is not counted as done work, so a run that lands slices reads as a repeat at its third restart | Medium | Designed 2026-10-04 (a claim's `slices`, declared with `--slice` or derived at the merge, counted as the run's done) — the build is TD-325 |
 | TD-323 | Build live checks in the free-pick lane: the build's PR on the `Kind:` line and its `live` reading, `lane_matches`, the grinder brief's pick list and four endings, the PR written on the open live checks | High | Open |
-| TD-324 | The person inbox counts FYI notes against the same depth as open questions, and nothing marks a person's note read, so FYIs fill a sender's slot until dismissed | High | Open |
+| TD-324 | The person inbox counts FYI notes against the same depth as open questions, and nothing marks a person's note read, so FYIs fill a sender's slot until dismissed | High | Built — awaiting merge |
 | TD-325 | Build slices as done work: `slices` on a claim, `ao progress done --pr N --slice`, the tick's write at a merge, `_reported` and the repeat test, the Reports panel, the grinder brief | Medium | Open |
 
 ---
@@ -2502,7 +2502,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (Paul: *change the inbox limit to be something large, like 200 for need/steers and 1k for fyi*; written by the anchor)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — Paul's decision, ready to build; `src/sessionorc/**`, so the techlead reads the PR.
+**Status:** Built — PR #TBD (`mail.PERSON_FYI_DEPTH` / `PERSON_FYI_SENDER_DEPTH`, `_check_person_depth(sender, question=…)`, design §4.10's two counts and figures, `tests/test_mail.py`). Left: archive once merged — the *Done when* is a test at the real figures, so no live look is owed.
 **Location:** `src/sessionorc/mail.py` (`PERSON_INBOX_DEPTH`, `PERSON_SENDER_DEPTH`), `src/sessionorc/agent_mail.py` (`_check_person_depth` and its three callers: a send to the person, the answered-FYI, `rpc_pass_up`), `tests/test_mail.py` (the depth tests), design §4.10 (*The numbers*: the person inbox's figures; the person inbox paragraph's *the same bounds*; the answered-FYI's *counted in the person inbox's depths*; *What bounds it*'s *200 in all, 20 from one sender*)
 
 **Why:** on 2026-10-04 techlead-ao-1's verdict on held PR #1040 was refused by `ao msg`, because the person inbox held 100 entries from that seat, every one a `note`. The two depths count every entry that is unread **or** an open `ask`/`steer`, and a person's read sets no `read_at` (`rpc_inbox`: *a person is not the session*), so a note counts until the person dismisses it, which deletes it. A seat that answers many questions fills its 100 slots with FYIs in a day or two, and then nothing it says reaches the person: not a verdict, not an escalation. The anchor dismissed the 100 notes by hand that night (text kept in `~/ao-shots/inbox-archive/`). Design §4.10's figures are also stale: it says *200 unread and 20 from one sender*, while the code holds 200 and 100 (Paul, 2026-09-28).
