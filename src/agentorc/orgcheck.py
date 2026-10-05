@@ -132,7 +132,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     twice; a team whose definition names one session twice (TD-268); a `place:` naming no linked
     host; a team in `settings.yml` no definition names. A
     warning, which does not fail it: a registered checkout off its default branch or holding
-    changes, and a `place:` naming a team no registered repo defines."""
+    changes, a `place:` naming a team no registered repo defines, and, per team under a flow, each
+    key it writes that the flow would fill with the same value (`teams.flow_redundant`)."""
     lacks: list[str] = []
     warnings: list[str] = []
 
@@ -173,6 +174,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
             teams.plan(org, name, here, files=files)
         except (teams.TeamError, ValueError, OSError) as e:
             lack(str(e).strip('"'))
+        else:
+            warnings.extend(teams.flow_redundant(org, team, here, here, files))
     # a flow nobody lists that is not usable (§4.9c): a listed one is the start's refusal, said above
     listed = {f for t in org.teams.values() for f in t.flows}
     for f in flowdefs.visible(roots, org.roles):

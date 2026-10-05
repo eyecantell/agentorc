@@ -594,6 +594,7 @@ class Compiled:
     held: list[str]
     listed: list[flowdefs.Flow]
     techlead: bool  # the team has a `techlead:` seat
+    cfg: repoconfig.RepoConfig | None = None  # the home repo's file, for what `flow_redundant` reads
 
     @property
     def reader(self) -> dict[str, Any] | None:
@@ -629,7 +630,7 @@ def compiled(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files:
     flow = next((f for f in listed if f.name == name), None)
     if flow is None or not flow.usable:
         return None
-    return Compiled(flow=flow, held=list(cfg.held or ()), listed=listed, techlead=team.techlead is not None)
+    return Compiled(flow=flow, held=list(cfg.held or ()), listed=listed, techlead=team.techlead is not None, cfg=cfg)
 
 
 def flow_needs(org: orgmod.Org, team: orgmod.TeamDef, role: str, host: str, here: str, files: Files | None) -> str:
@@ -663,6 +664,51 @@ def entry_role(
         if stage is not None:
             return stage.role
     return team.entry_role(type_)
+
+
+def flow_redundant(
+    org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files: Files | None = None
+) -> list[str]:
+    """What `ao org check` warns of, per team, under its current flow (design §4.9c *What is shown*):
+    each key written that the flow would fill with the same value — what a repo may delete. A
+    member's `lane:` equal to its stage's, compared in its written order (its pick order);
+    `entries.feature` equal to the role of the stage whose lane holds `design-first` (item 4); and a
+    member stage's role's `review:` in the repo's own `roles:` equal to the reader the flow gives
+    (item 2), its `held` compared as a set. A team with no usable current flow warns of nothing."""
+    under = compiled(org, team, host, here, files)
+    if under is None:
+        return []
+    flow, out = under.flow, []
+    src = team.source.name if team.source else "its definition"
+    for m in team.members:
+        stage = flow.stage_of(m.role) if m.team is None and m.lane else None
+        if stage is not None and not stage.review and m.lane == stage.lane:
+            out.append(
+                f"team {team.name}: {m.name}'s lane: {', '.join(m.lane)} is what flow {flow.name} fills — "
+                f"{src} may drop it"
+            )
+    design = next((st for st in flow.stages if "design-first" in st.lane), None)
+    if design is not None and team.entries.get("feature") == design.role:
+        out.append(
+            f"team {team.name}: entries.feature: {design.role} is what flow {flow.name} fills — {src} may drop it"
+        )
+    reader, cfg = under.reader, under.cfg
+    if reader is None or cfg is None:
+        return out
+    roles = dict.fromkeys(m.role for m in team.members if m.team is None and m.role)
+    for role in roles:
+        stage = flow.stage_of(role)
+        review = (cfg.roles.get(role) or {}).get("review")
+        if stage is None or stage.review or not review:
+            continue
+        same = review.get("reader") == reader["reader"] and review.get("bound", REVIEW_BOUND) == reader["bound"]
+        if same and set(review.get("held") or ()) == set(reader["held"]):
+            where = cfg.path.name if cfg.path else repoconfig.FILE
+            out.append(
+                f"team {team.name}: {role}'s review: in {where} is the reader flow {flow.name} gives — "
+                f"the repo may drop it (a session outside a flow still reads it)"
+            )
+    return out
 
 
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
