@@ -4060,7 +4060,7 @@ Both go away only when the record says who closed it.
 
 **Why:** the header's controls are decided by *live* (any session not ended), and an idle manager is live, so a team that has in fact stopped looks like one that can be wound down; and the manager's own silence — a stop with no declaration — is what left it looking that way.
 
-**Resolved:** 2026-10-05 (built by PRs #439, #448 and the page's step (2); live check held: PR #NNNN) — design §4.5a *team groups* and *Start / Wind down / Stop now*, §4.9a *A person's Start on a concluded team*; `teamrun.concluded`, `teamrun._close_concluded`, `ui/templates/group_head.html`; the briefs `src/agentorc/briefs/manager.md` and `docs/briefs/manager-ao-1.md`.
+**Resolved:** 2026-10-05 (built by PRs #439, #448 and the page's step (2); live check held: PR #1074) — design §4.5a *team groups* and *Start / Wind down / Stop now*, §4.9a *A person's Start on a concluded team*; `teamrun.concluded`, `teamrun._close_concluded`, `ui/templates/group_head.html`; the briefs `src/agentorc/briefs/manager.md` and `docs/briefs/manager-ao-1.md`.
 
 **Done when** the briefs say a usage stop is a restart declaration, the design says when a team's group collapses and which control it carries, the page matches, and a team stopped for the window reads as one on the live page.
 

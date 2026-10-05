@@ -123,6 +123,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Open |
 | TD-327 | A timed-out `ao wait` says *nothing unread — end your turn* while mail an earlier wait reported is still unread | Low | Open |
 | TD-328 | A scheduled record takes Switch to interactive and Kill as if it were live: the switch is undone at the start, and a kill leaves an `exited` record of a run that never happened | Low | Open |
+| TD-329 | A team member whose `profile:` names a shell profile starts Claude Code | Low | Open |
 
 ---
 
@@ -2244,3 +2245,20 @@ The design sentence goes in §6 *Start time*, beside Cancel, in the same PR. The
 **Done when:** on a scheduled record, `ao mode … interactive` and `ao kill` no longer leave a record the design does not describe (refused, or carried as the design says); the card offers only the scheduled acts; design §6 says so; and the suite passes.
 
 **Related:** TD-152 (the start time, where it was found), TD-026 (the design), §9 invariant 5.
+
+## TD-329: A team member whose `profile:` names a shell profile starts Claude Code
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-2, found pressing TD-099's live check on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teams.py` (`Launch.create_params`: `"adapter": profiles.DEFAULT_ADAPTER`), `src/agentorc/profiles.py` (`Profile.adapter`), design §4.2a (a profile names its adapter), §4.9
+
+**Why:** a team definition's member `{role: grinder, profile: sh}`, where `profiles.yml` gives `sh` `adapter: shell`, was started by `ao team start` as a `claude-code` session with the profile `sh` on its record, and sat on Claude Code's first-run screens. Every create a team start makes sends the default adapter whatever the profile says, so the record names a profile whose tool it is not running. The New session form already derives the adapter from the profile (`ui/app.py` `profile_adapter`, TD-284 slice 2); a team start does not.
+
+**Fix:** derive the create's `adapter` from the member's profile as the form does, or refuse at `teams.plan` a member whose profile's adapter is not an agent's (a team member runs a brief, which a shell cannot), in the words `ao org check` and Start share. Which of the two is a design call: a shell member has no use today, so refusing is the conservative reading.
+
+**Done when:** a team start never records a profile whose adapter differs from the session's.
+
