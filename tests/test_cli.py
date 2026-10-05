@@ -757,6 +757,11 @@ def test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn(subprocess_ag
     assert cli.main(["wait", "--timeout", "1.2"]) == 0
     assert cli.END_THE_TURN in (out := capsys.readouterr().out) and "nothing changed" in out
     call_sync("msg", to=sid, text="from the person")
+    # TD-327: a wait that times out while mail is unread — mail it does not wake on, or that an earlier
+    # wait reported — prints the unread line alone, never *nothing unread*
+    assert cli.main(["wait", "--timeout", "1.2"]) == 0
+    out = capsys.readouterr().out
+    assert "nothing changed" in out and "you have 1 unread" in out and cli.END_THE_TURN not in out
     assert cli.main(["inbox", "--unread"]) == 0  # found something: no line
     assert cli.END_THE_TURN not in capsys.readouterr().out
     call_sync("kill", id=sid)
