@@ -4118,7 +4118,7 @@ Both go away only when the record says who closed it.
 
 **Why:** every setting a person moves is a file edit or a CLI call today, and the reserves are the one Paul moves weekly.
 
-**Resolved:** 2026-10-05 (built by PR #684; live check held: PR #NNNN) — design §4.5 screen 8, §4.5a *Settings page* rows and the top bar's **Settings** tab; `ui/settings_page.py`, `ui/templates/settings.html`, `AO.settings` in `ui/static/app.js`, `tests/test_ui_settings.py`.
+**Resolved:** 2026-10-05 (built by PR #684; live check held: PR #1078) — design §4.5 screen 8, §4.5a *Settings page* rows and the top bar's **Settings** tab; `ui/settings_page.py`, `ui/templates/settings.html`, `AO.settings` in `ui/static/app.js`, `tests/test_ui_settings.py`.
 
 **Done when** Paul sets his weekly reserves from the page and the chip's line follows on the next tick; a team's stop time set on the page shows as the members' *stops* note; the promote switch flips `repos.<repo>.promote.auto`; the terminal's size changes on an open Focus without a reload and ligatures stay off; every read-only value shows its file on the *i* mark and Open file opens it; Reset this browser clears the `ao.*` keys after a confirm; a session's request to the page's write route is refused; the page reads at the type scale of TD-144 in both themes at 1440 and 390 px.
 
