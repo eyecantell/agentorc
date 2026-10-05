@@ -3913,10 +3913,9 @@ shorter than a night, the PR opened at once and merged at the bound unless answe
 scope and spending** are an `ask` with two to four suggested answers, and the entry waits. The
 three are the mail kinds the Inbox already draws (§4.5a, §4.10), so the person's part is a press,
 batched by the Inbox and answered whenever they open it; Focus on the member is the live
-conversation when one is wanted. It is a preset since flows (TD-307, §4.9c; not built — TD-309):
+conversation when one is wanted. It is a preset since flows (TD-307, §4.9c; built by TD-309 slice 2):
 the built-in `td` names it, so the package ships `designer.md` with its mechanics and a repo's
-designer brief is its supplement under a flow, and its whole brief in a team with no flow; until then it is a role a repo or `org.yml` defines with its own
-brief; `director` keeps
+designer brief is its supplement under a flow, and its whole brief in a team with no flow; `director` keeps
 its name (its members are managers, and *director > manager > worker* reads as a line). The
 older words — `orchestrator` and `lead` for the manager, `orchestrate` for `control` — resolve to
 nothing: there has been no release and one user, so there is no renamed-roles table, no
