@@ -4078,7 +4078,7 @@ Both go away only when the record says who closed it.
 
 **Why:** TD-160's *Why*: the safety net exists in the design and no person can reach it from the page.
 
-**Resolved:** 2026-10-05 (built by PRs #664 and #667; live check held: PR #NNNN) — design §4.9 *A person in the team*, §4.9b *The reader*, §4.5a **Team** picker and the Start / Wind down / Stop now row, §4.7; `teams.team_review`, `cli._team_defaults`, `teamrun.rows`' *stays*, `ui/templates/group_head.html`.
+**Resolved:** 2026-10-05 (built by PRs #664 and #667; live check held: PR #1077) — design §4.9 *A person in the team*, §4.9b *The reader*, §4.5a **Team** picker and the Start / Wind down / Stop now row, §4.7; `teams.team_review`, `cli._team_defaults`, `teamrun.rows`' *stays*, `ui/templates/group_head.html`.
 
 **Done when** TD-160's *Done when*: Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so); and Wind down on ao-grind with his session live names it as staying.
 
@@ -4099,7 +4099,7 @@ Both go away only when the record says who closed it.
 
 **What the design round has to settle:** (a) **the role** — a `plain` (or `person`) role in the org's `roles:` with `review: {reader: techlead, held: [...]}` and the held paths for agentorc, or `review:` defaulted for any `--team` session whose team has a techlead; (b) **the Team field** on New session — a picker over the org's team definitions, filtering the role list to that team's roles plus `plain`, prefilling `controllers` from the team's manager as `ao new --team` would; (c) **what `team` keys on** once it is more than a badge — the card lands in the team's group, the team's counts include it, Wind down and Stop now leave a person's attended session alone or ask; (d) the CLI help line, once (c) is true.
 
-**Resolved:** 2026-10-05 (designed 2026-09-25; built by TD-173, PRs #664 and #667; live check held: PR #NNNN — the form's Team pick seen live, entry-2 and entry-3 in ao-grind's group with the team's `review`, and `ao pr held` and Wind down pressed on a scratch home) — design §4.9 *A person in the team*, §4.9b *The reader*, §4.5a **Team** picker, §4.7 `ao new --team`.
+**Resolved:** 2026-10-05 (designed 2026-09-25; built by TD-173, PRs #664 and #667; live check held: PR #1077 — the form's Team pick seen live, entry-2 and entry-3 in ao-grind's group with the team's `review`, and `ao pr held` and Wind down pressed on a scratch home) — design §4.9 *A person in the team*, §4.9b *The reader*, §4.5a **Team** picker, §4.7 `ao new --team`.
 
 **Done when** Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so).
 
