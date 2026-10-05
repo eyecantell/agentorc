@@ -260,7 +260,9 @@ def _stage_text(stage: Path, read: Reader | None) -> str:
     """A stage brief's text as `brief.fill` reads a file slot: stripped, `none` when empty. A file of
     the package is this host's own; a repo flow's is read through `read`, so a node member's is read
     on its checkout across the link (design §4.4a, TD-309) as `flowdefs.check` read it."""
-    here = read is None or stage.is_relative_to(Path(str(resources.files("agentorc"))))
+    package = Path(str(resources.files("agentorc")))
+    # `flowdefs.PACKAGE_DIR` is resolved and `_stage_default` is not: either spelling is the package's
+    here = read is None or any(stage.is_relative_to(p) for p in (package, package.resolve()))
     try:
         text = (_read_here if here else read)(stage)
     except OSError as e:
