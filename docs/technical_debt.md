@@ -126,7 +126,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-313 | Build role directories (the org's and a repo's) and the org's flow directories, with the home's history tracking them — design §4.9c, the second part of the flows build | Low | Open |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
-| TD-316 | `ao host rebuild` replaces a node's container and ends the team sessions inside without a word: refuse, or wind the team down first | Medium | Open |
 | TD-318 | A definition is read at the home: take the landing rule's unreachable node clause out of `org.landing`, and have `ao org` and `ao org check` name a repo held only on a node | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Open |
 
@@ -2323,27 +2322,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Done when:** on a scratch home, a team under a repo flow `build → ui-review (held: ui) → review (held: core)` with a `ui-reader` seat: a PR touching both sets is asked of the ui reader first, `ao pr held` names it, its `pass` moves the turn to the techlead, which merges and answers `merged`; a PR touching `core` alone goes to the techlead only; a reply to a PR's ask with no verdict is refused; a record with the older `review` shape behaves as before; a switch to `build-review` with an ask open at the ui reader leaves that ask answered and the techlead's link still to read. When built, §4.9c's and the pointers' *designed, not built* marks come off.
 
 **Related:** TD-314 (the design), TD-307 and TD-309 (flows), TD-313 (role directories, for a review seat role that is no preset), TD-093 (the reader).
-
-## TD-316: `ao host rebuild` ends the team sessions inside the node's container without a word
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-04 (Paul, through Add entry; drafted by entry-3)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built 2026-10-04 (grinder-ao-1, PR #1041) — `containers.live_on_node` and `by_team`, `cmd_host`'s `_clear_node` before `rebuild` and `forget` with `--wind-down`, `--force` and `--timeout`, design §4.4a in the same PR; `tests/test_cli_host.py` against a faked container. Merged, live look pending on `docs/user_attention.md`: the *Done when* on a real container node.
-**Location:** `src/sessionorc/containers.py` (`host_up`, `up`: `rebuild` passes `--remove-existing-container --build-no-cache` and looks at no session first; `host_forget`: `docker rm -f` the same way), `src/agentorc/cli.py` (`cmd_host`), design §4.4a *A container node*, *The home supervises it* (*`ao host rebuild <name>` rebuilds the image on purpose*; *a container stopped or restarted is that host rebooting: tmux and its sessions are gone*)
-
-**Why:** a rebuild removes the node's container, and the tmux server and every session in it go with it. Nothing asks the home which sessions live on that node, nothing tells them, and the command prints only the new container's line. Seen 2026-10-03 at 23:38 (TD-299): `ao host rebuild contractmatch` ended grinder-cm-1 and manager-cm-1 mid-run. A session ended this way gets no wrap-up prompt, so what it held only in its conversation is lost, which is the stranding cadence's *ledger before idle* exists to prevent, and its record just goes `exited` as if the host had rebooted. The design says a rebuild is *on purpose* and says what a gone container means; it does not say what a rebuild owes the sessions it is about to end. `ao host forget` has the same hole: it closes the host's records at the home, after the container is gone, and the sessions get no wrap-up either. `ao host up` does not: it reuses the container.
-
-**Fix:** before the container is removed, `ao host rebuild <name>` asks the home for the live records on that node. With none, it goes on as today. With any, it refuses, exits non-zero and names them, by team, and offers two ways on:
-1. `--wind-down` runs `ao team stop` for each team with a session there (the wrap-up prompt, the wait, then the lead; design §4.9a), then rebuilds once the node holds no live session; it refuses still if a session with no team is left.
-2. `--force` is today's behaviour, said aloud: the sessions it ended are printed.
-`ao host forget` gets the same check and the same two flags. The rule goes into design §4.4a in the same PR, beside the *rebuilds the image on purpose* sentence. An unreachable home is a refusal too, since the check cannot be made; `--force` still works.
-
-**Done when:** on a scratch home with a container node and a team running inside it: `ao host rebuild <node>` refuses, names the team's sessions, and the container id is unchanged; `--wind-down` sends the wrap-up, waits, and the new container comes up with the team wound down; `--force` rebuilds and prints the sessions it ended; a node with no live session rebuilds as today; `ao host forget` behaves the same three ways.
-
-**Related:** TD-299 (where it was seen; its *Left* line carried this until this entry took it over), TD-057 step 3c.2 (`ao host up|rebuild|forget|status`), TD-053 (wind-down), design §4.9a.
 
 ## TD-318: A definition is read at the home — the landing rule loses its node clause, and `ao org` names a repo held only on a node
 

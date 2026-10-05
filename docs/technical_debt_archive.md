@@ -3876,3 +3876,25 @@ Both go away only when the record says who closed it.
 **Done when** the pages read at the new scale in both themes with no rule outside `:root` naming a pixel size; every Org card is still one height and six rows at 1440 and at 390 px; the Inbox column, the rail and the Focus page fit as before; `pdm run test` and `pdm run lint` pass; and **Paul has read the live page after the promote and said the size is right** — if not, `--t-body` moves and nothing else does. TD-130 archives with his word.
 
 **Related:** TD-130 (the design), TD-095 (the card's anatomy: six rows of one height), TD-082 (the Inbox column), TD-137 (the narrow layout, which uses the same tokens), TD-127 (the fold, whose lead is `--t-body`).
+
+## TD-316: `ao host rebuild` ends the team sessions inside the node's container without a word
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-04 (Paul, through Add entry; drafted by entry-3)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built 2026-10-04 (grinder-ao-1, PR #1041) — `containers.live_on_node` and `by_team`, `cmd_host`'s `_clear_node` before `rebuild` and `forget` with `--wind-down`, `--force` and `--timeout`, design §4.4a in the same PR; `tests/test_cli_host.py` against a faked container. Merged, live look pending on `docs/user_attention.md`: the *Done when* on a real container node.
+**Location:** `src/sessionorc/containers.py` (`host_up`, `up`: `rebuild` passes `--remove-existing-container --build-no-cache` and looks at no session first; `host_forget`: `docker rm -f` the same way), `src/agentorc/cli.py` (`cmd_host`), design §4.4a *A container node*, *The home supervises it* (*`ao host rebuild <name>` rebuilds the image on purpose*; *a container stopped or restarted is that host rebooting: tmux and its sessions are gone*)
+**Resolved:** 2026-10-05 (PR #1041; the live look on `docs/user_attention.md`) — it holds: Paul decided the look *Works* on 2026-10-05, the board line is closed in this PR, and `tests/test_cli_host.py` covers the refusal, `--wind-down` and `--force` for `rebuild` and `forget` against a faked container.
+
+**Why:** a rebuild removes the node's container, and the tmux server and every session in it go with it. Nothing asks the home which sessions live on that node, nothing tells them, and the command prints only the new container's line. Seen 2026-10-03 at 23:38 (TD-299): `ao host rebuild contractmatch` ended grinder-cm-1 and manager-cm-1 mid-run. A session ended this way gets no wrap-up prompt, so what it held only in its conversation is lost, which is the stranding cadence's *ledger before idle* exists to prevent, and its record just goes `exited` as if the host had rebooted. The design says a rebuild is *on purpose* and says what a gone container means; it does not say what a rebuild owes the sessions it is about to end. `ao host forget` has the same hole: it closes the host's records at the home, after the container is gone, and the sessions get no wrap-up either. `ao host up` does not: it reuses the container.
+
+**Fix:** before the container is removed, `ao host rebuild <name>` asks the home for the live records on that node. With none, it goes on as today. With any, it refuses, exits non-zero and names them, by team, and offers two ways on:
+1. `--wind-down` runs `ao team stop` for each team with a session there (the wrap-up prompt, the wait, then the lead; design §4.9a), then rebuilds once the node holds no live session; it refuses still if a session with no team is left.
+2. `--force` is today's behaviour, said aloud: the sessions it ended are printed.
+`ao host forget` gets the same check and the same two flags. The rule goes into design §4.4a in the same PR, beside the *rebuilds the image on purpose* sentence. An unreachable home is a refusal too, since the check cannot be made; `--force` still works.
+
+**Done when:** on a scratch home with a container node and a team running inside it: `ao host rebuild <node>` refuses, names the team's sessions, and the container id is unchanged; `--wind-down` sends the wrap-up, waits, and the new container comes up with the team wound down; `--force` rebuilds and prints the sessions it ended; a node with no live session rebuilds as today; `ao host forget` behaves the same three ways.
+
+**Related:** TD-299 (where it was seen; its *Left* line carried this until this entry took it over), TD-057 step 3c.2 (`ao host up|rebuild|forget|status`), TD-053 (wind-down), design §4.9a.
