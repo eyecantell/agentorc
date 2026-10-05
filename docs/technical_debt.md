@@ -2501,7 +2501,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 **Added:** 2026-10-04 (the designer, TD-321's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 built (grinder-ao-1): `ProgressEntry.slices` and `add_slice`, `rpc_progress(slice=True)` (`agent._slice`), the tick's derived slice in `_note_review`, `_reported(s, now)` and `_restart_reading`; `tests/test_slices_done.py`. **Left:** slice 2 (the words: `ao progress done --slice`, the Reports panel, `ao status -v`, the brief and the skill).
+**Status:** Slice 1 built (grinder-ao-1, PR #1055): `ProgressEntry.slices` and `add_slice`, `rpc_progress(slice=True)` (`agent._slice`), the tick's derived slice in `_note_review`, `_reported(s, now)` and `_restart_reading`; `tests/test_slices_done.py`. **Left:** slice 2 (the words: `ao progress done --slice`, the Reports panel, `ao status -v`, the brief and the skill).
 **Location:** `src/sessionorc/models.py` (`ProgressEntry`, `_note_review`), `src/sessionorc/agent.py` (`rpc_progress`), `src/sessionorc/agent_tick.py` (`_derive_reports_inner`), `src/sessionorc/agent_common.py` (`_reported`, `_restart_reading`; `_new_done` and `_counted` unchanged), `src/agentorc/cli.py` (`ao progress done --slice`), `src/agentorc/ui/` (the Reports panel), `src/agentorc/briefs/grinder.md`, `src/agentorc/skill.md`, `tests/`; design §4.8 (the `progress` channel), §4.9a *A slice is work done*, §4.7. Held path (`src/sessionorc/**`): the techlead reads slice 1.
 
 **Why:** TD-321's design. A run that merges slices on an entry it still holds reports `done: []`, so its restart reads *early* inside `RESTART_EARLY`, counts toward the ceiling, and its third run on the entry is a *repeat* sent to the person, though each run landed work.
