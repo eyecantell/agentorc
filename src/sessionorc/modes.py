@@ -78,6 +78,7 @@ MAILBOX = frozenset(
         "pass_up",
         "inbox",
         "thread",
+        "pr_reads",
         "inbox_delete",
         "inbox_snooze",
         "inbox_hand",

@@ -213,3 +213,51 @@ async def test_a_verdict_rides_only_on_a_reply_to_a_prs_ask_and_the_person_needs
         assert said["verdict"] is None, "the person's word ends it: a word, not a verdict"
         for sid in (w, tl):
             await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_pr_reads_says_where_each_ask_stands_to_its_author_its_readers_and_a_person(agent, tmp_path):
+    """§4.9c *Whose turn it is* (TD-315 slice 2): `pr_reads {id, pr}` — each `ask` the session sent
+    carrying that PR, its addressees, time, whether it is open and its last reply's verdict, never
+    text; refused to a session that is neither the author nor one of the readers it asked."""
+    async with LocalClient() as person:
+
+        async def mk(n: str, **kw):
+            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            return (await person.call("create", **params))["id"]
+
+        w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
+        ui = await mk("ui", team="t", unattended=True)
+        tl = await mk("tl", team="t", unattended=True)
+        other = await mk("o", team="t", unattended=True)
+        async with (
+            LocalClient(caller=w) as wc,
+            LocalClient(caller=ui) as uc,
+            LocalClient(caller=tl) as tc,
+            LocalClient(caller=other) as oc,
+        ):
+            assert (await wc.call("pr_reads", id=w, pr=12))["asks"] == [], "nothing asked yet"
+            first = (await wc.call("msg", to=ui, text="#12: the page", kind="ask", pr=12))["entry"]
+            await wc.call("msg", to=tl, text="#13: another PR", kind="ask", pr=13)
+            await uc.call("msg", reply_to=first["id"], kind="reply", text="the page reads right", verdict="pass")
+            second = (await wc.call("msg", to=tl, text="#12: the core", kind="ask", pr=12))["entry"]
+            got = await wc.call("pr_reads", id=w, pr=12)
+            assert got["id"] == w and got["pr"] == 12
+            assert [(a["id"], a["to"], a["open"], a["verdict"]) for a in got["asks"]] == [
+                (first["id"], [ui], False, "pass"),
+                (second["id"], [tl], True, None),
+            ]
+            assert got["asks"][0]["replied_at"] and got["asks"][1]["replied_at"] is None
+            assert all("text" not in a for a in got["asks"]), "fields, never text"
+            assert (await uc.call("pr_reads", id=w, pr=12)) == got, "a reader asked learns where the chain stands"
+            assert (await tc.call("pr_reads", id=w, pr=12)) == got
+            assert (await person.call("pr_reads", id=w, pr=12)) == got
+            with pytest.raises(AgentError, match="cannot read .* reads of PR #12"):
+                await oc.call("pr_reads", id=w, pr=12)
+            with pytest.raises(AgentError, match="cannot read"):  # asked about #12 only
+                await uc.call("pr_reads", id=w, pr=13)
+            await tc.call("msg", reply_to=second["id"], kind="reply", text="merged #12", verdict="merged")
+            got = await wc.call("pr_reads", id=w, pr=12)
+            assert [a["verdict"] for a in got["asks"]] == ["pass", "merged"]
+        for sid in (w, ui, tl, other):
+            await person.call("kill", id=sid)
