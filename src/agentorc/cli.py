@@ -753,7 +753,12 @@ def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
             f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
             "(design §4.4a: decided, not built)"
         )
-    return orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
+    org, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
+    # the flow each team runs now is the home's setting (§4.9c, `teams.<team>.flow`); an agent that is
+    # down or too old to answer leaves every team on the first of its `flows:`
+    with contextlib.suppress(AgentError, AgentUnavailable):
+        org = orgmod.with_settings(org, call_sync("settings").get("teams"))
+    return org, notes
 
 
 def _org_here() -> orgmod.Org:
@@ -1681,10 +1686,11 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return emit(args, got, said)
 
 
-def _defined_team(args: argparse.Namespace) -> str:
-    """The team `args.name` names, checked against the org's definitions here — the agent takes the
-    key as given (design §4.7): a team the org does not define is refused, naming the defined ones."""
-    org = _org_here()
+def _defined_team(args: argparse.Namespace, org: orgmod.Org | None = None) -> str:
+    """The team `args.name` names, checked against the org's definitions here (`org`, else read) — the
+    agent takes the key as given (design §4.7): a team the org does not define is refused, naming the
+    defined ones."""
+    org = org if org is not None else _org_here()
     if args.name in org.refused:  # two repos define it (§4.9 *Names are the org's*): say why, not "no team"
         raise AgentError(org.refused[args.name])
     if args.name not in org.teams:
@@ -1755,6 +1761,47 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
     got = call_sync("set_settings", teams={name: {"on_work": args.what}})
     t = (got.get("teams") or {}).get(name) or {}
     return emit(args, got, lambda: print(_team_setting_line(name, t)))
+
+
+def cmd_team_flow(args: argparse.Namespace) -> int:
+    """`ao team flow <team> [<flow>]` (design §4.7, §4.9c): with no flow, the team's flows in order,
+    the current one marked, each one's flow strip and why the team cannot use it; with a flow, writes
+    `teams.<team>.flow` through `set_settings` — a person's own — refused here for a flow the team
+    does not list, as a team's name is. The next start compiles it; Apply to a live team's records
+    (`--apply`, the relaunch) is TD-309 slice 5's."""
+    try:
+        org = _org_here()
+        name = _defined_team(args, org)
+    except (ValueError, AgentError) as e:
+        return fail(args, str(e), 1)
+    team = org.teams[name]
+    if not team.flows:
+        return fail(args, f"team {name} lists no flows: — it runs as its definition is written (design §4.9c)", 1)
+    if args.flow is not None:
+        if args.flow not in team.flows:
+            return fail(args, f"team {name} lists {', '.join(team.flows)}, not {args.flow!r} (design §4.9c)", 1)
+        got = call_sync("set_settings", teams={name: {"flow": args.flow}})
+        team = orgmod.with_settings(org, got.get("teams")).teams[name]
+    here = hosts.local_host().name
+    rows = teams.flow_rows(org, team, team.host or here, here)
+    note = teams.flow_unlisted(team)
+    out = {"team": name, "flow": teams.current_flow(team), "flows": rows, "note": note}
+
+    def prose() -> None:
+        if args.flow is not None:
+            print(
+                f"{name}: flow set to {args.flow} — its next start runs it (Apply to live members: not built — TD-309)"
+            )
+        if note:
+            print(note)
+        w = max(len(r["name"]) for r in rows)
+        for r in rows:
+            mark = "*" if r["current"] else " "
+            print(f"{mark} {r['name']:<{w}}  {r['strip'] or '—'}")
+            if r["cannot"]:
+                print(f"  {'':<{w}}  {r['cannot']}")
+
+    return emit(args, out, prose)
 
 
 def _balance_words(bal: dict[str, Any]) -> str:
@@ -2966,6 +3013,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("what", choices=settings_mod.ON_WORK, help="ask: an Inbox row (the default); start: the home starts")
     q.set_defaults(fn=cmd_team_on_work)
+
+    q = add_team("flow", help="the team's flows, the one it runs marked; with a flow, pick it (§4.9c)")
+    q.add_argument("name")
+    q.add_argument("flow", nargs="?", help="one of the team's flows: — written to teams.<team>.flow")
+    q.set_defaults(fn=cmd_team_flow)
 
     q = add_team("balance", help="the team's balance lines: over one, its members take no new claim (§6 Balance)")
     q.add_argument("name")

@@ -276,6 +276,13 @@ def cannot_follow(flow: str, team: str, reasons: Collection[str]) -> str:
     return f"{flow} cannot be followed by {team}: {'; '.join(reasons)}, or drop {flow} from flows:"
 
 
+def strip(flow: Flow, *, techlead: str = "") -> str:
+    """The team card's **flow strip** and `ao team flow`'s (§4.9c *What is shown*): the stages in order
+    and the person last — *design → build → review → you, through techlead-ao-1*."""
+    route = f"through {techlead}" if techlead else "directly"
+    return " → ".join([st.name for st in flow.stages] + [f"you, {route}"])
+
+
 def path_line(flow: Flow, role: str | None, *, techlead: str = "", held: Collection[str] = ()) -> str:
     """The `{flow}` text a member of `role` is told (§4.9c item 5): the stages in order by role, its
     own stage marked, the review stage by its seat's id and the paths held, and the person last with

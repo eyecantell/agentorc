@@ -173,7 +173,7 @@ class SettingsMixin:
           which clears that window's reserve. A label the profile's adapter does not report is
           refused, with the reported ones named — except before the profile has any reading, when
           nothing can be checked and the reply says `unchecked`.
-        - `teams`: `{team: {schedule?, until?, reserve?, balance?, on_work?} | None}` — a field set to
+        - `teams`: `{team: {schedule?, until?, reserve?, balance?, on_work?, flow?} | None}` — a field set to
           None is cleared, a team set to None removed. The team's name is the client's to check
           against the org's definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
         - `repos`: `{repo: {promote?: {auto: bool}, pull?: bool} | None}`.

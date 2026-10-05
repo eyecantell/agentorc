@@ -303,7 +303,7 @@ def usage(doc: dict[str, Any]) -> dict[str, Any]:
 
 # -- teams, repos, person (§5, TD-146) -------------------------------------------------------------
 
-TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work")
+TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow")
 ON_WORK = ("ask", "start", "off")  # §6 rule 8: what a wound-down team whose lanes gained work does; `ask` when absent
 BALANCE_KEYS = ("prs", "oldest", "review")
 TERMINAL_KEYS = ("size", "face", "copy_on_select")
@@ -397,8 +397,9 @@ def instant(value: Any) -> str:
 def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
     """One team's settings: `schedule` (TD-133's rule, a mapping kept as written until that build
     reads it), `until` (an instant, §6 *Team stop time*) and `reserve` (a flat percent added to the
-    profile's reserve for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*) and
-    `on_work` (§6 rule 8: `ask`, `start` or `off`)."""
+    profile's reserve for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*),
+    `on_work` (§6 rule 8: `ask`, `start` or `off`) and `flow` (§4.9c: the name of the flow the team
+    runs now — the client checks it against the team's `flows:`; the agent reads no definition)."""
 
     def schedule(v: Any) -> dict[str, Any]:
         if not isinstance(v, dict) or not v:
@@ -410,6 +411,12 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"on_work is ask, start or off (§6 rule 8), not {v!r}")
         return str(v)
 
+    def flow(v: Any) -> str:
+        word = v.strip() if isinstance(v, str) else ""
+        if not word or any(c.isspace() for c in word):
+            raise ValueError(f"flow is the name of a flow the team lists (§4.9c), not {v!r}")
+        return word
+
     value = _fields(value, TEAM_KEYS, "a team's settings", drop)
     checks = {
         "schedule": schedule,
@@ -417,6 +424,7 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
         "reserve": _pct,
         "balance": lambda v: parse_balance(v, drop),
         "on_work": on_work,
+        "flow": flow,
     }
     return _each(value, checks, drop)
 

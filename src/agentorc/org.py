@@ -38,8 +38,10 @@ it — it stores `team` and `project` as two plain strings on the record and not
 
 from __future__ import annotations
 
+import copy
+import dataclasses
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -166,6 +168,9 @@ class TeamDef:
     # the flows the team may run, the first its default (design §4.9c, TD-309): names only — a flow
     # is found and judged where the team's repo is read (`teams.plan`, `flowdefs`); empty: no flow
     flows: list[str] = field(default_factory=list)
+    # `teams.<team>.flow` in `settings.yml` (§4.9c, §5): the flow a person picked — the setting, not
+    # the definition, so no file sets it; `with_settings` does, on the client's own copy. "" is none
+    flow: str = ""
 
     def entry_role(self, type_: str) -> str:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
@@ -513,6 +518,23 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
         if tname not in org.teams and tname not in org.refused:
             notes.append(f"place.{tname}: no registered repo defines a team {tname!r} — nothing is placed on {host}")
     return org, notes
+
+
+def with_settings(org: Org, teams: Mapping[str, Any] | None) -> Org:
+    """`org` with each team's `teams.<team>.flow` from the home's `settings.yml` (§4.9c *A team lists
+    its flows, and the person picks one*), as the agent's `settings` read gives `teams`. A copy: the
+    definition is read and cached elsewhere, and a setting is never written into it. A value the
+    team no longer lists is kept as read — `teams.current_flow` reads it as the first, and says so."""
+    picked = {
+        name: str(t["flow"])
+        for name, t in (teams or {}).items()
+        if isinstance(t, dict) and t.get("flow") and name in org.teams
+    }
+    if not picked:
+        return org
+    out = copy.copy(org)
+    out.teams = {n: dataclasses.replace(t, flow=picked[n]) if n in picked else t for n, t in org.teams.items()}
+    return out
 
 
 # ── parsing ───────────────────────────────────────────────────────────────────────────────────

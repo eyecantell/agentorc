@@ -81,6 +81,12 @@ def world(tmp_path, monkeypatch):
             return state["host"]
         if method == "repos":  # the home's repo readings, with the balance marks (§6 *Balance*)
             return state.get("repos", {})
+        if method == "settings":  # the home's `teams:` (§5), whose `flow` picks a team's flow (§4.9c)
+            return {"teams": state.get("teams", {})}
+        if method == "set_settings":
+            for n, f in params["teams"].items():
+                state.setdefault("teams", {}).setdefault(n, {}).update(f)
+            return {"teams": state["teams"]}
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
         if method == "host_dir":

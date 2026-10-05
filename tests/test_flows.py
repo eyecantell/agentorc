@@ -4,6 +4,7 @@ and a team's `flows:` refused at its start when a flow is unknown, not usable or
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -445,3 +446,70 @@ def test_a_feature_entry_opens_the_flows_design_stage(world, tmp_path):  # noqa:
     assert teams.entry_role(org, org.teams["ao-grind"], "feature", HOST, HOST) == "techlead"  # no design stage
     org = _with(tmp_path, flows=["td"], entries={"feature": "grinder"})
     assert teams.entry_role(org, org.teams["ao-grind"], "feature", HOST, HOST) == "grinder"
+
+
+# ── the setting: which listed flow runs (TD-309 slice 4) ──────────────────────────────────────────
+
+
+def test_the_flow_setting_is_a_name_the_agent_takes_without_a_definition():
+    from sessionorc import settings as settings_mod
+
+    assert settings_mod.parse_team({"flow": "build-review"}) == {"flow": "build-review"}
+    for bad in ("", "  ", "td review", 3):
+        with pytest.raises(ValueError, match="flow is the name of a flow"):
+            settings_mod.parse_team({"flow": bad})
+
+
+def test_the_person_picks_a_listed_flow_and_an_unlisted_pick_reads_as_the_first(world, tmp_path):  # noqa: F811
+    """§4.9c *A team lists its flows, and the person picks one*: `teams.<team>.flow` turns the team
+    to a flow it lists; absent, the first; a value it no longer lists reads as the first, said."""
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    org = _write(tmp_path, doc)
+    assert teams.current_flow(org.teams["ao-grind"]) == "td"
+    picked = orgmod.with_settings(org, {"ao-grind": {"flow": "build-review"}, "other": {"flow": "td"}})
+    assert picked is not org and org.teams["ao-grind"].flow == ""  # a copy: the definition never carries it
+    team = picked.teams["ao-grind"]
+    assert teams.current_flow(team) == "build-review" and teams.flow_unlisted(team) == ""
+    p = teams.plan(picked, "ao-grind", HOST)  # the start compiles the pick
+    assert p.flow == "build-review" and p.sit_out == ["designer-ao"]
+    gone = orgmod.with_settings(org, {"ao-grind": {"flow": "build"}}).teams["ao-grind"]
+    assert teams.current_flow(gone) == "td"
+    assert teams.flow_unlisted(gone) == "teams.ao-grind.flow is build, which ao-grind does not list — it runs td"
+    assert orgmod.with_settings(org, {"ao-grind": {"on_work": "ask"}}) is org  # no pick: the org as read
+
+
+def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsys):  # noqa: F811
+    """`ao team flow <team> [<flow>]` (design §4.7): the flows, the current marked, each strip and why
+    one cannot be followed; a pick of a listed flow is written through `set_settings`, any other refused."""
+    from agentorc import cli
+
+    _, state = world
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = _team_doc(tmp_path)
+    doc["teams"]["ao-grind"].update(
+        flows=["build", "td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"}
+    )
+    _write(tmp_path, doc)
+    assert cli.main(["team", "flow", "ao-grind"]) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "* build         build → you, through ao-agentorc-techlead-ao",
+        "  td            design → build → review → you, through ao-agentorc-techlead-ao",
+        "                td cannot be followed by ao-grind: no designer — add one to members:, or drop td from flows:",
+        "  build-review  build → review → you, through ao-agentorc-techlead-ao",
+    ]
+    assert cli.main(["team", "flow", "ao-grind", "hunt"]) != 0
+    assert "lists build, td, build-review, not 'hunt'" in capsys.readouterr().err
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build-review"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert state["teams"]["ao-grind"] == {"flow": "build-review"}
+    assert got["flow"] == "build-review" and [r["current"] for r in got["flows"]] == [False, False, True]
+    assert cli.main(["team", "flow", "ao-grind"]) == 0  # read back from the home's setting
+    assert capsys.readouterr().out.splitlines()[-1].startswith("* build-review ")
+    del doc["teams"]["ao-grind"]["flows"]
+    _write(tmp_path, doc)
+    assert cli.main(["team", "flow", "ao-grind"]) != 0
+    assert "lists no flows:" in capsys.readouterr().err
