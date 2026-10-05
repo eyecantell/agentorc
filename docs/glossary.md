@@ -102,6 +102,8 @@ not mix:
   that tells them the path from that step's side; a team that lists a flow staffs every stage of it.
   A stage is not a phase (*design · grind · review*, derived from claims) and not a state. —
   *proposed* 2026-10-04 (design §4.9c).
+- **path set** — a named list of a repo's held paths (`.agentorc.yml` `held: {<name>: […]}`), which a review stage names as the paths it reads (design §4.9c *A review stage any seat may hold*, TD-314). — *proposed* 2026-10-04.
+- **verdict** — the word on a reader's answer to a held PR's `ask`: `pass`, `merged` or `findings`, a field of the reply and never read from its text (design §4.9c, TD-314). — *proposed* 2026-10-04.
 - **sits out** — what a member is while its team's current flow has no stage for its role but another
   of the team's flows does: not started, or wound down at a switch, its card saying so until a flow
   that uses it is current again. — *proposed* 2026-10-04 (design §4.9c).

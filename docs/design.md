@@ -3395,7 +3395,7 @@ has no composer to fill.
 message to a session's inbox rather than typing into its pane, and is refused unless the graph
 permits it — the caller's controllers, its members, or a session sharing its team or a controlled
 target. An `ask` to the person takes no `--bound` (TD-069). A message to the person whose first paragraph is long, or which has no paragraph break, sends with a one-line warning (§4.10 *How a message to a person is written*, TD-127). `--outcome` and `--thread` are TD-079;
-`--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093). `--shot <path>` (TD-290; built 2026-10-03, TD-292 slice 2), up to four times, names a screenshot and makes the message a **look**: it rides only on a `steer` or an `ask` to the person, each path must be a `.png` directly under `docs/mockups/reviews/` of the sender's repo, and the envelope carries them as `shots` (§4.10 *A look*); a file in the sender's checkout is sent as its repo-relative path, however it was typed. `ao msg person "…"` addresses the org's person inbox,
+`--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093); `--verdict pass|merged|findings` on the reply to one is designed 2026-10-04 and not built (§4.9c *A review stage any seat may hold*, TD-314; TD-315). `--shot <path>` (TD-290; built 2026-10-03, TD-292 slice 2), up to four times, names a screenshot and makes the message a **look**: it rides only on a `steer` or an `ask` to the person, each path must be a `.png` directly under `docs/mockups/reviews/` of the sender's repo, and the envelope carries them as `shots` (§4.10 *A look*); a file in the sender's checkout is sent as its repo-relative path, however it was typed. `ao msg person "…"` addresses the org's person inbox,
 ungated. **Every `ao msg` reply ends with when each addressee will read it** (§4.10 *When it is read*, TD-158, built by TD-168) — a last line per addressee, `<id>: <sentence>` — the same sentence the composer shows, one per addressee, `read_when` under `--json`; from a session it also says when the addressee's wake budget is spent, since a session's message refills nothing. ungated. `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because
 it is its own. **`ao inbox --thread <id>`** (TD-129; built — TD-136 slice 1) is the person's read of one
 thread whole: the `thread` RPC, person-only, gathers every entry sharing the named entry's `root`
@@ -3426,7 +3426,7 @@ nothing else is special. The setting's defaults (`held` every PR, `bound` two ho
 in here too, and an empty `held:` is refused. No `review` on the record is *not held*, and `gh`
 is not asked. A PR whose files cannot be read, or whose list `gh` returns short of its
 `changedFiles` (one page of a large PR), is an error, never *not held*. `--id` asks about
-another session's record. It is the author's own check, and the host agent never makes it.
+another session's record. It is the author's own check, and the host agent never makes it. Designed 2026-10-04, not built (TD-314; TD-315): under a flow with more than one review stage it prints the chain and whose turn it is, from the record and the home's `pr_reads` (§4.9c *A review stage any seat may hold*).
 
 **`ao gate`**'s readings carry their age (TD-230; built — TD-233 slices 1 and 4): each window
 read from a reading ends *· read 6h ago (asked)* — `reported` once reports exist — and `--json`
@@ -5526,7 +5526,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
   ```
 
   `review: {reader, held, bound}` — `reader` is `techlead` (the team's seat; the only reader
-  today) or `person`; **`held` is a list of path globs matched against the PR's changed files and
+  today — a chain of readers under a flow, each any seat, with a `verdict` on each answer, is
+  designed 2026-10-04 and not built: §4.9c *A review stage any seat may hold*, TD-314) or `person`; **`held` is a list of path globs matched against the PR's changed files and
   defaults to every PR (`**`)**; `bound` defaults to two hours. The record carries it as `review`,
   home-owned, set at start and shown on the Focus header as text. **Whether a PR is held keys on
   the record's `review` and the PR's paths** — never on who wrote the PR or its session's mode
@@ -5668,7 +5669,8 @@ names a `seat` role; `manager` and `plain` roles are in no stage. **Today one se
 stage: the team's `techlead:` seat** (role `techlead`), because the held-PR machinery knows two
 readers, `techlead` and `person` (§4.9b *The reader*); a review stage naming another seat role is
 refused when the flow is read, naming TD-314, the design of a review stage any seat role may hold,
-and of a PR passed from one reader to the next. So a new role is usable in every flow whose stages
+and of a PR passed from one reader to the next (designed 2026-10-04, not built — TD-315: *A review
+stage any seat may hold*, below). So a new role is usable in every flow whose stages
 want its kind, and a new flow in every team whose members have the kinds it wants — the two are
 written apart and meet only at a stage's `role:` and its kind. **A role knows nothing of flows**:
 under a flow, a role's own `review:` is set aside (the flow says what waits, item 2 below) and its
@@ -5747,7 +5749,8 @@ stages:
   - {name: build,  role: grinder,  lane: [free-pick, "owner:grinder"],     brief: build.md}
 ```
 
-A stage is one mapping in `stages:` — `name`, `role`, `lane`, `brief` and nothing else, a stray key
+A stage is one mapping in `stages:` — `name`, `role`, `lane`, `brief` and nothing else (a review
+stage's `held:` is TD-314's, designed and not built — below), a stray key
 refused naming it as in a team, a stray top-level key in `flow.yml` likewise:
 
 - **`name`**: the stage's word, unique in the flow, shown in the brief's `{flow}` lines, the card's
@@ -5897,7 +5900,8 @@ gains no flow field: a member's stage is its role (§9 invariant 9).
    where there is no `held:` to give (above). When it holds none, no role gets a reader. A team with
    no flow reads every `review:` as it does today. Under a flow every member stage's role is held on
    the same paths: a path held for one role only (today's per-role `review.held`) is not kept, and a
-   repo that needs it waits for TD-314's path sets — none of the four repos does today.
+   repo that needs it waits for TD-314's path sets — none of the four repos does today (TD-314's
+   sets, designed 2026-10-04, are per review stage and do not bring a per-role path back).
 3. **A person in the team** (§4.9 *A person in the team*, whose union sentence points here) takes
    the reader the current flow gives: `reader: techlead` and the repos' `held:` when the flow has a
    review stage, no reader when it has none. A team with no flow keeps today's union.
@@ -6052,6 +6056,98 @@ team's manager is `on_call: true` as `manager_on_call.md` is for the preset (`ON
 and without one it can be a standing manager only. Profiles are untouched: per host in `profiles.yml`, a role's profile in
 the org file's overlay or its own `role.yml`. What a repo still repeats of the package — mechanics in
 its supplements — is TD-114's remaining cut, which this design widens to *the path, too*.
+
+**A review stage any seat may hold, and a PR read by more than one (TD-314; designed 2026-10-04,
+not built — TD-315, after TD-309).** Paul (2026-10-04): *add/remove a review round*; *roles and
+flows essentially orthogonal*. What TD-307 left to the techlead seat alone is opened here, and
+everything in this paragraph block is designed and not built. Where TD-307's text above speaks of
+the `techlead` seat as the review stage's — the stage's `role` bullet, *Every listed flow must be
+followable* (unstaffed *when the team has no `techlead:` seat*; a seat edited out of the file),
+*the paths its techlead reviews* under *What is the repo's* — it is read, once this is built, as
+the stage's own seat and that stage's path set; TD-315 rewords those sentences when it builds.
+
+- **A review stage names any `seat` role.** It is staffed when the team's definition holds
+  **exactly one seat of that role whose trigger is `asks`** — the `techlead:` seat for the role
+  `techlead`, a `seats:` entry for any other (§4.9b *Seats with a trigger*) — since a held PR
+  reaches its reader as an `ask` and a seat is filled by one. No seat of the role, two of them, or
+  one on another trigger, and the stage is unstaffed: the flow is *not followable*, in the words
+  that say which (*td-ui cannot be followed by ao-grind: no seat of role ui-reader — add one under
+  seats: with trigger: asks*). A flow may hold more than one review stage, in the order they read;
+  two of one role are refused as any two stages of one role are. A review seat's role is a preset
+  of kind `seat` or a role directory of that kind (TD-313); what makes it a reader is its stage's
+  brief, not its template.
+- **A repo names its path sets.** `.agentorc.yml`'s top-level `held:` is a list, as TD-307 wrote
+  it, or a **mapping of named sets** — `held: {core: ["src/sessionorc/**", "docs/briefs/**"], ui:
+  ["src/agentorc/ui/**"]}` — and a review stage gains one key, **`held:`**, the name of a set
+  (`held: ui`). A stage that writes none holds every held path of the repo: the list, or the union
+  of the named sets. A stage naming a set none of the team's repos defines is unstaffed (*nothing
+  held: no path set ui in agentorc*); where a team has more than one repo a set is the union of
+  the sets of that name. A set's name is a word of lower-case letters, digits and `-`. The key is
+  a review stage's alone, refused on a stage that gives a lane. A path held for one role and not
+  another is still not kept (item 2 above): a path is held for what it is, whoever wrote the PR.
+- **The record carries the chain.** Where the current flow holds review stages, every member role
+  of its other stages — and a person's own session in the team, item 3 above, which takes what a
+  member takes — gets **`review: {chain: [{stage, reader, held}, …], bound}`** — one link for
+  each review stage in the flow's order, `reader` the seat's name as the definition gives it,
+  `held` that stage's paths — in place of item 2's `{reader: techlead, held}`. The record's older
+  shape stays valid and means a chain of one: `{reader: techlead|person, held}` is what a role's
+  own `review:` writes for a team with no flow, and what every record written before the build
+  holds. `normalize_review` takes either, and the host agent checks the shape and stores it, as it
+  does today; that a `reader` names a seat of the team is the client's check, made at the compile.
+- **A PR is held by every link whose paths it touches, and is read in the flow's order.** The
+  author walks the chain — there is still no mover between stages: it sends `ao msg --kind ask
+  --pr <n> <reader>` to the first reader holding the PR, takes the next item, and on that reader's
+  answer asks the next. **Only the last reader holding the PR merges it** (for an `unattended`
+  asker; for an `interactive` one every answer is a recommendation, as it is today); a reader
+  before the last answers that its read is done and merges nothing. A PR that touches one link's
+  paths is read by that reader alone, exactly as a held PR is read today.
+- **The reader's answer carries a verdict.** A reply to an `ask` that carries `pr` takes
+  **`--verdict pass|merged|findings`** (`ao msg --reply-to <id> --verdict pass "…"`), kept on the
+  reply's envelope as **`verdict`**, a word and never read out of the text: `pass` — nothing
+  against it on my paths, and I did not merge it; `merged` — I am the last reader and merged it;
+  `findings` — the text says what, and the author fixes and asks again on the same thread. Such a
+  reply without a verdict is refused, naming the three; `--verdict` on any other reply is refused.
+  The one-reader case takes it too, so the Repo page's standing can say what a read came to. **A
+  `pass` stands for the PR**: commits pushed after it for a later reader's findings do not send
+  the PR back, and a later reader that sees its fix reach into an earlier reader's paths says so
+  in its findings, which the author then asks of that reader again, on its thread. Judgement, not
+  machinery: the last reader reads the whole final diff.
+- **Whose turn it is: `ao pr held <n>`.** It prints the chain as the record holds it against the
+  PR's files — each link that holds the PR, its reader and the paths that matched — and where each
+  stands, from a new read of the home, **`pr_reads {id, pr}`**: for the `ask`s that session sent
+  carrying that `pr`, each one's addressee, time, whether it is open, and the `verdict` of its
+  last reply — structured fields and never text, as `prs_waiting` is (§4.9b), answered to the
+  author itself, to a session the ask is addressed to, and to a person. So the line reads
+  *ui-review · ui-reader-ao-1 · src/agentorc/ui/\*\* · passed 14:02* and *review · techlead-ao-1 ·
+  src/sessionorc/\*\* · **your turn to ask — it merges***; `--json` carries `chain`, each link's
+  `state` (`passed`, `asked`, `findings`, `next`, `later`), `turn` and `merges`. A reader runs the
+  same command with `--id <the asker>` to learn whether it is the last. The home answers the read
+  and times nothing; the check is still the author's own, and a session with the older `review`
+  shape reads a chain of one.
+- **The words.** The build stage's brief says *run `ao pr held <n>`; ask the reader it names; a PR
+  with a link still to read is never yours to merge*, in place of naming `{techlead}`; a review
+  stage's brief says how its reader answers — the verdict, and `ao pr held <n> --id <asker>` to
+  know whether the merge is its own. `{flow}` draws every review stage with its seat and its
+  paths (*… → ui-review (ui-reader-ao-1, on src/agentorc/ui/\*\*) → review (techlead-ao-1, on
+  src/sessionorc/\*\*) → you, through techlead-ao-1*). Questions still go to the `techlead:` seat
+  (§4.9b): a review seat of another role reads PRs and answers nothing else.
+- **The bound and the person.** Each ask is bounded by the repo's `review.bound`, as one is today;
+  past it the author asks the person on that thread and **the PR is the person's**, the rest of
+  its chain with it: their merge or their word ends it.
+- **A switch mid-chain.** An ask already sent stays with its reader, who answers it (*What a
+  switch leaves alone*, above). What is left to read is whatever `ao pr held` says under the
+  record as it now stands: a link the new flow dropped is no longer asked, a link it added is, and
+  a `pass` already given to a stage of the same name stands. A reader holding an open ask at a
+  switch that leaves it no longer the last answers `pass`, as `ao pr held --id` then tells it. A
+  review seat whose role has no stage in the current flow is **not sat out**: *Members the flow
+  does not use sit out* (above) is a rule for members, which run until wound down, and a seat is
+  none — it is filled only by an ask, costs nothing between them, and answers what it was asked,
+  as a `techlead:` seat under a flow with no review stage already does.
+- **What is shown.** The team header's *n PRs waiting · oldest* already counts every seat's
+  `prs_waiting`. The Repo page's PR standing (§4.5 screen 11) and `ao repo`'s, which the
+  design words as the techlead seat's and the code already reads from every seat of the team,
+  name the reader and say the verdicts in place of *waiting on review* and *reviewed*: *passed by ui-reader-ao-1 · waiting on techlead-ao-1 ·
+  40m*, *findings from techlead-ao-1*, *merged by techlead-ao-1*. No control is added.
 
 **One flow per team; more kinds of work are more teams.** A team runs one flow at a time. Different
 kinds of work on one repo — building the ledger's entries, checking production, a UI-design pass —
