@@ -103,7 +103,7 @@ class NotifyMixin:
                         str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until
                     )
         doc = settings_mod.load()
-        on_work = {name: t.get("on_work") for name, t in settings_mod.teams(doc).items()}
+        on_work = {name: (t or {}).get("on_work", "ask") for name, t in settings_mod.teams(doc).items()}
         for team, rec in (self._host_rec.get("teams") or {}).items():
             mark = rec.get("work_waiting") if isinstance(rec, dict) else None
             if not isinstance(mark, dict) or mark.get("held") or on_work.get(team, "ask") != "ask":

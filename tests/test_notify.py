@@ -352,6 +352,26 @@ async def test_a_blocked_outcome_a_restart_row_and_a_team_with_work_are_told(age
         agent.sessions.pop(s.id, None)
 
 
+async def test_a_team_with_settings_of_its_own_and_no_on_work_key_is_told_as_ask(agent, sent):
+    # an absent `on_work` means `ask` (design §5, §6 rule 8), for a team with other settings as for one with none
+    settings_mod.save(
+        {
+            "notify": {"telegram": {"on": True, "secrets": "samscrape/prd", "link": ""}},
+            "teams": {"cm-grind": {"reserve": 20}, "off-grind": {"reserve": 20, "on_work": "off"}},
+        }
+    )
+    t0 = datetime.now(UTC)
+    teams = agent._host_rec.setdefault("teams", {})
+    for team in ("cm-grind", "off-grind"):
+        teams[team] = {"work_waiting": {"at": _z(t0), "repo": "/r", "members": {"a": ["TD-1"]}}}
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        assert [t for _, t in sent] == ["agentorc · cm-grind wound down and has work: 1 entry"], sent
+    finally:
+        teams.pop("cm-grind", None)
+        teams.pop("off-grind", None)
+
+
 async def test_a_row_whose_hold_ends_while_a_page_is_visible_is_not_told_then_or_later(agent, sent, tmp_path):
     _on()
     t0 = datetime.now(UTC)
