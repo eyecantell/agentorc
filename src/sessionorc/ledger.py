@@ -47,6 +47,8 @@ ID_ITEM = re.compile(r"^TD-(\d+)$")
 XREPO_ITEM = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")  # cadence §2.4's `<repo>#TD-NNN`
 DECISION = re.compile(r"\bdecision\s*\(([^)]+)\)", re.I)
 WORD = re.compile(r"[^\s,;]+")
+BUILT = re.compile(r"#(\d+)")  # a `Kind: live-check #<n>` line's builds (design §4.9b, TD-323)
+SQUASH = re.compile(r"\(#(\d+)\)\s*$")  # a squash commit's subject ends `(#<n>)`
 
 # The page's four kinds, in the order an entry is tested for them (§4.4 *Repo facts*).
 KINDS = ("for-you", "design-first", "pickable", "other")
@@ -127,12 +129,52 @@ def parse_blocked(raw: str) -> tuple[list[str], list[str], list[str]]:
 
 
 Resolve = Callable[[str], str]  # a `<repo>#TD-NNN` item → `archived`, `open` or `unresolved`
+Live = Callable[[int], bool]  # a PR number → whether its squash commit is in the repo's live commit
+
+
+def built(value: str) -> list[int]:
+    """The builds a `**Kind:** live-check #<n>` line names (design §4.9b *A live check is a
+    grinder's once its build is live*, TD-323): the `#<n>` after the kind's word, one or several,
+    separated by spaces or commas. Anything else after the word — prose, nothing — names none, and
+    the word itself is read as before."""
+    m = WORD.search(value or "")
+    rest = [t for t in re.split(r"[\s,]+", (value or "")[m.end() :] if m else "") if t]
+    nums = [BUILT.fullmatch(t) for t in rest]
+    return [int(x.group(1)) for x in nums] if rest and all(nums) else []
+
+
+class LiveReader:
+    """The home's `live` for one checkout (design §4.9b, TD-323): PR `n` is live when the commit on
+    `origin/<default>` whose subject ends `(#n)` is an ancestor of `live`, the promote reading's live
+    commit (§6 *Promote*). **Unknown is never live**: no live commit, no default branch here, no such
+    commit, or git failing all read False. The log is read once, and only when asked."""
+
+    def __init__(self, root: Path | str, live: str | None) -> None:
+        self.root, self.live = root, live
+        self._squash: dict[int, str] | None = None
+        self._seen: dict[int, bool] = {}
+
+    def __call__(self, n: int) -> bool:
+        if not self.live:
+            return False
+        if n not in self._seen:
+            if self._squash is None:
+                self._squash = {}
+                ref = default_ref(self.root)
+                for line in ((_git(self.root, "log", "--format=%H %s", ref) if ref else None) or "").splitlines():
+                    sha, _, subject = line.partition(" ")
+                    if (m := SQUASH.search(subject)) and int(m.group(1)) not in self._squash:
+                        self._squash[int(m.group(1))] = sha
+            sha = self._squash.get(n)
+            self._seen[n] = bool(sha) and _git(self.root, "merge-base", "--is-ancestor", sha, self.live) is not None
+        return self._seen[n]
 
 
 def kind_of(entry: dict[str, Any]) -> str:
     """The page's kind for an entry (§4.4 *Repo facts*), tested in this order so each has one:
     *for you* (`Owner: paul`, `Kind: decision`, or blocked by a decision), *design-first* (`Kind:
-    design-first`), *pickable* (pickable, `Kind: build` or none), else *other*."""
+    design-first`), *pickable* (pickable, `Kind: build` or none, or a live check whose build is
+    live, TD-323), else *other*."""
     if (
         entry.get("owner") == "paul"
         or entry.get("kind") == "decision"
@@ -141,19 +183,25 @@ def kind_of(entry: dict[str, Any]) -> str:
         return "for-you"
     if entry.get("kind") == "design-first":
         return "design-first"
-    if entry.get("pickable") == "yes" and entry.get("kind") in ("", "build"):
+    if entry.get("pickable") == "yes" and _buildlike(entry):
         return "pickable"
     return "other"
+
+
+def _buildlike(entry: dict[str, Any]) -> bool:
+    """`free-pick`'s kinds: `build` or unwritten, and a live check that reads `live: yes` (§4.9b)."""
+    return entry.get("kind") in ("", "build") or (entry.get("kind") == "live-check" and entry.get("live") == "yes")
 
 
 def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
     prose. A word: `design-first` is a pickable entry with `Kind: design-first`; `free-pick` a
-    pickable one whose kind is `build` or unwritten (TD-228), so a live check, an evaluation and a
-    decision match no lane; a reference, or any other word, matches nothing until a role gives it a
-    meaning here. **An `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the
-    entry's `Owner:` must be one named or absent, so `[free-pick, owner:grinder]` leaves the
-    anchor's entries out; it matches nothing by itself."""
+    pickable one whose kind is `build` or unwritten (TD-228), or a live check whose build is live
+    (§4.9b, TD-323), so a live check not yet live, an evaluation and a decision match no lane; a
+    reference, or any other word, matches nothing until a role gives it a meaning here. **An
+    `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the entry's `Owner:` must
+    be one named or absent, so `[free-pick, owner:grinder]` leaves the anchor's entries out; it
+    matches nothing by itself."""
     owners = {o for w in lane if (o := owner_word(w))}
     mine = str(entry.get("owner") or "").lower()
     if owners and mine and mine not in owners:
@@ -167,11 +215,13 @@ def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     if word == "design-first":
         return entry.get("kind") == "design-first"
     if word == "free-pick":
-        return entry.get("kind") in ("", "build")
+        return _buildlike(entry)
     return False
 
 
-def entries(text: str, archive: str | None = None, resolve: Resolve | None = None) -> list[dict[str, Any]]:
+def entries(
+    text: str, archive: str | None = None, resolve: Resolve | None = None, live: Live | None = None
+) -> list[dict[str, Any]]:
     """Every entry of one version of the file, in file order: `id`, `title`, the header fields
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
     unknown), `blocked_by` — what still blocks, as the script lists it: open ids, `decision (<who>)`,
@@ -181,10 +231,12 @@ def entries(text: str, archive: str | None = None, resolve: Resolve | None = Non
     anything but `archived` keeps the block; with no `resolve` it is unresolved. A
     written `**Pickable:**` line is not read (TD-228 slice 4): what blocks an entry is said in
     `Blocked by:`. `for_page` is the page's kind. A field is read only from the entry's own
-    section."""
+    section. A `Kind: live-check` entry also carries `built`, the PRs its line names, and `live`,
+    `yes` when `live` says every one of them is live and `no` otherwise — no callable, no PR named
+    (§4.9b, TD-323)."""
     t = strip_comments(text)
     heads = list(HEADING.finditer(t))
-    live = {_norm(m.group(1)) for m in heads}
+    here = {_norm(m.group(1)) for m in heads}
     archived = ids_in(archive)
     out: list[dict[str, Any]] = []
     for m in heads:
@@ -199,7 +251,7 @@ def entries(text: str, archive: str | None = None, resolve: Resolve | None = Non
                 if "#" in b:
                     if (resolve(b) if resolve else "unresolved") != "archived":
                         blocked_by.append(b)
-                elif _norm(b) in live or _norm(b) not in archived:
+                elif _norm(b) in here or _norm(b) not in archived:
                     blocked_by.append(b)
             blocked_by += [f"decision ({w})" for w in who] + [repr(b) for b in bad]
         e = {
@@ -212,6 +264,9 @@ def entries(text: str, archive: str | None = None, resolve: Resolve | None = Non
             "blocked_by": blocked_by,
             "pickable": "no" if blocked_by else "yes",
         }
+        if e["kind"] == "live-check":
+            e["built"] = built(fields.get("kind", ""))
+            e["live"] = "yes" if live is not None and e["built"] and all(live(n) for n in e["built"]) else "no"
         e["for_page"] = kind_of(e)
         out.append(e)
     return out
@@ -398,7 +453,12 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
 
 
 def entries_before(
-    root: Path | str, rel: str, before: datetime | None, timeout: float = 10.0, resolve: Resolve | None = None
+    root: Path | str,
+    rel: str,
+    before: datetime | None,
+    timeout: float = 10.0,
+    resolve: Resolve | None = None,
+    live: Live | None = None,
 ) -> tuple[list[dict[str, Any]] | None, str]:
     """The ledger's entries as the last commit of `origin/<default>` before `before` held them
     (design §6 rule 6, TD-227: `lane_seen`'s first write is the ledger at the declaration), and
@@ -417,7 +477,7 @@ def entries_before(
         if text is None:
             return None, f"no {rel} at {ref} {sha[:8]}"
         archive = _git(root, "show", f"{sha}:{archive_path(rel)}", timeout=timeout)
-        return entries(text, archive, resolve), f"{ref} at {sha[:8]}"
+        return entries(text, archive, resolve, live), f"{ref} at {sha[:8]}"
     return None, "no origin/<default> here"
 
 
@@ -432,11 +492,13 @@ def reading(
     with_history: bool = True,
     rel: str | None = None,
     resolve: Resolve | None = None,
+    live: Live | None = None,
 ) -> dict[str, Any]:
     """The ledger reading of one checkout (§4.4 *Repo facts*): `{path, entries, by_priority,
     by_kind, windows, recent, at}`, or `{path, error}` when the file cannot be read. The archive
     beside the ledger (`archive_path`; none there, nothing archived) and `resolve` — the home's
-    `Registry` — derive each entry's `pickable`. `windows` is `{day|week|month: {opened, closed}}`
+    `Registry` — derive each entry's `pickable`; `live` — the home's `LiveReader` — a live check's
+    `live`. `windows` is `{day|week|month: {opened, closed}}`
     from the history and `recent` the entries opened or closed in the longest window, newest first —
     both absent when the history was not read, and marked `history_error` when git could not be
     asked."""
@@ -449,7 +511,7 @@ def reading(
         archive: str | None = (Path(root) / archive_path(rel)).read_text(encoding="utf-8")
     except OSError:
         archive = None
-    got = entries(text, archive, resolve)
+    got = entries(text, archive, resolve, live)
     out: dict[str, Any] = {
         "path": rel,
         "entries": got,

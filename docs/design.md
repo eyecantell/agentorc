@@ -5384,7 +5384,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
 
   **A live check is a grinder's once its build is live (TD-320; Paul, 2026-10-04: *we should
   make live-checks pickable by grinders so they do not have to wait on a promote*; designed that
-  day, not built — TD-323).** A built entry whose *Done when* only the running system can show
+  day; the reading and the lane built — TD-323 slice 1, the briefs and the ledger's lines not yet).** A built entry whose *Done when* only the running system can show
   becomes `Kind: live-check`, and until this rule it matched no lane: it waited for the anchor
   after every promote, and seven High entries stood that way on 2026-10-04.
   - **The entry names its build on its `Kind:` line.** The PR that makes an entry a live check

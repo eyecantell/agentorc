@@ -263,3 +263,30 @@ async def test_what_rule_six_leaves_alone(agent, tmp_path):
         assert agent.sessions[failed].lane_seen is None
         for sid in [*ids.values(), failed]:
             await person.call("kill", id=sid)
+
+
+async def test_a_live_check_whose_build_becomes_live_is_told_once(agent, tmp_path):
+    """TD-323 (design §4.9b): a live check matches `free-pick` once its build reads live, so a build
+    that becomes live is new work in the lane — told once by rule 6, as an entry filed since is; one
+    not live, and one the anchor owns, are told to nobody."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+
+    def check(id: str, live: str, owner: str = "grinder") -> dict:
+        return {**_e(id, kind="live-check"), "owner": owner, "built": [7], "live": live}
+
+    async with LocalClient() as person:
+        led = [_e("TD-001"), check("TD-002", "no"), check("TD-003", "no", owner="anchor")]
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick", "owner:grinder"], led)
+        rec = agent.sessions[sid]
+        await agent._keep_running(now)
+        assert rec.lane_seen["ids"] == ["TD-001"] and _notes(agent, sid) == []
+        # the promote makes #7 live: the repo facts read both checks `live: yes`
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [
+            _e("TD-001"), check("TD-002", "yes"), check("TD-003", "yes", owner="anchor"),
+        ]  # fmt: skip
+        await agent._lane_news(rec, now)
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "your lane gained 1 entry since you declared out of work: TD-002" in notes[0]
+        await person.call("kill", id=sid)
