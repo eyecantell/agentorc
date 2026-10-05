@@ -3666,3 +3666,28 @@ Both go away only when the record says who closed it.
 **Fix:** keep git's first `fatal:`/`error:` line (as `_git_why` in the same module already does), not the last; a test with a remote that does not exist.
 
 **Related:** TD-263 (the pull), TD-264 (where it was seen).
+
+## TD-324: The person inbox counts FYI notes against the same depth as open questions, and nothing marks a person's note read, so FYIs fill a sender's slot until dismissed
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-04 (Paul: *change the inbox limit to be something large, like 200 for need/steers and 1k for fyi*; written by the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Fixed — PR #1050.
+**Location:** `src/sessionorc/mail.py` (`PERSON_INBOX_DEPTH`, `PERSON_SENDER_DEPTH`), `src/sessionorc/agent_mail.py` (`_check_person_depth` and its three callers: a send to the person, the answered-FYI, `rpc_pass_up`), `tests/test_mail.py` (the depth tests), design §4.10 (*The numbers*: the person inbox's figures; the person inbox paragraph's *the same bounds*; the answered-FYI's *counted in the person inbox's depths*; *What bounds it*'s *200 in all, 20 from one sender*)
+
+**Resolved:** 2026-10-04 (PR #1050) — the person inbox's two counts: `mail.PERSON_INBOX_DEPTH` / `PERSON_SENDER_DEPTH` for open questions, `PERSON_FYI_DEPTH` / `PERSON_FYI_SENDER_DEPTH` for FYIs, `agent_mail._check_person_depth(sender, question=…)`; design §4.10 *What bounds it* and *The numbers*; `tests/test_mail.py`.
+
+**Why:** on 2026-10-04 techlead-ao-1's verdict on held PR #1040 was refused by `ao msg`, because the person inbox held 100 entries from that seat, every one a `note`. The two depths count every entry that is unread **or** an open `ask`/`steer`, and a person's read sets no `read_at` (`rpc_inbox`: *a person is not the session*), so a note counts until the person dismisses it, which deletes it. A seat that answers many questions fills its 100 slots with FYIs in a day or two, and then nothing it says reaches the person: not a verdict, not an escalation. The anchor dismissed the 100 notes by hand that night (text kept in `~/ao-shots/inbox-archive/`). Design §4.10's figures are also stale: it says *200 unread and 20 from one sender*, while the code holds 200 and 100 (Paul, 2026-09-28).
+
+**Fix:** two counts in place of one set, each with its own depths:
+1. **Questions**: the open `ask`s and `steer`s. They refuse an `ask` or a `steer` to the person, and a pass-up, at **200** in all and **100** from one sender (today's `PERSON_INBOX_DEPTH` / `PERSON_SENDER_DEPTH`, now counting questions only).
+2. **FYIs**: every other entry still in the person inbox: notes, replies, the answered-FYI. They refuse any other send to the person at **1000** in all (Paul's figure) and **500** from one sender (the anchor's, so one looping sender leaves the others room), as new constants beside the existing pair. A closed `ask` or `steer` counts here until retention or deletion takes it. A cap stays, because a looping session would otherwise flood the Inbox (design §4.10 *The bounds are part of the design*), and the answered-FYI stays counted so a full inbox still refuses a reply rather than let an answer land unseen.
+3. The refusal keeps naming `user_attention.md` with a `Due:` date, and says which count is full.
+4. Design §4.10 in the same PR: the numbers paragraph and *What bounds it* give the two counts and their figures (the dated fact to `docs/design-history.md`), and the answered-FYI sentence names the FYI count.
+5. Tests: notes past the FYI depth refused while an `ask` still lands; questions past theirs refused while a note still lands; per sender for both; the answered-FYI refused at a full FYI count; the existing depth tests moved onto the count they test.
+
+**Done when:** a sender with 100 notes still in the person inbox can still send an `ask` and a note to the person, and the design's figures match `mail.py`.
+
+**Related:** TD-069 (the depths counting open questions, 2026-09-19), TD-075 (the techlead seat, the heaviest writer to the person), TD-052 (the bounds).
