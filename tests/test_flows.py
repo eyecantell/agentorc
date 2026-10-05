@@ -763,14 +763,19 @@ def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys,
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build"])
     tl = next(s for s in state["sessions"] if s["name"] == "techlead-ao")
     tl["prs_waiting"] = {
-        "n": 2,
+        "n": 3,
         "oldest": "2026-10-05T09:00:00Z",
-        "asks": [{"from": "ao-agentorc-grind-1", "pr": 1020}, {"from": "ao-x-w@devenv", "pr": 1021}],
+        "asks": [
+            {"from": "ao-agentorc-grind-1", "pr": 1020},
+            {"from": "ao-x-w@devenv", "pr": 1021},
+            {"from": f"ao-agentorc-grind-2@{HOST}", "pr": 1022},
+        ],
     }
     assert cli.main(["team", "flow", "ao-grind", "build"]) == 0
     out = capsys.readouterr().out
     assert "  grind-1's PR #1020 stays with techlead-ao" in out
     assert "  ao-x-w@devenv's PR #1021 stays with techlead-ao" in out
+    assert "  grind-2's PR #1022 stays with techlead-ao" in out
     assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
     got = json.loads(capsys.readouterr().out)["apply"]
     assert got["stays"][0] == {

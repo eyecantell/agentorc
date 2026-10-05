@@ -25,7 +25,7 @@ from typing import Any
 from agentorc import flowdefs, repoconfig, teams
 from agentorc import org as orgmod
 from sessionorc import balance as balance_mod
-from sessionorc import hosts
+from sessionorc import hosts, naming
 from sessionorc import ledger as ledger_mod
 from sessionorc.client import AgentError
 from sessionorc.gitinfo import work_left
@@ -822,7 +822,8 @@ def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
     """What a switch leaves with a reader (design §4.9c *What a switch leaves alone*): each open PR
     `ask` at a session of the team, from the reader's `prs_waiting.asks` (§4.9b, TD-333) in the order
     they came — `{from, pr, reader, line}`, the line *grinder-ao-1's PR #1020 stays with
-    techlead-ao-1*. The sender is named by its record where this home lists it, else by its address."""
+    techlead-ao-1*. The sender is named by its record where this home lists it, else by its address.
+    A reader not running now is still the reader: a seat comes back on its next question (§4.9b)."""
     names = {str(s["id"]): str(s.get("name") or s["id"]) for s in sessions if s.get("id")}
     out: list[dict[str, Any]] = []
     for s in badged(name, sessions):
@@ -831,7 +832,9 @@ def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
             continue
         reader = str(s.get("name") or s.get("id"))
         for a in waiting.get("asks") or []:
-            sender = names.get(str(a.get("from")), str(a.get("from")))
+            sent = str(a.get("from"))
+            # this host's own sender may be addressed `id@home`, which the list names by its bare id
+            sender = names.get(sent) or names.get(naming.split_address(sent)[0], sent)
             line = f"{sender}'s PR #{a.get('pr')} stays with {reader}"
             out.append({"from": a.get("from"), "pr": a.get("pr"), "reader": reader, "line": line})
     return out
