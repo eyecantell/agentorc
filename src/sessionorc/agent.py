@@ -672,7 +672,9 @@ class HostAgent(
         shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
         promote's readings per repo (`promotes`, §6 *Promote*), the pull's (`pulls`, §6 *Pull*) and
         each wound-down team's `work_waiting` as the `host` record holds it (`work: {<team>: mark}`,
-        §6 rule 8), which is what draws the Inbox's team start row and the card's note; and what
+        §6 rule 8), which is what draws the Inbox's team start row and the card's note; each team's
+        balance mark (`balance: {<team>: mark}`, §6 *Balance*), every one, a mark with no `repo` included,
+        which no checkout's `repos` reading carries (TD-330); and what
         each live session waits on (`waiting: {<sender>: [{id, ref, bound}]}`, `work.waiting_of`
         over the person inbox, §4.9a *Waiting is read, never declared*, TD-274) — references and
         bounds, never the questions' text — which a session's `ao team status` cannot read for
@@ -689,6 +691,11 @@ class HostAgent(
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())
                 if isinstance(rec, dict) and isinstance(rec.get("work_waiting"), dict)
+            }
+            out["balance"] = {
+                team: dict(rec["balance"])
+                for team, rec in sorted((self._host_rec.get("teams") or {}).items())
+                if isinstance(rec, dict) and isinstance(rec.get("balance"), dict)
             }
         else:
             out["link"] = dict(self.home_link)

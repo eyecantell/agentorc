@@ -1589,23 +1589,27 @@ class TickMixin:
         member's profile over its usage line; the team's stop time passed and not cleared;
         `WORK_STARTS_DAY` starts in the day; a start inside `WORK_EARLY`; its repo over the team's
         balance line (`_work_balance`). Nothing to replay holds it too: the row of `ask` is the
-        person's way to start a team the rule cannot."""
+        person's way to start a team the rule cannot. A standing balance hold that an earlier bound
+        displaces is kept beside it as `balance`, so a failed reading when that bound lifts does not
+        start a team that was over its line (TD-330)."""
+        prior = _balance_hold(standing)
+        kept = {"balance": prior} if prior is not None else {}
         if not replays:
-            return {"why": "nothing"}
+            return {"why": "nothing", **kept}
         for profile in dict.fromkeys(r.profile for r in replays):
             if (over := self._profile_over(profile, now, team)) is not None:
                 # the window's reset, when the reading has one, so the row can say when the hold lifts
                 resets = {"resets": over["resets"]} if over.get("resets") else {}
-                return {"why": "usage", "profile": profile, **resets}
+                return {"why": "usage", "profile": profile, **resets, **kept}
         until = conf.get("until")
         with contextlib.suppress(TypeError, ValueError):
             if until and _parse(str(until)) <= now:
-                return {"why": "until", "until": str(until)}
+                return {"why": "until", "until": str(until), **kept}
         if len(started) >= agent_common.WORK_STARTS_DAY:
-            return {"why": "day", "count": len(started)}
+            return {"why": "day", "count": len(started), **kept}
         if started and _recent(started[-1], now, agent_common.WORK_EARLY):
-            return {"why": "early", "started": started[-1]}
-        return self._work_balance(conf.get("balance"), records or replays, now, standing)
+            return {"why": "early", "started": started[-1], **kept}
+        return self._work_balance(conf.get("balance"), records or replays, now, prior)
 
     def _work_balance(
         self, bal: dict[str, Any] | None, records: list[Session], now: datetime, standing: Any = None
@@ -1628,7 +1632,7 @@ class TickMixin:
             bal, roots, self._repos, min(waiting) if waiting else None,
             min(bounds) if bounds else balance_mod.REVIEW_BOUND, now,
         )  # fmt: skip
-        kept = standing if isinstance(standing, dict) and standing.get("why") == "balance" else None
+        kept = _balance_hold(standing)
         if got is None:
             return kept
         if not got[0]:
@@ -3242,3 +3246,14 @@ def _span(seconds: float) -> str:
 def _lines(crossed: Any) -> list[tuple[Any, Any]]:
     """A balance crossing's lines and limits, without the numbers that move with the clock."""
     return [(c.get("line"), c.get("limit")) for c in crossed or [] if isinstance(c, dict)]
+
+
+def _balance_hold(held: Any) -> dict[str, Any] | None:
+    """The balance hold a standing `held` carries (§6 rule 8's fifth bound): the hold itself, or the one
+    kept beside another bound that displaced it (`_work_held`); None when it carries none."""
+    if not isinstance(held, dict):
+        return None
+    if held.get("why") == "balance":
+        return held
+    inner = held.get("balance")
+    return inner if isinstance(inner, dict) and inner.get("why") == "balance" else None
