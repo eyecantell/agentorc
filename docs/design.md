@@ -673,14 +673,15 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   home, readings kept in `repos.json` beside `usage.json`, served by the `repos` RPC and pushed as
   a `repos` event when any changes (`repo: null` for a checkout the registry dropped; a node
   forwards the RPC and refuses it offline, §4.4a), the shape `usage` has. **Pull requests**: two
-  `gh pr list --json number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft`
+  `gh pr list --json number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft`
   reads in the checkout — `--state open` for the open list, and `--state all --search
   updated:>=<a month ago> --limit 1000` for the windows, since a busy repo opens more than a page
   of PRs in a month (the reading says `truncated` when the second fills its limit) — **every five
   minutes** in a thread, never per tick, once per
   remote (two checkouts of one repo are one read); kept as the open list plus, per window (the
   last day, 7 days and 30 days, rolling), the counts *opened* (`createdAt` in the window) and *closed*
-  (`closedAt` or `mergedAt` in it, a merge being a close) and the month's PRs as `recent`; a read that failed keeps the last
+  (`closedAt` or `mergedAt` in it, a merge being a close) and the month's PRs as `recent`, each kept PR
+  with its `head` (`headRefOid`), which §6 rule 10 reads; a read that failed keeps the last
   reading and records `error` and `failed_at`, so the page can say *could not look* — an outage
   is never zero PRs, the rule `_count_seats` already follows for merges (`merged_prs` answers
   `None`, never `[]`). **The ledger**: the repo's `ledger:` file (`.agentorc.yml`, default
@@ -8475,7 +8476,8 @@ code and needs no grant; a session doing the same work does.
      before the script; a head neither can give is no reading. A merged PR's head no longer
      moves, and nor does one closed unmerged, so its entry carries `merged` or `closed` (a PR found
      closed at the head it was read at is marked so with no second run) and a settled read of it stands with nothing asked,
-     until the member's own new `done` names the PR (a derived entry is written anew at every
+     until the member's own new `done` names the PR — so a PR reopened after it was marked is read again
+     only at that `done` (a derived entry is written anew at every
      derivation, so its date is no report). Of the PRs waiting, the one longest unread is looked at first.
      A pass takes `told` away with `row`, so a fail after it is a first fail again. **`pass`** writes the entry and nothing else. **`fail`**
      the first time for that PR — `told` empty — is one fixed line to the member, rule 5's two
