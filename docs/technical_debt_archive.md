@@ -4755,3 +4755,21 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Done when:** a Done pressed on a row read from origin lands on origin's `main` within the bound, as one squash-merged PR of the host agent's with the fixed message as its title, the checkout's `main` is unchanged until the pull moves it, the Inbox draws the row done after its fetching read, and the tests above pass; cadence §4.5 names the tool's PR.
 
 **Related:** TD-222 (the design and the steer), TD-263 (the pull), TD-208 and TD-221 (the disabled row this ends), TD-069 (the write-back), TD-142 and TD-255 (Reply and Decide, which ride the same path).
+
+## TD-330: Three loose ends of the balance rule: a hold lost to another reason, a nested team's lead, a mark with no repo
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-2, carried out of TD-239 when its live check held; each from a techlead read of its slices)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — the page's half of (3) left. Built (PR #1106, grinder-ao-1): (1) `_work_held` keeps a standing balance hold beside an earlier bound as `held.balance` (`_balance_hold`), and §6 rule 8 says `on_work: ask` drops every hold, the balance one included, a later `start` reading the line afresh; (2) written in §6 as one layer deep while nesting is not built; (3)'s home and terminal half — `rpc_host` carries `balance: {<team>: mark}`, every mark, `teamrun.balance_marks(repos, host)` merges it, `ao team list` and `ao team balance` read both. **Left** (`src/agentorc/ui/`, grinder-ao-2's package): the team card (`ui/repo.py`, `team_groups`' `marks`) and the Settings page's **balance** field (`ui/settings_page.py`, `balance_card`) pass the `host` read's `balance` to `balance_marks` (the page already reads `host` for `work`, `app.py` `home_reading`), with the page's UI check; then §6's *not yet the `host` read* clause goes.
+**Location:** `src/sessionorc/agent_tick.py` (`_work_held`, `_work_balance`, `_balance_leads`), `src/sessionorc/agent.py` (`rpc_host`, the `host` read), `src/agentorc/teamrun.py` (`balance_marks`); design §6 *Balance*
+
+**Why:** TD-239 built the rule whole, and its reviews left three cases nobody scheduled. (1) A standing `balance` hold on `work_waiting` is lost whenever another reason takes `held` or strips it (a usage hold, `on_work` set to `ask` and back), so a failing PR reading at that moment starts the team (#799's read). (2) `_balance_leads` reads only the bottom layer of controllers: a team of manager → g1 → w tells g1, and with a second grinder beside g1 tells only the person (#798's read). (3) A mark with an empty `repo` is in no `repos` reading, so the terminal and the page never say it; only the refusal does (#847).
+
+**Resolved:** 2026-10-05 (PR #1122) — (1) and (2) and the home and terminal half of (3) are built in #1106: `_work_held` / `_balance_hold` in `src/sessionorc/agent_tick.py`, §6 rule 8 and *Balance*, `rpc_host`'s `balance`, and `teamrun.balance_marks`. The page's half of (3) is built in #1122: `ui/repo.py` `team_groups(balance=…)` and `ui/settings_page.py` `balance_card(host=…)`, with `tests/test_ui_team_summary.py` and `tests/test_ui_settings.py`. Design §6 *Balance* says where each reads the mark.
+
+**Done when:** each of the three is fixed or written down in §6 as how it is meant to be.
+
+**Related:** TD-239 (the build), TD-177 (the design), TD-227 (rule 8's holds).
