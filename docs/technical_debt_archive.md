@@ -4224,7 +4224,7 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Why:** TD-177's *Why*: the repo's numbers make a growing pull-request count visible and nothing acts on it, so the person finds out from the card once it is large.
 
-**Resolved:** 2026-10-05 (built by PRs #772, #796, #798, #799, #847, #850 and #853; live check held: PR #NNNN) — design §6 *Balance*, §4.5a the team card's **over its line** and the Settings page's **balance**, §4.7 `ao team balance`, §5 `teams.<team>.balance`; `sessionorc/balance.py`, `tests/test_balance.py`. Left over: TD-330.
+**Resolved:** 2026-10-05 (built by PRs #772, #796, #798, #799, #847, #850 and #853; live check held: PR #1080) — design §6 *Balance*, §4.5a the team card's **over its line** and the Settings page's **balance**, §4.7 `ao team balance`, §5 `teams.<team>.balance`; `sessionorc/balance.py`, `tests/test_balance.py`. Left over: TD-330.
 
 **Done when:** on a scratch home with `ao team balance <team> --prs 1` and two open pull requests in the scratch repo, a member's `ao progress claim` is refused with the numbers, the card reads *over its line*, the manager's inbox holds one note, and closing one pull request clears the mark within a repo reading and rings the member.
 
@@ -4245,6 +4245,6 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 
 **Status:** Designed 2026-09-29 (the designer, PR #759; the steer to Paul is `m-412813e0ac60`, bound 2026-09-30 06:23 MDT): design §6 *Balance*, §4.5a (the Settings page's **balance**, the team card's **over its line** note), §4.7 `ao team balance`, §5 `teams.<team>.balance`, §10's question closed. It departs from this entry's Fix in one thing: the rule acts at the claim, refused by the host agent, and not in the manager's round, because a manager hands out no work and cannot read the reader's queue; the manager is told and logs it. Closes with TD-239. **Next:** designed; the build is TD-239.
 
-**Resolved:** 2026-10-05 (designed by PR #759; built and checked as TD-239, live check held: PR #NNNN) — design §6 *Balance*.
+**Resolved:** 2026-10-05 (designed by PR #759; built and checked as TD-239, live check held: PR #1080) — design §6 *Balance*.
 
 **Related:** TD-176, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
