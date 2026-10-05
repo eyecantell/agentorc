@@ -1007,9 +1007,11 @@ class TickMixin:
                     if bool(old.get("merged")) == merged and bool(old.get("closed")) == closed:
                         continue
                     if closed and not old.get("merged"):
-                        # closed unmerged at the head it was read at: the read stands, settled
-                        old["closed"] = True
-                        self._save(s)
+                        # closed unmerged at the head it was read at: the read stands, settled — written
+                        # only to the record still under its address, as a read is
+                        if self._is_record(s) and self._cadence_member(s):
+                            old["closed"] = True
+                            self._save(s)
                         continue
                 got = await asyncio.to_thread(cadence_mod.check, root, pr)
                 if got is None or not self._is_record(s) or not self._cadence_member(s):

@@ -437,12 +437,20 @@ async def test_a_closed_pr_settles_and_an_open_ones_head_comes_from_the_repo_rea
         assert rec.checks[0]["closed"] is True and gh.ran == [842] and gh.asked == [842, 842]
         await agent._cadence_pass([rec])
         assert gh.asked == [842, 842], "a closed PR's settled read asks nothing more, not even its head"
+        # a record replaced while the pass was out is never written: the mark goes to the record under the address
+        gone = Session(id=rec.id, name="w", kind="agent", adapter="shell", dir="", repo=root, host=agent.host)
+        gone.supervised, gone.unattended = True, True
+        gone.progress = [ProgressEntry(ref="TD-259", status="done", pr=845)]
+        gone.checks = [{"pr": 845, "at": "t", "sha": "eee", "verdict": "pass", "failed": []}]
+        gh.heads[845] = ("eee", "closed")
+        await agent._cadence_pass([gone])
+        assert "closed" not in gone.checks[0] and agent.sessions[rec.id] is rec
         # an open PR the repo reading holds: its head is read there, and gh is not asked
         _done(rec, "TD-258", 843)
         agent._repos[root] = {"prs": {"open": [{"number": 843, "head": "ddd", "state": "open"}], "recent": []}}
         gh.verdicts[843] = PASS
         await agent._cadence_pass([rec])
         await agent._cadence_pass([rec])
-        assert gh.asked == [842, 842] and gh.ran == [842, 843]
+        assert gh.asked == [842, 842, 845] and gh.ran == [842, 843]
         assert cadence.entry_of(rec.checks, 843)["sha"] == "ddd"
         await person.call("kill", id=rec.id)
