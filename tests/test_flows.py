@@ -342,7 +342,8 @@ def test_an_edit_to_a_stage_brief_is_brief_changed(tmp_path):
 
     flow_dir = tmp_path / ".agentorc" / "flows" / "mine"
     flow_dir.mkdir(parents=True)
-    (flow_dir / "flow.yml").write_text("stages:\n  - {name: build, role: grinder, lane: [free-pick], brief: build.md}\n")
+    stage = "{name: build, role: grinder, lane: [free-pick], brief: build.md}"
+    (flow_dir / "flow.yml").write_text(f"stages:\n  - {stage}\n")
     (flow_dir / "build.md").write_text("build words\n")
     cfg = repoconfig.load(tmp_path)
     mine = flowdefs.load("mine", cfg)
