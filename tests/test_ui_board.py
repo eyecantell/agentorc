@@ -803,6 +803,57 @@ def test_a_fetch_that_is_stopped_or_fails_is_followed_by_a_plain_read(tmp_path, 
 
 
 @pytest.mark.unit
+def test_the_read_after_a_press_stopped_draws_the_board_as_the_write_back_left_it(tmp_path, monkeypatch):
+    """§4.5 screen 6 (3), TD-264: a fetching read after a press that is stopped reads the board in the
+    host agent's own tree — origin's head once the press merged — named as the checkout's board and
+    read from origin, so the snoozed row is drawn snoozed; never for a whole read, and the checkout's
+    plain read when the tree holds the same board. The real reader."""
+    import subprocess
+
+    due = date.today().isoformat()
+    root = repo(tmp_path, "proj", f"# Board\n\n- [ ] the line. Due: {due}.\n")
+    host(tmp_path, monkeypatch, [root])
+    from agentorc.ui import app as uiapp
+    from sessionorc import board as board_mod
+
+    tree = board_mod.tree_dir(root) / "docs" / "user_attention.md"
+    tree.parent.mkdir(parents=True)
+    tree.write_text("# Board\n\n- [ ] the line. Due: 2099-01-01.\n")
+    board = str(root / "docs" / "user_attention.md")
+
+    def run(argv, **kw):
+        if "--fetch" in argv:
+            raise subprocess.TimeoutExpired(argv, kw["timeout"])
+        return subprocess.run(argv, **kw)
+
+    rows, note = uiapp.read_boards(run=run, fetch=True, board=board)
+    assert note == "" and [(r["board"], r["root"], r["repo"], r["due"]) for r in rows] == [
+        (board, str(root), "proj", "2099-01-01")
+    ]
+    assert rows[0]["source"] == "origin" and not rows[0]["due_now"]
+    assert uiapp.origin_note(rows[0])["text"].startswith("read from origin: this checkout has not pulled it yet")
+    # the reader's own bound on its fetch (*fetch skipped*, its report whole) is the same stop
+    import json
+
+    def skipped(argv, **kw):
+        done = subprocess.run([a for a in argv if a != "--fetch"], **kw)
+        got = json.loads(done.stdout)
+        for b in got["boards"]:
+            b["fetch_note"] = "fetch skipped (timeout)"
+        return subprocess.CompletedProcess(argv, 0, json.dumps(got), "")
+
+    rows, _ = uiapp.read_boards(run=skipped, fetch=True, board=board)
+    assert [(r["due"], r["source"]) for r in rows] == [("2099-01-01", "origin")]
+    # a whole read is not a press's: the checkout's, said as skipped
+    rows, _ = uiapp.read_boards(run=run, fetch=True)
+    assert rows[0]["due"] == due and rows[0]["fetch_note"] == "fetch skipped (timeout)"
+    # the tree holds the checkout's board: the plain read, as before
+    tree.write_text((root / "docs" / "user_attention.md").read_text())
+    rows, _ = uiapp.read_boards(run=run, fetch=True, board=board)
+    assert rows[0]["due"] == due and rows[0]["source"] == "" and rows[0]["fetch_note"] == "fetch skipped (timeout)"
+
+
+@pytest.mark.unit
 def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, monkeypatch):
     """The first request reads plainly; from then a stale reading starts one fetching read, however
     many requests find it stale, and each is answered from the last reading meanwhile; a press

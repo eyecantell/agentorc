@@ -2378,9 +2378,11 @@ Screens:
    reached*. (3) *The read after a press* — Snooze, Done, Reply, Decide — is a read of that one board
    alone, laid over the last reading, so the other repos' rows do not move: a fetching one, since
    the write-back lands on origin's head (built — TD-264; the edit is there and not yet in the
-   checkout, §4.4), bounded as every fetching read is and, stopped, showing the line as the
-   write-back's result reported it (not built: stopped, it is the plain read's line, the
-   checkout's, until the next fetching read — TD-264's remainder).
+   checkout, §4.4), bounded as every fetching read is and, stopped — by that bound, or by the reader's own on its
+   fetch (*fetch skipped*) — showing the line as the write-back left it: the board in the host agent's own tree, which the press reset to origin's
+   head once its PR merged, read plainly and named as the checkout's board under the *behind* note
+   (built — TD-264); the checkout's plain read only where there is no such tree or it holds the
+   checkout's board word for word.
    What the reader found is said, by board, in **one note above that repo's first board row**
    in each list the page draws (*Needs you*, *Not due yet*, the *not shown* fold, the Repo
    page's *Waiting on you*), drawn as text; the phrases are one table in the code, and a test
