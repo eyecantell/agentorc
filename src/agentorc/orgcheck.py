@@ -12,8 +12,8 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
+from agentorc import flowdefs, teams
 from agentorc import org as orgmod
-from agentorc import teams
 from sessionorc import board, defs, gitinfo, paths
 from sessionorc import settings as settings_mod
 
@@ -65,7 +65,7 @@ def remainder(home: Path | None = None) -> dict[str, Any]:
     return {"home": str(home), "tree": tree, "files": files}
 
 
-def view(org: orgmod.Org, here: str, home: Path | None = None) -> dict[str, Any]:
+def view(org: orgmod.Org, here: str, home: Path | None = None, roots: Collection[str] = ()) -> dict[str, Any]:
     """The org as the clients aggregate it: each team with its source file, its repos, the host it
     lands on and why; the names a repo's definition lost to the org file's (`shadowed`) and the
     ones two repos define (`refused`); then the remainder's files with their last commit."""
@@ -86,6 +86,7 @@ def view(org: orgmod.Org, here: str, home: Path | None = None) -> dict[str, Any]
         "teams": rows,
         "shadowed": {n: [str(f) for f in fs] for n, fs in org.shadowed.items()},
         "refused": dict(org.refused),
+        "flows": flowdefs.visible(roots, org.roles),  # every flow the org can see here (§4.9c)
         "remainder": remainder(home),
     }
 
@@ -172,6 +173,11 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
             teams.plan(org, name, here, files=files)
         except (teams.TeamError, ValueError, OSError) as e:
             lack(str(e).strip('"'))
+    # a flow nobody lists that is not usable (§4.9c): a listed one is the start's refusal, said above
+    listed = {f for t in org.teams.values() for f in t.flows}
+    for f in flowdefs.visible(roots, org.roles):
+        if not f["usable"] and not f.get("shadowed") and f["name"] not in listed:
+            lack(f"flow {f['name']} ({f['source']}) is not usable — {'; '.join(f['problems'])}")
     for name in sorted(settings_mod.teams(settings or {})):
         if name not in org.teams and name not in org.refused:
             lack(

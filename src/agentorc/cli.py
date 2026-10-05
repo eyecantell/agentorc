@@ -801,7 +801,7 @@ def cmd_org(args: argparse.Namespace) -> int:
 
         emit(args, got, verdict)
         return 0 if got["ok"] else 1
-    got = {**orgcheck.view(org, here), "notes": notes}
+    got = {**orgcheck.view(org, here, roots=hosts.local_host().repos()), "notes": notes}
 
     def prose() -> None:
         rows = got["teams"]
@@ -820,6 +820,11 @@ def cmd_org(args: argparse.Namespace) -> int:
         for note in notes:
             if note not in got["refused"].values():
                 print(f"note: {note}")
+        # every flow the org can see (§4.9c): the built-ins, then each registered repo's
+        fw = max((len(f["name"]) for f in got["flows"]), default=0)
+        for f in got["flows"]:
+            state = f.get("shadowed") or ("usable" if f["usable"] else "not usable — " + "; ".join(f["problems"]))
+            print(f"flow {f['name']:<{fw}}  {state}  [{f['source']}]")
         rem = got["remainder"]
         history = "" if rem["tree"] else "  no history yet — `ao service install` makes it a work tree"
         print(f"{rem['home']}:{history}")
@@ -1025,6 +1030,20 @@ def cmd_team_list(args: argparse.Namespace) -> int:
         marks = teamrun.balance_marks(call_sync("repos"))
     for r in rows:
         r["balance"] = marks.get(r["name"]) if r["live"] else None
+    # the team's flows (§4.9c *What is shown*, TD-309 slice 6): each listed flow, the current one, its
+    # strip and why the team cannot follow it, and `entries.feature` as the current flow fills it
+    here = hosts.local_host().name
+    for r in rows:
+        t = org.teams.get(r["name"])
+        if t is None or not t.flows:
+            r.update(flow=None, flows=[], flow_note="")
+            continue
+        host = t.host or here
+        r.update(
+            flow=teams.current_flow(t), flows=teams.flow_rows(org, t, host, here), flow_note=teams.flow_unlisted(t)
+        )
+        with contextlib.suppress(teams.TeamError, ValueError, OSError):
+            r["entries"]["feature"] = teams.entry_role(org, t, "feature", host, here)
 
     def prose() -> None:
         if not rows:
@@ -1054,6 +1073,17 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                 + f"members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
             )
+            if r.get("flow"):  # *flow: td — design → build → review → you, through techlead-ao-1*
+                now = next((f for f in r["flows"] if f["current"]), {})
+                others = [f["name"] for f in r["flows"] if not f["current"]]
+                also = f"  (also lists {', '.join(others)})" if others else ""
+                print(f"{'':<{w}}  flow: {r['flow']} — {now.get('strip') or '—'}{also}")
+                unread = next((f["unread"] for f in r["flows"] if f.get("unread")), "")
+                for line in [r["flow_note"], *(f["cannot"] for f in r["flows"])]:
+                    if line:
+                        print(f"{'':<{w}}  {line}")
+                if unread:  # a node's checkout this host cannot read: not judged here
+                    print(f"{'':<{w}}  flows not read from here: {unread}")
         # a repo's definition the org file's wins over, and a name two repos define (§4.9)
         for name, files in org.shadowed.items():
             for f in files:
@@ -1790,6 +1820,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             )
         if note:
             print(note)
+        if unread := next((r["unread"] for r in rows if r.get("unread")), ""):
+            print(f"flows not read from here: {unread}")
         w = max(len(r["name"]) for r in rows)
         for r in rows:
             mark = "*" if r["current"] else " "

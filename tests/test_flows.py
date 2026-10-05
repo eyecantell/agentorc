@@ -517,3 +517,70 @@ def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsy
     _write(tmp_path, doc)
     assert cli.main(["team", "flow", "ao-grind"]) != 0
     assert "lists no flows:" in capsys.readouterr().err
+
+
+# ── the listings (TD-309 slice 6) ────────────────────────────────────────────────────────────────
+
+
+def test_ao_team_list_carries_the_flows_and_the_feature_role(world, tmp_path, capsys):  # noqa: F811
+    """§4.9c *What is shown*: `ao team list` and its `--json` carry `flows`, `flow` and why a flow
+    cannot be followed; `entries.feature` reads as the current flow fills it."""
+    from agentorc import cli
+
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    _write(tmp_path, doc)
+    assert cli.main(["--json", "team", "list"]) == 0
+    row = next(r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] == "ao-grind")
+    assert row["flow"] == "td" and [f["name"] for f in row["flows"]] == ["td", "build-review"]
+    assert row["entries"]["feature"] == "designer" and row["flow_note"] == ""
+    assert cli.main(["team", "list"]) == 0
+    assert "  flow: td — design → build → review → you, through ao-agentorc-techlead-ao  (also lists build-review)" in (
+        capsys.readouterr().out
+    )
+    t["members"].pop()  # no designer: td cannot be followed, said under the team
+    _write(tmp_path, doc)
+    assert cli.main(["team", "list"]) == 0
+    assert "td cannot be followed by ao-grind: no designer" in capsys.readouterr().out
+    assert cli.main(["--json", "team", "list"]) == 0
+    other = [r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] != "ao-grind"]
+    assert all(r["flow"] is None and r["flows"] == [] for r in other)  # a team with no flows: none
+
+
+def test_ao_org_lists_every_flow_and_check_fails_on_one_not_usable(world, tmp_path, capsys):  # noqa: F811
+    """§4.7: `ao org` lists the built-ins and each registered repo's flows with source and whether
+    usable; `ao org check` fails on a flow that is not usable, and a repo flow taking a built-in's
+    name is listed as not read."""
+    from agentorc import cli
+
+    root = tmp_path / "agentorc"
+    repo_flow(
+        root, "hunt", [{"name": "find", "role": "hunter", "lane": ["free"], "brief": "find.md"}], {"find.md": "x"}
+    )
+    repo_flow(root, "td", [{"name": "x", "role": "grinder", "lane": ["free-pick"], "brief": "x.md"}])
+    assert cli.main(["--json", "org"]) == 0
+    flows = {(f["name"], f["source"]): f for f in json.loads(capsys.readouterr().out)["flows"]}
+    assert all(flows[(n, "package")]["usable"] for n in flowdefs.BUILTIN)
+    hunt = flows[("hunt", str(root / ".agentorc" / "flows" / "hunt"))]
+    assert hunt["usable"], hunt["problems"]
+    assert flows[("td", str(root / ".agentorc" / "flows" / "td"))]["shadowed"].startswith("not read: td is a built-in")
+    assert cli.main(["org"]) == 0
+    assert f"flow hunt          usable  [{root / '.agentorc' / 'flows' / 'hunt'}]" in capsys.readouterr().out
+    assert cli.main(["org", "check"]) == 0
+    capsys.readouterr()
+    repo_flow(root, "broken", [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "gone.md"}])
+    assert cli.main(["org", "check"]) == 1
+    assert "lacking: flow broken (" in capsys.readouterr().out
+
+
+def test_a_flow_file_that_cannot_be_read_is_a_problem_of_the_flow_not_a_crash(tmp_path):
+    """Review of #1068: `ao org` and its check list every flow, so one bad file is that flow's problem."""
+    d = repo_flow(tmp_path, "bad", [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"}])
+    (d / "flow.yml").write_bytes(b"stages: \xff\xfe\n")
+    (tmp_path / ".agentorc" / "flows" / "stray.txt").write_text("not a flow\n")
+    rows = {f["name"]: f for f in flowdefs.visible([tmp_path])}
+    assert not rows["bad"]["usable"] and "could not be read" in rows["bad"]["problems"][0]
+    assert "stray.txt" not in rows and all(rows[n]["usable"] for n in flowdefs.BUILTIN)

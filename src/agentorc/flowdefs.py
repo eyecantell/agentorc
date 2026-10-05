@@ -253,6 +253,45 @@ def load(
     return check(flow, cfg, overlay, read=read) if flow is not None else None
 
 
+def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Every flow the org can see on this host (§4.7 `ao org`, §4.9c *What is shown*): the package's
+    built-ins, then each registered checkout's `.agentorc/flows/<name>/`, each `{name, source,
+    usable, problems}` — `source` `package` or the flow's directory. A repo directory that takes a
+    built-in's name is listed with `shadowed` set, as `find` never reads it; a checkout whose
+    `.agentorc.yml` cannot be read is skipped (`with_repos` names it). The org's own directories are
+    TD-313's."""
+    out: list[dict[str, Any]] = []
+    package_cfg = repoconfig.load_text(None, PACKAGE_DIR)
+    for name in BUILTIN:
+        flow = find(name)
+        if flow is not None:
+            check(flow, package_cfg, overlay)
+            out.append({"name": name, "source": "package", "usable": flow.usable, "problems": list(flow.problems)})
+    for root in roots:
+        where = Path(root).expanduser()
+        base = where / REPO_DIR
+        if not base.is_dir():
+            continue
+        try:
+            cfg = repoconfig.load(where)
+        except (OSError, ValueError):
+            continue
+        try:
+            dirs = sorted(p for p in base.iterdir() if (p / FILE).is_file())
+        except OSError:  # unreadable, or gone since `is_dir`: nothing of it can be listed
+            continue
+        for d in dirs:
+            row: dict[str, Any] = {"name": d.name, "source": str(d), "usable": False, "problems": []}
+            if d.name in BUILTIN:
+                row["shadowed"] = f"not read: {d.name} is a built-in's name, and the built-in is the flow"
+            elif (flow := load(d.name, cfg, overlay)) is None:  # `_read_here` reads an unreadable file as none
+                row["problems"] = [f"flow {d.name}: its {FILE} could not be read ({d / FILE})"]
+            else:
+                row.update(usable=flow.usable, problems=list(flow.problems))
+            out.append(row)
+    return out
+
+
 def unfollowable(flow: Flow, staffed: Collection[str], *, techlead: bool, held: Collection[str]) -> list[str]:
     """Why a team cannot follow `flow` (§4.9c *Every listed flow must be followable*), in the shared
     words' middle part, or [] when it can: a member stage whose role the team starts no member of; the
