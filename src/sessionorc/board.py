@@ -372,15 +372,22 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
             raise unreachable(
                 f"gh pr create: no pull request number in {url[-1][:120] if url else 'its output'!r}"
             ) from None
-        cp = _gh(t, clock, "gh pr merge", "pr", "merge", str(n), "--squash")
+        try:
+            cp = _gh(t, clock, "gh pr merge", "pr", "merge", str(n), "--squash")
+        except Refused as e:  # timed out: it may have landed all the same, so it is read below
+            cp = subprocess.CompletedProcess([], 1, "", str(e))
         if cp.returncode != 0:
             why = _why(cp, "gh pr merge")
-            _gh_quiet(t, "pr", "close", str(n))
-            moved = False
+            moved = landed = False
             with contextlib.suppress(Refused):
-                if _git(t, "fetch", "-q", "origin", want, timeout=clock.left("git fetch")).returncode == 0:
-                    moved = not still()
-            raise Refused(MOVED) if moved else unreachable(why)
+                if _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
+                    # a merge that failed after the forge took it (a timeout, an error on the reply):
+                    # origin's board is the edit's, so it landed — a retried add must not write twice
+                    landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", str(BOARD)).returncode == 0
+                    moved = not landed and not still()
+            if not landed:
+                _gh_quiet(t, "pr", "close", str(n))
+                raise Refused(MOVED) if moved else unreachable(why)
     except Refused:
         if pushed:
             _git_quiet(t, "push", "-q", "origin", "--delete", branch)

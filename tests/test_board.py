@@ -844,3 +844,14 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         assert not [e for e in agent.sessions[h].inbox if e.from_ == "person"]  # the node's store untouched
         monkeypatch.setattr(agent, "mode", "home")
         await me.call("kill", id=h)
+
+
+def test_a_merge_that_landed_though_the_forge_said_otherwise_is_a_landed_edit(repo, monkeypatch):
+    """Review of PR #1036: `gh pr merge` failing after the forge took the merge (a timeout, a lost
+    reply) is read from origin — the edit landed — so the press succeeds and a retried add never
+    writes its line twice."""
+    monkeypatch.setenv("FAKE_GH_FAIL", "merge-after")
+    got = board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
+    board.write_back(repo, 8, ITEM, "done")
+    assert f"- [x] {ITEM}" in origin_board(repo)

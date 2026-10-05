@@ -59,6 +59,9 @@ def main(argv: list[str]) -> int:
                 return 1
         pr["state"] = "merged"
         state_file.write_text(json.dumps(state))
+        if fail == "merge-after":  # merged, and the reply lost: what a timeout looks like
+            print("Post https://api.github.com/graphql: context deadline exceeded", file=sys.stderr)
+            return 1
         return 0
     if argv[:2] == ["pr", "close"]:
         state["prs"][argv[2]]["state"] = "closed"
