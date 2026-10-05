@@ -29,7 +29,8 @@ import yaml
 
 from sessionorc import paths
 
-DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member (teams.create_params)
+DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member with no profile (teams.create_params)
+SHELL_ADAPTER = "shell"  # no agent: a profile may name it, a team session may not (teams.plan, TD-329)
 DEFAULT_PERMISSION_WAIT = 600  # seconds; long enough to reach a phone (design §4.2)
 BILLINGS = ("subscription", "metered")
 PRICE_KINDS = ("input", "output", "cache_read", "cache_write")

@@ -4635,3 +4635,19 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Done when:** the five points read right in `ao team --skill`, each checked against the code.
 
 **Related:** TD-067 (the recipe, archived), TD-329 (a member's shell profile starts Claude Code).
+
+## TD-329: A team member whose `profile:` names a shell profile starts Claude Code
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-2, found pressing TD-099's live check on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — **decided 2026-10-05 (techlead-ao-1's answer to grinder-ao-2's steer, mail `m-354be66e09a0`):** refuse at `teams.plan` a member or manager whose profile's adapter is the shell's, in the words `ao team start`, Start and `ao org check` share, and say so in design §4.9 in the same PR; **and** `Launch.create_params` sends the profile's own adapter, not `profiles.DEFAULT_ADAPTER`, so no record names a profile whose tool it is not running. The test of *an agent's* is `adapter` is not the shell's, as §4.1's anchor rule scopes it, never keyed on a role. A refusal that needs more than `plan` and its three callers is said on that thread first.
+**Location:** `src/agentorc/teams.py` (`Launch.create_params`: `"adapter": profiles.DEFAULT_ADAPTER`), `src/agentorc/profiles.py` (`Profile.adapter`), design §4.2a (a profile names its adapter), §4.9
+
+**Why:** a team definition's member `{role: grinder, profile: sh}`, where `profiles.yml` gives `sh` `adapter: shell`, was started by `ao team start` as a `claude-code` session with the profile `sh` on its record, and sat on Claude Code's first-run screens. Every create a team start makes sends the default adapter whatever the profile says, so the record names a profile whose tool it is not running. The New session form already derives the adapter from the profile (`ui/app.py` `profile_adapter`, TD-284 slice 2); a team start does not.
+
+**Resolved:** 2026-10-05 (PR #1100) — `teams._launch` refuses a profile whose adapter is `profiles.SHELL_ADAPTER` for any team session, and `Launch.create_params` sends the profile's adapter; design §4.9 *Starting and stopping*; tests in `tests/test_cli_teams.py`.
+
+**Done when:** a team start never records a profile whose adapter differs from the session's.

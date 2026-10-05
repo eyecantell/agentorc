@@ -4680,15 +4680,18 @@ badges the session, with one line saying there is no reach to describe.
 
 **Starting and stopping** (`agentorc/teams.py` plans a start and `ao team` runs it). `ao team
 start <name>` resolves the definition, then checks *everything before launching anything*: every
-checkout exists on this host, every role and profile resolves, and every session name is free
-under §4.1's rule — a live holder refuses the whole start and names it, so there is never half a
+checkout exists on this host, every role and profile resolves (a profile that runs the shell is
+refused, below), and every session name is free under §4.1's rule — a live holder refuses the whole start and names it, so there is never half a
 team (a member the team's current flow sits out is not started, and is no half: §4.9c); a holder a person suspended over an identity alarm (§4.8a) refuses it for the same reason;
 exited or closed holders are superseded as §4.1 says, which makes `ao team start`
 after a night's exit the restart too. Then it creates the manager (its grants, profile and mode —
 the role's `control`, the host's profile and unattended, unless the definition overrides any of
 them — in a worktree), and each member with `controllers: [lead id]`, its role, lane, brief (the
 role's template with `{lane}`, `{techlead}` and `{manager}` filled — `{manager}` the id the manager takes, worked out before anything starts as `{techlead}` is, said by the start should it come up under another, and `none` where a person leads or the session was started by hand — the Project block in front — and a `brief:` in its `{repo}` slot rather than in place of the template),
-profile and worktree. A person runs it, so no attenuation applies (§4.8 create rule); a manager
+profile and worktree. Each is created with its profile's own adapter, so no record names a
+profile whose tool it is not running; a profile whose adapter is the shell's is refused for any
+team session, in the words `ao team start`, Start and `ao org check` share, since a team session
+runs a brief and a shell cannot. A person runs it, so no attenuation applies (§4.8 create rule); a manager
 running it is subject to it as for any create. It prints one line per session with the id,
 `--json` the records. The manager is started with an empty `controllers` list: the definition,
 not a repo default, is the authority over a team session, and it is a person who runs the start.

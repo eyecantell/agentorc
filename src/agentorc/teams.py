@@ -115,6 +115,9 @@ class Launch:
     team: str
     project: str  # the badge: the project the home repo came from
     profile: str = ""
+    adapter: str = (
+        profiles.DEFAULT_ADAPTER
+    )  # the profile's own tool (§4.2a): a record never names one it is not running
     prompt: str | None = None
     grants: list[str] = field(default_factory=list)
     lane: list[str] = field(default_factory=list)
@@ -139,7 +142,7 @@ class Launch:
             **({"host": self.host} if self.host else {}),
             "name": self.name,
             "dir": str(self.dir),
-            "adapter": profiles.DEFAULT_ADAPTER,
+            "adapter": self.adapter,
             "repo": str(self.dir),
             "worktree": self.name,
             "unattended": self.unattended,
@@ -764,11 +767,18 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     # `org.yml`'s `roles:` and the repo's `.agentorc.yml` (those three inside `resolve_role`), the
     # member's own `profile`, then `--profile` on the command line.
     profile = profile_override or (member.profile if member is not None else None) or role.profile or ""
+    adapter = profiles.DEFAULT_ADAPTER
     if profile:
         try:
-            profiles.get(profile)  # checked here so a typo stops the start rather than one session
+            adapter = profiles.get(profile).adapter  # checked here so a typo stops the start rather than one session
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+        if adapter == profiles.SHELL_ADAPTER:
+            # a team session runs a brief, which a shell cannot (§4.9, TD-329); "an agent's" is §4.1's
+            # test — its adapter is not the shell's — whatever the role
+            raise TeamError(
+                f"{where}: profile {profile!r} runs a shell, and a team session is an agent's (design §4.9)"
+            )
     try:
         prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager, told)
     except ValueError as e:
@@ -784,6 +794,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         team=team.name,
         project=project_of(org, team.projects, home),
         profile=profile,
+        adapter=adapter,
         prompt=prompt,
         grants=grants,
         lane=lane,
