@@ -2573,7 +2573,7 @@ Screens:
    lines (§6 *Usage gate*); **Repos** — a card per registered checkout with its `.agentorc.yml`
    values read-only and the one setting a person flips, the promote's **auto** (§6 *Promote*), which
    this round moves out of the checked-in file; **You** — *yours everywhere*: `open_in` and the
-   terminal's size, face and copy on select (§5 `person:`; TD-164), **board items shown** (TD-207), and *this browser*: theme, *mine*, the folds, with
+   terminal's size, face and copy on select (§5 `person:`; TD-164), **board items shown** (TD-207), a **Telegram** card (*when you are not looking*: §4.10, TD-092; not built — TD-319), and *this browser*: theme, *mine*, the folds, with
    **Reset this browser**; **Hosts**, **Profiles**, **Org** — read-only. **Every read-only value
    carries an *i* mark** that says which file it comes from, when that file is re-read, and whether
    a change needs the host agent restarted (§5; a host's name, its `home:` and its identity mode are
@@ -2866,6 +2866,7 @@ noted). If a control is not in this table it does not exist.
 | Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **when work appears**, **balance**, **flow** (TD-307; not built — TD-309: a pick of the team's `flows:`, applied on Save as the card's Flow pick applies), **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **balance** (TD-177; designed 2026-09-29, built 2026-09-30 — TD-239 slice 4) is a switch and three fields — *open PRs above* `n`, *oldest open longer than* `d`, *the reader's queue past its bound* (a tick box) — written to `teams.<team>.balance` (§6 *Balance*); off, the key is absent; turned on, the fields start at 10, `2d` and ticked, and a field left empty is a line not drawn; under them, the repo's numbers as they read now, so the line is set against what it would have done today — `ao team balance`'s three lines (`teamrun.balance_rows`), and above them the mark while one stands, and *no live member: a team with none is not read* where that is so; the lines are written whole, and only when a Save moved them, a switch on with no line drawn refused in place. **when work appears** (TD-214; designed 2026-09-28, built — TD-227 slice 3) is a picker of three, *ask me · start the team · do nothing*, written to `teams.<team>.on_work` (§6 rule 8) when the pick moves, *ask me* marked *default* while the key is absent; its note says what each of the three does, the picked one first — *wound down — ask me: an Inbox row asks when its lanes gain entries · start the team: the home starts it · do nothing: it waits for Start or its schedule* (TD-286). **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
 | Settings page | **Repos**: the promote's **auto** switch, the **pull** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no auto switch and says why. **pull** (§6 *Pull*; TD-222, designed 2026-10-01, built 2026-10-02 — TD-263) on every card, `promote:` block or not: on when `repos.<repo>.pull` is absent, written through `set_settings`, and beside it the last pass's reading for the checkout — *current*, *last pulled <age> · n commits*, *waiting: <name> is mid-turn*, *refused: <why>*, *off* — so a checkout that is not following origin says why here |
 | Settings page | **You**: `open_in` (preset, template or none), terminal **size** and **face**; **Reset this browser** | *yours everywhere*, written to `person:` through `set_settings`: `open_in` as §5 defines it (`vscode`, `none`, or `{label, url}`, the same refusals, a bad template named in place and the default kept); the terminal's **size** (a number of pixels, bounded 8–32 as `set_settings` bounds it) and **face** (a typed or picked `font-family` name; `monospace` is always appended and ligatures stay off — goal 12), applied to every open terminal without a reload. *this browser*: the theme, *mine* and the folds as they stand, display with their own controls where they already have one, and **Reset this browser**, which clears every `ao.*` key of this browser's `localStorage` after a confirm and reloads — a new control, browser-local, writing nothing anywhere else |
+| Settings page | **You**: **Telegram** — **tell me on Telegram** switch, **secrets**, **link**, **Send a test** | designed 2026-10-04 (TD-092; not built — TD-319; §4.10 *Told on Telegram when nobody is looking*; mockup `Settings.dc.html`): a card under **You**, *when you are not looking*. The switch is off until the person turns it on; **secrets** takes a Doppler `project/config` (a name — the card never shows, asks for or stores a token) and **link** the address this UI is reached at from a phone, both written to `notify.telegram` through `set_settings` by the card's **Save** (§4.5a **Save** / **Cancel** on a card). Turning the switch on with no secrets is the RPC's refusal, in place. Under the fields, display only: what is told (*a session waiting on you, a question, a blocked outcome, an identity alarm, a member not restarted, a team with work*) and when (*after a minute, once, and never while a page is visible; no text a session wrote is sent*), a line each, and the last send — *last sent 14:02* or *last send failed 14:02: `<reason>`*, from the home's `host` read. **Send a test** (`notify_test`, a person's own) sends one message now with the saved values, whatever the switch says, and prints the result beside the button; it is disabled while the card has unsaved changes. On a node every value reads *set at `<home>`* and the test is sent from the home |
 | Settings page | **Open file** | the editor button with a file's path in place of a session directory (§5 `person.open_in`): `{path}` the file, `{remote}` the host as before; drawn on every file card (hosts, profiles, org, each repo's `.agentorc.yml`, and the home's `settings.yml` itself, read-only there) and absent under `open_in: none`; on a card whose values are set here but whose definition is a file's — a team's card, a metered profile's card — the file is named at the card's head, *defined in org.yml* / *billing and prices in profiles.yml*, with **Open file** beside it, so the button is not read as one more setting (TD-286) |
 | Settings page | **Save** / **Cancel** on a card | (TD-286, from Paul's walk of Settings) every card with fields — *trust a reading for*, each profile's usage card, each team card, **You** — ends with **Save**, disabled until a field differs from what was drawn, and **Cancel** beside it, shown only then, which puts the drawn values back and the lines beside them; after a Save what was saved is what was drawn, so both settle. The row says *saved to settings.yml*, the one file every value set here lives in |
 | Settings page | read-only values and the ***i*** mark | display only: every value of `hosts.yml`, `profiles.yml`, `org.yml` and a repo's `.agentorc.yml` as the client reads it, and beside each file's heading an *i* mark whose paragraph names the file's path, when it is re-read (per request, per tick, or at the agent's start — a host's name, `home:` and identity mode are start-only, and the mark says *restart the host agent to apply*), and who edits it (by hand; by PR). A value the file does not set shows its default, marked *default*. Nothing here is a control |
@@ -7056,6 +7057,67 @@ follow, and they bind every row kind, mail and state alike:
    never-gated read (§4.8a).
 4. **An answer is followed to its outcome.** Below.
 
+**Told on Telegram when nobody is looking (TD-092; Paul, 2026-10-04: *we use telegram elsewhere,
+make sense to keep using it here*; designed that day, not built — TD-319).** The Inbox waits for a
+page to be opened, and an unattended team whose one question sits behind a closed tab is a team that
+waits. When the person has turned it on, the **home** sends one Telegram message for a row that
+newly stops a session or a team until they answer.
+
+- **What is told: what is stopped, not what is listed.** A subset of *Needs you*, each a row the
+  home itself raises and can name from structured fields: a session in `needs-you` (the state rows
+  `permission`, `question` and `needs`), an open `ask` in the person inbox, an
+  outcome reported `blocked`, an identity alarm (§4.8a), a member the tick could not restart (the
+  restart row, §6 *Keeping a team running*), and a wound-down team whose lanes gained work under `on_work: ask` (§6
+  rule 8). **Not told**: `stalled?`, `limited` and `unpushed` rows, *idle · open work*, a failed
+  cadence check, *merged without its read*, a promote, a due board item, a `steer` (it takes its
+  default at its bound) and everything in FYI — each waits for the person's next visit and stops
+  nobody meanwhile, or ends by itself. The list is the design's, not a setting: one switch, no
+  picks per kind.
+- **When: once, after a minute, and only if nobody is looking.** A row is told when it has stood
+  for `NOTIFY_HOLD` (60 s) — a permission a controller answers, or a state that flickers, is
+  never told — and is still there, not snoozed. **Looking** is a page of agentorc visible in a
+  browser: the page's poll says whether its document is visible, the UI hands that to the home on
+  the person's `inbox` read (`watching`), and the home keeps the time of the last one in memory.
+  A row whose hold ends within `NOTIFY_WATCHED` (2 min) of such a read is **not told, then or
+  later**: it was on a screen, where the top bar's count rose. **One message per row**: the home
+  keeps what it told beside the attention trail (`notified`, a row's key and when), a key leaves
+  when its row ends, and a row that ends and begins again is a new row. **Bounded**: past
+  `NOTIFY_BURST` (6 messages in ten minutes) the next one reads *and more need you — open the
+  Inbox*, and nothing further is sent until the window clears; the rows held back are not told
+  afterwards.
+- **What a message says: who and what kind, never what a session wrote.** One line from structured
+  fields and a link: *agentorc · grinder-ao-1 (ao-grind) needs you: permission*; *… asks you a
+  question · TD-229*; *… reports blocked · TD-142*; *identity alarm on …*; *ao-grind: grinder-ao-2
+  was not restarted*; *cm-grind wound down and has work: 3 entries*. The pending text, a
+  question's words and a `doing` line are **not sent**: a message leaves the machine for a third
+  party's servers and a phone's lock screen, and text a session wrote can hold a command line, a
+  path or something a tool printed. The link is the row: `notify.telegram.link` (below) followed
+  by the Inbox's address for it — the message page for mail (§4.5 screen 6 *The message page*),
+  the Inbox with that row scrolled to and marked for a state row. With no `link` set the message
+  carries none.
+- **Where the secrets live: Doppler, and only in the sender's own process.** The bot's token and
+  the chat's id are `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in a Doppler config (the person's
+  cross-repo convention), and `settings.yml` holds that config's **name** — never a value. The home
+  sends by starting a child, `doppler run --project <p> --config <c> -- <python> -m
+  sessionorc.notify`, with the message on its stdin: the two values exist in that child's
+  environment for one request and nowhere else — not in a unit file, not under `~/.agentorc`, not
+  in the host agent's environment, and never in a log line (a failure's reason is the HTTP status
+  or the exception's class, not its URL, which holds the token). The child is detached from the
+  tick and given 30 seconds.
+- **The setting.** `notify:` in `settings.yml` (§5), a key of its own because the tick reads it and
+  nothing under `person:` reaches a policy: `telegram: {on, secrets: "<project>/<config>", link}`.
+  Absent or `on: false`, nothing is sent and no child is started. Written through `set_settings`
+  like every setting; `on: true` with no `secrets` is refused, naming the field.
+- **A failed send is shown, and raises nothing.** The home keeps `notify: {last_ok, last_error}` on
+  its `host` read, and the Settings card says *last sent 14:02* or *last send failed 14:02: doppler:
+  not logged in*. A failure is not retried, is not a row and is never itself told.
+- **Only the home sends.** It owns the mailbox and the graph (§4.4a); a node's sessions are told
+  from the home's copy of their records, and a node that is offline is told about by nothing.
+  **Send a test** (§4.5a) is the `notify_test` RPC — a person's own (§4.8 `PERSON_ONLY`), served at
+  the home and forwarded there from a node as the home-owned edits are — and sends *agentorc · a
+  test from `<home>`* with the link to the Inbox, whatever `on` says, answering with the send's
+  result in words.
+
 **Outcomes (TD-079).** A manager sees its members' states, not whether a person's answer was acted
 on; so the thread itself carries it. A question to the person that closed as **`replied`** or
 **`go_with_it`** **owes an outcome**, and the asker settles it in one of two ways:
@@ -7504,7 +7566,7 @@ session is never woken by mail at all.
   next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a
   *definition* — what a team, a repo, a host or a profile *is* — stays in its own file above and
   below this bullet; a *setting* is a value the person turns without redefining anything, and every
-  such value lives here, under five keys (`usage:`, the fifth, since TD-233 slice 4):
+  such value lives here, under six keys (`usage:`, the fifth, since TD-233 slice 4; `notify:`, the sixth, designed with TD-092 and not built — TD-319):
 
 ```yaml
 usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
@@ -7526,6 +7588,10 @@ person:                                       # the person's own — nothing her
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a, TD-164; default on)
   inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (TD-207; built — TD-220: drawn by the Inbox and the Repo page, picked on the Settings page's You)
+notify:                                       # §4.10 *Told on Telegram when nobody is looking* (TD-092; not built — TD-319): read by the home's tick
+  telegram: {on: false,                       # the one switch; absent or false, nothing is sent
+             secrets: "samscrape/prd",        # the Doppler project/config holding TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID — a name, never a value
+             link: "http://kmaster:8765"}     # how the person's phone reaches the UI (§4.5b); the row's address is appended
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it (the gate reads amounts since TD-151 slice 3; `set_settings`, `ao gate` and the Settings page take them since slice 5). A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
