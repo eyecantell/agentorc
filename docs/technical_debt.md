@@ -2405,6 +2405,8 @@ dc-grind is the other case: its grinder is live, idle and truly out of work (fou
 2. `orgcheck.view` gains, per linked host, the registry entries whose directory name no entry of this host's registry has (`repos_via` over `host_repos`, as `_land` asks), and `ao org` prints each under the remainder: *held only on `<node>`: its .agentorc.yml is not read; register a checkout at `<home>`*. `orgcheck.check` adds the same line as a **warning**, which does not fail it. A host whose registry cannot be read (`OSError`: unreachable, or a build without the `repos` link method) is one note, *`<node>`: its registry could not be read*, and never read as holding nothing.
 3. The design's two *not built — TD-318* marks (§4.9, §4.7) become *built*, and the dated line goes to `docs/design-history.md` §4.9.
 
+`rpc_host_repos`'s docstring (`src/sessionorc/agent_remote.py`) still gives the node clause as the reason it exists; it is reworded when that file is next touched (a held path, so not in this PR), and the comments in `org.py` that name the clause go with step 1.
+
 **Done when** `landing` has two clauses and its tests say so; with a linked node whose registry holds a repo the home's does not, `ao org` lists it and `ao org check` warns and still exits 0; with that node unreachable both say its registry could not be read; `pdm run test` passes.
 
 **Related:** TD-229 (the aggregate and the question), TD-210 (the design), TD-299 (cm-grind on its container node: the home's checkout for the reading, `place:` for the work).
