@@ -1032,7 +1032,8 @@ def cmd_team_list(args: argparse.Namespace) -> int:
     asked: teamrun.Waiting = {}
     with contextlib.suppress(AgentError, AgentUnavailable):
         asked = teamrun.waiting_of_home(call_sync)  # a member waiting on the person is not concluded (TD-274)
-    rows = teamrun.rows(org, call_sync("list"), asked)
+    sessions = call_sync("list")
+    rows = teamrun.rows(org, sessions, asked)
     # the home's `work_waiting` marks (§6 rule 8), as ids per team; an agent without the reading has none
     waiting: dict[str, int] = {}
     with contextlib.suppress(AgentError, AgentUnavailable):
@@ -1053,12 +1054,16 @@ def cmd_team_list(args: argparse.Namespace) -> int:
     for r in rows:
         t = org.teams.get(r["name"])
         if t is None or not t.flows:
-            r.update(flow=None, flows=[], flow_note="")
+            r.update(flow=None, flows=[], flow_note="", differences=[])
             continue
         host = t.host or here
         r.update(
             flow=teams.current_flow(t), flows=teams.flow_rows(org, t, host, here), flow_note=teams.flow_unlisted(t)
         )
+        # §4.9c *Switching*: a live team's records against its current flow — *flow changed — Apply*
+        r["differences"] = []
+        with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError):  # said by the flows' lines
+            r["differences"] = teamrun.flow_changed(call_sync, org, t.name, here, sessions)
         with contextlib.suppress(teams.TeamError, ValueError, OSError):
             r["entries"]["feature"] = teams.entry_role(org, t, "feature", host, here)
 
@@ -1101,6 +1106,10 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                         print(f"{'':<{w}}  {line}")
                 if unread:  # a node's checkout this host cannot read: not judged here
                     print(f"{'':<{w}}  flows not read from here: {unread}")
+                if r["differences"]:
+                    print(f"{'':<{w}}  flow changed — Apply (ao team flow {r['name']} --apply):")
+                    for d in r["differences"]:
+                        print(f"{'':<{w}}    {d['line']}")
         # a repo's definition the org file's wins over, and a name two repos define (§4.9)
         for name, files in org.shadowed.items():
             for f in files:
@@ -1839,11 +1848,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             applied = teamrun.apply(call_sync, org, name, here, caller=os.environ.get("AGENTORC_SESSION") or None)
             out["apply"] = applied
         else:
-            out["differences"] = []
-            sessions = call_sync("list")
-            if teamrun.live(teamrun.crew(name, sessions)):  # a stopped team's next start compiles the flow
-                plan = teams.plan(org, name, here, files=teamrun.files_via(call_sync))
-                out["differences"] = [d.as_dict(plan.flow) for d in teamrun.differences(plan, sessions)]
+            # empty for a stopped team: its next start compiles the flow
+            out["differences"] = teamrun.flow_changed(call_sync, org, name, here, call_sync("list"))
     except (teams.TeamError, ValueError, OSError, AgentError) as e:
         if args.flow is None and not args.apply:
             out["differences"], out["unread"] = [], str(e)

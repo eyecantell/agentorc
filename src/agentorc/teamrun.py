@@ -798,6 +798,20 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     return out
 
 
+def flow_changed(
+    call: Call, org: orgmod.Org, name: str, host: str, sessions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """What a client that reads a live team says of its records against its current flow (§4.9c
+    *Switching*: the Org page, `ao team list`, `ao team flow`), one `Difference.as_dict` per member;
+    empty for a team with no `flows:` or nothing live, which compiles nothing until its next start.
+    Raises what `teams.plan` raises: the caller says why the records were not compared."""
+    t = org.teams.get(name)
+    if t is None or not t.flows or not live(crew(name, sessions)):
+        return []
+    plan = teams.plan(org, name, host, files=files_via(call))
+    return [d.as_dict(plan.flow) for d in differences(plan, sessions)]
+
+
 def relaunch_params(x: teams.Launch) -> dict[str, Any]:
     """The `relaunch` RPC's `launch`: the four keys it replaces, an absent one sent as None so the
     home removes it (a switch to `build` takes `review` off)."""

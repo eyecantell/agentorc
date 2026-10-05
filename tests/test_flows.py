@@ -752,3 +752,25 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
     }
     assert not [p for m, p in state["calls"] if m == "relaunch" and p["id"] != "ao-agentorc-grind-1"]
     assert cli.main(["team", "flow", "ao-grind", "td", "--apply"]) == 2
+
+
+def test_ao_team_list_says_flow_changed_while_the_records_differ(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    """§4.9c *Switching*: a client reading a live team compares it with its current flow — a pick
+    written and not yet applied (the page's, before slice 4b applies at once) reads *flow changed*."""
+    from agentorc import cli
+
+    _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    assert cli.main(["--json", "team", "list"]) == 0
+    assert json.loads(capsys.readouterr().out)["teams"][0]["differences"] == []
+    cli.call_sync("set_settings", teams={"ao-grind": {"flow": "build-review"}})  # written, not applied
+    assert cli.main(["--json", "team", "list"]) == 0
+    row = next(r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] == "ao-grind")
+    assert {(d["name"], d["act"]) for d in row["differences"]} == {
+        ("designer-ao", "sit_out"),
+        ("grind-1", "relaunch"),
+        ("grind-2", "relaunch"),
+    }
+    assert cli.main(["team", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "flow changed — Apply (ao team flow ao-grind --apply):" in out
+    assert "designer-ao: sits out under build-review" in out
