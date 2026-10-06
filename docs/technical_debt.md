@@ -87,7 +87,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Open |
-| TD-313 | Build role directories (the org's and a repo's) and the org's flow directories, with the home's history tracking them — design §4.9c, the second part of the flows build | Low | Open |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
@@ -1495,24 +1494,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when:** each of the four teams lists flows it can follow and `ao org check` names no *same value* key for any of them.
 
 **Related:** TD-307, TD-309.
-
-## TD-313: Build role directories and the org's flow directories (design §4.9c, the second part)
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-04 (TD-307's design, split from TD-309 on the Sonnet review: the first build ships what a team needs to run a flow, this one what a person needs to define a role or an install-wide flow; the anchor session)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 built (grinder-ao-2, PR #1125): the org's flow directories — `flowdefs.org_dir`, `find` resolving the org's over a repo's (a built-in's name never read), `visible` listing them and the repo directories they shadow, `unfollowable`'s node reason (*an org flow, and <team> runs on <host> — define it in the repo*); `tests/test_flows.py`. Slice 2 built (grinder-ao-2): role directories — `repoconfig.definition` and `resolve_role`'s definition layer (a preset, else `~/.agentorc/roles/<name>/`, else the repo's `.agentorc/roles/<name>/`, whole, the overlays over it), `role.yml` (`brief:` and an unknown `kind` refused) and `template.md` / `template_on_call.md` in `Role.compose`, a preset's name never read, key-only roles refused (a repo's file when loaded, `org.yml`'s at resolve), `role_names` listing the directories, `repoconfig.visible` in `ao org` (a shadowed repo role said) and `ao org check`, `unfollowable`'s *<role> is an org role* on a node; the *Done when*'s two halves pinned in `tests/test_flows.py`. Slice 3 built (grinder-ao-1): the home's history for `flows/` and `roles/` — `defs.TRACKED_DIRS`, every file under each committed by `commit_defs` and the hand edit's commit, a `.yml` that does not parse waiting, a removal committed, and an older home's `.gitignore` gaining the lines in its next commit (`tests/test_defs_history.py`). Left: a node team whose *member* (not a flow stage) names an org role is not yet refused at its start; and the New session form on another host (`ui.app.config_on`) reads none of that checkout's role directories (`repoconfig.unread`), so a repo-defined role there is missing from its pick-list.
-**Location:** `src/agentorc/org.py` (`org.load` reads `~/.agentorc/flows/` and `~/.agentorc/roles/` beside the overlay), `src/agentorc/repoconfig.py` (`load` reads `<root>/.agentorc/roles/`; `resolve_role` gains the definition layer — the org's over a repo's, whole; a directory taking a preset's name refused; `role.yml`'s keys and `template.md`, `template_on_call.md` for a `manager` kind; a key-only role refused, in the same build as nothing else since `designer` is already a preset by TD-309), the readers `role_names`, `roles`, `ui/app.py` `_roles_for` and `/api/roles`, `cli.py` `ao roles`, `org._entries_resolve`, `teams.team_roles`; `src/sessionorc/defs.py` (`TRACKED`, `IGNORE`, `commit_defs`: the org's `flows/` and `roles/`); `ao org` (a shadowed repo role directory said); the node rule (an org flow or role not followable by a node team)
-
-**Why:** TD-307's design defines roles and flows as directories so a person — and later a page — can add one without splicing YAML. TD-309 builds the package's and a repo's flows, which is all the four teams need; defining a role, or an install-wide flow, waits for this.
-
-**Fix:** design §4.9c *Where flows and roles live*, *More flows, and more roles*, *A flow is usable only when it is whole* (a role directory's half), and the TD-313 clauses of its *Done when*.
-
-**Done when:** a role directory under `~/.agentorc/roles/` is used by an org flow with no other file changed, and a `hunt` flow in the org's directory starts a hunter and a grinder with their lanes and briefs from it; `git -C ~/.agentorc log` shows both.
-
-**Related:** TD-307 (the design), TD-309 (the first part), TD-314 (any seat role in a review stage).
 
 ## TD-314: A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next
 
