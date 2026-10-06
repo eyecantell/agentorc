@@ -89,16 +89,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
 | TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Designed 2026-10-06 (one send on a scraped idle, then the *brief not sent* mark) — the build is TD-348 |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
-| TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Open |
+| TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Designed 2026-10-06 (a member's open `ask` to the person is an Answer needed block and counted) — the build is TD-350 |
 | TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Open |
 | TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Open |
 | TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Open |
 | TD-348 | Build *a brief whose first hook is lost*: one send on a scraped idle after `FIRST_PROMPT_HOOK_WAIT`, *brief not sent · no hook since launch* at `FIRST_PROMPT_BOUND` | High | Open |
-| TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Open — design first |
-| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Open |
-| TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Designed 2026-10-06 (a member's open `ask` to the person is an Answer needed block and counted) — the build is TD-350 |
-| TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Open |
-| TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Open |
 | TD-350 | Build the Org's ask block: a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup's *answer needed* | Low | Open |
 
 ---
@@ -1662,7 +1657,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/agentorc/ui/org.py` (`answer_blocks`, `summary`, `team_groups`, `rollup`); `src/agentorc/ui/app.py` (the Org route, which already computes `inbox_sections` for the top bar — its `needs` rows are the source, so the Org and the Inbox cannot disagree); `src/agentorc/ui/templates/rollup.html` (the *answer needed* tooltip) and the team summary template's Answer needed blocks; `tests/test_ui.py` or `tests/test_org.py`
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`, `summary`, `team_groups`, `rollup`); `src/agentorc/ui/app.py` (the Org route, which already computes `inbox_sections` for the top bar — its `needs` rows are the source, so the Org and the Inbox cannot disagree); `src/agentorc/ui/templates/rollup.html` (the *answer needed* tooltip) and `team_summary.html` (the `m.answers` loop, the Answer needed blocks); `tests/test_ui.py` or `tests/test_org.py`
 
 **Why:** design §4.5a *team card: Answer needed / Doing* (TD-344, 2026-10-06): a member's open `ask` to the person is a block under **Answer needed** and is counted there and in the rollup's *answer needed*. Today `answer_blocks` reads only members whose state is in `NEEDS_YOU_ROWS` (a pane's permission or question), so a member that mailed its question and ended its turn is `idle` and the Org reads *0 answer needed* while the team waits (techlead-ao-1's `m-e60ada636596`, 2026-10-06).
 
