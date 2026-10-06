@@ -220,6 +220,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-06 (TD-344, the designer; Paul's read of the Org that day, filed by the anchor): the rollup's *answer needed* and the team card's **Answer needed** facet count a member's open `ask` to the person, not only a pane's permission or question — on 2026-10-06 techlead-ao-1's `ask` (`m-e60ada636596`) held the team's review and the Org read *0 answer needed*, the ask counted only under *in the Inbox* among every other row. Not built — TD-350. Not taken: rewording the two lines so a blocking ask cannot read as none (the count would still say 0 where the team waits), and an answer control on the Org (the Inbox answers; one place).
 - 2026-09-04: the home page was a card grid, decided over a table (a grid keeps each session's facts grouped and shows a live tail). The home was named **Herd**, then **Team**, and became **Org** when the team definitions of §4.9 landed. The 2026-09-04 card drew Allow / Deny, Close session, Forget and Switch profile / Wait inside the slot; the 2026-09-21 anatomy moved them into the foot, which was new work for the page. Mockups of 2026-09-04: https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
 - 2026-09-04, generalised 2026-09-06: the security decision "never a bare public port" — the UI is root-equivalent (it types into a shell as you), so it is reached over a private network or an authenticated tunnel, never a bare public port.
 - 2026-09-06 review: the browser-mechanics bullets (live state over `/events`, card order, permission countdown, tail hygiene, keyboard focus, errors, VS Code links) were written in this review.
@@ -287,6 +288,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-06 (TD-344, the designer): the **team card: Answer needed / Doing** row gains the ask block — the member, *asked you · <age>*, the ask's first line as text, **Open** to the message page, no answer control — and the **Org rollup** row's *answer needed* counts it (not built — TD-350).
 - 2026-09-06 (**Where**: this directory / new worktree): the worktree option landed after a session was started in the main checkout beside its anchor.
 - 2026-09-06 (directory field → occupancy): the occupancy check landed; the create RPC refuses the same way.
 - 2026-09-11 (name field → holder): `/api/name_check` → the `name_check` RPC landed.

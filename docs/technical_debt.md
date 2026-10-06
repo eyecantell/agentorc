@@ -94,6 +94,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Open |
 | TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Open |
 | TD-348 | Build *a brief whose first hook is lost*: one send on a scraped idle after `FIRST_PROMPT_HOOK_WAIT`, *brief not sent · no hook since launch* at `FIRST_PROMPT_BOUND` | High | Open |
+| TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Open — design first |
+| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Open |
+| TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Designed 2026-10-06 (a member's open `ask` to the person is an Answer needed block and counted) — the build is TD-350 |
+| TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Open |
+| TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Open |
+| TD-350 | Build the Org's ask block: a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup's *answer needed* | Low | Open |
 
 ---
 
@@ -1543,7 +1549,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** **Designed 2026-10-06** (the designer, PR #TBD): the first of the Fix's two shapes — a member's open `ask` to the person is an **Answer needed** block (the member, *asked you · <age>*, the ask's first line as text, **Open** to its message page, no answer control) counted in the facet and in the rollup's *answer needed*; the Inbox still counts it under *in the Inbox*, and the design says one ask may be in both lines (design §4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*). Not taken: the wording-only fix (a count of 0 would still stand where the team waits). Before: Open.
+**Blocked by:** TD-350
 **Location:** `src/agentorc/ui/org.py` (`answer_blocks`: members whose state is in `NEEDS_YOU_ROWS`), `src/agentorc/ui/templates/rollup.html` (the *Needs you* facet: *answer needed*, then *in the Inbox*); design §4.5a *team card: Answer needed / Doing*
 
 **Why:** On 2026-10-06 techlead-ao-1 held the whole team's review on an `ask` to the person (`m-e60ada636596`), and Paul read the Org's *Needs you* as *0 answer needed*. That count is only members whose pane waits on a permission or a question. A member that mailed its question and ended its turn is `idle`, so its ask is counted only on the second line, *in the Inbox*, among every other Inbox row. The question that stopped the team reads as nothing to answer.
@@ -1645,3 +1652,22 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes (TD-342's *Done when*); then TD-342 archives with this entry.
 
 **Related:** TD-342 (the design), TD-341 (the one cause seen, fixed), TD-339, TD-343.
+
+
+## TD-350: Build the Org's ask block — a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-06 (TD-344's design round; the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`, `summary`, `team_groups`, `rollup`); `src/agentorc/ui/app.py` (the Org route, which already computes `inbox_sections` for the top bar — its `needs` rows are the source, so the Org and the Inbox cannot disagree); `src/agentorc/ui/templates/rollup.html` (the *answer needed* tooltip) and the team summary template's Answer needed blocks; `tests/test_ui.py` or `tests/test_org.py`
+
+**Why:** design §4.5a *team card: Answer needed / Doing* (TD-344, 2026-10-06): a member's open `ask` to the person is a block under **Answer needed** and is counted there and in the rollup's *answer needed*. Today `answer_blocks` reads only members whose state is in `NEEDS_YOU_ROWS` (a pane's permission or question), so a member that mailed its question and ended its turn is `idle` and the Org reads *0 answer needed* while the team waits (techlead-ao-1's `m-e60ada636596`, 2026-10-06).
+
+**Fix, one PR:** the Org route hands `team_groups` the Inbox's `needs` rows it already has (`secs["needs"]`; an empty list when the agent is down); `answer_blocks` takes them and adds, after the pane blocks, one block per open `ask` whose sender is one of the team's records — `from` matched to a record id, a node's `id@host` by its id, the kinds the Inbox counts as a session's ask to the person (`PERSON_ASK_KINDS`), never a `steer`, a board row or a state row — oldest first: `{id: <the mail id>, member, name, kind: "ask", text: <the first line>, at}`; the template draws it as the design says — the member a Focus link, *asked you · <age>* with the page's age shape, the first line as text, **Open** to `/inbox/<id>`, no answer control; the facet opens on *answer* and tints while any block stands, as it does for a pane's; `rollup`'s `answer_needed` sums every block. The rollup's tooltip says *members waiting on a permission or a question, or whose ask to you is open*. Tests: a team whose idle member has an open `ask` to the person shows one block and `answer_needed` 1; the ask closed, none; a `steer` from the member, none; a pane question and an ask on two members, two blocks; a sender outside the team, none. Then a look on a scratch home (`scripts/look_home.py`, §4.9b) with a member's ask open, the shot named in the PR.
+
+**Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home (TD-344's *Done when*); then TD-344 archives.
+
+**Related:** TD-344 (the design), TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
