@@ -118,6 +118,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     WORK_SETTLE,  # noqa: F401
     WORK_STARTS_DAY,  # noqa: F401
     WRAPUP_GRACE,  # noqa: F401
+    LeadTyped,
     RpcError,  # noqa: F401
     _alarm_report,  # noqa: F401
     _alarm_since,  # noqa: F401
@@ -400,6 +401,8 @@ class HostAgent(
         # judged at that turn's `Stop`; and the run of rings so answered with nothing read.
         self._rang: dict[str, dict[str, Any]] = {}
         self._unread_rings: dict[str, int] = {}
+        # a brief whose line went in and whose paste did not (TD-347): its next try pastes the brief alone
+        self._lead_typed: set[str] = set()
         self._prompting: dict[str, asyncio.Task[None]] = {}  # a brief being typed (§4.1, TD-339), one per session
         # One typist per pane (TD-094): `_submit` holds its session's lock from paste to confirmed
         # submit, and a ring holds it from reading the composer to its own submit — so a ring never
@@ -1813,7 +1816,7 @@ class HostAgent(
             await self._type(sid, adapter, text)
         return before
 
-    async def _type(self, sid: str, adapter: Any, text: str, lead: str | None = None) -> None:
+    async def _type(self, sid: str, adapter: Any, text: str, lead: str | None = None, lead_in: bool = False) -> None:
         """Paste, Enter, and confirm the prompt left the composer (TD-027, design §4.2). Only an
         adapter that can read its tool's composer (`composer(tail_raw)`, design §4.3) gets the
         confirmation; the rest get the blind paste + Enter. The paste is given a moment to paint
@@ -1826,11 +1829,17 @@ class HostAgent(
         stuck prompt.
 
         `lead` is a line of the home's typed as literal keys before the paste, in the same prompt —
-        the brief's line (§4.1 *The brief is the person's word*, TD-347)."""
+        the brief's line (§4.1 *The brief is the person's word*, TD-347). A paste refused while that
+        line is in the composer — typed now, or by an earlier try (`lead_in`) — raises `LeadTyped`."""
         reader = getattr(adapter, "composer", None)
         if lead:
             await asyncio.to_thread(self.tmux.send_literal, sid, lead + " ")
-        await asyncio.to_thread(self.tmux.paste, sid, text)
+        try:
+            await asyncio.to_thread(self.tmux.paste, sid, text)
+        except Exception as e:
+            if lead or lead_in:
+                raise LeadTyped(f"the paste was refused after the line went in: {e}") from e
+            raise
         if reader is None:
             await asyncio.to_thread(self.tmux.send_enter, sid)
             return

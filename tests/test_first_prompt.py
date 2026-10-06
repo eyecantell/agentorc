@@ -114,7 +114,8 @@ async def test_a_paste_refused_after_the_line_pastes_the_brief_after_it_on_the_n
 ):
     """The line is typed as keys and the brief pasted after it (§4.1, TD-347): a paste tmux refuses
     leaves the line alone in the composer, and the next try pastes the brief after it — an Enter there
-    would submit the line with no brief and mark the brief sent (review of PR #1158)."""
+    would submit the line with no brief and mark the brief sent (review of PR #1158). It is known from
+    the step that failed, never read back, since the composer may show the line cut over two rows."""
     paste, refused = agent.tmux.paste, []
 
     def once(name: str, text: str) -> None:
@@ -124,6 +125,11 @@ async def test_a_paste_refused_after_the_line_pastes_the_brief_after_it_on_the_n
         paste(name, text)
 
     monkeypatch.setattr(agent.tmux, "paste", once)
+    # the real tool paints the 111-character line over two rows of an 80-column pane, and the composer
+    # read returns the first alone: the recovery cannot read the line back (review of PR #1158)
+    stub = adapters.get("brief0")
+    whole = stub.composer
+    monkeypatch.setattr(stub, "composer", lambda tail: None if (t := whole(tail)) is None else t[:78])
     async with LocalClient() as c:
         w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
         await agent.rpc_hook(w, state="idle")

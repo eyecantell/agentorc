@@ -262,6 +262,12 @@ class RpcError(Exception):
         self.data = data
 
 
+class LeadTyped(RpcError):
+    """`_type`'s line went in as keys and its paste was refused (§4.1, TD-347): the composer holds the
+    line alone, which a retry must not submit — nor recognise by reading it back, since the tool may
+    paint a long line over two rows and the composer read returns only the first (review of PR #1158)."""
+
+
 def person_only(caller: Any, act: str, section: str) -> None:
     """The one check of a person's own act (`mail.PERSON_ONLY`, design §4.8 *A person's own act is a
     named RPC, and the gate is one list*): the first statement of each such RPC, refusing every
