@@ -218,7 +218,8 @@ def held_mark(v: dict[str, Any]) -> dict[str, Any] | None:
     if not left:
         return None
     reader = str((v.get("review") or {}).get("reader") or "") if isinstance(v.get("review"), dict) else ""
-    whose = "the person's" if reader == "person" else "the techlead's"
+    chained = isinstance(v.get("review"), dict) and "chain" in v["review"]  # a flow's chain (§4.9c, TD-315)
+    whose = "the person's" if reader == "person" else "its readers'" if chained else "the techlead's"
     paths = list(
         dict.fromkeys(str(p) for c in left for p in (c.get("paths") if isinstance(c.get("paths"), list) else []))
     )

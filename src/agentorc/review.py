@@ -17,6 +17,7 @@ from typing import Any
 # the glob match and the files read are `sessionorc`'s since §6 rule 11 reads them at the home
 # (TD-258 slice 2): the package rule runs one way, so `ao pr held` reads them from there
 from sessionorc.held import GH_TIMEOUT, held_paths, matches, pr_files  # noqa: F401
+from sessionorc.models import review_links
 
 
 def setting(review: Any) -> dict[str, Any] | None:
@@ -25,6 +26,14 @@ def setting(review: Any) -> dict[str, Any] | None:
     empty `held:` is not *hold everything*, and not *hold nothing* either."""
     if not review:
         return None
+    if isinstance(review, dict) and isinstance(review.get("chain"), list):
+        # a flow's chain (§4.9c, TD-315): its links as written, `held` their union — the record's
+        # shape is the host agent's check (`normalize_review`); whose turn it is, is slice 4's
+        links = [dict(x) for x in review_links(review)]
+        if not links:
+            raise ValueError(f"review is not a setting: {review!r}")
+        held = list(dict.fromkeys(g for x in links for g in x.get("held") or ["**"]))
+        return {"chain": links, "held": held, "bound": str(review.get("bound") or "2h")}
     if not isinstance(review, dict) or not review.get("reader"):
         raise ValueError(f"review is not a setting: {review!r}")
     held = review.get("held", ["**"])

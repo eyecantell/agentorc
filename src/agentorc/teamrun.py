@@ -758,6 +758,8 @@ def _short(path: str | None) -> str:
 
 
 def _reader(review: Any) -> str:
+    if isinstance(review, dict) and isinstance(review.get("chain"), list):  # a flow's chain (§4.9c, TD-315)
+        return " then ".join(str(x.get("reader") or "?") for x in review["chain"] if isinstance(x, dict)) or "none"
     return str(review.get("reader") or "none") if isinstance(review, dict) else "none"
 
 

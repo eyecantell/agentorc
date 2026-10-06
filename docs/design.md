@@ -6305,7 +6305,8 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   shape reads a chain of one. **Built** (TD-315 slice 2): `pr_reads` — each ask's `id`, `to`, `at`,
   `open`, and its last reply's `verdict` and `replied_at`, the asks oldest first, refused to any
   other session; a mail read, so a node's session reads it over the link. `ao pr held`'s chain is
-  slice 4.
+  slice 4; until then it reads a chain's links that hold the PR in the flow's order, with no turn
+  (slice 3, since the compile writes chains).
 - **The words.** The build stage's brief says *run `ao pr held <n>`; ask the reader it names; a PR
   with a link still to read is never yours to merge*, in place of naming `{techlead}`; a review
   stage's brief says how its reader answers — the verdict, and `ao pr held <n> --id <asker>` to
