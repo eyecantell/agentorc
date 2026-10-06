@@ -11,7 +11,7 @@ judges; it writes nothing, and nothing here starts a session.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,10 +28,10 @@ FILE = "flow.yml"
 BUILTIN = ("td", "build-review", "build")
 ORG_SUB = "flows"  # the org's flow directories: `~/.agentorc/flows/<name>/` (§4.9c, TD-313)
 FLOW_KEYS = ("stages",)
-STAGE_KEYS = ("name", "role", "lane", "brief")
+STAGE_KEYS = ("name", "role", "lane", "brief", "held")
 PACKAGE_REF = "package:"
-# Today one seat holds a review stage: the team's `techlead:` seat (§4.9b *The reader* knows two
-# readers); a review stage of any other seat role is TD-314's design.
+# The role of the team's `techlead:` seat (§4.9b): a review stage of any other seat role is staffed by
+# a `seats:` entry of that role on `asks` (§4.9c *A review stage any seat may hold*, TD-315)
 REVIEW_ROLE = "techlead"
 REF_RE = re.compile(r"(?i)[a-z]{2,6}-\d{1,4}|#?\d{1,6}")
 
@@ -43,6 +43,7 @@ class Stage:
     lane: list[str] = field(default_factory=list)  # empty: a review stage
     brief: str = ""  # the reference as written
     path: Path | None = None  # the brief's file, resolved; None when the reference cannot be
+    held: str = ""  # a review stage's path set, by name (TD-315); "" holds every held path of the repo
 
     @property
     def review(self) -> bool:
@@ -67,6 +68,11 @@ class Flow:
     @property
     def review_stage(self) -> Stage | None:
         return next((s for s in self.stages if s.review), None)
+
+    @property
+    def review_stages(self) -> list[Stage]:
+        """Every review stage, in the order they read (§4.9c, TD-315)."""
+        return [s for s in self.stages if s.review]
 
 
 def _read_here(path: Path) -> str | None:
@@ -145,6 +151,14 @@ def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: P
             if not v:
                 flow.problems.append(f"{key}.{k} is required")
         stage = Stage(name=sname or f"#{i}", role=role, lane=[w.strip() for w in lane], brief=brief)
+        held = st.get("held")
+        if held is not None:
+            if lane:
+                flow.problems.append(f"{key}.held is a review stage's alone, and this stage gives a lane")
+            elif not isinstance(held, str) or not repoconfig.HELD_SET_RE.fullmatch(held.strip()):
+                flow.problems.append(f"{key}.held names one path set: a word of lower-case letters, digits and -")
+            else:
+                stage.held = held.strip()
         if brief:
             stage.path, why = _brief_path(brief, flow_dir, place_root)
             if why:
@@ -238,10 +252,6 @@ def check(
         if st.review:
             if role.kind != "seat":
                 flow.problems.append(f"{key}: a review stage names a seat, and {st.role!r} is a {role.kind}")
-            elif st.role != REVIEW_ROLE:
-                flow.problems.append(
-                    f"{key}: today only the `techlead` seat holds a review stage — another seat's is TD-314's design"
-                )
         else:
             if role.kind != "worker":
                 flow.problems.append(
@@ -333,14 +343,19 @@ def unfollowable(
     held: Collection[str],
     team: str = "",
     node: str = "",
+    seats: Collection[tuple[str, str]] = (),
+    held_sets: Mapping[str, Collection[str]] | None = None,
+    repo: str = "",
 ) -> list[str]:
     """Why a team cannot follow `flow` (§4.9c *Every listed flow must be followable*), in the shared
     words' middle part, or [] when it can: an org flow, or a stage naming an org role, for a team
     that runs on the node `node` (its briefs are read there, and the org's directories are the
     home's, §4.4a); a member stage whose role
-    the team starts no member of; the review stage when the team has no `techlead:` seat, or when
-    nothing would be held (its repos write no `held:`). `staffed` is the roles the definition's
-    members take."""
+    the team starts no member of; a review stage with no reader — the `techlead:` seat for the role
+    `techlead`, else exactly one `seats:` entry of its role on `asks` (TD-315) — or with nothing to
+    hold: its repos write no `held:`, or no path set of the name it gives. `staffed` is the roles the
+    definition's members take, `seats` its `seats:` entries as `(role, trigger)`, `held_sets` the
+    repo's named sets (`repo`'s)."""
     out: list[str] = []
     if node and flow.place == "org":
         out.append(f"an org flow, and {team} runs on {node} — define it in the repo")
@@ -348,9 +363,24 @@ def unfollowable(
         out += [f"{st.role} is an org role" for st in flow.stages if st.role and repoconfig.org_role(st.role)]
     for st in flow.stages:
         if st.review:
-            if not techlead:
-                out.append("no techlead seat — add `techlead:` to the team")
-            elif not held:
+            had = len(out)  # a stage with no reader says that alone, as before
+            if st.role == REVIEW_ROLE:
+                if not techlead:
+                    out.append("no techlead seat — add `techlead:` to the team")
+            elif (asks := sum(1 for r, t in seats if r == st.role and t == "asks")) > 1:
+                out.append(f"{asks} seats of role {st.role} on asks — a review stage has one reader")
+            elif not asks:
+                other = next((t for r, t in seats if r == st.role), "")
+                out.append(
+                    f"the seat of role {st.role} is on trigger {other} — a review seat's trigger is asks"
+                    if other
+                    else f"no seat of role {st.role} — add one under seats: with trigger: asks"
+                )
+            if len(out) > had:
+                continue
+            if st.held and not (held_sets or {}).get(st.held):
+                out.append(f"nothing held: no path set {st.held} in {repo or 'its repo'}")
+            elif not st.held and not held:
                 out.append("nothing held — write held:")
         elif st.role not in staffed:
             out.append(f"no {st.role} — add one to members:")

@@ -634,6 +634,8 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
         defaults["review"] = reader
         if reader is None:
             return f"no reader: team {name}'s flow {teams.current_flow(team)} holds nothing for this role"
+        if "chain" in reader:  # more than the techlead on every held path (§4.9c, TD-315)
+            return f"held PRs read by {teams.chain_line(reader)} (ao pr held <n>)"
         return f"held PRs read by team {name}'s techlead on {', '.join(reader['held'])} (ao pr held <n>)"
     if defaults.get("review") is None:
         defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))

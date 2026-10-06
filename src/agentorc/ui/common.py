@@ -772,6 +772,8 @@ def team_reader(
     if flowed:
         if review is None:
             return {"review": None, "line": f"no reader: the flow {teams.current_flow(t)} holds nothing", "flow": True}
+        if "chain" in review:  # more than the techlead on every held path (§4.9c, TD-315)
+            return {"review": review, "line": f"held PRs read by {teams.chain_line(review)}", "flow": True}
         here = host_name()
         seat = teams.seat_id(org, t, t.host or here, here) or t.techlead.name
         return {"review": review, "line": f"held PRs read by {seat} on {', '.join(review['held'])}", "flow": True}
