@@ -456,8 +456,10 @@ class Role:
         reader = _read_here if self.defined_place == "org" else (read or _read_here)
         try:
             text = reader(path)
-        except OSError as e:
-            raise ValueError(f"role {self.name!r}: {path} cannot be read ({e.strerror or e})") from None
+        except (OSError, UnicodeDecodeError) as e:
+            raise ValueError(
+                f"role {self.name!r}: {path} cannot be read ({getattr(e, 'strerror', None) or e})"
+            ) from None
         if text is None:
             if on_call:
                 raise ValueError(
@@ -767,10 +769,15 @@ def org_roles_dir() -> Path:
     return paths.home() / ORG_ROLES_SUB
 
 
-def _dir_names(base: Path) -> list[str]:
-    """The role directories under `base` on this host, by name: each a directory holding `role.yml`."""
+def _dir_names(base: Path, *, any_dir: bool = False) -> list[str]:
+    """The role directories under `base` on this host, by name: each a directory holding `role.yml`
+    (`any_dir`: every directory, so `visible` names one that lacks it)."""
     try:
-        return sorted(p.name for p in base.iterdir() if not p.name.startswith(".") and (p / ROLE_FILE).is_file())
+        return sorted(
+            p.name
+            for p in base.iterdir()
+            if not p.name.startswith(".") and ((p / ROLE_FILE).is_file() or (any_dir and p.is_dir()))
+        )
     except OSError:  # no such directory, or unreadable: none listed here
         return []
 
@@ -801,8 +808,8 @@ def definition(cfg: RepoConfig, name: str) -> tuple[str, Path, str] | None:
         d = base / name
         try:
             text = reader(d / ROLE_FILE)
-        except OSError as e:
-            raise ValueError(f"{d / ROLE_FILE} cannot be read ({e.strerror or e})") from None
+        except (OSError, UnicodeDecodeError) as e:
+            raise ValueError(f"{d / ROLE_FILE} cannot be read ({getattr(e, 'strerror', None) or e})") from None
         if text is not None:
             return place, d, text
     return None
@@ -832,8 +839,8 @@ def _defined_block(name: str, place: str, d: Path, text: str, read: Reader | Non
     block["kind"] = kind
     try:
         template = (_read_here if place == "org" else (read or _read_here))(d / ROLE_TEMPLATE)
-    except OSError as e:
-        raise ValueError(f"{d / ROLE_TEMPLATE} cannot be read ({e.strerror or e})") from None
+    except (OSError, UnicodeDecodeError) as e:
+        raise ValueError(f"{d / ROLE_TEMPLATE} cannot be read ({getattr(e, 'strerror', None) or e})") from None
     if template is None:
         raise ValueError(
             f"{d}: no {ROLE_TEMPLATE} — a role directory holds {ROLE_FILE} and its template (design §4.9c)"
@@ -851,13 +858,15 @@ def visible(roots: Collection[Path | str] = ()) -> list[dict[str, Any]]:
     org_names = _dir_names(org_roles_dir())
     places = [("org", org_roles_dir())] + [("repo", Path(r).expanduser() / ROLE_DIR) for r in roots]
     for place, base in places:
-        for name in _dir_names(base):
+        for name in _dir_names(base, any_dir=True):
             d = base / name
             row: dict[str, Any] = {"name": name, "source": str(d), "usable": False, "problems": []}
             if name in PRESETS:
                 row["problems"] = [f"{d}: {name} is a preset's name — a preset is redefined by key only (design §4.9c)"]
             elif place == "repo" and name in org_names:
                 row["shadowed"] = f"not read: the org's role {name} ({org_roles_dir() / name}) is the role"
+            elif not (d / ROLE_FILE).is_file():
+                row["problems"] = [f"{d}: no {ROLE_FILE} — a role directory holds {ROLE_FILE} and {ROLE_TEMPLATE}"]
             else:
                 try:
                     _defined_block(name, place, d, _read_here(d / ROLE_FILE) or "", None)
@@ -947,5 +956,21 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
 
 
 def roles(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = None) -> list[Role]:
-    """Every role resolved, for `ao roles` and the form's pick-list."""
-    return [resolve_role(cfg, n, roles_overlay) for n in role_names(cfg, roles_overlay)]
+    """Every role resolved, for `ao roles` and the form's pick-list. A role directory that is not
+    whole is left out, never an error: one broken directory must not empty every pick-list, and
+    `ao org check` names it (`visible`)."""
+    out = []
+    for n in role_names(cfg, roles_overlay):
+        try:
+            out.append(resolve_role(cfg, n, roles_overlay))
+        except (KeyError, ValueError):
+            if n in PRESETS:  # a preset's own keys: the overlay's error is the person's to see
+                raise
+    return out
+
+
+def unread(path: Path) -> str | None:
+    """A `Reader` for a repo whose files are not read from here (the New session form's config of
+    another host's checkout, `ui.app.config_on`): none of its role directories is read, rather than
+    this host's disk at the same path."""
+    return None

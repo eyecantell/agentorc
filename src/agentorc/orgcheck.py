@@ -231,6 +231,13 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     for f in flowdefs.visible(roots, org.roles):
         if not f["usable"] and not f.get("shadowed") and f["name"] not in listed:
             lack(f"flow {f['name']} ({f['source']}) is not usable — {'; '.join(f['problems'])}")
+    defined = {r["name"] for r in repoconfig.visible(roots) if r["usable"]}
+    for name in sorted(org.roles):  # an overlay is not a definition (§4.9c): org.yml's key must name one
+        if name not in repoconfig.PRESETS and name not in defined:
+            lack(
+                f"{org.path.name if org.path else 'org.yml'}: roles.{name} — unknown role: no preset and no role "
+                "directory, the org's or a registered checkout's, defines it (an overlay is not a definition, §4.9c)"
+            )
     for r in repoconfig.visible(roots):  # a role directory that is not whole, or takes a preset's name
         if not r["usable"] and not r.get("shadowed"):
             lack(f"role {r['name']} ({r['source']}) is not usable — {'; '.join(r['problems'])}")

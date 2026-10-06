@@ -5855,8 +5855,9 @@ the org's, per key (`repoconfig.resolve_role`) — and are not to be unified. **
 no preset and no directory is refused** when the file is read (*unknown role*, naming the
 directories that would define it): an overlay is not a definition. A repo's `.agentorc.yml` is
 refused as it is read; `org.yml`'s `roles:` may lay over a role a repo defines, which the org file
-cannot see, so its key naming nothing is refused where the role is resolved (`ao roles`, a start,
-`ao org check`'s flows). A role defined in a directory writes its `kind` in `role.yml` (`worker`
+cannot see, so its key naming nothing is refused where the role is resolved (a start, a flow's
+check) and named by `ao org check` against every role directory it can see. A role directory that
+is not whole is left out of `ao roles` and the pick-lists, and named by `ao org check`. A role defined in a directory writes its `kind` in `role.yml` (`worker`
 where unwritten); an overlay never does. The YAML files keep no `flows:` key: a flow is found by its directory.
 **An org flow or role is not usable by a team on a node** (§4.4a): a node team's roles and briefs
 are read on the node, and the org's directories are the home's; such a team is told so as *not

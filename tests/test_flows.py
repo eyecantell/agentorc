@@ -5,6 +5,7 @@ and a team's `flows:` refused at its start when a flow is unknown, not usable or
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -1097,3 +1098,22 @@ def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(worl
     define_role(root / ".agentorc" / "roles", "hunter")
     assert cli.main(["org", "check"]) == 1
     assert "lacking: role hunter (" in capsys.readouterr().out
+    shutil.rmtree(root / ".agentorc" / "roles" / "hunter")
+    # a directory with no role.yml is not whole, and a broken one leaves every other role listed
+    (root / ".agentorc" / "roles" / "stray").mkdir()
+    (repoconfig.org_roles_dir() / "security" / "template.md").unlink()
+    assert cli.main(["org", "check"]) == 1
+    out = capsys.readouterr().out
+    assert "lacking: role stray (" in out and "no role.yml" in out and "lacking: role security (" in out
+    names = [r.name for r in repoconfig.roles(repoconfig.load(root))]
+    assert "security" not in names and "grinder" in names
+    assert cli.main(["roles"]) == 0
+    capsys.readouterr()
+    # org.yml's `roles:` key naming no definition is named, since the org file cannot see the repos
+    (repoconfig.org_roles_dir() / "security" / "template.md").write_text("x\n")
+    shutil.rmtree(root / ".agentorc" / "roles" / "stray")
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc.setdefault("roles", {})["grnder"] = {"lane": ["free-pick"]}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["org", "check"]) == 1
+    assert "roles.grnder — unknown role" in capsys.readouterr().out
