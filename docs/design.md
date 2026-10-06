@@ -4563,20 +4563,21 @@ repo. The org a client sees is the union:
 
 **What is left at the home has a history** (TD-210; built — TD-229 slice 5). `org.yml`, `profiles.yml` and
 `settings.yml` stay files under `~/.agentorc/`, where every reader finds them, and at the home
-the directory becomes a git work tree that tracks those three — and, once flows are built, the org's `flows/` and `roles/` directories (§4.9c; TD-313) — and ignores the rest: sessions,
+the directory becomes a git work tree that tracks those three — and the org's `flows/` and `roles/` directories (§4.9c; built — TD-313), every file under each — and ignores the rest: sessions,
 runs and mail are state, and `hosts.yml` is this machine's own name and links, which another
 machine must not inherit. **The home's host agent is the one committer**, so two writers never
 meet on the index: it commits after its own `set_settings` (*settings: usage_gate.grind.week
 30 → 20*; detached from the reply, so a slow git never holds Save), when a client asks with the act's words after **Members…** wrote (*org: ao-grind
 +grinder-ao-3*, the `commit_defs` RPC, a person's own), and on the reports' cadence for a hand
-edit, as *edited by hand*. It runs `git add` and `git commit` on the three and reads none of
+edit, as *edited by hand*. It runs `git add` and `git commit` on the three and the two directories and reads none of
 them for meaning (it still reads no `org.yml`); a file that does not parse as YAML is left
 uncommitted until it does, and a commit that fails is logged and never fails the write. It
 commits as *agentorc*, with the person's git hooks and signing set aside for its own commits
 (`sessionorc.defs`), and a home that is not a work tree yet commits nothing until `ao service
 install` makes it one. So
 `git -C ~/.agentorc log -p org.yml` is the file's history and the `org.yml.bak-*` copies have
-no more work to do. A node's replica of `settings.yml` is not tracked. **The home never
+no more work to do. A home made a work tree before the directories were tracked gains their
+`.gitignore` lines in its next commit. A node's replica of `settings.yml` is not tracked. **The home never
 pushes and adds no remote**: a copy off the machine is the person's own `git remote add` and
 push; the daily backup carries the three files, not their history. No secret is in any of the
 three (Doppler holds them). The home's work tree is never a checkout a brief is merged into: a

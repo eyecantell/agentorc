@@ -176,3 +176,46 @@ def test_service_install_makes_the_home_a_work_tree_at_the_home_only(tmp_path, m
     monkeypatch.setattr(hosts, "home_name", lambda: hosts.local_host().name)
     assert service._home_history(str(home)) == str(home / ".git")
     assert service._home_history(str(home)) is None, "already one"
+
+
+def test_the_orgs_flow_and_role_directories_are_tracked_whole(tmp_path):
+    """§4.9c *Where flows and roles live* (TD-313): the org's `flows/` and `roles/` are the home's to
+    commit, every file under each; a `.yml` that does not parse waits, a removal is committed, and the
+    state beside them stays ignored."""
+    home = tmp_path / "home"
+    (home / "flows" / "hunt").mkdir(parents=True)
+    (home / "flows" / "hunt" / "flow.yml").write_text("stages: []\n")
+    (home / "flows" / "hunt" / "hunt.md").write_text("hunt\n")
+    (home / "sessions").mkdir()
+    (home / "sessions" / "x.json").write_text("{}")
+    assert defs.init(home) is True
+    assert _tracked(home) == {".gitignore", "flows/hunt/flow.yml", "flows/hunt/hunt.md"}
+    (home / "roles" / "hunter").mkdir(parents=True)
+    (home / "roles" / "hunter" / "role.yml").write_text("kind: member\n")
+    (home / "roles" / "hunter" / "template.md").write_text("you hunt\n")
+    (home / "flows" / "hunt" / "flow.yml").write_text("stages: [\n")  # mid-edit: does not parse
+    assert defs.commit("edited by hand", home=home) is True
+    assert _tracked(home) >= {"roles/hunter/role.yml", "roles/hunter/template.md"}
+    assert _log(home, "flows/hunt/flow.yml") == ["the home's definitions, first tracked"], "waits until it parses"
+    (home / "flows" / "hunt" / "flow.yml").write_text("stages: [hunt]\n")
+    (home / "roles" / "hunter" / "template.md").unlink()
+    assert defs.commit("edited by hand", home=home) is True
+    assert "roles/hunter/template.md" not in _tracked(home), "a removal is the change"
+    assert _log(home, "flows/hunt/flow.yml") == ["edited by hand", "the home's definitions, first tracked"]
+    assert "sessions/x.json" not in _tracked(home)
+    assert defs.commit("edited by hand", home=home) is False
+
+
+def test_a_home_tracked_before_the_directories_lets_them_in_on_its_next_commit(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "org.yml").write_text("a: 1\n")
+    old = "# the home's definitions\n*\n!.gitignore\n!org.yml\n!profiles.yml\n!settings.yml\n"
+    (home / ".gitignore").write_text(old)
+    subprocess.run(["git", "-C", str(home), "init", "-q"], check=True)
+    assert defs.commit("first", home=home, files=(".gitignore", *defs.TRACKED)) is True
+    (home / "roles" / "hunter").mkdir(parents=True)
+    (home / "roles" / "hunter" / "role.yml").write_text("kind: member\n")
+    assert defs.commit("edited by hand", home=home) is True
+    assert {".gitignore", "roles/hunter/role.yml"} <= _tracked(home)
+    assert (home / ".gitignore").read_text().startswith(old), "the file's own lines are kept"
