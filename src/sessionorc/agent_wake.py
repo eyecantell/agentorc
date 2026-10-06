@@ -305,7 +305,11 @@ class WakeMixin:
         elif road == "scraped":
             return  # a scraped idle is trusted only with a composer that reads empty (§4.1, TD-348)
         try:
-            if left:
+            if left == mail.BRIEF_LINE:
+                # the home's line went in and the paste was refused: the brief goes after it, never an
+                # Enter on the line alone, which would submit no brief and mark it sent (review of PR #1158)
+                await self._type(sid, adapter, s.first_prompt)
+            elif left:
                 await self._enter_again(sid, reader)  # the last try's brief is still in the composer
             else:
                 # the home's line, then the brief as the paste: one prompt (§4.1, TD-347); the lock is held already

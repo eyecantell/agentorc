@@ -109,6 +109,30 @@ async def test_a_composer_that_never_takes_the_brief_marks_the_record_until_a_pr
         assert rec.first_prompt_error is None and rec.first_prompt is None and rec.first_prompt_sent_at
 
 
+async def test_a_paste_refused_after_the_line_pastes_the_brief_after_it_on_the_next_try(
+    agent, briefstubs, tmp_path, monkeypatch
+):
+    """The line is typed as keys and the brief pasted after it (§4.1, TD-347): a paste tmux refuses
+    leaves the line alone in the composer, and the next try pastes the brief after it — an Enter there
+    would submit the line with no brief and mark the brief sent (review of PR #1158)."""
+    paste, refused = agent.tmux.paste, []
+
+    def once(name: str, text: str) -> None:
+        if not refused:
+            refused.append(text)
+            raise RuntimeError("tmux refused the paste")
+        paste(name, text)
+
+    monkeypatch.setattr(agent.tmux, "paste", once)
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        await agent.rpc_hook(w, state="idle")
+        rec = agent.sessions[w]
+        assert await wait_for(lambda: _sent(rec), timeout=10), "the brief was never sent"
+        assert refused == [BRIEF] and rec.first_prompt_tries == 1
+        assert await _submitted(agent, w) == ["SUBMITTED " + TYPED], "the line and the brief, as one prompt"
+
+
 async def _sent(rec) -> bool:
     return bool(rec.first_prompt_sent_at)
 
