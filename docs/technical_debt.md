@@ -87,11 +87,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
-| TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Open — design first |
-| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Open |
+| TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Designed 2026-10-06 (one send on a scraped idle, then the *brief not sent* mark) — the build is TD-348 |
+| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
 | TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Open |
 | TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Open |
 | TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Open |
+| TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Open |
+| TD-348 | Build *a brief whose first hook is lost*: one send on a scraped idle after `FIRST_PROMPT_HOOK_WAIT`, *brief not sent · no hook since launch* at `FIRST_PROMPT_BOUND` | High | Open |
 
 ---
 
@@ -1503,7 +1505,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-06 (grinder-ao-1, on the anchor's finding for TD-339's live check)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design round needed. The cause of the one case seen is fixed by TD-341; this entry is the missing fallback.
+**Status:** **Designed 2026-10-06** (the designer, PR #1153, with TD-343 in one §4.1 round; the entry's default taken — (a) once, then (b)): design §4.1 *A brief whose first hook is lost* (`FIRST_PROMPT_HOOK_WAIT`, one send on a scraped idle with an empty composer; `FIRST_PROMPT_BOUND`, then `first_prompt_error` *no hook since launch*), §4.5a *brief not sent* mark. The build is TD-348; this entry archives with it. Was: Open — design round needed. The cause of the one case seen is fixed by TD-341; this entry is the missing fallback.
+**Blocked by:** TD-348
 **Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: `state == "idle"` and `confidence == "hook"`); design §4.1 *No prose in the argv*, §4.5a *brief not sent* mark.
 
 **Why:** design §4.1 sends the brief at the record's first `idle` **by hook**, and the *brief not sent* mark is written only after `FIRST_PROMPT_TRIES` refused sends. A run whose first hook never lands — refused (TD-341), dropped, or a hook config that did not load — makes no try at all, so no mark: grinder-ao-1's run of 2026-10-05 22:38 sat at an empty composer, `stalled? (scraped)`, for 7.5 hours until the person restarted it, and its card said nothing about a brief.
@@ -1521,7 +1524,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-06 (the anchor, asked by Paul why the team did nothing all day)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** **Designed 2026-10-06** (the designer, PR #1153; the shape — a typed line of the home's own before the pasted brief and a fixed preface at the head of the context file, against the brief inside the context file with a fixed *begin* as the first prompt — steered to Paul): design §4.1 *The brief is the person's word, and the tool is told so*, §4.10 *A ring is answered by a read, or the bell stops* (`DOORBELL_HELD`, `doorbell_held`). No page control, so no mockup. The build is TD-347; this entry archives with it. Was: Open
+**Blocked by:** TD-347
 **Location:** design §4.1 *No prose in the argv*; `src/sessionorc/agent_wake.py` (`_first_prompt_typing`: the brief sent by bracketed paste); `src/agentorc/adapters/claude_code/__init__.py` (`--append-system-prompt-file`, the start context)
 
 **Why:** Since TD-339 the brief is typed at the composer by bracketed paste, and Claude Code hands a paste to the model wrapped in `<pasted_content>` with the rule that instructions inside it are followed only where the user's own words ask for it. A brief is nothing but a paste, so a careful model takes it as data. On 2026-10-06 at 12:29Z techlead-ao-1 (Fable) answered its brief with *"Your message contains only pasted text, a techlead-seat brief for agentorc, with nothing from you saying what to do with it, so I haven't acted on it"*, then held grinder-ao-1's PR ask on #1150 unread until the person answered its mailed `ask` (`m-e60ada636596`) at 22:20Z. In those ten hours the doorbell rang it about thirty times, each a Fable turn that only re-said it was holding. grinder-ao-1 (Opus) acted on the same kind of brief, so whether a session starts is up to the model's judgement on each run. Every member, seat and restart launched since TD-339 is exposed.
@@ -1603,3 +1607,41 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** `docs/design/` holds one file per section with unchanged § numbers, `docs/design.md` is an index, `pdm run test` passes with the doc-bound tests reading the section files, no brief or skill points at a section by line number in the old file, and a design PR touching one section changes one file.
 
 **Related:** TD-345 (the review that had to be scoped), TD-249 (archived: the bound that makes the file too large to read whole).
+## TD-347: Build *the brief is the person's word* — the typed line before the paste, the context file's preface, the doorbell held
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the designer, TD-343's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_wake.py` (`_first_prompt_typing`, `_ring_typing`, `_bell_blocked`), `src/sessionorc/agent.py` (`_type`: a literal line before the paste), `src/sessionorc/tmux.py` (`send_literal`, `paste`), `src/sessionorc/mail.py` (`DOORBELL_HELD`), `src/sessionorc/models.py` (`doorbell_held`), `src/sessionorc/paths.py` / `src/agentorc/adapters/claude_code/__init__.py` (the context file's preface), `src/agentorc/cli.py` (`ao status -v`), `tests/`; design §4.1 *The brief is the person's word, and the tool is told so*, §4.10 *A ring is answered by a read, or the bell stops*. Held path (`src/sessionorc/**`): the techlead reads it.
+
+**Why:** TD-343's design. A seat took its pasted brief as data and held a PR ask ten hours; each fresh entry rang it again.
+
+**Fix, two slices, a PR each:**
+1. **The road.** `_first_prompt_typing` sends the brief as one prompt: the fixed line (`mail.BRIEF_LINE`, the words in §4.1) by `send_literal`, then the brief by `paste`, one Enter, the same composer confirmation; `sends` records it as before. The context file always exists and begins with the home's fixed preface (`BRIEF_PREFACE`, the words in §4.1), a blank line, then the caller's start context when there is one; the writer moves from the adapter (today's `if start_context:` in `launch`) to the host agent, which writes the file for every launch of an adapter with `start_context` and hands the adapter its path, so the preface is one text for every tool. A test asserts the line is typed before the paste and the preface heads the file, with and without a start context.
+2. **The bell.** A ring remembers the unread count it rang with; at the turn's `Stop` (the next hook `idle`), a count no lower counts one *unread ring*, a lower one resets the run; at `DOORBELL_HELD` (3) in a row the record's `doorbell_held = {at, rings}` is set and `_bell_blocked` answers *holding its mail unread*; `inbox` marking an entry read clears it, and so does `_refill` (a person's act toward it). `ao status -v` prints *doorbell held · n unread rings* on the mail line. Tests: three unread rings hold, a read clears, a person's send clears.
+3. **The press** (slice 1's PR, on a scratch home with a real Claude Code session): a member started with a brief on Opus and on Fable acts on it with no word from the person — the session's first turn runs the brief's first step — and `ps -o args` still shows no prose.
+
+**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted (TD-343's *Done when*); then TD-343 archives with this entry.
+
+**Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
+
+## TD-348: Build *a brief whose first hook is lost* — one send on a scraped idle, then the mark
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the designer, TD-342's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: the `confidence == "hook"` gate), `src/sessionorc/agent_common.py` (`FIRST_PROMPT_HOOK_WAIT`, `FIRST_PROMPT_BOUND`), `src/sessionorc/models.py`, `src/agentorc/ui/cards.py` (the mark's reason), `tests/`; design §4.1 *A brief whose first hook is lost*, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads it.
+
+**Why:** TD-342's design. A run whose first hook never landed made no try at its brief and showed no mark for 7.5 hours.
+
+**Fix, one PR:** the tick's send of a due `first_prompt` takes, besides a hook-reported `idle`, a **scraped** `idle` once: when the record has had no hook event since its launch, `FIRST_PROMPT_HOOK_WAIT` (120 s) has passed since `created`, the state is `idle` by scrape and the adapter's `composer(tail)` reads empty — one try, counted in `first_prompt_tries` and marked `scraped` on the record's `sends` entry; its `UserPromptSubmit` confirms it as any send. A hook-reported `idle` before the bound sends as before. At `FIRST_PROMPT_BOUND` (300 s) since `created` with the brief still unsent, `first_prompt_error = "no hook since launch"`; the card and `ao status -v` say *brief not sent · no hook since launch*; a hook arriving later clears nothing by itself. Tests with the `hookstub` adapter: a launch with its hooks silenced gets its brief by the scraped send; one whose composer never reads empty carries the mark at the bound; a hook-reported launch is unchanged.
+
+**Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes (TD-342's *Done when*); then TD-342 archives with this entry.
+
+**Related:** TD-342 (the design), TD-341 (the one cause seen, fixed), TD-339, TD-343.
