@@ -1119,6 +1119,44 @@ class MailMixin:
             "unread": s.unread(),
         }
 
+    async def rpc_pr_reads(self, id: str, pr: int, caller: Any = None) -> dict[str, Any]:
+        """`pr_reads {id, pr}` (design §4.9c *Whose turn it is*, TD-315 slice 2): the `ask`s session
+        `id` sent carrying `pr`, oldest first, each one's addressees, time, whether it is open, and
+        the `verdict` of its last reply with that reply's time — structured fields and never text, as
+        `prs_waiting` is. Answered to the author itself, to a session one of those asks is addressed
+        to, and to a person; the home answers it and times nothing. A read, marking nothing."""
+        try:
+            pr = int(pr)
+        except (TypeError, ValueError):
+            raise RpcError(f"pr is a PR's number, not {pr!r}") from None
+        s = self._find(self._addr(id))
+        asks = [e for e in s.outbox if e.kind == "ask" and e.pr == pr]
+        if not mail.is_person(caller) and not self._is_self(s, caller):
+            me = self._addr(caller)
+            if not any(self._addr(x) == me for e in asks for x in e.to):
+                raise RpcError(
+                    f"{me} cannot read {id}'s reads of PR #{pr}: its author, a reader it asked, or a person "
+                    f"reads them (design §4.9c)"
+                )
+        replies: dict[str, MailEntry] = {}
+        for e in s.inbox:  # the replies landed in the asker's inbox, oldest first
+            if e.kind == "reply" and e.reply_to:
+                replies[e.reply_to] = e
+        reads = []
+        for e in sorted(asks, key=lambda e: e.at):
+            last = replies.get(e.id)
+            reads.append(
+                {
+                    "id": e.id,
+                    "to": list(e.to),
+                    "at": e.at,
+                    "open": e.open,
+                    "verdict": last.verdict if last else None,
+                    "replied_at": last.at if last else None,
+                }
+            )
+        return {"id": self._address(s), "pr": pr, "asks": reads}
+
     async def rpc_thread(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """`ao inbox --thread <id>` and the Inbox's message page (design §4.7, §4.5 screen 6,
         TD-136): the whole thread of one entry in the person inbox — every entry sharing its
