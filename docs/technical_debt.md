@@ -96,6 +96,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Open |
 | TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Open |
 | TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Open |
+| TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Open |
 
 ---
 
@@ -1681,3 +1682,27 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** §6 rule 11, §4.9b, §4.9 and §4.9c state one review model in present-tense rule voice, §9 invariant 9 covers flows, the slice history sits in design-history, and any code that differs has a build entry.
 
 **Related:** TD-309, TD-313, TD-315 (archived: the layer), TD-310 (the repos' move).
+
+## TD-346: Split `docs/design.md` into one file per section under `docs/design/`, with `design.md` kept as the index
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, decided by Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open. Paul, 2026-10-06: do it, in a quiet window.
+**Location:** `docs/design.md`; the four tests that read it whole (`tests/test_help.py`, `test_primer.py`, `test_screen.py`, `test_ui.py`); the briefs (`docs/briefs/`, `src/agentorc/briefs/`) and code comments that name the file; `docs/design-history.md` (its sections follow the design's); CLAUDE.md's documentation map
+
+**Why:** the design is about 9,500 lines, roughly 200k tokens. Nobody can review it whole on one budget: a review on 2026-10-06 had to be scoped to §4.9c by line ranges (TD-345). Every design PR edits the same file, so concurrent design rounds conflict on it. A brief that names the sections a role needs can only name line ranges, and those drift. The sessions already read it by `grep -n` and ranged reads, never whole, so the split serves reviews, conflicts and briefs. Day-to-day reading doesn't need it.
+
+**Fix:** design the layout first, then move it in one PR:
+- One file per top-level section, with §4's subsections each a file of their own (`docs/design/4.5a-controls.md` and the like). **The § numbers stay as they are**, because code comments, briefs, the ledger and the history cite them.
+- `docs/design.md` becomes the index: what the design is, the present-tense rule (CLAUDE.md), and one line per section file.
+- The tests that read the file whole read the section they bind to (`help.py`'s list from §4.5a, the primer's from §4.9b, and so on), through one helper in `tests/`.
+- Briefs that say *grep `docs/design.md`* say *grep `docs/design/`*. A `grep -rn` over the directory finds what one file did.
+- `design-history.md` either splits the same way or keeps its § headings. The round decides which.
+- Land it when no design PR is open, since every open one conflicts, and say so on the board for the window.
+
+**Done when** `docs/design/` holds one file per section with unchanged § numbers, `docs/design.md` is an index, `pdm run test` passes with the doc-bound tests reading the section files, no brief or skill points at a section by line number in the old file, and a design PR touching one section changes one file.
+
+**Related:** TD-345 (the review that had to be scoped), TD-249 (archived: the bound that makes the file too large to read whole).
