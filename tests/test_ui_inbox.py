@@ -1089,7 +1089,7 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     assert 'if (action === "identity_log") body = { id: b.dataset.who || "" };' in js
     assert "res.to.name || res.to.id" in js  # the RPC answers `to` as {id, name}, never a bare string
     # an answer, so the row goes (only Suspend and a board decide leave it standing), and a refusal names the control
-    assert "if (staterow && !stays) { AO.handRing(staterow); staterow.remove(); }" in js
+    assert "AO.handRing(row); row.remove(); left = true;" in js  # a state row leaves on the press (TD-340)
     assert 'identity_log: "Log TD"' in js and "${named[action] || action} failed" in js
 
 
@@ -2117,8 +2117,10 @@ def test_suspend_is_offered_only_where_there_is_something_to_stop_and_leaves_the
 
     js = (UI / "static" / "app.js").read_text()
     # with a board row's decide (TD-255), the one act on this page that does **not** take its row away
-    assert 'const stays = action === "suspend" || (action === "board" && body.action === "decide");' in js
-    assert "if (staterow && !stays) { AO.handRing(staterow); staterow.remove(); }" in js
+    assert (
+        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);' in js
+    )
+    assert "AO.handRing(row); row.remove(); left = true;" in js  # a state row leaves on the press (TD-340)
     assert 'if (action === "suspend") body = { id: b.dataset.who || "" };' in js
     assert "why:" not in js.split('action === "suspend"')[1][:200]  # the agent composes the reason
 
@@ -2999,3 +3001,58 @@ def test_the_host_pick_lists_this_host_and_its_nodes(tmp_path, monkeypatch):
     rec = {"id": "ao-w@box", "name": "w", "dir": "/r", "adapter": "claude-code", "adapter_id": "u-1", "host": "box"}
     assert "host=box" in resume_form_url(rec)
     assert "host=" not in resume_form_url({**rec, "id": "ao-w", "host": "kmaster"})
+
+
+# -- §4.5 screen 6 *A control answers the press* (TD-338, TD-340) ------------------------------------
+
+
+def _js_table(js: str, name: str) -> set[str]:
+    body = js[js.index(f"const {name} = {{") :]
+    body = body[: body.index("};")]
+    return set(re.findall(r'"?([a-z_-]+)"?\s*:', body.split("{", 1)[1]))
+
+
+@pytest.mark.unit
+def test_every_inbox_control_has_its_verb_under_way():
+    """§4.5a **Inbox row: pending**: one table in the page's script, keyed by the control's wire name (a
+    board row's by `board_<its action>`) — every `data-act` the Inbox draws has its verb, so no pending
+    row shows a wire name; and every row carries the error line a refused press is drawn on."""
+    root = pathlib.Path(__file__).parents[1] / "src/agentorc/ui"
+    js = (root / "static/app.js").read_text()
+    verbs = _js_table(js, "PRESS_VERBS")
+    html = "".join(
+        (root / "templates" / f).read_text()
+        for f in ("inbox_row.html", "inbox.html", "inbox_rows.html", "inbox_entry.html", "inbox_rail.html")
+    )
+    acts = set(re.findall(r'data-act="([a-z_-]+)"', html)) - {"board"}
+    acts |= {f"board_{a}" for a in re.findall(r'data-board-act="([a-z_]+)"', html)}
+    assert acts and not sorted(acts - verbs), f"no verb for {sorted(acts - verbs)}"
+    assert 'board_done: "checking off…"' in js
+    row = (root / "templates/inbox_row.html").read_text()
+    macro = row[row.index("{% macro row(e, section") :]
+    assert macro.count('<div class="st rowerr" role="alert" hidden></div>') == 4  # each of the four row shapes
+    assert row.count('class="st rowerr"') == 4  # and nowhere else, so a row has one
+    # the frame of a press: marked before the request leaves, the row out first when the press takes it
+    assert "pressed();\n      const res = await act(id, action2 || action, body);" in js
+    assert (
+        'waiting = AO.toast(action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);'
+        in js
+    )
+    assert "const text = kept[msg] || AO.pressErrs[msg];" in js
+    # `say` is the handler's own, declared partway down it: nothing above the declaration may call it
+    handler = js[js.index('const b = ev.target.closest("[data-act], [data-copy]");') :]
+    assert "say(" not in handler[: handler.index("const say = ")]
+    # a poll's swap keeps a press in flight as it was: out, or pending (the review of #1144)
+    assert "if (f && f.leaves) r.remove(); else if (f) AO.markPending(r, f.verb);" in js
+
+
+@pytest.mark.unit
+def test_every_button_has_one_hover_one_press_and_one_ring():
+    """§4.5a **a control's look**: `:hover`, `:active` and `:focus-visible` are set once, on `.btn`, and
+    no variant sets its own hover (the ghost's and the card footers' rules are folded into the one)."""
+    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    rules = [r.split("{")[0].strip() for r in css.split("}") if "{" in r]
+    for state in (":hover", ":active", ":focus-visible"):
+        mine = [s for s in rules if ".btn" in s and state in s]
+        assert len(mine) == 1 and mine[0].startswith(f".btn{state}"), (state, mine)
+    assert ".btn:hover:not(:disabled)" in css and ".btn.primary { --btn-wash: transparent;" in css

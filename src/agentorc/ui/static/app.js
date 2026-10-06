@@ -80,14 +80,22 @@
   if (AO.termChan && AO.termChan.unref) AO.termChan.unref();  // node's probes (tests) only: a browser has no unref
 
   // ---- toasts: the one error surface (design §4.5) ----
-  AO.toast = function (text, ok, href) {
+  // `wait` makes **a toast that waits** (§4.5 screen 6 *A control answers the press*, TD-340): no
+  // clock until `settle(text, ok, href)` rewrites it with the answer and starts one. Returns the toast.
+  AO.toast = function (text, ok, href, wait) {
     const el = document.createElement("div");
-    el.className = "toast" + (ok ? " ok" : "");
-    el.textContent = text;
-    // a toast that names a thing links to its page (*handed to techlead-ao-1 · m-…*, TD-219 slice 4)
-    if (href) { const a = document.createElement("a"); a.href = href; a.textContent = " open"; el.appendChild(a); }
-    $("#toasts").appendChild(el);
-    setTimeout(() => el.remove(), href ? 10000 : ok ? 3000 : 7000);  // a link needs the time to be pressed
+    const draw = (t, good, link) => {
+      el.className = "toast" + (good ? " ok" : "");
+      el.textContent = t;
+      // a toast that names a thing links to its page (*handed to techlead-ao-1 · m-…*, TD-219 slice 4)
+      if (link) { const a = document.createElement("a"); a.href = link; a.textContent = " open"; el.appendChild(a); }
+      setTimeout(() => el.remove(), link ? 10000 : good ? 3000 : 7000);  // a link needs the time to be pressed
+    };
+    el.settle = (t, good, link) => { draw(t, good, link); return el; };
+    const box = $("#toasts");
+    if (wait) { el.className = "toast wait"; el.textContent = text; } else draw(text, ok, href);
+    if (box) box.appendChild(el);
+    return el;
   };
 
   // The Focus pane's **copy on select** (§4.5a, TD-174): written to the person's settings, which
@@ -295,7 +303,7 @@
   // opened with the row's board and text. Resolves to the agent's answer once the line is on the
   // board, or null on Cancel. A refusal is drawn in the form and leaves it open, so the person can
   // pick another board or fix the date rather than start again from the row.
-  AO.boardAdd = function (b) {
+  AO.boardAdd = function (b, onSend) {
     const dlg = $("#boardadd");
     if (!dlg) { AO.toast("Put on the board: this page has no form for it"); return Promise.resolve(null); }
     const sel = $("#baboard"), text = $("#batext"), due = $("#badue"), err = $("#baerr"), go = $("#bago");
@@ -327,16 +335,63 @@
         const miss = !body.board ? "pick a board" : !body.text ? "say what is needed" : !body.due ? "give it a Due date" : "";
         if (miss) { err.textContent = miss; err.hidden = false; return; }
         go.disabled = true;
+        if (onSend) onSend();  // the row is marked once the form sends (§4.5 screen 6, TD-340)
         try {
           done = await act("person", "board", body);
           dlg.close("done");
         } catch (e) {
           err.textContent = `not put on the board: ${e.message}`; err.hidden = false;
+          const r = b.closest(".mailrow"); if (r) { AO.unPend(r); delete AO.inflight[r.dataset.msg]; }  // a send again marks it again
         } finally { go.disabled = false; }
       };
       dlg.addEventListener("close", () => resolve(done), { once: true });
       dlg.returnValue = ""; dlg.showModal(); (text || dlg).focus();
     });
+  };
+
+  // §4.5 screen 6 *A control answers the press* (TD-338, TD-340) and §4.5a **Inbox row: pending**: the
+  // verb a pending row shows in place of its age, one table keyed by the control's wire name (a board
+  // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
+  const PRESS_VERBS = {
+    board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
+    board_notright: "deciding…", board_add: "writing…", snooze: "snoozing…", attention_snooze: "snoozing…",
+    unsnooze: "unsnoozing…", dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
+    clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
+    reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
+    suspend: "suspending…", promote: "promoting…", work_start: "starting…", restart: "restarting…",
+    resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
+  };
+  const PRESS_NOT = {
+    board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",
+    unsnooze: "unsnoozed", dismiss: "dismissed", identity_ack: "dismissed", clear_work: "dismissed",
+    clear_mark: "dismissed", clear_promote: "dismissed", unmail: "deleted", allow: "allowed", deny: "denied",
+    gowithit: "sent", identity_log: "logged", restart: "restarted", resume: "resumed", "reopen-push": "resumed",
+  };
+  // the presses that take their row away: it leaves as the request leaves (rule 3); a state or board
+  // row leaves on any answer but Suspend and a decide, as it did on the answer before
+  const PRESS_LEAVES = ["board_done", "board_snooze", "snooze", "attention_snooze", "unsnooze", "dismiss", "identity_ack",
+    "clear_work", "clear_mark", "clear_promote", "unmail", "allow", "deny", "gowithit", "identity_log", "restart", "resume",
+    "reopen-push"];
+  AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
+  AO.pressVerb = (key) => PRESS_VERBS[key] || key;
+  AO.pressErrs = {};  // a refused press's words by entry id, until that row's next press or a reload
+  // the presses still in flight, by entry id: a poll's swap must not draw back a row the press took
+  // away, nor draw one that stays as pressable, while its request is out (review of #1144)
+  AO.inflight = {};
+  AO.markPending = function (row, verb) {
+    if (row.classList.contains("pending")) return;  // a form sent twice: the row is marked once
+    row.classList.add("pending");
+    row.setAttribute("aria-busy", "true");
+    row.querySelectorAll("button, .btn").forEach((x) => { if (!x.disabled) { x.disabled = true; x.dataset.pressoff = "1"; } });
+    const age = row.querySelector(".st.age, [data-slot], .mhead .meta");  // its age, or a board row's due words
+    if (age) { age.dataset.was = age.textContent; age.dataset.wasSince = age.dataset.since || ""; delete age.dataset.since; age.textContent = verb; }
+  };
+  AO.unPend = function (row) {  // a row the press left in place, once its answer is in and nothing redrew it
+    row.classList.remove("pending");
+    row.removeAttribute("aria-busy");
+    row.querySelectorAll("[data-pressoff]").forEach((x) => { x.disabled = false; delete x.dataset.pressoff; });
+    const age = row.querySelector("[data-was]");
+    if (age) { age.textContent = age.dataset.was; if (age.dataset.wasSince) age.dataset.since = age.dataset.wasSince; delete age.dataset.was; delete age.dataset.wasSince; }
   };
 
   document.addEventListener("click", async (ev) => {
@@ -350,6 +405,33 @@
     // state and not a copy of it, leaves the moment the state is answered.
     // a board row (TD-069 step 3) goes the way a state row does: out on the answer, back on a refusal
     const staterow = b.closest(".staterow, .boardrow");
+    // §4.5 screen 6 *A control answers the press* (TD-340): in the frame before the request leaves, the
+    // row is marked pending, and a row the press takes away leaves with a toast that waits for the
+    // answer; a press that asks first (a prompt, a composer) is marked once it is answered
+    const row = b.closest(".mailrow");
+    const key = AO.pressKey(action, b.dataset.boardAct);
+    const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);
+    const leaves = !!row && !keeps && (PRESS_LEAVES.includes(key) || !!staterow);
+    let waiting = null, left = false;
+    const say = (text, ok, href) => {
+      if (!waiting) return AO.toast(text, ok, href);
+      const w = waiting; waiting = null;
+      return w.settle(text, ok, href);
+    };
+    const pressed = () => {
+      if (!row || !row.isConnected) return;
+      delete AO.pressErrs[row.dataset.msg];
+      const err = row.querySelector(".rowerr"); if (err) { err.hidden = true; err.textContent = ""; }
+      const verb = AO.pressVerb(key);
+      AO.markPending(row, verb);
+      if (row.dataset.msg) AO.inflight[row.dataset.msg] = { leaves, verb };
+      if (!leaves) return;
+      // the control goes with its row, and while it holds the focus the refresh would decline to redraw
+      if (row.contains(document.activeElement)) document.activeElement.blur();
+      AO.handRing(row); row.remove(); left = true;
+      const what = verb.replace(/…$/, "");
+      waiting = AO.toast(action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);
+    };
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     if (action === "popout") { const m = b.closest("details.more"); if (m) m.open = false; AO.popOut(id); return; }
     // A choice made in a row's *more ▾* or *Snooze* menu folds that menu — and only a menu: the
@@ -443,11 +525,12 @@
       if (action === "clear_mark") body = { sid: b.dataset.sid, kind: b.dataset.kind, pr: b.dataset.pr ? Number(b.dataset.pr) : null };
       if (action === "work_start") {
         const team = b.dataset.team;
+        pressed();
         const r = await fetch(`/api/teams/${encodeURIComponent(team)}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
         let o = {}; try { o = await r.json(); } catch (e) {}
         if (!r.ok) throw new Error(o.detail || r.statusText);
-        AO.toast(o.text || `${team}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
-        (o.notes || []).forEach((w) => AO.toast(`${team}: ${w}`));
+        say(o.text || `${team}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
+        (o.notes || []).forEach((w) => say(`${team}: ${w}`));
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -513,11 +596,12 @@
         if (!m) return;
         let refs = [];
         try { refs = JSON.parse(b.dataset.refs || "[]"); } catch (_) { refs = []; }
+        pressed();
         const res = await act("person", "board", {
           action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, reply: m.text, refs,
         });
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
-        AO.toast(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
+        say(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -532,6 +616,7 @@
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
         // the prefix is the form's, whatever case it was retyped in
         const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
+        pressed();
         await act("person", "board", {
           action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text,
           answer, answers: JSON.parse(b.dataset.answers || "[]"),
@@ -545,90 +630,91 @@
         } catch (e) {
           handed = `no entry was handed on: ${e.message}`; refused = true;
         }
-        AO.toast(`decided: ${answer} — landed on the board on origin · ${handed}`, !refused);
+        say(`decided: ${answer} — landed on the board on origin · ${handed}`, !refused);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
       if (action === "board_add") {
-        const res = await AO.boardAdd(b);
+        const res = await AO.boardAdd(b, pressed);
         if (!res) return;
-        AO.toast(res.dismiss_refused
+        say(res.dismiss_refused
           ? `on the board, committed — but the entry stayed: ${res.dismiss_refused}`
           : "on the board — landed on origin; the entry is dismissed", true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
       if (action === "resume-form") {
+        pressed();
         const r = await act(id, "resume", { form: true });
         location.href = r.form || `/new`;
         return;
       }
       if (action === "resume" || action === "reopen-push") {
+        pressed();
         const r = await act(id, "resume", { push: action === "reopen-push" });
-        if (r.form) { AO.toast(`resume needs the form: ${r.why}`, true); location.href = r.form; return; }
-        AO.toast("resumed — same name, same record, its mail came with it", true);
+        if (r.form) { say(`resume needs the form: ${r.why}`, true); location.href = r.form; return; }
+        say("resumed — same name, same record, its mail came with it", true);
         location.href = `/focus/${r.id}${AO.poppedId ? "?window=1" : ""}`;
         return;
       }
+      pressed();
       const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "restart") {
-        AO.toast(`restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
+        say(`restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       }
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
-      if (action === "allow" || action === "deny") AO.toast(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
-      if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
-      if (action === "wrapup") AO.toast("wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes", true);
+      if (action === "allow" || action === "deny") say(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
+      if (action === "drop") say(`${b.dataset.ref}: dropped`, true);
+      if (action === "wrapup") say("wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes", true);
       // an orphaned question's answer (§4.10, TD-216): no reply entry — the home wrote it on the board
       // and mailed the holders, and `note` is its sentence, the row's standing as a result
       const orphanNote = ["reply", "answer", "gowithit"].includes(action) && res.board ? res.note : "";
-      if (orphanNote) AO.toast(orphanNote, true);
-      else if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
-      if (action === "answer" && !orphanNote) AO.toast(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
-      if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
+      if (orphanNote) say(orphanNote, true);
+      else if (action === "message" || action === "reply") say(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
+      if (action === "answer" && !orphanNote) say(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
+      if (action === "unmail") say(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
       if (["message", "reply", "answer", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
-      if (action === "snooze") AO.toast("snoozed — it comes back at that time; the sender is not told", true);
-      if (action === "unsnooze") AO.toast("back in its section", true);
+      if (action === "snooze") say("snoozed — it comes back at that time; the sender is not told", true);
+      if (action === "unsnooze") say("back in its section", true);
       if (action === "hand_look") {
-        AO.toast(`sent to ${b.dataset.name || res.to || "the reviewer"} — set aside until it reports, then back with its reading`, true);
+        say(`sent to ${b.dataset.name || res.to || "the reviewer"} — set aside until it reports, then back with its reading`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       }
-      if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
-      if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
-      if (action === "gowithit" && !orphanNote) AO.toast("go with it — the sender takes its default now", true);
+      if (action === "pause") say("paused — the sender is told not to take its default yet", true);
+      if (action === "resume") say("resumed — the clock runs again, with what was left", true);
+      if (action === "gowithit" && !orphanNote) say("go with it — the sender takes its default now", true);
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
-      if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
-      if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
-      if (action === "promote") AO.toast(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
-      if (action === "clear_promote") AO.toast(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
-      if (action === "clear_work") AO.toast(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
-      if (action === "clear_mark") AO.toast(!(res.cleared || []).length ? "nothing was standing any more" : res.kind === "held" ? "dismissed — the crossings stay on the record; the next one is a note again" : "dismissed — the read stays on the record; a later failing read is a row again", true);
-      if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
-      if (action === "board" && body.action === "decide") AO.toast(`decided: ${body.answer} — landed on the board on origin; the item stays, as its session's work order`, true);
-      else if (action === "board") AO.toast(body.action === "done" ? "checked off — landed on the board on origin" : `snoozed to ${body.due} — landed on the board on origin`, true);
-      if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
-      if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) AO.toast("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
-      else if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
+      if (action === "identity_ack") say("dismissed — the agent's log keeps every alarm, a line each", true);
+      if (action === "identity_log") say(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
+      if (action === "promote") say(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
+      if (action === "clear_promote") say(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
+      if (action === "clear_work") say(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
+      if (action === "clear_mark") say(!(res.cleared || []).length ? "nothing was standing any more" : res.kind === "held" ? "dismissed — the crossings stay on the record; the next one is a note again" : "dismissed — the read stays on the record; a later failing read is a row again", true);
+      if (action === "suspend") say(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
+      if (action === "board" && body.action === "decide") say(`decided: ${body.answer} — landed on the board on origin; the item stays, as its session's work order`, true);
+      else if (action === "board") say(body.action === "done" ? "checked off — landed on the board on origin" : `snoozed to ${body.due} — landed on the board on origin`, true);
+      if (action === "dismiss") say(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
+      if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) say("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
+      else if (action === "attention_snooze") say(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
       // the state is answered, so the row is gone: it is taken out here rather than waited for, and
       // the refresh below puts back whatever the record actually says. **Suspend is the exception**
       // (§4.8a): it acts on the session and *leaves the row standing* — the alarm is still there to
       // be answered — so the row is refreshed in place rather than taken out from under the person.
       // A **decide** leaves its row standing too (§4.4 *Decide*: a decided item is not done): the
       // refresh redraws it reading *decided*, and the ring stays where the person pressed.
-      const stays = action === "suspend" || (action === "board" && body.action === "decide");
-      if (staterow && !stays) { AO.handRing(staterow); staterow.remove(); }
+      // A row the press took away left with it (`pressed`); one that stays — Suspend, a decide — is
+      // redrawn by the refresh, which puts back whatever the record actually says.
       if ((staterow || id === "person") && typeof AO.refreshInboxPage === "function") {
-        // the control that was pressed is about to go with its row, and while it holds the focus
-        // the refresh below would politely decline to redraw the section it sits in
         if (document.activeElement === b) b.blur();
         AO.refreshInboxPage();
       }
-      if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
-      if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
-      if (action === "start") AO.toast(res.start_note ? `${res.start_note} — the agent starts it then` : "starts on the next tick", true);
+      if (action === "grants") say(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
+      if (action === "stop") say(res.stop_note || "no stop time: nothing will stop this session", true);
+      if (action === "start") say(res.start_note ? `${res.start_note} — the agent starts it then` : "starts on the next tick", true);
       if (action2 === "controllers") {
-        AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
+        say(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
         if (typeof AO.refreshMembership === "function") AO.refreshMembership();
       }
     } catch (e) {
@@ -636,20 +722,27 @@
       // the press — is not a failure to shout about: the state is simply no longer pending, and
       // the refresh below shows what it is now (design §4.5a **Inbox row: state**).
       if (staterow && /no pending permission/i.test(e.message)) {
-        AO.toast("already answered — nothing was sent twice", true);
-        AO.handRing(staterow); staterow.remove();
+        say("already answered — nothing was sent twice", true);
+        if (!left) { AO.handRing(staterow); staterow.remove(); }
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
       const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…" };
-      AO.toast(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
+      say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
       // wrote nothing, and its toast says so in its own words
       const writes = ["reply", "answer", "gowithit"].includes(action);
       const rowerr = writes && b.closest(".mailrow") && b.closest(".mailrow").querySelector(".rowerr");
       if (rowerr) { rowerr.textContent = `not written: ${e.message}`; rowerr.hidden = false; }
-      if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
+      // a row the press took away comes back with the next refresh, carrying the refusal on its error
+      // line until its next press or a reload — the page holds it, nothing at the home does (TD-340)
+      if (row && row.dataset.msg && (left || writes)) AO.pressErrs[row.dataset.msg] = writes ? `not written: ${e.message}` : `not ${PRESS_NOT[key] || AO.pressVerb(key).replace(/…$/, "")}: ${e.message}`;
+      if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
+    } finally {
+      if (row && row.dataset.msg) delete AO.inflight[row.dataset.msg];
+      if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
+      if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
     }
   });
 
@@ -1736,8 +1829,14 @@
     return kept;
   };
   AO.restoreRowErrs = function (root, kept) {
+    // a press still in flight: its row stays out, or stays pending, whatever the swap drew (TD-340)
+    if (root) root.querySelectorAll(".mailrow[data-msg]").forEach((r) => {
+      const f = AO.inflight[r.dataset.msg];
+      if (f && f.leaves) r.remove(); else if (f) AO.markPending(r, f.verb);
+    });
     if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
-      const text = kept[el.closest(".mailrow").dataset.msg];
+      const msg = el.closest(".mailrow").dataset.msg;
+      const text = kept[msg] || AO.pressErrs[msg];  // a refused press's words, held by the page (TD-340)
       if (text) { el.textContent = text; el.hidden = false; }
     });
   };

@@ -90,10 +90,20 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn[hidden] { display: none; }  /* .btn sets display, which beats [hidden]: Settings' Cancel showed always (TD-296 #2) */
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
-.btn.ghost { border-color: transparent; background: transparent; color: var(--strong); } .btn.ghost:hover { background: var(--hover); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
 .btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
 .btn.sm { height: 26px; font-size: var(--t-small); padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
 .btn.on { background: var(--ended-bg); color: var(--fg); }
+/* §4.5a **a control's look** (§4.5 screen 6 *A control answers the press*, TD-340): one hover, one
+   press and one focus ring for every `.btn`, whatever its variant — the wash is a layer over the
+   variant's own colour, so a variant differs at rest and in nothing else; a filled one darkens instead
+   (`--btn-wash` transparent, `--btn-shade`), and a disabled one keeps its dimmed look and takes neither */
+.btn { --btn-wash: var(--hover); --btn-shade: brightness(1); }
+.btn.primary { --btn-wash: transparent; --btn-shade: brightness(.9); }
+.btn.light { --btn-wash: rgba(255, 255, 255, .12); }
+.btn:hover:not(:disabled) { background-image: linear-gradient(var(--btn-wash), var(--btn-wash)); filter: var(--btn-shade); }
+.btn:active:not(:disabled) { background-image: linear-gradient(var(--btn-wash), var(--btn-wash)); filter: var(--btn-shade) brightness(.94); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .28); }
+.btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .input { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); font-family: inherit; display: flex; align-items: center; }
 input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
 /* Put on the board's *what's needed* (TD-281): four rows that grow with the text, then scroll */
@@ -243,6 +253,8 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .inboxrows { display: flex; flex-direction: column; gap: 8px; }
 .inboxpage .mailrow:hover { border-color: var(--border); }
 .inboxpage .mailrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* §4.5a **Inbox row: pending** (TD-340): the frame of a press — dimmed, its controls disabled, its age the verb */
+.mailrow.pending { opacity: .6; pointer-events: none; }  /* links and the Snooze menu, which take no `disabled` */
 /* §4.5 screen 6 *Layout* / §4.10: an FYI entry newer than this browser last saw is marked **new**
    — the browser's own memory, as the fold is. A mark and never a control: no border, no cursor,
    nothing to press; the row's own surface is what it sits on. */
@@ -396,9 +408,8 @@ details.fold[open] > summary { margin-bottom: 3px; }
 .sc-slot > .caption { height: calc(var(--lh) * 1em); } .sc-slot > .caption.ready { color: var(--fg); }
 /* the foot (TD-095, second pass): the next act outlined at normal strength, the rest plain links at
    normal strength — never the dimmed grey a disabled control wears — and Allow the one filled button */
-.sc-foot .btn.next { background: transparent; color: var(--fg); border-color: var(--muted); }
-.sc-foot .btn.next:hover, .sc-foot .btn.link:hover { background: var(--hover); }
-.sc-foot .btn.link { background: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
+.sc-foot .btn.next { background-color: transparent; color: var(--fg); border-color: var(--muted); }
+.sc-foot .btn.link { background-color: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
 details.more .menu button:disabled { opacity: .45; cursor: default; } details.more .menu button:disabled:hover { background: none; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: var(--t-title); font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
@@ -431,7 +442,7 @@ details.more .menu { position: fixed; z-index: 40; background: var(--card); bord
 details.more .menu button { text-align: left; background: none; border: 0; padding: 6px 8px; color: var(--fg); font: inherit; cursor: pointer; border-radius: 3px; } details.more .menu button:hover { background: var(--hover); }
 details.more .menu .menutoggle { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: var(--fg); cursor: pointer; border-radius: 3px; } details.more .menu .menutoggle:hover { background: var(--hover); } details.more .menu .menutoggle.off { opacity: .45; cursor: default; }  /* copy on select (TD-174) */
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
-.toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: var(--t-small); max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); }
+.toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: var(--t-small); max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); } .toast.wait { border-left-color: var(--muted); }  /* a toast that waits: no clock until its answer (TD-340) */
 /* Focus */
 .page.focus { flex-direction: row; align-items: flex-start; gap: 14px; }
 .focus .main { flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; } .focus .side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -464,9 +475,8 @@ details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1
    strength, the rest plain, more ▾ at the right. The buttons had been spread over the tail of the
    wrapping identity row (Paul's screenshot, 2026-09-25: two lines of them, split). */
 .focus #facts { flex-wrap: wrap; row-gap: 6px; }
-.focus #facts .btn.next { background: transparent; color: var(--fg); border-color: var(--muted); }
-.focus #facts .btn.link { background: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
-.focus #facts .btn.next:hover, .focus #facts .btn.link:hover { background: var(--hover); }
+.focus #facts .btn.next { background-color: transparent; color: var(--fg); border-color: var(--muted); }
+.focus #facts .btn.link { background-color: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
 .focus #facts details.more .menu { min-width: 210px; } .focus #facts .menu .key { float: right; margin-left: 12px; color: var(--muted); font-size: var(--t-cap); }
 .focus #facts .menu button.danger { color: var(--stalled-fg); }
 .badge.readymark { cursor: default; color: var(--done-fg); background: var(--done-bg); border-color: var(--done); }  /* the card's caption, in the card's words */

@@ -212,7 +212,9 @@ def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     assert e["inbox_3"]["nth"]  # no page key: on a row without answers the handler leaves it alone
     assert got["answers"] == [["first", "second"], []]
     assert "if (!k || (k.nth && !answers.length)) return;" in js
-    assert 'action === "suspend" || (action === "board" && body.action === "decide")' in js  # the row stays
+    assert (
+        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);' in js
+    )  # the row stays
     assert e["inbox_g"] == "Go with it"
     assert [k["keys"] for k in got["keys"] if k.get("nth")] == [["1", "2", "3", "4"]]
     row = (UI / "templates" / "inbox_row.html").read_text()
