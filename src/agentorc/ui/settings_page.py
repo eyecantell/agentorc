@@ -501,3 +501,42 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
         "copy_on_select": term.get("copy_on_select") is not False,  # on by default (§4.5a, TD-164)
         "size_bounds": (lo, hi),
     }
+
+
+# **Telegram**'s two display lines under its fields (§4.5a **You**: **Telegram**, §4.10 *Told on
+# Telegram when nobody is looking*): what is told, and when — the design's list, not a setting
+TELEGRAM_TOLD = (
+    "told: a session waiting on you · a question · a blocked outcome · an identity alarm · "
+    "a member not restarted · a team with work"
+)
+TELEGRAM_WHEN = "after a minute, once, and never while a page is visible · no text a session wrote is sent"
+
+
+def telegram(
+    notify: Mapping[str, Any] | None, last: Mapping[str, Any] | None, now: datetime | None = None
+) -> dict[str, Any]:
+    """**You**: **Telegram** (§4.5a, §4.10; TD-319 slice 3): `notify.telegram` as the `settings` read
+    keeps it — the switch, the Doppler `project/config` (a name, never a value) and the link — and the
+    last send from the home's `host` read (`notify: {last_ok, last_error}`), the later of the two:
+    *last sent 14:02* or *last send failed 14:02: <reason>*; nothing yet, or a node's read, draws none."""
+    tg = (notify or {}).get("telegram") if isinstance(notify, Mapping) else None
+    tg = tg if isinstance(tg, Mapping) else {}
+    now = now or datetime.now(UTC)
+    last = last if isinstance(last, Mapping) else {}
+    ok = _when(last.get("last_ok"))
+    err = last.get("last_error") if isinstance(last.get("last_error"), Mapping) else {}
+    bad = _when(err.get("at"))
+    said, failed = "", False
+    if bad is not None and (ok is None or bad > ok):
+        said, failed = f"last send failed {usage_clock(bad, now)}: {err.get('reason') or 'no reason given'}", True
+    elif ok is not None:
+        said = f"last sent {usage_clock(ok, now)}"
+    return {
+        "on": tg.get("on") is True,
+        "secrets": str(tg.get("secrets") or ""),
+        "link": str(tg.get("link") or ""),
+        "last": said,
+        "last_failed": failed,
+        "told": TELEGRAM_TOLD,
+        "when": TELEGRAM_WHEN,
+    }

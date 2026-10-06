@@ -253,6 +253,8 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .inboxrows { display: flex; flex-direction: column; gap: 8px; }
 .inboxpage .mailrow:hover { border-color: var(--border); }
 .inboxpage .mailrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* §4.10 *Told on Telegram* (TD-319 slice 3): the row a `?row=` link landed on, marked until the page is left */
+.inboxpage .mailrow.landed { border-color: var(--link); box-shadow: inset 3px 0 0 var(--link); }
 /* §4.5a **Inbox row: pending** (TD-340): the frame of a press — dimmed, its controls disabled, its age the verb */
 .mailrow.pending { opacity: .6; pointer-events: none; }  /* links and the Snooze menu, which take no `disabled` */
 /* §4.5 screen 6 *Layout* / §4.10: an FYI entry newer than this browser last saw is marked **new**

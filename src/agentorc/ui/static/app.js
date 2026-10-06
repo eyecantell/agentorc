@@ -1577,6 +1577,7 @@
   // What lives in the browser is what belongs to this browser — the filter, the FYI fold — exactly
   // as the Org's filter and team folds do.
   const IN_SECS = ["needs", "steering", "waiting", "answered", "fyi", "snoozed"];
+  let landed = "";  // the row a `?row=` link landed on: marked until the page is left, across the poll's swaps
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
   // which is what the entry stores; the prompt is in the person's own clock.
@@ -1639,6 +1640,20 @@
       b.addEventListener("blur", () => para.classList.remove("peek"));
     });
   }
+  // §4.10 *Told on Telegram when nobody is looking* (TD-319 slice 3): `/inbox?row=<key>` scrolls to that
+  // row and marks it — the rail cleared first when its picks hide it, a snoozed row's box opened — and
+  // says *that row is gone — it was answered* when the page has no such row
+  function landOn(id) {
+    const find = () => $$(".inboxpage .mailrow").find((r) => r.dataset.msg === id);
+    let r = find();
+    if (r && r.hidden && $("#railclear")) { $("#railclear").click(); r = find(); }
+    const gone = $("#landgone");
+    if (!r) { if (gone) gone.classList.remove("hidden"); return; }
+    landed = id;
+    const box = r.closest("details"); if (box) box.open = true;
+    r.classList.add("landed");
+    r.focus({ preventScroll: true }); r.scrollIntoView({ block: "center" });
+  }
   AO.inbox = function () {
     const f = $("#ifilter");
     setupInfoMarks();
@@ -1660,6 +1675,7 @@
     // the browser's last picks and writes them back into the URL, so a link copied from the bar is
     // always the page as seen; a press is a history entry, so Back undoes it; typing is not.
     const fromUrl = AO.railPicks(location.search);
+    const landing = AO.rowOfKey(new URLSearchParams(location.search).get("row"));  // read before the picks rewrite the URL
     const any = (p) => !!(p.team.length || p.sec.length || p.kind.length || p.find);
     rail = any(fromUrl) ? fromUrl : AO.railPicks(store.get("inboxpicks", ""));
     const save = (push) => {
@@ -1732,6 +1748,7 @@
     const from = location.hash.slice(1);
     const row = from && $$(".inboxpage .mailrow").find((r) => r.dataset.msg === from && !r.hidden);
     if (row) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: "center" }); }
+    if (landing) landOn(landing);
     refreshInbox();
   };
 
@@ -1902,6 +1919,7 @@
         AO.restoreDenyWhys(el, kept);
         AO.restoreRowErrs(el, errs);
         AO.reopenFolds(el);
+        if (landed) $$(".mailrow", el).forEach((r) => r.classList.toggle("landed", r.dataset.msg === landed));
         if (ring) {
           const rows = $$(".mailrow", el), back = rows.find((r) => r.dataset.msg === ring.dataset.msg) || rows[at] || rows[rows.length - 1];
           if (back) back.focus({ preventScroll: true });
@@ -1966,6 +1984,15 @@
   const FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>";
   let rail = { team: [], sec: [], kind: [], find: "" };
   const findOpened = new Set();
+  // the Inbox's `?row=<key>` (§4.10 *Told on Telegram*, TD-319 slice 3): a Telegram message's link names
+  // its row by the home's key — `<session>|<kind>` for a state row, `work:<team>` for a team with work —
+  // and the page's row for it is `data-msg` `<session>:<kind>`, `work:<team>` as it is. Pure, for the tests.
+  AO.rowOfKey = function (key) {
+    const k = String(key || "").trim();
+    if (!k || k.startsWith("work:")) return k;
+    const i = k.indexOf("|");
+    return i < 0 ? k : `${k.slice(0, i)}:${k.slice(i + 1)}`;
+  };
   AO.railPicks = function (search) {
     const q = new URLSearchParams(search || "");
     const lst = (k) => (q.get(k) || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -3844,6 +3871,8 @@
         const terminal = { size: f.elements.size.value ? Number(f.elements.size.value) : null, face: f.elements.face.value.trim() || null, copy_on_select: f.elements.copy_on_select.checked };
         return ["you", { open_in, terminal, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
+      // **Telegram** (§4.5a **You**, §4.10; TD-319): the three fields whole, an empty one cleared by the route
+      notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],
     };
     // **Save** and **Cancel** (§4.5a *Settings page*, TD-286): Save is pressable, and Cancel shown, only
     // while a field differs from what was drawn; Cancel puts the drawn values back, and a Save makes
@@ -3853,6 +3882,8 @@
       const dirty = state(f) !== f.dataset.drawn, save = $(".setsave", f), cancel = $(".setcancel", f);
       if (save) save.disabled = !dirty;
       if (cancel) cancel.hidden = !dirty;
+      // **Send a test** sends the saved values, so not while the card holds others (§4.5a **You**: **Telegram**)
+      const test = $(".settgtest", f); if (test) { test.disabled = dirty; test.title = dirty ? "save first: a test sends the saved values" : test.dataset.title || test.title; }
     };
     const drawn = (f) => {
       for (const el of f.elements) {
@@ -3925,6 +3956,21 @@
         AO.toast(`${card.dataset.repo}: pull ${box.checked ? "on" : "off"} · applies on the next pass`, true);
       } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
     }));
+    // **Send a test** (§4.5a **You**: **Telegram**, §4.10): `notify_test` at the home, its result in words beside the button
+    $$(".settgtest", page).forEach((b) => {
+      b.dataset.title = b.title;
+      b.addEventListener("click", async () => {
+        const out = $(".settgsaid", b.closest("form"));
+        b.disabled = true; out.textContent = "sending…"; out.classList.remove("warn");
+        try {
+          const got = await post("notify_test", {});
+          const at = got.at ? new Date(got.at) : null, clock = at && !isNaN(at) ? at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+          out.textContent = got.sent ? `sent ${clock} — look for it on your phone` : got.result || "the send failed";
+          out.classList.toggle("warn", !got.sent);
+        } catch (err) { out.textContent = err.message; out.classList.add("warn"); }
+        settle(b.closest("form"));
+      });
+    });
     const openin = $("#setopenin");
     if (openin) openin.addEventListener("change", () => $("#settemplate").classList.toggle("hidden", openin.value !== "template"));
     // *this browser* (§4.5a): what it holds, each set by its own control; Reset clears every `ao.*` key
