@@ -4869,3 +4869,48 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Done when** on a scratch home, `set_settings teams.<team>.until` two hours out puts *stops <t>* on the live team's header, and `ao until <member> +1h` puts *· stops <t>* on that member's compact card alone (TD-335's *Done when*); then TD-335 archives with this entry.
 
 **Related:** TD-335 (the design), TD-146 (the team stop time), TD-176 (the compact card), TD-026 (the *starts* note, the same slot on a team with nothing live), TD-297 (where it was seen).
+
+## TD-338: Inbox controls give no feedback — hover differs by button kind, a press shows nothing while it runs, and a row waits on the server before it moves
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-05 (the anchor, from Paul's use of the Inbox)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-05** (the designer, PR #1142; the one open choice — the board write-back stays one request rather than answering early and reporting the landing as an Inbox event — steered to Paul): design §4.5 screen 6 *A control answers the press* (one look for every `.btn` on every page; the **pending** mark in the frame of the press, the control's verb under way; a row the press takes away gone on the press, a toast that waits for the landing, the row back marked on a refusal; Suspend and a board decide pending in place), §4.5a *a control's look*, *Inbox row: pending*, the **Done** row; mockup `InboxPress.dc.html` (`docs/mockups/reviews/2026-10-05-td338-press.png`). The build is TD-340; this entry archives with it. Was: Open.
+**Location:** `src/agentorc/ui/static/app.css` (`.btn`), `src/agentorc/ui/static/app.js` (the `data-act` click handler: `act()`, then `staterow.remove()` and `AO.refreshInboxPage()`), `src/agentorc/ui/templates/inbox_row.html`; design §4.5 *Inbox* (*A row is a card*), §4.5a *Inbox row* and *Inbox board row*, §4.4 (the board write-back)
+
+**Why:** Paul, 2026-10-05, pressing **Done** on a few board rows: the buttons behave differently under the mouse, a press gives no sign it was taken, and the row stays put, looking dead, until it vanishes on a redraw. What the code does:
+1. **Hover differs by kind.** `.btn` has no `:hover` and no `:active` rule. Only `.btn.ghost:hover` (and the footers' `.btn.next` / `.btn.link`) changes. `inbox_row.html` draws 39 ghost buttons, 8 plain, 4 `primary` and 2 `answer`, so most controls light up under the mouse and **Done**, the answers and the primary ones do not.
+2. **A press shows nothing.** The handler awaits `act()` with the button enabled and the row unchanged. Nothing is disabled or marked while the request runs, so a second press is possible and the first looks ignored.
+3. **The row waits on the slowest step.** It is taken out only after `act()` returns. For a board row that is the whole write-back (§4.4, `sessionorc/board.py`): fetch, commit in the host agent's tree, push, `gh pr create` and a squash merge, bounded at 40 s (`BOUND`). Measured that evening on samscrape's #1028: the PR opened at 19:51:33 and merged at :37, and the UI's POST answered at :42, roughly ten seconds after the press. Only then do the toast and `refreshInboxPage()` move the row.
+
+**Resolved:** 2026-10-05 (PRs #1142, #1144). Designed in #1142 and built by TD-340 in #1144, whose UI check shows the *Done when* on a scratch home.
+
+**Done when** on a scratch home every Inbox control shows the same hover and pressed state, a press disables its control and marks its row within one frame, a board **Done** takes its row out before the write-back returns and brings it back with the reason when the write-back is refused, and the UI check's screenshots show the hover, pressed and pending states.
+
+**Related (all archived):** TD-264 (the write-back), TD-255 (the board row's answers), TD-082 (the Inbox layout), TD-124 (the keys, which press the same controls).
+
+## TD-340: Build *A control answers the press* — one look for every control, the pending mark, a row gone on the press
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-05 (the designer, TD-338's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built (grinder-ao-2, PR #1144).
+**Location:** `src/agentorc/ui/static/app.css` (`.btn` and its variants: `:hover`, `:active`, `:focus-visible`, `:disabled`; `.mailrow.pending`, `.rowerr`), `src/agentorc/ui/static/app.js` (the `data-act` click handler: the pending table, the disable, the early `staterow.remove()`, the waiting toast, the refused row's words; `AO.toast` gains a handle whose text can be rewritten and whose clock starts late), `src/agentorc/ui/templates/inbox_row.html` (an error line on every row, as the mail rows have), `tests/` (the template and handler tests); design §4.5 screen 6 *A control answers the press*, §4.5a *a control's look*, *Inbox row: pending*, the **Done** row.
+
+**Why:** TD-338's design. Paul, 2026-10-05: the Inbox's buttons behaved differently under the mouse, a press showed nothing, and a checked-off board row stood some ten seconds until the write-back returned.
+
+**Resolved:** 2026-10-05 (PR #1144). Design §4.5 screen 6 *A control answers the press* and §4.5a *a control's look* and *Inbox row: pending* carry the lasting content. The *Done when* was pressed on a scratch home and is recorded in the PR's UI check, which has the pressed, pending, waiting and refused screenshots:
+- Done and Reply light the same under the pointer, and a held Done sinks.
+- A held decide is pending, `aria-busy` and disabled in the frame of the click.
+- A board **Done** is out of the document in that frame, with *checking off — landing on the board…* waiting.
+- When the write-back is refused (the scratch repo has no origin), the row comes back with *not checked off: <the server's words>*.
+
+A successful landing could not be shown, because the scratch board has no origin. Its words are today's. Pinned by `tests/test_ui_inbox.py::test_every_inbox_control_has_its_verb_under_way` and `::test_every_button_has_one_hover_one_press_and_one_ring`.
+
+**Done when** on a scratch home every Inbox control shows the same hover and pressed state, a press disables its control and marks its row within one frame, a board **Done** takes its row out before the write-back returns and brings it back with the reason when the write-back is refused, and the UI check's screenshots show the hover, pressed and pending states (TD-338's *Done when*); then TD-338 archives with this entry.
+
+**Related:** TD-338 (the design), TD-264 (the write-back), TD-124 (the keys press the same controls), TD-216 (`.rowerr` on a mail row).

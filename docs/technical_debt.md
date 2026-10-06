@@ -90,9 +90,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
-| TD-338 | Inbox controls give no feedback: hover differs by button kind, a press shows nothing while it runs, and a board **Done** leaves its row standing ~10 s until the write-back returns | Medium | Designed 2026-10-05 (one look for every control; a press marks its row pending and takes it out at once; the toast waits for the landing) — the build is TD-340 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Open |
-| TD-340 | Build *A control answers the press*: one hover, pressed and focus look for every `.btn`; the **pending** mark; a row taken out on the press, the waiting toast, the row back on a refusal | Medium | Open |
 
 ---
 
@@ -1554,32 +1552,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-283 (archived: the start context on every launch), contractmatch PR #122.
 
-## TD-338: Inbox controls give no feedback — hover differs by button kind, a press shows nothing while it runs, and a row waits on the server before it moves
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-05 (the anchor, from Paul's use of the Inbox)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-05** (the designer, PR #1142; the one open choice — the board write-back stays one request rather than answering early and reporting the landing as an Inbox event — steered to Paul): design §4.5 screen 6 *A control answers the press* (one look for every `.btn` on every page; the **pending** mark in the frame of the press, the control's verb under way; a row the press takes away gone on the press, a toast that waits for the landing, the row back marked on a refusal; Suspend and a board decide pending in place), §4.5a *a control's look*, *Inbox row: pending*, the **Done** row; mockup `InboxPress.dc.html` (`docs/mockups/reviews/2026-10-05-td338-press.png`). The build is TD-340; this entry archives with it. Was: Open.
-**Blocked by:** TD-340
-**Location:** `src/agentorc/ui/static/app.css` (`.btn`), `src/agentorc/ui/static/app.js` (the `data-act` click handler: `act()`, then `staterow.remove()` and `AO.refreshInboxPage()`), `src/agentorc/ui/templates/inbox_row.html`; design §4.5 *Inbox* (*A row is a card*), §4.5a *Inbox row* and *Inbox board row*, §4.4 (the board write-back)
-
-**Why:** Paul, 2026-10-05, pressing **Done** on a few board rows: the buttons behave differently under the mouse, a press gives no sign it was taken, and the row stays put, looking dead, until it vanishes on a redraw. What the code does:
-1. **Hover differs by kind.** `.btn` has no `:hover` and no `:active` rule. Only `.btn.ghost:hover` (and the footers' `.btn.next` / `.btn.link`) changes. `inbox_row.html` draws 39 ghost buttons, 8 plain, 4 `primary` and 2 `answer`, so most controls light up under the mouse and **Done**, the answers and the primary ones do not.
-2. **A press shows nothing.** The handler awaits `act()` with the button enabled and the row unchanged. Nothing is disabled or marked while the request runs, so a second press is possible and the first looks ignored.
-3. **The row waits on the slowest step.** It is taken out only after `act()` returns. For a board row that is the whole write-back (§4.4, `sessionorc/board.py`): fetch, commit in the host agent's tree, push, `gh pr create` and a squash merge, bounded at 40 s (`BOUND`). Measured that evening on samscrape's #1028: the PR opened at 19:51:33 and merged at :37, and the UI's POST answered at :42, roughly ten seconds after the press. Only then do the toast and `refreshInboxPage()` move the row.
-
-**Fix:** design first, then build.
-- **One look for every bordered control** (§4.5 already says *everything bordered is one*): the same `:hover`, `:active` and `:focus-visible` across `.btn` and its variants, so a control reads as pressable the same way wherever it sits.
-- **A press answers in the same frame.** The pressed control is disabled and the row is marked pending (dimmed, a short *checking off…* / *snoozing…* label) before the request goes out.
-- **A row whose press takes it away leaves at once.** Done, Dismiss, Snooze and their kind are taken out on the press, not on the server's answer, and the toast says it is landing. A refusal or a failed write-back puts the row back, marked, with the server's words. **Suspend** and a board **decide** keep their row, as they do now. They change in place.
-- Decide whether the board write-back should also stop holding the HTTP request open: answer once the edit is accepted, and report the landing (or its failure) as an Inbox event.
-
-**Done when** on a scratch home every Inbox control shows the same hover and pressed state, a press disables its control and marks its row within one frame, a board **Done** takes its row out before the write-back returns and brings it back with the reason when the write-back is refused, and the UI check's screenshots show the hover, pressed and pending states.
-
-**Related (all archived):** TD-264 (the write-back), TD-255 (the board row's answers), TD-082 (the Inbox layout), TD-124 (the keys, which press the same controls).
-
 ## TD-339: Build *No prose in the argv* — the start context by file, the brief typed at the composer
 
 **Priority:** High
@@ -1600,24 +1572,3 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels (TD-336's *Done when*); then TD-336 archives with this entry.
 
 **Related:** TD-336 (the design), TD-283 (the start context on every launch), TD-027 (the verified send), TD-199 (a running member keeps its brief), contractmatch PR #122.
-## TD-340: Build *A control answers the press* — one look for every control, the pending mark, a row gone on the press
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-05 (the designer, TD-338's build)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.css` (`.btn` and its variants: `:hover`, `:active`, `:focus-visible`, `:disabled`; `.mailrow.pending`, `.rowerr`), `src/agentorc/ui/static/app.js` (the `data-act` click handler: the pending table, the disable, the early `staterow.remove()`, the waiting toast, the refused row's words; `AO.toast` gains a handle whose text can be rewritten and whose clock starts late), `src/agentorc/ui/templates/inbox_row.html` (an error line on every row, as the mail rows have), `tests/` (the template and handler tests); design §4.5 screen 6 *A control answers the press*, §4.5a *a control's look*, *Inbox row: pending*, the **Done** row.
-
-**Why:** TD-338's design. Paul, 2026-10-05: the Inbox's buttons behaved differently under the mouse, a press showed nothing, and a checked-off board row stood some ten seconds until the write-back returned.
-
-**Fix, one PR** (all under `src/agentorc/ui`; the UI check of §4.9b, with the hover, pressed and pending states in its screenshots):
-1. **The look.** `.btn:hover` the `--hover` wash (a filled `primary` a shade darker — `filter: brightness(.92)` or a second token, the builder's call, the same in both themes), `.btn:active` an inset shadow with the darker shade, `.btn:focus-visible` the 2 px `--link` ring at 1 px offset, on `.btn` itself so every variant inherits it; `.btn:disabled` and `.btn:disabled:hover` keep the dimmed look with no wash. The `.btn.ghost:hover` rule and the footers' `.btn.next:hover` / `.btn.link:hover` fold into the one rule. Nothing changes for the *i* mark, the rail, the menus or `.seg`.
-2. **The press.** In the click handler, before `act()`: every `.btn` in the row disabled, the row given `pending` (`opacity: .6`, `aria-busy="true"`), and its age (`.mhead .meta`, or the row's time slot) replaced by the verb from one table keyed by the control's `data-act` — and, for a board row's `board`, by its `action` too (`board`+`done` → *checking off…*, `board`+`snooze` and `snooze` / `attention_snooze` → *snoozing…*, `board`+`decide` → *deciding…*, `dismiss` / `identity_ack` → *dismissing…*, `unmail` → *deleting…*, `allow` / `deny` / `reply` / `answer` / `gowithit` / `hand_look` → *sending…*, `suspend` → *suspending…*, `board_add` → *writing…*, `promote` → *promoting…*, `work_start` → *starting…*, `restart` → *restarting…*, `resume` → *resuming…*, `unsnooze` → *unsnoozing…*; the wire name as the fallback — the Inbox's `data-act` values are the keys, so `start`, `delete` and `message` are not among them); a control that opens a composer (`reply`, `board_reply`, `board_notright`, `board_add`) marks the row after the composer resolves with text, never before. The `stays` set (Suspend, decide) keeps the row and is redrawn by the refresh as today.
-3. **The row leaves on the press.** For a row not in `stays`, `AO.handRing(staterow); staterow.remove()` moves to before `act()`; the toast is created at the press with no clock (`AO.toast` returns the element, and a `wait` form holds its removal until `settle(text, ok)` is called), *checking off — landing on the board…* and the like, settled by the answer with today's words; on a refusal the same toast settles red with the server's words, and `refreshInboxPage()` puts the row back with `not <verb>: <words>` in its `.rowerr`, remembered in a page-level map by entry id until that row's next press or a reload. The `no pending permission` branch keeps its *already answered* words.
-4. **Tests.** The handler's table is covered by a template test that every `data-act` on the Inbox has a verb; the CSS by a test that `.btn:hover`, `.btn:active`, `.btn:focus-visible` exist once on `.btn` and that no variant sets its own `:hover` (the ghost rule gone); a `pytest-playwright` or jsdom run is not asked for — the UI check's screenshots are the proof of the look.
-
-**Done when** on a scratch home every Inbox control shows the same hover and pressed state, a press disables its control and marks its row within one frame, a board **Done** takes its row out before the write-back returns and brings it back with the reason when the write-back is refused, and the UI check's screenshots show the hover, pressed and pending states (TD-338's *Done when*); then TD-338 archives with this entry.
-
-**Related:** TD-338 (the design), TD-264 (the write-back), TD-124 (the keys press the same controls), TD-216 (`.rowerr` on a mail row).
