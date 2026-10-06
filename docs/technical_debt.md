@@ -1549,7 +1549,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
 **Owner:** designer
 **Kind:** design-first
-**Status:** **Designed 2026-10-06** (the designer, PR #TBD): the first of the Fix's two shapes — a member's open `ask` to the person is an **Answer needed** block (the member, *asked you · <age>*, the ask's first line as text, **Open** to its message page, no answer control) counted in the facet and in the rollup's *answer needed*; the Inbox still counts it under *in the Inbox*, and the design says one ask may be in both lines (design §4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*). Not taken: the wording-only fix (a count of 0 would still stand where the team waits). Before: Open.
+**Status:** **Designed 2026-10-06** (the designer, PR #1157): the first of the Fix's two shapes — a member's open `ask` to the person is an **Answer needed** block (the member, *asked you · <age>*, the ask's first line as text, **Open** to its message page, no answer control) counted in the facet and in the rollup's *answer needed*; the Inbox still counts it under *in the Inbox*, and the design says one ask may be in both lines (design §4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*). Not taken: the wording-only fix (a count of 0 would still stand where the team waits). Before: Open.
 **Blocked by:** TD-350
 **Location:** `src/agentorc/ui/org.py` (`answer_blocks`: members whose state is in `NEEDS_YOU_ROWS`), `src/agentorc/ui/templates/rollup.html` (the *Needs you* facet: *answer needed*, then *in the Inbox*); design §4.5a *team card: Answer needed / Doing*
 
