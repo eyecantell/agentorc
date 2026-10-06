@@ -129,10 +129,18 @@
       "h": 1000
     },
     {
+      "file": "InboxPress.dc.html",
+      "title": "Inbox \u2014 a control answers the press (TD-338)",
+      "x": 1540,
+      "y": 2760,
+      "w": 1000,
+      "h": 980
+    },
+    {
       "file": "NewSession.dc.html",
       "title": "New session",
       "x": 1540,
-      "y": 2760,
+      "y": 3840,
       "w": 720,
       "h": 1080
     },
@@ -140,7 +148,7 @@
       "file": "RepoPage.dc.html",
       "title": "Repo \u2014 the page (checked in from the canvas, 2026-09-26)",
       "x": 1540,
-      "y": 3940,
+      "y": 5020,
       "w": 1440,
       "h": 900
     },
@@ -148,7 +156,7 @@
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 4940,
+      "y": 6020,
       "w": 1440,
       "h": 820
     },
@@ -156,7 +164,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 5860,
+      "y": 6940,
       "w": 1440,
       "h": 2320
     },

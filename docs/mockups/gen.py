@@ -1546,6 +1546,56 @@ def rail(secs, teams, kinds, all_on=False, find=""):
   {group("Kinds", kinds, "the coarse kind of a row")}
 </div>'''
 
+def inbox_press():
+    """TD-338 (§4.5 screen 6 *A control answers the press*): one look for every control, the pending mark, a row gone on the press."""
+    HOVER = "background: #eef0f3;"
+    HOVER_P = "background: #0f1317; border-color: #0f1317;"
+    DOWN = "box-shadow: inset 0 2px 3px rgba(0,0,0,.18); background: #e3e6ea;"
+    DOWN_P = "box-shadow: inset 0 2px 3px rgba(0,0,0,.35); background: #0f1317; border-color: #0f1317;"
+    RING = "outline: 2px solid #1f5fa8; outline-offset: 1px;"
+    OFF = "opacity: .45;"
+    def ladder(label, cls, hover, down):
+        cell = lambda st, t="": f'<span class="btn sm {cls}" style="{st}">{label}</span>'
+        return (f'<tr><td class="muted" style="font-size: 12px; padding: 6px 10px 6px 0; white-space: nowrap;">{cls or "plain"}</td>'
+                + "".join(f'<td style="padding: 6px 14px 6px 0;">{cell(st)}</td>' for st in ("", hover, down, RING, OFF)) + "</tr>")
+    heads = "".join(f'<th class="muted" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; text-align: left; padding: 0 14px 4px 0;">{h}</th>' for h in ("", "rest", "hover", "pressed", "focus (keys)", "disabled"))
+    table = ('<table style="border-collapse: collapse;"><tr>' + heads + "</tr>"
+             + ladder("Done", "", HOVER, DOWN) + ladder("Open board", "ghost", HOVER, DOWN) + ladder("Allow", "primary", HOVER_P, DOWN_P)
+             + ladder("Stop now", "danger", HOVER, DOWN) + ladder("Works <span style=\"font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280;\">default</span>", "answer", HOVER, DOWN) + "</table>")
+    b = lambda label, c="", st="": f'<span class="btn sm {c}" style="{st}">{label}</span>'
+    gap = '<span style="flex-grow: 1;"></span>'
+    text = '<div class="txt">Give the contractmatch container node what a worker needs, so cm-grind can run inside it (TD-299 step 3).</div><div class="meta">due today · agentorc · <a href="#">docs/user_attention.md:11</a></div>'
+    ctl = lambda st="": b("Reply", "", st) + b("Snooze ▾", "", st) + b("Done", "", st) + gap + b("Open board", "ghost", st)
+    rest = mcard("#cbd0d6", "board", "agentorc", "ao-grind", "due today · Oct 3", text, ctl())
+    pending = mcard("#cbd0d6", "board", "agentorc", "ao-grind", '<i style="color: #b45309;">checking off…</i>', text, ctl(OFF), cls="pending").replace('<div class="mcard pending">', '<div class="mcard pending" style="opacity: .6;" aria-busy="true">')
+    back = mcard("#cbd0d6", "board", "agentorc", "ao-grind", "due today · Oct 3",
+                 text + '<div style="font-size: 12px; color: #991b1b; margin-top: 2px;">not checked off: the push was refused — origin moved under the commit; press again</div>', ctl())
+    toast = lambda words, color, note: (f'<div style="display: flex; align-items: center; gap: 12px;"><div style="background: #fff; border: 1px solid #cbd0d6; border-left: 3px solid {color}; padding: 8px 12px; border-radius: 4px; font-size: 12px; max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15);">{words}</div><span class="muted" style="font-size: 12px;">{note}</span></div>')
+    step = lambda n, title, blurb: f'<div style="margin: 18px 0 8px;"><span style="font-weight: 600; font-size: 14px;">{n}. {title}</span> <span class="muted" style="font-size: 12px;">{blurb}</span></div>'
+    note = ("Design notes, not page text. <b>Three rules</b> (TD-338, §4.5 screen 6 <i>A control answers the press</i>): a control looks pressable the same way on every page — a variant differs at rest and in nothing else, and a disabled one takes no hover; "
+            "a press is answered in its own frame — the row's controls disabled, the row dimmed and <code>aria-busy</code>, its age replaced by the control's verb under way; "
+            "a row the press takes away is gone as the request leaves, its toast waiting without a clock for the landing, and a refusal brings the row back on the next refresh with the server's words on its error line. "
+            "<b>Suspend</b> and a board <b>decide</b> stay, pending in place. <b>Not taken</b>: answering the write-back's request early and reporting the landing as an Inbox event — the row is gone at the press already, so nothing would show sooner.")
+    return head("Inbox — a control answers the press") + f'''<div style="width: 1000px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="padding: 20px 24px 28px;">
+<div style="font-size: 16px; font-weight: 600; margin-bottom: 2px;">A control answers the press</div>
+<div class="muted" style="font-size: 12px;">TD-338 · §4.5 screen 6 · §4.5a <i>a control's look</i>, <i>Inbox row: pending</i></div>
+{step(1, "One look for every bordered control", "— every page; the ghost's hover today is the only one, so Done and Allow did not light")}
+<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 12px 14px; display: inline-block;">{table}</div>
+{step(2, "A press answers in the same frame", "— before the request leaves: controls off, the row dimmed, the age replaced by the verb")}
+<div class="inboxcol" style="margin: 0; max-width: 920px;">{rest}{pending}</div>
+{step(3, "A row the press takes away is gone on the press", "— the toast waits, without a clock, for the landing; the refusal brings the row back, marked")}
+<div style="display: flex; flex-direction: column; gap: 10px; max-width: 920px;">
+{toast("checking off — landing on the board…", "#d9a441", "at the press — no clock yet")}
+{toast("checked off — landed on the board on origin", "#059669", "the answer, ~10 s later — the clock starts")}
+{toast("Done failed: the push was refused — origin moved under the commit", "#dc2626", "a refusal — and the row comes back:")}
+</div>
+<div class="inboxcol" style="margin: 10px 0 0; max-width: 920px;">{back}</div>
+<div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 18px; max-width: 920px;">{note}</div>
+</div>
+</div>
+''' + TAIL
+
 
 def inbox_message():
     """Screen 6's message page (design §4.5 screen 6 *The message page*, TD-129): one entry, whole, with its thread and the row's controls at the foot."""
@@ -1772,6 +1822,7 @@ files = {
     "Inbox.dc.html": inbox(),
     "InboxRail.dc.html": inbox(picks=True),
     "InboxMessage.dc.html": inbox_message(),
+    "InboxPress.dc.html": inbox_press(),
     "InboxPhone.dc.html": inbox_phone(),
     "Type.dc.html": type_scale(),
     "TypeDark.dc.html": darken(type_scale()),
@@ -1803,6 +1854,7 @@ LAYOUT = [
     ("Message.dc.html", "Message — when it is read", 0),
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
+    ("InboxPress.dc.html", "Inbox — a control answers the press (TD-338)", 1),
     ("NewSession.dc.html", "New session", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Commands.dc.html", "Commands", 1),
