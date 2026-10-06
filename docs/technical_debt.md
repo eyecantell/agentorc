@@ -61,8 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Partly done — all five slices and each profile's amount on the hover built; left: the turns' rate (the designer's word first) and the live look |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
-| TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Designed 2026-09-26 (the designer) — the build is TD-191; archives with it |
-| TD-191 | Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line | Medium | Built — the live look waits on the promote |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Designed 2026-09-28 with TD-223 — the build is TD-228 |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open — answered by TD-210's design; closes with TD-229 |
 | TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Designed 2026-09-28 — the build is TD-229 |
@@ -1008,46 +1006,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.2, §4.8, §8; `docs/decisions/2026-09-06-adopt-dev-cadence.md` (why it was adopted, what it changed); TD-035, TD-055, TD-070, TD-118, TD-125, TD-126, TD-142 (the clauses); dev-cadence cadence.md §3 (who makes a change to a synced file).
 
-## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
-
-**Priority:** Medium
-**Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-09-26 (the designer): design §4.8 *A session's round log: `ao log`, never a commit*, §4.7 (the verb), §4.6 (the file beside the run log), §4.5a *Focus side panel, Session card: rounds line*; mockup `Focus.dc.html` (the rounds line). Settled: (a) the round line stays, the commit goes; (b) the narrative lives in a host-agent file beside the run log, keyed by the record's name in its repo so a restart continues it, written by `ao log` and read by `ao log --tail n` — never a branch, never mail, not the trail; (c) the launch branch is a launch artefact the manager commits nothing to; the existing commits are left, and the anchor may reset the branch once; (d) the template's round step becomes `ao log`, the wind-down pushes nothing, the supplement's line changes with it; (e) Ready to close was right and the log wrong. The file-beside-the-run-log choice (against the record's trail) is on the board for Paul (the person inbox is full); the design is PR #603, which merges after 2026-09-27 03:00 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-191; this entry archives with it. **What was:** nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git. **Next:** designed; the build is TD-191.
-**Blocked by:** TD-191
-
-**Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
-
-**What the design round has to settle:** (a) **whether the round line is kept at all** — as a printed line in the turn it is already in the run log, and `ao progress` is the declared record; (b) **where a restart-surviving narrative lives** if it is wanted — the record's own trail (§4.5a's trail rows), a home-owned per-session notes file under `~/.agentorc/` beside the run logs and pruned with them (`runs_keep_days`, §4.6), or a `note` to itself; never a git branch; (c) **the launch branch's role** — a launch artefact the manager never commits to, as the grinder's is, and what becomes of the 196 commits on `manager-ao-1` (left; §4.1 supersedes the record at the next start under its name, and the branch is the launch's artefact); (d) the template's step 5 and the wind-down's step (4), and the supplement's *the one thing you commit to it* line, which is dev-cadence's shape of a supplement (§4.8, TD-114) and changes with the template; (e) whether Ready to close should ever read a launch branch's own commits as unpushed work, or that is exactly right and the log is what is wrong — the round decides.
-
-**Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
-
-**Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
-
-## TD-191: Build the round log: `ao log` and the `log` RPC on the session's own record, the file beside the run log keyed by name and pruned with it, `--tail`, the Session card's rounds line, the manager template's round step and the supplement's line
-
-**Priority:** Medium
-**Added:** 2026-09-26 (the designer, from TD-175's design)
-**Owner:** anchor
-**Kind:** live-check #661
-**Status:** Built (2026-09-27, grinder-ao-1, PR #661) — all five steps, as the *Fix* lists them (the rounds line is server-rendered, so `app.js` is untouched); the file is `<runs_dir>/<base id>.rounds.log`, the base id being the record's name in its repo (design §4.6). **Left:** after a promote, a manager's round lands in `ao log --tail` and on its Focus Session card, and its launch branch stops gaining commits (the anchor may reset `manager-ao-1`'s branch to `origin/main` once, design §4.8). Design §4.8 *A session's round log: `ao log`, never a commit*, §4.7 *Reporting*, §4.6 *The round log*, §4.5a *Focus side panel, Session card: rounds line*; mockup `Focus.dc.html`. **Next:** built; what is left is the live look after a promote.
-
-**Location:** `src/sessionorc/agent.py` (a `log` RPC: append for the caller's own record — `--id` refused, as `doing`'s own-record rule — and a `log_tail` read, ungated; the file under `paths.runs_dir()` named by the record's name in its repo; the prune beside `runs_keep_days`'s), `src/sessionorc/paths.py`, `src/agentorc/cli.py` (`ao log "<line>"`, `ao log --tail n`, `--json`), `src/agentorc/skill.md` (one clause), `src/agentorc/briefs/manager.md` (step 5 → `ao log`; the wind-down pushes nothing; a first read of `ao log --tail 20` on a restart), `docs/briefs/manager-ao-1.md` (*the one thing you commit to it* → *you commit nothing to it*), `src/agentorc/ui/app.py` and `templates/focus.html` (the Session card's rounds line, display only), `src/agentorc/ui/static/app.js`.
-
-**Why:** TD-175's *Why*: a save-point branch by another name, tripping the unpushed signal, for a narrative that has no git-free home.
-
-**Fix:**
-1. **The file and the RPC**: `<runs_dir>/<name>.rounds.log`, one line `YYYY-MM-DDTHH:MMZ <line>`; `log {text}` appends for the caller's record only (a person may not write one: it is the session's memory); `log_tail {id, n}` reads the last n, ungated; both served where the session runs (a node's own, as the run log is). Pruned when the last record of that name is past `runs_keep_days`.
-2. **`ao log`**: `ao log "<line>"` and `ao log --tail n` (default 20), `--json` the entries; the skill's read-only line names `--tail`.
-3. **The template**: step 5 becomes *`ao log "HH:MM  <member>: <state> → <what you did>"`; nothing is committed*; the quiet-rounds folding stays; the wind-down sequence's push step goes; a restart's first read adds `ao log --tail 20`. The supplement's *the one thing you commit to it is your log* becomes *you commit nothing to it*. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads this PR.
-4. **Focus**: the *rounds* line on the Session card, under *run log*: the last two lines with their stamps, *from an earlier run* on a line older than the record's `created`; *no round log* when empty. No fold of its own.
-5. **Tests:** the RPC's own-record rule; the file's name from the record's name and repo; a second record under the same name continues it; the prune; the CLI's text and `--json`; the template text under `tests/test_briefs*`; the Session card's rounds line.
-
-**Done when** TD-175's *Done when*: the manager template's round step commits nothing, a restarted manager can read what its previous run did with `ao log --tail`, and a manager's card shows no unpushed count from its own log.
-
-**Related:** TD-175 (the design), TD-110 (the night report: the person's read), TD-114 (the supplement's shape), TD-103 (the tick took the mechanical rounds), §4.6 (run logs), §4.8 (`doing`, the own-record rule), §4.10 (the name carries its mail).
-
 ## TD-198: The kind bar's *pickable* bucket swallows design-first entries
 
 **Priority:** Low
@@ -1647,7 +1605,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes (TD-342's *Done when*); then TD-342 archives with this entry.
 
 **Related:** TD-342 (the design), TD-341 (the one cause seen, fixed), TD-339, TD-343.
-
 
 ## TD-350: Build the Org's ask block — a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup
 
