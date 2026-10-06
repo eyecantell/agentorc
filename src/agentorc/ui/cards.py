@@ -475,16 +475,20 @@ def _clock(iso: Any) -> str:
 
 def brief_unsent(s: Mapping[str, Any]) -> dict[str, str] | None:
     """design §4.5a **brief not sent** (§4.1 *No prose in the argv*, TD-339): the host agent typed the
-    brief at the composer `FIRST_PROMPT_TRIES` times and the composer did not take it — *brief not
-    sent · <reason>*, with the cure on hover. None while it is not so, and on an ended record."""
+    brief at the composer `FIRST_PROMPT_TRIES` times and the composer did not take it, or no hook
+    reached the record by `FIRST_PROMPT_BOUND` (TD-348) — *brief not sent · <reason>*, with the cure
+    on hover. None while it is not so, and on an ended record."""
     err = s.get("first_prompt_error")
     if not err or s.get("state") in ("exited", "closed"):
         return None
     text = f"brief not sent · {err}"
-    full = (
-        f"{text}: the host agent typed this session's brief at its composer and the composer did not take it "
-        "— send it (Focus, or ao send); the mark goes with the next prompt"
+    # §4.1 *A brief whose first hook is lost* (TD-348): no hook reached the record within the bound
+    what = (
+        "no hook reached this session within five minutes of its launch, so its brief was never sent"
+        if err == "no hook since launch"
+        else "the host agent typed this session's brief at its composer and the composer did not take it"
     )
+    full = f"{text}: {what} — send it (Focus, or ao send); the mark goes with the next prompt"
     return {"text": text, "full": full}
 
 
