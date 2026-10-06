@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -72,7 +73,7 @@ def parse_open_in(raw: object) -> OpenIn:
 
 
 WHERE = "settings.yml person.open_in"
-_read: dict[str, Any] = {"person": {}, "migrate": []}  # the last `settings` answer's two parts
+_read: dict[str, Any] = {"person": {}, "migrate": [], "teams": {}}  # the last `settings` answer's parts
 
 
 def set_read(answer: dict[str, Any] | None) -> None:
@@ -82,8 +83,27 @@ def set_read(answer: dict[str, Any] | None) -> None:
         return
     person = answer.get("person")
     migrate = answer.get("migrate")
+    teams = answer.get("teams")
     _read["person"] = dict(person) if isinstance(person, dict) else {}
     _read["migrate"] = [str(m) for m in migrate] if isinstance(migrate, list) else []
+    teams = teams if isinstance(teams, dict) else {}
+    _read["teams"] = {str(k): dict(v) for k, v in teams.items() if isinstance(v, dict)}
+
+
+def team_until(team: str) -> str:
+    """A team's own stop time, `teams.<team>.until` (design §5, §6 *Team stop time*), as last read:
+    the instant as written, or "" when it is absent, cleared or passed — the team header's **stops**
+    note and a compact card's *differs* both read it (§4.5a *team card: stops note*, TD-337)."""
+    t = _read["teams"].get(team) or {}
+    until = t.get("until")
+    if not isinstance(until, str) or not until or t.get("passed"):
+        return ""
+    try:
+        at = datetime.fromisoformat(until.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    at = at if at.tzinfo else at.replace(tzinfo=UTC)
+    return until if at > datetime.now(UTC) else ""
 
 
 def open_in() -> OpenIn:

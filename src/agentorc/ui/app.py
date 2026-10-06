@@ -282,6 +282,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     _blocks,  # noqa: F401
     _holders_width,  # noqa: F401
     _https,  # noqa: F401
+    _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
     answer_blocks,  # noqa: F401
     compact_line,  # noqa: F401
@@ -835,6 +836,8 @@ def create_app() -> FastAPI:
             got: dict[str, Any] = {}
             with contextlib.suppress(Exception):
                 got = dict(await call("host"))
+            with contextlib.suppress(Exception):  # the teams' stop times, for the headers a delta re-renders (TD-337)
+                uiconf.set_read(await call("settings"))
             work_cache.update(
                 at=now,
                 work=dict(got.get("work") or {}),
@@ -2661,6 +2664,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 raise HTTPException(400, f"flow not set — {str(e).strip(chr(34))}") from None
         if change:
             got = await call("set_settings", teams={team: change})
+            with contextlib.suppress(Exception):  # the header's stops note reads the new time on the next delta
+                uiconf.set_read(await call("settings"))
         if flow is not None:  # …then written and applied at once, as the team card's Flow pick (§4.9c)
             try:
                 applied = await asyncio.to_thread(teamrun.pick_flow, rpc, org, team, host_name(), flow)
@@ -3195,7 +3200,14 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
+                    was = known.get(s["id"]) or {}
                     known[s["id"]] = s
+                    if s.get("team") and s.get("run_until") != was.get("run_until"):
+                        # a team's stop time stamps its members while the Save that moved it is still
+                        # in flight: read the settings again, or the compact line compares the new
+                        # stamp with the old time and says it differs (TD-337)
+                        with contextlib.suppress(Exception):
+                            uiconf.set_read(await call("settings"))
                     v = view(
                         s,
                         list(known.values()),

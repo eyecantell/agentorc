@@ -488,3 +488,50 @@ def test_the_repo_pages_rows_keep_their_id_tags_and_columns():
     css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
     assert ".repopage .rrow > .mono.strong, .repopage .rrow > .meta { flex: none; white-space: nowrap; }" in css
     assert "@media (max-width: 720px) { .repopage .rrow:not(.drow) { flex-wrap: wrap; } }" in css
+
+
+def test_a_live_teams_stop_time_is_on_its_header_once(monkeypatch):
+    """§4.5a team card **stops** note (§6 *Team stop time*, TD-337): the team's own `until`, from the
+    settings read, on a live team's header by the card's formatter; a member's compact line says
+    *stops <t>* only where its own time differs, and *wrapping up* once asked; nothing on a team with
+    nothing live, and nothing once the time is cleared or has passed."""
+    from agentorc.ui import uiconf
+    from sessionorc.models import stop_note
+
+    later = (datetime.now(UTC) + timedelta(hours=2)).replace(second=30, microsecond=0)
+    team_at, own_at = _iso(later), _iso(later + timedelta(hours=1))
+    ms = [member("g1", role_label="Grinder", run_until=team_at), member("g2", role_label="Grinder", run_until=own_at)]
+    for m in ms:
+        m.update(rank=1, slot={"text": "", "caption": ""}, place="kmaster / samscrape")
+    team = ms[0]["team"]
+    monkeypatch.setattr(uiconf, "_read", {"person": {}, "migrate": [], "teams": {}})
+    uiconf.set_read({"teams": {team: {"until": team_at, "passed": False}}})
+    (g,) = ui.team_groups(ms, (), {}, {})
+    assert g["stops_note"] == stop_note({"run_until": team_at}) and g["stops_note"].startswith("stops ")
+    head = ui.templates.get_template("group_head.html").render(g=g)
+    assert (
+        f'<div class="meta stopsnote" title="every member and seat stops here · Settings">{g["stops_note"]}</div>'
+        in head
+    )
+    lines = {m["id"]: m["compact_line"] for m in g["members"]}
+    assert lines["g1"] == "Grinder"  # the team's own time: on the header, not on the member
+    second_off = {**ms[0], "run_until": _iso(later - timedelta(seconds=1))}  # reads the same: not drawn
+    assert ui.compact_line(second_off) == "Grinder"
+    assert lines["g2"] == f"Grinder · {stop_note({'run_until': own_at})}"  # its own differs
+    ms[0]["wrapup_sent_at"] = _iso(datetime.now(UTC))
+    (g,) = ui.team_groups(ms, (), {}, {})
+    assert {m["id"]: m["compact_line"] for m in g["members"]}["g1"] == "Grinder · wrapping up"
+    # nothing live: the slot is the *starts* note's
+    (dead,) = ui.team_groups([{**m, "state": "exited"} for m in ms], (), {}, {})
+    assert dead["stops_note"] == "" and "stopsnote" not in ui.templates.get_template("group_head.html").render(g=dead)
+    # cleared, passed, or a time the read marks passed: none, and every member's own time is its own again
+    for teams in (
+        {},
+        {team: {"until": _iso(datetime.now(UTC) - timedelta(hours=1))}},
+        {team: {"until": team_at, "passed": True}},
+    ):
+        uiconf.set_read({"teams": teams})
+        (g,) = ui.team_groups(ms, (), {}, {})
+        assert g["stops_note"] == "" and {m["id"]: m["compact_line"] for m in g["members"]}["g1"].startswith(
+            "Grinder · stops "
+        )
