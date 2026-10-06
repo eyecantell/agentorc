@@ -908,7 +908,12 @@ class HostAgent(
                     unattended=unattended,
                     cwd=directory,
                     name=name,
-                    **({"start_context": start_context} if start_context else {}),
+                    # the home's preface heads it, so every launch of such a tool has the file (§4.1, TD-347)
+                    **(
+                        {"start_context": mail.start_context_file_text(start_context)}
+                        if getattr(ad, "start_context", False)
+                        else {}
+                    ),
                 )
             except (KeyError, ValueError, OSError) as e:  # OSError: the start context's file (TD-339)
                 raise RpcError(str(e).strip('"')) from None
@@ -1808,7 +1813,7 @@ class HostAgent(
             await self._type(sid, adapter, text)
         return before
 
-    async def _type(self, sid: str, adapter: Any, text: str) -> None:
+    async def _type(self, sid: str, adapter: Any, text: str, lead: str | None = None) -> None:
         """Paste, Enter, and confirm the prompt left the composer (TD-027, design §4.2). Only an
         adapter that can read its tool's composer (`composer(tail_raw)`, design §4.3) gets the
         confirmation; the rest get the blind paste + Enter. The paste is given a moment to paint
@@ -1818,8 +1823,13 @@ class HostAgent(
         Only the Enter is ever re-sent, and only with the text visibly still in the composer —
         never the text (design §4.2). A composer that cannot be read (no composer row, or a failed
         capture — `capture_tail` returns [] then) counts as emptied: no evidence is not evidence of a
-        stuck prompt."""
+        stuck prompt.
+
+        `lead` is a line of the home's typed as literal keys before the paste, in the same prompt —
+        the brief's line (§4.1 *The brief is the person's word*, TD-347)."""
         reader = getattr(adapter, "composer", None)
+        if lead:
+            await asyncio.to_thread(self.tmux.send_literal, sid, lead + " ")
         await asyncio.to_thread(self.tmux.paste, sid, text)
         if reader is None:
             await asyncio.to_thread(self.tmux.send_enter, sid)

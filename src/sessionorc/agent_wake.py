@@ -308,7 +308,8 @@ class WakeMixin:
             if left:
                 await self._enter_again(sid, reader)  # the last try's brief is still in the composer
             else:
-                await self._type(sid, adapter, s.first_prompt)  # the lock is held already
+                # the home's line, then the brief as the paste: one prompt (§4.1, TD-347); the lock is held already
+                await self._type(sid, adapter, s.first_prompt, lead=mail.BRIEF_LINE)
         except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste
             if self.sessions.get(sid) is not s:
                 return  # forgotten, or its name taken by a new record, while it typed

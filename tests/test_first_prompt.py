@@ -19,6 +19,8 @@ from sessionorc.client import LocalClient
 pytestmark = pytest.mark.integration
 
 BRIEF = "You are a grinder. Read the ledger, then pick one entry."
+# the home's line, typed as keys, then the brief as the paste: one prompt (§4.1, TD-347)
+TYPED = f"{mail.BRIEF_LINE} {BRIEF}"
 
 
 class BriefStub(ComposerStub):
@@ -68,7 +70,7 @@ async def test_the_brief_is_typed_at_the_first_idle_and_before_the_doorbell(agen
         await asyncio.sleep(4 * FAST_TICK)
         assert await _submitted(agent, w) == [], "nothing is typed before the first hook idle"
         await agent.rpc_hook(w, state="idle")
-        assert await wait_for(lambda: _first(agent, w, "SUBMITTED " + BRIEF), timeout=6), "the brief was never typed"
+        assert await wait_for(lambda: _first(agent, w, "SUBMITTED " + TYPED), timeout=6), "the brief was never typed"
         assert await wait_for(lambda: _sent(rec), timeout=6), "typed, and the record never said so"
         assert rec.first_prompt is None and rec.first_prompt_sent_at and rec.first_prompt_error is None
         assert rec.sends[-1].from_ == mail.SYSTEM and rec.sends[-1].text == "(the brief)"
@@ -78,7 +80,7 @@ async def test_the_brief_is_typed_at_the_first_idle_and_before_the_doorbell(agen
         await agent.rpc_hook(w, state="idle")
         line = "SUBMITTED " + mail.unread_line(1)
         assert await wait_for(lambda: _first(agent, w, line, at=1), timeout=6), "the doorbell never rang after it"
-        assert (await _submitted(agent, w))[0] == "SUBMITTED " + BRIEF, "typed once"
+        assert (await _submitted(agent, w))[0] == "SUBMITTED " + TYPED, "typed once"
 
 
 async def _first(agent, sid: str, line: str, at: int = 0) -> bool:

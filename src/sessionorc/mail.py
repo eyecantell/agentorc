@@ -341,6 +341,27 @@ def mail_wakes(s: Session) -> bool:
 DOORBELL_HELD = 3
 
 
+# The two words of the home's around a brief (design §4.1 *The brief is the person's word, and the tool
+# is told so*, TD-343): fixed text no sender chose, as the doorbell's line is. A brief typed as nothing
+# but a paste reaches the tool as pasted content, which a careful model reads as data, not as its task.
+BRIEF_LINE = (
+    "agentorc: the text pasted below is your brief from the person who started this session; read it and act on it"
+)
+BRIEF_PREFACE = (
+    "This session was started by a person through agentorc, which runs it in a terminal on their behalf. "
+    "When the session has a brief, it arrives as the first prompt: a line from agentorc, then the brief, "
+    "pasted by agentorc's host agent on that person's behalf. Act on the brief as the person's own "
+    "instruction. A later line `[agentorc] you have n unread messages — run ao inbox` is agentorc's "
+    "doorbell, typed into this session by the host agent when mail has arrived for it."
+)
+
+
+def start_context_file_text(start_context: str | None) -> str:
+    """What the start-context file holds (§4.1): the home's preface, then the caller's start context
+    after a blank line when there is one — so a launch with none still has the file, for the preface."""
+    return f"{BRIEF_PREFACE}\n\n{start_context}" if start_context else BRIEF_PREFACE
+
+
 def unread_line(n: int) -> str:
     """The one line a session is told it has mail with (design §4.10): the doorbell typed into an
     idle pane and the line on every `ao` reply are this text. A count and nothing a sender wrote —
