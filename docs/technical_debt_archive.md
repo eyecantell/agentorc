@@ -5101,7 +5101,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-06 (the designer, TD-342's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built 2026-10-06 (grinder-ao-2, PR #1162)
 **Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: the `confidence == "hook"` gate), `src/sessionorc/agent_common.py` (`FIRST_PROMPT_HOOK_WAIT`, `FIRST_PROMPT_BOUND`), `src/sessionorc/models.py`, `src/agentorc/ui/cards.py` (the mark's reason), `tests/`; design §4.1 *A brief whose first hook is lost*, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads it.
 
 **Why:** TD-342's design. A run whose first hook never landed made no try at its brief and showed no mark for 7.5 hours.
