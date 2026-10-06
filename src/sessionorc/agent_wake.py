@@ -259,9 +259,11 @@ class WakeMixin:
         rev = s.rev
         left = None
         if reader is not None:
-            left = reader(await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True))
-            s = self.sessions.get(sid)
-            if s is None or s.rev != rev or not self._first_prompt_due(s):
+            tail = await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True)
+            if not tail:
+                return  # a failed capture is no evidence of an empty composer: never a second paste on it
+            left = reader(tail)
+            if self.sessions.get(sid) is not s or s.rev != rev or not self._first_prompt_due(s):
                 return  # it moved while the screen was read: the next tick looks again
             if left is None or (left and not s.first_prompt_tries):
                 return  # a dialog, or someone's words: wait for the next tick
@@ -271,8 +273,8 @@ class WakeMixin:
             else:
                 await self._type(sid, adapter, s.first_prompt)  # the lock is held already
         except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste
-            if s.id not in self.sessions:
-                return
+            if self.sessions.get(sid) is not s:
+                return  # forgotten, or its name taken by a new record, while it typed
             s.first_prompt_tries += 1
             why = str(e) or type(e).__name__
             log.warning(
@@ -283,6 +285,8 @@ class WakeMixin:
             self._save(s)
             await self._push_changes()
             return
+        if self.sessions.get(sid) is not s:
+            return  # forgotten, or its name taken by a new record, while it typed
         s.first_prompt_sent_at = now_iso()
         s.first_prompt = None  # kept until sent (§4.1); the transcript holds it from here
         # what was typed, and by whom (§4.10 `sends`): the home, the brief — named, never its text again
