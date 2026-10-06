@@ -8,6 +8,16 @@ from agentorc import repoconfig
 pytestmark = pytest.mark.unit
 
 
+def define(base, name, yml="", template="# {name}\n\n{lane}\n"):
+    """A role directory (design §4.9c, TD-313): `role.yml` and `template.md` under `base`."""
+    d = base / name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "role.yml").write_text(yml)
+    if template is not None:
+        (d / "template.md").write_text(template)
+    return d
+
+
 def test_missing_file_gives_the_defaults(tmp_path):
     cfg = repoconfig.load(tmp_path)
     assert cfg.path is None and cfg.root == tmp_path
@@ -54,6 +64,7 @@ commands:
   - {name: test, run: pdm run test}
 """
     )
+    define(tmp_path / ".agentorc" / "roles", "reviewer")  # a `roles:` key names a definition (§4.9c)
     cfg = repoconfig.load(tmp_path)
     assert cfg.path == tmp_path / ".agentorc.yml"
     assert cfg.unattended == {"workers": 3, "window": {"weekday": "20:00-06:00", "weekend": "all"}}
@@ -69,7 +80,9 @@ commands:
     o = repoconfig.resolve_role(cfg, "manager")
     assert o.grants == ["control"] and o.lane == [] and o.controllers == []
     r = repoconfig.resolve_role(cfg, "reviewer")
-    assert r.source == "repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
+    assert (
+        r.source == "repo role + repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
+    )
     assert [x.name for x in repoconfig.roles(cfg)] == [
         "grinder",
         "hunter",
@@ -80,17 +93,22 @@ commands:
         "plain",
         "reviewer",
     ]
-    with pytest.raises(KeyError, match="unknown role 'nope'; known: grinder, hunter"):
+    with pytest.raises(KeyError, match="unknown role 'nope' — no preset, .*; known: grinder, hunter"):
         repoconfig.resolve_role(cfg, "nope")
 
 
-def test_the_org_overlay_sits_between_built_in_and_repo(tmp_path):
+def test_the_org_overlay_sits_between_built_in_and_repo(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))  # its org role directory is this test's
     (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {lane: [TD-001]}}\n")
     cfg = repoconfig.load(tmp_path)
     overlay = {"grinder": {"profile": "grind", "lane": ["free-pick"]}, "scout": {"grants": ["control"]}}
     g = repoconfig.resolve_role(cfg, "grinder", roles_overlay=overlay)
     assert g.profile == "grind" and g.lane == ["TD-001"] and g.source == "built-in + org + repo"
-    assert repoconfig.resolve_role(cfg, "scout", roles_overlay=overlay).source == "org"
+    with pytest.raises(KeyError, match="unknown role 'scout'"):  # an overlay is not a definition (§4.9c)
+        repoconfig.resolve_role(cfg, "scout", roles_overlay=overlay)
+    define(repoconfig.org_roles_dir(), "scout")
+    scout = repoconfig.resolve_role(cfg, "scout", roles_overlay=overlay)
+    assert scout.source == "org role + org" and scout.grants == ["control"]
     assert "scout" in repoconfig.role_names(cfg, overlay)
 
 
@@ -172,6 +190,9 @@ def test_old_role_names_are_unknown_roles(tmp_path):
         with pytest.raises(KeyError, match=f"unknown role '{old}'"):
             repoconfig.resolve_role(repoconfig.RepoConfig(), old)
     (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {profile: repo-prof}\n")
+    with pytest.raises(ValueError, match="`roles`.lead: unknown role 'lead'"):  # a key alone defines nothing
+        repoconfig.load(tmp_path)
+    define(tmp_path / ".agentorc" / "roles", "lead")
     role = repoconfig.resolve_role(repoconfig.load(tmp_path), "lead")
     assert (role.name, role.profile, role.grants) == ("lead", "repo-prof", [])
 
@@ -245,6 +266,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
     assert repoconfig.default_label("reviewer") == "Reviewer" and repoconfig.default_label("") == ""
     # a layer's label wins per key, as every other key does, and to_dict says what the page shows
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  reviewer: {icon: eye}\n")
+    define(tmp_path / ".agentorc" / "roles", "reviewer")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.display == "TD grinder" and grinder.icon == "wrench" and grinder.to_dict()["label"] == "TD grinder"
@@ -277,6 +299,8 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
     # the repo's own file overrides it, and its other keys are untouched
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {icon: terminal}\n  reviewer: {icon: eye}\n")
+    define(tmp_path / ".agentorc" / "roles", "reviewer")
+    define(tmp_path / ".agentorc" / "roles", "lead")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.icon == "terminal" and grinder.brief == "grinder.md" and grinder.lane == ["free-pick"]

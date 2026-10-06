@@ -51,8 +51,11 @@ def test_pages_and_shell_flow(client, tmp_path):
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
     assert 'name="role"' in r.text and 'title="built-in · grants control">manager · unattended</option>' in r.text
     (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
+    (tmp_path / ".agentorc" / "roles" / "reviewer").mkdir(parents=True)  # a role directory (§4.9c)
+    (tmp_path / ".agentorc" / "roles" / "reviewer" / "role.yml").write_text("")
+    (tmp_path / ".agentorc" / "roles" / "reviewer" / "template.md").write_text("review {lane}\n")
     r = client.get(f"/new?dir={tmp_path}")
-    assert 'title="repo">reviewer · unattended</option>' in r.text and 'data-default="orc"' in r.text
+    assert 'title="repo role + repo">reviewer · unattended</option>' in r.text and 'data-default="orc"' in r.text
     roles = client.get(f"/api/roles?dir={tmp_path}").json()
     assert roles["controllers"] == ["orc"] and [x["name"] for x in roles["roles"]][-1] == "reviewer"
     (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")

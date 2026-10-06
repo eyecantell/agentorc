@@ -543,16 +543,21 @@ def test_a_members_brief_is_a_supplement_in_the_templates_repo_slot(world, capsy
 
 
 def test_a_template_with_no_supplement_reads_none_and_a_role_without_one_takes_the_brief_whole(tmp_path):
-    """The slot reads `none` when the repo gives nothing (design §4.8); a role the package ships no
-    template for takes the repo's brief as the whole brief, as before."""
+    """The slot reads `none` when the repo gives nothing (design §4.8); a role defined in a directory
+    takes its own `template.md`, the repo's slots filled as a preset's are (§4.9c, TD-313)."""
     from agentorc import repoconfig
 
     cfg = repoconfig.RepoConfig(root=tmp_path)
     text = repoconfig.resolve_role(cfg, "grinder").brief_text()
     assert "## This repo's rules" in text and "\n\nnone\n\n" in text and "{repo}" not in text
     (tmp_path / "r.md").write_text("reviewer: {lane}\n")
+    d = tmp_path / ".agentorc" / "roles" / "reviewer"
+    d.mkdir(parents=True)
+    (d / "role.yml").write_text("")
+    (d / "template.md").write_text("reviewer: {lane}\n{repo}\n")
+    assert repoconfig.resolve_role(cfg, "reviewer").brief_text(["TD-1"]) == "reviewer: TD-1\nnone\n"
     cfg.roles = {"reviewer": {"brief": "r.md"}}
-    assert repoconfig.resolve_role(cfg, "reviewer").brief_text(["TD-1"]) == "reviewer: TD-1\n"
+    assert repoconfig.resolve_role(cfg, "reviewer").brief_text(["TD-1"]) == "reviewer: TD-1\nreviewer: TD-1\n"
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
     # a repo's `roles.grinder.brief` fills the slot, and a definition's `brief:` takes it instead
     (tmp_path / "g.md").write_text("the role's own\n")
@@ -1892,6 +1897,10 @@ def test_new_with_a_team_keeps_a_roles_deliberately_empty_controllers(world):
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
     doc["roles"]["solo"] = {"controllers": []}
     write_org(tmp_path, doc)
+    solo = tmp_path / "home" / "roles" / "solo"  # an org role directory the overlay speaks over (§4.9c)
+    solo.mkdir(parents=True)
+    (solo / "role.yml").write_text("")
+    (solo / "template.md").write_text("solo: {lane}\n")
     state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
     assert cli.main(["new", "me", "--team", "ao-grind", "--role", "solo"]) == 0
     (made,) = creates(state)

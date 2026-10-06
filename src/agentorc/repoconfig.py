@@ -27,7 +27,7 @@ repo's own `roles:`, each overriding per key.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -35,6 +35,7 @@ from typing import Any
 
 import yaml
 
+from sessionorc import paths
 from sessionorc.models import GRANTS, normalize_context, normalize_review, owner_word
 
 FILE = ".agentorc.yml"
@@ -125,6 +126,16 @@ STAGE_PLACEHOLDER = "{stage}"
 NO_FLOW = "none"
 NO_STAGE = "none"
 STAGE_SUFFIX = ".stage.md"
+# A role defined outside the package (design §4.9c *Where flows and roles live*, TD-313): a directory
+# holding `role.yml` (the `ROLE_KEYS`, `kind` among them, never `brief:`) and `template.md` (its
+# mechanics, with the template slots) — the org's `~/.agentorc/roles/<name>/` over a repo's
+# `.agentorc/roles/<name>/`, each whole, a peer of a preset. A manager's may ship
+# `template_on_call.md`, its shape on call as `ON_CALL_BRIEFS` gives a preset's.
+ROLE_DIR = Path(".agentorc") / "roles"
+ORG_ROLES_SUB = "roles"
+ROLE_FILE = "role.yml"
+ROLE_TEMPLATE = "template.md"
+ROLE_TEMPLATE_ON_CALL = "template_on_call.md"
 # The one role whose template wraps it only under a flow (§4.9c *The designer gets a template*): until
 # TD-310 cuts every designer brief in use to a supplement, a designer started outside a flow is its
 # repo's brief whole, as before the build.
@@ -306,6 +317,8 @@ class Role:
     sources: list[str] = field(default_factory=list)  # `built-in`, `org`, `repo`: which layers spoke
     brief_source: str = ""  # which layer the brief came from: the template is read from there
     root: Path | None = None  # the repo the role was resolved in; where a repo brief path is relative to
+    defined: Path | None = None  # its directory, for a role defined in one (§4.9c, TD-313): `template.md` is there
+    defined_place: str = ""  # `org` or `repo`: where `defined` is — the org's is this host's own disk
 
     @property
     def display(self) -> str:
@@ -395,7 +408,11 @@ class Role:
         template = ON_CALL_BRIEFS.get(self.template, self.template) if on_call and self.template else self.template
         if flow is None and self.name in FLOW_ONLY_TEMPLATES:
             template = None
-        if template is None:
+        default_stage: Path | None = None
+        if self.defined is not None:
+            src_path = self.defined / (ROLE_TEMPLATE_ON_CALL if on_call else ROLE_TEMPLATE)
+            text, base = self._defined_template(src_path, read, on_call), str(src_path)
+        elif template is None:
             if not extra:
                 if self.name in FLOW_ONLY_TEMPLATES:
                     raise ValueError(f"{self.name} needs a brief outside a flow (design §4.9c)")
@@ -406,10 +423,12 @@ class Role:
             src = resources.files("agentorc").joinpath("briefs", template)
             text = src.read_text(encoding="utf-8")
             base = str(src)
+            default_stage = _stage_default(template)
+        if self.defined is not None or template is not None:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
-            stage = flow.stage if flow is not None else _stage_default(template)
+            stage = flow.stage if flow is not None else default_stage
             text = text.replace(FLOW_PLACEHOLDER, flow.text if flow is not None else NO_FLOW)
             slots[FLOW_PLACEHOLDER] = {"text": flow.text if flow is not None else NO_FLOW}
             text = text.replace(STAGE_PLACEHOLDER, _stage_text(stage, read) if stage else NO_STAGE)
@@ -429,6 +448,26 @@ class Role:
             text = text.replace(slot, value)
             slots[slot] = {"text": value}
         return text, {"base": base, "slots": slots}
+
+    def _defined_template(self, path: Path, read: Reader | None, on_call: bool) -> str:
+        """A defined role's template (§4.9c): the org's read on this host, a repo's through `read`
+        (a node's checkout across the link). A manager with no `template_on_call.md` is a standing
+        manager only."""
+        reader = _read_here if self.defined_place == "org" else (read or _read_here)
+        try:
+            text = reader(path)
+        except (OSError, UnicodeDecodeError) as e:
+            raise ValueError(
+                f"role {self.name!r}: {path} cannot be read ({getattr(e, 'strerror', None) or e})"
+            ) from None
+        if text is None:
+            if on_call:
+                raise ValueError(
+                    f"role {self.name!r}: no {ROLE_TEMPLATE_ON_CALL} in {self.defined} — without one it can be a "
+                    "standing manager only (design §4.9c)"
+                )
+            raise ValueError(f"role {self.name!r}: no {ROLE_TEMPLATE} in {self.defined} (design §4.9c)")
+        return text
 
     def bound_for(self, unattended: bool) -> int | None:
         """The bound a session started by hand in this role is given (design §4.8 *The bound has two
@@ -472,6 +511,8 @@ class RepoConfig:
     # §4.9c (TD-309): the repo's held paths, top level — what a flow's review stage waits for. None:
     # the key is absent (a review stage then has nothing to hold); never an empty list
     held: list[str] | None = None
+    # how the repo's files were read (`load`'s `read`): its role directories are read the same way (§4.9c)
+    read: Reader | None = field(default=None, repr=False, compare=False)
 
 
 def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
@@ -479,7 +520,13 @@ def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
     this host's disk by default, another host's checkout across the link for a team started there
     (TD-057 step 4b.3) — one loader for both, `load_text`."""
     root = Path(repo_root).expanduser()
-    return load_text((read or _read_here)(root / FILE), root)
+    cfg = load_text((read or _read_here)(root / FILE), root)
+    cfg.read = read
+    for name in cfg.roles:
+        # an overlay is not a definition (design §4.9c): a key naming no preset and no directory is refused
+        if name not in PRESETS and definition(cfg, name) is None:
+            raise ValueError(f"{cfg.path}: `roles`.{name}: {_unknown(cfg, name)}")
+    return cfg
 
 
 def load_text(text: str | None, repo_root: Path | str) -> RepoConfig:
@@ -717,23 +764,157 @@ def default_label(name: str) -> str:
     return name[:1].upper() + name[1:]
 
 
+def org_roles_dir() -> Path:
+    """The org's role directories (design §4.9c, TD-313): the home's `roles/`, every team's to use."""
+    return paths.home() / ORG_ROLES_SUB
+
+
+def _dir_names(base: Path, *, any_dir: bool = False) -> list[str]:
+    """The role directories under `base` on this host, by name: each a directory holding `role.yml`
+    (`any_dir`: every directory, so `visible` names one that lacks it)."""
+    try:
+        return sorted(
+            p.name
+            for p in base.iterdir()
+            if not p.name.startswith(".") and ((p / ROLE_FILE).is_file() or (any_dir and p.is_dir()))
+        )
+    except OSError:  # no such directory, or unreadable: none listed here
+        return []
+
+
+def org_role(name: str) -> bool:
+    """Whether `name` is defined by the org's directory — not a preset, and the org's `roles/<name>/`
+    holds `role.yml` — so a team on a node cannot use it (§4.9c: the org's directories are the home's)."""
+    return name not in PRESETS and _plain_name(name) and (org_roles_dir() / name / ROLE_FILE).is_file()
+
+
+def _plain_name(name: str) -> bool:
+    return bool(name) and "/" not in name and "\\" not in name and not name.startswith(".")
+
+
+def definition(cfg: RepoConfig, name: str) -> tuple[str, Path, str] | None:
+    """Where the role `name` is defined outside the package (§4.9c), the org's over a repo's, whole:
+    `(place, directory, role.yml's text)`, or None — a preset's name is never read from a directory
+    (a directory taking one is refused: `visible`). The org's is read on this host; a repo's
+    through `cfg.read`, as its `.agentorc.yml` was."""
+    if name in PRESETS or not _plain_name(name):
+        return None
+    for place, base, reader in (
+        ("org", org_roles_dir(), _read_here),
+        ("repo", Path(cfg.root) / ROLE_DIR if cfg.root is not None else None, cfg.read or _read_here),
+    ):
+        if base is None:
+            continue
+        d = base / name
+        try:
+            text = reader(d / ROLE_FILE)
+        except (OSError, UnicodeDecodeError) as e:
+            raise ValueError(f"{d / ROLE_FILE} cannot be read ({getattr(e, 'strerror', None) or e})") from None
+        if text is not None:
+            return place, d, text
+    return None
+
+
+def _defined_block(name: str, place: str, d: Path, text: str, read: Reader | None) -> dict[str, Any]:
+    """A role directory's `role.yml` read as a `roles:` entry is, with its `kind` (§4.9c): a
+    `brief:` refused — the directory's `template.md` is its mechanics — and the template required."""
+    where = f"{d / ROLE_FILE}"
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as e:
+        raise ValueError(f"{where}: not valid YAML ({e})") from None
+    data = {} if data is None else data
+    if not isinstance(data, dict):
+        raise ValueError(f"{where}: the top level must be a mapping ({', '.join(ROLE_KEYS)})")
+    data = {str(k): v for k, v in data.items()}
+    if "brief" in data:
+        raise ValueError(
+            f"{where}: `brief:` is not a defined role's — its mechanics are its {ROLE_TEMPLATE}, and a repo's "
+            f"supplement for it is that repo's `roles.{name}.brief` (design §4.9c)"
+        )
+    kind = data.pop("kind", DEFAULT_KIND)
+    if kind not in KINDS:
+        raise ValueError(f"{where}: kind {kind!r} is not a kind ({', '.join(KINDS)})")
+    block = _role_block(name, data, f"{where}: roles")
+    block["kind"] = kind
+    try:
+        template = (_read_here if place == "org" else (read or _read_here))(d / ROLE_TEMPLATE)
+    except (OSError, UnicodeDecodeError) as e:
+        raise ValueError(f"{d / ROLE_TEMPLATE} cannot be read ({getattr(e, 'strerror', None) or e})") from None
+    if template is None:
+        raise ValueError(
+            f"{d}: no {ROLE_TEMPLATE} — a role directory holds {ROLE_FILE} and its template (design §4.9c)"
+        )
+    return block
+
+
+def visible(roots: Collection[Path | str] = ()) -> list[dict[str, Any]]:
+    """Every role directory this host can see (§4.7 `ao org`, §4.9c), as `flowdefs.visible` lists
+    flows: the org's, then each checkout's in `roots`, each `{name, source, usable, problems}` —
+    `source` its directory. A directory taking a preset's name is not usable (a preset is redefined
+    by key only); a repo's the org's shadows is listed with `shadowed` set, never read; one that is
+    not whole (its `role.yml` not a role, no `template.md`) is not usable, with the reason."""
+    out: list[dict[str, Any]] = []
+    org_names = _dir_names(org_roles_dir())
+    places = [("org", org_roles_dir())] + [("repo", Path(r).expanduser() / ROLE_DIR) for r in roots]
+    for place, base in places:
+        for name in _dir_names(base, any_dir=True):
+            d = base / name
+            row: dict[str, Any] = {"name": name, "source": str(d), "usable": False, "problems": []}
+            if name in PRESETS:
+                row["problems"] = [f"{d}: {name} is a preset's name — a preset is redefined by key only (design §4.9c)"]
+            elif place == "repo" and name in org_names:
+                row["shadowed"] = f"not read: the org's role {name} ({org_roles_dir() / name}) is the role"
+            elif not (d / ROLE_FILE).is_file():
+                row["problems"] = [f"{d}: no {ROLE_FILE} — a role directory holds {ROLE_FILE} and {ROLE_TEMPLATE}"]
+            else:
+                try:
+                    _defined_block(name, place, d, _read_here(d / ROLE_FILE) or "", None)
+                except (OSError, ValueError) as e:
+                    row["problems"] = [str(e)]
+                else:
+                    row["usable"] = True
+            out.append(row)
+    return out
+
+
+def _unknown(cfg: RepoConfig, name: str) -> str:
+    where = f" in {cfg.root}" if cfg.root is not None else ""
+    return (
+        f"unknown role {name!r} — no preset, no {org_roles_dir() / name}/ and no {ROLE_DIR / name}/{where} "
+        "(an overlay is not a definition, design §4.9c)"
+    )
+
+
 def role_names(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = None) -> list[str]:
-    """Every role that resolves here: the built-ins first, then what the layers add, each once."""
-    return list(dict.fromkeys([*PRESETS, *(roles_overlay or {}), *cfg.roles]))
+    """Every role that resolves here: the built-ins first, then the org's role directories, then the
+    repo's (§4.9c), each once — an overlay's key adds none, since it defines nothing. A repo read
+    across the link lists the directories its own `roles:` names; this host's lists them all."""
+    repo = _dir_names(Path(cfg.root) / ROLE_DIR) if cfg.root is not None and cfg.read is None else []
+    named = list(cfg.roles) if cfg.read is not None else []  # `load` refused a key naming no definition
+    return list(dict.fromkeys([*PRESETS, *_dir_names(org_roles_dir()), *repo, *named]))
 
 
 def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, Any]] | None = None) -> Role:
-    """Built-in < `roles_overlay` (the org layer, a later step) < the repo's `roles:`, per key.
-    An unknown name is a `KeyError` naming it and what would have resolved."""
+    """The role's definition — a preset, else the org's role directory, else the repo's (§4.9c,
+    TD-313), whole — then `roles_overlay` (`org.yml`'s `roles:`) < the repo's `roles:`, per key.
+    An unknown name — a key no preset and no directory defines among them — is a `KeyError` naming
+    it, the directories that would define it, and what would have resolved; a directory that is not
+    whole is a `ValueError`."""
+    found = definition(cfg, name)
+    defined = _defined_block(name, found[0], found[1], found[2], cfg.read) if found else None
+    if name not in PRESETS and defined is None:
+        raise KeyError(f"{_unknown(cfg, name)}; known: {', '.join(role_names(cfg, roles_overlay))}")
     layers = [
         ("built-in", PRESETS.get(name)),
+        (f"{found[0]} role" if found else "", defined),
         ("org", (roles_overlay or {}).get(name)),
         ("repo", cfg.roles.get(name)),
     ]
     spoke = [(src, block) for src, block in layers if block is not None]
-    if not spoke:
-        raise KeyError(f"unknown role {name!r}; known: {', '.join(role_names(cfg, roles_overlay))}")
     role = Role(name=name, root=cfg.root)
+    if found:
+        role.defined_place, role.defined = found[0], found[1]
     for src, block in spoke:
         role.sources.append(src)
         if "kind" in block:  # a preset's alone: `_role_block` refuses it in an overlay
@@ -775,5 +956,21 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
 
 
 def roles(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = None) -> list[Role]:
-    """Every role resolved, for `ao roles` and the form's pick-list."""
-    return [resolve_role(cfg, n, roles_overlay) for n in role_names(cfg, roles_overlay)]
+    """Every role resolved, for `ao roles` and the form's pick-list. A role directory that is not
+    whole is left out, never an error: one broken directory must not empty every pick-list, and
+    `ao org check` names it (`visible`)."""
+    out = []
+    for n in role_names(cfg, roles_overlay):
+        try:
+            out.append(resolve_role(cfg, n, roles_overlay))
+        except (KeyError, ValueError):
+            if n in PRESETS:  # a preset's own keys: the overlay's error is the person's to see
+                raise
+    return out
+
+
+def unread(path: Path) -> str | None:
+    """A `Reader` for a repo whose files are not read from here (the New session form's config of
+    another host's checkout, `ui.app.config_on`): none of its role directories is read, rather than
+    this host's disk at the same path."""
+    return None

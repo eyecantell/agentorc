@@ -153,7 +153,7 @@ def test_a_role_with_an_empty_controllers_list_means_nobody_not_the_repo_default
 def test_an_unknown_role_or_grant_is_an_error_naming_it(repo, capsys):
     root, calls = repo
     assert cli.main(["--json", "new", "g1", "--role", "sage"]) == 1
-    assert json.loads(capsys.readouterr().out)["error"].startswith("unknown role 'sage'; known: grinder")
+    assert json.loads(capsys.readouterr().out)["error"].startswith("unknown role 'sage' — no preset")
     (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert cli.main(["new", "g1", "--role", "grinder"]) == 1
     assert "grants: unknown grant 'fly'" in capsys.readouterr().err
@@ -171,11 +171,15 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     (root / ".agentorc.yml").write_text(
         "controllers: [orc]\nroles:\n  grinder: {profile: grind, brief: docs/briefs/g.md}\n  reviewer: {lane: [ui]}\n"
     )
+    d = root / ".agentorc" / "roles" / "reviewer"  # a `roles:` key overlays a definition (§4.9c)
+    d.mkdir(parents=True)
+    (d / "role.yml").write_text("{}\n")
+    (d / "template.md").write_text("# reviewer\n")
     assert cli.main(["roles"]) == 0
     out = capsys.readouterr().out
     assert out.splitlines()[0] == f"roles from {root / '.agentorc.yml'}"
     assert "grinder   [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
-    assert "brief: docs/briefs/g.md" in out and "reviewer  [repo]  lane: ui" in out
+    assert "brief: docs/briefs/g.md" in out and "reviewer  [repo role + repo]  lane: ui" in out
     assert "label: Grinder" in out and "label: Reviewer" in out  # what the page shows (design §4.8 *The names*)
     # when to message it (design §4.8, TD-171): its own line under the role's, where a role has one
     assert "  message: its own card only: the entry it holds, a finding on its PR" in out

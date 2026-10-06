@@ -1439,7 +1439,9 @@ async def config_on(call: Any, host: str, directory: str) -> repoconfig.RepoConf
         got = await call("host_files", host=host, dir=root, paths=[repoconfig.FILE])
     except HTTPException as e:
         raise HostSilent(silent(host, e)) from None
-    return repoconfig.load_text(((got or {}).get("files") or {}).get(repoconfig.FILE), root)
+    cfg = repoconfig.load_text(((got or {}).get("files") or {}).get(repoconfig.FILE), root)
+    cfg.read = repoconfig.unread  # its role directories are not read across the link here (TD-313)
+    return cfg
 
 
 def files_on(call: Any, loop: asyncio.AbstractEventLoop) -> teams.Files:

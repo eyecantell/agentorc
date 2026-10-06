@@ -5,6 +5,7 @@ and a team's `flows:` refused at its start when a flow is unknown, not usable or
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -47,8 +48,12 @@ def test_every_preset_has_a_kind_and_an_overlay_may_not_write_one(tmp_path):
     }
     with pytest.raises(ValueError, match=r"grinder.kind: a role's kind is its definition's"):
         cfg_with(tmp_path, "roles:\n  grinder: {kind: seat}\n")
-    # a key-only role writes no kind and is a worker
-    assert repoconfig.resolve_role(cfg_with(tmp_path, "roles:\n  scout: {brief: d.md}\n"), "scout").kind == "worker"
+    # a key-only role defines nothing (§4.9c, TD-313): refused when the file is read, and never resolved
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  scout: {brief: d.md}\n")
+    with pytest.raises(ValueError, match="`roles`.scout: unknown role 'scout'"):
+        repoconfig.load(tmp_path)
+    with pytest.raises(KeyError, match="unknown role 'scout'"):
+        repoconfig.resolve_role(cfg_with(tmp_path, "roles:\n  scout: {brief: d.md}\n"), "scout")
 
 
 def test_held_is_a_top_level_list_of_paths(tmp_path):
@@ -945,3 +950,170 @@ def test_ao_team_list_says_flow_changed_while_the_records_differ(world, tmp_path
     out = capsys.readouterr().out
     assert "flow changed — Apply (ao team flow ao-grind --apply):" in out
     assert "designer-ao: sits out under build-review" in out
+
+
+# ── role directories (TD-313 slice 2) ───────────────────────────────────────────────────────────────
+
+
+def define_role(base: Path, name: str, yml: str = "kind: worker\n", template: str | None = "# {lane}\n") -> Path:
+    d = base / name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "role.yml").write_text(yml)
+    if template is not None:
+        (d / "template.md").write_text(template)
+    return d
+
+
+@pytest.mark.unit
+def test_a_role_directory_defines_a_role_the_orgs_over_a_repos_whole(tmp_path, monkeypatch):
+    # §4.9c *Where flows and roles live*: `role.yml` (the role keys and `kind`) and `template.md`, the
+    # org's `~/.agentorc/roles/<name>/` over a repo's `.agentorc/roles/<name>/`, never merged by key
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    root = tmp_path / "r"
+    repo_role = define_role(root / ".agentorc" / "roles", "security", "kind: seat\nicon: eye\nlane: [a]\n")
+    cfg = repoconfig.load(root)
+    sec = repoconfig.resolve_role(cfg, "security")
+    assert (sec.kind, sec.icon, sec.lane, sec.source, sec.defined) == ("seat", "eye", ["a"], "repo role", repo_role)
+    assert "security" in repoconfig.role_names(cfg)
+    org_role = define_role(
+        repoconfig.org_roles_dir(),
+        "security",
+        "icon: shield\nlabel: security\nprofile: grind\n",
+        "sec: {lane}\n{repo}\n",
+    )
+    sec = repoconfig.resolve_role(cfg, "security")
+    assert (sec.kind, sec.icon, sec.lane, sec.display, sec.profile) == ("worker", "shield", [], "security", "grind")
+    assert sec.source == "org role" and sec.defined == org_role  # whole: the repo's `kind` and `lane` gone
+    # its template is the brief, the repo's slots filled as a preset's; an overlay still lays over it per key
+    text, made = sec.compose(["TD-1"])
+    assert text == "sec: TD-1\nnone\n" and made["base"] == str(org_role / "template.md")
+    (root / "s.md").write_text("the repo's security words\n")
+    (root / ".agentorc.yml").write_text("roles:\n  security: {brief: s.md, lane: [b]}\n")
+    sec = repoconfig.resolve_role(repoconfig.load(root), "security", {"security": {"profile": "fable"}})
+    assert sec.source == "org role + org + repo" and sec.profile == "fable"
+    assert sec.brief_text() == "sec: b\nthe repo's security words\n"
+    rows = {(r["name"], r["source"]): r for r in repoconfig.visible([root])}
+    assert rows[("security", str(org_role))]["usable"]
+    assert "the org's role security" in rows[("security", str(repo_role))]["shadowed"]
+
+
+@pytest.mark.unit
+def test_a_role_directory_that_is_not_whole_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    base = repoconfig.org_roles_dir()
+    cfg = cfg_with(tmp_path)
+    for yml, template, why in (
+        ("brief: x.md\n", "t\n", "`brief:` is not a defined role's"),
+        ("kind: boss\n", "t\n", "kind 'boss' is not a kind"),
+        ("icon: rocket\n", "t\n", "icon: unknown icon 'rocket'"),
+        ("- a\n", "t\n", "the top level must be a mapping"),
+        ("kind: worker\n", None, "no template.md"),
+    ):
+        d = define_role(base, "odd", yml, template)
+        with pytest.raises(ValueError, match=why):
+            repoconfig.resolve_role(cfg, "odd")
+        assert not {r["name"]: r for r in repoconfig.visible()}["odd"]["usable"]
+        for f in d.iterdir():
+            f.unlink()
+        d.rmdir()
+    # a directory taking a preset's name is never read, and is listed as refused
+    define_role(base, "grinder", "kind: seat\n")
+    assert repoconfig.resolve_role(cfg, "grinder").kind == "worker"
+    assert "a preset's name" in repoconfig.visible()[0]["problems"][0]
+    # a manager on call takes `template_on_call.md`; without one it is a standing manager only
+    d = define_role(base, "boss", "kind: manager\n", "standing\n")
+    boss = repoconfig.resolve_role(cfg, "boss")
+    assert boss.brief_text() == "standing\n"
+    with pytest.raises(ValueError, match="standing manager only"):
+        boss.compose(on_call=True)
+    (d / "template_on_call.md").write_text("on call\n")
+    assert boss.compose(on_call=True)[0] == "on call\n"
+
+
+@pytest.mark.unit
+def test_an_org_flow_uses_an_org_role_and_a_node_team_cannot(tmp_path, monkeypatch):
+    # TD-313's *Done when*, its first half: a role directory under `~/.agentorc/roles/` is used by an
+    # org flow with no other file changed — and, on a node, the role is the home's (*security is an org role*)
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    d = flowdefs.org_dir() / "sweep"
+    d.mkdir(parents=True)
+    (d / "flow.yml").write_text("stages:\n  - {name: look, role: security, lane: [free], brief: look.md}\n")
+    (d / "look.md").write_text("look\n")
+    assert "unknown role 'security'" in flowdefs.load("sweep", cfg_with(tmp_path)).problems[0]
+    define_role(repoconfig.org_roles_dir(), "security", "kind: worker\nlane: [free]\n", "sec {lane}\n{stage}\n")
+    sweep = flowdefs.load("sweep", cfg_with(tmp_path))
+    assert sweep.usable, sweep.problems
+    text, _ = repoconfig.resolve_role(cfg_with(tmp_path), "security").compose(flow=flowdefs.under(sweep, "security"))
+    assert text == "sec free\nlook\n"
+    assert flowdefs.unfollowable(sweep, {"security"}, techlead=False, held=()) == []
+    why = flowdefs.unfollowable(sweep, {"security"}, techlead=False, held=(), team="cm-grind", node="contractmatch")
+    assert "security is an org role" in why
+    # a seat where a stage gives a lane is not usable, as for a preset
+    define_role(repoconfig.org_roles_dir(), "security", "kind: seat\n", "sec\n")
+    assert "names a worker, and 'security' is a seat" in " ".join(flowdefs.load("sweep", cfg_with(tmp_path)).problems)
+
+
+def test_a_hunt_flow_in_the_orgs_directory_starts_its_members_from_it(world, tmp_path):  # noqa: F811
+    # TD-313's *Done when*, its second half: a `hunt` flow in the org's directory starts a hunter and
+    # a grinder with their lanes and briefs from it, and an org role directory's member beside them
+    d = flowdefs.org_dir() / "hunt"
+    d.mkdir(parents=True)
+    stages = [
+        {"name": "find", "role": "hunter", "lane": ["free"], "brief": "find.md"},
+        {"name": "build", "role": "grinder", "lane": ["free-pick"], "brief": "build.md"},
+        {"name": "look", "role": "security", "lane": ["free"], "brief": "look.md"},
+    ]
+    (d / "flow.yml").write_text(yaml.safe_dump({"stages": stages}))
+    for f in ("find", "build", "look"):
+        (d / f"{f}.md").write_text(f"the org's {f} words\n")
+    define_role(repoconfig.org_roles_dir(), "security", "kind: worker\nlane: [free]\n", "security: {lane}\n{stage}\n")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t["flows"] = ["hunt"]
+    for m in t["members"]:
+        m.pop("lane", None)
+    t["members"].append({"role": "security", "name": "security-ao", "home": "agentorc"})
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    assert p.flow == "hunt"
+    by = {x.role: x for x in p.members}
+    assert by["grinder"].lane == ["free-pick"] and "the org's build words" in by["grinder"].prompt
+    assert by["hunter"].lane == ["free"] and "the org's find words" in by["hunter"].prompt
+    assert by["security"].prompt == "security: free\nthe org's look words\n"
+
+
+def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(world, tmp_path, capsys):  # noqa: F811
+    """§4.9c: `ao org` says a repo's role directory the org's shadows, as a shadowed team; `ao org
+    check` fails on one that is not whole or takes a preset's name."""
+    from agentorc import cli
+
+    root = tmp_path / "agentorc"
+    define_role(root / ".agentorc" / "roles", "security")
+    define_role(repoconfig.org_roles_dir(), "security")
+    assert cli.main(["org"]) == 0
+    out = capsys.readouterr().out
+    assert f"role security  usable  [{repoconfig.org_roles_dir() / 'security'}]" in out
+    assert "role security  not read: the org's role security" in out
+    assert cli.main(["org", "check"]) == 0
+    capsys.readouterr()
+    define_role(root / ".agentorc" / "roles", "hunter")
+    assert cli.main(["org", "check"]) == 1
+    assert "lacking: role hunter (" in capsys.readouterr().out
+    shutil.rmtree(root / ".agentorc" / "roles" / "hunter")
+    # a directory with no role.yml is not whole, and a broken one leaves every other role listed
+    (root / ".agentorc" / "roles" / "stray").mkdir()
+    (repoconfig.org_roles_dir() / "security" / "template.md").unlink()
+    assert cli.main(["org", "check"]) == 1
+    out = capsys.readouterr().out
+    assert "lacking: role stray (" in out and "no role.yml" in out and "lacking: role security (" in out
+    names = [r.name for r in repoconfig.roles(repoconfig.load(root))]
+    assert "security" not in names and "grinder" in names
+    assert cli.main(["roles"]) == 0
+    capsys.readouterr()
+    # org.yml's `roles:` key naming no definition is named, since the org file cannot see the repos
+    (repoconfig.org_roles_dir() / "security" / "template.md").write_text("x\n")
+    shutil.rmtree(root / ".agentorc" / "roles" / "stray")
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc.setdefault("roles", {})["grnder"] = {"lane": ["free-pick"]}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["org", "check"]) == 1
+    assert "roles.grnder — unknown role" in capsys.readouterr().out

@@ -33,6 +33,10 @@ def test_compose_says_what_the_brief_was_made_from_and_filling_it_gives_the_text
     sup = tmp_path / "briefs" / "g.md"
     sup.write_text("grind {lane}, ask {techlead}\n")
     (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {brief: briefs/g.md}, solo: {brief: briefs/g.md}}\n")
+    solo = tmp_path / ".agentorc" / "roles" / "solo"  # a role directory (§4.9c, TD-313)
+    solo.mkdir(parents=True)
+    (solo / "role.yml").write_text("")
+    (solo / "template.md").write_text("solo {lane}: {repo}\n")
     cfg = repoconfig.load(tmp_path)
     g = repoconfig.resolve_role(cfg, "grinder")
     text, made = g.compose(["TD-001"], techlead="tl-1")
@@ -47,9 +51,10 @@ def test_compose_says_what_the_brief_was_made_from_and_filling_it_gives_the_text
     # no supplement: the slot is the text the template's `none` word is
     text, made = repoconfig.resolve_role(repoconfig.load(tmp_path / "briefs"), "hunter").compose()
     assert made["slots"]["{repo}"] == {"text": "none"} and fill(made) == text
-    # a role with no template: the repo's brief is the base, taken whole
+    # a role directory: its template.md is the base, the repo's brief in its `{repo}` slot
     text, made = repoconfig.resolve_role(cfg, "solo").compose(["x"])
-    assert made["base"] == str(sup) and "{repo}" not in made["slots"] and fill(made) == text
+    assert made["base"] == str(solo / "template.md") and made["slots"]["{repo}"] == {"file": str(sup)}
+    assert fill(made) == text == "solo x: grind harder x\n"
     assert repoconfig.resolve_role(cfg, "plain").compose() == (None, None)
     assert repoconfig.prefixed(made, "") is made and repoconfig.prefixed(None, "B") is None
     assert repoconfig.prefixed(made, "B")["prefix"] == "B"

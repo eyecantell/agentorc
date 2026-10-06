@@ -455,7 +455,7 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
     for cfg, teams in found:
         mine = {k: v for k, v in teams.items() if str(k) not in twice}
         try:
-            org = merge_repo_teams(org, Path(cfg.root), mine, cfg.roles) if mine else org
+            org = merge_repo_teams(org, Path(cfg.root), mine, repoconfig.role_names(cfg)) if mine else org
         except (OSError, ValueError) as e:
             notes.append(f"{cfg.root}: {str(e).strip(chr(34))}")
     if twice or org is file_org:  # a copy of our own before anything is written on it
@@ -816,8 +816,9 @@ def _validate(org: Org, label: str) -> None:
 
 def _entries_resolve(org: Org, team: TeamDef, key: str, repo_roles: Collection[str]) -> None:
     """Each role `entries:` names resolves (design §4.9, TD-219): a built-in preset, the org's
-    `roles:`, a role the repo's own file defines, or one the team's own definition starts."""
-    known = [*repoconfig.PRESETS, *org.roles, *repo_roles]
+    `roles:`, an org role directory, a role the repo defines (its directories, design §4.9c), or one
+    the team's own definition starts."""
+    known = [*repoconfig.role_names(repoconfig.RepoConfig()), *org.roles, *repo_roles]
     known += [m.role for m in team.members if m.team is None and m.role] + [s.role for s in team.seats]
     for t, role in team.entries.items():
         if role not in known:

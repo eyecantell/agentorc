@@ -335,14 +335,17 @@ def unfollowable(
     node: str = "",
 ) -> list[str]:
     """Why a team cannot follow `flow` (§4.9c *Every listed flow must be followable*), in the shared
-    words' middle part, or [] when it can: an org flow, for a team that runs on the node `node` (its
-    briefs are read there, and the org's directories are the home's, §4.4a); a member stage whose role
+    words' middle part, or [] when it can: an org flow, or a stage naming an org role, for a team
+    that runs on the node `node` (its briefs are read there, and the org's directories are the
+    home's, §4.4a); a member stage whose role
     the team starts no member of; the review stage when the team has no `techlead:` seat, or when
     nothing would be held (its repos write no `held:`). `staffed` is the roles the definition's
     members take."""
     out: list[str] = []
     if node and flow.place == "org":
         out.append(f"an org flow, and {team} runs on {node} — define it in the repo")
+    if node:  # the org's role directories are the home's too (§4.9c): *security is an org role*
+        out += [f"{st.role} is an org role" for st in flow.stages if st.role and repoconfig.org_role(st.role)]
     for st in flow.stages:
         if st.review:
             if not techlead:
