@@ -335,7 +335,6 @@
 {{ recommends(e) }}
 {{ answers(e) }}
 <div class="st standing" title="where your answer goes (design §4.10): the board always, and whoever holds the reference">{{ e.standing.text if e.standing else 'its session is gone' }}</div>
-<div class="st rowerr" role="alert" hidden></div>
 <div class="row gap wrap mfoot">
   {%- if e.kind == 'steer' and e.bound %}
   <span class="st timeleft" data-deadline="{{ e.bound }}" data-then="then it waits on you">{% if e.left %}{{ e.left }} left, then it waits on you{% else %}the time is up: it waits on you{% endif %}</span>
@@ -667,7 +666,7 @@
   <span class="st boardstanding" title="where a Reply goes: always the board line; mailed as well to a live session holding the lease on one of its references">{% if e.session %}{{ e.session }} · {% endif %}{{ e.standing.text }}</span>
   {%- endif %}
   <span class="grow"></span>
-  <span class="st" title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
+  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
 </div>
 {#- §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset as a message's
     text is (§4.10), its bold head and the sentence after it drawn and the rest under *details*,
@@ -836,14 +835,18 @@
 </div>
 {%- endmacro %}
 
+{#- every row carries an error line (§4.5a *Inbox row: pending*, TD-340): a refused write, or a press
+    that took its row away and was refused, drawn there once the refresh brings the row back -#}
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
 <div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {{ board(e, section, origin_first) }}
+<div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'trail' %}
 <div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-rkind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {{ trail(e, section) }}
+<div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row %}
 <div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
@@ -851,6 +854,7 @@
 {%- elif e.row == 'work' %}{{ work_row(e, section) }}
 {%- elif section == 'snoozed' %}{{ state_snoozed(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
+<div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- else %}
 <div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
@@ -870,6 +874,7 @@
 {%- elif e.kind == 'steer' %}{{ steer(e, section) }}
 {%- else %}{{ ask(e, section) }}
 {%- endif %}
+<div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- endif %}
 {%- endmacro %}

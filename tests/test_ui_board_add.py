@@ -157,4 +157,4 @@ def test_the_script_opens_the_form_and_draws_a_refusal_in_it():
     fn = js[js.index("AO.boardAdd = function") : js.index('document.addEventListener("click", async (ev)')]
     assert '$("#boardadd")' in fn and 'act("person", "board", body)' in fn and 'action: "add"' in fn
     assert "err.textContent = `not put on the board: ${e.message}`" in fn
-    assert 'if (action === "board_add")' in js and "await AO.boardAdd(b)" in js
+    assert 'if (action === "board_add")' in js and "await AO.boardAdd(b, pressed)" in js
