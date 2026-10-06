@@ -413,7 +413,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     # cadence's order (§4.4 *Repo facts*, TD-228): within a priority, debt before a feature
     assert out.index("pickable     TD-014") < out.index("pickable     TD-015") < out.index("pickable     TD-013")
     # slice 6: the reader's standing on each open PR, what members hold, the board items due
-    assert "waiting on review by tl · 40m" in out and "holds        TD-010 → #9  g1" in out
+    assert "waiting on tl · 40m" in out and "holds        TD-010 → #9  g1" in out
     assert "due          3d overdue  decide TD-283" in out
     # the servicing team's doing log, newest first; another team's is not this repo's
     assert out.index("g1: pushing TD-010") < out.index("g1: reading the ledger") and "not this repo's" not in out

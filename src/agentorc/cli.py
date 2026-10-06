@@ -1471,24 +1471,23 @@ def _board_due(root: pathlib.Path) -> dict[str, Any]:
 
 
 def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
-    """Each PR's standing with the servicing team's techlead (§4.9b *The reader*), by number: from
-    the seat's inbox entries carrying a `pr`. A session's `ao repo` may not read another's inbox,
-    so from a session this is empty — the page's read is a person's."""
-    out: dict[str, str] = {}
+    """Each PR's standing with the servicing team's readers (§4.9c *What is shown*), by number: from
+    every seat's inbox entries carrying a `pr` and its sent replies' verdicts (`review.standing`, the
+    page's words). A session's `ao repo` may not read another's mail, so from a session this is
+    empty — the page's read is a person's."""
+    from agentorc import review as reviewmod
+
+    seats: list[tuple[str, list[Any], list[Any]]] = []
     for m in members:
         if not (m.get("seat") or m.get("role") == "techlead"):
             continue
         try:
-            entries = (call_sync("inbox", id=m["id"]) or {}).get("entries") or []
+            inbox = (call_sync("inbox", id=m["id"]) or {}).get("entries") or []
+            sent = (call_sync("inbox", id=m["id"], sent=True) or {}).get("entries") or []
         except AgentError:
             continue
-        for e in sorted((e for e in entries if isinstance(e, dict)), key=lambda e: str(e.get("at") or "")):
-            if isinstance(e.get("pr"), int) and e.get("kind") == "ask":
-                if e.get("closed_by"):
-                    out[str(e["pr"])] = f"reviewed by {m['id']}"
-                elif not e.get("closed_reason"):
-                    out[str(e["pr"])] = f"waiting on review by {m['id']} · {_age(str(e.get('at') or ''))}"
-    return out
+        seats.append((str(m.get("name") or m["id"]), inbox, sent))
+    return {str(pr): st["word"] for pr, st in reviewmod.standing(seats, _age).items()}
 
 
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}

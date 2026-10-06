@@ -67,8 +67,9 @@ def fake(repos, fleet, doing=None, inbox=None):
             return False
 
         async def call(self, method, **kw):
-            if method == "inbox":
-                return (inbox or {}).get(kw.get("id"), {"entries": []})
+            if method == "inbox":  # a seat's sent mail is keyed `<id>/sent`
+                key = f"{kw.get('id')}/sent" if kw.get("sent") else kw.get("id")
+                return (inbox or {}).get(key, {"entries": []})
             return {
                 "repos": repos,
                 "doing_log": doing or {},
@@ -108,6 +109,7 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
     fleet = [
         rec("tdgrind-1", root, git={"branch": "td301"}, progress=[{"ref": "TD-301", "status": "claimed", "pr": 811}]),
         rec("techlead-1", root, state="exited", role="techlead"),
+        rec("ui-reader-1", root, role="ui-reader", seat={"trigger": "asks"}),  # a seat at work is read too
     ]
     doing = {
         "grind": [
@@ -122,7 +124,10 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
                 {"kind": "ask", "pr": 811, "at": _iso(datetime.now(UTC) - timedelta(minutes=40))},
                 {"kind": "ask", "pr": 805, "at": _iso(NOW), "closed_by": "m-1"},
             ]
-        }
+        },
+        "techlead-1/sent": {"entries": [{"id": "m-1", "kind": "reply", "verdict": "pass"}]},
+        "ui-reader-1": {"entries": [{"kind": "ask", "pr": 811, "at": _iso(NOW - timedelta(hours=1)), "closed_by": "m-2"}]},
+        "ui-reader-1/sent": {"entries": [{"id": "m-2", "kind": "reply", "verdict": "pass"}]},
     }
     c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet, doing, inbox))
     html = c.get("/repo/samscrape").text
@@ -131,7 +136,8 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
     prs = html[html.index('id="prs"') : html.index('id="debt"')]
     assert prs.index("#805") < prs.index("#811")
     assert 'href="/focus/tdgrind-1">tdgrind-1</a>' in prs and ">draft<" in prs
-    assert "waiting on review · 40m" in prs and ">reviewed<" in prs
+    # each reader named, its answer's verdict said (§4.9c *What is shown*, TD-315 slice 5b)
+    assert '"tag wait">passed by ui-reader-1 · waiting on techlead-1 · 40m<' in prs and '"tag done">passed by techlead-1<' in prs
     # Technical debt: four lists, held by, folded past four with +n more
     assert 'id="debt-pickable"' in html and "held by tdgrind-1" in html and "+2 more" in html
     assert html.count('class="rrow folded"') == 2
@@ -163,7 +169,14 @@ def test_the_ledger_lists_sort_by_priority_then_id_and_the_chips_count():
     rows = [{"name": "a"}, {"name": "b"}, {"name": "a"}]
     assert [(c["label"], c["n"]) for c in doing_chips(rows)] == [("all", 3), ("a", 2), ("b", 1)]
     got = pr_standing(
-        [{"kind": "ask", "pr": 5, "at": _iso(NOW), "closed_reason": "expired"}, {"kind": "note", "pr": 6}], NOW
+        [
+            (
+                "tl",
+                [{"kind": "ask", "pr": 5, "at": _iso(NOW), "closed_reason": "expired"}, {"kind": "note", "pr": 6}],
+                [],
+            )
+        ],
+        NOW,
     )
     assert got == {}  # an expired ask stands for nothing; a note is not a request for review
 

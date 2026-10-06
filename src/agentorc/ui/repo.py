@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from agentorc import org as orgmod
-from agentorc import repoconfig, teamrun, teams
+from agentorc import repoconfig, review, teamrun, teams
 from sessionorc import mail
 from sessionorc.models import (
     has_control,
@@ -106,20 +106,11 @@ def pr_rows(
     return rows
 
 
-def pr_standing(entries: Collection[dict[str, Any]], now: datetime) -> dict[int, dict[str, Any]]:
-    """Each PR's standing with the techlead (§4.9b *The reader*), from the seat's inbox entries that
-    carry a `pr`: *waiting on review · <age>* while the `ask` is open, *reviewed* once it carries a
-    reply. The latest entry for a number wins."""
-    out: dict[int, dict[str, Any]] = {}
-    for e in sorted((e for e in entries if isinstance(e, dict)), key=lambda e: str(e.get("at") or "")):
-        pr = e.get("pr")
-        if not isinstance(pr, int) or e.get("kind") != "ask":
-            continue
-        if e.get("closed_by"):
-            out[pr] = {"word": "reviewed", "cls": "done"}
-        elif not e.get("closed_reason"):
-            out[pr] = {"word": f"waiting on review · {_age(e.get('at'), now)}", "cls": "wait"}
-    return out
+def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) -> dict[int, dict[str, Any]]:
+    """Each PR's standing with the team's readers (§4.5 screen 11, §4.9c *What is shown*): `seats`
+    one `(name, inbox, sent)` per seat of the team, read as a person's read — `review.standing`,
+    the words `ao repo` prints too, aged against `now`."""
+    return review.standing(seats, lambda at: _age(at, now))
 
 
 def ledger_lists(r: Mapping[str, Any], motion: Collection[dict[str, Any]]) -> list[dict[str, Any]]:

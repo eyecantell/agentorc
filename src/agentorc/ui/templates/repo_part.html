@@ -13,7 +13,7 @@
 <section class="rsec" id="prs">
   <div class="row gap rsh"><span class="h2">Open PRs</span> <span class="meta">{{ prs | length }} · newest last</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-prs" title="About this list">i</button></div>
-  <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ g.summary.repo.read ~ ' ago' if g.summary.repo else '' }}); the standing is the techlead seat's inbox — <i>waiting on review</i> while its ask is open, <i>reviewed</i> once answered</div>
+  <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ g.summary.repo.read ~ ' ago' if g.summary.repo else '' }}); the standing is each review seat's mail — <i>waiting on</i> the seat while its ask is open, then <i>passed by</i>, <i>findings from</i> or <i>merged by</i> it, as its answer's verdict says</div>
   <div class="rlist">
   {% for p in prs %}
     <div class="rrow"><a class="mono strong" href="{{ p.url }}" target="_blank" rel="noopener">#{{ p.number }}</a><span class="rtitle">{{ p.title }}</span><span class="grow"></span>
