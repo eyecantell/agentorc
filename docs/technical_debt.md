@@ -90,9 +90,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
-| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check 2026-10-06: argv holds, a restart's brief does not — blocked by TD-341, TD-342 |
+| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built; live check: a restart with no alarm |
 | TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Open — design first |
+| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Open |
+| TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Open |
+| TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Open |
 
 ---
 
@@ -1612,3 +1615,69 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes.
 
 **Related:** TD-339, TD-341, TD-336.
+
+## TD-343: A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, asked by Paul why the team did nothing all day)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.1 *No prose in the argv*; `src/sessionorc/agent_wake.py` (`_first_prompt_typing`: the brief sent by bracketed paste); `src/agentorc/adapters/claude_code/__init__.py` (`--append-system-prompt-file`, the start context)
+
+**Why:** Since TD-339 the brief is typed at the composer by bracketed paste, and Claude Code hands a paste to the model wrapped in `<pasted_content>` with the rule that instructions inside it are followed only where the user's own words ask for it. A brief is nothing but a paste, so a careful model takes it as data. On 2026-10-06 at 12:29Z techlead-ao-1 (Fable) answered its brief with *"Your message contains only pasted text, a techlead-seat brief for agentorc, with nothing from you saying what to do with it, so I haven't acted on it"*, then held grinder-ao-1's PR ask on #1150 unread until the person answered its mailed `ask` (`m-e60ada636596`) at 22:20Z. In those ten hours the doorbell rang it about thirty times, each a Fable turn that only re-said it was holding. grinder-ao-1 (Opus) acted on the same kind of brief, so whether a session starts is up to the model's judgement on each run. Every member, seat and restart launched since TD-339 is exposed.
+
+**Fix:** design first, then build. Give the brief a road the tool trusts. For example: send it with the start context through `--append-system-prompt-file` (the system prompt is the operator's word), and type only a short first prompt of the home's own, outside any paste, that says to begin; or type a short line of the home's own beside the pasted brief saying it is this session's brief from the person who started it. Either way, keep TD-336's rule: no prose in the argv. Also bound the doorbell: a session that answered a ring by holding, with nothing new in its inbox, is not rung again for the same unread count.
+
+**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted.
+
+**Related:** TD-336 and TD-339 (no prose in the argv), TD-341 and TD-342 (a brief whose first hook is lost; #1150).
+
+## TD-344: The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`: members whose state is in `NEEDS_YOU_ROWS`), `src/agentorc/ui/templates/rollup.html` (the *Needs you* facet: *answer needed*, then *in the Inbox*); design §4.5a *team card: Answer needed / Doing*
+
+**Why:** On 2026-10-06 techlead-ao-1 held the whole team's review on an `ask` to the person (`m-e60ada636596`), and Paul read the Org's *Needs you* as *0 answer needed*. That count is only members whose pane waits on a permission or a question. A member that mailed its question and ended its turn is `idle`, so its ask is counted only on the second line, *in the Inbox*, among every other Inbox row. The question that stopped the team reads as nothing to answer.
+
+**Fix:** design first. Either *answer needed* also counts an open `ask` to the person from a live member of the team, linked to its Inbox row, or the facet's two lines are worded so that a blocking ask cannot read as none.
+
+**Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home.
+
+**Related:** TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
+
+## TD-345: The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor: a scoped review on Fable, asked by Paul, of §4.9c and §9 whole and the parts of §4.8, §4.9, §4.9b and §6 they touch)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open. Findings (1)–(3) were checked against the text by the anchor. The rest are as the reviewer gave them, with line numbers of `origin/main` at `f6175c3`.
+**Location:** `docs/design.md` §4.9c (5846–6511), §4.9b *The reader* and *Seats with a trigger*, §4.9 *A person in the team*, §6 rule 11, §9 invariant 9
+
+**Why:** flows, role directories and review stages for any seat (TD-309, TD-313, TD-315) were added in small slices. The review's verdict: the layer is structurally sound, but the older sections still describe a single techlead with a role-owned `review:`, and the generalisation lives only in §4.9c's patches. Findings (1) and (3) are ones a builder cannot implement unambiguously; the rest are a consolidation pass.
+1. **§6 rule 11 reads one reader** (~8645: *for `reader: techlead`, an `ask` … with a reply from that seat*), while §4.9c (6354) says rule 11 already holds a chain's PR *read by a reply from any reader its asks named*. That also contradicts 6361's *only the last reader holding the PR merges it*: a chain PR merged after the first reader's `pass` is not a crossing. Rewrite rule 11 for the chain (read when every link whose paths it touches has a reply, or the last reader replied `merged`).
+2. **The verdict is spelled two ways:** §4.9b (5787) says the seat *answers on the thread: `merge`, or findings*, and §4.9c says `--verdict pass|merged|findings`. §4.9b should say the three and point at §4.9c.
+3. **A switch keys on a stage `name` that no rule may read:** 6000 says `name` is *read by no rule*, and 6416 says *a `pass` already given to a stage of the same name stands*. Key the carried `pass` on the reader and its path set, or let the `name` bullet say the switch reads it.
+4. §4.9c items 2 and 3 say the compile writes `review: {reader: techlead, held}`, and the TD-315 bullet (6344–6357) says `{chain, bound}` *in place of item 2's*. Restate items 2 and 3 as the chain, with the older shape as its one-link form.
+5. §4.9 *A person in the team* (4830–4836) takes `held:` as the union of the member roles' lists *once flows are built*. Under a flow, a role's `review:` is set aside (item 2), so it should take the flow's chain on the repos' `held:`, as a member does.
+6. §4.9b *The reader* (5756–5770) still presents `review:` as a setting of the role. It should say that a role's `review:` is read only with no flow, and that under a flow the record's `review` is the flow's chain.
+7. §4.9b *Seats with a trigger* (5436–5440) calls `asks` *the techlead's* trigger, but TD-315 staffs review stages with other seats on `trigger: asks`. Nothing says what such a seat does with a non-PR ask: pass it to `{techlead}`, or have the mail gate refuse it.
+8. §4.9c's opening paragraph (~900 words) and about 25 inline *Built (slice N)* sentences are history voice in rule text (CLAUDE.md: the design says what is true now). Move the slice record to design-history, and keep one *built* line.
+9. The designer carve-out *until TD-310* (6056–6073) is a transitional state with no stated status. State TD-310's status once, and delete the carve-out when it lands (with §4.8 ~4082's matching words).
+10. §9 says nothing about the flows layer's load-bearing rule (*the host agent never sees a flow, and the record gains no flow field*), and `closed_for: {why: sit_out}` is a flow-derived mark the tick keys on. Extend invariant 9: no rule keys on a flow or a stage, and `sit_out` and `relaunch` are person-written marks.
+11. Sitting out is stated three times (6115, 6227, 6417–6421), and the first reads as covering seats. Say *worker member* there, and give the seat exception once.
+12. The `{flow}` line and 6025–6031 route questions *through techlead-ao-1* even in a `build` flow where no seat reads. Word the strip so that a seat outside the path is not shown in it.
+
+**Fix:** one design round of rewrites in rule voice: rule 11 and §4.9b's reader first, (1)–(3), then the rest. Build entries only where code differs from the result. Rule 11's chain reading and the verdict spelling may already be built one way; read the code to see which.
+
+**Done when** §6 rule 11, §4.9b, §4.9 and §4.9c state one review model in present-tense rule voice, §9 invariant 9 covers flows, the slice history sits in design-history, and any code that differs has a build entry.
+
+**Related:** TD-309, TD-313, TD-315 (archived: the layer), TD-310 (the repos' move).
