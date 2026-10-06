@@ -209,11 +209,33 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   never through the person's interactive shell: rc files change directories, set aliases and
   print banners, and any of those moves or breaks a launch. The `shell` adapter is the one place
   the person's shell is the point. **One exception to *directly*, and it keeps the rule's
-  point:** tmux refuses a command line past its message size (*command too long*, about 16 KB),
-  and a session's brief rides in its argv. Past 8 KB the argv is written to a launch script under
+  point:** tmux refuses a command line past its message size (*command too long*, about 16 KB).
+  Past 8 KB the argv is written to a launch script under
   the home (`launch/<tmux name>.sh`, mode `0700`) that `exec`s it under `/bin/sh` — never the
   person's shell, no rc file — so the pane's first process is still the command itself and the
   limit that applies is the kernel's.
+- **No prose in the argv** (TD-336; designed 2026-10-05, not built — TD-339). A session's argv
+  names the tool, its flags, its ids and paths — never its brief and never its start context.
+  A process's command line is read by everything on the host — `ps`, `pgrep`, `pkill -f` — and
+  on 2026-10-05 a repo script a member was told to run ended with `pkill -f chromium`, matched
+  the word in the brief riding in that member's own argv, and killed the session running it; no
+  rule in a brief can guard against a script the session does not read. So the two texts travel
+  another way. **The start context is a file**: written under the home beside the launch script
+  (`launch/<tmux name>.context.md`, mode `0600`, removed with it when the record is forgotten) and
+  named by the tool's file flag (§4.3), at every launch of the conversation as before. **The brief
+  is typed, not passed**: every launch lands at the composer (the no-prompt launch of §4.2, now the
+  only kind), and the host agent sends the brief as the session's first prompt the way `ao send`
+  does — bracketed paste, the composer must empty, `prompt-stuck` otherwise (TD-027) — once the
+  record's first `idle` arrives by hook. The launch record keeps the brief as `first_prompt` until
+  it is sent (`first_prompt_sent_at`); a send the composer does not take is tried again on the next
+  tick while the session sits idle, `FIRST_PROMPT_TRIES` (3) in all, and then the record carries
+  the refusal (`first_prompt_error`) and the card says *brief not sent · <reason>* (§4.5a) —
+  the session is live at its composer with nothing to do, which a person or its manager can see
+  and cure with a send. What a person sees is unchanged: the brief is still the conversation's
+  first turn on Focus and in the transcript, a `create` still returns when the pane exists, and
+  the record reads `working` when the brief's turn starts rather than at the launch. The argv
+  that is left is a few hundred bytes, so the launch script is for an argv a profile's
+  `extra_args` made long, and nothing else.
 - `history-limit` is raised at creation; `pipe-pane` streams output to
   `~/.agentorc/runs/<session>-<created>.log` continuously (a reboot loses nothing that reached
   the pipe).
@@ -285,7 +307,7 @@ State transitions (Claude Code adapter):
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
 | `SessionStart` with `source: compact` (a compaction ends by firing it; a manual `/compact` fires nothing after) | no state change — the session is what it was, idle after a `/compact`, working mid-turn (TD-090) |
 | `SessionStart` with `source: resume` (`claude --resume` prints the conversation and waits at the composer; no `Stop` follows) | `idle` — a prompt given with the resume reports `working` through its own `UserPromptSubmit` (TD-155) |
-| `SessionStart` with `source: startup` from a launch with no prompt (`ao new` without one, the Add entry form's **Open a session**; the launch sets `AGENTORC_AT_COMPOSER=1` in the pane's environment, since the payload cannot say it) | `idle` — no turn follows the start, so no `Stop` would ever report it, and the person's own session read `working` with **→ Steer** until its first turn (TD-283); a launch with a prompt reads `working` on its start as before, its prompt running at once |
+| `SessionStart` with `source: startup` (every launch lands at the composer since TD-336 — not built, TD-339; until then a launch with no prompt: `ao new` without one, the Add entry form's **Open a session** — the launch sets `AGENTORC_AT_COMPOSER=1` in the pane's environment, since the payload cannot say it) | `idle` — no turn follows the start, so no `Stop` would ever report it, and the person's own session read `working` with **→ Steer** until its first turn (TD-283). A launch with a brief reads `working` when the host agent's first send starts its turn (§4.1 *No prose in the argv*); until TD-339 lands, a launch with a prompt reads `working` on its start, its prompt running at once |
 | `PreToolUse`, `PostToolUse` from inside a subagent (the tool sets `agent_id` only there) | no state change — a background agent runs on after its caller's `Stop`, and says nothing about the main composer (TD-201). So a permission a subagent's tool asks for, answered in the terminal rather than through **Allow** / **Deny** (which set `working` themselves), leaves the record `needs-you` with its old pending until the main thread's next event: the safer of the two errors, the other being a background agent wiping the main thread's question |
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
@@ -511,9 +533,14 @@ class Adapter(Protocol):
                                                       # `start_context: str | None` (TD-283 part 2, built
                                                       # 2026-10-04): text the session holds from its start that is no
                                                       # prompt — no turn runs for it and nothing is typed. Claude Code:
-                                                      # `--append-system-prompt`, given again at every launch of the
-                                                      # conversation, a resume included, since the tool keeps it in no
-                                                      # file of the session's. An adapter that can carry one says so
+                                                      # `--append-system-prompt-file <path>` (TD-336; §4.1 *No prose in
+                                                      # the argv* — the flag is in the binary of 2.1.290 and its own
+                                                      # Remote Control carrier uses it, though `--help` lists only
+                                                      # `--append-system-prompt`; until TD-339 lands, that one), given
+                                                      # again at every launch of the conversation, a resume included,
+                                                      # since the tool keeps it in no file of the session's. The `prompt`
+                                                      # is not argv's either: `LaunchSpec.first_prompt`, which the host
+                                                      # agent types at the composer (§4.1). An adapter that can carry one says so
                                                       # (`start_context = True`); a create that hands one to an adapter
                                                       # that cannot (`shell`) is refused in words, never folded into a
                                                       # prompt. The record keeps the text (`start_context`) and so does
@@ -2946,6 +2973,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **paused · usage** mark | built (TD-100 slice 3): when the record carries `gated` (§6 *Usage gate*), the slot's first line — *what explains a stop*, §4.5 row 5 (a) — reads ***paused · usage** — `<profile> <label> n% ≥ line%`, line moves `<when>`* (*resets `<when>`* when `next` is the window's `resets`, as a flat reserve's always is), with *· pause sent* once `gated.sent_at` is set — and, when the pause is under a team's reserve priority (`gated.team_extra`, §6, TD-146), ***paused · usage (ao-grind +10)** — …* with the team's line — composed by the page from the record's fields, never from anything the session said; row 5's *one text, the first that applies* holds — a pending permission or question, a `limited` reset or a `stalled?` note takes the slot and the mark waits for it to clear (§6: a person is needed for those, not for the pause), while the Focus header shows the mark regardless; the state pill stays `idle` (or `working`, until the pause prompt is taken). A mark, not pressable. The Focus header shows the same line and, on an unattended session, nothing to press: the way out is **Take over** (the person's send is not refused) or a lower reserve (`ao gate`), and under a team's priority a lower one of those too (`teams.<team>.reserve`, which the hover names). It goes when `gated` does — the resume send clears it |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Drawn only for an unattended Role pick and refused on any other session, since policies leave interactive sessions alone (§4.2); empty means nothing stops it (§6, TD-026) |
 | New session | **At** field | designed (TD-026, §6 *Start time*; built 2026-09-27 — TD-152): the start time the session waits for: `20:00` (the next one, in your clock), `+2h`, or an ISO time; empty means start now. Drawn and refused as **Until** is, and refused with an Until that is not after it; Start then creates a `scheduled` record and the Org shows its card with the *starts* note |
+| card / Focus header | **brief not sent** mark | display only (TD-336; designed 2026-10-05, not built — TD-339; §4.1 *No prose in the argv*): on a record whose `first_prompt_error` is set — the host agent typed the brief at the composer `FIRST_PROMPT_TRIES` times and the composer did not take it — *brief not sent · <the send's reason>* in the slot's words, amber, the same text `ao status -v` prints. The session is live and idle; the cure is a send (Focus, or `ao send` with the brief), and the mark goes when the record's first prompt is reported by `UserPromptSubmit`. A launch the tick made for a team (§6) carries the same mark, since the tick has no caller to hand the refusal to |
 | card / Focus header | **waiting** mark | display only (TD-271; designed 2026-10-02; built — TD-274; §4.9a *Waiting is read, never declared*). When the person inbox holds an open `ask` or `steer` from this session whose `about` names a reference, the slot's ending (§4.5 *The card's anatomy* row 5 (b)) gains the wait after the declaration where there is one — after its fixed words and before its reason, which the card cuts — after a closed or exited record's ending where it declared nothing, or stands alone where there is neither: *out of work · waiting on you: TD-222 until 09:57*, *waiting on you: TD-222* (an `ask` has no bound; two questions name the sooner bound and *and 1 more*), the question's first paragraph on hover; the Focus header carries the same words as a chip beside the *out of work* chip's place, and `ao status -v` prints them on the declaration's line. Read from the person inbox the page already holds, keyed by the entry's sender, never from a session's words; it leaves when the entry closes. A live team with a waiting member is not concluded, and its *not concluded* line names it (§6 rule 9; the help entry's words are TD-274's) |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line (TD-053). On a card it moves into the slot (TD-095): the fixed words, then the first line of the reason as text, clamped, the whole of it and the time of the declaration on hover — and no age of its own, since a card has one clock; the Focus header keeps the chip. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a). The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start by a run with nothing new done, or a `repeat` whenever it is asked (§4.9a *Early is decided from the record*), and a controller does not act on one — so it is drawn as wanting a person instead: the chip reads *restart wanted · early*, or *restart wanted · repeats TD-229* for a repeat, and the hover ends with the mark's `decided` words (TD-249 slice 6) |

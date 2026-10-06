@@ -90,9 +90,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
 | TD-335 | A team's stop time is drawn nowhere on the Org: a live team's member is a compact card with no *stops* note, and the team header has none | Low | Open — design-first |
-| TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Open |
+| TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-337 | Build the team card's **stops** note from `teams.<team>.until`, and the compact card's own only when its `run_until` differs, with *· wrapping up* once asked | Low | Open |
 | TD-338 | Inbox controls give no feedback: hover differs by button kind, a press shows nothing while it runs, and a board **Done** leaves its row standing ~10 s until the write-back returns | Medium | Open |
+| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Open |
 
 ---
 
@@ -1561,7 +1562,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-05 (the anchor, asked by Paul why cm-grind was idle)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open. contractmatch's side is fixed by its PR #122 (kills by executable); agentorc's is not.
+**Status:** **Designed 2026-10-05** (the designer; the shape — the brief typed at the composer, against the brief inside the system-prompt file with a fixed first prompt — steered to Paul): design §4.1 *No prose in the argv* (the start context as `launch/<tmux name>.context.md` named by the tool's file flag; the brief as `first_prompt` on the launch record, sent by the verified send at the record's first `idle`, three tries, then `first_prompt_error`), §4.2's `SessionStart` row (every launch lands at the composer), §4.3 (`--append-system-prompt-file`, hidden from `--help` and present in 2.1.290's binary; `LaunchSpec.first_prompt`), §4.5a *brief not sent* mark. The build is TD-339; this entry archives with it. Was: Open. contractmatch's side is fixed by its PR #122 (kills by executable); agentorc's is not.
+**Blocked by:** TD-339
 **Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`: the brief as the prompt positional, a start context as `--append-system-prompt`, both in argv), design §4.1 (*a session's brief rides in its argv*), §4.3
 
 **Why:** On 2026-10-05 at 23:07 UTC `grinder-cm-1`'s pane died with status 143 (SIGTERM) while it ran contractmatch's `frontend/scripts/run_ci_tests.sh`, which its brief tells it to run for anything integration-affecting. The script's cleanup runs `pkill -f chromedriver` and `pkill -f "chromium"`, which match a word anywhere in a process's command line. The launch puts the session's brief there (the prompt positional), and `docs/briefs/grinder-cm-1.md` names *Chromium + chromedriver*, so the cleanup killed the `claude` process running it. TD-026's work was left uncommitted, as an earlier run had left the same work. The briefs' standing rule (`docs/briefs/grinder-ao-1.md`: *never run a process-matching kill with a pattern that can match your own shell command line*) cannot help: the session does not see the kill, a script it was told to run does, and nothing says its own command line holds a few kilobytes of prose. Any repo, any script, any word the brief happens to use.
@@ -1618,3 +1620,24 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** on a scratch home every Inbox control shows the same hover and pressed state, a press disables its control and marks its row within one frame, a board **Done** takes its row out before the write-back returns and brings it back with the reason when the write-back is refused, and the UI check's screenshots show the hover, pressed and pending states.
 
 **Related (all archived):** TD-264 (the write-back), TD-255 (the board row's answers), TD-082 (the Inbox layout), TD-124 (the keys, which press the same controls).
+
+## TD-339: Build *No prose in the argv* — the start context by file, the brief typed at the composer
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-05 (the designer, TD-336's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`, `LaunchSpec`), `src/sessionorc/adapters.py` (`LaunchSpec.first_prompt`), `src/sessionorc/agent.py` (`create`: the launch record's `first_prompt`; the send path `rpc_send` uses, `SUBMIT_SECONDS`, `prompt-stuck`), `src/sessionorc/agent_tick.py` (the first send at the record's first `idle`, the retries, `first_prompt_error`), `src/sessionorc/models.py` (the record and launch-record fields), `src/sessionorc/paths.py` (`launch/`), `src/agentorc/ui/cards.py` and `templates/card.html` (the mark), `src/agentorc/cli.py` (`ao status -v`), `tests/` (the hook-stub adapter of `scripts/look_home.py`); design §4.1 *No prose in the argv*, §4.2's `SessionStart` row, §4.3, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads slice 2.
+
+**Why:** TD-336's design. A repo script's `pkill -f <word>` killed the session whose brief, riding in its argv, held the word.
+
+**Fix, in two slices, a PR each:**
+1. **The adapter** (`src/agentorc`). `launch` writes the start context to `launch/<tmux name>.context.md` (mode `0600`) and passes `--append-system-prompt-file <path>` in place of `--append-system-prompt <text>`; the prompt leaves argv and rides on `LaunchSpec.first_prompt`, so every launch is the no-prompt launch (`AGENTORC_AT_COMPOSER=1`, §4.2). The file is removed with the launch script when the record is forgotten. A test asserts no word of a brief or a start context is in the argv, and that the context file's text is the start context given.
+2. **The host agent** (`src/sessionorc`). `create` keeps `first_prompt` on the launch record and reports `working` only when a turn starts; on the record's first hook `idle` the tick sends it by the path `rpc_send` uses (bracketed paste, the composer must empty, `prompt-stuck`), writing `first_prompt_sent_at`; a refusal is tried again on the next idle tick, `FIRST_PROMPT_TRIES` (3), then `first_prompt_error` holds the reason; a `UserPromptSubmit` clears it. The card's *brief not sent · <reason>* mark and `ao status -v`'s line. A resume with a prompt, a restart, a Resume and a profile switch go the same way. Tests: a brief sent on the first idle and `working` after; a composer that never takes it marks the record after three tries and clears on a prompt; a launch with no brief marks nothing.
+3. **The press** (slice 2's PR, on a scratch home with `scripts/look_home.py`): a session whose brief names a word, then `pkill -f <that word>` from another pane — the session survives, and `ps -o args` on its pane's process shows no prose.
+
+**Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels (TD-336's *Done when*); then TD-336 archives with this entry.
+
+**Related:** TD-336 (the design), TD-283 (the start context on every launch), TD-027 (the verified send), TD-199 (a running member keeps its brief), contractmatch PR #122.
