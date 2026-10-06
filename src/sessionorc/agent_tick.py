@@ -3224,11 +3224,21 @@ class TickMixin:
         with contextlib.suppress(OSError):
             (paths.launch_dir() / f"{address}.json").unlink(missing_ok=True)
 
+    def _drop_context(self, conversation: str | None, gone: Session) -> None:
+        """A conversation's start-context file, once no record but `gone` holds it (§4.1 *No prose in
+        the argv*, TD-339): on Forget, and when a create replaces a record in place with another
+        conversation. A record still holding it would hand it again on a Resume."""
+        if not conversation or any(r.adapter_id == conversation for r in self.sessions.values() if r is not gone):
+            return
+        with contextlib.suppress(OSError, ValueError):
+            paths.context_file(conversation).unlink(missing_ok=True)
+
     def _forget(self, sid: str) -> None:
         gone = self.sessions.get(sid)
         if gone is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
         self._drop_launch(sid)  # the launch record goes with the record on Forget (§6)
+        self._drop_context(gone.adapter_id, gone)
         # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
         # every other holder of those asks — the askers — is told so. Done while it is still in the
         # map so `_mark` reaches it, harmlessly, along with the rest. A `steer` is the exception:

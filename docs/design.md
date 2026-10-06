@@ -214,15 +214,16 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   the home (`launch/<tmux name>.sh`, mode `0700`) that `exec`s it under `/bin/sh` — never the
   person's shell, no rc file — so the pane's first process is still the command itself and the
   limit that applies is the kernel's.
-- **No prose in the argv** (TD-336; designed 2026-10-05; the host agent's half built — TD-339 slice 2,
-  the adapter's slice 1 still to come, so a Claude Code launch still passes both texts). A session's argv
+- **No prose in the argv** (TD-336; designed 2026-10-05; built — TD-339 slices 2 and 1). A session's argv
   names the tool, its flags, its ids and paths — never its brief and never its start context.
   A process's command line is read by everything on the host — `ps`, `pgrep`, `pkill -f` — and
   on 2026-10-05 a repo script a member was told to run ended with `pkill -f chromium`, matched
   the word in the brief riding in that member's own argv, and killed the session running it; no
   rule in a brief can guard against a script the session does not read. So the two texts travel
   another way. **The start context is a file**: written under the home beside the launch script
-  (`launch/<tmux name>.context.md`, mode `0600`, removed with it when the record is forgotten) and
+  (`launch/<conversation id>.context.md`, mode `0600` — the tool's id, since the launch is asked for
+  before the tmux name is chosen — removed when the last record holding that conversation is
+  forgotten) and
   named by the tool's file flag (§4.3), at every launch of the conversation as before. **The brief
   is typed, not passed**: every launch lands at the composer (the no-prompt launch of §4.2, now the
   only kind), and the host agent sends the brief as the session's first prompt the way `ao send`
@@ -241,7 +242,11 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   `first_prompt_tries` and `first_prompt_error`, the tick's send on the host that holds the pane —
   into an empty composer, or Enter again on one still holding an earlier try's brief, never the text
   twice — the doorbell held off until the brief is typed, the send recorded in `sends` from `system`
-  as *(the brief)*, and the hook's `prompt` word on `UserPromptSubmit` clearing the mark.
+  as *(the brief)*, and the hook's `prompt` word on `UserPromptSubmit` clearing the mark. **Built**
+  (TD-339 slice 1): the Claude Code adapter writes the context file (`paths.context_file`) and names
+  it with `--append-system-prompt-file`, hands the prompt back as `LaunchSpec.first_prompt` and sets
+  `AGENTORC_AT_COMPOSER=1` on every launch but a resume, whose `source: resume` says it; a resume id
+  that is not a plain file name is refused.
 - `history-limit` is raised at creation; `pipe-pane` streams output to
   `~/.agentorc/runs/<session>-<created>.log` continuously (a reboot loses nothing that reached
   the pipe).
@@ -313,7 +318,7 @@ State transitions (Claude Code adapter):
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
 | `SessionStart` with `source: compact` (a compaction ends by firing it; a manual `/compact` fires nothing after) | no state change — the session is what it was, idle after a `/compact`, working mid-turn (TD-090) |
 | `SessionStart` with `source: resume` (`claude --resume` prints the conversation and waits at the composer; no `Stop` follows) | `idle` — a prompt given with the resume reports `working` through its own `UserPromptSubmit` (TD-155) |
-| `SessionStart` with `source: startup` (every launch lands at the composer since TD-336 — not built, TD-339; until then a launch with no prompt: `ao new` without one, the Add entry form's **Open a session** — the launch sets `AGENTORC_AT_COMPOSER=1` in the pane's environment, since the payload cannot say it) | `idle` — no turn follows the start, so no `Stop` would ever report it, and the person's own session read `working` with **→ Steer** until its first turn (TD-283). A launch with a brief reads `working` when the host agent's first send starts its turn (§4.1 *No prose in the argv*); until TD-339 lands, a launch with a prompt reads `working` on its start, its prompt running at once |
+| `SessionStart` with `source: startup` (every launch lands at the composer since TD-336, built TD-339 — the launch sets `AGENTORC_AT_COMPOSER=1` in the pane's environment, since the payload cannot say it) | `idle` — no turn follows the start, so no `Stop` would ever report it, and the person's own session read `working` with **→ Steer** until its first turn (TD-283). A launch with a brief reads `working` when the host agent's first send starts its turn (§4.1 *No prose in the argv*) |
 | `PreToolUse`, `PostToolUse` from inside a subagent (the tool sets `agent_id` only there) | no state change — a background agent runs on after its caller's `Stop`, and says nothing about the main composer (TD-201). So a permission a subagent's tool asks for, answered in the terminal rather than through **Allow** / **Deny** (which set `working` themselves), leaves the record `needs-you` with its old pending until the main thread's next event: the safer of the two errors, the other being a background agent wiping the main thread's question |
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
@@ -543,7 +548,7 @@ class Adapter(Protocol):
                                                       # the argv* — the flag is in the binary of 2.1.290 and its own
                                                       # Remote Control carrier uses it, though `--help` gives it no entry of
                                                       # its own — only `--bare`'s text names `--append-system-prompt[-file]`;
-                                                      # until TD-339 lands, `--append-system-prompt`), given
+                                                      # built, TD-339 slice 1), given
                                                       # again at every launch of the conversation, a resume included,
                                                       # since the tool keeps it in no file of the session's. The `prompt`
                                                       # is not argv's either: `LaunchSpec.first_prompt`, which the host

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 DEFAULT_HOME = Path("~/.agentorc")
@@ -38,6 +39,15 @@ def attachments_dir() -> Path:
 def launch_dir() -> Path:
     """Launch scripts for commands too long for tmux's own command line (`Tmux.new_session`)."""
     return home() / "launch"
+
+
+def context_file(conversation: str) -> Path:
+    """A conversation's start context, by file rather than in the argv (design §4.1 *No prose in the
+    argv*, TD-339): written by the adapter at each launch, removed with the last record holding it.
+    The id is the tool's, or a resume's as given: one that is not a plain file name is refused."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", conversation):
+        raise ValueError(f"conversation id {conversation!r} cannot name a file")
+    return launch_dir() / f"{conversation}.context.md"
 
 
 def remote_dir(host: str) -> Path:

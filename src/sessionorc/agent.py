@@ -902,7 +902,7 @@ class HostAgent(
                     name=name,
                     **({"start_context": start_context} if start_context else {}),
                 )
-            except (KeyError, ValueError) as e:
+            except (KeyError, ValueError, OSError) as e:  # OSError: the start context's file (TD-339)
                 raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
@@ -978,6 +978,8 @@ class HostAgent(
                 s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
             self.sessions[sid] = s
             self.store.save(s)
+            if isinstance(holder, Session) and holder.adapter_id != s.adapter_id:
+                self._drop_context(holder.adapter_id, holder)  # replaced in place, never forgotten
             self._remember_dir(directory)
             if resume:
                 await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
