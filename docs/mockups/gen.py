@@ -505,8 +505,10 @@ def team_desktop(team_first=False):
     GRID = "display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"
     WORDS = {"needs": "needs you", "stalled": "stalled?", "done": "closed"}
 
-    def group(title, sub, cards_html, needs=0, team=False, strip=""):
+    def group(title, sub, cards_html, needs=0, team=False, strip="", stops=""):
         flag = pill("needs", f"{needs} needs you") if needs else ""
+        # §4.5a **team card: stops note** (TD-335): the team's own `until`, once, on the live header
+        stop = f'<span class="meta" title="every member and seat stops here · Settings">· stops {stops}</span>' if stops else ""
         acts = ('<span style="flex-grow: 1;"></span><span class="btn sm ghost" title="the definition\'s members: add one, remove one (design §4.9, TD-163)">Members…</span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span><span class="btn sm ghost" title="About these controls — what each does, when you would press it, what it does not do (design §4.5a, TD-157)" style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>'
                 if team else "")
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
@@ -514,7 +516,7 @@ def team_desktop(team_first=False):
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
                 f'<div style="display: flex; align-items: center; gap: 10px;">'
                 f'<span style="font-weight: 600; font-size: 15px;">{title}</span>'
-                f'<span class="meta">{sub}</span>{flag}{acts}</div>'
+                f'<span class="meta">{sub}</span>{stop}{flag}{acts}</div>'
                 f'{strip}'
                 f'<div style="{GRID}">{cards_html}</div></div>')
 
@@ -573,7 +575,7 @@ def team_desktop(team_first=False):
                 counts[w] = counts.get(w, 0) + 1
         tally = " · ".join(f"{n} {w}" for w, n in counts.items())
         grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True, compact=team_first) for h, r, x in members), needs, team=True,
-                      strip=summary(team) if team_first else STRIPS.get(team, ""))
+                      strip=summary(team) if team_first else STRIPS.get(team, ""), stops="06:00" if team == "samscrape-grind" else "")
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
     for team, source, lead, live, repo in TEAMS:
