@@ -128,6 +128,7 @@ def view(
         "shadowed": {n: [str(f) for f in fs] for n, fs in org.shadowed.items()},
         "refused": dict(org.refused),
         "flows": flowdefs.visible(roots, org.roles),  # every flow the org can see here (§4.9c)
+        "roles": repoconfig.visible(roots),  # every role directory, the org's and the checkouts' (§4.9c, TD-313)
         "remainder": remainder(home),
         "held_elsewhere": elsewhere,
         "unread": unread,
@@ -230,6 +231,9 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     for f in flowdefs.visible(roots, org.roles):
         if not f["usable"] and not f.get("shadowed") and f["name"] not in listed:
             lack(f"flow {f['name']} ({f['source']}) is not usable — {'; '.join(f['problems'])}")
+    for r in repoconfig.visible(roots):  # a role directory that is not whole, or takes a preset's name
+        if not r["usable"] and not r.get("shadowed"):
+            lack(f"role {r['name']} ({r['source']}) is not usable — {'; '.join(r['problems'])}")
     for name in sorted(settings_mod.teams(settings or {})):
         if name not in org.teams and name not in org.refused:
             lack(

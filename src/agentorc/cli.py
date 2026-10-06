@@ -837,6 +837,11 @@ def cmd_org(args: argparse.Namespace) -> int:
         for f in got["flows"]:
             state = f.get("shadowed") or ("usable" if f["usable"] else "not usable — " + "; ".join(f["problems"]))
             print(f"flow {f['name']:<{fw}}  {state}  [{f['source']}]")
+        # every role directory (§4.9c, TD-313): the org's, then each registered repo's, a shadowed one said
+        rw = max((len(r["name"]) for r in got["roles"]), default=0)
+        for r in got["roles"]:
+            state = r.get("shadowed") or ("usable" if r["usable"] else "not usable — " + "; ".join(r["problems"]))
+            print(f"role {r['name']:<{rw}}  {state}  [{r['source']}]")
         rem = got["remainder"]
         history = "" if rem["tree"] else "  no history yet — `ao service install` makes it a work tree"
         print(f"{rem['home']}:{history}")
