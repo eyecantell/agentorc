@@ -2084,20 +2084,40 @@ def cmd_pr(args: argparse.Namespace) -> int:
         return fail(args, str(e), 1)
     paths = reviewmod.held_paths(files, setting)
     out = {"pr": args.n, "id": sid, "held": bool(paths), "review": setting, "paths": paths, "files": len(files)}
+    walked: dict[str, Any] | None = None
+    if paths and "chain" in setting:
+        # whose turn it is (§4.9c, TD-315 slice 4): the links that hold the PR, each where it stands
+        # from the home's `pr_reads`; a home that predates it, or will not say, leaves them unknown
+        links = []
+        for x in setting["chain"]:
+            if mine := reviewmod.held_paths(files, {"chain": [x]}):
+                links.append({**x, "paths": mine})
+        unread = ""
+        try:
+            asks = call_sync("pr_reads", id=sid, pr=args.n).get("asks") or []
+        except AgentUnavailable:
+            raise
+        except AgentError as e:  # an older home, or a reader not yet asked: its refusal is said
+            asks, unread = None, str(e)
+        walked = reviewmod.walk(links, asks)
+        out.update(walked, unread=unread)
 
     def prose() -> None:
         if not setting:
             print(f"PR #{args.n} is not held: {sid} has no review on its record, so it merges as the cadence says")
         elif not paths:
             print(f"PR #{args.n} is not held: none of its {len(files)} files is under {', '.join(setting['held'])}")
-        elif "chain" in setting:  # each link that holds the PR, in the flow's order (§4.9c, TD-315)
-            shown = ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
-            links = [x for x in setting["chain"] if reviewmod.held_paths(files, {"chain": [x]})]
-            order = ", then ".join(f"{x['reader']} ({x['stage']})" for x in links)
-            print(
-                f"PR #{args.n} is held for {order} (bound {setting['bound']}): {shown}\n"
-                f'ask the first: ao msg --kind ask --pr {args.n} <reader> "<your summary>"; the last merges'
-            )
+        elif walked is not None:  # each link that holds the PR, in the flow's order (§4.9c, TD-315)
+            n = len(walked["chain"])
+            print(f"PR #{args.n} is held by {n} reader{'' if n == 1 else 's'}, in order (bound {setting['bound']}):")
+            for row in walked["chain"]:
+                print(f"  {row['stage']} · {row['reader']} · {', '.join(row['held'])} · {_link_state(row, walked)}")
+            if out.get("unread"):
+                print(f"where each stands is not read: {out['unread']}")
+            elif walked["turn"] is None:
+                print(f"every reader has passed it — {walked['merges']} merges it")
+            elif not getattr(args, "id", None):
+                print(f'ask the first not passed: ao msg --kind ask --pr {args.n} <reader> "<your summary>"')
         else:
             shown = ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
             print(
@@ -2106,6 +2126,21 @@ def cmd_pr(args: argparse.Namespace) -> int:
             )
 
     return emit(args, out, prose)
+
+
+def _link_state(row: dict[str, Any], walked: dict[str, Any]) -> str:
+    """One link's standing in `ao pr held`'s words (§4.9c *Whose turn it is*): *passed 14:02*,
+    *asked 13:40*, *findings 13:55*, *your turn to ask*, *later*; the last link's *— it merges*."""
+    at = str(row.get("at") or "")
+    when = f" {at[11:16]} UTC" if len(at) >= 16 else ""
+    word = {
+        "passed": f"passed{when}",
+        "asked": f"asked{when}",
+        "findings": f"findings{when} — fix, and ask again on its thread",
+        "next": "your turn to ask",
+        "later": "later",
+    }.get(row["state"], "not read: the home did not say")
+    return word + (" — it merges" if row["reader"] == walked["merges"] and row is walked["chain"][-1] else "")
 
 
 def cmd_progress(args: argparse.Namespace) -> int:

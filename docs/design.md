@@ -6225,8 +6225,8 @@ the org file's overlay or its own `role.yml`. What a repo still repeats of the p
 its supplements — is TD-114's remaining cut, which this design widens to *the path, too*.
 
 **A review stage any seat may hold, and a PR read by more than one (TD-314; designed 2026-10-04,
-TD-315 builds it in slices: the first three built — the record's chain and the verdict, `pr_reads`,
-and the path sets, the stage and the compile; `ao pr held`'s chain and the words and the page not).** Paul (2026-10-04): *add/remove a review round*; *roles and
+TD-315 builds it in slices: the first four built — the record's chain and the verdict, `pr_reads`,
+the path sets, the stage and the compile, and `ao pr held`'s chain; the words and the page not).** Paul (2026-10-04): *add/remove a review round*; *roles and
 flows essentially orthogonal*. What TD-307 left to the techlead seat alone is opened here, and
 everything in this paragraph block is designed and not built. Where TD-307's text above speaks of
 the `techlead` seat as the review stage's — the stage's `role` bullet, *Every listed flow must be
@@ -6305,9 +6305,11 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   and times nothing; the check is still the author's own, and a session with the older `review`
   shape reads a chain of one. **Built** (TD-315 slice 2): `pr_reads` — each ask's `id`, `to`, `at`,
   `open`, and its last reply's `verdict` and `replied_at`, the asks oldest first, refused to any
-  other session; a mail read, so a node's session reads it over the link. `ao pr held`'s chain is
-  slice 4; until then it reads a chain's links that hold the PR in the flow's order, with no turn
-  (slice 3, since the compile writes chains).
+  other session; a mail read, so a node's session reads it over the link. **Built** (slice 4):
+  `ao pr held`'s chain — `review.walk` over the links that hold the PR and the author's asks, a
+  link's reader matched to an ask's addressee by the seat's name, the longest that fits
+  (`review.addressed`); a `pr_reads` that is refused (a reader not asked yet) or that an older home
+  does not know leaves each link *not read* and says why, with no turn, never a guess.
 - **The words.** The build stage's brief says *run `ao pr held <n>`; ask the reader it names; a PR
   with a link still to read is never yours to merge*, in place of naming `{techlead}`; a review
   stage's brief says how its reader answers — the verdict, and `ao pr held <n> --id <asker>` to

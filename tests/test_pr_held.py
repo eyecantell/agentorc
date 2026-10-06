@@ -97,11 +97,64 @@ def test_ao_pr_held_reads_a_flows_chain(monkeypatch, capsys):
     assert got["held"] == ["src/agentorc/ui/**", "src/sessionorc/**"] and got["chain"] == chain["chain"]
     _world(monkeypatch, chain, ["src/agentorc/ui/app.py", "src/sessionorc/agent.py"])
     assert cli.main(["pr", "held", "12"]) == 0
-    assert "is held for ui-reader-ao (ui-review), then techlead-ao (review)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "is held by 2 readers, in order (bound 2h)" in out
+    assert "  ui-review · ui-reader-ao · src/agentorc/ui/app.py · your turn to ask" in out
+    assert "  review · techlead-ao · src/sessionorc/agent.py · later — it merges" in out
     _world(monkeypatch, chain, ["src/sessionorc/agent.py"])
     assert cli.main(["pr", "held", "12"]) == 0
     out = capsys.readouterr().out
-    assert "is held for techlead-ao (review)" in out and "ui-reader" not in out
+    assert "held by 1 reader" in out and "your turn to ask — it merges" in out and "ui-reader" not in out
+
+
+def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
+    # §4.9c *Whose turn it is* (TD-315 slice 4): each link's state from the author's asks, the
+    # first not passed its turn, the last its merger; a reader asks with `--id <the asker>`
+    links = [
+        {"stage": "ui-review", "reader": "ui-reader-ao", "paths": ["src/agentorc/ui/app.py"]},
+        {"stage": "review", "reader": "techlead-ao", "paths": ["src/sessionorc/agent.py"]},
+    ]
+
+    def ask(to, verdict=None, at="2026-10-05T13:40:00Z", replied="2026-10-05T14:02:00Z"):
+        return {"id": "m", "to": [to], "at": at, "open": verdict is None, "verdict": verdict,
+                "replied_at": replied if verdict else None}  # fmt: skip
+
+    def states(asks):
+        got = reviewmod.walk(links, asks)
+        return [r["state"] for r in got["chain"]], got["turn"], got["merges"]
+
+    assert states([]) == (["next", "later"], "ui-reader-ao", "techlead-ao")
+    assert states([ask("ao-agentorc-ui-reader-ao")]) == (["asked", "later"], "ui-reader-ao", "techlead-ao")
+    assert states([ask("ao-agentorc-ui-reader-ao", "findings")])[0] == ["findings", "later"]
+    passed = ask("ao-agentorc-ui-reader-ao@node1", "pass")
+    assert states([passed]) == (["passed", "next"], "techlead-ao", "techlead-ao")
+    assert states([passed, ask("ao-agentorc-techlead-ao", "merged")]) == (["passed", "passed"], None, "techlead-ao")
+    # an ask asked again after findings: the newest counts
+    again = [ask("ao-agentorc-ui-reader-ao", "findings"), ask("ao-agentorc-ui-reader-ao")]
+    assert states(again)[0] == ["asked", "later"]
+    # a home that did not say: unknown, never a guess
+    assert states(None)[0] == ["unknown", "unknown"]
+    assert reviewmod.addressed("ao-agentorc-other-ui-reader-aox", ["ui-reader-ao"]) is None
+    # a seat name that ends another's is never taken for it (the review of slice 4)
+    assert reviewmod.addressed("ao-agentorc-ui-reader", ["reader", "ui-reader"]) == "ui-reader"
+    assert reviewmod.addressed("ao-agentorc-reader@node1", ["reader", "ui-reader"]) == "reader"
+    # a PR one link holds: an ask to another reader is not its read
+    one = [links[1]]
+    assert reviewmod.walk(one, [passed])["chain"][0]["state"] == "next"
+    assert reviewmod.walk(one, [passed], older=True)["chain"][0]["state"] == "passed"  # the older shape: any ask
+    assert reviewmod.walk(links, None)["turn"] is None
+    # the command, with the home's reads
+    chain = {"chain": [{"stage": x["stage"], "reader": x["reader"], "held": x["paths"]} for x in links], "bound": "2h"}
+    _world(monkeypatch, chain, ["src/agentorc/ui/app.py", "src/sessionorc/agent.py"])
+    base = cli.call_sync
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"asks": [passed]} if m == "pr_reads" else base(m, **kw))
+    assert cli.main(["--json", "pr", "held", "12"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["turn"] == "techlead-ao" and got["merges"] == "techlead-ao" and got["unread"] == ""
+    assert [r["state"] for r in got["chain"]] == ["passed", "next"]
+    assert cli.main(["pr", "held", "12"]) == 0
+    out = capsys.readouterr().out
+    assert "ui-reader-ao · src/agentorc/ui/app.py · passed 14:02 UTC" in out and "your turn to ask — it merges" in out
 
 
 # -- the page half (design §4.5a *PRs waiting*, TD-093 slice 3) --------------------------------------
