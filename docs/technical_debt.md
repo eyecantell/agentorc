@@ -89,9 +89,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Open |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
-| TD-335 | A team's stop time is drawn nowhere on the Org: a live team's member is a compact card with no *stops* note, and the team header has none | Low | Open — design-first |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
-| TD-337 | Build the team card's **stops** note from `teams.<team>.until`, and the compact card's own only when its `run_until` differs, with *· wrapping up* once asked | Low | Open |
 | TD-338 | Inbox controls give no feedback: hover differs by button kind, a press shows nothing while it runs, and a board **Done** leaves its row standing ~10 s until the write-back returns | Medium | Designed 2026-10-05 (one look for every control; a press marks its row pending and takes it out at once; the toast waits for the landing) — the build is TD-340 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Open |
 | TD-340 | Build *A control answers the press*: one hover, pressed and focus look for every `.btn`; the **pending** mark; a row taken out on the press, the waiting toast, the row back on a refusal | Medium | Open |
@@ -1537,25 +1535,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
 
-## TD-335: A team's stop time is drawn nowhere on the Org — a live team's member card is compact, with no *stops* note
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (grinder-ao-1, pressing TD-297 on a scratch home)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-05** (the designer, PR #1136; the choice of the header over a note on every member's card steered to Paul): design §4.5a *Org — team card: **stops** note* (a live team's `teams.<team>.until` on the header's second line, once, by the card's formatter; gone when cleared or past; nothing on a team with nothing live, whose slot is the *starts* note's), the *card / Focus header — **stops** note* and *card: compact* rows and §4.5 screen 1's compact bullet (a member's compact card draws *· stops <t>* only when its `run_until` differs from the team's, and *· wrapping up* once asked); mockup `Main.dc.html` (samscrape-grind's header). The build is TD-337; this entry archives with it. Was: Open. Seen 2026-10-05 on a scratch home (`scripts/look_home.py`): `set_settings teams.lk.until` two hours out, an unattended shell session in team `lk`; the tick gave the record the team's instant (`run_until`), the `/api/sessions` view carries `stop_note: stops 20:56`, and Focus's header draws **stops 20:56** — but the Org draws it nowhere. A member of a team is the **compact** card (a live team's, and a team's with nothing live once unfolded: `repo.compact_in`) (§4.5a *card: compact*, TD-176 slice 3), whose spec lists the name, the pill, one line of its own and the foot, and no *stops* note; `card.html`'s compact branch draws none; and the team header (`group_head.html`) has no stop time either. §4.5a's row *card / Focus header — **stops** note* says a card shows it whenever something will stop the session, and the Settings look of 2026-09-27 (TD-148, archived) expected *its members' cards should show the stops note*. Which one is meant is a design call, so the designer's: the compact card's one line, a header note (*stops 20:56* once for the team), or §4.5a's row narrowed to the full card.
-**Blocked by:** TD-337
-**Location:** design §4.5a *card: compact* and the **stops** note row, §4.5 screen 1 (the team summary); `src/agentorc/ui/templates/card.html` (compact branch), `src/agentorc/ui/templates/group_head.html`, `src/agentorc/ui/cards.py` (`stop_note`), `src/agentorc/ui/org.py` (`compact_line`), `src/agentorc/ui/repo.py` (`compact_in`)
-
-**Why:** a person who sets a team's stop time on Settings sees it on no Org card, only by opening a member's Focus.
-
-**Fix:** the designer settles where a live team's stop time is drawn on the Org and words it in §4.5a; the build follows.
-
-**Done when:** on a scratch home, a team with a stop time shows it on the Org where §4.5a says.
-
-**Related:** TD-297 (where it was seen), TD-146 and TD-148 (the team stop time and its Settings card), TD-176 (the compact card).
-
 ## TD-336: A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word
 
 **Priority:** High
@@ -1574,28 +1553,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels.
 
 **Related:** TD-283 (archived: the start context on every launch), contractmatch PR #122.
-
-## TD-337: Build the team card's **stops** note, and the compact card's own only when it differs
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-05 (the designer, TD-335's build)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/org.py` (the group head's notes; `compact_line`), `src/agentorc/ui/templates/group_head.html` (the second line, beside `balance_note` and `work_started`), `src/agentorc/ui/templates/card.html` (the compact branch), `src/sessionorc/models.py` (`stop_note`, which `cards.py` imports), `src/agentorc/ui/help.py` and `tests/test_help.py` (the team card's help, if its paragraph names the notes), `tests/test_ui.py`; design §4.5a *team card: stops note*, *card: compact*, the **stops** note row, §4.5 screen 1, §6 *Team stop time*, §5 `teams.<team>.until`
-
-**Why:** TD-335's design. A person who sets a team's stop time on Settings sees it on no Org card.
-
-**Fix:**
-1. The group head reads the team's `until` (§5 `teams.<team>.until`; `None` when absent, cleared or past) the way it gets `balance` and `work` — carried on the home's `host` reading, or passed from the page's `settings` call (`call("settings")`, `app.py`); the Org's group builder (`ui/repo.py`) takes no settings read today and, on a live team, draws *stops <t>* on the header's second line by `stop_note`'s formatter — the same words as the card's, *stops 06:00* / *stops Mon 06:00* — with the tooltip §4.5a gives; nothing on a team with nothing live. Re-rendered with the header on every delta, as the other notes are, so a Settings press shows without a reload.
-2. The compact card's one line (`compact_line`) appends *· stops <t>* only when the record's `run_until` differs from the team's instant, and *· wrapping up* when `wrapup_sent_at` is set; the full card keeps its note as it is.
-3. If the team card's help paragraph (§4.5a *The help text*, `ui/help.py`) lists the header's notes, add the *stops* note to it there and in the design in the same PR, since `tests/test_help.py` holds the two together.
-4. Tests: a live team with `until` draws the note on the header and on no matching member; a member whose `run_until` differs draws its own; a team with nothing live and an `until` draws none; a past or cleared `until` draws none.
-
-**Done when** on a scratch home, `set_settings teams.<team>.until` two hours out puts *stops <t>* on the live team's header, and `ao until <member> +1h` puts *· stops <t>* on that member's compact card alone (TD-335's *Done when*); then TD-335 archives with this entry.
-
-**Related:** TD-335 (the design), TD-146 (the team stop time), TD-176 (the compact card), TD-026 (the *starts* note, the same slot on a team with nothing live), TD-297 (where it was seen).
 
 ## TD-338: Inbox controls give no feedback — hover differs by button kind, a press shows nothing while it runs, and a row waits on the server before it moves
 

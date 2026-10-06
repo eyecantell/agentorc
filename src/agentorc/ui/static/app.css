@@ -220,6 +220,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .helppanel { flex-basis: 100%; margin: 4px 0 0; max-width: 90ch; } .helppanel[hidden] { display: none; }
 .ghead .overline { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* **over its line** (§4.5a, TD-239): amber, display only */
 .ghead .notconcluded { flex-basis: 100%; white-space: normal; }  /* its own line under the header */
+.ghead .stopsnote { flex-basis: 100%; }  /* **stops** (§4.5a, TD-337): the team's stop time, its own line */
 .ghead .flowcannot { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* *cannot be followed* (§4.5a, §4.9c): its own line */
 .ghead .flowpick { width: auto; flex: none; height: 26px; display: inline-block; }  /* the **Flow** pick (§4.5a, TD-309): inline, beside the strip */
 .ghead .flowchanged { color: var(--needs-fg); }  /* *flow changed* beside its Apply (§4.5a, TD-309) */

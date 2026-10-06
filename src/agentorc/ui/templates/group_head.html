@@ -87,6 +87,10 @@
 {#- design §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark in its own numbers,
     amber, display only — the line is moved on the Settings page #}
 {% if g.balance_note %}<div class="meta overline" title="its members take no new claim until it clears · Settings">{{ g.balance_note }}</div>{% endif %}
+{#- design §4.5a team card **stops** note (§6 *Team stop time*, TD-337): a live team's own stop time,
+    `teams.<team>.until`, by the card's stops formatter — once here, and on a member's compact line
+    only where its own differs; display only, the time is moved on the Settings page #}
+{% if g.stops_note %}<div class="meta stopsnote" title="every member and seat stops here · Settings">{{ g.stops_note }}</div>{% endif %}
 {#- …and on a live team the start the rule made (§4.5a **work waiting** note): the header's second line #}
 {% if g.work_started %}<div class="meta workstarted" title="the home started this team because its lanes gained work while it was wound down (design §6 rule 8, on_work: start)">started <span class="localtime" data-at="{{ g.work_started.at }}">{{ g.work_started.age ~ ' ago' if g.work_started.age else g.work_started.at }}</span>{% if g.work_started.first %} for {{ g.work_started.first }}{% if g.work_started.more %} and {{ g.work_started.more }} more{% endif %}{% endif %}{% if g.work_started.failed %}<span class="warn" title="a replay that failed is on that record's restarts entry, with its error (ao status -v); Start on its card, or the team's Start once it winds down, brings it back"> · {{ g.work_started.n }} of {{ g.work_started.of }} records started — {{ g.work_started.failed | join(', ') }} did not</span>{% endif %}</div>{% endif %}
 {% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{#- **who for what** (§4.8, TD-171) is in the panel, not on the header (TD-252) #}{{ hm2.panel('team', 'team-' ~ g.team, g.who) }}{% endif %}

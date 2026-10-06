@@ -16,8 +16,10 @@ from agentorc import repoconfig, review, teamrun, teams
 from sessionorc import mail
 from sessionorc.models import (
     has_control,
+    stop_note,
 )
 
+from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
 from .common import _age, host_name
 from .inbox import work_note, work_started
@@ -344,6 +346,9 @@ def team_groups(
                 "work_started": work_started(crew) if live and team != NO_TEAM else None,
                 # §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark, display only
                 "balance_note": teamrun.balance_note(marks[team]) if live and team in marks else "",
+                # §4.5a team card **stops** note (§6 *Team stop time*, TD-337): the team's own setting,
+                # on a live team alone — a team with nothing live has the *starts* note's slot
+                "stops_note": stop_note({"run_until": until}) if live and (until := uiconf.team_until(team)) else "",
                 # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
                 # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
                 # since a wind-down would only wake the manager to find nothing to wind down

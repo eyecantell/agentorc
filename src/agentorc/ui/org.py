@@ -12,8 +12,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sessionorc.models import stop_note
 from sessionorc.reports import branch_ref
 
+from . import uiconf
 from .cards import DEAD
 from .common import _age, _instant, _short_age
 from .inbox import NEEDS_YOU_ROWS, state_kind
@@ -354,4 +356,16 @@ def compact_line(v: dict[str, Any]) -> str:
             what = str(doing)
         else:
             what = ""
-    return " · ".join(x for x in (role, what) if x)
+    return " · ".join(x for x in (role, what, *_own_stop(v)) if x)
+
+
+def _own_stop(v: Mapping[str, Any]) -> tuple[str, str]:
+    """A live member's stop time on its compact line (§4.5a *card: compact*, *team card: stops note*,
+    TD-337): *stops <t>* only where its `run_until` reads differently from its team's — the team's is on the
+    header, once — and *wrapping up* once the host agent has asked it, which is each record's own."""
+    if v.get("state") in DEAD:
+        return "", ""
+    # compared as drawn: a stamp a second off the team's reads the same, and the header already says it
+    own = stop_note({"run_until": v.get("run_until")})
+    team = stop_note({"run_until": uiconf.team_until(str(v.get("team") or ""))})
+    return (own if own != team else "", "wrapping up" if v.get("wrapup_sent_at") else "")
