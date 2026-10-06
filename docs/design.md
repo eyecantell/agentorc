@@ -223,7 +223,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   another way. **The start context is a file**: written under the home beside the launch script
   (`launch/<conversation id>.context.md`, mode `0600` — the tool's id, since the launch is asked for
   before the tmux name is chosen — removed when the last record holding that conversation is
-  forgotten) and
+  forgotten, or replaced in place by a create of another conversation) and
   named by the tool's file flag (§4.3), at every launch of the conversation as before. **The brief
   is typed, not passed**: every launch lands at the composer (the no-prompt launch of §4.2, now the
   only kind), and the host agent sends the brief as the session's first prompt the way `ao send`
