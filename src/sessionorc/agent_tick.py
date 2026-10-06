@@ -3229,6 +3229,12 @@ class TickMixin:
         if gone is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
         self._drop_launch(sid)  # the launch record goes with the record on Forget (§6)
+        if gone.adapter_id and not any(
+            r.adapter_id == gone.adapter_id for r in self.sessions.values() if r is not gone
+        ):
+            # its start context's file, once no record holds the conversation (§4.1 *No prose in the argv*)
+            with contextlib.suppress(OSError, ValueError):
+                paths.context_file(gone.adapter_id).unlink(missing_ok=True)
         # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
         # every other holder of those asks — the askers — is told so. Done while it is still in the
         # map so `_mark` reaches it, harmlessly, along with the rest. A `steer` is the exception:

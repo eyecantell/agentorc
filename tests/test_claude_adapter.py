@@ -242,11 +242,12 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     spec = ad.launch(profile="", resume=None, prompt="do it", unattended=False, cwd=tmp_path, name="t1")
     assert spec.argv[0] == "claude" and "--settings" in spec.argv and "--session-id" in spec.argv
     assert spec.adapter_id and uuid.UUID(spec.adapter_id)
-    assert spec.argv[-1] == "do it" and "--model" in spec.argv and "--name" in spec.argv
+    assert spec.first_prompt == "do it" and "--model" in spec.argv and "--name" in spec.argv
+    assert not any("do it" in a for a in spec.argv)  # typed at the composer, never passed (TD-339)
     assert "CLAUDE_CONFIG_DIR" not in spec.env or spec.env["CLAUDE_CONFIG_DIR"].endswith(".claude")
     assert spec.env["AGENTORC_PERMISSION_WAIT"] == "600"
     assert "AGENTORC_PROFILE" not in spec.env  # read by nothing (TD-149 (8)); the record carries the profile
-    assert AT_COMPOSER_ENV not in spec.env  # a prompt runs at once: its start is `working` (TD-283)
+    assert spec.env[AT_COMPOSER_ENV] == "1"  # every launch lands at the composer, its brief typed there (TD-339)
     bare = ad.launch(profile="", resume=None, prompt=None, unattended=False, cwd=tmp_path)
     assert bare.env[AT_COMPOSER_ENV] == "1"
     hooks_path = Path(spec.argv[spec.argv.index("--settings") + 1])
@@ -262,7 +263,7 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert g_layer["crossSessionInbound"] == "refuse"
     assert "crossSessionInbound" not in json.loads(hooks_path.read_text())
     dashed = ad.launch(profile="", resume=None, prompt="-1 is the answer", unattended=False, cwd=tmp_path)
-    assert dashed.argv[-2:] == ["--", "-1 is the answer"]
+    assert dashed.first_prompt == "-1 is the answer" and "--" not in dashed.argv
     with pytest.raises(KeyError, match="unknown profile"):
         ad.launch(profile="nope", resume=None, prompt=None, unattended=False, cwd=tmp_path)
     # the account a profile runs under, for the once-per-account usage poll (§4.2a, TD-122)

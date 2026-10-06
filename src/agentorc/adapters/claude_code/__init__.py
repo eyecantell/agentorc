@@ -447,11 +447,25 @@ def _turn(line: bytes, source: str, offset: int) -> dict | None:
     }
 
 
+def write_context_file(conversation: str, text: str) -> Path:
+    """The start context as the file `--append-system-prompt-file` names (design §4.1 *No prose in the
+    argv*, TD-339): under the home beside the launch scripts, owner-only, rewritten at each launch of
+    the conversation and removed with the last record that holds it."""
+    path = paths.context_file(conversation)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8", errors="surrogateescape") as f:
+        f.write(text)
+    os.chmod(path, 0o600)
+    return path
+
+
 class ClaudeCodeAdapter:
     name = "claude-code"
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
-    start_context = True  # `--append-system-prompt`, given at every launch of the conversation (§4.3, TD-283)
+    start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self.binary = binary or "claude"
@@ -484,18 +498,16 @@ class ClaudeCodeAdapter:
             argv += prof.unattended_args or ["--dangerously-skip-permissions"]
         if start_context:
             # the system prompt's tail, not a turn: the tool keeps it in no file of the session's, so
-            # a resume is handed it again (design §4.3, TD-283)
-            argv += ["--append-system-prompt", start_context]
-        if prompt:
-            if prompt.startswith("-"):
-                argv.append("--")  # a pasted brief that starts with '-' is a prompt, not an option
-            argv.append(prompt)
+            # a resume is handed it again (design §4.3, TD-283) — by file, never as prose in the argv,
+            # which every `pkill -f` on the host reads (design §4.1 *No prose in the argv*, TD-339)
+            argv += ["--append-system-prompt-file", str(write_context_file(adapter_id, start_context))]
         env = {"AGENTORC_PERMISSION_WAIT": str(prof.permission_wait)}
-        if not prompt and not resume:
-            env[AT_COMPOSER_ENV] = "1"  # no turn follows the start: `startup` reads idle (TD-283)
+        if not resume:
+            env[AT_COMPOSER_ENV] = "1"  # every launch lands at the composer: `startup` reads idle (TD-283, TD-339)
         if prof.config_dir:
             env["CLAUDE_CONFIG_DIR"] = str(prof.config_dir)
-        return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id)
+        # the prompt is typed at the composer by the host agent at the first idle, never passed (TD-339)
+        return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None)
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
         m = self.explain(tail)

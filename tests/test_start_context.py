@@ -98,6 +98,23 @@ async def test_the_launch_record_keeps_it_so_a_restart_launches_with_it(agent, c
         await c.call("kill", id=again["id"])
 
 
+async def test_the_context_file_goes_with_the_last_record_holding_the_conversation(agent, ctxstub, tmp_path):
+    # design §4.1 *No prose in the argv* (TD-339): removed when the record is forgotten, but never from
+    # under another record of the same conversation, whose Resume would hand it again
+    async with LocalClient() as c:
+        a = await c.call("create", name="a", dir=str(tmp_path), adapter="ctxstub", resume="cc-9", start_context="t")
+        await c.call("kill", id=a["id"])
+        b = await c.call("create", name="b", dir=str(tmp_path), adapter="ctxstub", resume="cc-9")
+        told = paths.context_file("cc-9")
+        told.parent.mkdir(parents=True, exist_ok=True)
+        told.write_text("t")
+        await c.call("remove", id=a["id"])
+        assert told.is_file()  # `b` still holds the conversation
+        await c.call("kill", id=b["id"])
+        await c.call("remove", id=b["id"])
+        assert not told.exists()
+
+
 @pytest.mark.unit
 def test_claude_code_carries_it_as_the_system_prompts_tail(tmp_path, monkeypatch):
     from agentorc.adapters.claude_code import AT_COMPOSER_ENV, ClaudeCodeAdapter
@@ -108,12 +125,18 @@ def test_claude_code_carries_it_as_the_system_prompts_tail(tmp_path, monkeypatch
     ad = ClaudeCodeAdapter(binary="claude")
     assert ad.start_context is True
     spec = ad.launch(profile="", resume=None, prompt=None, unattended=False, cwd=tmp_path, start_context="told")
-    i = spec.argv.index("--append-system-prompt")
-    assert spec.argv[i + 1] == "told" and spec.argv[-1] == "told"  # no prompt follows it
+    # by file, never as prose in the argv (design §4.1 *No prose in the argv*, TD-339)
+    told = Path(spec.argv[spec.argv.index("--append-system-prompt-file") + 1])
+    assert told == tmp_path / "home" / "launch" / f"{spec.adapter_id}.context.md"
+    assert told.read_text() == "told" and told.stat().st_mode & 0o777 == 0o600
+    assert "told" not in spec.argv and "--append-system-prompt" not in spec.argv
     assert spec.env[AT_COMPOSER_ENV] == "1"  # still at the composer: no turn runs for it
-    resumed = ad.launch(profile="", resume="abc", prompt="-go", unattended=False, cwd=tmp_path, start_context="told")
-    assert resumed.argv[resumed.argv.index("--append-system-prompt") + 1] == "told"
-    assert resumed.argv[-2:] == ["--", "-go"]  # the prompt still comes last
+    resumed = ad.launch(profile="", resume="abc", prompt="-go", unattended=False, cwd=tmp_path, start_context="again")
+    path = Path(resumed.argv[resumed.argv.index("--append-system-prompt-file") + 1])
+    assert path.name == "abc.context.md" and path.read_text() == "again"
+    assert resumed.first_prompt == "-go" and "-go" not in resumed.argv  # typed at the composer
+    with pytest.raises(ValueError, match="cannot name a file"):
+        ad.launch(profile="", resume="../x", prompt=None, unattended=False, cwd=tmp_path, start_context="told")
     bare = ad.launch(profile="", resume=None, prompt=None, unattended=False, cwd=tmp_path)
-    assert "--append-system-prompt" not in bare.argv
+    assert "--append-system-prompt-file" not in bare.argv and bare.first_prompt is None
     assert Path(spec.argv[spec.argv.index("--settings") + 1]).is_file()
