@@ -43,3 +43,4 @@
 - [Designer run lessons 2026-10-04](designer-run-lessons-2026-10-04.md) — a history line goes above a section's newest lines, never at its tail; re-check the build number at the merge; no checkout while a reviewer reads the worktree
 - [Memory edits block auto promote](memory-edits-block-auto-promote.md) — a memory write lands uncommitted in the main checkout and auto promote refuses a dirty checkout; land it by PR
 - [Read the claim's reply](read-the-claims-reply.md) — `ao progress claim` can be refused; never send it to /dev/null, check your record before the first step (TD-152 pressed twice, 2026-10-05)
+- [Designer run lessons 2026-10-05](designer-run-lessons-2026-10-05.md) — a steer's first paragraph is warned past ~100 words (read the reply past the warning line); the manager seat may hold no session; a fact-check by commit ref frees the worktree
