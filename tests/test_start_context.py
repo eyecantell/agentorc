@@ -113,6 +113,13 @@ async def test_the_context_file_goes_with_the_last_record_holding_the_conversati
         await c.call("kill", id=b["id"])
         await c.call("remove", id=b["id"])
         assert not told.exists()
+        # a create under a held name replaces its record in place, never forgetting it: the old
+        # conversation's file goes there (review of PR #1147)
+        old = await c.call("create", name="c", dir=str(tmp_path), adapter="ctxstub", resume="cc-7", start_context="t")
+        paths.context_file("cc-7").write_text("t")
+        await c.call("kill", id=old["id"])
+        new = await c.call("create", name="c", dir=str(tmp_path), adapter="ctxstub", resume="cc-8", start_context="u")
+        assert new["id"] == old["id"] and not paths.context_file("cc-7").exists()
 
 
 @pytest.mark.unit
