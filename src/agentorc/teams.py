@@ -439,7 +439,8 @@ def flow_for(
         return None
     if read is not None and flow.place == "org":  # another host's team: an org flow is not followable there
         return None
-    return flowdefs.under(flow, role, techlead=techlead, held=cfg.held or ())
+    links = flowdefs.review_links(flow, cfg, _readers(team), techlead)
+    return flowdefs.under(flow, role, techlead=techlead, held=cfg.held or (), links=links)
 
 
 def brief_ids(
@@ -826,7 +827,10 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     if under is not None:
         member_stage = stage is not None and not stage.review and not lead and not seat
         review = under.reader if member_stage else None
-    told = flowdefs.under(under.flow, role.name, techlead=techlead, held=under.held) if under is not None else None
+    told = None
+    if under is not None:  # `{flow}` draws every review stage with its seat and its paths (§4.9c, TD-315)
+        links = flowdefs.review_links(under.flow, under.cfg, under.readers, techlead)
+        told = flowdefs.under(under.flow, role.name, techlead=techlead, held=under.held, links=links)
     grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
     # Profile precedence (§4.9 "Roles gain a profile"), lowest first: the package's built-ins,
     # `org.yml`'s `roles:` and the repo's `.agentorc.yml` (those three inside `resolve_role`), the

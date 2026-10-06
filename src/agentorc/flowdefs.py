@@ -400,18 +400,28 @@ def strip(flow: Flow, *, techlead: str = "") -> str:
     return " → ".join([st.name for st in flow.stages] + [f"you, {route}"])
 
 
-def path_line(flow: Flow, role: str | None, *, techlead: str = "", held: Collection[str] = ()) -> str:
+def path_line(
+    flow: Flow,
+    role: str | None,
+    *,
+    techlead: str = "",
+    held: Collection[str] = (),
+    links: Mapping[str, tuple[str, Collection[str]]] | None = None,
+) -> str:
     """The `{flow}` text a member of `role` is told (§4.9c item 5): the stages in order by role, its
-    own stage marked, the review stage by its seat's id and the paths held, and the person last with
+    own stage marked, each review stage by its seat and the paths it holds, and the person last with
     how the team's questions get there — *td: design (designer) → **build** (grinder) → review
-    (techlead-ao-1, on src/sessionorc/**) → you, through techlead-ao-1.* No member's id is in it, so a
-    member added or removed changes no sibling's brief. A role with no stage reads *you stand
-    outside it*."""
+    (techlead-ao-1, on src/sessionorc/**) → you, through techlead-ao-1.* `links` gives a review
+    stage, by its name, its seat and its paths (TD-315: *ui-review (ui-reader-ao-1, on
+    src/agentorc/ui/**)*); a stage it does not name reads the techlead and `held`, as one stage did.
+    No member's id is in it, so a member added or removed changes no sibling's brief. A role with no
+    stage reads *you stand outside it*."""
     parts = []
     for st in flow.stages:
         who = st.role
         if st.review:
-            who = ", on ".join(x for x in (techlead or st.role, ", ".join(held)) if x)
+            seat, paths = (links or {}).get(st.name) or (techlead or st.role, held)
+            who = ", on ".join(x for x in (seat, ", ".join(paths)) if x)
         word = f"**{st.name}**" if st.role == role else st.name
         parts.append(f"{word} ({who})")
     route = f"through {techlead}" if techlead else "directly"
@@ -421,10 +431,32 @@ def path_line(flow: Flow, role: str | None, *, techlead: str = "", held: Collect
     return text
 
 
-def under(flow: Flow, role: str | None, *, techlead: str = "", held: Collection[str] = ()) -> repoconfig.UnderFlow:
+def under(
+    flow: Flow,
+    role: str | None,
+    *,
+    techlead: str = "",
+    held: Collection[str] = (),
+    links: Mapping[str, tuple[str, Collection[str]]] | None = None,
+) -> repoconfig.UnderFlow:
     """What `Role.compose` fills a member of `role` started under `flow` with: the `{flow}` line and
     its stage's brief for `{stage}` — none for a role the flow gives no stage."""
     stage = flow.stage_of(role) if role else None
     return repoconfig.UnderFlow(
-        text=path_line(flow, role, techlead=techlead, held=held), stage=stage.path if stage else None
+        text=path_line(flow, role, techlead=techlead, held=held, links=links), stage=stage.path if stage else None
     )
+
+
+def review_links(
+    flow: Flow, cfg: repoconfig.RepoConfig | None, readers: Mapping[str, str], techlead: str = ""
+) -> dict[str, tuple[str, list[str]]]:
+    """Each review stage of `flow` by its name, with the seat that reads it and the paths it holds in
+    `cfg`'s repo, for `{flow}` (§4.9c *The words*, TD-315): the techlead stage's seat `techlead` where
+    given, any other its seat's name from `readers` (role → name), else the role; its paths its set's,
+    or every held path."""
+    out: dict[str, tuple[str, list[str]]] = {}
+    for st in flow.review_stages:
+        seat = (techlead if st.role == REVIEW_ROLE else "") or readers.get(st.role) or st.role
+        paths = (repoconfig.held_for(cfg, st.held) if cfg is not None else None) or []
+        out[st.name] = (seat, list(paths))
+    return out

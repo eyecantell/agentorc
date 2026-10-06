@@ -304,12 +304,16 @@ def test_under_a_flow_a_member_reads_its_path_line_and_its_stage_brief():
         "docs/briefs/**) → you, through ao-r-techlead-1."
     )
     assert flowdefs.path_line(td, "manager").endswith("→ you, directly. You stand outside it.")
+    links = {"review": ("techlead-ao-1", ["src/sessionorc/**"])}
+    assert "review (techlead-ao-1, on src/sessionorc/**)" in flowdefs.path_line(td, "grinder", links=links)
     cfg = repoconfig.RepoConfig()
     text, made = repoconfig.resolve_role(cfg, "grinder").compose(
         techlead="ao-r-techlead-1", flow=flowdefs.under(td, "grinder", techlead="ao-r-techlead-1", held=held)
     )
     assert f"**This team's flow:** {line}" in text
-    assert "A `design-first` entry is the design stage's" in text and "ask --pr <n> ao-r-techlead-1" in text
+    assert "A `design-first` entry is the design stage's" in text
+    # §4.9c *The words* (TD-315): the build brief asks the reader `ao pr held` names, not the techlead by id
+    assert "ask the reader it names" in text and "A PR with a reader still to read is never yours to merge" in text
     assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "build.md")}
     assert made["slots"]["{flow}"] == {"text": line}
     # the techlead reads the review stage's brief; under `build` it reads none
@@ -354,7 +358,7 @@ def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path): 
     )
     text, made = repoconfig.resolve_role(cfg, "grinder").compose(**ids)
     assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "build-review" / "build.md")}
-    assert f"ask --pr <n> {seat}" in text
+    assert "ask the reader it names" in text  # `ao pr held` names the reader (§4.9c *The words*, TD-315)
     # without the role and repo, or for a team with no flows, nothing of a flow: `{flow}` reads none
     assert "flow" not in teams.brief_ids(org, "ao-grind", HOST)
     assert "flow" not in teams.brief_ids(_with(tmp_path, flows=[]), "ao-grind", HOST, "grinder", cfg)
@@ -1223,6 +1227,11 @@ def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # no
 
     assert normalize_review(chain) == chain  # the host agent takes it as the compile writes it
     assert teams.chain_line(chain) == "ui-reader-ao on src/agentorc/ui/**, then techlead-ao on src/sessionorc/**"
+    # §4.9c *The words* (TD-315 slice 5): `{flow}` draws every review stage with its seat and its paths
+    assert grinder.prompt_from["slots"]["{flow}"]["text"] == (
+        f"td-ui: **build** (grinder) → ui-review (ui-reader-ao, on src/agentorc/ui/**) → review "
+        f"({p.techlead_id}, on src/sessionorc/**) → you, through {p.techlead_id}."
+    )
     # the same seat edited out: not followable, in the shared words
     t["seats"] = []
     with pytest.raises(teams.TeamError, match="td-ui cannot be followed by ao-grind: no seat of role auditor"):
