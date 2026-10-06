@@ -797,6 +797,9 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     under: Compiled | None = None,
 ) -> Launch:
     where = f"team {team.name}: {name}"
+    if host != here and repoconfig.org_role(role_name):
+        # §4.9c: the org's role directories are the home's, and a node team's briefs are read on the node
+        raise TeamError(f"{where}: {role_name} is an org role, and {team.name} runs on {host} — define it in the repo")
     checkout, read = _checkout(org, team, home, host, here, files, where)
     try:
         cfg = repoconfig.load(checkout, read=read)

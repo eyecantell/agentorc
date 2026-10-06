@@ -1054,6 +1054,28 @@ def test_an_org_flow_uses_an_org_role_and_a_node_team_cannot(tmp_path, monkeypat
     assert "names a worker, and 'security' is a seat" in " ".join(flowdefs.load("sweep", cfg_with(tmp_path)).problems)
 
 
+def test_a_node_team_member_naming_an_org_role_is_refused_at_its_start(world, tmp_path):  # noqa: F811
+    # §4.9c *An org flow or role is not usable by a team on a node*: a member's role, not only a flow's
+    # stage — its brief would be the home's `~/.agentorc/roles/`, which the node never reads
+    define_role(repoconfig.org_roles_dir(), "security", "kind: worker\n", "sec {lane}\n")
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["projects"]["ao"]["repos"]["agentorc"]["contractmatch"] = "/srv/cm/agentorc"
+    doc["teams"]["ao-grind"]["members"].append({"role": "security", "name": "sec", "home": "agentorc"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    org = orgmod.load()
+    teams.plan(org, "ao-grind", HOST)  # on the home, the org's role is the team's to use
+    org = _with(tmp_path, host="contractmatch")
+    asked: list[list[str]] = []
+
+    def files(host: str, directory: str, paths: list[str]) -> dict[str, str | None]:
+        asked.append(paths)
+        return dict.fromkeys(paths)
+
+    with pytest.raises(teams.TeamError, match="sec: security is an org role, and ao-grind runs on contractmatch"):
+        teams.plan(org, "ao-grind", HOST, files=files)
+    assert asked  # the members before it were read on the node; the refusal is the org role's alone
+
+
 def test_a_hunt_flow_in_the_orgs_directory_starts_its_members_from_it(world, tmp_path):  # noqa: F811
     # TD-313's *Done when*, its second half: a `hunt` flow in the org's directory starts a hunter and
     # a grinder with their lanes and briefs from it, and an org role directory's member beside them
