@@ -1208,6 +1208,7 @@ class HostAgent(
             await asyncio.to_thread(self.tmux.kill_session, holder)
             return None, holder
         await asyncio.to_thread(self.tmux.kill_session, holder.id)  # a dead pane, if it still has one
+        self._id_pane_replaced(holder.id)  # the new run's first hook waits for a fresh list (TD-341)
         # The replaced record's rows end here, with the record: it is gone from the graph, and the
         # new session under its id must not inherit what it was showing (review of PR #269).
         self._attention_gone(holder, "forgotten")
