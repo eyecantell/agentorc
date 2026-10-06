@@ -181,6 +181,9 @@ def test_the_standing_names_each_reader_and_says_its_verdict():
             ask(10, "11:00", closed_by="r5"),
             ask(11, "11:00", closed_by="p1"),  # the person's word past the bound: no verdict
             ask(12, "11:00", closed_reason="expired"),  # closed unanswered: stands for nothing
+            ask(10, "10:00", closed_by="r5"),
+            ask(13, "10:00", closed_by="r5"),
+            ask(13, "11:00", closed_reason="expired"),  # the latest closed unanswered: the earlier word goes
         ],
         [
             {"id": "r3", "kind": "reply", "verdict": "findings"},
@@ -193,7 +196,7 @@ def test_the_standing_names_each_reader_and_says_its_verdict():
     assert got[8] == {"word": "passed by ui-reader-ao-1 · merged by techlead-ao-1", "cls": "done"}
     assert got[10] == {"word": "findings from techlead-ao-1", "cls": "wait"}
     assert got[11] == {"word": "reviewed by techlead-ao-1", "cls": "done"}
-    assert 9 not in got and 12 not in got
+    assert 9 not in got and 12 not in got and 13 not in got
 
 
 def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeypatch):

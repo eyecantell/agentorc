@@ -103,8 +103,8 @@ def standing(seats: list[tuple[str, list[Any], list[Any]]], age: Callable[[str],
     seat — its inbox entries, whose `ask`s carrying a `pr` are what it was asked to read, and its sent
     mail, whose replies carry the `verdict`. Per seat the latest ask for a number wins: open, *waiting
     on <name> · <age>*; answered, *passed by*, *findings from* or *merged by <name>* by its reply's
-    verdict, *reviewed by <name>* for an answer with none (a person's word, an older reply). An ask
-    closed unanswered stands for nothing. The seats' words are joined in the order their asks were
+    verdict, *reviewed by <name>* for an answer with none (a person's word, an older reply). A latest
+    ask closed unanswered stands for nothing. The seats' words are joined in the order their asks were
     sent — *passed by ui-reader-ao-1 · waiting on techlead-ao-1 · 40m* — and `cls` is `wait` while
     the turn is the reader's or the author's (an open ask, findings), else `done`."""
     verdicts = {
@@ -123,8 +123,12 @@ def standing(seats: list[tuple[str, list[Any], list[Any]]], age: Callable[[str],
                 reads.setdefault(pr, {})[name] = {"at": at, "word": word, "wait": v == "findings"}
             elif not e.get("closed_reason"):
                 reads.setdefault(pr, {})[name] = {"at": at, "word": f"waiting on {name} · {age(at)}", "wait": True}
+            else:  # the latest ask closed unanswered: what an earlier one came to no longer stands
+                reads.get(pr, {}).pop(name, None)
     out: dict[int, dict[str, str]] = {}
     for pr, by in reads.items():
+        if not by:
+            continue
         parts = sorted(by.values(), key=lambda x: x["at"])
         cls = "wait" if any(x["wait"] for x in parts) else "done"
         out[pr] = {"word": " · ".join(x["word"] for x in parts), "cls": cls}

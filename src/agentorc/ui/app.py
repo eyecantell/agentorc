@@ -1190,10 +1190,13 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         reads: list[tuple[str, list[Any], list[Any]]] = []
         for m in members:
             if m["id"] in seat_ids or str(m.get("role") or "") == "techlead":
+                inbox: list[Any] = []
+                sent: list[Any] = []  # an older home or a failed read: the asks still say who waits
                 with contextlib.suppress(Exception):
                     inbox = (await call("inbox", id=m["id"])).get("entries") or []
+                with contextlib.suppress(Exception):
                     sent = (await call("inbox", id=m["id"], sent=True)).get("entries") or []
-                    reads.append((str(m.get("name") or m["id"]), inbox, sent))
+                reads.append((str(m.get("name") or m["id"]), inbox, sent))
         standing = pr_standing(reads, now)
         rel = (r.get("ledger") or {}).get("path") or ""
         ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
