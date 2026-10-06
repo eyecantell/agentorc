@@ -347,6 +347,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             # a doorbell that would not submit twice (§4.10): the sender learns its mail did not wake
             if bell := s.get("doorbell_failed"):
                 print(f"{'':<{w}}      doorbell failed {_age(bell['at'])}: {bell['error']}")
+            # its brief typed at the composer and not taken (§4.1 *No prose in the argv*, TD-339)
+            if err := s.get("first_prompt_error"):
+                print(f"{'':<{w}}      brief not sent · {err}")
             # `owed` is here for **someone else's** eyes (design §4.10 *Outcomes*, TD-079 step 3):
             # the owing session is told on every `ao` reply of its own, but a lead reading its
             # members cannot see a debt it is meant to chase unless the record says so.

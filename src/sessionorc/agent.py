@@ -68,6 +68,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     FILL_CEILING,  # noqa: F401
     FILL_WINDOW,  # noqa: F401
     FINISHED_SETTLE,  # noqa: F401
+    FIRST_PROMPT_TRIES,  # noqa: F401
     FLOW_CLAUSE,  # noqa: F401
     GIT_EVERY,  # noqa: F401
     HOME_EDITS,  # noqa: F401
@@ -391,6 +392,7 @@ class HostAgent(
         # entry — and the rings in flight, one per session.
         self._bells: dict[str, dict[str, Any]] = {}
         self._ringing: dict[str, asyncio.Task[None]] = {}
+        self._prompting: dict[str, asyncio.Task[None]] = {}  # a brief being typed (§4.1, TD-339), one per session
         # One typist per pane (TD-094): `_submit` holds its session's lock from paste to confirmed
         # submit, and a ring holds it from reading the composer to its own submit — so a ring never
         # pastes into the middle of a `send`, where the two lines would be submitted as one.
@@ -968,6 +970,7 @@ class HostAgent(
                 review=reading,
                 context_bound=bound,
                 start_context=start_context,
+                first_prompt=spec.first_prompt or None,
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)

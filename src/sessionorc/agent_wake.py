@@ -9,24 +9,29 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import secrets
 from datetime import UTC, datetime
 from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
     mail,
     waits,
 )
 from sessionorc.agent_common import (
     COMPOSER_LINES,
     DOORBELL_TRIES,
+    FIRST_PROMPT_TRIES,
     RpcError,
     _parse,
     _Wait,
     log,
 )
 from sessionorc.models import (
+    SYSTEM,
     MailEntry,
+    SendEntry,
     Session,
     now_iso,
 )
@@ -115,6 +120,8 @@ class WakeMixin:
         wake decision — the budget and new mail."""
         if s.state != "idle" or s.confidence != "hook":
             return "not hook-confirmed idle"  # never a scraped idle or `stalled?` (a takeover)
+        if self._first_prompt_due(s):
+            return "its brief is not typed yet"  # the first prompt is the brief, never the doorbell's line
         if not mail.mail_wakes(s):
             return "a person's session"  # invariant 5: the chip and the line, nothing typed
         if getattr(adapters.get(s.adapter), "composer", None) is None:
@@ -209,6 +216,90 @@ class WakeMixin:
             self._save(s)
         await self._push_changes()
 
+    # -- the brief typed at the composer (design §4.1 *No prose in the argv*, TD-339) ------------------
+
+    @staticmethod
+    def _first_prompt_due(s: Session) -> bool:
+        """The record holds a brief that is neither sent nor given up on."""
+        return bool(s.first_prompt) and not s.first_prompt_sent_at and not s.first_prompt_error
+
+    def _send_first_prompts(self) -> None:
+        """Each tick, on the host that holds the pane: start one send of the brief for every record
+        whose first prompt is due and that sits at a hook-reported `idle` — the composer the launch
+        landed at. One task per session, as a ring is: a submit takes seconds and the tick never waits."""
+        for s in list(self.sessions.values()):
+            if s.id in self._prompting or not self._first_prompt_due(s):
+                continue
+            if s.state != "idle" or s.confidence != "hook" or s.superseded_by:
+                continue
+            self._prompting[s.id] = asyncio.create_task(self._first_prompt(s.id))
+
+    async def _first_prompt(self, sid: str) -> None:
+        try:
+            typing = self._typing[sid]
+            if typing.locked():
+                return  # someone is typing into the pane: the next tick looks again
+            async with typing:
+                await self._first_prompt_typing(sid)
+        except Exception:  # noqa: BLE001 — a detached task: a send that breaks is a log line
+            log.exception("the first prompt of %s failed", sid)
+        finally:
+            self._prompting.pop(sid, None)
+
+    async def _first_prompt_typing(self, sid: str) -> None:
+        """One try, under the pane's typing lock. The composer must read empty — a dialog (None) or
+        someone's words wait for the next tick, uncounted — unless an earlier try left the brief
+        there, when only Enter is pressed again (the text is never typed twice, §4.2). A try the
+        composer does not take is counted; the `FIRST_PROMPT_TRIES`th writes `first_prompt_error`."""
+        s = self.sessions.get(sid)
+        if s is None or not self._first_prompt_due(s) or s.state != "idle" or s.confidence != "hook":
+            return
+        adapter = adapters.get(s.adapter)
+        reader = getattr(adapter, "composer", None)
+        rev = s.rev
+        left = None
+        if reader is not None:
+            left = reader(await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True))
+            s = self.sessions.get(sid)
+            if s is None or s.rev != rev or not self._first_prompt_due(s):
+                return  # it moved while the screen was read: the next tick looks again
+            if left is None or (left and not s.first_prompt_tries):
+                return  # a dialog, or someone's words: wait for the next tick
+        try:
+            if left:
+                await self._enter_again(sid, reader)  # the last try's brief is still in the composer
+            else:
+                await self._type(sid, adapter, s.first_prompt)  # the lock is held already
+        except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste
+            if s.id not in self.sessions:
+                return
+            s.first_prompt_tries += 1
+            why = str(e) or type(e).__name__
+            log.warning(
+                "the brief of %s did not submit (%d of %d): %s", sid, s.first_prompt_tries, FIRST_PROMPT_TRIES, why
+            )
+            if s.first_prompt_tries >= FIRST_PROMPT_TRIES:
+                s.first_prompt_error = why
+            self._save(s)
+            await self._push_changes()
+            return
+        s.first_prompt_sent_at = now_iso()
+        s.first_prompt = None  # kept until sent (§4.1); the transcript holds it from here
+        # what was typed, and by whom (§4.10 `sends`): the home, the brief — named, never its text again
+        sent = SendEntry(id="s-" + secrets.token_hex(6), from_=SYSTEM, at=s.first_prompt_sent_at, text="(the brief)")
+        s.sends = (s.sends + [sent])[-mail.SENDS_KEEP :]
+        self._save(s)
+        await self._push_changes()
+
+    async def _enter_again(self, sid: str, reader: Any) -> None:
+        """Enter and C-m on a composer still holding an earlier try's brief, confirmed as `_type`
+        confirms its own (TD-027); `prompt-stuck` when it still holds it."""
+        for key in ("Enter", "C-m"):
+            await asyncio.to_thread(self.tmux.send_key, sid, key)
+            if await self._poll(lambda: _empty(reader, self.tmux, sid), agent_common.SUBMIT_SECONDS):
+                return
+        raise RpcError(f"prompt-stuck: {sid} still shows its brief in the composer after Enter and C-m")
+
     def _bell_failed(self, s: Session, bell: dict[str, Any], error: str) -> None:
         bell["failures"] += 1
         log.warning("doorbell for %s did not submit (%d of %d): %s", s.id, bell["failures"], DOORBELL_TRIES, error)
@@ -265,3 +356,7 @@ class WakeMixin:
         s.wake_refilled_at = datetime.now(UTC).isoformat(timespec="microseconds")
         self._save(s)
         self._poke_waits()
+
+
+async def _empty(reader: Any, tmux: Any, sid: str) -> bool:
+    return not reader(await asyncio.to_thread(tmux.capture_tail, sid, COMPOSER_LINES, raw=True))

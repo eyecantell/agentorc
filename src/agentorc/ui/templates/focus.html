@@ -67,6 +67,10 @@
          the page and hidden until true, kept current from the pushed delta as the two above are. #}
       <span class="badge gated{% if not s.gated %} hidden{% endif %}" id="fgated"
             title="{{ (s.gated or {}).full }}">{{ (s.gated or {}).text or 'paused · usage' }}</span>
+      {# design §4.5a **brief not sent** (§4.1 *No prose in the argv*, TD-339): a mark, amber, never
+         pressable, hidden until true and kept current from the delta as the two above are #}
+      <span class="badge brief{% if not s.brief_unsent %} hidden{% endif %}" id="fbrief"
+            title="{{ (s.brief_unsent or {}).full }}">{{ (s.brief_unsent or {}).text or 'brief not sent' }}</span>
     </div>
     {# **The acts line** (design §4.5 *The Focus screen's anatomy*, TD-156): the next act first,
        outlined, by state — Close session when the checklist passes, Take over on an unattended

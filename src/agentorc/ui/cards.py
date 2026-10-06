@@ -394,6 +394,7 @@ def view(
     d["stop_note"] = stop_note(s)
     d["start_note"] = start_note(s)  # §6 *Start time*, §4.5a **starts** note (TD-152): a scheduled record's
     d["gated"] = gated_view(s.get("gated"))  # the usage gate's pause (§6, TD-100): a mark, never a state
+    d["brief_unsent"] = brief_unsent(s)  # §4.5a **brief not sent** (TD-339): the slot's and Focus's mark
     d["grants_all"] = list(GRANTS)
     # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
     # over an unattended session; hand an interactive one back where there is someone to hand it
@@ -470,6 +471,21 @@ def _clock(iso: Any) -> str:
         return ""
     at = at.astimezone()
     return ("" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")) + f"{at:%H:%M}"
+
+
+def brief_unsent(s: Mapping[str, Any]) -> dict[str, str] | None:
+    """design §4.5a **brief not sent** (§4.1 *No prose in the argv*, TD-339): the host agent typed the
+    brief at the composer `FIRST_PROMPT_TRIES` times and the composer did not take it — *brief not
+    sent · <reason>*, with the cure on hover. None while it is not so, and on an ended record."""
+    err = s.get("first_prompt_error")
+    if not err or s.get("state") in ("exited", "closed"):
+        return None
+    text = f"brief not sent · {err}"
+    full = (
+        f"{text}: the host agent typed this session's brief at its composer and the composer did not take it "
+        "— send it (Focus, or ao send); the mark goes with the next prompt"
+    )
+    return {"text": text, "full": full}
 
 
 def gated_view(raw: Any) -> dict[str, str] | None:
@@ -664,6 +680,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # the usage gate's pause explains a stop (§4.5a **paused · usage**, TD-100); it waits behind
         # a permission, a question, a limit or a stall above, which are a person's to answer
         kind, text, full = "lim", d["gated"]["text"], d["gated"]["full"]
+    elif d.get("brief_unsent"):
+        # §4.5a **brief not sent** (§4.1 *No prose in the argv*, TD-339): live and idle with nothing to
+        # do, amber as the design words it — the needs family's colour, never its ring
+        kind, text, full = "needs", d["brief_unsent"]["text"], d["brief_unsent"]["full"]
     elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict):
         # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled six times
         # in the hour, and this one's fill tripped it — an ending, as the crash ceiling's is

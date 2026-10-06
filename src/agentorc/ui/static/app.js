@@ -3178,6 +3178,13 @@
         gt.title = (v.gated && v.gated.full) || "";
         gt.textContent = (v.gated && v.gated.text) || "paused · usage";
       }
+      // …and a brief the composer did not take (§4.5a **brief not sent**, TD-339): the next prompt clears it
+      const bu = $("#fbrief");
+      if (bu) {
+        bu.classList.toggle("hidden", !v.brief_unsent);
+        bu.title = (v.brief_unsent && v.brief_unsent.full) || "";
+        bu.textContent = (v.brief_unsent && v.brief_unsent.text) || "brief not sent";
+      }
       const susp = $("#fsuspended");
       if (susp) {
         susp.classList.toggle("hidden", !v.suspended_note);

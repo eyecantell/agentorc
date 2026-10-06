@@ -163,6 +163,7 @@ class TickMixin:
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
+        self._send_first_prompts()  # before the doorbell, which a brief not yet typed holds off
         self._ring_doorbells()
 
     async def _team_stop_times(self, now: datetime) -> None:
@@ -3148,6 +3149,11 @@ class TickMixin:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
+        if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
+            # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
+            # typed by the tick, or a person's or a manager's send that cures *brief not sent*
+            s.first_prompt_sent_at = s.first_prompt_sent_at or now_iso()
+            s.first_prompt, s.first_prompt_error = None, None
         state = None if stale else event.get("state")
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None

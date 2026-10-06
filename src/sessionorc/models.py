@@ -77,6 +77,10 @@ NODE_OWNED = frozenset(
         "gated",
         "wrapup_at",
         "doorbell_failed",
+        "first_prompt",
+        "first_prompt_sent_at",
+        "first_prompt_tries",
+        "first_prompt_error",
         "run_log",
         "previous_run",
         "supersedes",
@@ -951,6 +955,16 @@ class Session:
     # conversation — a resume carries it whether or not it says so — so a page can show what the
     # session was told beside the person's own words (§4.5a **Told at start**). None: there is none.
     start_context: str | None = None
+    # The brief, typed and never passed (design §4.1 *No prose in the argv*, TD-339): the first prompt
+    # the adapter handed back (`LaunchSpec.first_prompt`) rather than put in the argv, kept until the
+    # host agent has typed it at the record's first hook-reported `idle` (`first_prompt_sent_at`), or a
+    # `UserPromptSubmit` says a prompt went in. `first_prompt_tries` counts the sends the composer did
+    # not take; at `FIRST_PROMPT_TRIES` the last one's reason is `first_prompt_error`, the card's
+    # *brief not sent* mark, which the next prompt clears. The pane's host writes all four.
+    first_prompt: str | None = None
+    first_prompt_sent_at: str | None = None
+    first_prompt_tries: int = 0
+    first_prompt_error: str | None = None
     # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
     # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
     # are what the session says it did.
@@ -1189,6 +1203,7 @@ class Session:
         d = self.to_dict()
         d.pop("inbox")
         d.pop("outbox")
+        d.pop("first_prompt")  # the brief's text, as a body is: the record's file has it until it is sent
         if not bookkeeping:
             d.pop("threads")
             d.pop("wakes")
