@@ -1184,11 +1184,20 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "noteam": True,
             }
             members = []
-        standing: dict[int, dict[str, Any]] = {}
+        # every seat's inbox and sent mail, read as a person's read (§4.9c *What is shown*): a seat by
+        # the definitions or its record, running or not — a view's `seat` is only an empty one's
+        seat_ids = {*seats, *(str(s.get("id")) for s in sessions if s.get("seat"))}
+        reads: list[tuple[str, list[Any], list[Any]]] = []
         for m in members:
-            if m.get("seat") or str(m.get("role") or "") == "techlead":
+            if m["id"] in seat_ids or str(m.get("role") or "") == "techlead":
+                inbox: list[Any] = []
+                sent: list[Any] = []  # an older home or a failed read: the asks still say who waits
                 with contextlib.suppress(Exception):
-                    standing.update(pr_standing((await call("inbox", id=m["id"])).get("entries") or [], now))
+                    inbox = (await call("inbox", id=m["id"])).get("entries") or []
+                with contextlib.suppress(Exception):
+                    sent = (await call("inbox", id=m["id"], sent=True)).get("entries") or []
+                reads.append((str(m.get("name") or m["id"]), inbox, sent))
+        standing = pr_standing(reads, now)
         rel = (r.get("ledger") or {}).get("path") or ""
         ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
         # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)

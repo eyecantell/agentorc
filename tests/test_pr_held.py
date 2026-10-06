@@ -160,6 +160,45 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
 # -- the page half (design §4.5a *PRs waiting*, TD-093 slice 3) --------------------------------------
 
 
+def test_the_standing_names_each_reader_and_says_its_verdict():
+    """TD-315 slice 5b (design §4.9c *What is shown*): the PR standing over every seat — each seat's
+    latest ask for a number, by its reply's verdict, in the order the asks were sent."""
+
+    def ask(pr, at, **kw):
+        return {"kind": "ask", "pr": pr, "at": f"2026-10-05T{at}:00+00:00", **kw}
+
+    ui = (
+        "ui-reader-ao-1",
+        [ask(7, "10:00", closed_by="r1"), ask(8, "10:00", closed_by="r2"), {"kind": "note", "pr": 9}],
+        [{"id": "r1", "kind": "reply", "verdict": "pass"}, {"id": "r2", "kind": "reply", "verdict": "pass"}],
+    )
+    tl = (
+        "techlead-ao-1",
+        [
+            ask(7, "11:00"),
+            ask(8, "11:00", closed_by="r3"),
+            ask(8, "12:00", closed_by="r4"),  # asked again on findings: the latest ask wins
+            ask(10, "11:00", closed_by="r5"),
+            ask(11, "11:00", closed_by="p1"),  # the person's word past the bound: no verdict
+            ask(12, "11:00", closed_reason="expired"),  # closed unanswered: stands for nothing
+            ask(10, "10:00", closed_by="r5"),
+            ask(13, "10:00", closed_by="r5"),
+            ask(13, "11:00", closed_reason="expired"),  # the latest closed unanswered: the earlier word goes
+        ],
+        [
+            {"id": "r3", "kind": "reply", "verdict": "findings"},
+            {"id": "r4", "kind": "reply", "verdict": "merged"},
+            {"id": "r5", "kind": "reply", "verdict": "findings"},
+        ],
+    )
+    got = reviewmod.standing([tl, ui], lambda at: "40m")
+    assert got[7] == {"word": "passed by ui-reader-ao-1 · waiting on techlead-ao-1 · 40m", "cls": "wait"}
+    assert got[8] == {"word": "passed by ui-reader-ao-1 · merged by techlead-ao-1", "cls": "done"}
+    assert got[10] == {"word": "findings from techlead-ao-1", "cls": "wait"}
+    assert got[11] == {"word": "reviewed by techlead-ao-1", "cls": "done"}
+    assert 9 not in got and 12 not in got and 13 not in got
+
+
 def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeypatch):
     remotes = {
         "/a": "git@github.com:eyecantell/agentorc.git\n",

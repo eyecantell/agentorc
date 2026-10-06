@@ -88,7 +88,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Open |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
-| TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
 | TD-335 | A team's stop time is drawn nowhere on the Org: a live team's member is a compact card with no *stops* note, and the team header has none | Low | Open — design-first |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Open |
@@ -1514,29 +1513,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** design it: a review stage naming any `seat` role, with its own paths (a path set the repo names, `held:` by name); a PR held by more than one stage passed from one reader to the next in the flow's order, each reader's *merged* or *findings* on the PR's thread; how the builder's brief and `ao pr held` say whose turn it is; what a switch does to a PR mid-chain.
 
 **Related:** TD-307 (flows), TD-093 (the reader), TD-291 (the UI check, which is the builder's today).
-
-## TD-315: Build review stages for any seat — path sets, the `review` chain, the verdict, whose turn
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-04 (the designer, TD-314's build)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1 built: 1a (PR #1120, grinder-ao-1) the record's chain shape, `review_links`, rule 11 holding a chain's PR on the union of its links' paths, the config loader refusing a chain; 1b (PR #1123, grinder-ao-1) the envelope's `verdict` and `ao msg --verdict`, required of a session's reply to a PR's ask and not of the person's (the techlead's answer to steer `m-d7ca78bdf6e7`), and the verdict line in `techlead.stage.md` and `flows/td/review.md` carried ahead of slice 5. Slice 2 built (grinder-ao-1): `rpc_pr_reads` in `agent_mail.py`, among `modes.MAILBOX` so a node's session reads it over the link; a reply's verdict is read from the asker's inbox by `reply_to`, so an ask asked again on a findings thread is its own row (`tests/test_review.py`). Slice 3 built (grinder-ao-2): `held:` as named sets (`RepoConfig.held_sets`, `repoconfig.held_for`), a review stage's `held:`, any seat role on a review stage with the staffing rule in `flowdefs.unfollowable`, and the compile writing the chain (`teams.Compiled.reader`, `teams._readers`, `teams.chain_line` on the started session's line), and the chain read where it would have broken — `review.setting` and `ao pr held` (the links holding the PR, in order, no turn), the Inbox's held mark, `teamrun._reader`; `tests/test_flows.py`, `tests/test_pr_held.py`. Slice 4 built (grinder-ao-2): `ao pr held`'s chain — `review.walk` and `review.addressed`, each link's state, `turn` and `merges`, the prose per link; `tests/test_pr_held.py`. Slice 5a built (grinder-ao-2, PR #1138): the words — `td`'s and `build-review`'s build briefs ask the reader `ao pr held` names and follow each verdict, `td`'s `review.md` answers *pass* where a reader after it still reads (`ao pr held --id`), and `{flow}` draws every review stage with its seat and its paths (`flowdefs.review_links`); `tests/test_flows.py`. **Next:** slice 5b, the Repo page's standing over every seat with the verdicts (`ui/repo.py` `pr_standing`, `ao repo`), and the §4.9c sentences that still name the techlead seat as the review stage's reworded, the *designed, not built* marks off.
-**Location:** the flow loader TD-309 builds (a review stage's role and `held:`), `src/agentorc/repoconfig.py` (`held:` as a list or a mapping), `src/agentorc/org.py` and `src/agentorc/teams.py` (the staffing check, the compile, `ao org check`), `src/sessionorc/models.py` (`REVIEW_READERS`, `normalize_review`, the envelope's `verdict`), `src/sessionorc/mail.py`, `src/agentorc/cli.py` (`ao msg --verdict`, `ao pr held`), the host agent's RPCs (`pr_reads`), the flows' `build.md` and `review.md`, `src/agentorc/ui/repo.py` (`pr_standing`)
-
-**Why:** TD-314's design: under flows a review stage is the techlead seat's alone, so a second review round, or a reader for some paths only, cannot be written.
-
-**Fix:** design §4.9c *A review stage any seat may hold, and a PR read by more than one*. Slices, each a PR; slices 1 and 2 touch `src/sessionorc/**` and wait for the reader:
-1. **The record and the verdict** — `normalize_review` takes `{chain: [{stage, reader, held}], bound}` beside the older shape (a chain of one); the reply envelope's `verdict` (`pass`, `merged`, `findings`), `ao msg --verdict`, required on a reply to an `ask` carrying `pr` and refused elsewhere.
-2. **`pr_reads {id, pr}`** — the home's structured read (addressee, time, open, last verdict; no text), answered to the author, an addressee and a person; over the link for a node's session as other mail reads are.
-3. **Path sets and the stage** — `held:` as a mapping of named sets in `.agentorc.yml`, a review stage's `held:`, any `seat` role on a review stage with the staffing rule (exactly one seat of the role on `asks`), the *not followable* reasons, the compile writing the chain, `ao org check`.
-4. **`ao pr held`** — the chain against the PR's files, each link's state from `pr_reads`, `turn` and `merges`, `--id` for a reader, `--json`.
-5. **The words and the page** — the built-in `build.md` and `review.md` (ask the reader `ao pr held` names; answer with a verdict; the last reader merges), `{flow}` drawing every review stage, the Repo page's standing over every seat with the verdicts. The page change is looked at by its builder (§4.9b).
-
-**Done when:** on a scratch home, a team under a repo flow `build → ui-review (held: ui) → review (held: core)` with a `ui-reader` seat: a PR touching both sets is asked of the ui reader first, `ao pr held` names it, its `pass` moves the turn to the techlead, which merges and answers `merged`; a PR touching `core` alone goes to the techlead only; a reply to a PR's ask with no verdict is refused; a record with the older `review` shape behaves as before; a switch to `build-review` with an ask open at the ui reader leaves that ask answered and the techlead's link still to read. When built, §4.9c's and the pointers' *designed, not built* marks come off.
-
-**Related:** TD-314 (the design), TD-307 and TD-309 (flows), TD-313 (role directories, for a review seat role that is no preset), TD-093 (the reader).
 
 ## TD-319: Build the Telegram channel — the home tells the person what newly stops a session or a team
 
