@@ -4294,7 +4294,9 @@ become whatever reuses its pid. A connection is one of:
   can connect after the tick has seen the pane go, when the walk meets no pane pid. So the host
   agent keeps each record's pane for `PANE_GONE_GRACE` (ten seconds) after it leaves the list —
   or after the list shows **another pane under the same record**, since a restart or a supersede
-  reuses the session's name and only the pane pid moves — and a `hook` RPC that matched no live
+  reuses the session's name and only the pane pid moves; **taking the name** (§4.1) moves the old
+  pane there at once, so the record has a pane no list has shown and the new run's first hook waits
+  for a fresh list rather than being judged against the old pane (TD-341) — and a `hook` RPC that matched no live
   pane is matched against **the pane of the record it names**, if that pane is inside the grace,
   by the POSIX session id and then the controlling terminal — the two signals an orphaned child
   keeps. The grace is for `hook` alone and for the record the hook names; every other request,

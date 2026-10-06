@@ -55,6 +55,19 @@ class IdentityMixin:
             if listed.get(sid) != p.pid and now - at < identity.PANE_GONE_GRACE
         }
 
+    def _id_pane_replaced(self, session: str) -> None:
+        """A restart or supersede under the same name has just killed the record's pane: the pane
+        is gone **now**, not at the next list (TD-341). Left listed, the record read as one whose
+        pane is known, so the new run's first hook — from a pane no list had shown yet — was judged
+        *outside* without waiting for a fresh list, refused, and its `idle` never arrived; and the
+        old run's last hook matched a pane the list still held. Moved to the gone table, the old
+        pane is under the grace, and the record has a pane the last list did not show."""
+        old = next((p for p in self._id_panes if p.session == session), None)
+        if old is None:
+            return
+        self._id_panes = [p for p in self._id_panes if p.session != session]
+        self._id_gone[session] = (old, time.monotonic())
+
     def _id_gone_channel(self, peer: int, session: str | None) -> identity.Channel | None:
         """A `hook` that matched no live pane, against the pane of the record it names if that pane
         left the list inside the grace (§4.8a *A hook just after its pane ended*, TD-115)."""

@@ -11,6 +11,7 @@ import json
 import shlex
 import sys
 import textwrap
+import time
 
 import pytest
 from conftest import wait_for, wait_state
@@ -809,3 +810,25 @@ async def test_a_handed_debt_is_not_deleted_away(agent, hookstub, tmp_path):
         assert [e["id"] for e in (await person.call("inbox", id=lead))["entries"]] == []
         for sid in (w, lead):
             await person.call("kill", id=sid)
+
+
+async def test_a_restarts_first_hook_waits_for_a_fresh_list(agent, tmp_path):
+    """TD-341: a team restart takes the closed record's name while the identity list still holds the
+    old run's pane under it, so the record read as one whose pane is known and the new run's first
+    hook — from a pane no list had shown — was judged *outside* at once: refused, its `idle` never
+    arrived, and the brief waiting on that `idle` was never typed. Taking the name drops the old
+    pane from the list into the gone table, so that hook waits for a fresh list and is served."""
+    agent.identity_mode = "enforce"
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        await me.call("close", id=a)
+        old = identity.Pane(a, 99999, 0)  # the old run's pane, as the list last showed it
+        agent._id_panes = [old]
+        agent._id_listed_at = time.monotonic()  # a list just landed: only an unlisted pane asks again
+        again = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        assert again == a and agent._id_gone[a][0] is old
+        assert all(p.pid != 99999 for p in agent._id_panes)
+        hook = {"id": 1, "method": "hook", "params": {"session": a, "state": "idle"}}
+        got = await _probe(me, tmp_path, a, "first-hook", hook)
+        assert got.get("error") != identity.MISMATCH
+        assert (await me.call("get", id=a))["identity_alarms"] == []

@@ -90,7 +90,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
-| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
+| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check 2026-10-06: argv holds, a restart's brief does not — blocked by TD-341, TD-342 |
+| TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built; live check: a restart with no alarm |
+| TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Open — design first |
 
 ---
 
@@ -1560,7 +1562,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-05 (the designer, TD-336's build)
 **Owner:** grinder
 **Kind:** live-check #1147
-**Status:** Built — slice 1 built (grinder-ao-1, PR #1147): the adapter writes the start context to `launch/<conversation id>.context.md` (`paths.context_file`, `0600`; the conversation id, since the launch runs before the tmux name is chosen) and names it with `--append-system-prompt-file`, hands the prompt back as `first_prompt`, sets `AGENTORC_AT_COMPOSER=1` on every launch but a resume, and `_forget` removes the file with the last record holding the conversation. Once #1147 is live, what is left is the press, read on the live copy: `ps -o args` of a session started after the promote shows no brief and no start context. Slice 2 built first (grinder-ao-1): the host agent's half — `LaunchSpec.first_prompt`, the record's four `first_prompt*` fields, the tick's send at the first hook `idle` (`agent_wake._send_first_prompts`), the doorbell held off until it is typed, the hook's `prompt` word on `UserPromptSubmit`, the card's *brief not sent* slot and Focus's badge (`cards.brief_unsent`, amber) and `ao status -v`'s line (`tests/test_first_prompt.py`; seen on a scratch home with the test's composer stub, PR's UI check). Both slices merged; what is left is the press on the live copy (below), once #1147 is live.
+**Status:** **Live check 2026-10-06 (grinder-ao-1), #1147 live (`ao promote status`: live f6175c3):** the argv half holds — `/proc/<pid>/cmdline` of grinder-ao-1's run started 06:12 local reads `claude --settings …grind+unattended.json --session-id … --name grinder-ao-1 --model opus --dangerously-skip-permissions`, no brief and no start context (a grinder has none, so no `--append-system-prompt-file` either), `AGENTORC_AT_COMPOSER=1` in its environment, and its record's `first_prompt_sent_at` is 2026-10-06T12:12:15Z. The brief half does not hold as written (the anchor's finding, mail m-3baf82ed4750): the same session's run of 2026-10-05 22:38, a restart seconds after the promote, never got its brief — its first hook was refused as *outside* (TD-341), so no hook `idle` came, and nothing types a brief that waits on one (TD-342); it sat at an empty composer, `stalled?`, for 7.5 hours. Blocked on both; once they are live, the check is a restart's brief typed. Before: Built — slice 1 built (grinder-ao-1, PR #1147): the adapter writes the start context to `launch/<conversation id>.context.md` (`paths.context_file`, `0600`; the conversation id, since the launch runs before the tmux name is chosen) and names it with `--append-system-prompt-file`, hands the prompt back as `first_prompt`, sets `AGENTORC_AT_COMPOSER=1` on every launch but a resume, and `_forget` removes the file with the last record holding the conversation. Once #1147 is live, what is left is the press, read on the live copy: `ps -o args` of a session started after the promote shows no brief and no start context. Slice 2 built first (grinder-ao-1): the host agent's half — `LaunchSpec.first_prompt`, the record's four `first_prompt*` fields, the tick's send at the first hook `idle` (`agent_wake._send_first_prompts`), the doorbell held off until it is typed, the hook's `prompt` word on `UserPromptSubmit`, the card's *brief not sent* slot and Focus's badge (`cards.brief_unsent`, amber) and `ao status -v`'s line (`tests/test_first_prompt.py`; seen on a scratch home with the test's composer stub, PR's UI check). Both slices merged; what is left is the press on the live copy (below), once #1147 is live.
+**Blocked by:** TD-341, TD-342
 **Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`, `LaunchSpec`), `src/sessionorc/adapters.py` (`LaunchSpec.first_prompt`), `src/sessionorc/agent.py` (`create`: the launch record's `first_prompt`; the send path `rpc_send` uses, `SUBMIT_SECONDS`, `prompt-stuck`), `src/sessionorc/agent_tick.py` (the first send at the record's first `idle`, the retries, `first_prompt_error`), `src/sessionorc/models.py` (the record and launch-record fields), `src/sessionorc/paths.py` (`launch/`), `src/agentorc/ui/cards.py` and `templates/card.html` (the mark), `src/agentorc/cli.py` (`ao status -v`), `tests/` (the `hookstub` adapter of `tests/_stubs.py`); design §4.1 *No prose in the argv*, §4.2's `SessionStart` row, §4.3, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads slice 2.
 
 **Why:** TD-336's design. A repo script's `pkill -f <word>` killed the session whose brief, riding in its argv, held the word.
@@ -1573,3 +1576,39 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels (TD-336's *Done when*); then TD-336 archives with this entry.
 
 **Related:** TD-336 (the design), TD-283 (the start context on every launch), TD-027 (the verified send), TD-199 (a running member keeps its brief), contractmatch PR #122.
+
+## TD-341: A restart's first hook is refused as *outside* — the identity list still holds the old run's pane under the record
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (grinder-ao-1, on the anchor's finding for TD-339's live check)
+**Owner:** grinder
+**Kind:** live-check #1150
+**Status:** Built (grinder-ao-1, PR #1150): `_take_name` calls `_id_pane_replaced`, which moves the record's pane from `_id_panes` to `_id_gone` the moment the name is taken. Design §4.8a says it. Left: the live check — a team restart after the promote logs no *hook for … matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
+**Location:** `src/sessionorc/agent_identity.py` (`_id_pane_replaced`, `_id_channel`'s `unlisted`), `src/sessionorc/agent.py` (`_take_name`), `tests/test_identity.py` (`test_a_restarts_first_hook_waits_for_a_fresh_list`); design §4.8a *A pane the tick has not listed yet*.
+
+**Why:** the host agent's journal, 2026-10-05 22:38: *ao-agentorc-grinder-ao-1 wants another run … restarting it*, *superseded the closed session of the same name*, then at 22:38:01 *hook for ao-agentorc-grinder-ao-1 matched no pane: peer 4150517 …, listed pane 3728701, gone pane None* and *identity alarm (enforce): outside claimed 'ao-agentorc-grinder-ao-1' on hook*. `_id_channel` takes a fresh pane list only while some live record has no pane in the last list; the restarted record still had one there — the old run's — so the new run's first hook, from a pane no list had shown, was judged against the stale list and refused. The record never reached a hook-reported `idle`, so its brief (TD-339) was never typed. TD-225's *(a)* recorded the old pane as gone only when a list showed another pane, which is after this hook.
+
+**Fix:** done above. Taking the name ends the old pane at once: it leaves the identity list (so the record is unlisted and its next hook waits for a fresh list) and enters the gone table (so the old run's last hook is still under the grace, TD-225).
+
+**Done when** a team restart on the live copy leaves no *outside claimed <itself> on hook* alarm at the restart, and the restarted run's brief is typed.
+
+**Related:** TD-339 (the brief that waited), TD-342 (no fallback when the first hook is lost), TD-225 (alarms at a restart), TD-115 (the grace).
+
+## TD-342: A brief waits only on a hook-reported `idle`, so a run whose first hook is lost never gets its brief
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (grinder-ao-1, on the anchor's finding for TD-339's live check)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design round needed. The cause of the one case seen is fixed by TD-341; this entry is the missing fallback.
+**Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: `state == "idle"` and `confidence == "hook"`); design §4.1 *No prose in the argv*, §4.5a *brief not sent* mark.
+
+**Why:** design §4.1 sends the brief at the record's first `idle` **by hook**, and the *brief not sent* mark is written only after `FIRST_PROMPT_TRIES` refused sends. A run whose first hook never lands — refused (TD-341), dropped, or a hook config that did not load — makes no try at all, so no mark: grinder-ao-1's run of 2026-10-05 22:38 sat at an empty composer, `stalled? (scraped)`, for 7.5 hours until the person restarted it, and its card said nothing about a brief.
+
+**Fix (for the designer):** choose between, or combine: (a) after a bound with `first_prompt` unsent and no hook, try the send on a scraped `idle` (the composer must still read empty, as for any send); (b) at that bound write `first_prompt_error` (*no hook since launch*) so the card's *brief not sent* mark says it and the person or a controller can send it. Default if asked: both — (a) once, then (b).
+
+**Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes.
+
+**Related:** TD-339, TD-341, TD-336.
