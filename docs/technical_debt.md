@@ -90,9 +90,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
-| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check 2026-10-06: argv holds, a restart's brief does not — blocked by TD-341, TD-342 |
+| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built; live check: a restart with no alarm |
 | TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Open — design first |
+| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Open |
+| TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Open |
 
 ---
 
@@ -1612,3 +1614,39 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes.
 
 **Related:** TD-339, TD-341, TD-336.
+
+## TD-343: A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, asked by Paul why the team did nothing all day)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.1 *No prose in the argv*; `src/sessionorc/agent_wake.py` (`_first_prompt_typing`: the brief sent by bracketed paste); `src/agentorc/adapters/claude_code/__init__.py` (`--append-system-prompt-file`, the start context)
+
+**Why:** Since TD-339 the brief is typed at the composer by bracketed paste, and Claude Code hands a paste to the model wrapped in `<pasted_content>` with the rule that instructions inside it are followed only where the user's own words ask for it. A brief is nothing but a paste, so a careful model takes it as data. On 2026-10-06 at 12:29Z techlead-ao-1 (Fable) answered its brief with *"Your message contains only pasted text, a techlead-seat brief for agentorc, with nothing from you saying what to do with it, so I haven't acted on it"*, then held grinder-ao-1's PR ask on #1150 unread until the person answered its mailed `ask` (`m-e60ada636596`) at 22:20Z. In those ten hours the doorbell rang it about twenty times, each a Fable turn that only re-said it was holding. grinder-ao-1 (Opus) acted on the same kind of brief, so whether a session starts is up to the model's judgement on each run. Every member, seat and restart launched since TD-339 is exposed.
+
+**Fix:** design first, then build. Give the brief a road the tool trusts. For example: send it with the start context through `--append-system-prompt-file` (the system prompt is the operator's word), and type only a short first prompt of the home's own, outside any paste, that says to begin; or type a short line of the home's own beside the pasted brief saying it is this session's brief from the person who started it. Either way, keep TD-336's rule: no prose in the argv. Also bound the doorbell: a session that answered a ring by holding, with nothing new in its inbox, is not rung again for the same unread count.
+
+**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted.
+
+**Related:** TD-336 and TD-339 (no prose in the argv), TD-341 and TD-342 (a brief whose first hook is lost; #1150).
+
+## TD-344: The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`: members whose state is in `NEEDS_YOU_ROWS`), `src/agentorc/ui/templates/rollup.html` (the *Needs you* facet: *answer needed*, then *in the Inbox*); design §4.5a *team card: Answer needed / Doing*
+
+**Why:** On 2026-10-06 techlead-ao-1 held the whole team's review on an `ask` to the person (`m-e60ada636596`), and Paul read the Org's *Needs you* as *0 answer needed*. That count is only members whose pane waits on a permission or a question. A member that mailed its question and ended its turn is `idle`, so its ask is counted only on the second line, *in the Inbox*, among every other Inbox row. The question that stopped the team reads as nothing to answer.
+
+**Fix:** design first. Either *answer needed* also counts an open `ask` to the person from a live member of the team, linked to its Inbox row, or the facet's two lines are worded so that a blocking ask cannot read as none.
+
+**Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home.
+
+**Related:** TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
