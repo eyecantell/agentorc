@@ -25,6 +25,9 @@ class LaunchSpec:
     argv: list[str] | None  # None → the person's login shell
     env: dict[str, str] = field(default_factory=dict)
     adapter_id: str | None = None  # the tool's own session id when the adapter chose it at launch
+    # the prompt the launch did not put in the argv (design §4.1 *No prose in the argv*, TD-339): the
+    # host agent types it once the session reports its first `idle`; None when there is none
+    first_prompt: str | None = None
 
 
 @runtime_checkable

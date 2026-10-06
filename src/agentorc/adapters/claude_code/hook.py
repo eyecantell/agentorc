@@ -134,6 +134,10 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
     if ev in TOOL_EVENTS:
         tool = payload.get("tool_name")
         return {**out, "state": STATE_EVENTS[ev], "pending": None, "event": f"{ev}:{tool}" if tool else ev}
+    if ev == "UserPromptSubmit":
+        # `prompt`: a prompt went in, which is what the host agent's typed brief waits on (§4.1 *No
+        # prose in the argv*, TD-339) — a word, not the prompt's text
+        return {**out, "state": "working", "pending": None, "prompt": True}
     if ev in STATE_EVENTS:
         return {**out, "state": STATE_EVENTS[ev], "pending": None}
     return None
