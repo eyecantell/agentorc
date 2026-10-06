@@ -124,6 +124,8 @@ class WakeMixin:
             return "its brief is not typed yet"  # the first prompt is the brief, never the doorbell's line
         if not mail.mail_wakes(s):
             return "a person's session"  # invariant 5: the chip and the line, nothing typed
+        if s.doorbell_held:
+            return "holding its mail unread"  # rung and answered with nothing read, DOORBELL_HELD times (TD-347)
         if getattr(adapters.get(s.adapter), "composer", None) is None:
             return "no composer"  # without a submit confirmation a ring could land on a half-typed line
         if s.wrapup_sent_at or s.wrapup_at or (s.run_until and now >= _parse(s.run_until)):
@@ -204,9 +206,13 @@ class WakeMixin:
             # only a decided ring has a stretch to keep: an undecided tick is taken again next tick,
             # which is how a refilled budget rings for mail that landed while it was spent
             bell = self._bells[sid] = {"rev": rev, "rung": False, "failures": 0}
+        # judged at its turn's Stop (TD-347); set before typing, since the tool's UserPromptSubmit can
+        # land before the submit confirmation does
+        self._rang[sid] = {"count": s.unread(), "turned": False}
         try:
             await self._type(sid, adapter, mail.unread_line(s.unread()))  # the lock is held already
         except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste: both a failed ring
+            self._rang.pop(sid, None)
             if s.id in self.sessions:
                 self._bell_failed(s, bell, str(e) or type(e).__name__)
             return
@@ -351,12 +357,46 @@ class WakeMixin:
         self._save(s)
         return {**decision, "entries": fresh}
 
+    def _bell_answered(self, s: Session, event: dict[str, Any]) -> None:
+        """A rung session's hook, judged against the ring (design §4.10 *A ring is answered by a read,
+        or the bell stops*, TD-347). The ring's turn starts with its prompt (`UserPromptSubmit`); at
+        that turn's `Stop` — the next hook `idle` — an unread count no lower than the ring's is one
+        more unread ring, a lower one ends the run. `DOORBELL_HELD` in a row set `doorbell_held`."""
+        rang = self._rang.get(s.id)
+        if rang is None:
+            return
+        if event.get("prompt"):
+            rang["turned"] = True
+            return
+        if event.get("state") != "idle" or not rang["turned"]:
+            return
+        del self._rang[s.id]
+        if s.unread() < rang["count"]:
+            self._unread_rings.pop(s.id, None)  # it read: the run ends
+            return
+        run = self._unread_rings[s.id] = self._unread_rings.get(s.id, 0) + 1
+        if run >= mail.DOORBELL_HELD and not s.doorbell_held:
+            s.doorbell_held = {"at": now_iso(), "rings": run}
+            log.info("%s: doorbell held after %d rings answered with nothing read", s.id, run)
+
+    def _bell_cleared(self, s: Session) -> bool:
+        """A read, or a person's act toward it, ends the run and lifts `doorbell_held` (TD-347).
+        True when the record changed, for the caller to save."""
+        self._rang.pop(s.id, None)
+        self._unread_rings.pop(s.id, None)
+        if not s.doorbell_held:
+            return False
+        s.doorbell_held = None
+        return True
+
     def _refill(self, s: Session | None) -> None:
         """A person's act toward `s` restores its wake budget in full (design §4.10 "Time and a
         person restore it"): a send or keys with no caller, a person's message, a decided
-        permission. Never a session's traffic, never a person looking (`seen`, a panel read)."""
+        permission. Never a session's traffic, never a person looking (`seen`, a panel read). It
+        lifts a held doorbell too (TD-347)."""
         if s is None:
             return
+        self._bell_cleared(s)
         s.wake_refilled_at = datetime.now(UTC).isoformat(timespec="microseconds")
         self._save(s)
         self._poke_waits()

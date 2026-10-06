@@ -6758,7 +6758,7 @@ sender's:
   followed by Enter *is* the recipient's next prompt with no `control` check — invariant 11
   bypassed by the mail system itself. The session learns who wrote what from `ao inbox`, whose
   output arrives as a tool result the session weighs, not as a prompt. **A ring is answered by a
-  read, or the bell stops** (TD-343; designed 2026-10-06, not built — TD-347): a ring is already
+  read, or the bell stops** (TD-343; designed 2026-10-06; built — TD-347 slice 2): a ring is already
   rung only when the count has risen past the last wake's watermark and within the wake budget,
   so a session that holds its mail unread is not rung for the same mail twice; but each fresh entry
   rang the seat of 2026-10-06 again, some thirty turns that each re-said it was holding. So after
@@ -6768,6 +6768,11 @@ sender's:
   entries read, which clears the mark) or a person's act toward it refills the budget (*Time and a
   person's act*), which clears it too; `ao status -v` prints the mark on the mail line, and the
   mail waits as it does under a spent budget — landed, undecided, read on the session's next look.
+  The host agent remembers each ring's count from just before it types the line (the tool's
+  `UserPromptSubmit` can land before the submit is confirmed), and judges it at the first hook
+  `idle` after that ring's prompt; the run is the host agent's, not the record's, so a restart of
+  the host agent starts it again, while the mark itself is on the record (`doorbell_held`,
+  `{at, rings}`; `mail.DOORBELL_HELD`).
   No control: the person's cure is a send or a take-over, as for any session that answers nothing. The sender gains no
   authority: the message gate decides whether mail is delivered, and ringing is what delivery does
   next.

@@ -7,6 +7,7 @@ session a wrap-up is under way in. A ring that will not submit is tried once mor
 import asyncio
 import re
 import time
+from datetime import UTC, datetime
 
 import pytest
 from conftest import FAST_TICK, wait_for
@@ -207,3 +208,86 @@ async def test_a_ring_that_will_not_submit_is_tried_once_more_then_recorded(
             capsys.readouterr()
             assert await asyncio.to_thread(cli.main, ["status", "-v"]) == 0
             assert re.search(r"doorbell failed \S+: prompt-stuck", capsys.readouterr().out)
+
+
+async def _unread_ring(agent, ld, w: str, n: int, *, read: bool = False) -> None:
+    """Mail lands, the bell rings with `n` unread, the ring's turn runs — reading its inbox or not —
+    and its `Stop` reports idle: one ring, judged at that Stop (§4.10, TD-347)."""
+    before = len(await _submitted(agent, w))
+    await ld.call("msg", to=w, text=f"mail {n}")
+
+    async def rung() -> bool:
+        got = await _submitted(agent, w)
+        return len(got) > before and got[-1] == "SUBMITTED " + mail.unread_line(n)
+
+    assert await wait_for(rung, timeout=6), f"ring {n} never came"
+    await agent.rpc_hook(w, state="working", prompt=True)  # the ring's UserPromptSubmit
+    if read:
+        async with LocalClient(caller=w) as me:
+            await me.call("inbox", unread=True)
+    await _idle(agent, w)
+
+
+async def test_three_rings_answered_with_nothing_read_hold_the_bell_until_a_read(
+    agent, composerstubs, tmp_path, capsys
+):
+    """TD-343's seat was rung by each fresh entry and answered every ring by re-saying it was
+    holding, some thirty turns. After `DOORBELL_HELD` rings in a row each answered by a turn that
+    left its unread count no lower, the record carries `doorbell_held` and the bell is silent for
+    it whatever lands; `ao inbox` marking an entry read lifts it (design §4.10, TD-347)."""
+    async with LocalClient() as c:
+        w = await _worker(agent, c, tmp_path, "w")
+        lead = await _lead(c, tmp_path, w)
+        await _idle(agent, w)
+        async with LocalClient(caller=lead) as ld:
+            # a read in the run ends it: two unread rings, then one answered by a read
+            await _unread_ring(agent, ld, w, 1)
+            await _unread_ring(agent, ld, w, 2)
+            await _unread_ring(agent, ld, w, 3, read=True)
+            assert agent._unread_rings.get(w) is None and agent.sessions[w].doorbell_held is None
+            for n in (1, 2, 3):
+                await _unread_ring(agent, ld, w, n)
+            async def held() -> dict | None:
+                return (await c.call("get", id=w))["doorbell_held"]
+
+            assert await wait_for(held, timeout=6), "three unread rings never held the bell"
+            assert (await held())["rings"] == mail.DOORBELL_HELD
+            assert agent._bell_blocked(agent.sessions[w], datetime.now(UTC)) == "holding its mail unread"
+            rung = await _submitted(agent, w)
+            await ld.call("msg", to=w, text="mail 4")
+            await _ticks()
+            assert await _submitted(agent, w) == rung, "the bell is silent while held"
+            # `ao status -v` says it on the mail line
+            capsys.readouterr()
+            assert await asyncio.to_thread(cli.main, ["status", "-v"]) == 0
+            assert "mail:   4 unread · doorbell held · 3 unread rings" in capsys.readouterr().out
+            # a read lifts it, and the next mail rings again
+            async with LocalClient(caller=w) as me:
+                await me.call("inbox", unread=True)
+            assert agent.sessions[w].doorbell_held is None
+            await ld.call("msg", to=w, text="mail 5")
+
+            async def rung_again() -> bool:
+                return (await _submitted(agent, w))[len(rung) :] == [LINE_1]
+
+            assert await wait_for(rung_again, timeout=6), "a read lifted the hold, and the next mail rings"
+
+
+async def test_a_persons_send_lifts_a_held_doorbell(agent, composerstubs, tmp_path):
+    """A person's act toward the session refills its budget and lifts the mark (§4.10 *Time and a
+    person's act*, TD-347)."""
+    async with LocalClient() as c:
+        w = await _worker(agent, c, tmp_path, "w")
+        lead = await _lead(c, tmp_path, w)
+        await _idle(agent, w)
+        async with LocalClient(caller=lead) as ld:
+            for n in (1, 2, 3):
+                await _unread_ring(agent, ld, w, n)
+
+        async def held() -> bool:
+            return bool(agent.sessions[w].doorbell_held)
+
+        assert await wait_for(held, timeout=6), "three unread rings never held the bell"
+        await c.call("send", id=w, text="read your mail")
+        assert agent.sessions[w].doorbell_held is None and w not in agent._unread_rings
+

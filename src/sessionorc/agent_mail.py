@@ -1088,6 +1088,7 @@ class MailMixin:
             at = now_iso()
             for e in entries:
                 e.read_at = e.read_at or at
+            self._bell_cleared(s)  # a read answers the bell (§4.10, TD-347)
             self._save(s)
             await self._push_changes()
         who = self._address(s)
