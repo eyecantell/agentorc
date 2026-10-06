@@ -3192,6 +3192,8 @@ class TickMixin:
             self._mail_hints,
             self._asks_hints,
             self._bells,
+            self._rang,  # a ring's count and the run of unread rings (TD-347): a reused id starts at none
+            self._unread_rings,
         ):
             side.pop(sid, None)
         if not (lock := self._typing.get(sid)) or not lock.locked():

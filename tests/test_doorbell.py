@@ -290,4 +290,8 @@ async def test_a_persons_send_lifts_a_held_doorbell(agent, composerstubs, tmp_pa
         assert await wait_for(held, timeout=6), "three unread rings never held the bell"
         await c.call("send", id=w, text="read your mail")
         assert agent.sessions[w].doorbell_held is None and w not in agent._unread_rings
+        # an id reused by a restart starts with no run of the old one's (review of PR #1163)
+        agent._unread_rings[w], agent._rang[w] = 2, {"count": 1, "turned": True}
+        agent._scrub(w)
+        assert w not in agent._unread_rings and w not in agent._rang
 
