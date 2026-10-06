@@ -162,9 +162,8 @@ def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
 
 def test_the_inbox_mark_of_a_chain_names_its_readers():
     # review of TD-315 slice 3: a chain has no top-level `reader`, so the mark says *its readers'*
-    from sessionorc import held
-
     from agentorc.ui.inbox import held_mark
+    from sessionorc import held
 
     v = {"id": "w", "dir": "/nowhere", "held_missed": [held.crossing(n, ["src/a.py"], "t") for n in (845, 846)]}
     texts = {}
