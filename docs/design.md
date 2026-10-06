@@ -5816,12 +5816,9 @@ in a preset or a role directory's `role.yml`, and refused in the `roles:` overla
 `.agentorc.yml`, so no install or repo changes what a flow may ask of a role it did not define.
 
 A stage that gives a lane names a `worker` role; a stage that gives none is a **review stage** and
-names a `seat` role; `manager` and `plain` roles are in no stage. **Today one seat can hold a review
-stage: the team's `techlead:` seat** (role `techlead`), because the held-PR machinery knows two
-readers, `techlead` and `person` (§4.9b *The reader*); a review stage naming another seat role is
-refused when the flow is read, naming TD-314, the design of a review stage any seat role may hold,
-and of a PR passed from one reader to the next (designed 2026-10-04, not built — TD-315: *A review
-stage any seat may hold*, below). So a new role is usable in every flow whose stages
+names a `seat` role; `manager` and `plain` roles are in no stage. **A review stage is held by one
+seat of its role**: the team's `techlead:` seat for the role `techlead`, and one `seats:` entry on
+`asks` for any other (*A review stage any seat may hold*, below; built — TD-315 slice 3). So a new role is usable in every flow whose stages
 want its kind, and a new flow in every team whose members have the kinds it wants — the two are
 written apart and meet only at a stage's `role:` and its kind. **A role knows nothing of flows**:
 under a flow, a role's own `review:` is set aside (the flow says what waits, item 2 below) and its
@@ -6010,8 +6007,9 @@ every team starts before this build — its definition's lanes, `review:` and `e
 `{flow}` and `{stage}` reading `none` (`{techlead}` still names the seat its questions go to).
 
 **Every listed flow must be followable.** A member stage is unstaffed when the definition starts no
-member of its role; the review stage when the team has no `techlead:` seat, **or when nothing would
-be held**: the team's repos write no `held:` (below) — a review with no paths would hold every path
+member of its role; a review stage when the team has no seat to hold it (the `techlead:` seat, or
+one `seats:` entry of its role on `asks`, below), **or when nothing would be held**: the team's
+repos write no `held:` (below), or no path set of the name the stage gives — a review with no paths would hold every path
 (§4.9: *one with no `held:` holds every path*), and under a flow a role's own `review:` holds
 nothing (item 2). A team that lists a flow with an unstaffed stage is **not followable**,
 said in every place the team is read, with what would make it so: *build-review cannot be followed
@@ -6227,7 +6225,8 @@ the org file's overlay or its own `role.yml`. What a repo still repeats of the p
 its supplements — is TD-114's remaining cut, which this design widens to *the path, too*.
 
 **A review stage any seat may hold, and a PR read by more than one (TD-314; designed 2026-10-04,
-not built — TD-315, after TD-309).** Paul (2026-10-04): *add/remove a review round*; *roles and
+TD-315 builds it in slices: the first three built — the record's chain and the verdict, `pr_reads`,
+and the path sets, the stage and the compile; `ao pr held`'s chain and the words and the page not).** Paul (2026-10-04): *add/remove a review round*; *roles and
 flows essentially orthogonal*. What TD-307 left to the techlead seat alone is opened here, and
 everything in this paragraph block is designed and not built. Where TD-307's text above speaks of
 the `techlead` seat as the review stage's — the stage's `role` bullet, *Every listed flow must be
@@ -6244,7 +6243,8 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   seats: with trigger: asks*). A flow may hold more than one review stage, in the order they read;
   two of one role are refused as any two stages of one role are. A review seat's role is a preset
   of kind `seat` or a role directory of that kind (TD-313); what makes it a reader is its stage's
-  brief, not its template.
+  brief, not its template. **Built** (TD-315 slice 3): `flowdefs.check` takes any seat role on a
+  review stage, and `unfollowable` names the three cases.
 - **A repo names its path sets.** `.agentorc.yml`'s top-level `held:` is a list, as TD-307 wrote
   it, or a **mapping of named sets** — `held: {core: ["src/sessionorc/**", "docs/briefs/**"], ui:
   ["src/agentorc/ui/**"]}` — and a review stage gains one key, **`held:`**, the name of a set
@@ -6254,6 +6254,8 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   the sets of that name. A set's name is a word of lower-case letters, digits and `-`. The key is
   a review stage's alone, refused on a stage that gives a lane. A path held for one role and not
   another is still not kept (item 2 above): a path is held for what it is, whoever wrote the PR.
+  **Built** (TD-315 slice 3): `RepoConfig.held_sets` (`held` their union) and `repoconfig.held_for`;
+  a stage's `held:`; one team repo only, as a start reads one today.
 - **The record carries the chain.** Where the current flow holds review stages, every member role
   of its other stages — and a person's own session in the team, item 3 above, which takes what a
   member takes — gets **`review: {chain: [{stage, reader, held}, …], bound}`** — one link for
@@ -6265,7 +6267,9 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   does today; that a `reader` names a seat of the team is the client's check, made at the compile.
   **Built** (TD-315 slice 1a): the shape, `review_links` reading either as links, and rule 11
   holding a chain's PR on the union of its links' paths, read by a reply from any reader its asks
-  named; nothing writes a chain until the compile does (slice 3).
+  named. **Built** (slice 3): the compile writes it (`teams.Compiled.reader`) where the flow's review
+  is more than the techlead on every held path — another seat's stage, a stage naming a set, more
+  than one — and the older shape where it is that alone, which reads the same as its chain of one.
 - **A PR is held by every link whose paths it touches, and is read in the flow's order.** The
   author walks the chain — there is still no mover between stages: it sends `ao msg --kind ask
   --pr <n> <reader>` to the first reader holding the PR, takes the next item, and on that reader's
@@ -6302,7 +6306,8 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   shape reads a chain of one. **Built** (TD-315 slice 2): `pr_reads` — each ask's `id`, `to`, `at`,
   `open`, and its last reply's `verdict` and `replied_at`, the asks oldest first, refused to any
   other session; a mail read, so a node's session reads it over the link. `ao pr held`'s chain is
-  slice 4.
+  slice 4; until then it reads a chain's links that hold the PR in the flow's order, with no turn
+  (slice 3, since the compile writes chains).
 - **The words.** The build stage's brief says *run `ao pr held <n>`; ask the reader it names; a PR
   with a link still to read is never yours to merge*, in place of naming `{techlead}`; a review
   stage's brief says how its reader answers — the verdict, and `ao pr held <n> --id <asker>` to

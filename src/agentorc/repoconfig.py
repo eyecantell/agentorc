@@ -132,6 +132,8 @@ STAGE_SUFFIX = ".stage.md"
 # `.agentorc/roles/<name>/`, each whole, a peer of a preset. A manager's may ship
 # `template_on_call.md`, its shape on call as `ON_CALL_BRIEFS` gives a preset's.
 ROLE_DIR = Path(".agentorc") / "roles"
+# A path set's name (§4.9c *A repo names its path sets*, TD-315): `held: {core: [...], ui: [...]}`
+HELD_SET_RE = re.compile(r"[a-z0-9-]+")
 ORG_ROLES_SUB = "roles"
 ROLE_FILE = "role.yml"
 ROLE_TEMPLATE = "template.md"
@@ -511,6 +513,9 @@ class RepoConfig:
     # §4.9c (TD-309): the repo's held paths, top level — what a flow's review stage waits for. None:
     # the key is absent (a review stage then has nothing to hold); never an empty list
     held: list[str] | None = None
+    # §4.9c (TD-315): `held:` written as a mapping of named sets, `{core: [...], ui: [...]}` — a review
+    # stage's `held: <set>` names one; None when `held:` is a list (or absent). `held` is then their union
+    held_sets: dict[str, list[str]] | None = None
     # how the repo's files were read (`load`'s `read`): its role directories are read the same way (§4.9c)
     read: Reader | None = field(default=None, repr=False, compare=False)
 
@@ -590,6 +595,19 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         cfg.teams = _mapping(value, where)
     elif key == "promote":
         cfg.promote = _promote(value, where)
+    elif key == "held" and isinstance(value, dict):
+        sets: dict[str, list[str]] = {}
+        for name, globs in value.items():
+            name = str(name)
+            if not HELD_SET_RE.fullmatch(name):
+                raise ValueError(f"{where}.{name}: a path set's name is a word of lower-case letters, digits and -")
+            sets[name] = _str_list(globs, f"{where}.{name}")
+            if not sets[name]:
+                raise ValueError(f"{where}.{name} names no path — a set that holds nothing is no set (design §4.9c)")
+        if not sets:
+            raise ValueError(f"{where} names no path set — a review that holds nothing is no key (design §4.9c)")
+        cfg.held_sets = sets
+        cfg.held = list(dict.fromkeys(g for globs in sets.values() for g in globs))
     elif key == "held":
         held = _str_list(value, where)
         if not held:
@@ -762,6 +780,14 @@ def _prompts(v: Any, here: str) -> list[dict[str, str]]:
 def default_label(name: str) -> str:
     """A role's label when nothing gives one: its name with its first letter raised."""
     return name[:1].upper() + name[1:]
+
+
+def held_for(cfg: RepoConfig, name: str = "") -> list[str] | None:
+    """The paths a review stage holds in `cfg`'s repo (§4.9c): its set `name`'s, or with none named
+    every held path (the list, or the union of the sets). None: the repo defines no such set."""
+    if not name:
+        return list(cfg.held) if cfg.held else None
+    return list((cfg.held_sets or {}).get(name) or []) or None
 
 
 def org_roles_dir() -> Path:

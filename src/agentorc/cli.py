@@ -634,6 +634,8 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
         defaults["review"] = reader
         if reader is None:
             return f"no reader: team {name}'s flow {teams.current_flow(team)} holds nothing for this role"
+        if "chain" in reader:  # more than the techlead on every held path (§4.9c, TD-315)
+            return f"held PRs read by {teams.chain_line(reader)} (ao pr held <n>)"
         return f"held PRs read by team {name}'s techlead on {', '.join(reader['held'])} (ao pr held <n>)"
     if defaults.get("review") is None:
         defaults["review"] = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
@@ -2088,6 +2090,14 @@ def cmd_pr(args: argparse.Namespace) -> int:
             print(f"PR #{args.n} is not held: {sid} has no review on its record, so it merges as the cadence says")
         elif not paths:
             print(f"PR #{args.n} is not held: none of its {len(files)} files is under {', '.join(setting['held'])}")
+        elif "chain" in setting:  # each link that holds the PR, in the flow's order (§4.9c, TD-315)
+            shown = ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
+            links = [x for x in setting["chain"] if reviewmod.held_paths(files, {"chain": [x]})]
+            order = ", then ".join(f"{x['reader']} ({x['stage']})" for x in links)
+            print(
+                f"PR #{args.n} is held for {order} (bound {setting['bound']}): {shown}\n"
+                f'ask the first: ao msg --kind ask --pr {args.n} <reader> "<your summary>"; the last merges'
+            )
         else:
             shown = ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
             print(

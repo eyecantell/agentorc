@@ -83,6 +83,27 @@ def test_ao_pr_held_answers_from_the_record_and_the_files(monkeypatch, capsys):
     assert "has no review on its record" in capsys.readouterr().out
 
 
+def test_ao_pr_held_reads_a_flows_chain(monkeypatch, capsys):
+    # TD-315 slice 3: the compile writes a chain, and `ao pr held` reads it — each link that holds
+    # the PR, in the flow's order; whose turn it is, is slice 4's
+    chain = {
+        "chain": [
+            {"stage": "ui-review", "reader": "ui-reader-ao", "held": ["src/agentorc/ui/**"]},
+            {"stage": "review", "reader": "techlead-ao", "held": ["src/sessionorc/**"]},
+        ],
+        "bound": "2h",
+    }
+    got = reviewmod.setting(chain)
+    assert got["held"] == ["src/agentorc/ui/**", "src/sessionorc/**"] and got["chain"] == chain["chain"]
+    _world(monkeypatch, chain, ["src/agentorc/ui/app.py", "src/sessionorc/agent.py"])
+    assert cli.main(["pr", "held", "12"]) == 0
+    assert "is held for ui-reader-ao (ui-review), then techlead-ao (review)" in capsys.readouterr().out
+    _world(monkeypatch, chain, ["src/sessionorc/agent.py"])
+    assert cli.main(["pr", "held", "12"]) == 0
+    out = capsys.readouterr().out
+    assert "is held for techlead-ao (review)" in out and "ui-reader" not in out
+
+
 # -- the page half (design §4.5a *PRs waiting*, TD-093 slice 3) --------------------------------------
 
 
@@ -137,3 +158,17 @@ def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
     assert 'href="https://github.com/eyecantell/agentorc/pull/12"' in html and ">#12</a>" in html
     html = templates.get_template("inbox_rows.html").render(rows=[{**e, "pr_url": ""}], section="needs")
     assert ">#12</span>" in html and "/pull/12" not in html
+
+
+def test_the_inbox_mark_of_a_chain_names_its_readers():
+    # review of TD-315 slice 3: a chain has no top-level `reader`, so the mark says *its readers'*
+    from agentorc.ui.inbox import held_mark
+    from sessionorc import held
+
+    v = {"id": "w", "dir": "/nowhere", "held_missed": [held.crossing(n, ["src/a.py"], "t") for n in (845, 846)]}
+    texts = {}
+    for name, review in (("old", {"reader": "techlead", "held": ["src/**"]}), ("chain", {"chain": [], "bound": "2h"})):
+        mark = held_mark({**v, "review": review})
+        assert mark is not None, name
+        texts[name] = json.dumps(mark["parts"])
+    assert "the techlead's read" in texts["old"] and "its readers' read" in texts["chain"]

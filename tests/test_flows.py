@@ -121,7 +121,8 @@ def test_a_repo_flow_is_found_by_its_directory_and_reaches_package_and_sibling_b
         ([{"name": "b", "role": "grinder", "lane": ["free-pick"]}], "", "brief is required"),
         ([{"name": "b", "role": "techlead", "lane": ["free-pick"], "brief": "b.md"}], "", "names a worker"),
         ([{"name": "r", "role": "grinder", "brief": "b.md"}], "", "a review stage names a seat"),
-        ([{"name": "r", "role": "auditor", "brief": "b.md"}], "", "TD-314"),
+        ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md", "held": "ui"}], "", "alone"),
+        ([{"name": "r", "role": "techlead", "brief": "b.md", "held": "UI sets"}], "", "names one path set"),
         ([{"name": "b", "role": "nobody", "lane": ["free-pick"], "brief": "b.md"}], "", "unknown role 'nobody'"),
         ([{"name": "b", "role": "grinder", "lane": ["whatever"], "brief": "b.md"}], "", "lane word 'whatever'"),
         ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "../../x.md"}], "", "nothing further"),
@@ -1117,3 +1118,90 @@ def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(worl
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     assert cli.main(["org", "check"]) == 1
     assert "roles.grnder — unknown role" in capsys.readouterr().out
+
+
+# ── review stages for any seat: path sets, the staffing, the chain (TD-315 slice 3) ──────────────────
+
+
+@pytest.mark.unit
+def test_held_may_be_a_mapping_of_named_path_sets(tmp_path):
+    # §4.9c *A repo names its path sets*: a list as before, or named sets — `held` then their union
+    cfg = cfg_with(tmp_path, "held:\n  core: [src/sessionorc/**, docs/briefs/**]\n  ui: src/agentorc/ui/**\n")
+    assert cfg.held_sets == {"core": ["src/sessionorc/**", "docs/briefs/**"], "ui": ["src/agentorc/ui/**"]}
+    assert cfg.held == ["src/sessionorc/**", "docs/briefs/**", "src/agentorc/ui/**"]
+    assert repoconfig.held_for(cfg, "ui") == ["src/agentorc/ui/**"] and repoconfig.held_for(cfg) == cfg.held
+    assert repoconfig.held_for(cfg, "docs") is None
+    assert cfg_with(tmp_path, "held: [a/**]\n").held_sets is None
+    for text, why in (
+        ("held: {UI: [a]}\n", "a word of lower-case letters"),
+        ("held: {ui: []}\n", "names no path"),
+        ("held: {}\n", "names no path set"),
+    ):
+        with pytest.raises(ValueError, match=why):
+            cfg_with(tmp_path, text)
+
+
+@pytest.mark.unit
+def test_a_review_stage_of_any_seat_is_staffed_by_one_seat_on_asks(tmp_path):
+    # §4.9c *A review stage names any seat role*: the techlead seat for `techlead`, else exactly one
+    # `seats:` entry of the role on `asks`; a stage's `held:` names a set its repo defines
+    stages = [
+        {"name": "build", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"},
+        {"name": "ui-review", "role": "auditor", "brief": "b.md", "held": "ui"},
+        {"name": "review", "role": "techlead", "brief": "b.md", "held": "core"},
+    ]
+    repo_flow(tmp_path, "td-ui", stages, {"b.md": "x\n"})
+    cfg = cfg_with(tmp_path, "held: {core: [src/sessionorc/**], ui: [src/agentorc/ui/**]}\n")
+    flow = flowdefs.load("td-ui", cfg)
+    assert flow.usable, flow.problems
+    assert [s.held for s in flow.review_stages] == ["ui", "core"]
+
+    def why(**kw):
+        args = {"techlead": True, "held": cfg.held, "seats": [("auditor", "asks")], "held_sets": cfg.held_sets}
+        return flowdefs.unfollowable(flow, {"grinder"}, repo="agentorc", **(args | kw))
+
+    assert why() == []
+    assert why(seats=[]) == ["no seat of role auditor — add one under seats: with trigger: asks"]
+    assert why(seats=[("auditor", "prs")]) == [
+        "the seat of role auditor is on trigger prs — a review seat's trigger is asks"
+    ]
+    assert why(seats=[("auditor", "asks")] * 2) == ["2 seats of role auditor on asks — a review stage has one reader"]
+    assert why(techlead=False) == ["no techlead seat — add `techlead:` to the team"]
+    assert why(held_sets={"core": ["x"]}) == ["nothing held: no path set ui in agentorc"]
+
+
+def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # noqa: F811
+    # §4.9c *The record carries the chain*: one link per review stage, its seat's name and its set's
+    # paths; a flow whose review is the techlead on every held path keeps the older shape
+    root = tmp_path / "agentorc"
+    (root / ".agentorc.yml").write_text("held: {core: [src/sessionorc/**], ui: [src/agentorc/ui/**]}\n")
+    stages = [
+        {"name": "build", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"},
+        {"name": "ui-review", "role": "auditor", "brief": "b.md", "held": "ui"},
+        {"name": "review", "role": "techlead", "brief": "b.md", "held": "core"},
+    ]
+    repo_flow(root, "td-ui", stages, {"b.md": "x\n"})
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t.update(flows=["td-ui"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    t["seats"] = [{"name": "ui-reader-ao", "role": "auditor", "trigger": "asks", "home": "agentorc"}]
+    for m in t["members"]:
+        m.pop("lane", None)
+    p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+    chain = {
+        "chain": [
+            {"stage": "ui-review", "reader": "ui-reader-ao", "held": ["src/agentorc/ui/**"]},
+            {"stage": "review", "reader": "techlead-ao", "held": ["src/sessionorc/**"]},
+        ],
+        "bound": teams.REVIEW_BOUND,
+    }
+    grinder = next(x for x in p.members if x.role == "grinder")
+    assert grinder.review == chain
+    from sessionorc.models import normalize_review
+
+    assert normalize_review(chain) == chain  # the host agent takes it as the compile writes it
+    assert teams.chain_line(chain) == "ui-reader-ao on src/agentorc/ui/**, then techlead-ao on src/sessionorc/**"
+    # the same seat edited out: not followable, in the shared words
+    t["seats"] = []
+    with pytest.raises(teams.TeamError, match="td-ui cannot be followed by ao-grind: no seat of role auditor"):
+        teams.plan(_write(tmp_path, doc), "ao-grind", HOST)

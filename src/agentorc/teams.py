@@ -407,6 +407,9 @@ def flow_rows(
                 held=cfg.held or (),
                 team=team.name,
                 node=host if host != here else "",
+                seats=[(x.role, x.trigger) for x in team.seats],
+                held_sets=cfg.held_sets,
+                repo=org.team_repos(team)[0],
             ):
                 row["cannot"] = flowdefs.cannot_follow(name, team.name, reasons)
         out.append(row)
@@ -596,6 +599,9 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             held=cfg.held or (),
             team=team.name,
             node=host if host != here else "",
+            seats=[(x.role, x.trigger) for x in team.seats],
+            held_sets=cfg.held_sets,
+            repo=home,
         )
         if reasons:
             raise TeamError(flowdefs.cannot_follow(name, team.name, reasons))
@@ -611,15 +617,31 @@ class Compiled:
     listed: list[flowdefs.Flow]
     techlead: bool  # the team has a `techlead:` seat
     cfg: repoconfig.RepoConfig | None = None  # the home repo's file, for what `flow_redundant` reads
+    readers: dict[str, str] = field(default_factory=dict)  # a review seat's role → its name (`_readers`)
 
     @property
     def reader(self) -> dict[str, Any] | None:
         """The reader a member stage's role gets (item 2): the techlead on the repos' `held:` when the
         flow holds a review stage the team can staff — never a `review:` with no `held:`, which would
-        hold every path — else None."""
-        if self.flow.review_stage is None or not self.techlead or not self.held:
+        hold every path — else None. A flow whose review is more than the techlead on every held path
+        — another seat's stage, a stage naming a path set, more than one — gives the chain (§4.9c *The
+        record carries the chain*, TD-315): one link per review stage in the flow's order, `reader` the
+        seat's name, `held` that stage's paths; None where a stage has no reader or nothing to hold,
+        which the start refuses in its own words."""
+        stages = self.flow.review_stages
+        if not stages:
             return None
-        return {"reader": "techlead", "held": sorted(self.held), "bound": REVIEW_BOUND}
+        if len(stages) == 1 and stages[0].role == flowdefs.REVIEW_ROLE and not stages[0].held:
+            if not self.techlead or not self.held:
+                return None
+            return {"reader": "techlead", "held": sorted(self.held), "bound": REVIEW_BOUND}
+        links = []
+        for st in stages:
+            paths = repoconfig.held_for(self.cfg, st.held) if self.cfg is not None else None
+            if not (who := self.readers.get(st.role)) or not paths:
+                return None
+            links.append({"stage": st.name, "reader": who, "held": sorted(paths)})
+        return {"chain": links, "bound": REVIEW_BOUND}
 
     def sits_out(self, role: str) -> bool:
         """A member of `role` sits out: its role is a member stage's of another listed flow and of no
@@ -646,7 +668,34 @@ def compiled(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files:
     flow = next((f for f in listed if f.name == name), None)
     if flow is None or not flow.usable:
         return None
-    return Compiled(flow=flow, held=list(cfg.held or ()), listed=listed, techlead=team.techlead is not None, cfg=cfg)
+    return Compiled(
+        flow=flow,
+        held=list(cfg.held or ()),
+        listed=listed,
+        techlead=team.techlead is not None,
+        cfg=cfg,
+        readers=_readers(team),
+    )
+
+
+def chain_line(review: dict[str, Any]) -> str:
+    """A chain's readers in the order they read, for the line a session started into the team is
+    told (§4.9c, TD-315): *ui-reader-ao-1 on src/agentorc/ui/\\*\\*, then techlead-ao-1 on …*."""
+    return ", then ".join(f"{x['reader']} on {', '.join(x['held'])}" for x in review.get("chain") or [])
+
+
+def _readers(team: orgmod.TeamDef) -> dict[str, str]:
+    """Each review seat of the team by its role (§4.9c, TD-315): the `techlead:` seat's name for the
+    role `techlead`, and the name of a `seats:` entry on `asks` for its role — the name a chain's link
+    gives as its `reader`. A role with two such seats has none: the stage is unstaffed."""
+    out: dict[str, str] = {}
+    asks = [x for x in team.seats if x.trigger == "asks"]
+    for x in asks:
+        if sum(1 for y in asks if y.role == x.role) == 1:
+            out[x.role] = x.name
+    if team.techlead is not None:
+        out[flowdefs.REVIEW_ROLE] = team.techlead.name
+    return out
 
 
 def flow_needs(org: orgmod.Org, team: orgmod.TeamDef, role: str, host: str, here: str, files: Files | None) -> str:
@@ -717,8 +766,8 @@ def flow_redundant(
         review = (cfg.roles.get(role) or {}).get("review")
         if stage is None or stage.review or not review:
             continue
-        same = review.get("reader") == reader["reader"] and review.get("bound", REVIEW_BOUND) == reader["bound"]
-        if same and set(review.get("held") or ()) == set(reader["held"]):
+        same = review.get("reader") == reader.get("reader") and review.get("bound", REVIEW_BOUND) == reader["bound"]
+        if same and set(review.get("held") or ()) == set(reader.get("held") or ()):
             where = cfg.path.name if cfg.path else repoconfig.FILE
             out.append(
                 f"team {team.name}: {role}'s review: in {where} is the reader flow {flow.name} gives — "
@@ -867,7 +916,14 @@ def flow_review(
     if flow is None or not flow.usable:
         return False, None
     # `listed` is the current flow alone: only `.reader` is read here, never `.sits_out`
-    c = Compiled(flow=flow, held=list(cfg.held or ()), listed=[flow], techlead=team.techlead is not None)
+    c = Compiled(
+        flow=flow,
+        held=list(cfg.held or ()),
+        listed=[flow],
+        techlead=team.techlead is not None,
+        cfg=cfg,
+        readers=_readers(team),
+    )
     stage = flow.stage_of(role) if role else None
     takes = role is None or (stage is not None and not stage.review)
     return True, c.reader if takes else None
