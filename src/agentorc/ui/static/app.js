@@ -341,6 +341,7 @@
           dlg.close("done");
         } catch (e) {
           err.textContent = `not put on the board: ${e.message}`; err.hidden = false;
+          const r = b.closest(".mailrow"); if (r) { AO.unPend(r); delete AO.inflight[r.dataset.msg]; }  // a send again marks it again
         } finally { go.disabled = false; }
       };
       dlg.addEventListener("close", () => resolve(done), { once: true });
@@ -358,7 +359,7 @@
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
     suspend: "suspending…", promote: "promoting…", work_start: "starting…", restart: "restarting…",
-    resume: "resuming…", "reopen-push": "resuming…", pause: "pausing…",
+    resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
   };
   const PRESS_NOT = {
     board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",
@@ -374,6 +375,9 @@
   AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
   AO.pressVerb = (key) => PRESS_VERBS[key] || key;
   AO.pressErrs = {};  // a refused press's words by entry id, until that row's next press or a reload
+  // the presses still in flight, by entry id: a poll's swap must not draw back a row the press took
+  // away, nor draw one that stays as pressable, while its request is out (review of #1144)
+  AO.inflight = {};
   AO.markPending = function (row, verb) {
     if (row.classList.contains("pending")) return;  // a form sent twice: the row is marked once
     row.classList.add("pending");
@@ -393,7 +397,7 @@
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
-    if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => say("copied", true)); return; }
+    if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
     const id = b.dataset.id, action = b.dataset.act;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
@@ -417,8 +421,10 @@
     const pressed = () => {
       if (!row || !row.isConnected) return;
       delete AO.pressErrs[row.dataset.msg];
+      const err = row.querySelector(".rowerr"); if (err) { err.hidden = true; err.textContent = ""; }
       const verb = AO.pressVerb(key);
       AO.markPending(row, verb);
+      if (row.dataset.msg) AO.inflight[row.dataset.msg] = { leaves, verb };
       if (!leaves) return;
       // the control goes with its row, and while it holds the focus the refresh would decline to redraw
       if (row.contains(document.activeElement)) document.activeElement.blur();
@@ -734,6 +740,7 @@
       if (row && row.dataset.msg && (left || writes)) AO.pressErrs[row.dataset.msg] = writes ? `not written: ${e.message}` : `not ${PRESS_NOT[key] || AO.pressVerb(key).replace(/…$/, "")}: ${e.message}`;
       if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     } finally {
+      if (row && row.dataset.msg) delete AO.inflight[row.dataset.msg];
       if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
       if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
     }
@@ -1822,6 +1829,11 @@
     return kept;
   };
   AO.restoreRowErrs = function (root, kept) {
+    // a press still in flight: its row stays out, or stays pending, whatever the swap drew (TD-340)
+    if (root) root.querySelectorAll(".mailrow[data-msg]").forEach((r) => {
+      const f = AO.inflight[r.dataset.msg];
+      if (f && f.leaves) r.remove(); else if (f) AO.markPending(r, f.verb);
+    });
     if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
       const msg = el.closest(".mailrow").dataset.msg;
       const text = kept[msg] || AO.pressErrs[msg];  // a refused press's words, held by the page (TD-340)

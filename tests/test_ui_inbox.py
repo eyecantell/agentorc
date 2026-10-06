@@ -3039,6 +3039,11 @@ def test_every_inbox_control_has_its_verb_under_way():
         in js
     )
     assert "const text = kept[msg] || AO.pressErrs[msg];" in js
+    # `say` is the handler's own, declared partway down it: nothing above the declaration may call it
+    handler = js[js.index('const b = ev.target.closest("[data-act], [data-copy]");') :]
+    assert "say(" not in handler[: handler.index("const say = ")]
+    # a poll's swap keeps a press in flight as it was: out, or pending (the review of #1144)
+    assert "if (f && f.leaves) r.remove(); else if (f) AO.markPending(r, f.verb);" in js
 
 
 @pytest.mark.unit
