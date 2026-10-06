@@ -1,8 +1,9 @@
 """The home's definition files have a history (design §4.9 *What is left at the home has a history*,
 TD-210, TD-229 slice 5): at the home, `~/.agentorc` is a git work tree that tracks `org.yml`,
-`profiles.yml` and `settings.yml` and ignores the rest — sessions, runs and mail are state, and
+`profiles.yml` and `settings.yml`, and the org's `flows/` and `roles/` directories (§4.9c, TD-313), and
+ignores the rest — sessions, runs and mail are state, and
 `hosts.yml` is this machine's own. The home's host agent is the one committer; it reads none of the
-three for meaning, only whether each parses as YAML. Nothing here adds a remote or pushes."""
+files for meaning, only whether each `.yml` parses as YAML. Nothing here adds a remote or pushes."""
 
 from __future__ import annotations
 
@@ -17,8 +18,14 @@ from sessionorc import paths
 log = logging.getLogger(__name__)
 
 TRACKED = ("org.yml", "profiles.yml", "settings.yml")
-IGNORE = "# the home's definitions (design §4.9): these are tracked, the rest is state\n*\n!.gitignore\n" + "".join(
-    f"!{f}\n" for f in TRACKED
+# the org's flow and role directories (§4.9c *Where flows and roles live*, TD-313): whole files under each
+TRACKED_DIRS = ("flows", "roles")
+DEFINITIONS = (*TRACKED, *TRACKED_DIRS)
+IGNORE = (
+    "# the home's definitions (design §4.9): these are tracked, the rest is state\n*\n!.gitignore\n"
+    + "".join(f"!{f}\n" for f in TRACKED)
+    # `*` matches at every depth, so a directory is let back in and then everything under it
+    + "".join(f"!{d}/\n!{d}/**\n" for d in TRACKED_DIRS)
 )
 # the committer's own name, and nothing of the person's git setup that could stop or sign a commit
 _GIT = (
@@ -49,15 +56,24 @@ def init(home: Path | None = None) -> bool:
     cp = _git(home, "init", "-q")
     if cp.returncode != 0:
         raise RuntimeError(cp.stderr.strip() or "git init failed")
+    _let_in(home)
+    commit("the home's definitions, first tracked", home=home, files=(".gitignore", *DEFINITIONS))
+    return True
+
+
+def _let_in(home: Path) -> bool:
+    """Write `IGNORE`'s lines into the home's `.gitignore`, and True when it changed: a file of the
+    person's own keeps its lines and the definitions are let back in after them. A home made a work
+    tree before a line was added (the directories, TD-313) gains it on its next commit."""
     ignore = home / ".gitignore"
     have = ignore.read_text(encoding="utf-8") if ignore.exists() else ""
     if not have:
         ignore.write_text(IGNORE, encoding="utf-8")
-    elif missing := [line for line in IGNORE.splitlines()[1:] if line not in have.splitlines()]:
-        # a file of the person's own keeps its lines; the three are let back in after them
+        return True
+    if missing := [line for line in IGNORE.splitlines()[1:] if line not in have.splitlines()]:
         ignore.write_text(have.rstrip("\n") + "\n" + "\n".join(missing) + "\n", encoding="utf-8")
-    commit("the home's definitions, first tracked", home=home, files=(".gitignore", *TRACKED))
-    return True
+        return True
+    return False
 
 
 def _parses(p: Path) -> bool:
@@ -68,18 +84,22 @@ def _parses(p: Path) -> bool:
     return True
 
 
-def commit(message: str, *, home: Path | None = None, files: tuple[str, ...] = TRACKED) -> bool:
-    """Commit `files` as they stand with `message`, and True when a commit was made. A file that does
-    not parse as YAML is left out until it does; one removed is committed as removed; a home that is
-    no work tree commits nothing. A git that fails is logged, never raised: the write it follows has
-    already happened and stands."""
+def commit(message: str, *, home: Path | None = None, files: tuple[str, ...] = DEFINITIONS) -> bool:
+    """Commit `files` as they stand with `message`, and True when a commit was made. A name in
+    `TRACKED_DIRS` stands for every file under that directory. A `.yml` file that does not parse as
+    YAML is left out until it does; one removed is committed as removed; a home that is no work tree
+    commits nothing. A `.gitignore` that lacks a directory's lines gains them, in the same commit. A git
+    that fails is logged, never raised: the write it follows has already happened and stands."""
     home = home or paths.home()
     if not is_tree(home):
         return False
     try:
         tracked = set(_git(home, "ls-files", "-z").stdout.split("\0"))
+        dirs = [f for f in files if f in TRACKED_DIRS]
+        if dirs and _let_in(home):
+            files = (".gitignore", *files)
         take = []
-        for f in files:
+        for f in _expand(home, files, tracked):
             p = home / f
             if p.exists():
                 if f.endswith(".yml") and not _parses(p):
@@ -134,3 +154,16 @@ def settings_message(before: object, after: object, cap: int = 200) -> str:
     """`settings: <the changes>`, cut to `cap` characters."""
     text = "; ".join(changes(before, after)) or "rewritten, unchanged"
     return "settings: " + (text if len(text) <= cap else text[: cap - 1] + "…")
+
+
+def _expand(home: Path, files: tuple[str, ...], tracked: set[str]) -> list[str]:
+    """`files` with each of `TRACKED_DIRS` among them replaced by the files under it as they stand,
+    and those of its tracked files that are gone, as paths relative to the home."""
+    out: list[str] = []
+    for f in files:
+        if f not in TRACKED_DIRS:
+            out.append(f)
+            continue
+        here = sorted(str(p.relative_to(home)) for p in (home / f).rglob("*") if p.is_file())
+        out += here + sorted(t for t in tracked if t.startswith(f + "/") and t not in here)
+    return out

@@ -320,7 +320,7 @@ class SettingsMixin:
             raise RpcError("commit_defs needs the act's words as its message")
         return {"committed": await self._commit_defs(message[:200])}
 
-    async def _commit_defs(self, message: str, files: tuple[str, ...] = defs.TRACKED) -> bool:
+    async def _commit_defs(self, message: str, files: tuple[str, ...] = defs.DEFINITIONS) -> bool:
         """The home's one committer (§4.9): at the home only, one git at a time, in a thread; never
         raises, since the write it follows has already happened."""
         if self.mode != "home":
