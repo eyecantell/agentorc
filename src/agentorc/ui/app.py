@@ -2535,6 +2535,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 ),
                 "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls")),
                 "you": term,
+                # **Telegram** (§4.5a **You**, §4.10; TD-319 slice 3): the last send is the home's alone
+                "telegram": setmod.telegram(got.get("notify"), None if node else (info or {}).get("notify")),
                 "browser_keys": setmod.BROWSER_KEYS,
                 "host_card": setmod.host_card(
                     setmod.local_entry(hosts.hosts_file()), local, hosts.home_name(), hosts.nodes()
@@ -2716,6 +2718,24 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if not change:
             raise HTTPException(400, "you: send open_in, terminal or inbox")
         return answer(await call("set_settings", person=change))
+
+    @app.post("/api/settings/notify")
+    async def settings_notify(request: Request):
+        """§4.5a **You**: **Telegram** → **Save**: `{telegram: {on, secrets, link}}` into `notify:` through
+        `set_settings` (§4.10, TD-319), an empty field cleared — whose refusal (`on` with no secrets, a
+        secrets that is not a `project/config`, a link that is not `http(s)://`) is said in place."""
+        body = await body_of(request)
+        tg = body.get("telegram")
+        if not isinstance(tg, dict) or not tg or not set(tg) <= {"on", "secrets", "link"}:
+            raise HTTPException(400, "notify: send {telegram: {on, secrets, link}}")
+        change = {k: (v.strip() or None) if isinstance(v, str) else v for k, v in tg.items()}
+        return answer(await call("set_settings", notify={"telegram": change}))
+
+    @app.post("/api/settings/notify_test")
+    async def settings_notify_test(request: Request):
+        """§4.5a **You**: **Telegram** → **Send a test**: `notify_test` (§4.10) — one message now with the
+        saved values, whatever the switch says, sent from the home; its result in words."""
+        return JSONResponse({"ok": True, **(await call("notify_test"))})
 
 
 def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:

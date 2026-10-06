@@ -336,7 +336,7 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         # the definition's file at the card's head, not a foot under Save (TD-286)
         card = page[page.index('data-team="sett-team"') :]
         card = card[: card.index("</form>")]
-        assert card.index("defined in <span class=\"mono\">org.yml</span>") < card.index("stop time")
+        assert card.index('defined in <span class="mono">org.yml</span>') < card.index("stop time")
         assert "setfoot" not in card
         bad = client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "maybe"})
         assert bad.status_code == 400 and "ask, start or off" in bad.json()["detail"]
@@ -481,3 +481,78 @@ def test_a_hidden_button_is_not_drawn_whatever_its_class_sets():
     assert ".btn[hidden] { display: none; }" in css
     html = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/templates/settings.html").read_text()
     assert 'class="btn sm ghost setcancel" type="button" hidden' in html
+
+
+@pytest.mark.unit
+def test_the_telegram_card_reads_the_setting_and_the_last_send():
+    """**You**: **Telegram** (§4.5a, §4.10; TD-319 slice 3): the switch, the secrets' name and the link as
+    `notify.telegram` keeps them, and the later of the home's last send and last failure in its words."""
+    off = setmod.telegram(None, None, NOW)
+    assert off["on"] is False and off["secrets"] == "" and off["link"] == "" and off["last"] == ""
+    assert "a blocked outcome" in off["told"] and "no text a session wrote is sent" in off["when"]
+    tg = {"telegram": {"on": True, "secrets": "samscrape/prd", "link": "http://kmaster:8765"}}
+    at = (NOW - timedelta(minutes=3)).isoformat()
+    got = setmod.telegram(tg, {"last_ok": at}, NOW)
+    assert (got["on"], got["secrets"], got["link"]) == (True, "samscrape/prd", "http://kmaster:8765")
+    assert got["last"].startswith("last sent ") and not got["last_failed"]
+    later = (NOW - timedelta(minutes=1)).isoformat()
+    bad = setmod.telegram(tg, {"last_ok": at, "last_error": {"at": later, "reason": "doppler: not logged in"}}, NOW)
+    assert (
+        bad["last_failed"] and bad["last"].startswith("last send failed ") and "doppler: not logged in" in bad["last"]
+    )
+    # a send after the failure is the line again
+    assert not setmod.telegram(tg, {"last_ok": later, "last_error": {"at": at, "reason": "x"}}, NOW)["last_failed"]
+
+
+def test_the_telegram_card_saves_through_set_settings_and_sends_a_test(client, subprocess_agent):
+    """**Save** writes `notify.telegram` through `set_settings` — an empty field cleared, `on` with no
+    secrets refused in the RPC's words — and **Send a test** is `notify_test`'s answer, refused while no
+    secrets are saved (§4.10; TD-319 slice 3)."""
+    from sessionorc.client import call_sync
+
+    try:
+        page = client.get("/settings").text
+        assert 'id="settelegram"' in page and 'name="tg_on" ' in page and "Send a test" in page
+        assert 'name="tg_on" title="Has the home send you one Telegram message' in page
+        no = client.post("/api/settings/notify", json={"telegram": {"on": True, "secrets": "", "link": ""}})
+        assert no.status_code == 400 and "secrets" in no.json()["detail"]
+        test = client.post("/api/settings/notify_test", json={})
+        assert test.status_code == 400 and "secrets is not set" in test.json()["detail"]
+        body = {"telegram": {"on": False, "secrets": "look/dev", "link": "http://127.0.0.1:1/"}}
+        assert client.post("/api/settings/notify", json=body).json()["ok"]
+        assert call_sync("settings")["notify"] == {
+            "telegram": {"on": False, "secrets": "look/dev", "link": "http://127.0.0.1:1"}
+        }
+        page = client.get("/settings").text
+        assert 'name="tg_secrets" value="look/dev"' in page and 'name="tg_on" title=' in page
+        assert client.post("/api/settings/notify", json={"telegram": {"link": ""}}).json()["ok"]
+        assert call_sync("settings")["notify"] == {"telegram": {"on": False, "secrets": "look/dev"}}
+        bad = client.post("/api/settings/notify", json={"telegram": {"link": "ftp://x"}})
+        assert bad.status_code == 400 and "http://" in bad.json()["detail"]
+        assert client.post("/api/settings/notify", json={"telegram": {"token": "x"}}).status_code == 400
+    finally:
+        call_sync("set_settings", notify={"telegram": None})
+
+
+@pytest.mark.unit
+def test_a_telegram_rows_key_is_the_inboxs_row():
+    """`/inbox?row=<key>` (§4.10, TD-319 slice 3): the home's key, `<session>|<kind>` or `work:<team>`, is
+    the page's `data-msg` — `<session>:<kind>`, `work:<team>` as it is — by `AO.rowOfKey`, run under node."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    from test_ui_menu import PROBE
+
+    probe = pathlib.Path(tempfile.mkdtemp()) / "row_probe.js"
+    head = PROBE[: PROBE.index("const P =")]
+    probe.write_text(
+        head
+        + """
+const k = (x) => window.AO.rowOfKey(x);
+console.log(JSON.stringify([k("ao-x-1|permission"), k("ao-x-1|alarm"), k("work:ao-grind"), k(""), k(null)]));
+"""
+    )
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout.strip().splitlines()[-1])
+    assert got == ["ao-x-1:permission", "ao-x-1:alarm", "work:ao-grind", "", ""]

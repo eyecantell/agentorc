@@ -56,6 +56,8 @@
      away under it, so the rows on screen are not silently frozen (design §4.5 *no silent failure
      path*, TD-069). The poll's own words go in `#agentdownwhy`. #}
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: <span id="agentdownwhy">host agent unreachable</span>{% if volatile %} (a volatile host: asleep?){% endif %} — no mail can be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/inbox">Retry</a></div>
+  {#- §4.10 *Told on Telegram* (TD-319 slice 3): a Telegram link's `?row=` named a row the page no longer has -#}
+  <div class="note warn hidden" id="landgone" role="status">that row is gone — it was answered</div>
 
   {# Snoozed: in none of the sections and in no count until its time — and never lost (§4.10). #}
   <details class="card pad snoozedbox" id="snoozedbox"{% if not sections.snoozed %} hidden{% endif %}>

@@ -319,6 +319,29 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "telegram",
+        "tell me on Telegram",
+        "Settings page: You",
+        (
+            "Has the home send you one Telegram message when a session or a team is stopped until you answer and "
+            "no page of agentorc is open. Turn it on once the Doppler project/config that holds the bot's token "
+            "and chat id is saved beside it, so a team's question does not wait behind a closed tab. It sends no "
+            "text a session wrote, tells a row once and only after a minute, and tells nothing while a page is "
+            "visible; off, nothing is sent."
+        ),
+    ),
+    Help(
+        "telegram-test",
+        "Send a test",
+        "Settings page: You",
+        (
+            "Sends one Telegram message from the home now, with the saved secrets and link, whatever the switch "
+            "says, and prints the result beside the button. Press it after saving the card, to see that a message "
+            "reaches your phone and that its link opens this page. It saves nothing and changes no setting, and "
+            "it waits while the card has changes not yet saved."
+        ),
+    ),
+    Help(
         "board-answers",
         "answers",
         "Inbox board row",
@@ -407,7 +430,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "held-missed",
         ),
     ),
-    ("settings", "Settings", ("on-work", "balance")),
+    ("settings", "Settings", ("on-work", "balance", "telegram", "telegram-test")),
 )
 
 

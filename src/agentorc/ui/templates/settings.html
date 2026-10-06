@@ -169,7 +169,7 @@
   </section>
 
   {# **You** (§4.5a *Settings page: You*): two halves by write path #}
-  {% set info_you = "Yours everywhere: the editor button (open_in) and the terminal's size and face, in settings.yml's person: through set_settings — every browser reads them. This browser: what this browser remembers — the theme, mine, the folds — each set by its own control, and Reset this browser, which clears them all here and nothing anywhere else." %}
+  {% set info_you = "Yours everywhere: the editor button (open_in) and the terminal's size and face, in settings.yml's person: through set_settings — every browser reads them. Telegram: whether the home tells you on Telegram what stops a session or a team while no page is open, in settings.yml's notify:. This browser: what this browser remembers — the theme, mine, the folds — each set by its own control, and Reset this browser, which clears them all here and nothing anywhere else." %}
   <section class="isec" id="sec-you">
     <div class="row gap sechead"><span class="h2">You</span>{{ imark("you", "You", info_you) }}</div>
     {{ panel("you", info_you) }}
@@ -209,6 +209,27 @@
       {{ panel("boardshow", info_board) }}
       <datalist id="setfaces"><option value="JetBrains Mono"><option value="Cascadia Code"><option value="Fira Code"><option value="Menlo"><option value="Consolas"><option value="DejaVu Sans Mono"></datalist>
       {{ saverow("every open terminal takes the size and face at once") }}
+    </form>
+    {#- **Telegram** (§4.5a **You**: **Telegram**, §4.10 *Told on Telegram when nobody is looking*; TD-319
+        slice 3): the switch, the Doppler project/config — a name; the card never shows, asks for or
+        stores a token — and the link, into `notify.telegram` through `set_settings`; under them what is
+        told and when, and the home's last send. **Send a test** sends now with the saved values, so it
+        is disabled while the card differs from what was drawn. -#}
+    <form class="card pad setcard" data-section="notify" id="settelegram">
+      <div class="row gap wrap"><span class="h2">when you are not looking</span><span class="badge">Telegram</span></div>
+      <label class="setrow"><span class="setlabel">tell me on Telegram</span>
+        <input type="checkbox" name="tg_on" title="{{ help_title('telegram') }}"{% if telegram.on %} checked{% endif %}>
+        <span class="note">one message when a session or a team is stopped until you answer</span></label>
+      <label class="setrow"><span class="setlabel">secrets</span>
+        <input class="input setin mono" name="tg_secrets" value="{{ telegram.secrets }}" placeholder="samscrape/prd" autocomplete="off" spellcheck="false">
+        <span class="note">a Doppler project/config — a name; the token is never shown or stored here</span></label>
+      <label class="setrow"><span class="setlabel">link</span>
+        <input class="input setin mono" name="tg_link" value="{{ telegram.link }}" placeholder="http://{{ host }}:8765" autocomplete="off" spellcheck="false">
+        <span class="note">how your phone reaches this page</span></label>
+      <div class="note">{{ telegram.told }}</div>
+      <div class="note">{{ telegram.when }}</div>
+      <div class="note settglast{% if telegram.last_failed %} warn{% endif %}"{% if not telegram.last %} hidden{% endif %}>{{ telegram.last }}</div>
+      {% call saverow("applies on the next tick · sent by the home") %}<span class="note settgsaid" role="status"></span><button class="btn sm settgtest" type="button" title="{{ help_title('telegram-test') }}">Send a test</button>{% endcall %}
     </form>
     <div class="card pad setcard" id="setbrowser">
       <div class="row gap wrap"><span class="h2">this browser</span></div>
