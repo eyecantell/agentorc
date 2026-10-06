@@ -3202,7 +3202,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     s = ev["session"]
                     was = known.get(s["id"]) or {}
                     known[s["id"]] = s
-                    if s.get("team") and s.get("run_until") != was.get("run_until"):
+                    moved = s.get("run_until") != was.get("run_until")
+                    if s.get("team") and moved and s.get("run_until") != uiconf.team_until(str(s["team"])):
                         # a team's stop time stamps its members while the Save that moved it is still
                         # in flight: read the settings again, or the compact line compares the new
                         # stamp with the old time and says it differs (TD-337)
