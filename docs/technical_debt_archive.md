@@ -4833,3 +4833,39 @@ The card's `more ▾` on a scheduled record offers both, beside Start now and Ca
 **Done when:** on a scratch home, a team under a repo flow `build → ui-review (held: ui) → review (held: core)` with a `ui-reader` seat: a PR touching both sets is asked of the ui reader first, `ao pr held` names it, its `pass` moves the turn to the techlead, which merges and answers `merged`; a PR touching `core` alone goes to the techlead only; a reply to a PR's ask with no verdict is refused; a record with the older `review` shape behaves as before; a switch to `build-review` with an ask open at the ui reader leaves that ask answered and the techlead's link still to read. When built, §4.9c's and the pointers' *designed, not built* marks come off.
 
 **Related:** TD-314 (the design), TD-307 and TD-309 (flows), TD-313 (role directories, for a review seat role that is no preset), TD-093 (the reader).
+
+## TD-335: A team's stop time is drawn nowhere on the Org — a live team's member card is compact, with no *stops* note
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (grinder-ao-1, pressing TD-297 on a scratch home)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-05** (the designer, PR #1136; the choice of the header over a note on every member's card steered to Paul): design §4.5a *Org — team card: **stops** note* (a live team's `teams.<team>.until` on the header's second line, once, by the card's formatter; gone when cleared or past; nothing on a team with nothing live, whose slot is the *starts* note's), the *card / Focus header — **stops** note* and *card: compact* rows and §4.5 screen 1's compact bullet (a member's compact card draws *· stops <t>* only when its `run_until` differs from the team's, and *· wrapping up* once asked); mockup `Main.dc.html` (samscrape-grind's header). The build is TD-337; this entry archives with it. Was: Open. Seen 2026-10-05 on a scratch home (`scripts/look_home.py`): `set_settings teams.lk.until` two hours out, an unattended shell session in team `lk`; the tick gave the record the team's instant (`run_until`), the `/api/sessions` view carries `stop_note: stops 20:56`, and Focus's header draws **stops 20:56** — but the Org draws it nowhere. A member of a team is the **compact** card (a live team's, and a team's with nothing live once unfolded: `repo.compact_in`) (§4.5a *card: compact*, TD-176 slice 3), whose spec lists the name, the pill, one line of its own and the foot, and no *stops* note; `card.html`'s compact branch draws none; and the team header (`group_head.html`) has no stop time either. §4.5a's row *card / Focus header — **stops** note* says a card shows it whenever something will stop the session, and the Settings look of 2026-09-27 (TD-148, archived) expected *its members' cards should show the stops note*. Which one is meant is a design call, so the designer's: the compact card's one line, a header note (*stops 20:56* once for the team), or §4.5a's row narrowed to the full card.
+**Location:** design §4.5a *card: compact* and the **stops** note row, §4.5 screen 1 (the team summary); `src/agentorc/ui/templates/card.html` (compact branch), `src/agentorc/ui/templates/group_head.html`, `src/agentorc/ui/cards.py` (`stop_note`), `src/agentorc/ui/org.py` (`compact_line`), `src/agentorc/ui/repo.py` (`compact_in`)
+
+**Why:** a person who sets a team's stop time on Settings sees it on no Org card, only by opening a member's Focus.
+
+**Resolved:** 2026-10-05 (PRs #1136, #1143). Designed in #1136, built by TD-337 in #1143. Its *Done when* was shown on a scratch home there: a team with a stop time shows it on the Org header, and a member's own time shows on its compact card only where it differs.
+
+**Done when:** on a scratch home, a team with a stop time shows it on the Org where §4.5a says.
+
+**Related:** TD-297 (where it was seen), TD-146 and TD-148 (the team stop time and its Settings card), TD-176 (the compact card).
+
+## TD-337: Build the team card's **stops** note, and the compact card's own only when it differs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-05 (the designer, TD-335's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built (grinder-ao-2, PR #1143).
+**Location:** `src/agentorc/ui/org.py` (the group head's notes; `compact_line`), `src/agentorc/ui/templates/group_head.html` (the second line, beside `balance_note` and `work_started`), `src/agentorc/ui/templates/card.html` (the compact branch), `src/sessionorc/models.py` (`stop_note`, which `cards.py` imports), `src/agentorc/ui/help.py` and `tests/test_help.py` (the team card's help, if its paragraph names the notes), `tests/test_ui.py`; design §4.5a *team card: stops note*, *card: compact*, the **stops** note row, §4.5 screen 1, §6 *Team stop time*, §5 `teams.<team>.until`
+
+**Why:** TD-335's design. A person who sets a team's stop time on Settings sees it on no Org card.
+
+**Resolved:** 2026-10-05 (PR #1143). Design §4.5a *team card: stops note* and *card: compact* carry the lasting content. The *Done when* was pressed on a scratch home and is recorded in the PR's UI check. With the team's `until` two hours out, the header read *stops 22:39*. A member given an earlier time with `set_stop` read *Grinder · stops 21:39* and its matching sibling read *Grinder*. A Save from the open page moved the header without a reload, and a Clear removed it. A later member time is clamped to the team's by the tick (§6), so the press used an earlier one, which is the case that differs. Pinned by `tests/test_ui_team_summary.py::test_a_live_teams_stop_time_is_on_its_header_once`.
+
+**Done when** on a scratch home, `set_settings teams.<team>.until` two hours out puts *stops <t>* on the live team's header, and `ao until <member> +1h` puts *· stops <t>* on that member's compact card alone (TD-335's *Done when*); then TD-335 archives with this entry.
+
+**Related:** TD-335 (the design), TD-146 (the team stop time), TD-176 (the compact card), TD-026 (the *starts* note, the same slot on a team with nothing live), TD-297 (where it was seen).
