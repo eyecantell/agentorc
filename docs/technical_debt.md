@@ -90,7 +90,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-315 | Build review stages for any seat: named path sets, the `review` chain, `--verdict`, `pr_reads` and `ao pr held`'s turn, the briefs' words, the Repo page's standing | Low | Open |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Slices 1 and 2 built |
-| TD-335 | A team's stop time is drawn nowhere on the Org: a live team's member is a compact card with no *stops* note, and the team header has none | Low | Designed 2026-10-05 (the team header's **stops** note; a member's own only when it differs) — the build is TD-337 |
+| TD-335 | A team's stop time is drawn nowhere on the Org: a live team's member is a compact card with no *stops* note, and the team header has none | Low | Open — design-first |
+| TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Open |
 | TD-337 | Build the team card's **stops** note from `teams.<team>.until`, and the compact card's own only when its `run_until` differs, with *· wrapping up* once asked | Low | Open |
 
 ---
@@ -1575,6 +1576,24 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when:** on a scratch home, a team with a stop time shows it on the Org where §4.5a says.
 
 **Related:** TD-297 (where it was seen), TD-146 and TD-148 (the team stop time and its Settings card), TD-176 (the compact card).
+
+## TD-336: A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-05 (the anchor, asked by Paul why cm-grind was idle)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open. contractmatch's side is fixed by its PR #122 (kills by executable); agentorc's is not.
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`: the brief as `--append-system-prompt` and as the prompt), design §4.1 (*a session's brief rides in its argv*), §4.3
+
+**Why:** On 2026-10-05 at 23:07 UTC `grinder-cm-1`'s pane died with status 143 (SIGTERM) while it ran contractmatch's `frontend/scripts/run_ci_tests.sh`, which its brief tells it to run for anything integration-affecting. The script's cleanup runs `pkill -f chromedriver` and `pkill -f "chromium"`, which match a word anywhere in a process's command line. The launch puts the session's brief there, and `docs/briefs/grinder-cm-1.md` names *Chromium + chromedriver*, so the cleanup killed the `claude` process running it. TD-026's work was left uncommitted, as an earlier run had left the same work. The template's rule (*never run a process-matching kill with a pattern that can match your own shell command line*) cannot help: the session does not see the kill, a script it was told to run does, and nothing says its own command line holds a few kilobytes of prose. Any repo, any script, any word the brief happens to use.
+
+**Fix:** design first, then build. Keep the brief out of the process's command line: hand it to the tool from a file under the home (the 8 KB launch script of §4.1 already exists, so the text could be read there rather than written into the `exec`'d argv), if the tool takes a system-prompt tail from a file or from stdin; otherwise say in §4.1 why it cannot, and have every template say that a script's `pkill -f` can hit the session. Whatever is chosen, a resume must still be handed the tail (TD-283).
+
+**Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels.
+
+**Related:** TD-283 (the start context on every launch), contractmatch PR #122.
 
 ## TD-337: Build the team card's **stops** note, and the compact card's own only when it differs
 
