@@ -46,6 +46,10 @@ def test_the_worker_presets_carry_300k_and_a_layer_can_change_or_remove_it(tmp_p
         "roles:\n  grinder:\n    context: {bound: 400k}\n  hunter:\n    context: none\n"
         "  manager:\n    context: none\n  scribe:\n    brief: docs/scribe.md\n"
     )
+    scribe_dir = tmp_path / ".agentorc" / "roles" / "scribe"  # a role directory (§4.9c)
+    scribe_dir.mkdir(parents=True)
+    (scribe_dir / "role.yml").write_text("")
+    (scribe_dir / "template.md").write_text("scribe {lane}\n")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.context_bound == 400_000 and not grinder.context_default

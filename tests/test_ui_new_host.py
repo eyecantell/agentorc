@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 REPO_YML = (
-    "roles:\n  scout:\n    brief: docs/scout.md\n  stray:\n    brief: /etc/stray.md\n"
+    "roles:\n  hunter:\n    brief: docs/scout.md\n  grinder:\n    brief: /etc/stray.md\n"
     "controllers: [lead-1]\nledger: docs/ledger.md\n"
 )
 NODE_FILES = {".agentorc.yml": REPO_YML, "docs/scout.md": "Scout the node's own alpha.\n"}
@@ -86,10 +86,12 @@ def test_the_repo_list_and_the_checks_are_the_picked_hosts(form):
 def test_the_roles_are_read_from_the_picked_hosts_repo(form):
     c, _calls = form
     got = c.get("/api/roles", params={"dir": "/srv/node/alpha/.claude/worktrees/td-1", "host": "node1"}).json()
-    assert "scout" in [r["name"] for r in got["roles"]] and got["controllers"] == ["lead-1"]
+    hunter = next(r for r in got["roles"] if r["name"] == "hunter")
+    assert hunter["source"] == "built-in + repo" and got["controllers"] == ["lead-1"]
     assert got["file"] == "node1:/srv/node/alpha/.agentorc.yml"
     outside = c.get("/api/roles", params={"dir": "/srv/node/gone", "host": "node1"}).json()
-    assert "scout" not in [r["name"] for r in outside["roles"]] and "error" not in outside
+    assert next(r for r in outside["roles"] if r["name"] == "hunter")["source"] == "built-in"
+    assert "error" not in outside
 
 
 @pytest.mark.unit
@@ -141,12 +143,12 @@ def test_start_on_another_host_carries_that_hosts_brief_and_ledger(form):
     c, calls = form
     r = c.post(
         "/new",
-        data={"name": "w1", "dir": "/srv/node/alpha", "role": "scout", "host": "node1"},
+        data={"name": "w1", "dir": "/srv/node/alpha", "role": "hunter", "host": "node1"},
         follow_redirects=False,
     )
     assert r.status_code == 303, r.text
     made = next(p for m, p in calls if m == "create")
-    assert made["host"] == "node1" and made["role"] == "scout"
+    assert made["host"] == "node1" and made["role"] == "hunter"
     assert "Scout the node's own alpha." in made["prompt"] and made["ledger"] == "docs/ledger.md"
     # the brief was read on node1, by its path in the checkout there
     assert ("host_files", {"host": "node1", "dir": "/srv/node/alpha", "paths": ["docs/scout.md"]}) in calls
@@ -157,7 +159,7 @@ def test_a_brief_outside_the_checkout_on_another_host_stops_start(form):
     c, calls = form
     r = c.post(
         "/new",
-        data={"name": "w1", "dir": "/srv/node/alpha", "role": "stray", "host": "node1"},
+        data={"name": "w1", "dir": "/srv/node/alpha", "role": "grinder", "host": "node1"},
         follow_redirects=False,
     )
     assert r.status_code == 400 and "outside the checkout" in r.text
