@@ -13,6 +13,7 @@ decisions; this file points at them rather than repeating them.
 
 ## Title and status
 
+- 2026-10-06 (TD-346, the designer; Paul, that day: *do it, in a quiet window*): the layout of the split decided — thirty files under `docs/design/` named `<§>-<slug>.md`, one per section and per §4 subsection, each beginning with its heading line as it stands; `design.md` the index; this history kept one file; tests through `tests/design_doc.py`; the move a script, landed when no open PR touches the file. Not built — TD-351.
 - 2026-09-04: the design session that produced this document; the project was called `sessionherd` for most of that day (see §10 for the rename to agentorc).
 - 2026-09-05: the last of the original open questions closed; building started the same day.
 - 2026-09-21: Paul named the project ShiftLead (shiftlead.dev). The packages, state directory, units, config file and command home keep the `agentorc` name until TD-060's second step, at a release boundary.
