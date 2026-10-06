@@ -996,7 +996,7 @@ def roles(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = Non
 
 
 def unread(path: Path) -> str | None:
-    """A `Reader` for a repo whose files are not read from here (the New session form's config of
-    another host's checkout, `ui.app.config_on`): none of its role directories is read, rather than
-    this host's disk at the same path."""
+    """A `Reader` for a directory whose files are not read from here (the New session form's config of
+    a directory outside any checkout on another host, `ui.app.config_on`): nothing in it is read,
+    rather than this host's disk at the same path."""
     return None

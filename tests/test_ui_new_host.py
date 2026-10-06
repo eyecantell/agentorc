@@ -10,9 +10,16 @@ from fastapi.testclient import TestClient
 
 REPO_YML = (
     "roles:\n  hunter:\n    brief: docs/scout.md\n  grinder:\n    brief: /etc/stray.md\n"
+    "  warden:\n    lane: [watch]\n"
     "controllers: [lead-1]\nledger: docs/ledger.md\n"
 )
-NODE_FILES = {".agentorc.yml": REPO_YML, "docs/scout.md": "Scout the node's own alpha.\n"}
+NODE_FILES = {
+    ".agentorc.yml": REPO_YML,
+    "docs/scout.md": "Scout the node's own alpha.\n",
+    # a role the node's checkout defines (§4.9c, TD-313): read there, never from this host's disk
+    ".agentorc/roles/warden/role.yml": "kind: worker\nicon: eye\n",
+    ".agentorc/roles/warden/template.md": "Ward {lane} on the node.\n",
+}
 
 
 @pytest.fixture
@@ -172,3 +179,25 @@ def test_start_on_a_host_that_does_not_answer_creates_nothing(form):
     r = c.post("/new", data={"name": "w1", "dir": "/x", "role": "scout", "host": "silent"}, follow_redirects=False)
     assert r.status_code == 400 and "did not answer" in r.text
     assert "create" not in [m for m, _ in calls]
+
+
+@pytest.mark.unit
+def test_a_role_the_other_hosts_checkout_defines_is_listed_and_started(form):
+    # TD-313: the form once read none of that checkout's role directories, so a repo-defined role there
+    # was missing from the pick-list; it is read through `host_files`, as a team start reads it
+    c, calls = form
+    got = c.get("/api/roles", params={"dir": "/srv/node/alpha", "host": "node1"}).json()
+    warden = next(r for r in got["roles"] if r["name"] == "warden")
+    assert warden["source"] == "repo role + repo" and warden["lane"] == ["watch"]
+    r = c.post(
+        "/new",
+        data={"name": "a1", "dir": "/srv/node/alpha", "role": "warden", "host": "node1"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, r.text
+    made = next(p for m, p in calls if m == "create")
+    assert made["prompt"].startswith("Ward watch on the node.")
+    assert (
+        "host_files",
+        {"host": "node1", "dir": "/srv/node/alpha", "paths": [".agentorc/roles/warden/template.md"]},
+    ) in calls

@@ -1427,21 +1427,26 @@ def away_host(host: str) -> str:
 
 async def config_on(call: Any, host: str, directory: str) -> repoconfig.RepoConfig:
     """`directory`'s repo config on another host (§4.4a *The New session form on another host*,
-    TD-294): `host_dir` gives the checkout's top level (`root`), `host_files` its `.agentorc.yml`,
-    and `repoconfig.load_text` parses it here — a team start's loader, so the two cannot disagree.
-    Outside a checkout, the defaults for the directory. A host that does not answer is
-    `HostSilent`; a malformed file is `ValueError` in the loader's words."""
+    TD-294): `host_dir` gives the checkout's top level (`root`), and `repoconfig.load` reads its
+    `.agentorc.yml` and the role directories its `roles:` names through `host_files` — a team start's
+    loader and reader, so the two cannot disagree (TD-313). The config's `read` blocks on the page's
+    loop, so whatever resolves a role from it runs in a worker thread. Outside a checkout, the
+    defaults for the directory, reading nothing there. A host that does not answer is `HostSilent`;
+    a malformed file is `ValueError` in the loader's words."""
     try:
         seen = await call("host_dir", host=host, dir=directory)
-        root = str((seen or {}).get("root") or "")
-        if not root:
-            return repoconfig.RepoConfig(root=Path(directory))
-        got = await call("host_files", host=host, dir=root, paths=[repoconfig.FILE])
     except HTTPException as e:
         raise HostSilent(silent(host, e)) from None
-    cfg = repoconfig.load_text(((got or {}).get("files") or {}).get(repoconfig.FILE), root)
-    cfg.read = repoconfig.unread  # its role directories are not read across the link here (TD-313)
-    return cfg
+    root = str((seen or {}).get("root") or "")
+    if not root:
+        cfg = repoconfig.RepoConfig(root=Path(directory))
+        cfg.read = repoconfig.unread  # never this host's disk at the same path
+        return cfg
+    read = teams.reader_on(files_on(call, asyncio.get_running_loop()), host, Path(root))
+    try:
+        return await asyncio.to_thread(repoconfig.load, root, read=read)
+    except OSError as e:  # the host stopped answering between the two reads
+        raise HostSilent(str(e)) from None
 
 
 def files_on(call: Any, loop: asyncio.AbstractEventLoop) -> teams.Files:
@@ -1602,7 +1607,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"roles": builtins}
         try:
             cfg = await config_on(call, h, dir.strip())
-            found = [r.to_dict() for r in repoconfig.roles(cfg)]
+            found = [r.to_dict() for r in await asyncio.to_thread(repoconfig.roles, cfg)]
         except ValueError as e:  # HostSilent among them: said where the note is
             return {"roles": builtins, "error": str(e)}
         return {"roles": found, "controllers": cfg.controllers, "file": f"{h}:{cfg.path}" if cfg.path else None}
@@ -1690,14 +1695,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 )
                 ledger = cfg.ledger
                 if role.strip():
-                    preset = repoconfig.resolve_role(cfg, role.strip())
+                    # another host's config reads across the link, which blocks: off the loop
+                    preset = (
+                        await asyncio.to_thread(repoconfig.resolve_role, cfg, role.strip())
+                        if away
+                        else repoconfig.resolve_role(cfg, role.strip())
+                    )
                     # a Team pick names the team's seat and manager in the brief, as a team start
                     # does for its members (`teams.brief_ids`, TD-253); `none` each without one
-                    read = (
-                        teams.reader_on(files_on(call, asyncio.get_running_loop()), away, Path(cfg.root or dir))
-                        if away
-                        else None
-                    )
+                    read = cfg.read if away else None
                     ids = (
                         await asyncio.to_thread(team_brief_ids, team.strip(), preset.name, cfg, read)
                         if team.strip()
