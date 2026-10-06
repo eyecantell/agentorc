@@ -1583,8 +1583,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Type:** debt
 **Added:** 2026-10-06 (grinder-ao-1, on the anchor's finding for TD-339's live check)
 **Owner:** grinder
-**Kind:** build
-**Status:** Built (grinder-ao-1, this PR): `_take_name` calls `_id_pane_replaced`, which moves the record's pane from `_id_panes` to `_id_gone` the moment the name is taken. Design §4.8a says it. Left: the live check — a team restart after the promote logs no *hook for … matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
+**Kind:** live-check #1150
+**Status:** Built (grinder-ao-1, PR #1150): `_take_name` calls `_id_pane_replaced`, which moves the record's pane from `_id_panes` to `_id_gone` the moment the name is taken. Design §4.8a says it. Left: the live check — a team restart after the promote logs no *hook for … matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 **Location:** `src/sessionorc/agent_identity.py` (`_id_pane_replaced`, `_id_channel`'s `unlisted`), `src/sessionorc/agent.py` (`_take_name`), `tests/test_identity.py` (`test_a_restarts_first_hook_waits_for_a_fresh_list`); design §4.8a *A pane the tick has not listed yet*.
 
 **Why:** the host agent's journal, 2026-10-05 22:38: *ao-agentorc-grinder-ao-1 wants another run … restarting it*, *superseded the closed session of the same name*, then at 22:38:01 *hook for ao-agentorc-grinder-ao-1 matched no pane: peer 4150517 …, listed pane 3728701, gone pane None* and *identity alarm (enforce): outside claimed 'ao-agentorc-grinder-ao-1' on hook*. `_id_channel` takes a fresh pane list only while some live record has no pane in the last list; the restarted record still had one there — the old run's — so the new run's first hook, from a pane no list had shown, was judged against the stale list and refused. The record never reached a hook-reported `idle`, so its brief (TD-339) was never typed. TD-225's *(a)* recorded the old pane as gone only when a list showed another pane, which is after this hook.
