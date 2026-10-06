@@ -6226,7 +6226,7 @@ its supplements — is TD-114's remaining cut, which this design widens to *the 
 
 **A review stage any seat may hold, and a PR read by more than one (TD-314; designed 2026-10-04,
 TD-315 builds it in slices: the first four built — the record's chain and the verdict, `pr_reads`,
-the path sets, the stage and the compile, and `ao pr held`'s chain; the words and the page not).** Paul (2026-10-04): *add/remove a review round*; *roles and
+the path sets, the stage and the compile, and `ao pr held`'s chain; the words built — slice 5a; the page not).** Paul (2026-10-04): *add/remove a review round*; *roles and
 flows essentially orthogonal*. What TD-307 left to the techlead seat alone is opened here, and
 everything in this paragraph block is designed and not built. Where TD-307's text above speaks of
 the `techlead` seat as the review stage's — the stage's `role` bullet, *Every listed flow must be
@@ -6316,7 +6316,12 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   know whether the merge is its own. `{flow}` draws every review stage with its seat and its
   paths (*… → ui-review (ui-reader-ao-1, on src/agentorc/ui/\*\*) → review (techlead-ao-1, on
   src/sessionorc/\*\*) → you, through techlead-ao-1*). Questions still go to the `techlead:` seat
-  (§4.9b): a review seat of another role reads PRs and answers nothing else.
+  (§4.9b): a review seat of another role reads PRs and answers nothing else. **Built** (TD-315
+  slice 5a): the build briefs of `td` and `build-review` (the reader `ao pr held` names, each
+  verdict's next step, *a PR with a reader still to read is never yours to merge*), `td`'s
+  `review.md` (`--id <the asker>`, *pass* where a reader after it still reads, the merge the last
+  reader's), and `{flow}` from `flowdefs.review_links` — the techlead stage by the seat's id, any
+  other by its seat's name, each with its set's paths.
 - **The bound and the person.** Each ask is bounded by the repo's `review.bound`, as one is today;
   past it the author asks the person on that thread and **the PR is the person's**, the rest of
   its chain with it: their merge or their word ends it.
