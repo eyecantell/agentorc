@@ -134,7 +134,15 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
     assert states(again)[0] == ["asked", "later"]
     # a home that did not say: unknown, never a guess
     assert states(None)[0] == ["unknown", "unknown"]
-    assert not reviewmod.addressed("ao-agentorc-other-ui-reader-aox", "ui-reader-ao")
+    assert reviewmod.addressed("ao-agentorc-other-ui-reader-aox", ["ui-reader-ao"]) is None
+    # a seat name that ends another's is never taken for it (the review of slice 4)
+    assert reviewmod.addressed("ao-agentorc-ui-reader", ["reader", "ui-reader"]) == "ui-reader"
+    assert reviewmod.addressed("ao-agentorc-reader@node1", ["reader", "ui-reader"]) == "reader"
+    # a PR one link holds: an ask to another reader is not its read
+    one = [links[1]]
+    assert reviewmod.walk(one, [passed])["chain"][0]["state"] == "next"
+    assert reviewmod.walk(one, [passed], older=True)["chain"][0]["state"] == "passed"  # the older shape: any ask
+    assert reviewmod.walk(links, None)["turn"] is None
     # the command, with the home's reads
     chain = {"chain": [{"stage": x["stage"], "reader": x["reader"], "held": x["paths"]} for x in links], "bound": "2h"}
     _world(monkeypatch, chain, ["src/agentorc/ui/app.py", "src/sessionorc/agent.py"])
@@ -142,11 +150,11 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
     monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"asks": [passed]} if m == "pr_reads" else base(m, **kw))
     assert cli.main(["--json", "pr", "held", "12"]) == 0
     got = json.loads(capsys.readouterr().out)
-    assert got["turn"] == "techlead-ao" and got["merges"] == "techlead-ao"
+    assert got["turn"] == "techlead-ao" and got["merges"] == "techlead-ao" and got["unread"] == ""
     assert [r["state"] for r in got["chain"]] == ["passed", "next"]
     assert cli.main(["pr", "held", "12"]) == 0
     out = capsys.readouterr().out
-    assert "ui-reader-ao · src/agentorc/ui/app.py · passed 14:02" in out and "your turn to ask — it merges" in out
+    assert "ui-reader-ao · src/agentorc/ui/app.py · passed 14:02 UTC" in out and "your turn to ask — it merges" in out
 
 
 # -- the page half (design §4.5a *PRs waiting*, TD-093 slice 3) --------------------------------------

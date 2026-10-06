@@ -2092,12 +2092,15 @@ def cmd_pr(args: argparse.Namespace) -> int:
         for x in setting["chain"]:
             if mine := reviewmod.held_paths(files, {"chain": [x]}):
                 links.append({**x, "paths": mine})
+        unread = ""
         try:
             asks = call_sync("pr_reads", id=sid, pr=args.n).get("asks") or []
-        except AgentError:
-            asks = None
+        except AgentUnavailable:
+            raise
+        except AgentError as e:  # an older home, or a reader not yet asked: its refusal is said
+            asks, unread = None, str(e)
         walked = reviewmod.walk(links, asks)
-        out.update(walked)
+        out.update(walked, unread=unread)
 
     def prose() -> None:
         if not setting:
@@ -2109,7 +2112,9 @@ def cmd_pr(args: argparse.Namespace) -> int:
             print(f"PR #{args.n} is held by {n} reader{'' if n == 1 else 's'}, in order (bound {setting['bound']}):")
             for row in walked["chain"]:
                 print(f"  {row['stage']} · {row['reader']} · {', '.join(row['held'])} · {_link_state(row, walked)}")
-            if walked["turn"] is None:
+            if out.get("unread"):
+                print(f"where each stands is not read: {out['unread']}")
+            elif walked["turn"] is None:
                 print(f"every reader has passed it — {walked['merges']} merges it")
             elif not getattr(args, "id", None):
                 print(f'ask the first not passed: ao msg --kind ask --pr {args.n} <reader> "<your summary>"')
@@ -2127,7 +2132,7 @@ def _link_state(row: dict[str, Any], walked: dict[str, Any]) -> str:
     """One link's standing in `ao pr held`'s words (§4.9c *Whose turn it is*): *passed 14:02*,
     *asked 13:40*, *findings 13:55*, *your turn to ask*, *later*; the last link's *— it merges*."""
     at = str(row.get("at") or "")
-    when = f" {at[11:16]}" if len(at) >= 16 else ""
+    when = f" {at[11:16]} UTC" if len(at) >= 16 else ""
     word = {
         "passed": f"passed{when}",
         "asked": f"asked{when}",

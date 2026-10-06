@@ -44,30 +44,35 @@ def setting(review: Any) -> dict[str, Any] | None:
     return {"reader": str(review["reader"]), "held": list(held), "bound": str(review.get("bound") or "2h")}
 
 
-def addressed(addr: str, reader: str) -> bool:
-    """Whether a mail address names a chain link's `reader`, the seat's name as the definition gives
-    it (§4.9c): the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name itself."""
+def addressed(addr: str, readers: list[str]) -> str | None:
+    """Which of a chain's `readers` — each the seat's name as the definition gives it (§4.9c) — a
+    mail address names: the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name
+    itself. The longest name that fits wins, so `ui-reader` is never taken for `reader`. None: none."""
     base = str(addr).split("@", 1)[0]
-    return base == reader or base.endswith(f"-{reader}")
+    fits = [r for r in readers if base == r or base.endswith(f"-{r}")]
+    return max(fits, key=len) if fits else None
 
 
-def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None) -> dict[str, Any]:
+def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None, *, older: bool = False) -> dict[str, Any]:
     """Where a held PR stands along its chain (§4.9c *Whose turn it is*, TD-315 slice 4): `links` the
     record's links that hold the PR, in the flow's order, and `asks` its author's asks carrying the
     PR as `pr_reads` gives them (None: the home did not say). Each link gets a `state` — `passed` (its
     reader's last answer was `pass` or `merged`), `asked` (an ask is open, or answered with no verdict),
     `findings`, `next` (the first link not passed, never asked: the author's turn to ask it) or
     `later` — and `at`, the time of what set it. `turn` is the first link not passed, None once every
-    link has passed; `merges` the last link's reader, the one that merges. A chain of one (the older
-    `{reader, held}`) takes every ask of the PR as its reader's, whoever it was addressed to."""
+    link has passed or when the home did not say; `merges` the last link's reader, the one that
+    merges. The older `{reader, held}` (`older`) takes every ask of the PR as its reader's, whoever it
+    was addressed to; a chain matches each ask to a link by its addressee. A chain names each seat
+    once — two stages of one role are refused — so no ask counts for two links."""
     rows: list[dict[str, Any]] = []
     turn: dict[str, Any] | None = None
+    readers = [str(x.get("reader") or "") for x in links]
     for link in links:
         row = {"stage": link.get("stage"), "reader": link.get("reader"), "held": list(link.get("paths") or [])}
         if asks is None:
             row["state"], row["at"] = "unknown", None
         else:
-            mine = [a for a in asks if len(links) == 1 or any(addressed(x, str(link["reader"])) for x in a["to"])]
+            mine = [a for a in asks if older or any(addressed(x, readers) == link["reader"] for x in a["to"])]
             last = mine[-1] if mine else None
             if last is None:
                 row["state"], row["at"] = ("later" if turn is not None else "next"), None
@@ -82,7 +87,7 @@ def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None) -> dict
         rows.append(row)
     return {
         "chain": rows,
-        "turn": turn["reader"] if turn is not None else None,
+        "turn": turn["reader"] if turn is not None and asks is not None else None,
         "merges": rows[-1]["reader"] if rows else None,
     }
 

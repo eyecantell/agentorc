@@ -6307,8 +6307,9 @@ the stage's own seat and that stage's path set; TD-315 rewords those sentences w
   `open`, and its last reply's `verdict` and `replied_at`, the asks oldest first, refused to any
   other session; a mail read, so a node's session reads it over the link. **Built** (slice 4):
   `ao pr held`'s chain — `review.walk` over the links that hold the PR and the author's asks, a
-  link's reader matched to an ask's addressee by the seat's name (`review.addressed`); a home that
-  does not answer `pr_reads` leaves each link *not read*, never guessed.
+  link's reader matched to an ask's addressee by the seat's name, the longest that fits
+  (`review.addressed`); a `pr_reads` that is refused (a reader not asked yet) or that an older home
+  does not know leaves each link *not read* and says why, with no turn, never a guess.
 - **The words.** The build stage's brief says *run `ao pr held <n>`; ask the reader it names; a PR
   with a link still to read is never yours to merge*, in place of naming `{techlead}`; a review
   stage's brief says how its reader answers — the verdict, and `ao pr held <n> --id <asker>` to
