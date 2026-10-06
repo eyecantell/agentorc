@@ -93,6 +93,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-335 | A team's stop time is drawn nowhere on the Org: a live team's member is a compact card with no *stops* note, and the team header has none | Low | Open — design-first |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Open |
 | TD-337 | Build the team card's **stops** note from `teams.<team>.until`, and the compact card's own only when its `run_until` differs, with *· wrapping up* once asked | Low | Open |
+| TD-338 | Inbox controls give no feedback: hover differs by button kind, a press shows nothing while it runs, and a board **Done** leaves its row standing ~10 s until the write-back returns | Medium | Open |
 
 ---
 
@@ -1616,3 +1617,28 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** on a scratch home, `set_settings teams.<team>.until` two hours out puts *stops <t>* on the live team's header, and `ao until <member> +1h` puts *· stops <t>* on that member's compact card alone (TD-335's *Done when*); then TD-335 archives with this entry.
 
 **Related:** TD-335 (the design), TD-146 (the team stop time), TD-176 (the compact card), TD-026 (the *starts* note, the same slot on a team with nothing live), TD-297 (where it was seen).
+
+## TD-338: Inbox controls give no feedback — hover differs by button kind, a press shows nothing while it runs, and a row waits on the server before it moves
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-05 (the anchor, from Paul's use of the Inbox)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.css` (`.btn`), `src/agentorc/ui/static/app.js` (the `data-act` click handler: `act()`, then `staterow.remove()` and `AO.refreshInboxPage()`), `src/agentorc/ui/templates/inbox_row.html`; design §4.5 *Inbox* (*A row is a card*), §4.5a *Inbox row* and *Inbox board row*, §4.4 (the board write-back)
+
+**Why:** Paul, 2026-10-05, pressing **Done** on a few board rows: the buttons behave differently under the mouse, a press gives no sign it was taken, and the row stays put, looking dead, until it vanishes on a redraw. What the code does:
+1. **Hover differs by kind.** `.btn` has no `:hover` and no `:active` rule. Only `.btn.ghost:hover` (and the footers' `.btn.next` / `.btn.link`) changes. `inbox_row.html` draws 39 ghost buttons, 8 plain, 4 `primary` and 2 `answer`, so most controls light up under the mouse and **Done**, the answers and the primary ones do not.
+2. **A press shows nothing.** The handler awaits `act()` with the button enabled and the row unchanged. Nothing is disabled or marked while the request runs, so a second press is possible and the first looks ignored.
+3. **The row waits on the slowest step.** It is taken out only after `act()` returns. For a board row that is the whole write-back (§4.4, `sessionorc/board.py`): fetch, commit in the host agent's tree, push, `gh pr create` and a squash merge, bounded at 40 s (`BOUND`). Measured that evening on samscrape's #1028: the PR opened at 19:51:33 and merged at :37, and the UI's POST answered at :42, roughly ten seconds after the press. Only then do the toast and `refreshInboxPage()` move the row.
+
+**Fix:** design first, then build.
+- **One look for every bordered control** (§4.5 already says *everything bordered is one*): the same `:hover`, `:active` and `:focus-visible` across `.btn` and its variants, so a control reads as pressable the same way wherever it sits.
+- **A press answers in the same frame.** The pressed control is disabled and the row is marked pending (dimmed, a short *checking off…* / *snoozing…* label) before the request goes out.
+- **A row whose press takes it away leaves at once.** Done, Dismiss, Snooze and their kind are taken out on the press, not on the server's answer, and the toast says it is landing. A refusal or a failed write-back puts the row back, marked, with the server's words. **Suspend** and a board **decide** keep their row, as they do now. They change in place.
+- Decide whether the board write-back should also stop holding the HTTP request open: answer once the edit is accepted, and report the landing (or its failure) as an Inbox event.
+
+**Done when** on a scratch home every Inbox control shows the same hover and pressed state, a press disables its control and marks its row within one frame, a board **Done** takes its row out before the write-back returns and brings it back with the reason when the write-back is refused, and the UI check's screenshots show the hover, pressed and pending states.
+
+**Related (all archived):** TD-264 (the write-back), TD-255 (the board row's answers), TD-082 (the Inbox layout), TD-124 (the keys, which press the same controls).
