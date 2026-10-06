@@ -535,8 +535,9 @@ class Adapter(Protocol):
                                                       # prompt — no turn runs for it and nothing is typed. Claude Code:
                                                       # `--append-system-prompt-file <path>` (TD-336; §4.1 *No prose in
                                                       # the argv* — the flag is in the binary of 2.1.290 and its own
-                                                      # Remote Control carrier uses it, though `--help` lists only
-                                                      # `--append-system-prompt`; until TD-339 lands, that one), given
+                                                      # Remote Control carrier uses it, though `--help` gives it no entry of
+                                                      # its own — only `--bare`'s text names `--append-system-prompt[-file]`;
+                                                      # until TD-339 lands, `--append-system-prompt`), given
                                                       # again at every launch of the conversation, a resume included,
                                                       # since the tool keeps it in no file of the session's. The `prompt`
                                                       # is not argv's either: `LaunchSpec.first_prompt`, which the host
