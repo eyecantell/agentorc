@@ -77,6 +77,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
+| TD-363 | `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing (held by a dead record, other repos' records, the falling-count order, the owner's case) | Medium | Open |
+| TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
+| TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
 
 ---
 
@@ -1320,3 +1323,64 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
 
+## TD-363: `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`repo_lanes`), `src/sessionorc/ledger.py` (`in_lanes`); `tests/test_repo_facts.py` (`test_in_lanes_splits_the_repos_count_by_the_teams_lanes`, `test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work`)
+
+**Why:** Each line below was reverted in a worktree on `origin/main` (089a10de), and `tests/test_repo_facts.py`, `test_ui_repo_page.py`, `test_ui_team_summary.py` and `test_ui_teams.py` were run: all passed.
+- `repo_lanes`: `if s.get("state") not in DEAD` → `if True`. A claim held by a dead record is counted as held, so a live member's lane entry reads as taken and the *out of work* warning is hidden. No test has a dead record that holds a claim.
+- `repo_lanes`: `Path(str(s["repo"])).resolve() == here` → `True`. Every record of every repo is read as the repo's. The fleet in both tests holds only records of one repo.
+- `in_lanes`: `rest.sort(key=lambda r: (-r["n"], r["owner"]))` → `key=lambda r: r["owner"]`. The docstring and §4.4 say falling count then name, but the one case, anchor 20 and dev-cadence 4, is alphabetical too.
+- `in_lanes`: `str(e.get("owner") or "").lower()` → no `.lower()`. A ledger `Owner: Anchor` would split from `anchor` in the rest.
+- The `superseded_by` filter is guarded: the test's `old` record carries a lane.
+
+**Fix:** Add to the existing tests, no source change:
+- a dead record that holds a claim (the entry stays unheld and the member is warned);
+- a record of another repo with a lane, absent from the result;
+- two owners whose counts and alphabetical order disagree (the larger count last by name);
+- an `Owner:` in mixed case, counted with its lowercase twin.
+- **Done when** each of the four reverts above fails a test.
+
+**Related:** TD-361 (built it), TD-357 (designed it), TD-364.
+
+## TD-364: The lanes line's real callers (#1196) are untested: the team card and the Repo page read the whole fleet, and every test reaches them through `members`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/repo.py` (`team_groups`: `team_summary(..., fleet=views)`), `src/agentorc/ui/org.py` (`team_summary`: `fleet if fleet is not None else members`), `src/agentorc/ui/app.py` (`repo_page`: `team_lanes(named, vs, r)`); `tests/test_ui_team_summary.py` (`test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work`)
+
+**Why:** `team_lanes` says *every live record of the repo for what is held*, so the callers pass the whole fleet. Reverted one at a time, with `tests/test_ui_repo_page.py`, `test_ui_team_summary.py` and `test_ui_teams.py` run, each still passed:
+- `team_groups`: `, fleet=views` removed, so the Org page's card reads its own members only.
+- `repo_page`: `team_lanes(named, vs, r)` → `team_lanes(named, members, r)`.
+- `org.team_summary`: `fleet if fleet is not None else members` → `members`.
+- `test_the_lanes_line_…` calls `team_summary` without `fleet`, so only the fallback is read. A claim held by another team's live member of the same repo, which is why the fleet is passed, is in no test through a caller. The card then warns a member out of work for an entry that another team's member holds.
+
+**Fix:** a test through `team_groups` (or the Org page) and one through `/repo/<name>?team=` with a second team's live record claiming an entry in the first team's lane: the first team's member is not warned. **Done when** the three reverts above fail a test.
+
+**Related:** TD-361, TD-363.
+
+## TD-365: `pick_flow` returns `stays` (#1191) and no test or caller reads it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`pick_flow`: `"stays": stays_with(name, sessions)`); `tests/test_flows.py`
+
+**Why:** `"stays": stays_with(name, sessions)` → `"stays": []` leaves `tests/test_flows.py`, `test_ui_teams.py`, `test_cli_teams.py`, `test_ui_settings.py` and `test_cli.py` passing. The docstring says `pick_flow` returns `stays` and what it is for; `app.js`'s `AO.flowSet` and `ao team flow <team> <flow>` read `differences` and `feature` but not `stays` (only `--apply`'s reply is printed with it).
+
+**Fix:** one assertion in `test_flows.py` that a pick with an open PR asked of a reader returns it in `stays`; or, if nothing is to read it, drop it from the return and the docstring. **Done when** the revert fails a test, or the key is gone.
+
+**Related:** TD-359 (#1191), TD-356.
