@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from collections import Counter
 from typing import Any
 
 from sessionorc import (
@@ -36,10 +37,27 @@ class IdentityMixin:
         """The live panes of this host's records, as the classification reads them. On the loop,
         from a pane list a thread already took."""
         was = self._id_panes
+        live = {sid: p for sid, p in panes.items() if not p.dead and sid in self.sessions}
+        # each pane's own scope (TD-360), read once per pane pid: a pane's cgroup does not move
+        if self._id_own_cg is None:
+            self._id_own_cg = self.proc.cgroup(os.getpid()) or ""
+        scopes = {
+            p.pane_pid: self._id_scopes[p.pane_pid]
+            if p.pane_pid in self._id_scopes
+            else identity.own_scope(p.pane_pid, self.proc, {self._id_own_cg} - {""})
+            for p in live.values()
+        }
+        self._id_scopes = scopes
+        counts = Counter(scopes.values())
+        shared = {cg for cg, n in counts.items() if cg and n > 1}  # a cgroup two panes share is neither's own
         self._id_panes = [
-            identity.Pane(sid, p.pane_pid, identity.tty_nr_of(p.tty) if p.tty else 0)
-            for sid, p in panes.items()
-            if not p.dead and sid in self.sessions
+            identity.Pane(
+                sid,
+                p.pane_pid,
+                identity.tty_nr_of(p.tty) if p.tty else 0,
+                "" if scopes[p.pane_pid] in shared else scopes[p.pane_pid],
+            )
+            for sid, p in live.items()
         ]
         now = self._id_listed_at = time.monotonic()
         # A pane is gone when its record lists no pane **or another one**: a restart or supersede

@@ -496,6 +496,70 @@ async def test_a_restart_under_the_same_name_keeps_the_old_pane_for_the_grace(ag
     assert "ao-x" not in agent._id_gone
 
 
+def test_a_gone_pane_in_a_scope_of_its_own_is_matched_by_that_scope():
+    """TD-360: Claude Code starts a hook with `setsid` and no terminal, so the orphan of a pane whose
+    tool has died keeps neither the pane's session id nor its pty. tmux under systemd starts each pane
+    in a `tmux-spawn-<uuid>.scope`, which the orphan keeps: the third signal, asked only when the scope
+    is the pane's own."""
+    scope, server = "/app.slice/tmux-spawn-1.scope", "/app.slice/agentorc-agent.service"
+    fp = FakeProc([*BASE, P(140, 1, 139), P(141, 1, 141)], {100: scope, 50: server, 140: scope, 141: server})
+    x = Pane("ao-x", 100, 0x8801, scope)
+    assert identity.classify_gone(140, x, fp) == Channel("session", "ao-x", "scope")
+    assert identity.classify_gone(141, x, fp) is None  # the server's cgroup: never the pane's
+    assert identity.classify_gone(140, Pane("ao-x", 100, 0x8801), fp) is None  # no scope of its own: no third signal
+    # own_scope: the pane's cgroup when it is neither its parent's (the tmux server's) nor a shared one
+    assert identity.own_scope(100, fp, set()) == scope
+    assert identity.own_scope(100, fp, {scope}) == ""  # the host agent's own
+    fp.cgroups[100] = server
+    assert identity.own_scope(100, fp, set()) == ""  # every pane in the server's cgroup: none
+    assert identity.own_scope(999, fp, set()) == ""  # gone before it was read
+
+
+async def test_the_old_runs_last_hook_is_its_sessions_by_the_panes_scope(agent, monkeypatch):
+    """TD-360: after TD-341 every ao-grind restart still alarmed — *peer 268870 (sid 268869), listed pane
+    268896, gone pane 4063114 0.9s ago*. The peer was the old run's `SessionEnd`, spawned as its pane was
+    killed, with a session of its own and no terminal. It is matched by the scope its pane ran in; a peer
+    outside that scope still alarms, and panes that share one cgroup have no scope to match by."""
+    import os
+
+    agent.identity_mode = "enforce"
+    agent._id_detached = ""
+    old, new, other = "/app.slice/tmux-spawn-old.scope", "/app.slice/tmux-spawn-new.scope", "/app.slice/x.scope"
+    server, mine = "/app.slice/agentorc-agent.service", "/app.slice/agentorc-agent.service"
+    fp = FakeProc(
+        [*BASE, P(140, 1, 139), P(141, 1, 141), P(300, 50, 300, 0x8803)],
+        {50: server, os.getpid(): mine, 100: old, 200: other, 140: old, 141: other, 300: new},
+    )
+    monkeypatch.setattr(agent, "proc", fp)
+    monkeypatch.setitem(agent.sessions, "ao-x", object())
+    monkeypatch.setitem(agent.sessions, "ao-y", object())
+
+    def info(pid: int) -> PaneInfo:
+        return PaneInfo(session="", created=0, current_command="claude", pane_pid=pid, dead=False, dead_status=None)
+
+    agent._id_note_panes({"ao-x": info(100), "ao-y": info(200)})
+    assert {p.session: p.cgroup for p in agent._id_panes} == {"ao-x": old, "ao-y": other}
+    agent._id_pane_replaced("ao-x")  # the restart took the name: the old pane is gone at once
+    agent._id_note_panes({"ao-x": info(300), "ao-y": info(200)})
+    assert agent._id_gone["ao-x"][0].cgroup == old
+
+    def hook(session: str) -> dict:
+        return {"id": 1, "method": "hook", "params": {"session": session, "state": "exited"}}
+
+    alarms = []
+    monkeypatch.setattr(agent, "_id_alarm", lambda entry, about: alarms.append(entry))
+    assert await agent._identify(hook("ao-x"), 140) is None  # the old run's last hook: its own
+    assert alarms == []
+    assert (await agent._identify(hook("ao-x"), 141))["error"] == identity.MISMATCH  # another scope
+    assert (await agent._identify(hook("ao-y"), 140))["error"] == identity.MISMATCH  # another record's
+    assert len(alarms) == 2
+    # two panes in one cgroup: neither has a scope of its own, so neither is matched by it
+    fp.cgroups[200] = new
+    agent._id_scopes = {}
+    agent._id_note_panes({"ao-x": info(300), "ao-y": info(200)})
+    assert [p.cgroup for p in agent._id_panes] == ["", ""]
+
+
 def test_no_read_decides_anything_on_its_caller():
     """The rule `identity.READS` rests on: a read is served under any claim, so it must not
     authorise on one. `host_files` was listed until the red-team of PR #248 — it serves the person

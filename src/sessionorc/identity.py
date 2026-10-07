@@ -138,11 +138,13 @@ def tty_nr_of(path: str) -> int:
 
 @dataclass(frozen=True)
 class Pane:
-    """A live pane of a record on this host: the record's id, the pane's first process, its pty."""
+    """A live pane of a record on this host: the record's id, the pane's first process, its pty, and
+    the cgroup the pane runs in when it is the pane's own (`own_scope`), else empty."""
 
     session: str
     pid: int
     tty_nr: int = 0
+    cgroup: str = ""
 
 
 @dataclass(frozen=True)
@@ -229,9 +231,10 @@ def classify(peer_pid: int, panes: Collection[Pane], reader: ProcReader, *, deta
 
 
 def classify_gone(peer_pid: int, pane: Pane, reader: ProcReader) -> Channel | None:
-    """`pane`'s session when the peer still carries its POSIX session id or its terminal — the two
-    signals an orphan keeps once the pane's first process has exited — else None (§4.8a *A hook
-    just after its pane ended*, TD-115). No walk: the pane pid is gone, so no ancestor can be it."""
+    """`pane`'s session when the peer still carries its POSIX session id, its terminal, or — where
+    the pane ran in a cgroup of its own — that cgroup: the signals an orphan keeps once the pane's
+    first process has exited; else None (§4.8a *A hook just after its pane ended*, TD-115, TD-360).
+    No walk: the pane pid is gone, so no ancestor can be it."""
     peer = reader.stat(peer_pid)
     if peer is None:
         return None
@@ -239,7 +242,24 @@ def classify_gone(peer_pid: int, pane: Pane, reader: ProcReader) -> Channel | No
         return Channel("session", pane.session, "sid")
     if pane.tty_nr and peer.tty_nr == pane.tty_nr:
         return Channel("session", pane.session, "tty")
+    # A tool that starts its hooks with `setsid` and no terminal (Claude Code) leaves an orphan
+    # neither of those; tmux under systemd starts each pane in a scope of its own, which it keeps
+    if pane.cgroup and reader.cgroup(peer_pid) == pane.cgroup:
+        return Channel("session", pane.session, "scope")
     return None
+
+
+def own_scope(pane_pid: int, reader: ProcReader, shared: Collection[str]) -> str:
+    """The cgroup `pane_pid` runs in when it is the pane's own — not its parent's (the tmux server's)
+    and none of `shared` (the host agent's) — else empty. tmux built with systemd support starts each
+    pane in a `tmux-spawn-<uuid>.scope`; a host where every pane shares the server's cgroup has none,
+    and a gone pane is then matched by session id and terminal alone (TD-360). The caller also
+    empties one that two panes share."""
+    cg = reader.cgroup(pane_pid)
+    st = reader.stat(pane_pid)
+    if not cg or st is None or st.ppid <= 1 or cg in shared:
+        return ""
+    return "" if reader.cgroup(st.ppid) in (None, cg) else cg
 
 
 @dataclass(frozen=True)
