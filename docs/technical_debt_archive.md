@@ -5219,3 +5219,41 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a manager that has run for a week raises no *unpushed* row unless commits exist only on this machine, and the briefs no longer tell it to commit a log.
 
 **Related:** TD-069 (the *unpushed* row), TD-079 (a row that cannot be answered is a row to fix), design §4.2 (Ready to close), TD-076 (the manager's brief is rewritten there anyway).
+
+## TD-344: The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-06** (the designer, PR #1157): the first of the Fix's two shapes — a member's open `ask` to the person is an **Answer needed** block (the member, *asked you · <age>*, the ask's first line as text, **Open** to its message page, no answer control) counted in the facet and in the rollup's *answer needed*; the Inbox still counts it under *in the Inbox*, and the design says one ask may be in both lines (design §4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*). Not taken: the wording-only fix (a count of 0 would still stand where the team waits). Before: Open.
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`: members whose state is in `NEEDS_YOU_ROWS`), `src/agentorc/ui/templates/rollup.html` (the *Needs you* facet: *answer needed*, then *in the Inbox*); design §4.5a *team card: Answer needed / Doing*
+
+**Why:** On 2026-10-06 techlead-ao-1 held the whole team's review on an `ask` to the person (`m-e60ada636596`), and Paul read the Org's *Needs you* as *0 answer needed*. That count is only members whose pane waits on a permission or a question. A member that mailed its question and ended its turn is `idle`, so its ask is counted only on the second line, *in the Inbox*, among every other Inbox row. The question that stopped the team reads as nothing to answer.
+
+**Resolved:** 2026-10-06 (PR #1167): built by TD-350 — `org.ask_blocks`, appended by `answer_blocks`; the Org route and its deltas (`needs_cache`) hand the team summaries the Inbox's *Needs you* rows; held on a scratch home (PR #1167's UI check: *Answer needed (1)*, the rollup's *1 answer needed*, gone once answered); tests in `tests/test_ui_team_summary.py` and `tests/test_ui_inbox.py`.
+
+**Fix (as it was):** design first. Either *answer needed* also counts an open `ask` to the person from a live member of the team, linked to its Inbox row, or the facet's two lines are worded so that a blocking ask cannot read as none.
+
+**Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home.
+
+**Related:** TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
+
+## TD-350: Build the Org's ask block — a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-06 (TD-344's design round; the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built 2026-10-06 (grinder-ao-2, PR #1167)
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`, `summary`, `team_groups`, `rollup`); `src/agentorc/ui/app.py` (the Org route, which already computes `inbox_sections` for the top bar — its `needs` rows are the source, so the Org and the Inbox cannot disagree); `src/agentorc/ui/templates/rollup.html` (the *answer needed* tooltip) and `team_summary.html` (the `m.answers` loop, the Answer needed blocks); `tests/test_ui.py` or `tests/test_org.py`
+
+**Why:** design §4.5a *team card: Answer needed / Doing* (TD-344, 2026-10-06): a member's open `ask` to the person is a block under **Answer needed** and is counted there and in the rollup's *answer needed*. Today `answer_blocks` reads only members whose state is in `NEEDS_YOU_ROWS` (a pane's permission or question), so a member that mailed its question and ended its turn is `idle` and the Org reads *0 answer needed* while the team waits (techlead-ao-1's `m-e60ada636596`, 2026-10-06).
+
+**Resolved:** 2026-10-06 (PR #1167): built by TD-350 — `org.ask_blocks`, appended by `answer_blocks`; the Org route and its deltas (`needs_cache`) hand the team summaries the Inbox's *Needs you* rows; held on a scratch home (PR #1167's UI check: *Answer needed (1)*, the rollup's *1 answer needed*, gone once answered); tests in `tests/test_ui_team_summary.py` and `tests/test_ui_inbox.py`.
+
+**Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home (TD-344's *Done when*); then TD-344 archives.
+
+**Related:** TD-344 (the design), TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).

@@ -18,7 +18,7 @@ from sessionorc.reports import branch_ref
 from . import uiconf
 from .cards import DEAD
 from .common import _age, _instant, _short_age
-from .inbox import NEEDS_YOU_ROWS, state_kind
+from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
 # -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
 
@@ -169,10 +169,46 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     return out
 
 
-def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+def ask_blocks(
+    members: Collection[dict[str, Any]], needs: Collection[dict[str, Any]], now: datetime | None = None
+) -> list[dict[str, Any]]:
+    """**A member's `ask` to you is a block too** (§4.5a *team card: Answer needed / Doing*, TD-350):
+    every open ask the Inbox counts under *Needs you* — `needs`, its rows as `inbox_sections` gave
+    them — whose sender is one of `members`, oldest first. The two are in the reader's form (§4.4a
+    *Every address crosses in the reader's form*): a node's record is `id@host` on both sides, and a
+    bare id is this host's, so they are matched whole. Never a
+    `steer`, a board row or a state row. Its text is the ask's first line, drawn as text."""
+    now = now or datetime.now(UTC)
+    names = {str(m["id"]): str(m.get("name") or m["id"]) for m in members}
+    out = []
+    for e in needs or ():
+        if not isinstance(e, Mapping) or e.get("row") or e.get("kind") not in PERSON_ASK_KINDS or not _entry_open(e):
+            continue
+        sid = str(e.get("from") or "")
+        if sid not in names:
+            continue
+        text = str(e.get("text") or "").strip()
+        out.append(
+            {
+                "id": str(e.get("id") or ""),
+                "member": sid,
+                "name": names[sid],
+                "kind": "ask",
+                "text": text.splitlines()[0] if text else "",
+                "at": str(e.get("at") or ""),
+                "age": _short_age(e.get("at"), now),
+            }
+        )
+    return sorted(out, key=lambda a: a["at"])
+
+
+def answer_blocks(
+    members: Collection[dict[str, Any]], needs: Collection[dict[str, Any]] = (), now: datetime | None = None
+) -> list[dict[str, Any]]:
     """**Answer needed** (§4.5a *team card: Answer needed / Doing*): each member waiting on a
     permission or a question — the permission with Allow / Deny when the hook gave something to
-    answer (`tool_use_id`), a question as its text with Focus."""
+    answer (`tool_use_id`), a question as its text with Focus — then each member's open `ask` to
+    the person from the Inbox's `needs` rows (`ask_blocks`, TD-350)."""
     out = []
     for m in members:
         kind = state_kind(m)
@@ -188,7 +224,7 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
                 "deadline": m.get("deadline") or "",
             }
         )
-    return out
+    return out + ask_blocks(members, needs, now)
 
 
 REF_WIDTH = 10  # *TDs in motion*'s reference column at most, in characters (§4.5a **Columns**, TD-252)
@@ -226,6 +262,7 @@ def team_summary(
     doing: Mapping[str, Any] | None,
     waiting: dict[str, Any] | None = None,
     now: datetime | None = None,
+    needs: Collection[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
     needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
@@ -234,7 +271,7 @@ def team_summary(
     now = now or datetime.now(UTC)
     r = team_repo(members, repos or {})
     motion = motion_rows(members, r)
-    answers = answer_blocks(members)
+    answers = answer_blocks(members, needs, now)
     return {
         "team": team,
         "repo": repo_facet(r, now, waiting) if r else None,

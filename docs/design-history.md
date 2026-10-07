@@ -291,6 +291,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-06 (TD-350, grinder-ao-2): the ask block built. The Org's deltas redraw each team summary without reading the mailbox, so they read the *Needs you* rows the last Org page or Inbox poll composed (the UI's `needs_cache`). The page and its deltas therefore count the same asks, and a delta is at most one poll behind the Inbox.
 - 2026-10-06 (TD-344, the designer): the **team card: Answer needed / Doing** row gains the ask block — the member, *asked you · <age>*, the ask's first line as text, **Open** to the message page, no answer control — and the **Org rollup** row's *answer needed* counts it (not built — TD-350).
 - 2026-09-06 (**Where**: this directory / new worktree): the worktree option landed after a session was started in the main checkout beside its anchor.
 - 2026-09-06 (directory field → occupancy): the occupancy check landed; the create RPC refuses the same way.

@@ -73,12 +73,22 @@
       <div class="fhead"><span class="kind">Answer needed ({{ m.answers | length }})</span><span class="grow"></span>
         <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
       {% for a in m.answers %}
+      {%- if a.kind == 'ask' %}
+      {#- **A member's ask to you** (§4.5a, TD-350): the member, *asked you · <age>*, the first line as
+          text, and **Open** — the message page holds the answers; the facet draws no answer control -#}
+      <div class="ablock">
+        <div><a class="name" href="/focus/{{ a.member }}">{{ a.name }}</a> <span class="meta">asked you · <span data-doing-at="{{ a.at }}" title="{{ a.at }}">{{ a.age }}</span></span></div>
+        <div class="atext" title="{{ a.text }}">{{ a.text }}</div>
+        <div><a class="btn sm next" href="/inbox/{{ a.id }}">Open</a> <span class="meta">answered on its page in the Inbox</span></div>
+      </div>
+      {%- else %}
       <div class="ablock">
         <div><a class="name" href="/focus/{{ a.id }}">{{ a.name }}</a> <span class="meta">{{ a.kind }}{% if a.deadline %} · <span class="countdown" data-deadline="{{ a.deadline }}"></span>{% endif %}</span></div>
         <div class="mono atext" title="{{ a.text }}">{{ a.text }}</div>
         {% if a.kind == 'permission' %}<div class="row gap"><button class="btn sm primary" data-act="allow" data-id="{{ a.id }}">Allow</button><button class="btn sm next" data-act="deny" data-id="{{ a.id }}">Deny</button><input class="denywhy" type="text" maxlength="200" data-id="{{ a.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"></div>
         {% else %}<div><a class="btn sm next" href="/focus/{{ a.id }}">▣ Focus</a> <span class="meta">answered in the terminal</span></div>{% endif %}
       </div>
+      {%- endif %}
       {% else %}
       <div class="meta">nothing waits on an answer</div>
       {% endfor %}

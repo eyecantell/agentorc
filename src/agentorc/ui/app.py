@@ -286,6 +286,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
     answer_blocks,  # noqa: F401
+    ask_blocks,  # noqa: F401
     compact_line,  # noqa: F401
     doing_rows,  # noqa: F401
     motion_rows,  # noqa: F401
@@ -681,6 +682,7 @@ def create_app() -> FastAPI:
             await work_marks(),
             flow_cache["flows"],  # the page load's reading: a delta reads no plan
             work_cache["balance"],  # the home's balance marks, read beside `work` (TD-330)
+            needs_cache["rows"],  # a member's open ask to the person (TD-350)
         )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
@@ -830,6 +832,10 @@ def create_app() -> FastAPI:
         return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
 
     work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None, "balance": None}
+    # the Inbox's *Needs you* rows as the last Org page or person-inbox poll composed them: what a
+    # delta's team summaries read for a member's open `ask` (§4.5a *Answer needed*, TD-350), so the
+    # page and its deltas draw the same blocks without a mailbox read per delta
+    needs_cache: dict[str, Any] = {"rows": []}
 
     async def home_reading(fresh: bool = False) -> None:
         now = time.monotonic()
@@ -999,6 +1005,7 @@ def create_app() -> FastAPI:
         board_view=board_view,
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
+        needs_cache=needs_cache,  # the Inbox's needs rows for the Org's ask blocks (TD-350)
     )
     for register in (
         _pages_routes,
@@ -1074,6 +1081,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # …and the team start rows (§4.5a, §6 rule 8), from the same reading
         work = {} if agent_down else (info or {}).get("work") or {}
         promos += work_rows(work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")})
+        h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no ask block (TD-350)
         if entries or handed or vs or boards or promos:
             secs = inbox_sections(
                 entries,
@@ -1089,6 +1097,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 handed=handed_rows(handed, {s.get("id"): s for s in sessions}, datetime.now(UTC)),
             )
             person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]
+            h.needs_cache["rows"] = secs["needs"]
         return templates.TemplateResponse(
             request,
             "org.html",
@@ -1096,7 +1105,14 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "sessions": vs,
                 "groups": (
                     groups := team_groups(
-                        vs, strip["teams"], repos, doing, work, flows, {} if agent_down else (info or {}).get("balance")
+                        vs,
+                        strip["teams"],
+                        repos,
+                        doing,
+                        work,
+                        flows,
+                        {} if agent_down else (info or {}).get("balance"),
+                        h.needs_cache["rows"],
                     )
                 ),
                 "rollup": rollup(groups),
@@ -1156,7 +1172,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
         vs = [view(s, sessions, icons=icons, seats=seats) for s in sessions]
-        groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing) or []
+        groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing, needs=h.needs_cache["rows"]) or []
         serving = [g for g in groups if g.get("summary") and (g["summary"].get("repo") or {}).get("name") == name]
         org, _ = await asyncio.to_thread(org_here)
         named = repo_teams(org, host_name()).get(str(Path(str(r.get("root") or "")).resolve()), "")
@@ -1170,7 +1186,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # its facets still stand — its members' claims, its doing log — with the repo's own
             # numbers, since no live member points the summary at the repo (review of slice 5)
             members = [v for v in vs if v.get("team") == named]
-            summary = team_summary(named, members, {}, doing, prs_waiting(members), now)
+            summary = team_summary(named, members, {}, doing, prs_waiting(members), now, needs=h.needs_cache["rows"])
             summary["repo"] = repo_facet(r, now, prs_waiting(members))
             summary["motion"] = motion_rows(members, r)
             summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
@@ -2927,6 +2943,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             boards=hz["due"] + hz["waiting"],
             fleet=fleet,
         )
+        h.needs_cache["rows"] = sections["needs"]  # the next delta's ask blocks on the Org (TD-350)
         got["agent_down"] = False
         got["board_note"] = board_note
         got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
