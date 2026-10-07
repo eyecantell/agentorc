@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from collections import Counter
 from typing import Any
 
 from sessionorc import (
@@ -36,10 +37,27 @@ class IdentityMixin:
         """The live panes of this host's records, as the classification reads them. On the loop,
         from a pane list a thread already took."""
         was = self._id_panes
+        live = {sid: p for sid, p in panes.items() if not p.dead and sid in self.sessions}
+        # each pane's own scope (TD-360), read once per pane pid: a pane's cgroup does not move
+        if self._id_own_cg is None:
+            self._id_own_cg = self.proc.cgroup(os.getpid()) or ""
+        scopes = {
+            p.pane_pid: self._id_scopes[p.pane_pid]
+            if p.pane_pid in self._id_scopes
+            else identity.own_scope(p.pane_pid, self.proc, {self._id_own_cg} - {""})
+            for p in live.values()
+        }
+        self._id_scopes = scopes
+        counts = Counter(scopes.values())
+        shared = {cg for cg, n in counts.items() if cg and n > 1}  # a cgroup two panes share is neither's own
         self._id_panes = [
-            identity.Pane(sid, p.pane_pid, identity.tty_nr_of(p.tty) if p.tty else 0)
-            for sid, p in panes.items()
-            if not p.dead and sid in self.sessions
+            identity.Pane(
+                sid,
+                p.pane_pid,
+                identity.tty_nr_of(p.tty) if p.tty else 0,
+                "" if scopes[p.pane_pid] in shared else scopes[p.pane_pid],
+            )
+            for sid, p in live.items()
         ]
         now = self._id_listed_at = time.monotonic()
         # A pane is gone when its record lists no pane **or another one**: a restart or supersede
@@ -75,21 +93,6 @@ class IdentityMixin:
         if gone is None or time.monotonic() - gone[1] >= identity.PANE_GONE_GRACE:
             return None
         return identity.classify_gone(peer, gone[0], self.proc)
-
-    def _id_past_run(self, session: str | None, params: Any) -> bool:
-        """A `hook` naming a record whose pane left inside the grace that would be ignored if served
-        (§4.8a *A hook just after its pane ended*, TD-360): the record is closed, or the hook reports
-        the end of a run whose tool id is not the record's — the old run's `SessionEnd` after a
-        restart or a supersede (TD-186)."""
-        gone = self._id_gone.get(session) if session else None
-        s = self.sessions.get(session) if session else None
-        if gone is None or s is None or time.monotonic() - gone[1] >= identity.PANE_GONE_GRACE:
-            return False
-        if getattr(s, "state", None) == "closed":
-            return True
-        event = params if isinstance(params, dict) else {}
-        aid, held = event.get("adapter_id"), getattr(s, "adapter_id", None)
-        return bool(aid and held and aid != held and event.get("state") in ("exited", "closed"))
 
     def _id_log_late_hook(self, peer: int, session: str) -> None:
         """What a hook that matched no pane of the record it names looked like (TD-225): the peer's
@@ -201,14 +204,6 @@ class IdentityMixin:
             # For this judgement only: the connection's classification stays what it was.
             log.info("hook for %s after its pane ended, matched by %s", hook_session, late.signal)
             ch = late
-        if rpc == "hook" and ch.kind != "session" and self._id_past_run(hook_session, params):
-            # The run's last word after its pane went (TD-360): Claude Code starts a hook in a session of
-            # its own with no terminal, so an orphan keeps neither signal the grace reads, and served it
-            # would be ignored (§4.2) — refused unheard, never an alarm, and never a channel granted.
-            log.info("hook for %s ends a run it no longer holds, after its pane went: refused unheard", hook_session)
-            if self.identity_mode != "enforce":
-                return None
-            return {"id": req.get("id"), "error": identity.MISMATCH}
         verdict = identity.judge(ch, named, rpc, hook_session=hook_session)
         if verdict.alarm is not None:
             if rpc == "hook" and hook_session:

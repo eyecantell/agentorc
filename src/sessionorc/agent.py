@@ -268,6 +268,8 @@ class HostAgent(
         # A record's pane that left the list, and when (monotonic): a hook of its ending process may
         # still arrive (TD-115, `identity.PANE_GONE_GRACE`).
         self._id_gone: dict[str, tuple[identity.Pane, float]] = {}
+        self._id_scopes: dict[int, str] = {}  # pane pid → its own cgroup, or "" (TD-360)
+        self._id_own_cg: str | None = None  # the host agent's own cgroup, never a pane's scope
         self._id_conns: dict[Any, identity.Channel] = {}  # a connection's classification, for its life
         self._id_dirty: set[str] = set()  # records whose alarm counts moved since their last write
         self._id_listed_at = 0.0
