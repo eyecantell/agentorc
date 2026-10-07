@@ -557,6 +557,8 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .ablock { display: flex; flex-direction: column; gap: 5px; padding-bottom: 8px; border-bottom: 1px solid var(--line2); }
 .ablock:last-child { border-bottom: 0; }
 .ablock .atext { font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+/* the team's *asked you* line under the facet's head (§4.5a, TD-354): a link, untinted, never a block */
+.asked { font-size: var(--t-small); margin: -2px 0 6px; }
 .dfeed { display: flex; flex-direction: column; gap: 3px; max-height: 12em; overflow: auto; }
 /* the Doing list's three columns (§4.5a **Ages and columns**, TD-232): the age right-aligned in a width
    that fits *just now*, the doer in the server's width (`--doer-n` characters, at most 18), the words

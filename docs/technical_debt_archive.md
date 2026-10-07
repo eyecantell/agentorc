@@ -5387,3 +5387,55 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** every page is read for minutes at a time; a size chosen for density is paid in every reading.
 
 **Related:** TD-095 (the card's anatomy and its sizes), TD-082 (the Inbox's layout), TD-127 (what a row shows first).
+
+---
+
+## TD-353: *Answer needed* mixes mail with live prompts since TD-350: a member's open question to the person moves to a line of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-06** (the designer, PR #1174): *Answer needed* — the facet's blocks, its count and the rollup's line — is a pane's permission or question alone again; a team's open `ask`s to the person from its members and seats are **one line under the facet's head**, *asked you · n · <age of the oldest>*, drawn in either face while one is open, the whole line a link to the Inbox landed on the oldest's row (`/inbox?row=<id>`, TD-319's landing), the members and first lines its tooltip, counted nowhere on the card and never a prompt; the rollup's *Needs you* gains a third line, *asked you*, summing the teams', drawn only while one is open; the Inbox keeps counting the ask under *in the Inbox*. The design says why there are two lines (§4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*; glossary *answer needed*, *asked you*). Built by TD-354. Was: Open. **Decided by Paul, 2026-10-06:** *Separate line*. The design round is the obvious tier: write it, land it, tell him with a note.
+**Location:** design §4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*; `src/agentorc/ui/org.py` (`ask_blocks`, appended by `answer_blocks`), the rollup's *answer needed* count, `src/agentorc/ui/templates/team_summary.html` and `rollup.html`
+
+**Why:** Paul's distinction, which TD-344 (designed in #1157) and TD-350 (built in #1167, live since `4d3133e`) broke. **Answer needed** is what needs him now: a prompt standing in a session's pane (a permission, a question the tool is showing), with Allow / Deny where it has them. **The Inbox** is mail, which can wait for him to open it. TD-344 came from his read of *0 answer needed* while techlead-ao-1's mailed `ask` held the team. The anchor filed it as a defect without checking it against that distinction, and the designer took the first of its two shapes. So since TD-350, an open `ask` from a member is an *Answer needed* block and counts in the rollup's *answer needed*, beside live prompts.
+
+**Fix:**
+- *Answer needed* (the facet's blocks and the rollup's count) goes back to live prompts only, as before TD-350.
+- A team with an open `ask` (or `steer`) to the person from one of its live members shows it on **a line of its own**, both in the team's facet and in the rollup. For example *asked you · 1 · 2h*, with the member and the ask's first line on hover, linking its Inbox row (`/inbox?row=…`, TD-319's landing).
+- It is visible on the team, where the waiting happens, and never counted or drawn as a prompt.
+- The Inbox keeps counting it under *in the Inbox*.
+- The design says why there are two lines: a prompt stops a session now, and a question waits in the mail.
+
+**Resolved:** 2026-10-06 (PR #1176): built by TD-354 — a team's open asks to the person are its *asked you* line and the rollup's row, Answer needed prompts alone.
+
+**Done when** on a scratch home, a member's open `ask` to the person shows as the team's *asked you* line, linking its Inbox row, and adds nothing to *Answer needed*; a pane prompt still does; and §4.5 and §4.5a say the two apart.
+
+**Related:** TD-344 and TD-350 (archived: the shape this replaces), TD-343 (the techlead's held ask that started it), TD-319 (the Inbox's `?row=` landing).
+
+---
+
+## TD-354: Build the *asked you* line — Answer needed back to prompts only, a team's `asked you · n · <age>` line in its facet and on the rollup, linking the Inbox row
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the designer, TD-353's design round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built 2026-10-06 (grinder-ao-2, PR #1176)
+**Location:** `src/agentorc/ui/org.py` (`answer_blocks`: drop the `ask_blocks` append, so `summary`'s `answers`, `face` and `answer_key` are prompts alone; `ask_blocks` becomes the line's data — `n`, the oldest's `id`, `at` and short age, the members' names and first lines for the tooltip — on the summary as `asked`; `rollup`: `asked` and `asked_team` beside `answer_needed`), `src/agentorc/ui/templates/team_summary.html` (the line under each face's `.fhead`, its age on `data-doing-at`; the `a.kind == 'ask'` block goes), `rollup.html` (the third *Needs you* row, hidden at 0, linking `#tsum-<team>`), `src/agentorc/ui/static/app.js` (nothing new: `answer_key` no longer carries asks, so an ask neither flips nor tints; `showDoingAges` moves the line's age), `tests/test_ui_team_summary.py` (the TD-350 test and the rollup's `answer_needed == 1` on an ask become the line's), `tests/test_ui_inbox.py` (`test_the_org_draws_a_members_open_ask_under_answer_needed` becomes the line's: *Answer needed (0)*, *asked you · 1*, `?row=<id>`, gone once answered). No held path.
+
+**Why:** design §4.5a *team card: Answer needed / Doing* (TD-353): a prompt in a pane stops a session now and a question in the mail waits, and Paul keeps the two apart; since TD-350 (live since `4d3133e`) an open `ask` is a block under **Answer needed** and in the rollup's *answer needed*, beside live prompts.
+
+**Fix:**
+1. `answer_blocks` returns the prompt blocks alone; `ask_blocks` → the line (`asked`): `{n, id, at, age, who: [{name, text}]}` over the Inbox's *Needs you* `ask` rows from the team's members and seats, as today's matching does, `None` when there are none.
+2. The facet: one line under the head in both faces — `<a href="/inbox?row=<id>" title="<name>: <first line>\n…">asked you · n · <age></a>` — no tint, no flip, not in *Answer needed (n)*; the rollup: a third row *asked you* with the sum and the first team's anchor, hidden at 0.
+3. Tests as named in Location; the UI check on a scratch home (`scripts/look_home.py`, design §4.9b): a member's open `ask` → *Answer needed (0)*, the line with `?row=`, the rollup's *asked you · 1*; a pane prompt still *Answer needed (1)*; the line gone once answered.
+
+**Resolved:** 2026-10-06 (PR #1176): built by TD-354 — `answer_blocks` back to pane prompts alone; `org.asked_line` the summary's `asked`, drawn under the facet's head in both faces and linking the oldest ask's Inbox row (`/inbox?row=`); the rollup's *asked you* row, hidden at 0; held on a scratch home (PR #1176's UI check: *asked you · 2*, *Answer needed (0)*, no tint, the landing, gone once answered); tests in `tests/test_ui_team_summary.py` and `tests/test_ui_inbox.py`.
+
+**Done when** on a scratch home, a member's open `ask` to the person shows as the team's *asked you* line, linking its Inbox row, and adds nothing to *Answer needed*; a pane prompt still does; and §4.5 and §4.5a say the two apart (TD-353's *Done when*); then TD-353 archives.
+
+**Related:** TD-353 (the design), TD-344 and TD-350 (archived: the shape this replaces), TD-319 (the Inbox's `?row=` landing).

@@ -298,7 +298,7 @@ def team_groups(
         dead = [m for m in crew if not m.get("seat") and m.get("state") in DEAD] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
-        # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are blocks (TD-350)
+        # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are its *asked you* line (TD-354)
         summary = team_summary(team, members, repos, doing, waiting, needs=needs) if team != NO_TEAM else None
         if summary:
             for m in members:
