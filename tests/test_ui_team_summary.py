@@ -651,6 +651,12 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     warn = '<span class="lanewarn" title="TD-355 — in its lane, held by nobody">· '
     assert warn + '<a class="strong" href="/focus/g1">grinder-ao-1</a> out of work with 1 in its lane</span>' in html
+    # a kind the Repo page draws no list for (none of it open): its count is not a link to nothing
+    lanes = {"pickable": [], "design_first": [], "rest": [], "design_first_rest": [], "out_of_work": []}
+    ln = ui.lanes_line("grind", lanes, {"pickable": 0, "design-first": 2})
+    line = ui.templates.get_template("lanes_line.html").render(ln=ln, url="/repo/samscrape")
+    assert '<span class="strong">0 pickable</span>' in line and "#debt-pickable" not in line
+    assert '<a class="strong" href="/repo/samscrape#debt-design-first">0 design-first</a>' in line
     # a team with no lane on any record: the bars alone
     s = ui.team_summary("grind", [member("g1"), member("g2")], {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})

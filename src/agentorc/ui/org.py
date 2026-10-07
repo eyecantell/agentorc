@@ -98,6 +98,8 @@ def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str,
             for m in lanes.get("out_of_work") or []
         ],
         "titles": {"pickable": pick, "design-first": design},
+        # a count links to its list only when the Repo page draws that list (it draws no empty one)
+        "listed": {k: int(by_kind.get(k) or 0) > 0 for k in ("pickable", "design-first")},
     }
 
 
