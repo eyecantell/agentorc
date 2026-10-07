@@ -1497,9 +1497,8 @@ def inbox(picks=False):
         ledger = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>For you in the ledger</span><span class="n" style="background: transparent; color: #6b7280;">3</span><span class="muted" style="font-size: 12px; font-weight: 400;">entries that wait on you · not counted</span></div>'
             + '<div class="muted mono" style="padding: 2px 2px 4px; font-size: 12px;">agentorc</div>'
             + lrow("TD-156", "M", "UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel", "yours", "agentorc", "ao-grind")
-            + lrow("TD-233", "H", "Build usage reported first, its age, and the gate's projection", "your decision", "agentorc", "ao-grind", "held by anchor")
-            + '<div class="muted mono" style="padding: 6px 2px 4px; font-size: 12px;">dev-cadence</div>'
-            + lrow("TD-070", "M", "Neither an ask nor a board item can offer its expected answers", "your decision", "dev-cadence", "dc-grind"))
+            + lrow("TD-133", "L", "Build the team start at the reset — schedules: in settings.yml, the tick's replay, ao schedule, the card's starts note", "your decision", "agentorc", "ao-grind")
+            + lrow("TD-319", "L", "Build the Telegram channel — the home tells the person what newly stops a session or a team", "your decision", "agentorc", "ao-grind", "held by grinder-ao-1"))
         body = (isec("Needs you", 7, opened=True) + "".join(needs) + later + ledger + isec("Steering", 3) + "".join(steering)
                 + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
