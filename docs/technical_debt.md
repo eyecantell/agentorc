@@ -1353,8 +1353,8 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Type:** debt
 **Added:** 2026-10-06 (the anchor, after Paul's first Apply on ao-grind)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1186
+**Status:** Built in #1186 (grinder-ao-1): `_brief_restart`'s guard passes a declared member whose record carries `relaunch`, design §4.9c *Switching* says so, and `tests/test_relaunch.py` holds the three cases. Left: the live check. Once #1186 is live (`ao promote status`), at the next Apply on a team whose idle members have declared out of work, read `ao status -v` (read only) within a tick of the press: each such member is restarted (`restarts` ends `why: flow`), its `{stage}` line names the flow's brief, and no member with unpushed work was restarted.
 **Location:** `src/sessionorc/agent_tick.py` (`_brief_restart`: `if s.out_of_work or s.restart_wanted: return`, before `why` is read), the mail that tells a member its lane gained entries; design §4.9c *Switching* (`docs/design/4.9c-flows.md`: an idle member is restarted by the tick under `why: flow`)
 
 **Why:** On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind. `rpc_relaunch` rewrote the launch records of grinder-ao-1, grinder-ao-2 and designer-ao-1 and marked each `relaunch`.
