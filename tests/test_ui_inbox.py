@@ -3056,3 +3056,38 @@ def test_every_button_has_one_hover_one_press_and_one_ring():
         mine = [s for s in rules if ".btn" in s and state in s]
         assert len(mine) == 1 and mine[0].startswith(f".btn{state}"), (state, mine)
     assert ".btn:hover:not(:disabled)" in css and ".btn.primary { --btn-wash: transparent;" in css
+
+
+@pytest.mark.integration
+def test_the_org_draws_a_members_open_ask_under_answer_needed(client, tmp_path):
+    """TD-350 (§4.5a *team card: Answer needed / Doing*): the Org route hands its *Needs you* rows to
+    the team summaries, so an idle member's open `ask` to the person is a block with **Open** and is
+    counted in the rollup; answered, it is gone."""
+    from sessionorc.client import LocalClient
+
+    async def ask():
+        async with LocalClient() as person:
+            w = (
+                await person.call(
+                    "create",
+                    name="askr350",
+                    dir=str(tmp_path),
+                    adapter="shell",
+                    argv=["bash", "--norc"],
+                    team="ao-t350",
+                )
+            )["id"]
+        async with LocalClient(caller=w) as wc:
+            return (await wc.call("msg", to="person", text="which branch?\nthe reading", kind="ask"))["entry"]["id"]
+
+    mid = asyncio.run(ask())
+    page = client.get("/").text
+    assert f'href="/inbox/{mid}"' in page and "which branch?" in page and "Answer needed (1)" in page
+
+    async def answer():
+        async with LocalClient() as person:
+            await person.call("msg", reply_to=mid, kind="reply", text="main")
+
+    asyncio.run(answer())
+    page = client.get("/").text
+    assert f'href="/inbox/{mid}"' not in page and "Answer needed (0)" in page

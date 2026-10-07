@@ -535,3 +535,56 @@ def test_a_live_teams_stop_time_is_on_its_header_once(monkeypatch):
         assert g["stops_note"] == "" and {m["id"]: m["compact_line"] for m in g["members"]}["g1"].startswith(
             "Grinder · stops "
         )
+
+
+def _ask(mid: str, frm: str, kind: str = "ask", minutes: int = 10, **kw) -> dict:
+    """A *Needs you* mail row as `inbox_sections` hands it on (TD-350)."""
+    return {
+        "id": mid,
+        "from": frm,
+        "kind": kind,
+        "text": f"Which branch for {mid}?\nthe reading",
+        "at": _iso(NOW - timedelta(minutes=minutes)),
+        **kw,
+    }
+
+
+def test_a_members_open_ask_to_the_person_is_an_answer_block_and_counted():
+    """TD-350 (§4.5a *team card: Answer needed / Doing*, TD-344): an idle member's open `ask` to the
+    person is a block under **Answer needed** — the member, *asked you · <age>*, the first line as
+    text, **Open** to its message page — and is counted in the rollup's *answer needed*."""
+    ms = [member("g1", state="idle"), member("g2")]
+    s = ui.team_summary("grind", ms, {}, {}, now=NOW, needs=[_ask("m-1", "g1")])
+    assert s["face"] == "answer" and [(a["kind"], a["member"], a["text"]) for a in s["answers"]] == [
+        ("ask", "g1", "Which branch for m-1?")
+    ]
+    assert s["answers"][0]["age"] == "10m" and s["answer_key"] == "m-1:ask"
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert 'href="/inbox/m-1"' in html and "asked you · " in html and 'href="/focus/g1"' in html
+    assert "Which branch for m-1?" in html and "the reading" not in html and 'data-act="allow"' not in html
+    for m in ms:
+        m.update(rank=1, slot={}, place="kmaster / samscrape", pill_word=m["state"])
+    groups = ui.team_groups(ms, (), {}, {}, needs=[_ask("m-1", "g1")])
+    ro = ui.rollup(groups)
+    assert ro["answer_needed"] == 1 and ro["answer_team"] == "grind"
+    assert "or whose ask to you is open" in ui.templates.get_template("rollup.html").render(ro=ro, person_needs=1)
+
+
+def test_only_an_open_ask_from_the_team_is_a_block():
+    """Closed, a `steer`, a state row, a board row, or a sender outside the team: no block. A pane's
+    question and an ask on two members: two blocks, the pane's first, then the asks oldest first; a
+    node's `id@host` sender is its record."""
+    ms = [member("g1", state="needs-you", pending={"kind": "question", "text": "which?"}), member("g2", state="idle")]
+
+    def asks(needs):
+        return [(a["kind"], a.get("member") or a["id"]) for a in ui.answer_blocks(ms, needs, NOW)]
+
+    assert asks([_ask("m-1", "g2", closed_reason="replied")]) == [("question", "g1")]
+    assert asks([_ask("m-1", "g2", kind="steer")]) == [("question", "g1")]
+    assert asks([{"id": "g2:question", "row": "question", "from": "g2", "kind": "ask"}]) == [("question", "g1")]
+    assert asks([_ask("m-1", "h9")]) == [("question", "g1")]
+    two = asks([_ask("m-2", "g2", minutes=1), _ask("m-1", "g2@node", minutes=30)])
+    assert two == [("question", "g1"), ("ask", "g2"), ("ask", "g2")]
+    assert [a["id"] for a in ui.answer_blocks(ms, [_ask("m-2", "g2", minutes=1), _ask("m-1", "g2", minutes=30)], NOW)][
+        1:
+    ] == ["m-1", "m-2"]
