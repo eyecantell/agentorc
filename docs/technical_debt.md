@@ -1384,7 +1384,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - On 2026-10-07 test-audit-ao-1, the first fill of the audit seats TD-098 added, mutation-tested the night's builds. It wrote TD-363 to TD-365 into PR #1197 and launched its independent fact-check as a background agent, as the cadence asks.
 - It ended its turn with *Waiting for the fact-check to finish*.
 - At 06:31:56 the tick found the seat idle, with nothing due and its work pushed, and closed it (*a seat with nothing due, idle and pushed — closing it*). That killed the fact-check and the run that would have merged.
-- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at about 17:15.
+- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at 17:07.
 - A member is not closed this way, but a seat is: any seat that waits on its own background work (a reviewer, a CI watch, a sleep) looks done to rule 3.
 
 **Fix:**
