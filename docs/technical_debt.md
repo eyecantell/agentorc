@@ -73,7 +73,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
 | TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
 | TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Open |
@@ -1257,26 +1256,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-364: The lanes line's real callers (#1196) are untested: the team card and the Repo page read the whole fleet, and every test reaches them through `members`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/repo.py` (`team_groups`: `team_summary(..., fleet=views)`), `src/agentorc/ui/org.py` (`team_summary`: `fleet if fleet is not None else members`), `src/agentorc/ui/app.py` (`repo_page`: `team_lanes(named, vs, r)`); `tests/test_ui_team_summary.py` (`test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work`)
-
-**Why:** `team_lanes` says *every live record of the repo for what is held*, so the callers pass the whole fleet. Reverted one at a time, with `tests/test_ui_repo_page.py`, `test_ui_team_summary.py` and `test_ui_teams.py` run, each still passed:
-- `team_groups`: `, fleet=views` removed, so the Org page's card reads its own members only.
-- `repo_page`: `team_lanes(named, vs, r)` → `team_lanes(named, members, r)`.
-- `org.team_summary`: `fleet if fleet is not None else members` → `members`.
-- `test_the_lanes_line_…` calls `team_summary` without `fleet`, so only the fallback is read. A claim held by another team's live member of the same repo, which is why the fleet is passed, is in no test through a caller. The card then warns a member out of work for an entry that another team's member holds.
-
-**Fix:** a test through `team_groups` (or the Org page) and one through `/repo/<name>?team=` with a second team's live record claiming an entry in the first team's lane: the first team's member is not warned. **Done when** the three reverts above fail a test.
-
-**Related:** TD-361, TD-363.
 
 ## TD-365: `pick_flow` returns `stays` (#1191) and no test or caller reads it
 
