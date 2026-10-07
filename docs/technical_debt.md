@@ -75,10 +75,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Partly done — agentorc's half built (PR #1166); the other three repos' halves are the anchor's |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
-| TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Designed — build TD-359 |
 | TD-357 | A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take | Medium | Designed 2026-10-06 — the build is TD-361 |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
-| TD-359 | Build TD-356: the Flow pick selects and Apply is the one gate | Medium | Open |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-361 | Build TD-357: the lanes line — what a team's lanes take of the repo's pickable count, the rest by owner | Medium | Open |
 
@@ -1268,34 +1266,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
 
-## TD-356: Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-06 (the anchor, from Paul's use of the team card)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-06** (the designer, PR #1183; the steer to Paul is `m-67be8efdcea8`, bound 2026-10-07 09:29 MDT): shape (a), Paul's leaning — the **Flow** pick, the Settings page's **flow** and `ao team flow <team> <flow>` select and write the setting and relaunch nothing; **flow changed — Apply** shows at once on a live team that differs, and Apply's confirm is the one gate. The two shapes differ in what a person can undo: a mis-pick is undone by picking back with nothing done, where a confirmed pick has already wound a member down — so the gate sits on Apply. Design §4.5a *team card: Flow pick*, *flow changed — Apply*, *Settings page: flow*; §4.9c *Switching*; §4.7 `ao team flow` (`<flow> --apply` does both). **The build is TD-359.** Earlier: Open
-**Blocked by:** TD-359
-**Location:** design §4.5a *team card: Flow pick* and *team card: flow changed — Apply*, §4.9c *Switching*; `src/agentorc/ui/static/app.js` (the pick's `Switch <team> to <flow>?` confirm, Apply's `confirm(ap.dataset.confirm)`)
-
-**Why:**
-- Paul, 2026-10-06: changing the selected flow gives a confirmation popup, which seems redundant with an Apply button. Use one or the other.
-- As designed:
-  - the **Flow** pick writes `teams.<team>.flow` and applies it at once after a confirm naming who sits out, starts and is relaunched;
-  - **flow changed — Apply** is for records that drift from the current flow for any other reason (a hand edit of the definition, a stage brief changed), and has its own confirm.
-- To the person, it reads as two gates on one act.
-
-**Fix:** design first. Choose one gate. For example:
-- (a) the pick only selects, and the team shows *flow changed — Apply* until the person presses Apply, which is the one place a relaunch is confirmed. Or:
-- (b) the pick applies with its confirm, and Apply needs no confirm of its own, since the mark's title already lists what it will do.
-
-Paul's leaning is in his words above. This is the obvious tier unless the two shapes differ in what a person can undo.
-
-**Done when** switching a team's flow from the card takes one deliberate confirmation, and §4.5a's two rows say which control carries it.
-
-**Related:** TD-355 (Apply's mark that never cleared), TD-309 (archived: the pick and Apply), TD-307 (the design).
-
 ## TD-357: A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take
 
 **Priority:** Medium
@@ -1345,30 +1315,6 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 
 **Related:** TD-355 (the mark that outlives the Apply), TD-309 (archived: *Switching*), TD-334 (archived: rule 7's retry), TD-310 (the move that surfaced it).
 
-## TD-359: Build TD-356: the Flow pick selects and Apply is the one gate
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-06 (the designer, from TD-356)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *team card: Flow pick*, *team card: flow changed — Apply*, *Settings page: flow*; §4.9c *Switching*; §4.7 `ao team flow`; `src/agentorc/ui/static/app.js` (`flowPick`, `AO.flowAsk`, Apply's confirm), `src/agentorc/teamrun.py` (`pick_flow`, `flow_preview`), `src/agentorc/ui/app.py` (`api_team_flow_pick`, `api_team_flow_preview`, the Settings Save that calls `pick_flow`), `src/agentorc/cli.py` (`cmd_team_flow`)
-
-**Why:** TD-356 — Paul: the pick's confirm is redundant with Apply, use one or the other. Designed 2026-10-06 (PR #1183): the pick, the Settings page's flow and `ao team flow <team> <flow>` write the setting and nothing more; Apply, with its confirm, is the one place a switch moves the running team.
-
-**Fix:**
-- `pick_flow`: keep the listing and *cannot follow* checks, write the setting, return `{team, flow, differences, stays}` read against the written org (`flow_changed`, `stays_with`) — no `apply`, no `not_applied`. The preview `GET /api/teams/<team>/flow?flow=` has no caller left: drop the route and `flow_preview` as a separate step (its checks fold into the pick).
-- `flowPick` (app.js): no `AO.flowAsk`; on success toast *flow set to <flow> — Apply to switch the running team* when differences came back, else *flow set to <flow>*; add *Add entry's feature now opens a techlead* where the picked flow has no design stage (the reply says which). The pick's handler already refreshes `flow_views`, so the mark redraws on the next reading.
-- Settings page's **flow** on Save: write only, through the same path; same words.
-- `cmd_team_flow`: `<flow>` writes, then prints the differences as the bare form does and the hint `ao team flow <team> --apply`; `<flow> --apply` is accepted and does both (the exit-2 refusal of the pair goes); `--apply` alone unchanged. Docstrings and the `--apply` help line follow §4.7.
-- Apply's confirm text is unchanged; it is now the only confirm on a switch.
-- Tests: `tests/test_ui_teams.py` (a pick writes and relaunches nothing; the preview route is gone; the Settings save), `tests/test_cli_teams.py` (`<flow>` prints differences and the hint; `<flow> --apply`), `tests/test_flows.py` where `pick_flow` is exercised; run `tests/test_design_doc.py` and `tests/test_help.py`.
-- TD-355 (the mark that never clears after Apply) is separate code; after this build a sticky mark misleads more, since a pick now shows the mark and Apply is meant to clear it. Land in either order and say so in the PR.
-
-**Done when** switching a team's flow from the card takes one deliberate confirmation, Apply's; the pick, the Settings page and `ao team flow <team> <flow>` write the setting and relaunch nothing; `ao team flow <team> <flow> --apply` does both; §4.5a's two rows, the Settings row and §4.7 read as built.
-
-**Related:** TD-356 (the design), TD-355 (Apply's mark that never clears), TD-358 (Apply never restarts a member that declared out of work — the same Apply), TD-309 (archived: the build of the pick and Apply).
 ## TD-360: A restart's first hook is still refused as *outside* after TD-341's fix — the identity alarm fires on each ao-grind restart
 
 **Priority:** Medium
