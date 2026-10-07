@@ -1438,13 +1438,14 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Location:** `src/sessionorc/agent_tick.py` (`_brief_restart`: `if s.out_of_work or s.restart_wanted: return`, before `why` is read), the mail that tells a member its lane gained entries; design §4.9c *Switching* (`docs/design/4.9c-flows.md`: an idle member is restarted by the tick under `why: flow`)
 
 **Why:** On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind. `rpc_relaunch` rewrote the launch records of grinder-ao-1, grinder-ao-2 and designer-ao-1 and marked each `relaunch`.
-- All three were idle and had declared `out of work`. `_brief_restart` returns early on `s.out_of_work` before it reads the relaunch, so the tick restarted none of them.
-- At 21:25, #1179 gave their lanes new entries, and the host agent told each of them (*told of 5 entries new in its lane*).
-- Each picked them up in its old run: the panes date from 19:48, 20:20 and 20:01, before the Apply. They now work on their pre-flow briefs (`grinder.stage.md`, and no stage for the designer), and the `td` stage briefs reach them only at a restart for some other reason.
-- The design says Apply *relaunches the idle grinders* (§4.9c *Done when*), and that only a node member waits until *it next works or the team's next Start*.
+- Six minutes later (`ao --json status`, 21:04), grinder-ao-1 and designer-ao-1 read `idle`, with `out_of_work` and `relaunch` both set. By 21:25 all three had declared out of work: the host agent's lane news, which tells only a member with `out_of_work`, told each of them. grinder-ao-2 may still have been working at 20:58 (it landed a board line at 21:00:21).
+- `_brief_restart` returns on `s.out_of_work or s.restart_wanted` before it reads `why`, so the tick restarted none of them.
+- At 21:25, #1179 gave their lanes new entries, and the host agent told each of them: 5 entries to each grinder, 2 to the designer.
+- Each picked the entries up in its old run: the panes date from 19:48, 20:20 and 20:01, before the Apply. They work on their pre-flow briefs (`grinder.stage.md`, and no stage for the designer), and the `td` stage briefs reach them only at a restart for some other reason.
+- The design (§4.9c *Switching*, `docs/design/4.9c-flows.md`) says Apply *relaunches the idle grinders*, and that a hook-confirmed idle member holding no claim is closed and created again by the tick under `why: flow`. It does not say what happens to a member that has declared out of work. The code makes that case follow rule 2 (*it declared: rule 2 or the team's next start is what starts it*), which leaves a person's Apply waiting on the member's own word.
 
 **Fix:**
-- A person's Apply is the person's word, so `relaunch` should restart an idle, settled member whether or not it declared out of work.
+- Say in §4.9c *Switching* what Apply does to a member that declared out of work. The anchor's reading, as written here: a person's Apply is the person's word, so `relaunch` restarts an idle, settled member whether or not it declared.
 - Either let `why == "flow"` pass the `out_of_work` / `restart_wanted` guard (clearing them, since the new run starts fresh), or, when a member with a pending `relaunch` is told its lane gained work, restart it on the launch record instead of ringing the old run.
 - The working member's case stays as designed: it is told on its `ao` replies.
 - Tests:
