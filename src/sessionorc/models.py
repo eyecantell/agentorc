@@ -143,6 +143,7 @@ HOME_OWNED = frozenset(
         "mail_decided",
         "wakes",
         "wake_refilled_at",
+        "doorbell_held",
     }
 )
 IDENTITY = frozenset({
@@ -1152,6 +1153,10 @@ class Session:
     # A doorbell that failed to submit twice (design §4.10): `{at, error}`, so the sender and the
     # page can see that the ring did not land; cleared by the next ring that does.
     doorbell_failed: dict[str, str] | None = None
+    # The bell stopped (design §4.10 *A ring is answered by a read, or the bell stops*, TD-347):
+    # `{at, rings}` after `mail.DOORBELL_HELD` rings in a row each answered by a turn that read none of
+    # its mail. The doorbell stays silent for it until it reads (`inbox`) or a person acts toward it.
+    doorbell_held: dict[str, Any] | None = None
     # The host this record's tmux session runs on (design §4.4a, TD-057 step 1). Ids naming a
     # session on this same host are stored bare; only another host's are stored `id@host`
     # (`naming.qualify`). The host agent fills it at create and backfills it on load.

@@ -336,6 +336,11 @@ def mail_wakes(s: Session) -> bool:
     return not (s.kind == "interactive" and not s.unattended)
 
 
+# Rings in a row, each answered by a turn that read none of its mail, before the bell stops (design
+# §4.10 *A ring is answered by a read, or the bell stops*, TD-347).
+DOORBELL_HELD = 3
+
+
 def unread_line(n: int) -> str:
     """The one line a session is told it has mail with (design §4.10): the doorbell typed into an
     idle pane and the line on every `ao` reply are this text. A count and nothing a sender wrote —

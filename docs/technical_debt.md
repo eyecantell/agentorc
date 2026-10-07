@@ -88,7 +88,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
 | TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Designed 2026-10-06 (a member's open `ask` to the person is an Answer needed block and counted) — the build is TD-350 |
 | TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Designed 2026-10-06 (thirty section files named by §, the index, one tests helper, the history whole, the quiet window) — the build is TD-351 |
-| TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Open |
+| TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Slice 2 built (the bell); slice 1 #1158 |
 | TD-350 | Build the Org's ask block: a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup's *answer needed* | Low | Open |
 | TD-351 | Build the design split: `docs/design/<§>-<slug>.md` by script, `design.md` the index, `tests/design_doc.py`, every path that says `docs/design.md` for a grep repointed, landed in a quiet window | Medium | Open |
 
@@ -1524,7 +1524,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-06 (the designer, TD-343's build)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 2 built (grinder-ao-1, PR #1163): `Session.doorbell_held` (`{at, rings}`, home-owned), `mail.DOORBELL_HELD` (3), `_bell_answered` judging each ring at the first hook `idle` after its `UserPromptSubmit` (the count remembered before the line is typed), `_bell_blocked`'s *holding its mail unread*, `_bell_cleared` from `inbox`'s read and from `_refill`, and `ao status -v`'s *doorbell held · n unread rings* (`tests/test_doorbell.py`: three unread rings hold, a read in the run ends it, a read lifts the hold and the next mail rings, a person's send lifts it). Slice 1 (the line, the preface) is PR #1158.
 **Location:** `src/sessionorc/agent_wake.py` (`_first_prompt_typing`, `_ring_typing`, `_bell_blocked`), `src/sessionorc/agent.py` (`_type`: a literal line before the paste), `src/sessionorc/tmux.py` (`send_literal`, `paste`), `src/sessionorc/mail.py` (`DOORBELL_HELD`), `src/sessionorc/models.py` (`doorbell_held`), `src/sessionorc/paths.py` / `src/agentorc/adapters/claude_code/__init__.py` (the context file's preface), `src/agentorc/cli.py` (`ao status -v`), `tests/`; design §4.1 *The brief is the person's word, and the tool is told so*, §4.10 *A ring is answered by a read, or the bell stops*. Held path (`src/sessionorc/**`): the techlead reads it.
 
 **Why:** TD-343's design. A seat took its pasted brief as data and held a PR ask ten hours; each fresh entry rang it again.
