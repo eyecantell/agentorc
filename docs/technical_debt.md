@@ -38,7 +38,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-075 | Every question a worker has goes to the person: a go-between — the lead, or a session beside it, on a stronger model — could answer what is already written down and steering, and pass up the rest with a recommendation | Medium | Partly done |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` to a pane that was gone in `test_send_wait_three_outcomes` (diagnosed and refused in words, PR #286; watching until 2026-09-27) | Low | Partly done |
-| TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Designed 2026-10-04 (Telegram, sent by the home) — the build is TD-319 |
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
@@ -604,23 +603,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **A fifth sighting — 2026-10-01 (grinder-ao-1, CI on PR #859, Python 3.12 only; 3.13 passed the same commit, `c4346b2`, a tests-only change to another file):** `tests/test_agent.py::test_send_wait_three_outcomes` ended in the suite's per-test *Timeout*, not an assertion — the hang shape, on the same test. Run 36822297238; the failed job was run again.
 
 **Related:** `tests/README.md` (the fixtures' timing rules), TD-069 (where it was seen).
-
-## TD-080: A manager's round log reads as unpushed work forever
-
-**Priority:** Medium
-**Added:** 2026-09-20 (the anchor session; Paul: *we have another 308 unpushed message — that session told me it was caught up; let's check on it*)
-**Owner:** anchor
-**Kind:** build
-**Status:** Partly done — **part (2), the measure, is built 2026-09-20 (PR #270, a worker):** `GitInfo.unpushed` and `GitInfo.pushed_against`, computed once by the host agent in `gitinfo.py` by §4.2's three rules — the branch's own `origin/<branch>` where it has one, the upstream where it does not, and *on no remote-tracking branch at all* where there is neither — and read by the card's flag, Ready to close (which now says what it measured against when it fails) and `ao team stop --close`, whose own third git test is gone: three tests became one. `ahead` is still on the record beside it and still means *ahead of the upstream*, which is *unmerged*. Part (1), the round log leaving git, goes with the manager's brief in TD-076 and is **not built** — until it is, the manager's worktree reads 0 unpushed by rule 1 (its log is pushed to `origin/<branch>` at wrap-up) rather than 308 by the old measure, so the false row is gone even while the log stays. **Next:** part (1) is in the manager's brief, the anchor's.
-**Location:** `docs/briefs/orchestrator-ao-1.md` (round step 4: *append one line per round to `docs/briefs/orchestrator-ao-1.log` … commit it to your launch branch*), `src/agentorc/briefs/lead.md`, `src/sessionorc/gitinfo.py` (`ahead`, read against the branch's upstream), `src/agentorc/teamrun.py` (`_unsafe_to_close`: a third test of *pushed*, folded into the one measure by the design of 2026-09-20), `src/agentorc/ui/app.py` (`ready_to_close`, `state_kind` → the *unpushed* row)
-
-**Why:** the session was right — nothing is stranded. Branch `orchestrator-ao-1` is *ahead 308, behind 173* of **`origin/main`, which is its upstream**, and its whole difference from main is two files: `docs/briefs/orchestrator-ao-1.log` (582 lines) and `orchestrator-ao-1.relayed.json`. The 308 commits are the manager's own round log, one commit per round since run 1, exactly as its brief tells it; they are pushed to `origin/orchestrator-ao-1` at wrap-up (the remote sits at run 5's wrap-up; run 6's rounds are local until this run ends). Because the branch tracks `origin/main`, where those commits can never land, every record in that worktree — the live manager and the exited `…-push` session alike — reads *308 unpushed*, and the Inbox raises *exited with unpushed work* for it, counted, for ever. A row that is always there teaches a person to ignore the row.
-
-**Recommended:** (1) **stop committing a round log to a branch.** It predates what the record now holds — `ao doing` (the round, with its age), the progress and findings channels, the run log — and a 582-line file in git is the least readable of them; the brief writes its one line per round to a file under the home (`runs/`), or nowhere. (2) **Measure *unpushed* against the branch's own remote** (`origin/<branch>`) when it has one, and against the upstream only when it does not — *ahead of main* is *unmerged*, which is a different question from *exists only on this machine*, and the row is about the second. (3) Until then the row for this worktree is noise, and Paul may dismiss it once TD-079's Dismiss exists for state rows.
-
-**Done when** a manager that has run for a week raises no *unpushed* row unless commits exist only on this machine, and the briefs no longer tell it to commit a log.
-
-**Related:** TD-069 (the *unpushed* row), TD-079 (a row that cannot be answered is a row to fix), design §4.2 (Ready to close), TD-076 (the manager's brief is rewritten there anyway).
 
 ## TD-091: Nothing says how much context a session has left, or that it has just compacted
 
