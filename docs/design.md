@@ -247,8 +247,8 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   it with `--append-system-prompt-file`, hands the prompt back as `LaunchSpec.first_prompt` and sets
   `AGENTORC_AT_COMPOSER=1` on every launch but a resume, whose `source: resume` says it; a resume id
   that is not a plain file name is refused.
-- **The brief is the person's word, and the tool is told so** (TD-343; designed 2026-10-06; the
-  road built — TD-347 slice 1, the bell not). A bracketed paste reaches Claude Code's model wrapped as pasted content, with
+- **The brief is the person's word, and the tool is told so** (TD-343; designed 2026-10-06; built —
+  TD-347 slices 1 and 2). A bracketed paste reaches Claude Code's model wrapped as pasted content, with
   the tool's own rule that instructions inside it are followed only where the user's own words ask
   for it — and a brief typed as nothing but a paste is, to a careful model, data: on 2026-10-06 a
   seat answered its brief that it held only pasted text and nothing saying what to do with it, and

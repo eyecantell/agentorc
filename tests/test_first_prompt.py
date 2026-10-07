@@ -136,6 +136,10 @@ async def test_a_paste_refused_after_the_line_pastes_the_brief_after_it_on_the_n
         rec = agent.sessions[w]
         assert await wait_for(lambda: _sent(rec), timeout=10), "the brief was never sent"
         assert refused == [BRIEF] and rec.first_prompt_tries == 1
+        assert w not in agent._lead_typed, "sent: the mark goes"
+        agent._lead_typed.add(w)
+        agent._scrub(w)  # a reused id starts with no line in the composer (the techlead's reading of #1158)
+        assert w not in agent._lead_typed
         assert await _submitted(agent, w) == ["SUBMITTED " + TYPED], "the line and the brief, as one prompt"
 
 

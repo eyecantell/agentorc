@@ -3196,6 +3196,7 @@ class TickMixin:
             self._unread_rings,
         ):
             side.pop(sid, None)
+        self._lead_typed.discard(sid)  # a reused id never starts with the old run's line in the composer (TD-347)
         if not (lock := self._typing.get(sid)) or not lock.locked():
             self._typing.pop(sid, None)  # a held one stays: its typist is mid-paste, the name reused or not
         for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:
