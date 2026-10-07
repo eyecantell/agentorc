@@ -9,4 +9,4 @@ The techlead's primer (`docs/briefs/techlead-context.md`) lives under `docs/brie
 
 **Why:** the design says the primer updates "in the PR that changes the architecture", but the designer's brief promises its PRs touch no held path; the two collide on every architecture-level design.
 
-**How to apply:** when a design changes who does what, write the primer's new row as a slice of the build entry (the build's briefs slice is held anyway) and keep the design PR to `docs/design.md`, the history, the glossary and the ledger. Related: [[design-help-text-is-bound-to-help-py]].
+**How to apply:** when a design changes who does what, write the primer's new row as a slice of the build entry (the build's briefs slice is held anyway) and keep the design PR to the design's files under `docs/design/`, the history, the glossary and the ledger. Related: [[design-help-text-is-bound-to-help-py]].

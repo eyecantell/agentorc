@@ -10,6 +10,7 @@ import pathlib
 import re
 
 import pytest
+from design_doc import section
 
 ROOT = pathlib.Path(__file__).parents[1]
 UI = ROOT / "src" / "agentorc" / "ui"
@@ -18,8 +19,8 @@ pytestmark = pytest.mark.unit
 
 
 def design_help() -> list[tuple[str, str, str]]:
-    """`(name, where, paragraph)` for each bullet under *The help text* in docs/design.md."""
-    s = (ROOT / "docs" / "design.md").read_text(encoding="utf-8")
+    """`(name, where, paragraph)` for each bullet under *The help text* in design §4.5a."""
+    s = section("4.5a")
     block = s[s.index("**The help text (TD-157).**") :]
     block = block[: block.index("\n\n", block.index("\n- **"))]  # the list ends at its blank line
     items = re.findall(r"^- \*\*(.+?)\*\* \((.+?)\) — (.*?)(?=^- \*\*|\Z)", block, re.S | re.M)

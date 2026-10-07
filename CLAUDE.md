@@ -6,7 +6,7 @@ Guidance for Claude Code sessions working in this repository.
 
 agentorc is a self-hosted web dashboard that orchestrates interactive AI coding-agent sessions
 (Claude Code first) and plain shells running in tmux across hosts. **Status: past phase 1**
-(§7 of the design says what each phase has and lacks). [`docs/design.md`](docs/design.md) is the source of truth: requirements,
+(§7 of the design says what each phase has and lacks). The design — one file per section under `docs/design/`, [`docs/design.md`](docs/design.md) its index — is the source of truth: requirements,
 architecture, every control (§4.5a — a control that is not in that table does not exist), the
 phase plan (§7), invariants (§9), and the dated question log (§10). It is written in the present tense and says what
 is true now; the dated record of how each rule came to be is [`docs/design-history.md`](docs/design-history.md). A

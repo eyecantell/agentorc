@@ -5,6 +5,8 @@ import pathlib
 from pathlib import Path
 
 import pytest
+from design_doc import files as design_files
+from design_doc import whole
 
 from agentorc.adapters.claude_code import RULES_FILE, ClaudeCodeAdapter
 from sessionorc.screen import Manifest, Rule
@@ -129,9 +131,8 @@ def test_the_standdown_rule_needs_both_of_the_banners_markers():
     for screen_lines in quiet:
         assert m.explain(screen_lines) is None, screen_lines
     assert m.explain(["  this device is standing down (code 4090).", "  ? for shortcuts    /rc failed"]) is not None
-    # design §4.2's own paragraph, however the file is wrapped
-    design = pathlib.Path(__file__).parents[1] / "docs" / "design.md"
-    para = [ln for ln in design.read_text().splitlines() if "Remote Control" in ln or "standing down" in ln]
+    # the design's own lines about it (§3, §4.2, §4.3 and §6 hold them), however the files are wrapped
+    para = [ln for ln in whole().splitlines() if "Remote Control" in ln or "standing down" in ln]
     assert m.explain(para) is None and m.explain([" ".join(para)]) is None
 
 
@@ -146,7 +147,7 @@ def test_the_rules_own_sources_do_not_trip_the_rule_they_describe():
     m = Manifest.load(RULES_FILE)
     root = pathlib.Path(__file__).parents[1]
     for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
-                root / "docs" / "design.md"):  # fmt: skip
+                *design_files()):  # fmt: skip
         lines = pathlib.Path(rel).read_text().splitlines()
         for i in range(max(1, len(lines) - 19)):
             got = m.explain(lines[i : i + 20])
@@ -183,7 +184,7 @@ def test_a_held_peer_message_needs_a_person_and_prose_about_it_does_not():
         assert m.explain(lines) is None, lines
     root = pathlib.Path(__file__).parents[1]
     for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
-                root / "docs" / "design.md"):  # fmt: skip
+                *design_files()):  # fmt: skip
         lines = pathlib.Path(rel).read_text().splitlines()
         for i in range(max(1, len(lines) - 14)):
             got = m.explain(lines[i : i + 15])
@@ -212,7 +213,7 @@ def test_claude_codes_first_run_screens_need_a_person_and_prose_about_them_does_
         assert m.explain(lines) is None, lines
     root = pathlib.Path(__file__).parents[1]
     for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
-                root / "docs" / "design.md"):  # fmt: skip
+                *design_files()):  # fmt: skip
         lines = pathlib.Path(rel).read_text().splitlines()
         for i in range(max(1, len(lines) - 14)):
             got = m.explain(lines[i : i + 15])

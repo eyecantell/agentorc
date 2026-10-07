@@ -6,6 +6,8 @@ prose to the truth, which is why the primer is never cited as a source."""
 import re
 from pathlib import Path
 
+from design_doc import section, whole
+
 REPO = Path(__file__).resolve().parents[1]
 PRIMER = REPO / "docs" / "briefs" / "techlead-context.md"
 
@@ -15,7 +17,7 @@ def _text() -> str:
 
 
 def test_every_design_section_the_primer_names_exists():
-    design = (REPO / "docs" / "design.md").read_text(encoding="utf-8")
+    design = whole()
     headings = set(re.findall(r"^#{2,3} (\d+(?:\.\d+[a-z]?)?)[. ]", design, flags=re.M))
     named = set(re.findall(r"§(\d+(?:\.\d+[a-z]?)?)", _text()))
     assert named, "the primer names no section at all"
@@ -23,8 +25,7 @@ def test_every_design_section_the_primer_names_exists():
 
 
 def test_every_invariant_the_primer_names_exists():
-    design = (REPO / "docs" / "design.md").read_text(encoding="utf-8")
-    body = design[design.index("## 9. Invariants") : design.index("## 10. ")]
+    body = section("9")
     have = set(re.findall(r"^(\d+)\. ", body, flags=re.M))
     named = set(re.findall(r"invariant (\d+)", _text()))
     assert named and not named - have, f"invariants the design does not have: {sorted(named - have)}"
