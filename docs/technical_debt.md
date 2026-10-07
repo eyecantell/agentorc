@@ -84,6 +84,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
 | TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Live check #1158: both slices built (#1158, #1163); the press read on the live copy once live |
+| TD-353 | *Answer needed* mixes mail with live prompts since TD-350: a member's open question to the person moves to a line of its own | Medium | Open — decided by Paul |
 
 ---
 
@@ -1438,3 +1439,25 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
 
+## TD-353: *Answer needed* mixes mail with live prompts since TD-350: a member's open question to the person moves to a line of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of the Org)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open. **Decided by Paul, 2026-10-06:** *Separate line*. The design round is the obvious tier: write it, land it, tell him with a note.
+**Location:** design §4.5 screen 1 *The rollup* and *A team's card*, §4.5a *Org rollup* and *team card: Answer needed / Doing*; `src/agentorc/ui/org.py` (`ask_blocks`, appended by `answer_blocks`), the rollup's *answer needed* count, `src/agentorc/ui/templates/team_summary.html` and `rollup.html`
+
+**Why:** Paul's distinction, which TD-344 (designed in #1157) and TD-350 (built in #1167, live since `4d3133e`) broke. **Answer needed** is what needs him now: a prompt standing in a session's pane (a permission, a question the tool is showing), with Allow / Deny where it has them. **The Inbox** is mail, which can wait for him to open it. TD-344 came from his read of *0 answer needed* while techlead-ao-1's mailed `ask` held the team. The anchor filed it as a defect without checking it against that distinction, and the designer took the first of its two shapes. So since TD-350, an open `ask` from a member is an *Answer needed* block and counts in the rollup's *answer needed*, beside live prompts.
+
+**Fix:**
+- *Answer needed* (the facet's blocks and the rollup's count) goes back to live prompts only, as before TD-350.
+- A team with an open `ask` (or `steer`) to the person from one of its live members shows it on **a line of its own**, both in the team's facet and in the rollup. For example *asked you · 1 · 2h*, with the member and the ask's first line on hover, linking its Inbox row (`/inbox?row=…`, TD-319's landing).
+- It is visible on the team, where the waiting happens, and never counted or drawn as a prompt.
+- The Inbox keeps counting it under *in the Inbox*.
+- The design says why there are two lines: a prompt stops a session now, and a question waits in the mail.
+
+**Done when** on a scratch home, a member's open `ask` to the person shows as the team's *asked you* line, linking its Inbox row, and adds nothing to *Answer needed*; a pane prompt still does; and §4.5 and §4.5a say the two apart.
+
+**Related:** TD-344 and TD-350 (archived: the shape this replaces), TD-343 (the techlead's held ask that started it), TD-319 (the Inbox's `?row=` landing).
