@@ -549,46 +549,67 @@ def _ask(mid: str, frm: str, kind: str = "ask", minutes: int = 10, **kw) -> dict
     }
 
 
-def test_a_members_open_ask_to_the_person_is_an_answer_block_and_counted():
-    """TD-350 (§4.5a *team card: Answer needed / Doing*, TD-344): an idle member's open `ask` to the
-    person is a block under **Answer needed** — the member, *asked you · <age>*, the first line as
-    text, **Open** to its message page — and is counted in the rollup's *answer needed*."""
+def test_a_members_open_ask_to_the_person_is_the_teams_asked_you_line():
+    """TD-354 (§4.5a *team card: Answer needed / Doing*, TD-353): an idle member's open `ask` to the
+    person is the team's *asked you · n · <age>* line — one link to the oldest's Inbox row, the
+    members and first lines its tooltip — drawn in either face, and the rollup's *asked you*; it is
+    not a block, not in Answer needed (n), and neither opens nor tints the facet."""
     ms = [member("g1", state="idle"), member("g2")]
-    s = ui.team_summary("grind", ms, {}, {}, now=NOW, needs=[_ask("m-1", "g1")])
-    assert s["face"] == "answer" and [(a["kind"], a["member"], a["text"]) for a in s["answers"]] == [
-        ("ask", "g1", "Which branch for m-1?")
-    ]
-    assert s["answers"][0]["age"] == "10m" and s["answer_key"] == "m-1:ask"
+    needs = [_ask("m-1", "g1"), _ask("m-0", "g2", minutes=40)]
+    s = ui.team_summary("grind", ms, {}, {}, now=NOW, needs=needs)
+    assert s["face"] == "doing" and s["answers"] == [] and s["answer_key"] == ""
+    assert s["asked"] == {
+        "n": 2,
+        "id": "m-0",
+        "at": needs[1]["at"],
+        "age": "40m",
+        "who": [{"name": "g2", "text": "Which branch for m-0?"}, {"name": "g1", "text": "Which branch for m-1?"}],
+    }
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    assert 'href="/inbox/m-1"' in html and "asked you · " in html and 'href="/focus/g1"' in html
-    assert "Which branch for m-1?" in html and "the reading" not in html and 'data-act="allow"' not in html
+    assert html.count('href="/inbox?row=m-0"') == 2, "one line under each face's head"
+    assert "asked you · 2 · " in html and 'title="g2: Which branch for m-0?\ng1: Which branch for m-1?"' in html
+    assert "the reading" not in html and "Answer needed (0)" in html and 'href="/inbox/m-0"' not in html
     for m in ms:
         m.update(rank=1, slot={}, place="kmaster / samscrape", pill_word=m["state"])
-    groups = ui.team_groups(ms, (), {}, {}, needs=[_ask("m-1", "g1")])
-    ro = ui.rollup(groups)
-    assert ro["answer_needed"] == 1 and ro["answer_team"] == "grind"
-    assert "or whose ask to you is open" in ui.templates.get_template("rollup.html").render(ro=ro, person_needs=1)
+    ro = ui.rollup(ui.team_groups(ms, (), {}, {}, needs=needs))
+    assert ro["answer_needed"] == 0 and ro["asked"] == 2 and ro["asked_team"] == "grind"
+    assert ro["asked_at"] == needs[1]["at"], "the oldest ask's age"
+    out = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2)
+    assert '<a href="#tsum-grind"' in out and ">asked you</a>" in out and "or whose ask to you is open" not in out
+    # at 0 the row is hidden; nothing open, no line on the card
+    zero = ui.templates.get_template("rollup.html").render(ro={**ro, "asked": 0}, person_needs=0)
+    assert ">asked you</a>" not in zero
+    assert ui.team_summary("grind", ms, {}, {}, now=NOW)["asked"] is None
 
 
-def test_only_an_open_ask_from_the_team_is_a_block():
-    """Closed, a `steer`, a state row, a board row, or a sender outside the team: no block. A pane's
-    question and an ask on two members: two blocks, the pane's first, then the asks oldest first; a
-    node's `id@host` sender is that record, and no other."""
+def test_a_pane_prompt_is_still_answer_needed_beside_the_line():
+    """TD-354: a member's pane question is still **Answer needed (1)**, opening and tinting the facet,
+    with the team's open ask beside it as the line, counted only there."""
+    ms = [member("g1", state="needs-you", pending={"kind": "question", "text": "which?"}), member("g2", state="idle")]
+    s = ui.team_summary("grind", ms, {}, {}, now=NOW, needs=[_ask("m-1", "g2")])
+    assert s["face"] == "answer" and [a["kind"] for a in s["answers"]] == ["question"] and s["asked"]["n"] == 1
+    assert s["answer_key"] == "g1:question"
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert "Answer needed (1)" in html and "asked you · 1 · " in html
+
+
+def test_only_an_open_ask_from_the_team_is_on_the_line():
+    """Closed, a `steer`, a state row, a board row, or a sender outside the team: not on the line. Two
+    asks on one member: both, oldest first; a node's `id@host` sender is that record, and no other.
+    Answer needed holds the pane's question alone, whatever the asks."""
     ms = [member("g1", state="needs-you", pending={"kind": "question", "text": "which?"}), member("g2", state="idle")]
 
     def asks(needs):
-        return [(a["kind"], a.get("member") or a["id"]) for a in ui.answer_blocks(ms, needs, NOW)]
+        return [a["id"] for a in ui.ask_blocks(ms, needs, NOW)]
 
-    assert asks([_ask("m-1", "g2", closed_reason="replied")]) == [("question", "g1")]
-    assert asks([_ask("m-1", "g2", kind="steer")]) == [("question", "g1")]
-    assert asks([{"id": "g2:question", "row": "question", "from": "g2", "kind": "ask"}]) == [("question", "g1")]
-    assert asks([_ask("m-1", "h9")]) == [("question", "g1")]
-    two = asks([_ask("m-2", "g2", minutes=1), _ask("m-1", "g2", minutes=30)])
-    assert two == [("question", "g1"), ("ask", "g2"), ("ask", "g2")]
+    assert asks([_ask("m-1", "g2", closed_reason="replied")]) == []
+    assert asks([_ask("m-1", "g2", kind="steer")]) == []
+    assert asks([{"id": "g2:question", "row": "question", "from": "g2", "kind": "ask"}]) == []
+    assert asks([_ask("m-1", "h9")]) == []
+    assert asks([_ask("m-2", "g2", minutes=1), _ask("m-1", "g2", minutes=30)]) == ["m-1", "m-2"]
     # a node's record is `id@host` in the reader's form on both sides (§4.4a): matched whole, so a
     # session of the same id on another host is not this member
     ms.append(member("g3@node", state="idle"))
-    assert asks([_ask("m-3", "g3@node"), _ask("m-4", "g2@other")]) == [("question", "g1"), ("ask", "g3@node")]
-    assert [a["id"] for a in ui.answer_blocks(ms, [_ask("m-2", "g2", minutes=1), _ask("m-1", "g2", minutes=30)], NOW)][
-        1:
-    ] == ["m-1", "m-2"]
+    assert asks([_ask("m-3", "g3@node"), _ask("m-4", "g2@other")]) == ["m-3"]
+    assert [(a["kind"], a["id"]) for a in ui.answer_blocks(ms)] == [("question", "g1")]
+    assert ui.asked_line(ms, [], NOW) is None

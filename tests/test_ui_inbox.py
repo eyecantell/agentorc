@@ -3059,10 +3059,11 @@ def test_every_button_has_one_hover_one_press_and_one_ring():
 
 
 @pytest.mark.integration
-def test_the_org_draws_a_members_open_ask_under_answer_needed(client, tmp_path):
-    """TD-350 (§4.5a *team card: Answer needed / Doing*): the Org route hands its *Needs you* rows to
-    the team summaries, so an idle member's open `ask` to the person is a block with **Open** and is
-    counted in the rollup; answered, it is gone."""
+def test_the_org_draws_a_members_open_ask_as_its_teams_asked_you_line(client, tmp_path):
+    """TD-354 (§4.5a *team card: Answer needed / Doing*, TD-353): the Org route hands its *Needs you*
+    rows to the team summaries, so an idle member's open `ask` to the person is the team's *asked
+    you* line, linking its Inbox row, and the rollup's *asked you* — never in Answer needed (n);
+    answered, it is gone."""
     from sessionorc.client import LocalClient
 
     async def ask():
@@ -3075,6 +3076,7 @@ def test_the_org_draws_a_members_open_ask_under_answer_needed(client, tmp_path):
                     adapter="shell",
                     argv=["bash", "--norc"],
                     team="ao-t350",
+                    unattended=True,  # a worker, so the team is live and the rollup sums it
                 )
             )["id"]
         async with LocalClient(caller=w) as wc:
@@ -3082,7 +3084,9 @@ def test_the_org_draws_a_members_open_ask_under_answer_needed(client, tmp_path):
 
     mid = asyncio.run(ask())
     page = client.get("/").text
-    assert f'href="/inbox/{mid}"' in page and "which branch?" in page and "Answer needed (1)" in page
+    assert f'href="/inbox?row={mid}"' in page and "asked you · 1 · " in page and "askr350: which branch?" in page
+    assert "Answer needed (0)" in page, "not counted among the prompts"
+    assert ">asked you</a>" in page, "the rollup's row"
 
     async def answer():
         async with LocalClient() as person:
@@ -3090,4 +3094,4 @@ def test_the_org_draws_a_members_open_ask_under_answer_needed(client, tmp_path):
 
     asyncio.run(answer())
     page = client.get("/").text
-    assert f'href="/inbox/{mid}"' not in page and "Answer needed (0)" in page
+    assert f'href="/inbox?row={mid}"' not in page and "asked you · " not in page and ">asked you</a>" not in page

@@ -172,11 +172,11 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
 def ask_blocks(
     members: Collection[dict[str, Any]], needs: Collection[dict[str, Any]], now: datetime | None = None
 ) -> list[dict[str, Any]]:
-    """**A member's `ask` to you is a block too** (§4.5a *team card: Answer needed / Doing*, TD-350):
-    every open ask the Inbox counts under *Needs you* — `needs`, its rows as `inbox_sections` gave
-    them — whose sender is one of `members`, oldest first. The two are in the reader's form (§4.4a
-    *Every address crosses in the reader's form*): a node's record is `id@host` on both sides, and a
-    bare id is this host's, so they are matched whole. Never a
+    """**A member's `ask` to you** (§4.5a *team card: Answer needed / Doing*, TD-350, TD-354): every
+    open ask the Inbox counts under *Needs you* — `needs`, its rows as `inbox_sections` gave them —
+    whose sender is one of `members`, oldest first: the data of the team's *asked you* line. The two
+    are in the reader's form (§4.4a *Every address crosses in the reader's form*): a node's record is
+    `id@host` on both sides, and a bare id is this host's, so they are matched whole. Never a
     `steer`, a board row or a state row. Its text is the ask's first line, drawn as text."""
     now = now or datetime.now(UTC)
     names = {str(m["id"]): str(m.get("name") or m["id"]) for m in members}
@@ -202,13 +202,32 @@ def ask_blocks(
     return sorted(out, key=lambda a: a["at"])
 
 
-def answer_blocks(
-    members: Collection[dict[str, Any]], needs: Collection[dict[str, Any]] = (), now: datetime | None = None
-) -> list[dict[str, Any]]:
+def asked_line(
+    members: Collection[dict[str, Any]], needs: Collection[dict[str, Any]], now: datetime | None = None
+) -> dict[str, Any] | None:
+    """**The *asked you* line** (§4.5a *team card: Answer needed / Doing*, TD-353, built by TD-354):
+    the team's open asks to the person summed into one line — how many, the oldest's id (the line
+    links its Inbox row) and age, and each ask's member and first line for the tooltip. None while
+    no ask is open. Never a block and never counted in Answer needed: a prompt stops a session now,
+    and a question in the mail waits."""
+    asks = ask_blocks(members, needs, now)
+    if not asks:
+        return None
+    first = asks[0]
+    return {
+        "n": len(asks),
+        "id": first["id"],
+        "at": first["at"],
+        "age": first["age"],
+        "who": [{"name": a["name"], "text": a["text"]} for a in asks],
+    }
+
+
+def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     """**Answer needed** (§4.5a *team card: Answer needed / Doing*): each member waiting on a
-    permission or a question — the permission with Allow / Deny when the hook gave something to
-    answer (`tool_use_id`), a question as its text with Focus — then each member's open `ask` to
-    the person from the Inbox's `needs` rows (`ask_blocks`, TD-350)."""
+    permission or a question in its pane, and those alone (TD-353) — the permission with Allow /
+    Deny when the hook gave something to answer (`tool_use_id`), a question as its text with Focus.
+    A member's open `ask` to the person is the facet's *asked you* line (`asked_line`), never here."""
     out = []
     for m in members:
         kind = state_kind(m)
@@ -224,7 +243,7 @@ def answer_blocks(
                 "deadline": m.get("deadline") or "",
             }
         )
-    return out + ask_blocks(members, needs, now)
+    return out
 
 
 REF_WIDTH = 10  # *TDs in motion*'s reference column at most, in characters (§4.5a **Columns**, TD-252)
@@ -271,7 +290,7 @@ def team_summary(
     now = now or datetime.now(UTC)
     r = team_repo(members, repos or {})
     motion = motion_rows(members, r)
-    answers = answer_blocks(members, needs, now)
+    answers = answer_blocks(members)
     return {
         "team": team,
         "repo": repo_facet(r, now, waiting) if r else None,
@@ -283,6 +302,8 @@ def team_summary(
         # …and the PR column's: *#811*, or *#712 merged*; 0 where no row has a PR, so the title takes the room
         "pr_w": max((len(f"#{x['pr']} {x['pr_state']}".rstrip()) for x in motion if x["pr"]), default=0),
         "answers": answers,
+        # the team's open asks to the person, one line under the facet's head in either face (TD-354)
+        "asked": asked_line(members, needs, now),
         "doing": (drows := doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}, now)),
         # the doer column's width, set here from the names in the list so a filter moves no column (§4.5a)
         "doer_w": min(max((len(d["name"]) for d in drows), default=1), DOER_WIDTH),
@@ -311,7 +332,7 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
     """The Org **rollup** (§4.5a *Org: rollup*, TD-176 slice 4): sums over every live team — the
     Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
     holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
-    counted once), and Needs you's *answer needed*. None when no team is live: the page then has no
+    counted once), and Needs you's *answer needed* and *asked you*. None when no team is live: the page then has no
     rollup — a wound-down team's summary (TD-192) is not summed. The Inbox's count is the top bar's,
     filled in by the client."""
     live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
@@ -347,6 +368,9 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
                 wins[w][k] += int(((p["windows"] or {}).get(w) or {}).get(k) or 0)
     busiest = max(repos.values(), key=lambda r: r["prs"]["n"] or 0, default=None)
     answers = [(g["team"], a) for g in live for a in g["summary"]["answers"]]
+    # *asked you* (TD-354): the teams' lines summed, the oldest's age, the first such team's anchor
+    asked = [(g["team"], g["summary"]["asked"]) for g in live if g["summary"].get("asked")]
+    oldest = min((a for _, a in asked), key=lambda a: a["at"], default=None)
     return {
         "agents": agents,
         "n_agents": len(members),
@@ -364,6 +388,10 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
         "waiting": sum(int((g.get("prs_waiting") or {}).get("n") or 0) for g in live),
         "answer_needed": len(answers),
         "answer_team": answers[0][0] if answers else "",
+        "asked": sum(a["n"] for _, a in asked),
+        "asked_at": oldest["at"] if oldest else "",
+        "asked_age": oldest["age"] if oldest else "",
+        "asked_team": asked[0][0] if asked else "",
     }
 
 

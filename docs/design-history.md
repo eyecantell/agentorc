@@ -293,6 +293,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-06 (TD-354, grinder-ao-2): TD-353's *asked you* line built — `org.asked_line` on the team summary, drawn under the facet's head in both faces and linking the oldest ask's Inbox row; `answer_blocks` back to pane prompts alone; the rollup's *asked you* row, hidden at 0.
 - 2026-10-06 (TD-353, the designer; Paul: *separate line*): the **team card: Answer needed / Doing** row's ask block becomes the facet's **asked you** line — summed, linking the oldest's Inbox row, counted nowhere on the card, never a prompt — and the **Org rollup** row's *answer needed* is prompts alone again, a third line **asked you** beside it (not built — TD-354).
 - 2026-10-06 (TD-350, grinder-ao-2): the ask block built. The Org's deltas redraw each team summary without reading the mailbox, so they read the *Needs you* rows the last Org page or Inbox poll composed (the UI's `needs_cache`). The page and its deltas therefore count the same asks, and a delta is at most one poll behind the Inbox.
 - 2026-10-06 (TD-344, the designer): the **team card: Answer needed / Doing** row gains the ask block — the member, *asked you · <age>*, the ask's first line as text, **Open** to the message page, no answer control — and the **Org rollup** row's *answer needed* counts it (not built — TD-350).
