@@ -63,7 +63,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Designed 2026-09-28 with TD-223 — the build is TD-228 |
 | TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open — answered by TD-210's design; closes with TD-229 |
-| TD-210 | The home's definition files (`org.yml`, `profiles.yml`, `settings.yml`) have no history and no copy off the machine: moving the home or starting an org elsewhere means copying files by hand | Medium | Designed 2026-09-28 — the build is TD-229 |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Designed 2026-09-28 — the build is TD-228 |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — live check 2026-10-03: alarms still land with *gone pane None*; (a) misses them |
 | TD-228 | Build the derived pickable: the reader's `Blocked by:` rule and the archive, the page's kinds in their new order, the lane words, this ledger's migration off the `**Pickable:**` line, the briefs' pick | Medium | Built — slices 1–4 (PRs #793, #898, #901 and slice 2); left: the live half of *Done when* on dc-grind after a promote |
@@ -80,7 +79,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-302 | A session on a node cannot say its own word: `ao doing` and `ao progress none`/`restart` are refused as not its own, so a node team's run cannot end cleanly | High | Built — PR #1000; the check waits on a node run |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Open |
-| TD-314 | A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next | Low | Designed 2026-10-04; the build is TD-315 |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
@@ -1036,22 +1034,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-093 (the reader and `held`), TD-120 (org roles), `docs/decisions/2026-09-25-settings-audit.md`.
 
-## TD-210: The home's definition files have no history and no copy off the machine
-
-**Priority:** Medium
-**Added:** 2026-09-28 (Paul: *does it seem odd that our org.yml is not source controlled? If I set up an org then want to work it from another machine, I have to remember to grab it?*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-09-28 (the designer, PR #725; the steer to Paul is `m-4dbd743f974f`, bound 2026-09-29 10:35 MDT): design §4.9 *The org is an aggregate of what the repos define* and *What is left at the home has a history*, §4.7 `ao org`, §4.5a *Members… on a repo-defined team*, §5; the glossary's *org*. It answers TD-209 too. Closes with TD-229. What came before: **Answered 2026-09-28 (Paul, to the anchor; the ask was closed `asker_gone` at the designer's restart seven minutes after it was put, before he saw it, TD-213):** none of the four as asked. Instead, *should org.yml actually be an aggregate of each of the repos that support a team? samscrape, contractmatch and dev-cadence would each have an org.yml that defines the team(s) associated with them, then agentorc/shiftlead aggregates them to create the full org.* The round designs that: each repo defines its own teams (its `.agentorc.yml` `teams:` exists today and `ao team list` already merges it with `org.yml`'s), versioned and reviewed with that repo, and the home aggregates them. What still needs a central home, and is much smaller: which repos make up the org and where each is checked out on which host, the accounts and profiles, the person's settings, and any team spanning repos. The round decides where that remainder lives (the four answers of the ask, now over a small file) and how an org is stood up on a fresh machine from the repos plus that remainder. TD-209 (per-repo review paths) falls to the same answer. **Asked 2026-09-28** (the designer, ask `m-75762d6d9bee` in the person inbox): where the definition files live — a private git repo the home reads from, its page edits committed and pushed (recommended); the same with the anchor pushing; a local git repo in `~/.agentorc` copied off the machine by the backup; or as they are. It is Paul's because it makes a new private repo and has the host agent push to it, which nothing in the host agent does today. The round runs on his answer. **Next:** designed; the build is TD-229.
-**Blocked by:** TD-229
-**Location:** `~/.agentorc/` (`org.yml`, `profiles.yml`, `settings.yml`, `hosts.yml`), design §4.4a (*`org.yml` lives on the home*), §5 (the settings files), §4.9 (Members… edits `org.yml` in place), `docs/decisions/2026-09-25-settings-audit.md` (the file table)
-
-**Why:** the home's definition files live only in `~/.agentorc/` on the home. A node reads the home's org and keeps none of its own (§4.4a), so two machines never disagree. But nothing gives the home's copy history or a second place to live. The nightly backup tars the files into `~/.agentorc/backups/`, on the same disk. Moving the home, rebuilding kmaster, or running the org from a fresh machine means remembering to copy the files by hand. There is no history: `~/.agentorc/` holds ten hand-made `org.yml.bak-*` files (2026-09-17 to 2026-09-24), which is version control by hand. The pressure grows now that Members… (TD-172) edits `org.yml` from the page. A repo's `.agentorc.yml` can hold `teams:` and is versioned with its code, but the org's projects, its `roles:` overlay and cross-repo teams have no such home.
-
-**Fix:** design a versioned home for the definition files. The anchor's proposal: a private git repo (e.g. `agentorc-org`) whose checkout the home reads from, via `AGENTORC_ORG_DIR` or `~/.agentorc` pointing into it. Then settle: (1) **which files**: `org.yml` and `profiles.yml` surely, `settings.yml` probably (the person's; no secrets in any, since secrets stay in Doppler), while `hosts.yml` (this machine's identity) and the runtime store (sessions, runs, inbox) stay local; (2) **page edits commit**: Members… and the Settings page's writes commit with a message naming the act, as the board write-back does (§4.4); pushed, or committed and left for the anchor to push; (3) **a hand edit and a page edit meeting**: the page refuses on a dirty checkout, or commits the hand edit first; (4) **moving the home**: clone the repo on the new machine and name it as the home; `ao host up` / `ao service install` could take the repo's URL; (5) where each file stands under the settings audit's definition-versus-setting rule, and whether per-repo keys (TD-209's held paths) move to the repos instead. Done when the org can be stood up on a fresh machine from a clone and one command, and `org.yml`'s history is `git log`.
-
-**Related:** TD-209 (the org-wide role's review paths), TD-172 (Members… edits `org.yml`), TD-146 (`settings.yml`), TD-057 (home and node), the settings audit ADR, CLAUDE.md's cross-repo convention (secrets in Doppler).
-
 ## TD-223: Rule 6 matches nothing in a ledger without Pickable, Owner and Kind lines
 
 **Priority:** Medium
@@ -1357,23 +1339,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-307, TD-309.
 
-## TD-314: A review stage is the techlead seat's alone: design one any seat role may hold, and a PR passed from one reader to the next
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-04 (TD-307's design, from Paul's *add/remove a review round* and *roles and flows essentially orthogonal*; the anchor session)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-04** (the designer, PR #1022): design §4.9c *A review stage any seat may hold, and a PR read by more than one*, with pointers in §4.9b *The reader* and §4.7 (`ao msg --verdict`, `ao pr held`); the glossary's *path set* and *verdict*. A review stage names any `seat` role, staffed by the one seat of that role on the `asks` trigger; a repo names path sets and a stage names one; the record's `review` is a chain; the author walks it, the last reader merges, each answer carries a `verdict`, and `ao pr held` says whose turn it is; a switch leaves a sent ask with its reader. No page control, so no mockup. Three choices are steered to Paul as `m-685639361bc4`, and Paul, 2026-10-04: *Go with all three*. The build is TD-315.
-**Blocked by:** TD-315
-**Location:** design §4.9c (*Roles and flows are orthogonal*), §4.9b *The reader* (`review: {reader, held}`), `sessionorc.models` (`REVIEW_READERS`, `normalize_review`), `ao pr held`
-
-**Why:** under flows (TD-307) a review stage may only name the team's `techlead:` seat, because the held-PR machinery knows two readers, `techlead` and `person`, one `held:` list per record and one reader per PR. A flow that wants a second review round — a UI or security reader before the techlead, or a different reader on some paths — cannot be written, and a seat role a person defines cannot hold a review stage, which is the one place roles and flows are not yet apart.
-
-**Fix:** design it: a review stage naming any `seat` role, with its own paths (a path set the repo names, `held:` by name); a PR held by more than one stage passed from one reader to the next in the flow's order, each reader's *merged* or *findings* on the PR's thread; how the builder's brief and `ao pr held` say whose turn it is; what a switch does to a PR mid-chain.
-
-**Related:** TD-307 (flows), TD-093 (the reader), TD-291 (the UI check, which is the builder's today).
-
 ## TD-319: Build the Telegram channel — the home tells the person what newly stops a session or a team
 
 **Priority:** Low
@@ -1555,7 +1520,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home (TD-344's *Done when*); then TD-344 archives.
 
 **Related:** TD-344 (the design), TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
-
 
 ## TD-351: Build the design split — `docs/design/<§>-<slug>.md` by script, `design.md` the index, `tests/design_doc.py`, the greps repointed, landed in a quiet window
 
