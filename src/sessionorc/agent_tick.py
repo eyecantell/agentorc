@@ -632,7 +632,7 @@ class TickMixin:
             await self._push_changes()
             return
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
-        await self._replay(s, "crash")
+        await self._replay(s, "crash", keep_mail=True)
 
     async def _scheduled_start(self, s: Session, now: datetime) -> None:
         """Design §6 *Start time* (TD-152): a `scheduled` record whose instant has passed is created
@@ -721,7 +721,7 @@ class TickMixin:
                 self._save(s)
                 await self._push_changes()
                 return
-        await self._replay(s, "wanted")
+        await self._replay(s, "wanted", keep_mail=True)
 
     async def _sit_out_close(self, s: Session) -> None:
         """A sit-out's end (design §4.9c *Switching*, TD-309 slice 5b): a record carrying `sit_out` — a
@@ -807,7 +807,7 @@ class TickMixin:
             # a retry taken from the other trigger's mark: the mark follows the trigger it is replayed under,
             # just before the replay, so a replay that fails again is taken again next tick (TD-334)
             self._mark_closed(s, why)
-        await self._replay(s, why)
+        await self._replay(s, why, keep_mail=True)
 
     @staticmethod
     def _mark_closed(s: Session, why: str) -> None:
@@ -1930,6 +1930,8 @@ class TickMixin:
         or at its node — the attempt appended to `restarts` and the list carried onto the new record,
         so the count survives the restart it counts. A replay that fails keeps its entry with `error`
         and counts all the same. `mark` adds to the entry (rule 8's `ids`, what a start was for).
+        Every caller but a scheduled start (whose `start_of` moves the mail itself) passes `keep_mail`:
+        the closed run's mail is the new record's, so a reply to its `ask` still has a thread (TD-352).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
         (`agent_common._reported`) — since the new record keeps none of the old one's `progress` (§4.9a, TD-245)."""
         now = datetime.now(UTC)

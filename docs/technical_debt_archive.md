@@ -5257,3 +5257,25 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a team member's open `ask` to the person is counted on the Org's *Needs you* in the line the person reads as answers needed, on a scratch home (TD-344's *Done when*); then TD-344 archives.
 
 **Related:** TD-344 (the design), TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
+
+---
+
+## TD-352: The tick's own restarts start the member with an empty mailbox, so a reader's reply to the run before's `ask` is a false crossing
+
+**Priority:** High
+**Type:** bug
+**Added:** 2026-10-06 (grinder-ao-1, read on its own record)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved 2026-10-06 (grinder-ao-1, PR #1170).
+**Location:** `src/sessionorc/agent_tick.py` (`_crash_restart`, `_wanted_restart`, rule 7's replay → `_replay(…, keep_mail=True)`), `tests/test_crash_restart.py`; design §6 rule 1, §4.10 *The name coming back adopts it*.
+
+**Resolved:** 2026-10-06 (grinder-ao-1, PR #1170). Rules 1, 2 and 7 replay with `keep_mail`, as rule 8, a seat's fill and a person's Restart already did; design §6 rule 1 says every replay of the tick's keeps the mail, and §4.10 drops *the tick's own replays did not*. `tests/test_crash_restart.py`: an `ask` the run before sent survives a wanted restart and a crash restart, and the reader's reply to it is `held.read_by`'s read (it fails without the fix: the new outbox is empty).
+
+**Why:** grinder-ao-1 asked the techlead about #1164 and #1158, then declared `restart` (context bound). The tick's wanted restart replayed it without `keep_mail`, so the new record held no outbox; the techlead merged #1164 and replied on the ask's thread twenty seconds later, and rule 11 found no thread of the record's for the reply — a crossing on `held_missed` and *[agentorc] PR #1164 … merged without the techlead's read* typed into the member, for a PR its reader had read and merged. §4.10 *The name coming back adopts it* already listed the tick's restart among the creates that keep the mail.
+
+**Done when** a member restarted by the tick keeps its mail and a reply to its predecessor's PR ask is the read.
+
+**Related:** TD-271 / TD-274 (`keep_mail` for rule 8 and a team's start), TD-246 / TD-250 (a person's Restart), TD-258 (rule 11's crossing), TD-349.
+
+---
