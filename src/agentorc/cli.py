@@ -340,7 +340,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             # Mail (design §4.10): the unread count and the marks — never a body, which `ao inbox`
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
-                print(f"{'':<{w}}      mail:   {unread} unread")
+                # the bell stopped after rings answered with nothing read (§4.10, TD-347)
+                held = f" · doorbell held · {h['rings']} unread rings" if (h := s.get("doorbell_held")) else ""
+                print(f"{'':<{w}}      mail:   {unread} unread{held}")
             # §4.9b (TD-075 step 4): open questions addressed to it — what fills an empty techlead seat
             if waiting := s.get("asks_waiting"):
                 print(f"{'':<{w}}      asks waiting: {waiting}")

@@ -3154,6 +3154,8 @@ class TickMixin:
             # typed by the tick, or a person's or a manager's send that cures *brief not sent*
             s.first_prompt_sent_at = s.first_prompt_sent_at or now_iso()
             s.first_prompt, s.first_prompt_error = None, None
+        if not stale:
+            self._bell_answered(s, event)  # a ring's turn, judged at its Stop (§4.10, TD-347)
         state = None if stale else event.get("state")
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
@@ -3190,6 +3192,8 @@ class TickMixin:
             self._mail_hints,
             self._asks_hints,
             self._bells,
+            self._rang,  # a ring's count and the run of unread rings (TD-347): a reused id starts at none
+            self._unread_rings,
         ):
             side.pop(sid, None)
         if not (lock := self._typing.get(sid)) or not lock.locked():

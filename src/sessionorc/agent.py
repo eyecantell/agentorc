@@ -395,6 +395,11 @@ class HostAgent(
         # entry — and the rings in flight, one per session.
         self._bells: dict[str, dict[str, Any]] = {}
         self._ringing: dict[str, asyncio.Task[None]] = {}
+        # A ring's answer (§4.10 *A ring is answered by a read, or the bell stops*, TD-347): per session,
+        # the unread count the last ring rang with and whether its turn has started (`{count, turned}`),
+        # judged at that turn's `Stop`; and the run of rings so answered with nothing read.
+        self._rang: dict[str, dict[str, Any]] = {}
+        self._unread_rings: dict[str, int] = {}
         self._prompting: dict[str, asyncio.Task[None]] = {}  # a brief being typed (§4.1, TD-339), one per session
         # One typist per pane (TD-094): `_submit` holds its session's lock from paste to confirmed
         # submit, and a ring holds it from reading the composer to its own submit — so a ring never
