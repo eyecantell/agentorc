@@ -81,7 +81,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
-| TD-355 | *flow changed — Apply* never clears: `teamrun.differences` compares `held` lists in order, and the flow compiles them sorted | High | Open |
+| TD-355 | *flow changed — Apply* never clears after an Apply: the relaunch waits for the member's next run, and the record's old `review` reads as a change | High | Open |
 | TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Open |
 
 ---
@@ -1382,7 +1382,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-339 (the brief that waited), TD-342 (no fallback when the first hook is lost), TD-225 (alarms at a restart), TD-115 (the grace).
 
-## TD-355: *flow changed — Apply* never clears: `teamrun.differences` compares `held` lists in order, and the flow compiles them sorted
+## TD-355: *flow changed — Apply* never clears after an Apply: a relaunch rewrites the launch record, the record keeps its old `review` until the member restarts, and `teamrun.differences` reads that as a change
 
 **Priority:** High
 **Type:** debt
@@ -1393,22 +1393,25 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Location:** `src/agentorc/teamrun.py` (`differences`: `(rec.get("review") or None) != (x.review or None)`), `src/agentorc/teams.py` (the compiled reader, `{"reader": "techlead", "held": sorted(...), "bound": REVIEW_BOUND}`)
 
 **Why:**
-- On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind's card, the first team on a flow (TD-310), and the host agent relaunched grinder-ao-1, grinder-ao-2 and designer-ao-1 with their stage briefs.
-- The mark stayed afterwards, and `ao team flow ao-grind` still lists each member as *relaunched — reader techlead → techlead*.
-- Each record's `review` holds `held: ["src/sessionorc/**", "docs/briefs/**"]`, in the order `.agentorc.yml` writes it. The flow compiles `sorted(held)`, so the two dicts differ only in list order, and `differences` reads that as a change.
-- `teams.flow_redundant` already compares `held` as a set; `differences` does not.
+- On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind's card, the first team on a flow (TD-310). The host agent wrote *relaunched by the person: its launch record replaced* for grinder-ao-1, grinder-ao-2 and designer-ao-1.
+- The mark stayed afterwards. `ao team flow ao-grind` still lists each of them as *relaunched — reader techlead → techlead*.
+- **The cause:** `rpc_relaunch` (`src/sessionorc/agent.py`) rewrites the launch file only. `~/.agentorc/launch/ao-agentorc-grinder-ao-1.json` holds the compiled `review`, with `held` sorted, from 02:58:33Z. It sets `relaunch: {at}` on the record but never touches the record's own `review` or `lane`. Those refresh only when the member restarts and replays the launch file.
+- The three members had declared out of work, so the tick has not restarted them. A finished member is never restarted; the relaunch takes effect when it next works.
+- Meanwhile `teamrun.differences` compares the record's stale `review` (`held` in `.agentorc.yml`'s order, from its pre-flow start) with the compiled one (`sorted(held)`), dict to dict, so it reports a difference.
+- Here the only difference is the order of `held`. A real change of lane or reader would stay flagged after Apply in the same way, until the member restarts.
 
-So every team on a flow whose `held:` isn't written sorted reads *flow changed* forever, and Apply relaunches its idle members on every press for nothing.
+So a team's *flow changed* mark outlives the press that answered it, and a second Apply rewrites the same launch records again.
 
 **Fix:**
-- Compare reviews as the flow means them: `reader` (or each chain link's reader and path set), `bound`, and `held` as a set, in `differences` and anywhere else a record's `review` is compared with a compiled one.
-- Check whether the record should also store `held` sorted, so that one shape travels end to end.
+- Make the mark respect an Apply that is still pending. For a record whose `relaunch` is newer than its start, compare the **launch record** (what the member will run next) with the compiled launch, not the record's live fields. Or the mark reads *applied — takes effect when it next works* and is not offered again.
+- Compare `review` as the flow means it, wherever a record's review is compared with a compiled one: `reader` (each chain link's reader and path set), `bound`, and `held` as a set, as `teams.flow_redundant` already does.
 - Tests:
+  - after a relaunch of an idle finished member, `differences` reports nothing for it;
   - a record whose `held` is the compiled set in another order shows no difference;
   - a changed set still does;
   - a chain still compares link by link.
 
-**Done when** after an Apply on a team whose `held:` is not sorted, `ao team flow <team>` and the card show no *flow changed*, and the tests above pass.
+**Done when** after an Apply, `ao team flow <team>` and the card no longer offer **Apply** for the members it relaunched, whether or not they have restarted yet, and the tests above pass.
 
 **Related:** TD-310 (the move that surfaced it), TD-309 (archived: *Switching*), TD-349 (archived: the chain shape).
 
