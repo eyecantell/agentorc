@@ -1698,6 +1698,72 @@ def type_scale():
 ''' + TAIL
 
 
+def repo_facet_board():
+    """The team card's **Repo facet**, Technical debt on *open* (design §4.5a *team card: Repo facet*), drawn
+    three times: as built, with the **lanes line** TD-357 designs under the legend (designed 2026-10-06), and
+    with its out-of-work warning. The numbers are ao-grind's on 2026-10-06: 24 pickable, 20 the anchor's and
+    4 dev-cadence's, one design-first entry pickable, every member out of work."""
+    K = {"pickable": "#2563eb", "design-first": "#4f46e5", "for you": "#d97706", "other": "#e5e7eb"}
+    def seg(label, n, total, title, fg="#fff"):
+        return (f'<a href="#" title="{title}" style="display: flex; align-items: center; justify-content: center; min-width: 22px; '
+                f'padding: 0 4px; border-radius: 2px; color: {fg}; font-size: 12px; font-weight: 600; text-decoration: none; '
+                f'background: {K[label]}; flex-basis: {100 * n / total:.1f}%;">{n}</a>')
+    def bar(items):
+        total = sum(n for _, n, _ in items)
+        return ('<div style="display: flex; gap: 2px; min-height: 22px;">'
+                + "".join(seg(k, n, total, t, fg="#374151" if k == "other" else "#fff") for k, n, t in items) + "</div>")
+    def legend():
+        return ('<div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #6b7280;">'
+                + "".join(f'<span><i style="display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; background: {c};"></i>{k}</span>'
+                          for k, c in K.items()) + "</div>")
+    link = lambda t: f'<a href="#" style="color: inherit; font-weight: 600;">{t}</a>'
+    def facet(caption, lanes_line="", hover_p="24 pickable", hover_d="10 design-first", pick=24, open_n=65, other=16):
+        prio = ('<div style="display: flex; gap: 2px; min-height: 22px;">'
+                + "".join(f'<a href="#" style="display: flex; align-items: center; justify-content: center; padding: 0 4px; border-radius: 2px; '
+                          f'color: {fg}; font-size: 12px; font-weight: 600; text-decoration: none; background: {bg}; flex-basis: {w}%;">{n} {k}</a>'
+                          for k, n, w, bg, fg in (("High", 9, 14, "#1e3a8a", "#fff"), ("Medium", 39, 60, "#3b82f6", "#fff"), ("Low", 17, 26, "#bfdbfe", "#1e3a8a")))
+                + "</div>")
+        kinds = bar([("pickable", pick, hover_p), ("design-first", 10, hover_d), ("for you", 15, "15 for you"), ("other", other, f"{other} other")])
+        return (f'<div style="width: 456px; display: flex; flex-direction: column; gap: 8px;">'
+                f'<div class="meta" style="font-size: 12px; white-space: normal; line-height: 1.5;">{caption}</div>'
+                f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">'
+                f'<div style="display: flex; align-items: center; gap: 8px;"><span class="kind">Repo</span> <a href="#" style="font-weight: 600;">agentorc</a>'
+                f'<span style="flex-grow: 1;"></span><span class="meta">open →</span></div>'
+                f'<div style="display: flex; align-items: center; gap: 8px;"><span class="kind">Technical debt ({open_n} open)</span><span class="btn sm ghost">Add entry…</span>'
+                f'<span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px;"><b>open</b> · day · week · month</span></div>'
+                f'{prio}{kinds}{legend()}{lanes_line}'
+                f'</div></div>')
+    plain = ('<div class="meta" style="font-size: 12px; line-height: 1.5; white-space: normal;">'
+             f'in ao-grind\'s lanes: {link("0 pickable")}, {link("1 design-first")} · the other 24 pickable: {link("anchor 20")}, {link("dev-cadence 4")}</div>')
+    warned = ('<div class="meta" style="font-size: 12px; line-height: 1.5; white-space: normal;">'
+              f'in ao-grind\'s lanes: {link("3 pickable")}, {link("1 design-first")} · the other 18 pickable: {link("anchor 14")}, {link("dev-cadence 4")}'
+              f' <span style="color: #b45309; background: #fef3c7; border-radius: 3px; padding: 0 5px;" title="TD-355, TD-358, TD-359 — in its lane, held by nobody">'
+              f'· <a href="#" style="color: inherit; font-weight: 600;">grinder-ao-1</a> out of work with 3 in its lane</span></div>')
+    boards = "".join([
+        facet("<b>As built</b> — the repo\'s four kinds; nothing says whose the 24 are."),
+        facet("<b>Designed (TD-357)</b> — the lanes line under the legend; the segments\' hovers say the same.", plain,
+              hover_p="24 pickable · 0 in ao-grind\'s lanes · anchor 20, dev-cadence 4",
+              hover_d="10 design-first · 1 in ao-grind\'s lanes · 9 wait on a build"),
+        facet("<b>Designed, a later reading: a member out of work with work in its lane</b> — three grinder entries filed since; a mark, never a prompt.", warned,
+              hover_p="21 pickable · 3 in ao-grind\'s lanes · anchor 14, dev-cadence 4", pick=21, open_n=62, other=16,
+              hover_d="10 design-first · 1 in ao-grind\'s lanes · 9 wait on a build"),
+    ])
+    note = ('<div class="note" style="width: 1380px;">Design notes, not page text. The kinds stay the repo\'s (§4.4 <i>Repo facts</i>): the lanes line is one '
+            'derived reading beside them — what of the pickable and design-first entries a lane of the team\'s member records takes (§6 rule 6\'s '
+            '<span class="mono">lane_matches</span>, so the card and the rule count by one rule), the rest of the pickable by owner. The warning names a member '
+            'carrying <span class="mono">out_of_work</span> whose own lane takes an entry nobody holds; rule 6 has mailed it what arrived since it declared, so what '
+            'was there at the declaration is the person\'s to read here. <span class="mono">ao repo</span>\'s first line carries the same split: '
+            '<span class="mono">24 pickable (ao-grind 0 · anchor 20, dev-cadence 4), 10 design-first (ao-grind 1)</span>; on the later reading, <span class="mono">21 pickable (ao-grind 3 · anchor 14, dev-cadence 4)</span>. Build: TD-361.</div>')
+    return head("Repo facet") + f'''<div style="width: 1440px; min-height: 520px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px;">
+  <div style="display: flex; gap: 20px; align-items: flex-start;">{boards}</div>
+  {note}
+</div>
+</div>
+''' + TAIL
+
+
 def settings_page():
     """Screen 8, Settings (design §4.5, TD-100 (4), 2026-09-25): the page that writes a setting and shows every other value with where it lives."""
     b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
@@ -1827,6 +1893,7 @@ files = {
     "Type.dc.html": type_scale(),
     "TypeDark.dc.html": darken(type_scale()),
     "Settings.dc.html": settings_page(),
+    "RepoFacet.dc.html": repo_facet_board(),
     "SettingsDark.dc.html": darken(settings_page()),
 }
 for n, s in files.items():
@@ -1862,6 +1929,7 @@ LAYOUT = [
     ("SettingsDark.dc.html", "Settings — dark", 2),
     ("MainDark.dc.html", "Org — dark", 2),
     ("OrgTeamFirst.dc.html", "Org — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
+    ("RepoFacet.dc.html", "Team card — Repo facet: the lanes line (TD-357, 2026-10-06)", 2),
     ("Type.dc.html", "Type scale", 2),
     ("TypeDark.dc.html", "Type scale — dark", 2),
 ]

@@ -193,10 +193,18 @@
       "h": 900
     },
     {
+      "file": "RepoFacet.dc.html",
+      "title": "Team card \u2014 Repo facet: the lanes line (TD-357, 2026-10-06)",
+      "x": 3120,
+      "y": 5080,
+      "w": 1440,
+      "h": 520
+    },
+    {
       "file": "Type.dc.html",
       "title": "Type scale",
       "x": 3120,
-      "y": 5080,
+      "y": 5700,
       "w": 1440,
       "h": 760
     },
@@ -204,7 +212,7 @@
       "file": "TypeDark.dc.html",
       "title": "Type scale \u2014 dark",
       "x": 3120,
-      "y": 5940,
+      "y": 6560,
       "w": 1440,
       "h": 760
     }
