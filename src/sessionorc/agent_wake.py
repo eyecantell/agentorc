@@ -229,14 +229,40 @@ class WakeMixin:
         """The record holds a brief that is neither sent nor given up on."""
         return bool(s.first_prompt) and not s.first_prompt_sent_at and not s.first_prompt_error
 
+    def _first_prompt_road(self, s: Session, now: datetime) -> str | None:
+        """How the brief may be sent now: `hook` at a hook-reported `idle` — the composer the launch
+        landed at — or, once, `scraped` (§4.1 *A brief whose first hook is lost*, TD-348): no hook
+        since the launch, `FIRST_PROMPT_HOOK_WAIT` passed since `created`, a scraped `idle`, and no try
+        made yet. None otherwise."""
+        if s.state != "idle" or s.superseded_by:
+            return None
+        if s.confidence == "hook" and s.id in self._last_hook:
+            return "hook"
+        if s.id in self._last_hook or s.first_prompt_tries:
+            return None
+        age = (now - _parse(s.created)).total_seconds()
+        return "scraped" if age >= agent_common.FIRST_PROMPT_HOOK_WAIT else None
+
     def _send_first_prompts(self) -> None:
         """Each tick, on the host that holds the pane: start one send of the brief for every record
-        whose first prompt is due and that sits at a hook-reported `idle` — the composer the launch
-        landed at. One task per session, as a ring is: a submit takes seconds and the tick never waits."""
+        whose first prompt is due and that may be sent now (`_first_prompt_road`). One task per
+        session, as a ring is: a submit takes seconds and the tick never waits. A record no hook has
+        reached by `FIRST_PROMPT_BOUND` after its launch, the brief unsent, is marked *no hook since
+        launch* (§4.1, TD-348) — a hook arriving later clears nothing by itself."""
+        now = datetime.now(UTC)
         for s in list(self.sessions.values()):
             if s.id in self._prompting or not self._first_prompt_due(s):
                 continue
-            if s.state != "idle" or s.confidence != "hook" or s.superseded_by:
+            if (
+                s.id not in self._last_hook
+                and not s.superseded_by
+                and (now - _parse(s.created)).total_seconds() >= agent_common.FIRST_PROMPT_BOUND
+            ):
+                s.first_prompt_error = agent_common.FIRST_PROMPT_NO_HOOK
+                log.warning("the brief of %s was not sent: no hook since its launch", s.id)
+                self._save(s)
+                continue
+            if self._first_prompt_road(s, now) is None:
                 continue
             self._prompting[s.id] = asyncio.create_task(self._first_prompt(s.id))
 
@@ -258,7 +284,10 @@ class WakeMixin:
         there, when only Enter is pressed again (the text is never typed twice, §4.2). A try the
         composer does not take is counted; the `FIRST_PROMPT_TRIES`th writes `first_prompt_error`."""
         s = self.sessions.get(sid)
-        if s is None or not self._first_prompt_due(s) or s.state != "idle" or s.confidence != "hook":
+        if s is None or not self._first_prompt_due(s):
+            return
+        road = self._first_prompt_road(s, datetime.now(UTC))
+        if road is None:
             return
         adapter = adapters.get(s.adapter)
         reader = getattr(adapter, "composer", None)
@@ -273,6 +302,8 @@ class WakeMixin:
                 return  # it moved while the screen was read: the next tick looks again
             if left is None or (left and not s.first_prompt_tries):
                 return  # a dialog, or someone's words: wait for the next tick
+        elif road == "scraped":
+            return  # a scraped idle is trusted only with a composer that reads empty (§4.1, TD-348)
         try:
             if left:
                 await self._enter_again(sid, reader)  # the last try's brief is still in the composer
@@ -296,7 +327,13 @@ class WakeMixin:
         s.first_prompt_sent_at = now_iso()
         s.first_prompt = None  # kept until sent (§4.1); the transcript holds it from here
         # what was typed, and by whom (§4.10 `sends`): the home, the brief — named, never its text again
-        sent = SendEntry(id="s-" + secrets.token_hex(6), from_=SYSTEM, at=s.first_prompt_sent_at, text="(the brief)")
+        sent = SendEntry(
+            id="s-" + secrets.token_hex(6),
+            from_=SYSTEM,
+            at=s.first_prompt_sent_at,
+            text="(the brief)",
+            scraped=road == "scraped",
+        )
         s.sends = (s.sends + [sent])[-mail.SENDS_KEEP :]
         self._save(s)
         await self._push_changes()

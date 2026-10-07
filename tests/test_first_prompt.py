@@ -128,3 +128,71 @@ def test_a_prompt_submit_says_a_prompt_went_in():
     got = translate({"hook_event_name": "UserPromptSubmit", "session_id": "u1"})
     assert got == {"adapter_id": "u1", "state": "working", "pending": None, "prompt": True}
     assert "prompt" not in translate({"hook_event_name": "Stop", "session_id": "u1"})
+
+
+# -- a brief whose first hook is lost (design §4.1, TD-348) ------------------------------------------------
+
+
+async def test_a_launch_whose_hooks_never_speak_gets_its_brief_on_a_scraped_idle(
+    agent, briefstubs, tmp_path, monkeypatch
+):
+    """No hook since the launch and `FIRST_PROMPT_HOOK_WAIT` passed: one send on a scraped `idle`
+    whose composer reads empty, marked `scraped` on the record's `sends`."""
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.5)
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        rec = agent.sessions[w]
+        rec.set_state("idle", confidence="scraped")  # what the tick reads off a launch no hook reached
+        assert await wait_for(lambda: _first(agent, w, "SUBMITTED " + BRIEF), timeout=8), "never sent on the scrape"
+        assert await wait_for(lambda: _sent(rec), timeout=6)
+        assert rec.first_prompt is None and rec.first_prompt_error is None and rec.first_prompt_tries == 0
+        assert rec.sends[-1].text == "(the brief)" and rec.sends[-1].scraped is True
+        assert (await c.call("get", id=w))["sends"][-1]["scraped"] is True
+
+
+async def test_a_scraped_idle_waits_for_the_hook_wait(agent, briefstubs, tmp_path):
+    """Before `FIRST_PROMPT_HOOK_WAIT`, a scraped `idle` sends nothing: the hook is the ordinary road."""
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        agent.sessions[w].set_state("idle", confidence="scraped")
+        await asyncio.sleep(4 * FAST_TICK)
+        assert await _submitted(agent, w) == [] and agent.sessions[w].first_prompt == BRIEF
+
+
+async def test_a_composer_that_never_reads_empty_is_marked_at_the_bound(agent, briefstubs, tmp_path, monkeypatch):
+    """Someone's words in the composer: the scraped send waits, uncounted, and at `FIRST_PROMPT_BOUND`
+    the record reads *brief not sent · no hook since launch* — on the card, and cleared by a prompt."""
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.2)
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 2.0)
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        agent.tmux.send_literal(w, "half a thought")
+        rec = agent.sessions[w]
+        rec.set_state("idle", confidence="scraped")
+        assert await wait_for(lambda: _marked(rec), timeout=10), "never marked at the bound"
+        assert rec.first_prompt_error == agent_common.FIRST_PROMPT_NO_HOOK and rec.first_prompt_tries == 0
+        assert await _submitted(agent, w) == [] and rec.first_prompt == BRIEF
+        slot = cards.view(await c.call("get", id=w))["slot"]
+        assert slot["text"] == "brief not sent · no hook since launch" and "no hook reached" in slot["full"]
+        # a hook arriving later clears nothing by itself; a prompt that goes in does
+        await agent.rpc_hook(w, state="idle")
+        await asyncio.sleep(3 * FAST_TICK)
+        assert rec.first_prompt_error == agent_common.FIRST_PROMPT_NO_HOOK and await _submitted(agent, w) == []
+        await agent.rpc_hook(w, state="working", prompt=True)
+        assert rec.first_prompt_error is None
+
+
+async def test_a_hook_before_the_bound_keeps_the_ordinary_road(agent, briefstubs, tmp_path, monkeypatch):
+    """A record a hook has reached is never marked *no hook since launch*, however long its brief waits,
+    and its hook `idle` sends as before — no `scraped` on the send."""
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.2)
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 0.5)
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        await agent.rpc_hook(w, state="working")
+        await asyncio.sleep(1.0)
+        rec = agent.sessions[w]
+        assert rec.first_prompt_error is None and await _submitted(agent, w) == []
+        await agent.rpc_hook(w, state="idle")
+        assert await wait_for(lambda: _sent(rec), timeout=6)
+        assert rec.sends[-1].scraped is False
