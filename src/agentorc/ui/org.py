@@ -174,7 +174,9 @@ def ask_blocks(
 ) -> list[dict[str, Any]]:
     """**A member's `ask` to you is a block too** (§4.5a *team card: Answer needed / Doing*, TD-350):
     every open ask the Inbox counts under *Needs you* — `needs`, its rows as `inbox_sections` gave
-    them — whose sender is one of `members` (a node's `id@host` by its id), oldest first. Never a
+    them — whose sender is one of `members`, oldest first. The two are in the reader's form (§4.4a
+    *Every address crosses in the reader's form*): a node's record is `id@host` on both sides, and a
+    bare id is this host's, so they are matched whole. Never a
     `steer`, a board row or a state row. Its text is the ask's first line, drawn as text."""
     now = now or datetime.now(UTC)
     names = {str(m["id"]): str(m.get("name") or m["id"]) for m in members}
@@ -182,7 +184,7 @@ def ask_blocks(
     for e in needs or ():
         if not isinstance(e, Mapping) or e.get("row") or e.get("kind") not in PERSON_ASK_KINDS or not _entry_open(e):
             continue
-        sid = str(e.get("from") or "").split("@", 1)[0]
+        sid = str(e.get("from") or "")
         if sid not in names:
             continue
         text = str(e.get("text") or "").strip()

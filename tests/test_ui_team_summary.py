@@ -573,7 +573,7 @@ def test_a_members_open_ask_to_the_person_is_an_answer_block_and_counted():
 def test_only_an_open_ask_from_the_team_is_a_block():
     """Closed, a `steer`, a state row, a board row, or a sender outside the team: no block. A pane's
     question and an ask on two members: two blocks, the pane's first, then the asks oldest first; a
-    node's `id@host` sender is its record."""
+    node's `id@host` sender is that record, and no other."""
     ms = [member("g1", state="needs-you", pending={"kind": "question", "text": "which?"}), member("g2", state="idle")]
 
     def asks(needs):
@@ -583,8 +583,12 @@ def test_only_an_open_ask_from_the_team_is_a_block():
     assert asks([_ask("m-1", "g2", kind="steer")]) == [("question", "g1")]
     assert asks([{"id": "g2:question", "row": "question", "from": "g2", "kind": "ask"}]) == [("question", "g1")]
     assert asks([_ask("m-1", "h9")]) == [("question", "g1")]
-    two = asks([_ask("m-2", "g2", minutes=1), _ask("m-1", "g2@node", minutes=30)])
+    two = asks([_ask("m-2", "g2", minutes=1), _ask("m-1", "g2", minutes=30)])
     assert two == [("question", "g1"), ("ask", "g2"), ("ask", "g2")]
+    # a node's record is `id@host` in the reader's form on both sides (§4.4a): matched whole, so a
+    # session of the same id on another host is not this member
+    ms.append(member("g3@node", state="idle"))
+    assert asks([_ask("m-3", "g3@node"), _ask("m-4", "g2@other")]) == [("question", "g1"), ("ask", "g3@node")]
     assert [a["id"] for a in ui.answer_blocks(ms, [_ask("m-2", "g2", minutes=1), _ask("m-1", "g2", minutes=30)], NOW)][
         1:
     ] == ["m-1", "m-2"]

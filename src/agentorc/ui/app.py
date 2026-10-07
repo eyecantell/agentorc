@@ -1172,7 +1172,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
         vs = [view(s, sessions, icons=icons, seats=seats) for s in sessions]
-        groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing) or []
+        groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing, needs=h.needs_cache["rows"]) or []
         serving = [g for g in groups if g.get("summary") and (g["summary"].get("repo") or {}).get("name") == name]
         org, _ = await asyncio.to_thread(org_here)
         named = repo_teams(org, host_name()).get(str(Path(str(r.get("root") or "")).resolve()), "")
@@ -1186,7 +1186,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # its facets still stand — its members' claims, its doing log — with the repo's own
             # numbers, since no live member points the summary at the repo (review of slice 5)
             members = [v for v in vs if v.get("team") == named]
-            summary = team_summary(named, members, {}, doing, prs_waiting(members), now)
+            summary = team_summary(named, members, {}, doing, prs_waiting(members), now, needs=h.needs_cache["rows"])
             summary["repo"] = repo_facet(r, now, prs_waiting(members))
             summary["motion"] = motion_rows(members, r)
             summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
