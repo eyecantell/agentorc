@@ -96,7 +96,7 @@ not mix:
   once and reused by every team that lists it: an ordered list of **stages**, each a role, the lane
   it gives and its **stage brief** (the built-in `td`: design → build → review, then the person, who
   is no stage). A team lists the flows it may run; which one it runs now is a setting the person
-  turns, and a switch applies itself. Per team, never per entry; nothing keys on it at runtime.
+  turns, and **Apply** moves the running team onto a switch. Per team, never per entry; nothing keys on it at runtime.
   *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; design §4.9c, TD-307).
 - **stage** — one step of a flow: a role, the lane it gives that role's members, and the stage brief
   that tells them the path from that step's side; a team that lists a flow staffs every stage of it.
