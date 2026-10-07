@@ -881,7 +881,7 @@ def test_an_apply_clears_flow_changed_before_the_member_restarts(world, tmp_path
     (d,) = json.loads(capsys.readouterr().out)["differences"]
     assert d["name"] == "grind-1" and d["what"] == ["reader techlead → techlead"]  # another set still differs
     grind["review"] = {**grind["review"], "held": ["docs/briefs/**", "src/sessionorc/**"]}
-    assert cli.main(["--json", "team", "flow", "ao-grind", "build"]) == 0
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build", "--apply"]) == 0
     assert "grind-1" in [d["name"] for d in json.loads(capsys.readouterr().out)["apply"]["applied"]]
     handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch" and "launch" in p}
     assert handed["ao-agentorc-grind-1"]["review"] is None
