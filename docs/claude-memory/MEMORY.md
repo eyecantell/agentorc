@@ -45,3 +45,4 @@
 - [Read the claim's reply](read-the-claims-reply.md) — `ao progress claim` can be refused; never send it to /dev/null, check your record before the first step (TD-152 pressed twice, 2026-10-05)
 - [Designer run lessons 2026-10-05](designer-run-lessons-2026-10-05.md) — a steer's first paragraph is warned past ~100 words (read the reply past the warning line); the manager seat may hold no session; a fact-check by commit ref frees the worktree
 - [Unused weekly tokens are lost velocity](unused-weekly-tokens-are-lost-velocity.md) — the weekly window does not carry over; near the reset keep every session busy, never defer to "save" it
+- [Designer run lessons 2026-10-06](designer-run-lessons-2026-10-06.md) — a steer needs `--default`; a build number taken mid-PR: squash, rebase once, renumber in the one resolution
