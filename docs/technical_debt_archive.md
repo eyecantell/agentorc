@@ -5730,3 +5730,26 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Fix:** decide where a repo's held paths live: in the repo's own `.agentorc.yml` (per repo, reviewed with the code), on the team in `org.yml`, or both with the repo's winning. Then move agentorc's two paths there and leave the org-wide role with a reader and no paths. Check §4.9b and the settings audit's definition-versus-setting rule (ADR 2026-09-25) for which it is. Done when grinder-dc-1's record holds dev-cadence's own held paths or none, and ao-grind's grinders keep theirs.
 
 **Related:** TD-093 (the reader and `held`), TD-120 (org roles), `docs/decisions/2026-09-25-settings-audit.md`.
+
+## TD-366: Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-07 (the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (the seat branch of the tick: `s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now)` → *a seat with nothing due, idle and pushed — closing it (§6 rule 3)*), `_seat_done`; design §6 rule 3, §4.9b *Seats with a trigger*
+
+**Why:**
+- On 2026-10-07 test-audit-ao-1, the first fill of the audit seats TD-098 added, mutation-tested the night's builds. It wrote TD-363 to TD-365 into PR #1197 and launched its independent fact-check as a background agent, as the cadence asks.
+- It ended its turn with *Waiting for the fact-check to finish*.
+- At 06:31:56 the tick found the seat idle, with nothing due and its work pushed, and closed it (*a seat with nothing due, idle and pushed — closing it*). That killed the fact-check and the run that would have merged.
+- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at 17:07.
+- A member is not closed this way, but a seat is: any seat that waits on its own background work (a reviewer, a CI watch, a sleep) looks done to rule 3.
+
+**Resolved:** 2026-10-07 (PR #1202). Of the three signals the build took the open PR, read from the records (`_seat_prs` in `src/sessionorc/agent_tick.py`): an open PR on the seat's checked-out branch, a claim carrying an open PR, or a claim derived from that branch before a reading has its PR keeps an idle seat open, until it hands the PR to a reader with an `ask` or sits idle `SEAT_PR_WAIT` (two hours). Design §6 rule 3 carries it; `tests/test_seat_policy.py` pins it.
+
+**Done when** an audit seat that opens a PR and waits on its fact-check lands the PR before rule 3 closes it, or hands it on, and the tests pass.
+
+**Related:** TD-098 (the audit seats), TD-259 (the on-call manager, which rule 3 also closes), TD-363 to TD-365 (the entries #1197 carried).

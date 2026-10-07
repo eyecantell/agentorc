@@ -79,7 +79,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-363 | `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing (held by a dead record, other repos' records, the falling-count order, the owner's case) | Medium | Open |
 | TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
 | TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
-| TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Open |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Open |
 
 ---
@@ -1369,38 +1368,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** one assertion in `test_flows.py` that a pick with an open PR asked of a reader returns it in `stays`; or, if nothing is to read it, drop it from the return and the docstring. **Done when** the revert fails a test, or the key is gone.
 
 **Related:** TD-359 (#1191), TD-356.
-
-## TD-366: Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-07 (the anchor)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (the seat branch of the tick: `s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now)` → *a seat with nothing due, idle and pushed — closing it (§6 rule 3)*), `_seat_done`; design §6 rule 3, §4.9b *Seats with a trigger*
-
-**Why:**
-- On 2026-10-07 test-audit-ao-1, the first fill of the audit seats TD-098 added, mutation-tested the night's builds. It wrote TD-363 to TD-365 into PR #1197 and launched its independent fact-check as a background agent, as the cadence asks.
-- It ended its turn with *Waiting for the fact-check to finish*.
-- At 06:31:56 the tick found the seat idle, with nothing due and its work pushed, and closed it (*a seat with nothing due, idle and pushed — closing it*). That killed the fact-check and the run that would have merged.
-- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at 17:07.
-- A member is not closed this way, but a seat is: any seat that waits on its own background work (a reviewer, a CI watch, a sleep) looks done to rule 3.
-
-**Fix:**
-- `_seat_done` (or rule 3's branch) does not close a seat that has work of its own in flight. Candidates for the signal:
-  - an open PR the seat authored that is neither merged nor handed to a reader;
-  - a background task the tool reports (Claude Code shows *N shell(s) running*, and a hook could carry it);
-  - a short grace after its last turn that a waiting seat renews.
-- The design says which (§6 rule 3).
-- At the least, a seat closed with an open PR of its own leaves it to its team's techlead seat or on the board, never stranded.
-- Tests:
-  - a seat idle with its own open, unread PR is not closed;
-  - one with nothing open still is.
-
-**Done when** an audit seat that opens a PR and waits on its fact-check lands the PR before rule 3 closes it, or hands it on, and the tests pass.
-
-**Related:** TD-098 (the audit seats), TD-259 (the on-call manager, which rule 3 also closes), TD-363 to TD-365 (the entries #1197 carried).
 
 ## TD-367: *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them
 
