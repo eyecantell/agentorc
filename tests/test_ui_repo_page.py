@@ -214,3 +214,21 @@ def test_a_live_check_row_says_whether_its_build_is_live(tmp_path, monkeypatch):
     assert "· waits for its build to be live #1060 #1061</span>" in row[: row.index("</div>")]
     row = html[html.index('id="TD-301"') :]
     assert "live" not in row[: row.index("</div>")]
+
+
+def test_the_count_line_carries_the_lanes_line_of_each_team_servicing_the_repo(tmp_path, monkeypatch):
+    """§4.5 screen 11 (§4.4 *In a team's lanes*, TD-361): the Technical debt heading's count line has
+    its lanes line once per team servicing the repo, from the one reader; the lists are not split."""
+    root = str(tmp_path / "samscrape")
+    r = reading(root)
+    for x in r["ledger"]["entries"]:
+        x["pickable"] = "yes"
+    fleet = [rec("tdgrind-1", root, lane=["free-pick", "owner:grinder"])]
+    c = client(monkeypatch, tmp_path, fake({root: r}, fleet))
+    html = c.get("/repo/samscrape").text
+    debt = html[html.index('id="debt"') :]
+    line = debt[debt.index('class="meta laneline"') :].split("</div>")[0]
+    assert "in grind's lanes: " in line and 'href="#debt-pickable"' in line
+    assert debt.count('class="meta laneline"') == 1
+    fleet[0].pop("lane")
+    assert 'class="meta laneline"' not in c.get("/repo/samscrape").text  # no lane on any record: none drawn
