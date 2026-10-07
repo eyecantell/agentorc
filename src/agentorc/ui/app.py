@@ -2346,26 +2346,12 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await h.flow_views(await call("list"), org)
         return JSONResponse({"ok": True, **got})
 
-    @app.get("/api/teams/{name}/flow")
-    async def api_team_flow_preview(name: str, flow: str):
-        """The team card's **Flow** pick, before it writes (§4.5a, §4.9c): what the pick would do —
-        who sits out, who starts, who is relaunched, and the PRs that stay with a reader — for its
-        confirm; refused for a flow the team does not list or cannot follow."""
-        if hosts.is_node():
-            raise HTTPException(409, node_org_note())
-        org, _notes = org_here()
-        sessions = await call("list")
-        try:
-            got = await asyncio.to_thread(teamrun.flow_preview, rpc, org, name, host_name(), flow, sessions)
-        except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
-            raise _team_http(e) from None
-        return JSONResponse(got)
-
     @app.post("/api/teams/{name}/flow")
     async def api_team_flow_pick(name: str, request: Request):
-        """The team card's **Flow** pick (§4.5a, §4.9c *Switching*; TD-309 slice 4b): `{flow}` written to
-        `teams.<team>.flow` and applied at once, as `ao team flow <team> <flow>` does. A person's own,
-        and not on a node, as Settings is not."""
+        """The team card's **Flow** pick (§4.5a, §4.9c *Switching*; TD-309 slice 4b, TD-359): `{flow}`
+        written to `teams.<team>.flow` and nothing more, as `ao team flow <team> <flow>` does — the
+        running team moves on **Apply**, the one gate. The reply is `pick_flow`'s, which the toast reads.
+        A person's own, and not on a node, as Settings is not."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
@@ -2375,7 +2361,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
             raise _team_http(e) from None
         h.settings_at["at"] = 0.0  # the next page reads the person's settings again (TD-174)
-        with contextlib.suppress(HTTPException):  # applied either way: a failed re-read is the next page load's
+        with contextlib.suppress(HTTPException):  # written either way: a failed re-read is the next page load's
             await h.flow_views(await call("list"))
         return JSONResponse({"ok": True, **got})
 
@@ -2677,21 +2663,20 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if flow is not None:  # **flow**: checked before anything is written, so a refusal saves nothing
             if hosts.is_node():
                 raise HTTPException(409, node_org_note())
-            fleet = await call("list")
             try:
-                await asyncio.to_thread(teamrun.flow_preview, rpc, org, team, host_name(), flow, fleet)
+                await asyncio.to_thread(teamrun.check_pick, rpc, org, team, host_name(), flow)
             except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
                 raise HTTPException(400, f"flow not set — {str(e).strip(chr(34))}") from None
         if change:
             got = await call("set_settings", teams={team: change})
             with contextlib.suppress(Exception):  # the header's stops note reads the new time on the next delta
                 uiconf.set_read(await call("settings"))
-        if flow is not None:  # …then written and applied at once, as the team card's Flow pick (§4.9c)
+        if flow is not None:  # …then written and nothing more, as the team card's Flow pick (§4.9c, TD-356)
             try:
-                applied = await asyncio.to_thread(teamrun.pick_flow, rpc, org, team, host_name(), flow)
+                picked = await asyncio.to_thread(teamrun.pick_flow, rpc, org, team, host_name(), flow)
             except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
                 raise HTTPException(400, f"the rest saved; flow not set — {str(e).strip(chr(34))}") from None
-            got = {**got, "apply": applied}
+            got = {**got, "pick": picked}
         return answer(got)
 
     @app.post("/api/settings/repos")
