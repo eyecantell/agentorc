@@ -1,0 +1,16 @@
+This is the agentorc repo's part of the auditor brief for **test-audit-ao-1** (design §4.8 `{repo}`, §4.9b *Seats with a trigger*, TD-098): what this repo does differently from the template around it, and nothing the template already says. The team is **ao-grind**; the person is Paul.
+
+**Your area, narrower than the template's: the tests of the PRs your trigger counts.** For each merged PR in scope, read the code it changed (`gh pr diff <n>`) against the tests under `tests/` that cover it — the ones it added or changed, and those that name the functions it touched (`grep -rn <name> tests/`). The docs are **docs-audit-ao-1**'s, not yours. What is a problem here, beyond the template's list:
+- **A changed behaviour no test would catch going back**: revert the line in your worktree, run the PR's tests, and a run that still passes is your evidence (restore the line before anything else).
+- **A test that asserts less than its name or docstring says**, or that passes against a fake the real caller never sees (a fixture's record shape the host agent does not write).
+- **A test that can reach the live system**: every test runs on private tmux sockets and a temp `AGENTORC_HOME` (`pdm run test`); one that reads `~/.agentorc`, the user's tmux server or `~/.claude` is a finding at High.
+- **A slow or timing-shaped test the PR added** — a sleep in place of a condition, a wall-clock assertion — and any test the PR made flaky in your runs (run the module three times).
+- **A ledger entry or a `**Resolved:**` line that names a test the suite does not have.**
+
+**Running the suite.** `pdm run test` and `pdm run lint` in your worktree. A scratch worktree's tests import the main checkout's package unless you say otherwise: `PYTHONPATH=$PWD/src pdm run pytest -q tests/<module>.py`. If `pdm run test` dies with an ImportError inside `_pytest`, see CLAUDE.md. Never `pdm run fmt`: it formats the whole repo.
+
+**The reading rule.** Never read `docs/design/` or `docs/technical_debt.md` whole: each is most of your context bound. Read the one section or entry a test's docstring cites — `grep -rn` the directory, or `awk '/^## TD-NNN:/{p=1;print;next} /^## /{p=0} p' docs/technical_debt.md`.
+
+**Where you work.** Your worktree is `.claude/worktrees/test-audit-ao-1`; never the main checkout `/home/kmaster/agentorc`. Read from `origin/main`. A finding's branch is `tdNNN-<slug>` off `origin/main`; before writing a number, `git fetch` and take the next free one from the summary table and the archive on `origin/main`, and open the PR before you write its number anywhere.
+
+**A finding's entry** carries this ledger's header lines after **Added:** — `**Owner:**` `grinder` and `**Kind:** build` for a missing or weak test (the fix is plain), `anchor` for one that needs the live system — and its row goes in the summary table. The PR touches the ledger alone, so it is not held: it merges on `python3 scripts/check_cadence.py --pr N` exiting 0 (capture the exit code — `| head` hides a FAIL) after an independent cheaper-model fact-check against the repo, posted as the PR's `cadence-review:` comment. Merge with `gh pr merge N --squash`, never `--delete-branch` from a worktree; rebase on `origin/main` first.

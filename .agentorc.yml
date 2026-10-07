@@ -28,6 +28,11 @@ teams:
     flows: [td, build-review]
     manager: {role: manager, name: manager-ao-1, brief: docs/briefs/manager-ao-1.md}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}
+    # seats with a trigger (design §4.9b, TD-098): auditors that file what the last PRs left in the
+    # docs and the tests, and never fix it; each fills after ten merged PRs, so an idle week costs nothing
+    seats:
+      - {name: docs-audit-ao-1, role: auditor, brief: docs/briefs/docs-audit.md, trigger: {prs: 10}}
+      - {name: test-audit-ao-1, role: auditor, brief: docs/briefs/test-audit.md, trigger: {prs: 10}}
     members:
       - {role: grinder, name: grinder-ao-1, brief: docs/briefs/grinder-ao-1.md}
       # the page and git lane, apart from the host agent: the split is by file and lives in its brief
