@@ -21,9 +21,9 @@ through PRs. The project is to be renamed `shiftlead` (TD-060); the code and doc
 agentorc.
 
 The design is the source of truth: one file per section under `docs/design/`, and `docs/design.md`
-its index. **A change in behaviour is a change to the design
-first**, and **a control that is not in §4.5a's table does not exist**. What a word means is
-`docs/glossary.md`. What is open or half-built is `docs/technical_debt.md` (each `TD-NNN` has a
+its index. **A change in behaviour is a change to the design first**, and **a control that is not
+in §4.5a's table does not exist**. What a word means is `docs/glossary.md`. What is open or
+half-built is `docs/technical_debt.md` (each `TD-NNN` has a
 Status that says what is built and what is not — *designed* is not *built*). What waits on the
 person is `docs/user_attention.md`.
 
