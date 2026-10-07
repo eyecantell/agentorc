@@ -754,14 +754,17 @@ class TickMixin:
 
         Its second trigger (§4.9c *Switching*, TD-309 slice 5): a record a person's Apply relaunched
         carries `relaunch`, and is restarted the same way under `why: flow` — the replay reads the
-        launch record the relaunch wrote."""
+        launch record the relaunch wrote — whether or not the member declared out of work, since the run
+        that declared is the one the Apply replaces (TD-358)."""
         why = "brief" if s.brief_changed else "flow" if s.relaunch else ""
         if not (why and s.supervised and s.unattended) or s.seat is not None or s.sit_out or work_mod.sat_out(s):
             return
         if s.superseded_by or s.suspended or s.gated or s.host != self.host:
             return
-        if s.out_of_work or s.restart_wanted:
-            return  # it declared: rule 2 or the team's next start is what starts it
+        if s.restart_wanted or (s.out_of_work and not s.relaunch):
+            # it declared: rule 2 or the team's next start is what starts it — except that a person's
+            # Apply is the person's word, and the old run's `none` does not stand against it (TD-358)
+            return
         # either trigger's failed restart is retried under the one that stands now: a person's Apply on a
         # record a `brief` restart left closed clears `brief_changed`, and the mark it left is `brief` (TD-334)
         closed_by_tick = self._closed_by_tick(s, "brief") or self._closed_by_tick(s, "flow")

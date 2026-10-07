@@ -461,7 +461,9 @@ code and needs no grant; a session doing the same work does.
      the record's `slots` do not name is filled from the file beside `base` named `<base's
      stem>.<slot>.md` where there is one, else `none`, so a template that gains a slot never replays
      it literally (§4.9c item 5); and a record carrying **`relaunch: {at}`** (§4.9c *Switching*; built — TD-309 slice 5a) is
-     restarted under this rule's conditions as one carrying `brief_changed` is; the host agent knows a file and a slot and no role, template or team, and
+     restarted under this rule's conditions as one carrying `brief_changed` is, save that a declaration of
+     `out_of_work` does not hold it back — the press is the person's word, and the run that declared is the
+     one it replaces (TD-358); the host agent knows a file and a slot and no role, template or team, and
      still never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a
      running team's brief; the template is the installed package's, so it is what was promoted.
@@ -486,8 +488,8 @@ code and needs no grant; a session doing the same work does.
      tried again by the tick, while a Close by anyone else is never undone. That
      second case is the manager's: it sits idle between rounds, its round log is a file and not
      its context (§4.8 *A session's round log*), and nothing of a round is lost with the run.
-     Never a seat (each fill is a replay and so reads the files anyway), never a member that
-     declared `out_of_work` (its next start is the team's), never an interactive session, never
+     Never a seat (each fill is a replay and so reads the files anyway), never — for `brief_changed` —
+     a member that declared `out_of_work` (its next start is the team's), never an interactive session, never
      past a stop time, into a wrap-up, a gate pause or a suspension, and not on a node yet, as
      rule 4's nudge is not. **The manager stays outside rule 5's context bound** (§4.8): this
      rule and a crash are what restart it, and its reading is drawn for a person to judge.

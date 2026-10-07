@@ -135,6 +135,59 @@ async def test_a_relaunch_of_a_record_a_failed_brief_restart_left_closed_restart
 
 
 @pytest.mark.integration
+async def test_a_relaunch_restarts_an_idle_member_that_declared_out_of_work(agent, tmp_path):
+    """TD-358: Paul's first Apply on ao-grind marked three idle members that had declared out of work, and
+    the guard for a declared member returned before it read the mark, so each took its lane's next entries
+    up in its old run, on its pre-flow brief. A person's Apply is the person's word: the member is restarted
+    under `why: flow` whatever its old run declared — with its work pushed; one with unpushed work is not,
+    and a member that declared with no `relaunch` keeps rule 7's guard."""
+    await park_ticks(agent)
+    repo = _repo(tmp_path)
+    _merge(repo, "first {lane}\n")
+    made = _made_from(tmp_path, repo)
+    declared = {"at": "2026-10-06T20:30:00Z", "why": "nothing pickable"}
+    recs = {}
+    async with LocalClient() as person:
+        for name in ("done", "left", "nomark"):
+            d = tmp_path / name
+            d.mkdir()
+            sid = (
+                await person.call(
+                    "create",
+                    name=name,
+                    dir=str(d),
+                    unattended=True,
+                    supervised=True,
+                    prompt="old",
+                    prompt_from=made,
+                    lane=["TD-1"],
+                    **SHELL,
+                )
+            )["id"]
+            recs[name] = (sid, agent.sessions[sid])
+        for name in ("done", "left"):
+            await person.call("relaunch", id=recs[name][0], launch={"prompt": "composed", "prompt_from": made})
+        recs["nomark"][1].brief_changed = {"at": "2026-10-06T20:40:00Z", "paths": ["/r/b.md"]}
+        for _sid, rec in recs.values():
+            _idle(rec)
+            rec.out_of_work = dict(declared)
+        recs["left"][1].git = {"dirty": 0, "unpushed": 2}
+        await agent._keep_running(datetime.now(UTC))
+        sid, rec = recs["done"]
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["flow"]
+        assert new.out_of_work is None and new.relaunch is None  # the new run starts fresh
+        for name in ("left", "nomark"):
+            sid, rec = recs[name]
+            assert agent.sessions[sid] is rec and rec.restarts == [], name
+            assert rec.out_of_work == declared, name
+        assert recs["left"][1].relaunch  # the mark stands: it is restarted once its work reads pushed
+        for sid, _rec in recs.values():
+            with contextlib.suppress(Exception):
+                await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
 async def test_a_relaunch_is_a_persons_and_refused_touching_nothing(agent, tmp_path):
     await park_ticks(agent)
     params = {"dir": str(tmp_path), **SHELL}

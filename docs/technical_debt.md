@@ -78,7 +78,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-355 | *flow changed — Apply* never clears after an Apply: the relaunch waits for the member's next run, and the record's old `review` reads as a change | High | Open |
 | TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Designed — build TD-359 |
 | TD-357 | A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take | Medium | Open |
-| TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Open |
+| TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-359 | Build TD-356: the Flow pick selects and Apply is the one gate | Medium | Open |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Open |
 
@@ -1353,8 +1353,8 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Type:** debt
 **Added:** 2026-10-06 (the anchor, after Paul's first Apply on ao-grind)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1186
+**Status:** Built in #1186 (grinder-ao-1): `_brief_restart`'s guard passes a declared member whose record carries `relaunch`, design §4.9c *Switching* says so, and `tests/test_relaunch.py` holds the three cases. Left: the live check. Once #1186 is live (`ao promote status`), at the next Apply on a team whose idle members have declared out of work, read `ao status -v` (read only) within a tick of the press: each such member is restarted (`restarts` ends `why: flow`), its `{stage}` line names the flow's brief, and no member with unpushed work was restarted.
 **Location:** `src/sessionorc/agent_tick.py` (`_brief_restart`: `if s.out_of_work or s.restart_wanted: return`, before `why` is read), the mail that tells a member its lane gained entries; design §4.9c *Switching* (`docs/design/4.9c-flows.md`: an idle member is restarted by the tick under `why: flow`)
 
 **Why:** On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind. `rpc_relaunch` rewrote the launch records of grinder-ao-1, grinder-ao-2 and designer-ao-1 and marked each `relaunch`.
