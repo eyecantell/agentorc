@@ -10,9 +10,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from sessionorc import paths
+from sessionorc import held, paths
 from sessionorc.agent import RESTART_CEILING, RESTART_SETTLE, RESTART_WINDOW
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import MailEntry
 
 pytestmark = pytest.mark.integration
 
@@ -249,4 +250,36 @@ async def test_a_replays_entry_carries_what_the_run_it_replaced_reported(agent, 
         rec = agent.sessions[sid]
         assert rec is new and rec.restarts[0] == entry
         assert rec.restarts[1]["error"] and (rec.restarts[1]["done"], rec.restarts[1]["left"]) == ([], ["TD-006"])
+        await person.call("kill", id=sid)
+
+
+async def test_the_ticks_restart_keeps_the_mail_so_an_earlier_runs_ask_is_still_read(agent, tmp_path):
+    """TD-352, design §4.10 *The name coming back adopts it*: the tick's own restarts — rule 1's crash,
+    rule 2's wanted, rule 7's brief changed — supersede in place with the closed record's mail, so
+    the reader's reply to an `ask` the run before sent is the PR's read (§6 rule 11), not a crossing."""
+    await park_ticks(agent)
+    review = {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
+    async with LocalClient() as person:
+        sid = await _member(person, tmp_path, lane=["TD-1"], review=review)
+        old = agent.sessions[sid]
+        ask = MailEntry(id="m-a1", from_=sid, to=["ao-x-tl"], at=_iso(datetime.now(UTC)), kind="ask", text="read", pr=7)
+        old.outbox.append(ask)
+        old.restart_wanted = {"at": _iso(datetime.now(UTC)), "why": "context bound"}
+        old.state, old.confidence, old.pending, old.git = "idle", "hook", None, {"dirty": 0, "unpushed": 0}
+        agent.store.save(old)
+        now = datetime.now(UTC)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not old and [r["why"] for r in new.restarts] == ["wanted"]
+        assert [e.id for e in new.outbox] == ["m-a1"], "the wanted restart keeps the run's sent mail"
+        new.inbox.append(
+            MailEntry(id="m-r1", from_="ao-x-tl", to=[sid], at=_iso(now), kind="reply", text="merged #7", root="m-a1")
+        )
+        assert held.read_by(new, 7) == "ao-x-tl", "the reply to the earlier run's ask is the read"
+        # and rule 1's crash restart keeps it as well
+        _crash(agent, sid)
+        await agent._keep_running(now + RESTART_SETTLE + timedelta(seconds=1))
+        again = agent.sessions[sid]
+        assert again is not new and [r["why"] for r in again.restarts] == ["wanted", "crash"]
+        assert [e.id for e in again.outbox] == ["m-a1"] and [e.id for e in again.inbox] == ["m-r1"]
         await person.call("kill", id=sid)

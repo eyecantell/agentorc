@@ -7017,13 +7017,13 @@ than above: its questions moved with the conversation and are not orphaned.
   names; the home clears `orphaned` at that create, whether or not the create resumed the
   conversation — the successor holds the name and the lane, and the ledger entry says what waits.
   Such a create also **keeps the closed record's mail** (TD-271; a person's Restart and a seat's
-  fill already did, `keep_mail`, §6 rules 2 and 3; the tick's own replays did not), so a lapse note or an answer written to the record
+  fill already did, `keep_mail`, §6 rules 2 and 3; the tick's own replays do too since TD-352, §6 rule 1), so a lapse note or an answer written to the record
   while the name was gone is read at the successor's first `ao inbox`. A team's start asks it:
   `ao team start`, the Org's Start and Add member create a member whose name a **closed** record
   holds with `keep_mail` (§4.9b) where the one starting is a person or one of that record's
   controllers — the host agent grants it to those alone — and otherwise start the member empty
-  and say so in the start's notes, naming it and why, so the start stays all or nothing; rule 8's
-  replays ask it for every record. A create that does not ask starts with an empty mailbox,
+  and say so in the start's notes, naming it and why, so the start stays all or nothing; the tick's
+  replays ask it for every record (§6 rule 1). A create that does not ask starts with an empty mailbox,
   whatever its `team` (TD-274 slice 4).
   The question is then an ordinary open question of that session: a Reply lands in its inbox as a
   `reply`, carrying the question's `about`, and the session owes the outcome (*Outcomes*, below).
@@ -8074,7 +8074,11 @@ code and needs no grant; a session doing the same work does.
      (home-owned, carried across the supersede so the count survives the restart it counts;
      since TD-245 each replay's entry also carries `done: [{ref, pr}]` and
      `left: [ref]`, what the run it replaced reported and what it claimed and did not close,
-     from the old record's `progress`, which the new record does not keep);
+     from the old record's `progress`, which the new record does not keep); **the mail is kept**:
+     every replay of the tick's — this rule's, rule 2's, rule 7's and rule 8's — is a `create` with
+     `keep_mail` (§4.9b), so the closed run's inbox and outbox move to the new record and a reply
+     to an `ask` the run before sent — a reader's to a held PR's, rule 11 — lands on a thread the
+     new record holds (TD-352);
      `why` is `crash`, `wanted` or `fill` (and `start`, `schedule`, rule 7's `brief` and rule 8's `work`, each named where it is written), and a replay that failed keeps its `why` and adds
      `error` (the text), so a failed entry still says what it was trying. At the ceiling the policy stops, writes
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
