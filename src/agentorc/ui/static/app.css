@@ -532,6 +532,10 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }
 .blk.opened { background: var(--blk-opened); } .blk.closed { background: var(--blk-closed); }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--t-small); color: var(--muted); }
+/* the lanes line under the legend (§4.5a *team card: Repo facet*, TD-361): its counts are links, a member out of work tinted */
+.laneline { font-size: var(--t-small); line-height: 1.5; white-space: normal; }
+.laneline a { color: inherit; font-weight: 600; }
+.lanewarn { color: var(--warn-fg); background: var(--warn-bg); border-radius: 3px; padding: 0 5px; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
 /* TDs in motion in columns (§4.5a **Columns**, TD-252): one grid per row with the same tracks, so
    each column starts at one x down the facet — the phase in the width of its longest word, the

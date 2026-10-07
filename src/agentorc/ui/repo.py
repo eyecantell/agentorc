@@ -299,7 +299,9 @@ def team_groups(
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
         # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are its *asked you* line (TD-354)
-        summary = team_summary(team, members, repos, doing, waiting, needs=needs) if team != NO_TEAM else None
+        summary = (
+            team_summary(team, members, repos, doing, waiting, needs=needs, fleet=views) if team != NO_TEAM else None
+        )
         if summary:
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m)

@@ -33,6 +33,7 @@
     <span class="grow"></span>
     {% if ledger_editor %}<a class="btn sm ghost" href="{{ ledger_editor.url }}">‹› Open ledger</a>{% endif %}
     {% if r.ledger %}<button class="btn sm ghost" type="button" data-addentry="{{ name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button>{% endif %}</div>
+  {% for ln in lanes or [] %}{% with url = '' %}{% include "lanes_line.html" %}{% endwith %}{% endfor %}
   <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes; <i>held by</i> is a member's claim</div>
   <div class="rlist">
   {% if r.ledger and r.ledger.entries is none %}<div class="rrow meta">could not look — {{ r.ledger.error or 'not read yet' }}</div>{% endif %}

@@ -290,9 +290,11 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401
     doing_rows,  # noqa: F401
+    lanes_line,
     motion_rows,  # noqa: F401
     repo_facet,  # noqa: F401
     rollup,  # noqa: F401
+    team_lanes,
     team_repo,  # noqa: F401
     team_summary,  # noqa: F401
 )
@@ -1188,7 +1190,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # numbers, since no live member points the summary at the repo (review of slice 5)
             members = [v for v in vs if v.get("team") == named]
             summary = team_summary(named, members, {}, doing, prs_waiting(members), now, needs=h.needs_cache["rows"])
-            summary["repo"] = repo_facet(r, now, prs_waiting(members))
+            summary["repo"] = repo_facet(r, now, prs_waiting(members), team_lanes(named, vs, r))
             summary["motion"] = motion_rows(members, r)
             summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
         else:
@@ -1231,6 +1233,14 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "teams": teams,
             "prs": pr_rows(r, members, standing, now),
             "lists": ledger_lists(r, summary["motion"]),
+            # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
+            "lanes": [
+                ln
+                for team, got in teamrun.repo_lanes(
+                    (r.get("ledger") or {}).get("entries"), str(r.get("root") or ""), sessions
+                ).items()
+                if (ln := lanes_line(team, got, (r.get("ledger") or {}).get("by_kind") or {}))
+            ],
             "boards": boards,
             "horizon": hz,
             "doing": summary["doing"],

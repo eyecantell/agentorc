@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agentorc import teamrun
 from sessionorc.models import stop_note
 from sessionorc.reports import branch_ref
 
@@ -69,11 +70,48 @@ def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
     return {"opened": o, "closed": c, "opct": round(100 * o / (o + c), 1) if o + c else 50.0}
 
 
-def repo_facet(r: Mapping[str, Any], now: datetime, waiting: dict[str, Any] | None = None) -> dict[str, Any]:
+def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The **lanes line** under the kind bar's legend (§4.5a *team card: Repo facet*, §4.4 *In a team's
+    lanes*, TD-361), from `ledger.in_lanes`' reading: what the team's lanes take, the rest of the
+    pickable by owner, each member out of work with unheld work in its lane, and the two segments'
+    hovers. None for a team none of whose records carries a lane: the bars stand alone."""
+    if not lanes or not team:
+        return None
+    rest = list(lanes.get("rest") or [])
+    owners = ", ".join(f"{o['owner']} {o['n']}" for o in rest)
+    n_pick, n_design = len(lanes.get("pickable") or []), len(lanes.get("design_first") or [])
+    waits = len(lanes.get("design_first_rest") or [])
+    pick = f"{int(by_kind.get('pickable') or 0)} pickable · {n_pick} in {team}'s lanes" + (
+        f" · {owners}" if owners else ""
+    )
+    design = (
+        f"{int(by_kind.get('design-first') or 0)} design-first · {n_design} in {team}'s lanes · {waits} wait on a build"
+    )
+    return {
+        "team": team,
+        "pickable": n_pick,
+        "design_first": n_design,
+        "rest": rest,
+        "other": sum(int(o["n"]) for o in rest),
+        "out_of_work": [
+            {**m, "title": f"{', '.join(m['ids'])} — in its lane, held by nobody"}
+            for m in lanes.get("out_of_work") or []
+        ],
+        "titles": {"pickable": pick, "design-first": design},
+    }
+
+
+def repo_facet(
+    r: Mapping[str, Any],
+    now: datetime,
+    waiting: dict[str, Any] | None = None,
+    lanes: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The team card's **Repo** facet (§4.5a *team card: Repo facet*): the repo's name and page, the
     ledger's open entries as two bars and its windows as blocks, the PRs' windows as blocks, the
     oldest open PR's age, how many wait on review, and the readings' age. A reading that failed is
-    `error`, drawn *could not look*; its last numbers, when there are any, stay beside it."""
+    `error`, drawn *could not look*; its last numbers, when there are any, stay beside it. `lanes`,
+    `lanes_line`'s, is the team's line under the legend (TD-361)."""
     led, prs = r.get("ledger") or {}, r.get("prs") or {}
     entries = led.get("entries")
     open_ = prs.get("open")
@@ -88,6 +126,7 @@ def repo_facet(r: Mapping[str, Any], now: datetime, waiting: dict[str, Any] | No
             "history_error": led.get("history_error") or "",
             "priority": _bars(led.get("by_priority") or {}, PRIORITY_BARS),
             "kind": _bars(led.get("by_kind") or {}, KIND_BARS),
+            "lanes": lanes,
             "windows": {w: _blocks((led.get("windows") or {}).get(w)) for w in WINDOWS} if led.get("windows") else None,
         },
         "prs": {
@@ -274,6 +313,15 @@ def doing_rows(
     return rows
 
 
+def team_lanes(team: str, fleet: list[dict[str, Any]], r: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The team's lanes line for its repo's reading (§4.4 *In a team's lanes*), from the one reader
+    `teamrun.repo_lanes` runs over the fleet — the team's records for its lanes, every live record of
+    the repo for what is held; None with no reading or no lane."""
+    led = (r or {}).get("ledger") or {}
+    got = teamrun.repo_lanes(led.get("entries"), str((r or {}).get("root") or ""), fleet).get(team)
+    return lanes_line(team, got, led.get("by_kind") or {})
+
+
 def team_summary(
     team: str,
     members: list[dict[str, Any]],
@@ -282,6 +330,7 @@ def team_summary(
     waiting: dict[str, Any] | None = None,
     now: datetime | None = None,
     needs: Collection[dict[str, Any]] = (),
+    fleet: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
     needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
@@ -293,7 +342,9 @@ def team_summary(
     answers = answer_blocks(members)
     return {
         "team": team,
-        "repo": repo_facet(r, now, waiting) if r else None,
+        "repo": repo_facet(r, now, waiting, team_lanes(team, fleet if fleet is not None else members, r))
+        if r
+        else None,
         "motion": motion,
         "phases": {ph: sum(1 for x in motion if x["phase"] == ph) for ph in PHASES},
         # the reference and holders columns' widths, from the rows, so every row's grid is the same (§4.5a **Columns**)

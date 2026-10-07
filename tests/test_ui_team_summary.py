@@ -613,3 +613,45 @@ def test_only_an_open_ask_from_the_team_is_on_the_line():
     assert asks([_ask("m-3", "g3@node"), _ask("m-4", "g2@other")]) == ["m-3"]
     assert [(a["kind"], a["id"]) for a in ui.answer_blocks(ms)] == [("question", "g1")]
     assert ui.asked_line(ms, [], NOW) is None
+
+
+def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
+    """§4.5a *team card: Repo facet*'s lanes line (§4.4 *In a team's lanes*, TD-361): under the
+    legend, what the team's lanes take and the rest by owner, each count a link; the two segments'
+    hovers say the same; a member out of work with unheld work in its lane tinted, its ids on hover,
+    its name a Focus link; a team with no lane on any record draws the bars alone."""
+    from agentorc.ui import app as ui
+
+    def e(i, page, owner, kind="build"):
+        return {"id": i, "title": i, "for_page": page, "owner": owner, "kind": kind, "pickable": "yes"}
+
+    entries = [e(f"TD-{100 + i}", "pickable", "anchor") for i in range(20)]
+    entries += [e(f"TD-{200 + i}", "pickable", "dev-cadence") for i in range(4)]
+    entries += [e("TD-300", "design-first", "designer", "design-first")] + [
+        e("TD-301", "design-first", "x", "design-first")
+    ]
+    r = reading("/r/samscrape")
+    r["ledger"].update(entries=entries, by_kind={"pickable": 24, "design-first": 2, "for-you": 0, "other": 0})
+    oow = {"at": _iso(NOW), "why": "nothing"}
+    lane = ["free-pick", "owner:grinder"]
+    members = [
+        member("g1", "idle", lane=lane, out_of_work=oow, name="grinder-ao-1"),
+        member("d1", "idle", lane=["design-first", "owner:designer"]),
+    ]
+    s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    line = html[html.index('class="meta laneline"') :].split("</div>")[0]
+    assert "in grind's lanes: " in line and ">0 pickable</a>, " in line and ">1 design-first</a>" in line
+    assert "· the other 24 pickable: " in line and ">anchor 20</a>, " in line and ">dev-cadence 4</a>" in line
+    assert 'href="/repo/samscrape#debt-pickable"' in line and "lanewarn" not in line
+    assert 'title="24 pickable · 0 in grind&#39;s lanes · anchor 20, dev-cadence 4"' in html
+    assert 'title="2 design-first · 1 in grind&#39;s lanes · 1 wait on a build"' in html
+    entries.append(e("TD-355", "pickable", "grinder"))
+    s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    warn = '<span class="lanewarn" title="TD-355 — in its lane, held by nobody">· '
+    assert warn + '<a class="strong" href="/focus/g1">grinder-ao-1</a> out of work with 1 in its lane</span>' in html
+    # a team with no lane on any record: the bars alone
+    s = ui.team_summary("grind", [member("g1"), member("g2")], {"/r/samscrape": r}, {}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert "laneline" not in html and 'title="24 pickable"' in html
