@@ -579,3 +579,92 @@ def test_the_grinder_template_says_the_pick_order_and_names_the_tool():
     text = resources.files("agentorc").joinpath("briefs", "grinder.md").read_text(encoding="utf-8")
     assert "High, then Medium, then Low" in text and "`ao repo` lists" in text
     assert "put the priority there" in text and "Choosing in a free-pick lane" in text
+
+
+def _oct6():
+    """The ledger of 2026-10-06 (TD-357): 24 pickable, 20 the anchor's and 4 dev-cadence's, one
+    design-first entry a designer's lane takes and another waiting on a build."""
+
+    def e(i, page, owner, kind="build"):
+        return {"id": i, "title": i, "for_page": page, "owner": owner, "kind": kind, "pickable": "yes"}
+
+    entries = [e(f"TD-{100 + i}", "pickable", "anchor") for i in range(20)]
+    entries += [e(f"TD-{200 + i}", "pickable", "dev-cadence") for i in range(4)]
+    entries += [e("TD-300", "design-first", "designer", "design-first")]
+    entries += [{**e("TD-301", "design-first", "designer", "design-first"), "pickable": "no"}]
+    entries += [e("TD-400", "for-you", "paul", "decision")]
+    grind = ["free-pick", "owner:grinder"]
+    out = {"at": "2026-10-06T20:00:00Z", "why": "nothing pickable"}
+    records = [
+        {"id": "g1", "name": "grinder-ao-1", "team": "ao-grind", "lane": grind, "state": "idle", "out_of_work": out},
+        {"id": "g2", "name": "grinder-ao-2", "team": "ao-grind", "lane": grind, "state": "idle", "out_of_work": out},
+        {"id": "d1", "name": "designer-ao-1", "team": "ao-grind", "lane": ["design-first", "owner:designer"]},
+        {"id": "m", "name": "manager-ao-1", "team": "ao-grind", "state": "idle"},  # no lane: contributes nothing
+    ]
+    return entries, records
+
+
+def test_in_lanes_splits_the_repos_count_by_the_teams_lanes():
+    """§4.4 *In a team's lanes* (TD-357, TD-361) on the 2026-10-06 case: 0 pickable and 1 design-first
+    in ao-grind's lanes, the rest by owner in falling count; a grinder entry filed since is in the
+    lanes and in the warning, and out of it once a live member holds it; an unowned build is in a
+    `free-pick` lane, and in the rest of a team whose only lane is a designer's."""
+    from sessionorc import ledger
+
+    entries, records = _oct6()
+    got = ledger.in_lanes(entries, records)
+    assert got["pickable"] == [] and got["design_first"] == ["TD-300"]
+    assert [(r["owner"], r["n"]) for r in got["rest"]] == [("anchor", 20), ("dev-cadence", 4)]
+    assert got["design_first_rest"] == ["TD-301"] and got["out_of_work"] == []  # TD-301 waits on a build
+    grinders = {"title": "g", "for_page": "pickable", "owner": "grinder", "kind": "build", "pickable": "yes"}
+    entries += [{"id": f"TD-35{i}", **grinders} for i in (5, 8, 9)]
+    got = ledger.in_lanes(entries, records, held={"TD-358"})
+    assert got["pickable"] == ["TD-355", "TD-358", "TD-359"]  # a held entry is still the team's work
+    assert [(m["name"], m["ids"]) for m in got["out_of_work"]] == [
+        ("grinder-ao-1", ["TD-355", "TD-359"]),
+        ("grinder-ao-2", ["TD-355", "TD-359"]),
+    ]
+    entries.append(
+        {"id": "TD-500", "title": "u", "for_page": "pickable", "owner": "", "kind": "build", "pickable": "yes"}
+    )
+    assert "TD-500" in ledger.in_lanes(entries, records)["pickable"]
+    designers = ledger.in_lanes(entries, records[2:])
+    assert ("unowned", 1) in [(r["owner"], r["n"]) for r in designers["rest"]]
+    assert ledger.in_lanes(entries, records[3:]) is None  # no lane on any record: nothing drawn
+    assert ledger.in_lanes(entries, []) is None
+
+
+def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work(repo, monkeypatch, capsys):
+    """§4.7 `ao repo` (TD-361): the first line's parentheses, one per servicing team; a member out of
+    work with unheld work in its lane on a line of its own; `--json` carries `lanes` by team;
+    `--all` reads no members and prints the counts alone."""
+    from agentorc import cli
+
+    entries, records = _oct6()
+    entries.append(
+        {"id": "TD-355", "title": "g", "for_page": "pickable", "owner": "grinder", "kind": "build", "pickable": "yes"}
+    )
+    by = {"pickable": 25, "design-first": 1, "for-you": 1, "other": 0}
+    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []},
+                           "ledger": {"entries": entries, "by_kind": by}}}  # fmt: skip
+    fleet = [{**r, "repo": str(repo)} for r in records]
+    fleet.append({"id": "old", "name": "grinder-ao-1", "team": "ao-grind", "repo": str(repo), "lane": ["free-pick"],
+                  "superseded_by": "g1", "state": "closed"})  # fmt: skip
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+    )
+    monkeypatch.chdir(repo)
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    first = out.splitlines()[0]
+    assert "28 open entries: 25 pickable (ao-grind 1 · anchor 20, dev-cadence 4), 1 design-first (ao-grind 1)," in first
+    assert "  grinder-ao-1 is out of work with 1 in its lane: TD-355" in out
+    assert "  grinder-ao-2 is out of work with 1 in its lane: TD-355" in out
+    fleet[0]["progress"] = [{"ref": "TD-355", "status": "claimed"}]
+    fleet[0]["state"] = "working"
+    assert cli.main(["--json", "repo"]) == 0
+    lanes = json.loads(capsys.readouterr().out)[0]["lanes"]
+    assert lanes["ao-grind"]["pickable"] == ["TD-355"] and lanes["ao-grind"]["out_of_work"] == []  # held now
+    reading[str(repo)].pop("lanes")  # the fake hands back the dict the last call filled; the home's is fresh
+    assert cli.main(["repo", "--all"]) == 0
+    assert "(ao-grind" not in capsys.readouterr().out

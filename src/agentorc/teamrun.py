@@ -916,6 +916,34 @@ def _feature_role(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, c
         return None
 
 
+def repo_lanes(
+    entries: list[dict[str, Any]] | None, root: str | Path, sessions: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Each team servicing a repo, and what its lanes take of the repo's open entries (design §4.4
+    *In a team's lanes*, TD-361): `ledger_mod.in_lanes` over the team's records in the repo — live or
+    ended, never one resumed as another — with what a live record of the repo holds claimed. A team
+    whose records carry no lane, and a repo whose ledger was not read, give nothing."""
+    if entries is None:
+        return {}
+    here = Path(root).resolve()
+    mine = [
+        s for s in sessions if s.get("repo") and Path(str(s["repo"])).resolve() == here and not s.get("superseded_by")
+    ]
+    held = {
+        str(p.get("ref"))
+        for s in mine
+        if s.get("state") not in DEAD
+        for p in s.get("progress") or []
+        if isinstance(p, dict) and p.get("status") == "claimed"
+    }
+    out: dict[str, dict[str, Any]] = {}
+    for team in sorted({str(s["team"]) for s in mine if s.get("team")}):
+        got = ledger_mod.in_lanes(entries, [s for s in mine if s.get("team") == team], held)
+        if got is not None:
+            out[team] = got
+    return out
+
+
 def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """What a switch leaves with a reader (design §4.9c *What a switch leaves alone*): each open PR
     `ask` at a session of the team, from the reader's `prs_waiting.asks` (§4.9b, TD-333) in the order

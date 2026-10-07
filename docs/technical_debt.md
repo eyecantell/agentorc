@@ -78,7 +78,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-357 | A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take | Medium | Designed 2026-10-06 — the build is TD-361 |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-361 | Build TD-357: the lanes line — what a team's lanes take of the repo's pickable count, the rest by owner | Medium | Open |
+| TD-361 | Build TD-357: the lanes line — what a team's lanes take of the repo's pickable count, the rest by owner | Medium | Partly done — the reader and `ao repo`; the card and the Repo page left |
 | TD-362 | The detached check's *unknown* clause never fires where tmux starts each pane in a scope of its own, and §4.8a says every pane is inside the service | Medium | Open |
 
 ---
@@ -1349,7 +1349,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-06 (the designer, from TD-357's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** **Slice 1 done 2026-10-06 (grinder-ao-2, PR #PRNUM):** the reader (`ledger.in_lanes`; `teamrun.repo_lanes` per servicing team) and `ao repo` (fix items 1 and 3, the reader's and the CLI's tests). **Left, slice 2:** the team card's lanes line and the Repo page's (item 2), with its UI check — after the designer's steer to Paul on the card (`m-805f8088ba04`, bound 2026-10-07 10:16 MDT) is answered or lapses.
 **Location:** `src/sessionorc/ledger.py` (the reader), `src/agentorc/ui/org.py` (`repo_facet`, `team_summary`), `src/agentorc/ui/templates/team_summary.html`, `src/agentorc/ui/repo.py` and the Repo page's template, `src/agentorc/cli.py` (`_repo_line`, `cmd_repo`); tests `tests/test_repo_facts.py`, `tests/test_ui_team_summary.py`, `tests/test_ui_repo_page.py`, the CLI's `ao repo` tests. `src/sessionorc/**` is a held path: the techlead reads the PR.
 
 **Why:** design §4.4 *In a team's lanes*, §4.5 the team card and screen 11, §4.5a *team card: Repo facet*, §4.7 `ao repo` (TD-357, designed 2026-10-06). On 2026-10-06 the card said *24 pickable* while every member of ao-grind was out of work.
