@@ -189,7 +189,7 @@ async def test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_ho
     async with LocalClient() as person:
         names = ("onbranch", "claimed", "fresh", "handed", "closedpr", "late", "reader")
         sids = {n: await _seat(person, tmp_path, name=n) for n in names}
-        for n, sid in sids.items():
+        for sid in sids.values():
             _idle(agent, sid, now)
             agent.sessions[sid].repo = root
         agent.sessions[sids["onbranch"]].git["branch"] = "td363-gaps"
