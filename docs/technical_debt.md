@@ -81,6 +81,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
+| TD-355 | *flow changed — Apply* never clears after an Apply: the relaunch waits for the member's next run, and the record's old `review` reads as a change | High | Open |
+| TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Open |
 
 ---
 
@@ -1380,3 +1382,62 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-339 (the brief that waited), TD-342 (no fallback when the first hook is lost), TD-225 (alarms at a restart), TD-115 (the grace).
 
+## TD-355: *flow changed — Apply* never clears after an Apply: a relaunch rewrites the launch record, the record keeps its old `review` until the member restarts, and `teamrun.differences` reads that as a change
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's press of Apply on ao-grind)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`differences`: `(rec.get("review") or None) != (x.review or None)`), `src/agentorc/teams.py` (the compiled reader, `{"reader": "techlead", "held": sorted(...), "bound": REVIEW_BOUND}`)
+
+**Why:**
+- On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind's card, the first team on a flow (TD-310). The host agent wrote *relaunched by the person: its launch record replaced* for grinder-ao-1, grinder-ao-2 and designer-ao-1.
+- The mark stayed afterwards. `ao team flow ao-grind` still lists each of them as *relaunched — reader techlead → techlead*.
+- **The cause:** `rpc_relaunch` (`src/sessionorc/agent.py`) rewrites the launch file only. `~/.agentorc/launch/ao-agentorc-grinder-ao-1.json` holds the compiled `review`, with `held` sorted, from 02:58:33Z. It sets `relaunch: {at}` on the record but never touches the record's own `review` or `lane`. Those refresh only when the member restarts and replays the launch file.
+- The three members had declared out of work, so the tick has not restarted them. A finished member is never restarted; the relaunch takes effect when it next works.
+- Meanwhile `teamrun.differences` compares the record's stale `review` (`held` in `.agentorc.yml`'s order, from its pre-flow start) with the compiled one (`sorted(held)`), dict to dict, so it reports a difference.
+- Here the only difference is the order of `held`. A real change of lane or reader would stay flagged after Apply in the same way, until the member restarts.
+
+So a team's *flow changed* mark outlives the press that answered it, and a second Apply rewrites the same launch records again.
+
+**Fix:**
+- Make the mark respect an Apply that is still pending. For a record whose `relaunch` is newer than its start, compare the **launch record** (what the member will run next) with the compiled launch, not the record's live fields. Or the mark reads *applied — takes effect when it next works* and is not offered again.
+- Compare `review` as the flow means it, wherever a record's review is compared with a compiled one: `reader` (each chain link's reader and path set), `bound`, and `held` as a set, as `teams.flow_redundant` already does.
+- Tests:
+  - after a relaunch of an idle finished member, `differences` reports nothing for it;
+  - a record whose `held` is the compiled set in another order shows no difference;
+  - a changed set still does;
+  - a chain still compares link by link.
+
+**Done when** after an Apply, `ao team flow <team>` and the card no longer offer **Apply** for the members it relaunched, whether or not they have restarted yet, and the tests above pass.
+
+**Related:** TD-310 (the move that surfaced it), TD-309 (archived: *Switching*), TD-349 (archived: the chain shape).
+
+## TD-356: Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's use of the team card)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a *team card: Flow pick* and *team card: flow changed — Apply*, §4.9c *Switching*; `src/agentorc/ui/static/app.js` (the pick's `Switch <team> to <flow>?` confirm, Apply's `confirm(ap.dataset.confirm)`)
+
+**Why:**
+- Paul, 2026-10-06: changing the selected flow gives a confirmation popup, which seems redundant with an Apply button. Use one or the other.
+- As designed:
+  - the **Flow** pick writes `teams.<team>.flow` and applies it at once after a confirm naming who sits out, starts and is relaunched;
+  - **flow changed — Apply** is for records that drift from the current flow for any other reason (a hand edit of the definition, a stage brief changed), and has its own confirm.
+- To the person, it reads as two gates on one act.
+
+**Fix:** design first. Choose one gate. For example:
+- (a) the pick only selects, and the team shows *flow changed — Apply* until the person presses Apply, which is the one place a relaunch is confirmed. Or:
+- (b) the pick applies with its confirm, and Apply needs no confirm of its own, since the mark's title already lists what it will do.
+
+Paul's leaning is in his words above. This is the obvious tier unless the two shapes differ in what a person can undo.
+
+**Done when** switching a team's flow from the card takes one deliberate confirmation, and §4.5a's two rows say which control carries it.
+
+**Related:** TD-355 (Apply's mark that never cleared), TD-309 (archived: the pick and Apply), TD-307 (the design).
