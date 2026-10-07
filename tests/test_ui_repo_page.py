@@ -232,3 +232,31 @@ def test_the_count_line_carries_the_lanes_line_of_each_team_servicing_the_repo(t
     assert debt.count('class="meta laneline"') == 1
     fleet[0].pop("lane")
     assert 'class="meta laneline"' not in c.get("/repo/samscrape").text  # no lane on any record: none drawn
+
+
+def _held_elsewhere(tmp_path):
+    """TD-364: a grind member out of work on `[free-pick, owner:grinder]`, and a live record of the
+    same repo in another team holding every grinder entry claimed."""
+    root = str(tmp_path / "samscrape")
+    r = reading(root)
+    for x in r["ledger"]["entries"]:
+        x.update(pickable="yes", kind="build")
+    ids = [x["id"] for x in r["ledger"]["entries"] if x["owner"] == "grinder"]
+    oow = {"at": _iso(NOW), "why": "nothing pickable"}
+    fleet = [
+        rec("g1", root, state="idle", lane=["free-pick", "owner:grinder"], out_of_work=oow),
+        rec("h1", root, team="other", progress=[{"ref": i, "status": "claimed"} for i in ids]),
+    ]
+    return root, r, fleet
+
+
+def test_the_team_card_reads_what_is_held_across_the_fleet_not_its_members_alone(tmp_path, monkeypatch):
+    """§4.4 *In a team's lanes* (TD-361, TD-364): what is held is read from every live record of the
+    repo, so a member out of work is not warned for entries a record outside its team holds — through
+    `team_groups`, the card's own caller; with nobody holding them it is."""
+    root, r, fleet = _held_elsewhere(tmp_path)
+    c = client(monkeypatch, tmp_path, fake({root: r}, fleet))
+    html = c.get("/repo/samscrape").text
+    assert "in grind's lanes: " in html and "lanewarn" not in html
+    fleet[1]["progress"] = []
+    assert "g1</a> out of work with 6 in its lane" in c.get("/repo/samscrape").text
