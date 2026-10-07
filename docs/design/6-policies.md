@@ -460,7 +460,7 @@ code and needs no grant; a session doing the same work does.
      `slots` name `{repo}`), any placeholder of `base` (lower-case letters alone between `{` and `}`)
      the record's `slots` do not name is filled from the file beside `base` named `<base's
      stem>.<slot>.md` where there is one, else `none`, so a template that gains a slot never replays
-     it literally (§4.9c item 5); and a record carrying **`relaunch: {at}`** (§4.9c *Switching*; built — TD-309 slice 5a) is
+     it literally (§4.9c item 5); and a record carrying **`relaunch: {at, lane, review}`** (§4.9c *Switching*; built — TD-309 slice 5a) is
      restarted under this rule's conditions as one carrying `brief_changed` is, save that a declaration of
      `out_of_work` does not hold it back — the press is the person's word, and the run that declared is the
      one it replaces (TD-358); the host agent knows a file and a slot and no role, template or team, and

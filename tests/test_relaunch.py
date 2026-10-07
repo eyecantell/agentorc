@@ -64,6 +64,7 @@ async def test_a_relaunch_replaces_the_launch_record_and_the_tick_restarts_on_it
             "relaunch", id=sid, launch={"prompt": "composed", "prompt_from": new_from, "lane": ["TD-9"]}
         )
         assert view["relaunch"]["at"] and rec.relaunch and rec.brief_changed is None
+        assert view["relaunch"]["lane"] == ["TD-9"] and view["relaunch"]["review"] is None  # what it runs next
         got = _launch(sid)
         assert got["lane"] == ["TD-9"] and got["prompt_from"] == new_from and got["prompt"] == "composed"
         assert "review" not in got  # absent from the launch handed: removed (a switch to `build`)

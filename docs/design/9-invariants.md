@@ -31,7 +31,7 @@
    **A flow is not on the record** (§4.9c): the host agent never reads a flow, the record gains
    no flow or stage field, and no rule keys on a flow or on a stage's `name` — a flow compiles,
    at a client, into fields a start already writes (`lane`, `review`, `prompt_from`), and the
-   tick reads those. `relaunch: {at}`, `sit_out: {at}` and `closed_for: {why: sit_out}` are
+   tick reads those. `relaunch: {at, lane, review}`, `sit_out: {at}` and `closed_for: {why: sit_out}` are
    marks a person's act writes (the `relaunch` RPC, a person's own), and the tick reads them as
    marks — a restart's second trigger, a record to close and then pass over — never as a flow.
 10. A report entry the session declared is never overwritten by one the host agent derived; a

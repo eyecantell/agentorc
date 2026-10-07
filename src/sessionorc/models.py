@@ -1090,9 +1090,10 @@ class Session:
     # as merged, for `BRIEF_SETTLE`; gone at the next create, or when the files read as recorded
     # again. The home's.
     brief_changed: dict[str, Any] | None = None
-    # Rule 7's second trigger (§4.9c *Switching*, TD-309 slice 5): `{at}` once a person's Apply replaced
-    # this record's launch record (`relaunch`); gone at the next create, which writes a launch record of
-    # its own. The home's.
+    # Rule 7's second trigger (§4.9c *Switching*, TD-309 slice 5): `{at, lane, review}` once a person's
+    # Apply replaced this record's launch record (`relaunch`), the two as handed (TD-355: what the member
+    # runs next, which the record's own fields are not until then); gone at the next create, which
+    # writes a launch record of its own. The home's.
     relaunch: dict[str, Any] | None = None
     # A sit-out under way (§4.9c *Switching*, TD-309 slice 5b): `{at}` once a person's Apply sent the
     # wrap-up to a member the team's flow no longer uses; the tick closes it once settled and writes

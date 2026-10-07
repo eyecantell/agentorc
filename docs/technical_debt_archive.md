@@ -5554,3 +5554,38 @@ Two things are missing, and the design round chooses between them or takes both:
 **Related:** TD-336 (the design), TD-283 (the start context on every launch), TD-027 (the verified send), TD-199 (a running member keeps its brief), contractmatch PR #122.
 
 **Resolved:** 2026-10-06 (live check, grinder-ao-2; built by PRs #1145 and #1147, the lost-first-hook road by #1162). Read on the live copy at `90f6bdd`, which carries all three. **The argv:** this run of grinder-ao-2 (pid 37181, restarted 20:20:37 local) reads `claude --settings …grind+unattended.json --session-id … --name grinder-ao-2 --model opus --dangerously-skip-permissions --append-system-prompt-file ~/.agentorc/launch/<conversation id>.context.md`, no prose, `AGENTORC_AT_COMPOSER=1` in its environment; `pgrep -af` for two phrases of its brief matches no process, so a `pkill -f` on a word of a brief kills no session (the *Done when*). **The brief:** every restart of ao-grind after #1162 went live typed its brief by the hook road (`sends`: *(the brief)*, `submitted`, not scraped): designer-ao-1 at 20:01:12 local, grinder-ao-2 at 20:20:40 — each one to two seconds after *superseded the closed session of the same name*; grinder-ao-1's at 19:48:05 too. Design §4.1 *No prose in the argv* carries it. Those same restarts still raised the identity alarm TD-341 was meant to end, but the brief no longer waits on that hook: that is TD-360.
+
+## TD-355: *flow changed — Apply* never clears after an Apply: a relaunch rewrites the launch record, the record keeps its old `review` until the member restarts, and `teamrun.differences` reads that as a change
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's press of Apply on ao-grind)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/teamrun.py` (`differences`: `(rec.get("review") or None) != (x.review or None)`), `src/agentorc/teams.py` (the compiled reader, `{"reader": "techlead", "held": sorted(...), "bound": REVIEW_BOUND}`)
+
+**Why:**
+- On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind's card, the first team on a flow (TD-310). The host agent wrote *relaunched by the person: its launch record replaced* for grinder-ao-1, grinder-ao-2 and designer-ao-1.
+- The mark stayed afterwards. `ao team flow ao-grind` still lists each of them as *relaunched — reader techlead → techlead*.
+- **The cause:** `rpc_relaunch` (`src/sessionorc/agent.py`) rewrites the launch file only. `~/.agentorc/launch/ao-agentorc-grinder-ao-1.json` holds the compiled `review`, with `held` sorted, from 02:58:33Z. It sets `relaunch: {at}` on the record but never touches the record's own `review` or `lane`. Those refresh only when the member restarts and replays the launch file.
+- The three members had declared out of work, so the tick has not restarted them. A finished member is never restarted; the relaunch takes effect when it next works.
+- Meanwhile `teamrun.differences` compares the record's stale `review` (`held` in `.agentorc.yml`'s order, from its pre-flow start) with the compiled one (`sorted(held)`), dict to dict, so it reports a difference.
+- Here the only difference is the order of `held`. A real change of lane or reader would stay flagged after Apply in the same way, until the member restarts.
+
+So a team's *flow changed* mark outlives the press that answered it, and a second Apply rewrites the same launch records again.
+
+**Fix:**
+- Make the mark respect an Apply that is still pending. For a record whose `relaunch` is newer than its start, compare the **launch record** (what the member will run next) with the compiled launch, not the record's live fields. Or the mark reads *applied — takes effect when it next works* and is not offered again.
+- Compare `review` as the flow means it, wherever a record's review is compared with a compiled one: `reader` (each chain link's reader and path set), `bound`, and `held` as a set, as `teams.flow_redundant` already does.
+- Tests:
+  - after a relaunch of an idle finished member, `differences` reports nothing for it;
+  - a record whose `held` is the compiled set in another order shows no difference;
+  - a changed set still does;
+  - a chain still compares link by link.
+
+**Done when** after an Apply, `ao team flow <team>` and the card no longer offer **Apply** for the members it relaunched, whether or not they have restarted yet, and the tests above pass.
+
+**Related:** TD-310 (the move that surfaced it), TD-309 (archived: *Switching*), TD-349 (archived: the chain shape).
+
+**Resolved:** 2026-10-06 (PR #1187, grinder-ao-2) — the home's `relaunch` marks `relaunch: {at, lane, review}`, the two as handed, and `teamrun.differences` reads a relaunched member's next run from the mark rather than the record's running lane and `review`; `review` is compared as the flow means it (`_review_key`: each reader in the chain's order, `held` as a set, the bound). Tests: `test_an_apply_clears_flow_changed_before_the_member_restarts`, `test_a_chain_is_compared_link_by_link_each_held_as_a_set`. The members Paul's Apply relaunched before this carry `{at}` alone, which says nothing of what they run next: they read *flow changed* until their next create (TD-358's restart), and never again after one. Design §4.9c *Switching*.

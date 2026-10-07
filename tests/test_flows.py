@@ -859,6 +859,79 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     assert any(x.startswith("grind-1: relaunched — reader techlead → none") for x in lines)
 
 
+def test_an_apply_clears_flow_changed_before_the_member_restarts(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    """TD-355: the home's `relaunch` replaces the launch record and marks the record `relaunch: {at,
+    lane, review}`; the record's own lane and `review` stay the old run's until the member restarts,
+    so the mark — what it runs next — is what the flow is read against, and Apply is not offered
+    again. A record's `held` in another order is no difference; another set is."""
+    from agentorc import cli
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build"])
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
+    read = [s for s in state["sessions"] if s.get("review")]
+    assert {s["name"] for s in read} >= {"grind-1", "grind-2"}
+    assert all(s["review"]["held"] == ["src/sessionorc/**"] for s in read)
+    for s in read:  # started before the repo held docs/briefs/** too: in the repo's order, not sorted
+        s["review"] = {**s["review"], "held": ["src/sessionorc/**", "docs/briefs/**"]}
+    grind = next(s for s in read if s["name"] == "grind-1")
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []  # the compiled set, sorted: the same
+    grind["review"] = {**grind["review"], "held": ["src/sessionorc/**"]}
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    (d,) = json.loads(capsys.readouterr().out)["differences"]
+    assert d["name"] == "grind-1" and d["what"] == ["reader techlead → techlead"]  # another set still differs
+    grind["review"] = {**grind["review"], "held": ["docs/briefs/**", "src/sessionorc/**"]}
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build"]) == 0
+    assert "grind-1" in [d["name"] for d in json.loads(capsys.readouterr().out)["apply"]["applied"]]
+    handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch" and "launch" in p}
+    assert handed["ao-agentorc-grind-1"]["review"] is None
+    old = dict(grind["review"])
+    for s in state["sessions"]:  # the home took them: brief re-recorded, the mark set, lane and review the old run's
+        if s["id"] in handed:
+            launch = handed[s["id"]]
+            s["brief"] = {"sources": [{"path": stage}] if (stage := teamrun_stage(launch)) else []}
+            s["relaunch"] = {"at": "2026-10-06T20:58:00Z", "lane": launch["lane"], "review": launch["review"]}
+        if s["name"] == "designer-ao":
+            s.update(state="closed", closed_for={"why": "sit_out"})
+    assert grind["review"] == old
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+    grind["relaunch"] = {"at": "2026-10-06T20:58:00Z"}  # a mark from before it carried them says nothing
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert [d["name"] for d in json.loads(capsys.readouterr().out)["differences"]] == ["grind-1"]
+
+
+def teamrun_stage(launch: dict) -> str | None:
+    from agentorc import teamrun
+
+    return teamrun.stage_of(launch["prompt_from"])
+
+
+def test_a_chain_is_compared_link_by_link_each_held_as_a_set():
+    from agentorc import teamrun
+
+    chain = {
+        "chain": [
+            {"stage": "ui", "reader": "ui-reader", "held": ["src/agentorc/ui/**", "docs/mockups/**"]},
+            {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]},
+        ],
+        "bound": teams.REVIEW_BOUND,
+    }
+    key = teamrun._review_key
+    reordered = {
+        **chain,
+        "chain": [{**chain["chain"][0], "held": ["docs/mockups/**", "src/agentorc/ui/**"]}, chain["chain"][1]],
+    }
+    assert key(reordered) == key(chain)
+    assert key({**chain, "chain": chain["chain"][::-1]}) != key(chain)  # the links' order is the flow's
+    assert key({**chain, "chain": [chain["chain"][0], {**chain["chain"][1], "reader": "other"}]}) != key(chain)
+    assert key({**chain, "bound": "4h"}) != key(chain)
+    assert key({"reader": "techlead", "held": ["b", "a"]}) == key(
+        {"reader": "techlead", "held": ["a", "b"], "bound": teams.REVIEW_BOUND}
+    )
+    assert key(None) is None and key({}) is None
+
+
 def test_a_switch_back_starts_the_member_that_sat_out(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     from agentorc import cli
 
