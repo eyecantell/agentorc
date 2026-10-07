@@ -866,14 +866,11 @@ def flow_view(call: Call, org: orgmod.Org, name: str, here: str, sessions: list[
     return out
 
 
-def flow_preview(
-    call: Call, org: orgmod.Org, name: str, here: str, flow: str, sessions: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """What a pick of `flow` would do to a team (design §4.5a team card **Flow** pick, whose confirm
-    names who sits out, who starts and who is relaunched, and what a switch leaves; §4.9c
-    *Switching*): `{team, flow, differences, stays}`, read against `flow` as if picked. Refused, in
-    `teams.TeamError`, for a flow the team does not list or one it cannot follow — the pick draws
-    those disabled, with the reason."""
+def check_pick(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> orgmod.Org:
+    """A pick of `flow` checked before it is written (design §4.5a team card **Flow** pick, the
+    Settings page's **flow**; §4.9c *Switching*): refused, in `teams.TeamError`, for a flow the team
+    does not list or one it cannot follow — the pick draws those disabled, with the reason. Returns
+    the org as if picked."""
     t = teams.find(org, name)
     if flow not in t.flows:
         raise teams.TeamError(f"team {name} lists {', '.join(t.flows) or 'no flows'}, not {flow!r} (design §4.9c)")
@@ -881,25 +878,42 @@ def flow_preview(
     rows = teams.flow_rows(picked, picked.teams[name], t.host or here, here, files=files_via(call))
     if cannot := next((r["cannot"] for r in rows if r["name"] == flow), ""):
         raise teams.TeamError(cannot)
-    diffs = flow_changed(call, picked, name, here, sessions)
-    return {"team": name, "flow": flow, "differences": diffs, "stays": stays_with(name, sessions)}
+    return picked
 
 
-def pick_flow(
-    call: Call, org: orgmod.Org, name: str, here: str, flow: str, *, caller: str | None = None
-) -> dict[str, Any]:
-    """The **Flow** pick, and the Settings page's **flow** on Save (§4.5a, §4.9c *Switching*): checked
-    as `flow_preview` checks it, written to `teams.<team>.flow` through `set_settings` — a person's
-    own — and applied at once (`apply`), as `ao team flow <team> <flow>` does. Returns `apply`'s; an
-    apply that fails once the pick is written says so in `not_applied`, never as a refusal, since
-    the setting stands and **Apply** finishes it."""
-    flow_preview(call, org, name, here, flow, call("list"))
+def pick_flow(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> dict[str, Any]:
+    """The **Flow** pick, the Settings page's **flow** on Save and `ao team flow <team> <flow>` (§4.5a,
+    §4.7, §4.9c *Switching*): checked (`check_pick`), written to `teams.<team>.flow` through
+    `set_settings` — a person's own — and nothing more: Apply is the one gate that moves the running
+    team (TD-356). Returns `{team, flow, differences, stays, feature}` read against the written org —
+    the records' differences (`flow_changed`, empty where they cannot be read: the flows' own lines
+    say why), what a switch would leave with a reader (`stays_with`), and `feature`, the role
+    **Add entry**'s *feature* now opens where the pick moved it (§4.9c item 4), else None."""
+    check_pick(call, org, name, here, flow)
+    t = teams.find(org, name)
+    host = t.host or here
+    was = _feature_role(org, t, host, here, call)
     got = call("set_settings", teams={name: {"flow": flow}})
+    written = orgmod.with_settings(org, (got or {}).get("teams"))
+    sessions = call("list")
+    diffs: list[dict[str, Any]] = []
+    with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError):  # said by the flows' lines
+        diffs = flow_changed(call, written, name, here, sessions)
+    now = _feature_role(written, written.teams[name], host, here, call)
+    return {
+        "team": name,
+        "flow": flow,
+        "differences": diffs,
+        "stays": stays_with(name, sessions),
+        "feature": now if now != was else None,
+    }
+
+
+def _feature_role(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, call: Call) -> str | None:
     try:
-        return apply(call, orgmod.with_settings(org, (got or {}).get("teams")), name, here, caller=caller)
-    except (teams.TeamError, ValueError, OSError, AgentError) as e:
-        why = f"flow set to {flow}, but not applied — {str(e).strip(chr(34))}: Apply on the team card tries again"
-        return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": [], "not_applied": why}
+        return teams.entry_role(org, team, "feature", host, here, files=files_via(call))
+    except (teams.TeamError, ValueError, OSError, AgentError):
+        return None
 
 
 def stays_with(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:

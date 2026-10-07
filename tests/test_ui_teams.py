@@ -999,36 +999,35 @@ def test_the_flow_pick_lists_the_teams_flows_and_disables_one_it_cannot_follow(w
     assert "data-flow-pick" not in _head(client.get("/").text)
 
 
-def test_a_flow_pick_is_previewed_then_written_and_applied(world, client):
-    """§4.9c *Switching*: the pick's confirm reads what it would do; the pick writes
-    `teams.<team>.flow` through `set_settings` and applies it at once, as `ao team flow <team> <flow>`."""
+def test_a_flow_pick_writes_the_setting_and_nothing_more(world, client):
+    """§4.5a team card **Flow** pick, §4.9c *A switch takes one gate, Apply* (TD-356, TD-359): the pick
+    writes `teams.<team>.flow` through `set_settings` and relaunches nothing; its answer carries the
+    records' differences, which the toast reads (*— Apply to switch the running team*), and **Apply**
+    then moves the team. The preview route is gone with the pick's confirm."""
     tmp_path, fleet = world
     _flow_org(tmp_path, ["build-review", "build"])
     fleet.sessions = [{**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
-    got = client.get("/api/teams/ao-grind/flow", params={"flow": "build"}).json()
-    assert got["flow"] == "build" and "grind-1: relaunched — lane none → free-pick" in [
-        d["line"] for d in got["differences"]
-    ]
-    assert not [m for m, _ in fleet.calls if m in ("set_settings", "relaunch")]  # a preview writes nothing
-    no = client.get("/api/teams/ao-grind/flow", params={"flow": "hunt"})
+    assert client.get("/api/teams/ao-grind/flow", params={"flow": "build"}).status_code == 405
+    no = client.post("/api/teams/ao-grind/flow", json={"flow": "hunt"})
     assert no.status_code == 400 and "lists build-review, build, not 'hunt'" in no.json()["detail"]
     got = client.post("/api/teams/ao-grind/flow", json={"flow": "build"}).json()
     assert ("set_settings", {"teams": {"ao-grind": {"flow": "build"}}}) in fleet.calls
-    assert got["flow"] == "build" and {d["name"]: d["act"] for d in got["applied"]}["grind-1"] == "relaunch"
-    (sent,) = [p for m, p in fleet.calls if m == "relaunch"]
-    assert sent["launch"]["review"] is None  # `build` has no review stage: the reader comes off
+    assert not [m for m, _ in fleet.calls if m in ("relaunch", "create")]  # nothing moves on a pick
+    assert got["flow"] == "build" and "grind-1: relaunched — lane none → free-pick" in [
+        d["line"] for d in got["differences"]
+    ]
+    assert "applied" not in got and "not_applied" not in got
     # a flow it cannot follow is refused before anything is written, in the flow's own words
     _flow_org(tmp_path, ["build-review", "td"])
     fleet.calls.clear()
-    no = client.get("/api/teams/ao-grind/flow", params={"flow": "td"})
+    no = client.post("/api/teams/ao-grind/flow", json={"flow": "td"})
     assert no.status_code == 400 and "td cannot be followed by ao-grind: no designer" in no.json()["detail"]
-    assert client.post("/api/teams/ao-grind/flow", json={"flow": "td"}).status_code == 400
     assert not [m for m, _ in fleet.calls if m == "set_settings"]
 
 
-def test_the_settings_pages_flow_is_written_and_applied_on_save(world, client):
-    """§4.5a *Settings page: Teams* **flow**: a pick of the team's flows, applied on Save as the card's
-    Flow pick applies; a flow it cannot follow is refused in place, naming why."""
+def test_the_settings_pages_flow_is_written_and_nothing_more_on_save(world, client):
+    """§4.5a *Settings page: Teams* **flow**: a pick of the team's flows, written on Save and nothing
+    more, as the card's Flow pick (TD-356); a flow it cannot follow is refused in place, naming why."""
     from agentorc.ui import settings_page as setmod
 
     tmp_path, fleet = world
@@ -1044,26 +1043,8 @@ def test_the_settings_pages_flow_is_written_and_applied_on_save(world, client):
     _flow_org(tmp_path, ["build-review", "build"])
     got = client.post("/api/settings/teams", json={"team": "ao-grind", "flow": "build"}).json()
     assert ("set_settings", {"teams": {"ao-grind": {"flow": "build"}}}) in fleet.calls
-    assert got["ok"] and {d["name"]: d["act"] for d in got["apply"]["applied"]}["grind-1"] == "relaunch"
-
-
-def test_a_pick_written_and_not_applied_says_so_and_is_no_refusal(world, client, monkeypatch):
-    """The pick is written before the apply: an apply that fails then leaves the setting standing, so
-    the answer says *flow set, but not applied* rather than refusing — the page keeps the new pick."""
-    from agentorc import teamrun
-
-    tmp_path, fleet = world
-    _flow_org(tmp_path, ["build-review", "build"])
-
-    def boom(*_a, **_k):
-        raise teamrun.teams.TeamError("kmaster is not answering")
-
-    monkeypatch.setattr(teamrun, "apply", boom)
-    got = client.post("/api/teams/ao-grind/flow", json={"flow": "build"})
-    assert got.status_code == 200 and ("set_settings", {"teams": {"ao-grind": {"flow": "build"}}}) in fleet.calls
-    assert got.json()["not_applied"] == (
-        "flow set to build, but not applied — kmaster is not answering: Apply on the team card tries again"
-    )
+    assert not [m for m, _ in fleet.calls if m in ("relaunch", "create")]
+    assert got["ok"] and got["pick"]["flow"] == "build" and got["pick"]["differences"]
 
 
 def test_a_members_flow_mark_says_what_a_switch_did_or_left_on_it(monkeypatch):

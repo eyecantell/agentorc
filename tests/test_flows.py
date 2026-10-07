@@ -827,7 +827,7 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     from agentorc import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review", "build"])
-    assert cli.main(["team", "flow", "ao-grind", "build-review"]) == 0
+    assert cli.main(["team", "flow", "ao-grind", "build-review", "--apply"]) == 0
     out = capsys.readouterr().out
     assert state["teams"]["ao-grind"] == {"flow": "build-review"}
     calls = [(m, p) for m, p in state["calls"] if m == "relaunch"]
@@ -850,7 +850,7 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
     assert json.loads(capsys.readouterr().out)["differences"] == []
     # `build`: no review stage — the reader comes off (sent as None, so the home removes it)
-    assert cli.main(["--json", "team", "flow", "ao-grind", "build"]) == 0
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build", "--apply"]) == 0
     got = json.loads(capsys.readouterr().out)["apply"]
     handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch"}
     assert handed["ao-agentorc-grind-1"]["review"] is None
@@ -939,7 +939,7 @@ def test_a_switch_back_starts_the_member_that_sat_out(world, tmp_path, capsys, m
     assert "ao-agentorc-designer-ao" not in [s["id"] for s in state["sessions"]]  # sat out at the start
     assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
     assert json.loads(capsys.readouterr().out)["differences"] == []
-    assert cli.main(["team", "flow", "ao-grind", "td"]) == 0
+    assert cli.main(["team", "flow", "ao-grind", "td", "--apply"]) == 0
     assert "designer-ao: starts under td" in capsys.readouterr().out
     made = [p for m, p in state["calls"] if m == "create"]
     assert [p["name"] for p in made] == ["designer-ao"] and made[0]["controllers"] == ["ao-agentorc-orc-ao"]
@@ -962,7 +962,7 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
             s.update(state="unreachable", host="devenv")
     assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
     assert json.loads(capsys.readouterr().out)["apply"]["applied"] == []  # td is current: nothing differs
-    assert cli.main(["--json", "team", "flow", "ao-grind", "build-review"]) == 0
+    assert cli.main(["--json", "team", "flow", "ao-grind", "build-review", "--apply"]) == 0
     got = json.loads(capsys.readouterr().out)["apply"]
     assert [d["name"] for d in got["applied"]] == ["grind-1"]
     skipped = {d["name"]: d["line"] for d in got["skipped"]}
@@ -971,7 +971,41 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
         "grind-2": "grind-2: devenv is not answering — applied to the others",
     }
     assert not [p for m, p in state["calls"] if m == "relaunch" and p["id"] != "ao-agentorc-grind-1"]
-    assert cli.main(["team", "flow", "ao-grind", "td", "--apply"]) == 2
+
+def test_a_flow_named_is_written_and_nothing_more(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    """§4.7, §4.9c *A switch takes one gate, Apply* (TD-356, TD-359): `ao team flow <team> <flow>`
+    writes the setting, relaunches nothing, and prints the differences as the bare form does, ending
+    with the hint; picking the old flow back reads nothing changed."""
+    from agentorc import cli
+
+    state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    assert cli.main(["team", "flow", "ao-grind", "build-review"]) == 0
+    out = capsys.readouterr().out
+    assert state["teams"]["ao-grind"] == {"flow": "build-review"}
+    assert not [m for m, _ in state["calls"] if m in ("relaunch", "create")]
+    assert "ao-grind: flow set to build-review" in out
+    assert "flow changed — Apply (ao team flow ao-grind --apply):" in out
+    assert "  designer-ao: sits out under build-review" in out
+    assert cli.main(["--json", "team", "flow", "ao-grind", "td"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["flow"] == "td" and got["differences"] == [] and "apply" not in got
+    assert cli.main(["team", "flow", "ao-grind", "td"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "nothing running differs"
+    assert not [m for m, _ in state["calls"] if m in ("relaunch", "create")]
+
+
+def test_a_pick_says_what_add_entrys_feature_now_opens(world, tmp_path, monkeypatch):  # noqa: F811
+    """§4.5a team card **Flow** pick, §4.9c item 4: a pick to a flow with no design stage says
+    *feature* now opens a techlead; a pick back to `td`, the designer; a pick that leaves it, nothing."""
+    from agentorc import cli, teamrun
+
+    _switching(world, tmp_path, monkeypatch, ["td", "build-review", "build"])
+    org = cli._org_here()
+    got = teamrun.pick_flow(cli.call_sync, org, "ao-grind", HOST, "build-review")
+    assert got["flow"] == "build-review" and got["feature"] == "techlead" and got["differences"]
+    org = cli._org_here()
+    assert teamrun.pick_flow(cli.call_sync, org, "ao-grind", HOST, "build")["feature"] is None
+    assert teamrun.pick_flow(cli.call_sync, cli._org_here(), "ao-grind", HOST, "td")["feature"] == "designer"
 
 
 def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys, monkeypatch):  # noqa: F811
@@ -991,7 +1025,7 @@ def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys,
             {"from": f"ao-agentorc-grind-2@{HOST}", "pr": 1022},
         ],
     }
-    assert cli.main(["team", "flow", "ao-grind", "build"]) == 0
+    assert cli.main(["team", "flow", "ao-grind", "build", "--apply"]) == 0
     out = capsys.readouterr().out
     assert "  grind-1's PR #1020 stays with techlead-ao" in out
     assert "  ao-x-w@devenv's PR #1021 stays with techlead-ao" in out

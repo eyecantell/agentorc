@@ -1827,9 +1827,11 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     in order, the current one marked, each one's flow strip and why the team cannot use it, and, for a
     live team, how its records differ from what the current flow compiles to, by member; with a flow,
     writes `teams.<team>.flow` through `set_settings` — a person's own — refused here for a flow the
-    team does not list, as a team's name is, and then applies it as `--apply` does: the sit-outs, the
-    starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per member, and one per
-    PR already asked of a reader, which stays its (*What a switch leaves alone*)."""
+    team does not list, as a team's name is, and nothing more (TD-356: Apply is the one gate), then
+    prints the differences as the bare form does and the hint `ao team flow <team> --apply`; with
+    `--apply`, after the write where a flow is named, applies the definition as it reads now: the
+    sit-outs, the starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per
+    member, and one per PR already asked of a reader, which stays its (*What a switch leaves alone*)."""
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -1838,8 +1840,6 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     team = org.teams[name]
     if not team.flows:
         return fail(args, f"team {name} lists no flows: — it runs as its definition is written (design §4.9c)", 1)
-    if args.flow is not None and args.apply:
-        return fail(args, "a flow named is applied at once: --apply is for the flow the team runs now", 2)
     if args.flow is not None:
         if args.flow not in team.flows:
             return fail(args, f"team {name} lists {', '.join(team.flows)}, not {args.flow!r} (design §4.9c)", 1)
@@ -1852,14 +1852,14 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     out: dict[str, Any] = {"team": name, "flow": teams.current_flow(team), "flows": rows, "note": note}
     applied: dict[str, Any] | None = None
     try:
-        if args.flow is not None or args.apply:
+        if args.apply:
             applied = teamrun.apply(call_sync, org, name, here, caller=os.environ.get("AGENTORC_SESSION") or None)
             out["apply"] = applied
         else:
             # empty for a stopped team: its next start compiles the flow
             out["differences"] = teamrun.flow_changed(call_sync, org, name, here, call_sync("list"))
     except (teams.TeamError, ValueError, OSError, AgentError) as e:
-        if args.flow is None and not args.apply:
+        if not args.apply:
             out["differences"], out["unread"] = [], str(e)
         else:
             return fail(args, f"{name}: flow {'set' if args.flow else 'read'}, but not applied — {e}", 1)
@@ -1893,6 +1893,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             print("flow changed — Apply (ao team flow " + name + " --apply):")
             for d in out["differences"]:
                 print(f"  {d['line']}")
+        elif args.flow is not None:
+            print("nothing running differs")
 
     return emit(args, out, prose)
 
@@ -3157,8 +3159,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     q = add_team("flow", help="the team's flows, the one it runs marked; with a flow, pick it (§4.9c)")
     q.add_argument("name")
-    q.add_argument("flow", nargs="?", help="one of the team's flows: — written to teams.<team>.flow, then applied")
-    q.add_argument("--apply", action="store_true", help="bring the live records to the flow the team runs now")
+    q.add_argument("flow", nargs="?", help="one of the team's flows: — written to teams.<team>.flow, nothing more")
+    q.add_argument(
+        "--apply",
+        action="store_true",
+        help="bring the live records to the flow the team runs now (after a flow named: the one written)",
+    )
     q.set_defaults(fn=cmd_team_flow)
 
     q = add_team("balance", help="the team's balance lines: over one, its members take no new claim (§6 Balance)")

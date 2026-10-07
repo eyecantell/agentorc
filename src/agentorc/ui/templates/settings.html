@@ -130,7 +130,7 @@
          team card's Flow pick applies, after the same confirm #}
       {% if t.flows %}<label class="setrow"><span class="setlabel">flow</span>
         <select class="input setin" name="flow" data-was="{{ t.flow }}">{% for p in t.flows %}<option value="{{ p.name }}"{% if p.current %} selected{% endif %}{% if p.cannot %} disabled title="{{ p.cannot }}"{% endif %}>{{ p.name }}{% if p.cannot %} — cannot be followed{% endif %}</option>{% endfor %}</select>
-        <span class="note">{{ t.flow_strip or "—" }} · applied at once on Save: who sits out, starts or is relaunched is asked first</span></label>{% endif %}
+        <span class="note">{{ t.flow_strip or "—" }} · written on Save and nothing more: the running team moves on its card's Apply</span></label>{% endif %}
       <label class="setrow"><span class="setlabel">schedule</span>
         <input class="input setin" value="{{ t.schedule | tojson if t.schedule else '' }}" placeholder="at a reset" disabled>
         <span class="note">not built — TD-133</span></label>
