@@ -238,7 +238,7 @@ def classify(
     # -- the pane's own cgroup scope (TD-362): a tool that starts its shells with `setsid` and no
     # terminal (Claude Code) leaves an orphaned background command none of the three; tmux under
     # systemd starts each pane in a scope of its own, which the orphan keeps -----------------------
-    cg = reader.cgroup(peer_pid) if detached or any(p.cgroup for p in panes) or ours else None
+    cg = reader.cgroup(peer_pid) if detached or any(p.cgroup for p in panes) else None
     if cg:
         for p in panes:
             if p.cgroup and p.cgroup == cg:
