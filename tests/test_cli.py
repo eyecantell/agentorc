@@ -996,8 +996,10 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
     for name in ("techlead.md", "manager.md", "grinder.md", "designer.md"):  # the designer a preset since TD-309
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
+    # since TD-310 the repo's designer brief is the template's `{repo}` supplement, so it says it no
+    # longer: the rule is in the template around it, once (§4.9c *The designer gets a template*)
     designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
-    assert SHAPE in designer.read_text(encoding="utf-8")  # whole until a flow wraps it (§4.9c, TD-310)
+    assert SHAPE not in designer.read_text(encoding="utf-8")
 
 
 @pytest.mark.unit
