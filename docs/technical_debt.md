@@ -77,7 +77,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
 | TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
 | TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
-| TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Open |
+| TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
+| TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Open |
 
 ---
 
@@ -1360,8 +1361,9 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** `sessionorc.ledger` (`for_page`), `src/agentorc/ui/repo.py` (`LEDGER_LISTS`), `src/agentorc/ui/org.py` (`KIND_BARS`), the Inbox; design §4.5 screen 6 (the Inbox), §4.7 `ao repo`
+**Status:** Designed 2026-10-07 (the designer, PR #PRNUM; the steer to Paul on the fold is `STEERID`, bound STEERBOUND): design §4.4 *Repo facts* (the *for you* kind is what waits on the person — `Owner: paul`, or `decision (paul)` — and an entry blocked by `decision (designer)` is *design-first*; a session's decision is *other*), §6 rule 6 (the `design-first` lane word takes such an entry, the decision's holder standing as its owner), §4.5 screen 6 *The ledger's entries that wait on you* (the Inbox's **For you in the ledger (n)** fold) and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo`, the glossary's *for you*; the mockup `Inbox.dc.html` (`docs/mockups/reviews/2026-10-07-td367-inbox-ledger-fold.png`). Settled: (a) the person's owner word stays `paul`, the one the ledger's `Fields:` line declares, read lower-cased for the decision's holder; (b) a `decision (designer)` makes the entry the designer's — in its lane by rule 6 whatever its `Owner:`, listed design-first, made by a PR that writes the decision and drops the item; (c) the Inbox fold is uncounted and closed by default, under *Needs you* after the board's rows, one link per row and no control (steered). **Next:** designed; the build is TD-368.
+**Blocked by:** TD-368
+**Location:** `sessionorc.ledger` (`kind_of`, `lane_matches`), `src/agentorc/ui/repo.py` (`LEDGER_LISTS`), `src/agentorc/ui/org.py` (`KIND_BARS`), the Inbox; design §4.5 screen 6 (the Inbox), §4.7 `ao repo`
 
 **Why:**
 - Paul, 2026-10-07: *15 for you* on the repo line, and *I do not see them in the inbox*.
@@ -1380,3 +1382,25 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
 
 **Related:** TD-357 (archived: the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
+
+## TD-368: Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the designer, from TD-367's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/ledger.py` (`kind_of`, `lane_matches`, `_word_matches`), `src/agentorc/cli.py` (`cmd_repo`'s design-first rows), `src/agentorc/ui/inbox.py` (`inbox_sections`, the page's fourth source), `src/agentorc/ui/templates/inbox.html` and `inbox_rail.html`, `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` (the lane sentence); tests `tests/test_ledger_derived.py`, `tests/test_repo_facts.py`, `tests/test_lane_news.py`, `tests/test_ui_inbox.py`, the CLI's `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
+
+**Why:** design §4.4 *Repo facts* (the page's kinds), §6 rule 6, §4.5 screen 6 *The ledger's entries that wait on you* and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo` (TD-367, designed 2026-10-07). On 2026-10-07 the repo line said *15 for you* about decisions that were the designer's and the anchor's, and the Inbox drew none of the fifteen.
+
+**Fix:**
+1. **The reader** (`sessionorc.ledger`): `kind_of`'s first test is `Owner: paul`, or a `blocked_by` item `decision (paul)` with the holder compared lower-cased; its second takes `Kind: design-first` and any entry with a `decision (designer)` item; `Kind: decision` on its own is no longer *for you* (the anchor's TD-209-shaped entries read *other*). `lane_matches`: the `design-first` word takes an entry with a `decision (designer)` item, pickable or not, and for that entry the lane's owner words compare against `designer`, not its `Owner:`. Tests: a fixture with `Owner: paul`, `decision (Paul)`, `decision (designer)` on an `Owner: grinder` build, and `Kind: decision` owned by the anchor, against a `[design-first, owner:designer]` lane — each entry in exactly one kind, TD-151's shape in the lane and the anchor's in none; in `test_lane_news`, such an entry filed is told to the designer's lane, and with its decision item dropped, to the grinder's.
+2. **`ao repo`**: a design-first row that is there for `decision (designer)` says *decision* after its owner; `--json` keeps the entries as they are (their `blocked_by` already says it).
+3. **The Inbox fold** (§4.5 screen 6, §4.5a): the page reads the home's repo facts (the `repos` reading the Org already polls) and draws **For you in the ledger (n)** under the *Needs you* rows after the board's rows, closed by default, the browser remembering it, nothing at zero; rows grouped by repo in registry order, then priority and id, with the id, title, priority letter, *yours* / *your decision*, *held by <name>*, each one link to `/repo/<name>#TD-n`; counted in no number and no rail group, filtered by the rail's *Teams* picks (a repo's servicing teams, else *no team*) and the find. A UI change: the UI check on a scratch home (§4.9b), its shot in the PR.
+4. **The briefs**: the designer's lane sentence in `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` says the lane also holds an entry blocked by `decision (designer)`, and what to do with one: claim it, write the decision into the design, drop the item from `Blocked by:` in that PR.
+
+**Done when** `ao repo` on this ledger counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else; TD-151 is in the design-first list, marked *decision*, and rule 6 tells the designer's lane of it; the Inbox draws the fold with that count, each row opening the Repo page on its entry; the briefs say it.
+
+**Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
