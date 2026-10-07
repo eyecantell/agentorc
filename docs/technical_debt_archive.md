@@ -5073,3 +5073,41 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
 
 **Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
+
+## TD-342: A brief waits only on a hook-reported `idle`, so a run whose first hook is lost never gets its brief
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (grinder-ao-1, on the anchor's finding for TD-339's live check)
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Designed 2026-10-06** (the designer, PR #1153, with TD-343 in one §4.1 round; the entry's default taken — (a) once, then (b)): design §4.1 *A brief whose first hook is lost* (`FIRST_PROMPT_HOOK_WAIT`, one send on a scraped idle with an empty composer; `FIRST_PROMPT_BOUND`, then `first_prompt_error` *no hook since launch*), §4.5a *brief not sent* mark. The build is TD-348; this entry archives with it. Was: Open — design round needed. The cause of the one case seen is fixed by TD-341; this entry is the missing fallback.
+**Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: `state == "idle"` and `confidence == "hook"`); design §4.1 *No prose in the argv*, §4.5a *brief not sent* mark.
+
+**Why:** design §4.1 sends the brief at the record's first `idle` **by hook**, and the *brief not sent* mark is written only after `FIRST_PROMPT_TRIES` refused sends. A run whose first hook never lands — refused (TD-341), dropped, or a hook config that did not load — makes no try at all, so no mark: grinder-ao-1's run of 2026-10-05 22:38 sat at an empty composer, `stalled? (scraped)`, for 7.5 hours until the person restarted it, and its card said nothing about a brief.
+
+**Resolved:** 2026-10-06 (PR #1162): built by TD-348 — `agent_wake._first_prompt_road` (one send on a scraped `idle` after `FIRST_PROMPT_HOOK_WAIT`, marked `scraped` on `sends`) and `_send_first_prompts` (*brief not sent · no hook since launch* at `FIRST_PROMPT_BOUND`); design §4.1 *A brief whose first hook is lost*; tests in `tests/test_first_prompt.py`.
+
+**Fix (for the designer, as it was):** choose between, or combine: (a) after a bound with `first_prompt` unsent and no hook, try the send on a scraped `idle` (the composer must still read empty, as for any send); (b) at that bound write `first_prompt_error` (*no hook since launch*) so the card's *brief not sent* mark says it and the person or a controller can send it. Default if asked: both — (a) once, then (b).
+
+**Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes.
+
+**Related:** TD-339, TD-341, TD-336.
+
+## TD-348: Build *a brief whose first hook is lost* — one send on a scraped idle, then the mark
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the designer, TD-342's build)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built 2026-10-06 (grinder-ao-2, PR #1162)
+**Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: the `confidence == "hook"` gate), `src/sessionorc/agent_common.py` (`FIRST_PROMPT_HOOK_WAIT`, `FIRST_PROMPT_BOUND`), `src/sessionorc/models.py`, `src/agentorc/ui/cards.py` (the mark's reason), `tests/`; design §4.1 *A brief whose first hook is lost*, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads it.
+
+**Why:** TD-342's design. A run whose first hook never landed made no try at its brief and showed no mark for 7.5 hours.
+
+**Resolved:** 2026-10-06 (PR #1162): built by TD-348 — `agent_wake._first_prompt_road` (one send on a scraped `idle` after `FIRST_PROMPT_HOOK_WAIT`, marked `scraped` on `sends`) and `_send_first_prompts` (*brief not sent · no hook since launch* at `FIRST_PROMPT_BOUND`); design §4.1 *A brief whose first hook is lost*; tests in `tests/test_first_prompt.py`.
+
+**Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes (TD-342's *Done when*); then TD-342 archives with this entry.
+
+**Related:** TD-342 (the design), TD-341 (the one cause seen, fixed), TD-339, TD-343.

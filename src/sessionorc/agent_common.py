@@ -82,6 +82,11 @@ PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in t
 SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
 COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
 FIRST_PROMPT_TRIES = 3  # the brief typed at the composer (§4.1 *No prose in the argv*, TD-339), then marked
+# §4.1 *A brief whose first hook is lost* (TD-348): with no hook since the launch, the brief is sent once
+# on a scraped `idle` after the first, and the record is marked *no hook since launch* at the second
+FIRST_PROMPT_HOOK_WAIT = 120.0  # seconds after `created`
+FIRST_PROMPT_BOUND = 300.0  # seconds after `created`
+FIRST_PROMPT_NO_HOOK = "no hook since launch"
 DOORBELL_TRIES = 2  # a doorbell that fails to submit is tried once more, then recorded (design §4.10)
 TITLE_CAP = 80  # characters of the tool's own title kept (design §4.5a **title**, TD-074): a name, not a line
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends

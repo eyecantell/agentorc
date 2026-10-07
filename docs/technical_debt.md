@@ -85,13 +85,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
-| TD-342 | A brief waits only on a hook-reported `idle`; a run whose first hook is lost never gets it | High | Designed 2026-10-06 (one send on a scraped idle, then the *brief not sent* mark) — the build is TD-348 |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
 | TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Designed 2026-10-06 (a member's open `ask` to the person is an Answer needed block and counted) — the build is TD-350 |
 | TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Designed 2026-10-06 (the twelve findings, in rule voice; the slice record to the history) — the build is TD-349 |
 | TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Designed 2026-10-06 (thirty section files named by §, the index, one tests helper, the history whole, the quiet window) — the build is TD-351 |
 | TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Open |
-| TD-348 | Build *a brief whose first hook is lost*: one send on a scraped idle after `FIRST_PROMPT_HOOK_WAIT`, *brief not sent · no hook since launch* at `FIRST_PROMPT_BOUND` | High | Open |
 | TD-349 | Build rule 11's read of a chain: `held.read_by` link by link, `addressed` in `sessionorc`, the review brief's line for an `ask` with no `pr` | High | Open |
 | TD-350 | Build the Org's ask block: a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup's *answer needed* | Low | Open |
 | TD-351 | Build the design split: `docs/design/<§>-<slug>.md` by script, `design.md` the index, `tests/design_doc.py`, every path that says `docs/design.md` for a grep repointed, landed in a quiet window | Medium | Open |
@@ -1459,25 +1457,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-339 (the brief that waited), TD-342 (no fallback when the first hook is lost), TD-225 (alarms at a restart), TD-115 (the grace).
 
-## TD-342: A brief waits only on a hook-reported `idle`, so a run whose first hook is lost never gets its brief
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-06 (grinder-ao-1, on the anchor's finding for TD-339's live check)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-06** (the designer, PR #1153, with TD-343 in one §4.1 round; the entry's default taken — (a) once, then (b)): design §4.1 *A brief whose first hook is lost* (`FIRST_PROMPT_HOOK_WAIT`, one send on a scraped idle with an empty composer; `FIRST_PROMPT_BOUND`, then `first_prompt_error` *no hook since launch*), §4.5a *brief not sent* mark. The build is TD-348; this entry archives with it. Was: Open — design round needed. The cause of the one case seen is fixed by TD-341; this entry is the missing fallback.
-**Blocked by:** TD-348
-**Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: `state == "idle"` and `confidence == "hook"`); design §4.1 *No prose in the argv*, §4.5a *brief not sent* mark.
-
-**Why:** design §4.1 sends the brief at the record's first `idle` **by hook**, and the *brief not sent* mark is written only after `FIRST_PROMPT_TRIES` refused sends. A run whose first hook never lands — refused (TD-341), dropped, or a hook config that did not load — makes no try at all, so no mark: grinder-ao-1's run of 2026-10-05 22:38 sat at an empty composer, `stalled? (scraped)`, for 7.5 hours until the person restarted it, and its card said nothing about a brief.
-
-**Fix (for the designer):** choose between, or combine: (a) after a bound with `first_prompt` unsent and no hook, try the send on a scraped `idle` (the composer must still read empty, as for any send); (b) at that bound write `first_prompt_error` (*no hook since launch*) so the card's *brief not sent* mark says it and the person or a controller can send it. Default if asked: both — (a) once, then (b).
-
-**Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes.
-
-**Related:** TD-339, TD-341, TD-336.
-
 ## TD-343: A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief
 
 **Priority:** High
@@ -1591,25 +1570,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted (TD-343's *Done when*); then TD-343 archives with this entry.
 
 **Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
-
-## TD-348: Build *a brief whose first hook is lost* — one send on a scraped idle, then the mark
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-06 (the designer, TD-342's build)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_wake.py` (`_send_first_prompts`, `_first_prompt_typing`: the `confidence == "hook"` gate), `src/sessionorc/agent_common.py` (`FIRST_PROMPT_HOOK_WAIT`, `FIRST_PROMPT_BOUND`), `src/sessionorc/models.py`, `src/agentorc/ui/cards.py` (the mark's reason), `tests/`; design §4.1 *A brief whose first hook is lost*, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads it.
-
-**Why:** TD-342's design. A run whose first hook never landed made no try at its brief and showed no mark for 7.5 hours.
-
-**Fix, one PR:** the tick's send of a due `first_prompt` takes, besides a hook-reported `idle`, a **scraped** `idle` once: when the record has had no hook event since its launch, `FIRST_PROMPT_HOOK_WAIT` (120 s) has passed since `created`, the state is `idle` by scrape and the adapter's `composer(tail)` reads empty — one try, counted in `first_prompt_tries` and marked `scraped` on the record's `sends` entry; its `UserPromptSubmit` confirms it as any send. A hook-reported `idle` before the bound sends as before. At `FIRST_PROMPT_BOUND` (300 s) since `created` with the brief still unsent, `first_prompt_error = "no hook since launch"`; the card and `ao status -v` say *brief not sent · no hook since launch*; a hook arriving later clears nothing by itself. Tests with the `hookstub` adapter: a launch with its hooks silenced gets its brief by the scraped send; one whose composer never reads empty carries the mark at the bound; a hook-reported launch is unchanged.
-
-**Done when** a run whose first hook is lost gets its brief, or its card says *brief not sent* within minutes (TD-342's *Done when*); then TD-342 archives with this entry.
-
-**Related:** TD-342 (the design), TD-341 (the one cause seen, fixed), TD-339, TD-343.
-
 
 ## TD-349: Build rule 11's read of a chain — `held.read_by` link by link, `addressed` in `sessionorc`, the review brief's line for an `ask` with no `pr`
 

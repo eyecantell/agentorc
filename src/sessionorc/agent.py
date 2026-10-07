@@ -68,6 +68,9 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     FILL_CEILING,  # noqa: F401
     FILL_WINDOW,  # noqa: F401
     FINISHED_SETTLE,  # noqa: F401
+    FIRST_PROMPT_BOUND,  # noqa: F401
+    FIRST_PROMPT_HOOK_WAIT,  # noqa: F401
+    FIRST_PROMPT_NO_HOOK,  # noqa: F401
     FIRST_PROMPT_TRIES,  # noqa: F401
     FLOW_CLAUSE,  # noqa: F401
     GIT_EVERY,  # noqa: F401
