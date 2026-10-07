@@ -121,6 +121,9 @@ RESTART_SETTLE = timedelta(seconds=60)
 FILL_CEILING = 6
 FILL_WINDOW = timedelta(hours=1)
 SEAT_IDLE_GRACE = timedelta(minutes=2)
+# how long rule 3 leaves an idle seat open on a PR of its own that no reader holds (§6 rule 3, TD-366):
+# its fact-check or CI runs in the background and wakes it; past this the seat is closed as before
+SEAT_PR_WAIT = timedelta(hours=2)
 # §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
 # the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
 IDLE_NUDGE = timedelta(minutes=20)

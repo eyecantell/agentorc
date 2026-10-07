@@ -11,8 +11,9 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import reports
-from sessionorc.agent import FILL_CEILING, SEAT_IDLE_GRACE
+from sessionorc.agent import FILL_CEILING, SEAT_IDLE_GRACE, SEAT_PR_WAIT
 from sessionorc.client import LocalClient
+from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -172,6 +173,56 @@ async def test_an_idle_seat_with_nothing_due_and_nothing_left_is_closed(agent, t
         for sid in (dirty, due, fresh):
             assert agent.sessions[sid].state == "idle", sid
             await person.call("kill", id=sid)
+
+
+async def test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_holds_it_or_the_wait_runs_out(
+    agent, tmp_path
+):
+    """TD-366: an audit seat opened its PR, launched its fact-check in the background and ended its
+    turn — rule 3 closed it, killing the fact-check and leaving the PR with nobody. A PR of its own
+    keeps an idle seat open: on its branch in the repo reading, on a claim, or a claim derived from
+    its branch before any reading has the PR. Handed to a reader, or past `SEAT_PR_WAIT`, it closes."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    root = str(tmp_path)
+    agent._repos[root] = {"root": root, "prs": {"open": [{"number": 1197, "branch": "td363-gaps", "state": "open"}]}}
+    async with LocalClient() as person:
+        names = ("onbranch", "claimed", "fresh", "handed", "closedpr", "late", "reader")
+        sids = {n: await _seat(person, tmp_path, name=n) for n in names}
+        for sid in sids.values():
+            _idle(agent, sid, now)
+            agent.sessions[sid].repo = root
+        agent.sessions[sids["onbranch"]].git["branch"] = "td363-gaps"
+        agent.sessions[sids["claimed"]].progress = [ProgressEntry(ref="TD-365", review_pr=1198)]
+        agent.sessions[sids["fresh"]].git["branch"] = "td364-callers"
+        agent.sessions[sids["fresh"]].progress = [
+            ProgressEntry(ref="TD-364", source="derived", branch="td364-callers")
+        ]
+        agent.sessions[sids["handed"]].progress = [ProgressEntry(ref="TD-366", pr=1199, source="derived")]
+        agent.sessions[sids["reader"]].inbox.append(
+            MailEntry(
+                id="m-0000000000aa",
+                from_=sids["handed"],
+                to=[sids["reader"]],
+                at=_iso(now),
+                kind="ask",
+                text="read #1199",
+                pr=1199,
+            )
+        )
+        agent.sessions[sids["reader"]].seat_due = {"at": _iso(now), "by": "every"}  # not this test's to close
+        agent.sessions[sids["closedpr"]].progress = [ProgressEntry(ref="TD-363", pr=1200, why=PR_CLOSED)]
+        late = agent.sessions[sids["late"]]
+        late.git["branch"] = "td363-gaps"
+        late.since = _iso(now - SEAT_PR_WAIT - timedelta(seconds=1))
+        await agent._keep_running(now)
+        for n in ("onbranch", "claimed", "fresh", "reader"):
+            assert agent.sessions[sids[n]].state == "idle", n
+        for n in ("handed", "closedpr", "late"):
+            assert agent.sessions[sids[n]].state == "closed", n
+        assert agent._seat_prs(agent.sessions[sids["onbranch"]], list(agent.sessions.values())) == ["#1197"]
+        for n in ("onbranch", "claimed", "fresh", "reader"):
+            await person.call("kill", id=sids[n])
 
 
 async def test_rule_three_leaves_an_unsupervised_or_attended_seat_alone(agent, tmp_path):

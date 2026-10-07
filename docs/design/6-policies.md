@@ -221,7 +221,15 @@ code and needs no grant; a session doing the same work does.
      is not gated, is filled: `create` with `keep_mail` (§4.9b), the launch record, and `seat_due` cleared; a seat
      that is `idle` with no `seat_due`, hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a
      fill is not closed before its prompt lands), with nothing dirty or unpushed, is closed
-     (a seat that left work is the board's, as today). **The fill ceiling**: `FILL_CEILING` — six
+     (a seat that left work is the board's, as today) — **unless it waits on a PR of its own**
+     (TD-366): an open PR on the branch it has checked out, as the repo reading has it; a claim on
+     its record carrying a PR not read merged or closed (`pr`, or `review_pr`); or a claim derived
+     from that branch whose PR no reading has yet. A seat that opened its PR, set its fact-check
+     or CI running in the background and ended its turn looks done to everything else here, and
+     the close would kill the check and leave the PR with nobody. A PR it handed to a reader — an
+     `ask` carrying it, open in any record's inbox — is the reader's, and no longer holds it; and
+     the wait is bounded: idle `SEAT_PR_WAIT` (two hours, `review.bound`'s default), it is closed
+     as before, and the PR stands among the repo's open ones. **The fill ceiling**: `FILL_CEILING` — six
      fills an hour over all seats sharing a controller (the graph, not the team badge), then
      `restart_ceiling` (with `why: fill`; the card says *fills exhausted · 6 in 1 h*) on the seat
      whose fill tripped it and the Inbox row as for a crash, its

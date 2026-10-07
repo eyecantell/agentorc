@@ -54,6 +54,7 @@ from sessionorc.agent_common import (
     RESTART_WINDOW,
     RESUME_MIN,
     SEAT_IDLE_GRACE,
+    SEAT_PR_WAIT,
     SETTLED,
     STALL_AFTER,
     TAIL_LINES,
@@ -76,6 +77,7 @@ from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
 from sessionorc.gitinfo import git_info, work_left
 from sessionorc.models import (
     PERSON,
+    PR_CLOSED,
     SYSTEM,
     Pending,
     Session,
@@ -2028,7 +2030,18 @@ class TickMixin:
         if s.state in ("exited", "closed") and s.seat_due:
             await self._fill(s, now, records)
         elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
-            log.info("%s: a seat with nothing due, idle and pushed — closing it (§6 rule 3)", s.id)
+            waits = self._seat_prs(s, records)
+            if waits and now - _parse(s.since) < SEAT_PR_WAIT:
+                return  # it ended its turn to wait on its own PR's fact-check or CI (TD-366)
+            if waits:
+                log.info(
+                    "%s: a seat idle %s on its own PR %s, which no reader holds — closing it (§6 rule 3)",
+                    s.id,
+                    SEAT_PR_WAIT,
+                    ", ".join(waits),
+                )
+            else:
+                log.info("%s: a seat with nothing due, idle and pushed — closing it (§6 rule 3)", s.id)
             closer = {"by": "tick", "why": "seat"}
             if s.host == self.host:
                 await self.rpc_close(s.id, closer=closer)
@@ -2152,6 +2165,34 @@ class TickMixin:
             # the fill was made: the cause is remembered on the record that took the seat
             new.seat_filled = [*s.seat_filled, {**{k: v for k, v in cause.items() if k != "at"}, "at": now_iso()}]
             self._save(new)
+
+    def _seat_prs(self, s: Session, records: list[Session]) -> list[str]:
+        """What of its own an idle seat may be waiting on (§6 rule 3, TD-366): an open PR on the branch
+        it has checked out, as the repo reading has it; a claim on its record carrying a PR not read
+        merged or closed; and a claim derived from that branch whose PR no reading has yet — what a
+        seat that opened its PR a minute ago holds. A PR it handed to a reader (an `ask` carrying it,
+        still open in any record's inbox) is the reader's, and nothing it waits on."""
+        branch = str((s.git or {}).get("branch") or "")
+        found: list[str] = []
+        opened = ((self._repos.get(s.repo or "") or {}).get("prs") or {}).get("open") or []
+        for p in opened:
+            if branch and isinstance(p, dict) and p.get("branch") == branch and isinstance(p.get("number"), int):
+                found.append(f"#{p['number']}")
+        for e in s.progress:
+            if e.status != "claimed" or e.why == PR_CLOSED:
+                continue
+            number = e.pr or e.review_pr
+            if number:
+                found.append(f"#{number}")
+            elif e.source == "derived" and branch and e.branch == branch:
+                found.append(branch)
+        handed: set[str] = set()
+        for r in records:
+            for a in (r.prs_waiting(home=self.host) or {}).get("asks", []):
+                sid, host = naming.split_address(str(a.get("from") or ""))
+                if (sid, host or self.host) == (s.id, s.host or self.host):
+                    handed.add(f"#{a['pr']}")
+        return sorted({w for w in found if w not in handed})
 
     def _seat_has_run(self, s: Session, now: datetime) -> bool:
         """A seat to close (§6 rule 3): hook-confirmed idle for `SEAT_IDLE_GRACE`, with its git known

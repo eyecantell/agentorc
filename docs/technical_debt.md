@@ -76,7 +76,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-363 | `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing (held by a dead record, other repos' records, the falling-count order, the owner's case) | Medium | Open |
 | TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
 | TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
-| TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Open |
+| TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Open |
 
 ---
@@ -1327,8 +1327,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Type:** debt
 **Added:** 2026-10-07 (the anchor)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1202
+**Status:** Built in PR #1202 (rule 3's `_seat_prs`, design §6 rule 3; `tests/test_seat_policy.py`). Left to read once #1202 is live (`ao promote status`): the next fill of an audit seat (test-audit-ao-1 or docs-audit-ao-1) that opens a PR — its record is not closed by the tick while the PR is open and unhanded (the host agent's log has no *a seat with nothing due, idle and pushed — closing it* for it before the PR merges or its `ask --pr` lands), and the PR is merged or with a reader.
 **Location:** `src/sessionorc/agent_tick.py` (the seat branch of the tick: `s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now)` → *a seat with nothing due, idle and pushed — closing it (§6 rule 3)*), `_seat_done`; design §6 rule 3, §4.9b *Seats with a trigger*
 
 **Why:**
