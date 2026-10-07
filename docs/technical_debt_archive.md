@@ -5668,3 +5668,47 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 - **Done when** a detached process started from a pane on kmaster (`setsid -f` from a shell under the pane, read on a scratch home or by test) is no longer read as *outside*, and §4.8a describes the scopes. (Filed as *classified unknown*; as built, a process in its pane's own scope is that session, per the Resolved line.)
 
 **Related:** TD-360 (the scope as a gone pane's signal), TD-077 (the identity work), TD-115.
+
+## TD-357: A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of ao-grind)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-06 (the designer, PR #1188; the steer to Paul is `m-805f8088ba04`, bound 2026-10-07 10:16 MDT): design §4.4 *In a team's lanes* (the derived reading: the lanes are the member records' `lane`, the match is §6 rule 6's `lane_matches`, the rest of the *pickable* by owner, a member out of work with unheld work in its own lane), §4.5 the team card's kind bar and screen 11's count line, §4.5a *team card: Repo facet* (the lanes line, the two hovers, the out-of-work warning), §4.7 `ao repo` (the first line's parentheses, the out-of-work line, `--json` `lanes`), the glossary's *in a team's lanes*; the mockup `RepoFacet.dc.html` (`docs/mockups/reviews/2026-10-06-td357-lanes-line.png`). Settled: (a) the kinds stay the repo's and the team's reading sits beside them as one derived line, never a second set of buckets or a per-team *pickable*; (b) the lanes are what the records carry, so the card and rule 6 count by one rule and one reader; (c) the Repo page's lists are not split by owner — each row says its owner since TD-228 — the count line is; (d) the out-of-work warning is a mark, never a prompt or a tick's mail: rule 6 already mails what arrived since the declaration, and what was there at it is the person's to read. **Next:** designed; the build is TD-361.
+**Location:** design §4.5 (the Repo facet and the kind bar on a team's card), §4.5a, §4.7 (`ao repo`'s first line); `sessionorc.ledger` (`for_page`), the team summary's Repo facet
+
+**Why:** On 2026-10-06 Paul read *24 pickable* for agentorc while all three of ao-grind's members were idle and out of work, and asked whether the calculation was wrong. It counts every entry that nothing blocks, whoever owns it. That evening the 24 were 12 anchor live checks, 8 anchor builds and 4 dev-cadence builds, and none matched a member's lane (`owner:grinder`, `owner:designer`). The number is right for the repo, and it misleads on a team, where *pickable* reads as *work this team could be doing*.
+
+**Fix:** design first. Where a team's card or the repo line shows the count, say how much of it the team's lanes can take, split by owner. For example *24 pickable · 0 for ao-grind (20 anchor, 4 dev-cadence)*, with the kind bar's hover listing them. Decide whether `ao repo` and the Repo page also split it by owner. An idle team beside a pickable count for its own lanes is then a real alarm, which the tick or the card can raise.
+
+**Done when** a team whose members are out of work never shows a pickable count for its own lanes above zero unless that work really is in their lanes, and the count says whose the rest is.
+
+**Related:** TD-228 (the derived pickable), TD-198 (the kind bar's buckets).
+
+**Resolved:** 2026-10-07 (designed in PR #1188; built as TD-361, PRs #1194 and #1196).
+
+## TD-361: Build TD-357: the lanes line — what a team's lanes take of the repo's pickable count, the rest by owner
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the designer, from TD-357's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved 2026-10-07 (PRs #1194, #1196). **Slice 1 done 2026-10-06 (grinder-ao-2, PR #1194):** the reader (`ledger.in_lanes`; `teamrun.repo_lanes` per servicing team) and `ao repo` (fix items 1 and 3, the reader's and the CLI's tests). **Slice 2 built 2026-10-06 (grinder-ao-2, PR #1196):** the card's lanes line and the Repo page's (item 2), UI-checked on a scratch home. It merged after the designer's steer to Paul on the card (`m-805f8088ba04`, bound 2026-10-07 10:16 MDT) was answered or lapsed.
+**Location:** `src/sessionorc/ledger.py` (the reader), `src/agentorc/ui/org.py` (`repo_facet`, `team_summary`), `src/agentorc/ui/templates/team_summary.html`, `src/agentorc/ui/repo.py` and the Repo page's template, `src/agentorc/cli.py` (`_repo_line`, `cmd_repo`); tests `tests/test_repo_facts.py`, `tests/test_ui_team_summary.py`, `tests/test_ui_repo_page.py`, the CLI's `ao repo` tests. `src/sessionorc/**` is a held path: the techlead reads the PR.
+
+**Why:** design §4.4 *In a team's lanes*, §4.5 the team card and screen 11, §4.5a *team card: Repo facet*, §4.7 `ao repo` (TD-357, designed 2026-10-06). On 2026-10-06 the card said *24 pickable* while every member of ao-grind was out of work.
+
+**Fix:**
+1. **The reader**, one function in `sessionorc.ledger` beside `lane_matches` (`in_lanes(entries, records)` or a name like it): for one team's records → `pickable` and `design_first` in the lanes (an entry `lane_matches` for any record's `lane`; a record with no lane contributes nothing), `rest` of the *pickable* kind by `Owner:` in falling count then name (an unowned build is never in it while the team has a `free-pick` lane), `design_first_rest` (the *design-first* entries not in the lanes: what waits on a build), and `out_of_work`: each record carrying `out_of_work` whose own lane takes an entry no live record of the repo holds `claimed`, with the ids. No lane on any record → `None`, and nothing is drawn.
+2. **The team card**: `repo_facet` takes the team's members and draws the lanes line under the legend — *in ao-grind's lanes: 0 pickable, 1 design-first · the other 24 pickable: anchor 20, dev-cadence 4* — each count a link to the Repo page's list, the *pickable* and *design-first* segments' `title`s as §4.5a words them, and the tinted warning *· grinder-ao-1 out of work with 3 in its lane* (ids in its `title`, the name a Focus link). Re-rendered on the `repos` event as the facet is. The Repo page's count line gets the same line once per team servicing the repo (`app.py`'s `serving`), the lists untouched.
+3. **`ao repo`**: the first line's parentheses on *pickable* and *design-first*, one per servicing team; under the holds, one line per member out of work with unheld work in its lane, naming the ids; `--json` carries `lanes: {<team>: {...}}` on the repo. `--all` prints the line as today.
+4. **Tests** on the 2026-10-06 case: 24 pickable (20 anchor, 4 dev-cadence) with three members out of work on lanes `[free-pick, owner:grinder]` ×2 and `[design-first, owner:designer]`, one pickable design-first → *0 pickable, 1 design-first*, the rest *anchor 20, dev-cadence 4*; a held grinder entry counts in the lanes and not in the warning; an unowned build is in a `free-pick` lane and not in the rest, and in the rest of a team whose only lane is `[design-first, owner:designer]`; a team with no lane draws no line; the card, the page and `ao repo` from the one reader.
+
+**Done when** a team whose members are out of work shows *0* for its lanes beside the repo's *pickable* count with the rest by owner — on the card, on the Repo page and on `ao repo`'s first line, from one reader — and a member out of work with unheld work in its own lane is named on the card and by `ao repo`; the page matches `docs/mockups/RepoFacet.dc.html`.
+
+**Related:** TD-357 (the design), TD-228 (the derived pickable, the owner on each row), TD-198 (the kind bar's buckets), §6 rule 6 (`lane_matches`, `lane_seen`).
+
+**Resolved:** 2026-10-07 (PRs #1194, #1196, grinder-ao-2) — one reader, `sessionorc.ledger.in_lanes` through `teamrun.repo_lanes` per servicing team, draws the lanes line on `ao repo`'s first line (with a line per member out of work with unheld work in its lane, and `--json` `lanes`), on the team card under the kind bar's legend (`org.lanes_line`, `lanes_line.html`: the counts linked to the Repo page's lists where it draws them, the two hovers, the tinted out-of-work mark with its ids and a Focus link) and on the Repo page's count line once per servicing team. UI-checked on a scratch home (`docs/mockups/reviews/2026-10-06-td361-card-lanes.png`, `…-repo-lanes.png`).
