@@ -6,7 +6,7 @@ in a few thousand words, so that an
 answer is given with the whole shape in mind and not only the asker's framing.
 
 **What this is not.** It is **an index, never a source.** Nothing here is cited as an answer:
-`--source` names the document this page pointed you to — a section of `docs/design.md`, a ledger
+`--source` names the document this page pointed you to — a section of `docs/design/`, a ledger
 entry, a brief, a dated decision — after you have read it there. If this page and that document
 disagree, the document is right, this page is stale, and you say so in your summary. A test
 (`tests/test_primer.py`) holds every section and path named here to ones that exist; it cannot
@@ -20,7 +20,8 @@ and steers many sessions from one page; teams of unattended sessions work a repo
 through PRs. The project is to be renamed `shiftlead` (TD-060); the code and docs still say
 agentorc.
 
-`docs/design.md` is the source of truth. **A change in behaviour is a change to that document
+The design is the source of truth: one file per section under `docs/design/`, and `docs/design.md`
+its index. **A change in behaviour is a change to the design
 first**, and **a control that is not in §4.5a's table does not exist**. What a word means is
 `docs/glossary.md`. What is open or half-built is `docs/technical_debt.md` (each `TD-NNN` has a
 Status that says what is built and what is not — *designed* is not *built*). What waits on the

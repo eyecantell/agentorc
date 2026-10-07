@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-The help texts listed in `docs/design.md` §4.5a (the *i* marks' list: Start, Wind down, the fold, Forget, …) are compared word for word with `src/agentorc/ui/help.py` by `tests/test_help.py`. A design PR that rewords one fails CI (PR #621, 2026-09-26).
+The help texts listed in design §4.5a (`docs/design/4.5a-controls.md`) (the *i* marks' list: Start, Wind down, the fold, Forget, …) are compared word for word with `src/agentorc/ui/help.py` by `tests/test_help.py`. A design PR that rewords one fails CI (PR #621, 2026-09-26).
 
 **Why:** the list in the design is the source the code copies, and the test keeps them from drifting — so the wording can only change in the PR that changes `help.py`.
 

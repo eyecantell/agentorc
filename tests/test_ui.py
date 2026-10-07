@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import wait_for_sync as wait_for
 from conftest import wait_screen
+from design_doc import section
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -974,10 +975,9 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     assert "this session looks stalled" in js
 
     # and the design says it where §4.5a points: the Send row and the §4.3 rule
-    design = (pathlib.Path(__file__).parents[1] / "docs" / "design.md").read_text()
-    send_row = next(ln for ln in design.split("\n") if ln.startswith("| Focus composer | **Send** |"))
+    send_row = next(ln for ln in section("4.5a").split("\n") if ln.startswith("| Focus composer | **Send** |"))
     assert "Steer" in send_row and "starts a new turn" in send_row
-    assert "to an `idle` session it starts a turn; to a `working` one it steers the turn in flight" in design
+    assert "to an `idle` session it starts a turn; to a `working` one it steers the turn in flight" in section("4.3")
 
 
 def test_a_stop_time_can_be_set_and_cleared_from_focus(client, tmp_path):
