@@ -1379,7 +1379,7 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-07 (grinder-ao-2, TD-339's live check)
+**Added:** 2026-10-06 (grinder-ao-2, TD-339's live check)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
@@ -1400,4 +1400,3 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
