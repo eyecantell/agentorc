@@ -81,7 +81,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-359 | Build TD-356: the Flow pick selects and Apply is the one gate | Medium | Open |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-361 | Build TD-357: the lanes line — what a team's lanes take of the repo's pickable count, the rest by owner | Medium | Open |
-| TD-362 | The detached check's *unknown* clause never fires where tmux starts each pane in a scope of its own, and §4.8a says every pane is inside the service | Medium | Open |
 
 ---
 
@@ -1418,29 +1417,3 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 
 **Related:** TD-357 (the design), TD-228 (the derived pickable, the owner on each row), TD-198 (the kind bar's buckets), §6 rule 6 (`lane_matches`, `lane_seen`).
 
-## TD-362: The detached check's *unknown* clause never fires where tmux starts each pane in a scope of its own, and §4.8a says every pane is inside the service
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-06 (grinder-ao-1, from TD-360; confirmed read-only on kmaster by the techlead)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/identity.py` (`detached_check`, `classify`'s cgroup clause), `src/sessionorc/agent_identity.py` (`_id_read_detached`); design §4.8a *unknown* (`docs/design/4.8a-identity.md`: *`KillMode=process` keeps the tmux server, and so every pane, inside `agentorc-agent.service`*)
-
-**Why:**
-- §4.8a's *unknown* clause catches a session's process that shed all three signals (a double fork with `setsid`, `tmux run-shell`). It compares the peer's cgroup with the tmux server's, on the premise that every pane is inside `agentorc-agent.service`.
-- On kmaster that premise is false. The tmux server (1658154) is in `agentorc-agent.service`, but tmux, built with systemd support, starts each pane in a `tmux-spawn-<uuid>.scope` of its own. A pane's claude and everything under it run there, read 2026-10-06 from `/proc/<pid>/cgroup`.
-- So a fully detached process from a session is in its pane's scope, not the server's cgroup. The clause never fires, and such a process reads as *outside*, the person: exactly the hole the check exists to close. `ao status -v` still says *detached-process check on*.
-- The stale sentence in §4.8a also misleads every reader of the identity design.
-
-**Fix:**
-- Design first, in the same PR: §4.8a *unknown* says where panes run. The clause also counts a peer that is in a cgroup under the tmux server's parent slice that is a pane's scope, `tmux-spawn-*.scope` or a listed pane's own (`Pane.cgroup`, TD-360). A gone pane's scope inside the grace counts too.
-- The check's *on* conditions stay: the agent is the service's own process, and the tmux server is in its cgroup.
-- Tests:
-  - a peer with no pane signal in a pane's own scope is *unknown*;
-  - a peer in the person's session scope is still *outside*;
-  - with every pane in the server's cgroup, today's clause still holds.
-- **Done when** a detached process started from a pane on kmaster (`setsid -f` from a shell under the pane, read on a scratch home or by test) is classified *unknown*, and §4.8a describes the scopes.
-
-**Related:** TD-360 (the scope as a gone pane's signal), TD-077 (the identity work), TD-115.

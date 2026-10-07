@@ -5589,3 +5589,25 @@ So a team's *flow changed* mark outlives the press that answered it, and a secon
 **Related:** TD-310 (the move that surfaced it), TD-309 (archived: *Switching*), TD-349 (archived: the chain shape).
 
 **Resolved:** 2026-10-06 (PR #1187, grinder-ao-2) — the home's `relaunch` marks `relaunch: {at, lane, review}`, the two as handed, and `teamrun.differences` reads a relaunched member's next run from the mark rather than the record's running lane and `review`; `review` is compared as the flow means it (`_review_key`: each reader in the chain's order, `held` as a set, the bound). Tests: `test_an_apply_clears_flow_changed_before_the_member_restarts`, `test_a_chain_is_compared_link_by_link_each_held_as_a_set`. The members Paul's Apply relaunched before this carry `{at}` alone, which says nothing of what they run next: they read *flow changed* until their next create (TD-358's restart), and never again after one. Design §4.9c *Switching*.
+
+## TD-362: The detached check's *unknown* clause never fires where tmux starts each pane in a scope of its own, and §4.8a says every pane is inside the service
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (grinder-ao-1, from TD-360; confirmed read-only on kmaster by the techlead)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved 2026-10-06 (PR #1192).
+**Location:** `src/sessionorc/identity.py` (`detached_check`, `classify`'s cgroup clause), `src/sessionorc/agent_identity.py` (`_id_read_detached`); design §4.8a *unknown* (`docs/design/4.8a-identity.md`: *`KillMode=process` keeps the tmux server, and so every pane, inside `agentorc-agent.service`*)
+
+**Why:**
+- §4.8a's *unknown* clause catches a session's process that shed all three signals (a double fork with `setsid`, `tmux run-shell`). It compares the peer's cgroup with the tmux server's, on the premise that every pane is inside `agentorc-agent.service`.
+- On kmaster that premise is false. The tmux server (1658154) is in `agentorc-agent.service`, but tmux, built with systemd support, starts each pane in a `tmux-spawn-<uuid>.scope` of its own. A pane's claude and everything under it run there, read 2026-10-06 from `/proc/<pid>/cgroup`.
+- So a fully detached process from a session is in its pane's scope, not the server's cgroup. The clause never fires, and such a process reads as *outside*, the person: exactly the hole the check exists to close. `ao status -v` still says *detached-process check on*.
+- The stale sentence in §4.8a also misleads every reader of the identity design.
+
+**Resolved:** 2026-10-06 (PR #1192). A pane's own cgroup scope is the fourth signal in `identity.classify`, after tty: a peer in a listed pane's own scope is that session. The *unknown* clause, under its unchanged on-conditions, widens only to the scopes of our server's panes that no live record holds: a listed pane that is no record's, and a gone pane inside the grace (`_id_ours`). It never takes any other `tmux-spawn-*` scope, which may be the person's own tmux. That is the techlead's narrowing of the grinder's steer (`m-10bbc5a879fb`). Left open by design: a scope that outlives its pane past the grace reads as *outside*, a narrower hole than the one this closes. `test_enforce_against_real_panes` shows the *Done when* on real panes on kmaster. Its double-forked, setsid'd process is served as its session where the private tmux gives panes scopes. The lasting content is design §4.8a (*The channel*, *unknown*) and `tests/test_identity.py`.
+
+- **Done when** a detached process started from a pane on kmaster (`setsid -f` from a shell under the pane, read on a scratch home or by test) is classified *unknown*, and §4.8a describes the scopes.
+
+**Related:** TD-360 (the scope as a gone pane's signal), TD-077 (the identity work), TD-115.
