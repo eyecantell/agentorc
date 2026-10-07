@@ -41,15 +41,19 @@ class IdentityMixin:
         # each pane's own scope (TD-360), read once per pane pid: a pane's cgroup does not move
         if self._id_own_cg is None:
             self._id_own_cg = self.proc.cgroup(os.getpid()) or ""
+        # the server's panes that are no record's are read too: a scope of theirs is ours to call
+        # *unknown*, never the person's (TD-362)
+        others = [p for sid, p in panes.items() if not p.dead and sid not in self.sessions]
         scopes = {
             p.pane_pid: self._id_scopes[p.pane_pid]
             if p.pane_pid in self._id_scopes
             else identity.own_scope(p.pane_pid, self.proc, {self._id_own_cg} - {""})
-            for p in live.values()
+            for p in [*live.values(), *others]
         }
         self._id_scopes = scopes
         counts = Counter(scopes.values())
         shared = {cg for cg, n in counts.items() if cg and n > 1}  # a cgroup two panes share is neither's own
+        self._id_other_scopes = {scopes[p.pane_pid] for p in others} - shared - {""}
         self._id_panes = [
             identity.Pane(
                 sid,
@@ -158,7 +162,7 @@ class IdentityMixin:
         if self._id_detached is None:
             await self._id_read_detached(await asyncio.to_thread(self.tmux.server_pid))
         detached = self._id_detached or None
-        ch = identity.classify(peer, self._id_panes, self.proc, detached=detached)
+        ch = identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours())
         listed = {p.session for p in self._id_panes}
         unlisted = any(
             sid not in listed and r.pane and (r.host or self.host) == self.host and r.state not in ("exited", "closed")
@@ -175,7 +179,15 @@ class IdentityMixin:
                 if self._id_listed_at and wait > 0:
                     await asyncio.sleep(wait)
                 self._id_note_panes(await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX))
-        return identity.classify(peer, self._id_panes, self.proc, detached=detached)
+        return identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours())
+
+    def _id_ours(self) -> set[str]:
+        """The scopes of this server's panes that no live record's pane holds (TD-362): a pane that is
+        no record's, and a record's gone pane inside the grace. A peer in one is *unknown* under the
+        detached check, never the person; any other `tmux-spawn-*.scope` may be the person's own tmux."""
+        now = time.monotonic()
+        gone = {p.cgroup for p, at in self._id_gone.values() if p.cgroup and now - at < identity.PANE_GONE_GRACE}
+        return self._id_other_scopes | gone
 
     async def _identify(self, req: dict[str, Any], peer: int, conn: Any = None) -> dict[str, Any] | None:
         """The one step at the head of dispatch (§4.8a *Where it lives*): judge the envelope's

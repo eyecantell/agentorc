@@ -185,15 +185,25 @@ def detached_check(reader: ProcReader, *, agent_pid: int, tmux_pid: int | None) 
     return mine
 
 
-def classify(peer_pid: int, panes: Collection[Pane], reader: ProcReader, *, detached: str | None = None) -> Channel:
-    """Which pane the peer belongs to, by the first of three signals that answers (§4.8a).
+def classify(
+    peer_pid: int,
+    panes: Collection[Pane],
+    reader: ProcReader,
+    *,
+    detached: str | None = None,
+    ours: Collection[str] = (),
+) -> Channel:
+    """Which pane the peer belongs to, by the first of four signals that answers (§4.8a).
 
     *Ancestry* breaks on an ordinary race — a background `ao wait` whose parent shell exited is
     reparented to init — so the POSIX session id and then the controlling terminal are asked: a
     reparented process keeps both, and neither can be borrowed (`setsid` only creates a session; a
-    terminal that is one session's cannot be taken by another without privilege). `detached` is
-    `detached_check`'s answer: a peer that matched no pane but sits in that cgroup shed all three
-    signals on purpose or by accident, and is *unknown*, never the person."""
+    terminal that is one session's cannot be taken by another without privilege). Last, the pane's
+    own cgroup scope (`Pane.cgroup`, empty where panes share one), which a same-user process could
+    move into as it could reopen a pty (TD-362). `detached` is `detached_check`'s answer: a peer
+    that matched no pane but sits in that cgroup shed every signal on purpose or by accident, and
+    is *unknown*, never the person — and so is one in `ours`, the scopes of the server's panes that
+    no live record's pane holds (a pane that is no record's, a gone one inside the grace)."""
     peer = reader.stat(peer_pid)
     if peer is None:
         return Channel("unknown", signal="unreadable")
@@ -225,7 +235,15 @@ def classify(peer_pid: int, panes: Collection[Pane], reader: ProcReader, *, deta
         for p in panes:
             if p.tty_nr and p.tty_nr == peer.tty_nr:
                 return Channel("session", p.session, "tty")
-    if detached and reader.cgroup(peer_pid) == detached:
+    # -- the pane's own cgroup scope (TD-362): a tool that starts its shells with `setsid` and no
+    # terminal (Claude Code) leaves an orphaned background command none of the three; tmux under
+    # systemd starts each pane in a scope of its own, which the orphan keeps -----------------------
+    cg = reader.cgroup(peer_pid) if detached or any(p.cgroup for p in panes) or ours else None
+    if cg:
+        for p in panes:
+            if p.cgroup and p.cgroup == cg:
+                return Channel("session", p.session, "scope")
+    if detached and cg and (cg == detached or cg in ours):
         return Channel("unknown", signal="cgroup")
     return OUTSIDE
 
