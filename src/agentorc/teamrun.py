@@ -770,6 +770,27 @@ def _current(name: str, records: list[dict[str, Any]]) -> dict[str, Any] | None:
     return (up or mine or [None])[-1]
 
 
+def _next_run(record: dict[str, Any]) -> dict[str, Any]:
+    """The lane and `review` a member runs next: what a person's Apply handed the home, carried on the
+    record's `relaunch` mark until the create that runs it (§4.9c *Switching*, TD-355), else the
+    record's own. A mark written before it carried them (`{at}` alone) says nothing of them."""
+    mark = record.get("relaunch")
+    return mark if isinstance(mark, dict) and "lane" in mark and "review" in mark else record
+
+
+def _review_key(review: Any) -> Any:
+    """A `review` as the flow means it (§4.9c): its reader, or each chain link's reader in order, each
+    with its `held` as a set, and its bound — so a record whose `held` is the compiled set in another
+    order is no difference (`teams.flow_redundant` compares so)."""
+    if not isinstance(review, dict) or not review:
+        return None
+    bound = review.get("bound", teams.REVIEW_BOUND)
+    if isinstance(review.get("chain"), list):
+        links = tuple((x.get("reader"), frozenset(x.get("held") or ())) for x in review["chain"] if isinstance(x, dict))
+        return ("chain", links, bound)
+    return ("reader", review.get("reader"), frozenset(review.get("held") or ()), bound)
+
+
 def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Difference]:
     """How a live team's records differ from what its current flow compiles to (design §4.9c
     *Switching*), member by member: lane, `review`, the `{stage}` file's path, and who should be
@@ -796,10 +817,11 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
         if persons(rec) or rec.get("state") == "closed":
             continue  # a person's lane and brief are theirs; a closed member is the next Start's
         what = []
-        if list(rec.get("lane") or []) != list(x.lane):
-            what.append(f"lane {', '.join(rec.get('lane') or []) or 'none'} → {', '.join(x.lane) or 'none'}")
-        if (rec.get("review") or None) != (x.review or None):
-            what.append(f"reader {_reader(rec.get('review'))} → {_reader(x.review)}")
+        runs = _next_run(rec)
+        if list(runs.get("lane") or []) != list(x.lane):
+            what.append(f"lane {', '.join(runs.get('lane') or []) or 'none'} → {', '.join(x.lane) or 'none'}")
+        if _review_key(runs.get("review")) != _review_key(x.review):
+            what.append(f"reader {_reader(runs.get('review'))} → {_reader(x.review)}")
         known, was = _record_stage(rec)
         now = stage_of(x.prompt_from)
         if known and was != now:

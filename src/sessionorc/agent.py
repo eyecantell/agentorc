@@ -1533,10 +1533,11 @@ class HostAgent(
         `lane`, `review` (`RELAUNCH_KEYS`), each replaced as handed and an absent one removed, the rest
         of the launch record standing. The home writes it as the record's launch record, re-records
         `brief` from the new `prompt_from` as a create does, clears `brief_changed`, and marks the record
-        `relaunch: {at}`, which rule 7 reads as its second trigger (`why: flow`): every replay reads the
-        new record, and a create under the name clears the mark. **A person's own**, refused to a
-        session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`); never an interactive
-        session, and never one with no launch record. Nothing is touched before every check passes;
+        `relaunch: {at, lane, review}` (the two as handed, so a client reads what the member runs next),
+        which rule 7 reads as its second trigger (`why: flow`): every replay reads the new record, and a
+        create under the name clears the mark. **A person's own**, refused to a session as
+        `set_settings` is, and the home's alone (`modes.HOME_EDITS`); never an interactive session, and
+        never one with no launch record. Nothing is touched before every check passes;
         the reply is the record.
 
         **`sit_out: true`** is its other form (slice 5b): a member the flow no longer uses is wound
@@ -1582,7 +1583,7 @@ class HostAgent(
         self._write_launch(address, s, params)
         s.brief, s.brief_changed = read, None
         self._brief_differs.pop(s.id, None)
-        s.relaunch = {"at": now_iso()}
+        s.relaunch = {"at": now_iso(), "lane": launch.get("lane"), "review": launch.get("review")}
         self._save(s)
         await self._push_changes()
         log.info("%s relaunched by the person: its launch record replaced", address)
