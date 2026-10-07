@@ -82,8 +82,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
-| TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
-| TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Live check #1158: both slices built (#1158, #1163); the press read on the live copy once live |
 | TD-353 | *Answer needed* mixes mail with live prompts since TD-350: a member's open question to the person moves to a line of its own | Medium | Open — decided by Paul |
 
 ---
@@ -1398,46 +1396,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a team restart on the live copy leaves no *outside claimed <itself> on hook* alarm at the restart, and the restarted run's brief is typed.
 
 **Related:** TD-339 (the brief that waited), TD-342 (no fallback when the first hook is lost), TD-225 (alarms at a restart), TD-115 (the grace).
-
-## TD-343: A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-06 (the anchor, asked by Paul why the team did nothing all day)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-06** (the designer, PR #1153; the shape — a typed line of the home's own before the pasted brief and a fixed preface at the head of the context file, against the brief inside the context file with a fixed *begin* as the first prompt — steered to Paul): design §4.1 *The brief is the person's word, and the tool is told so*, §4.10 *A ring is answered by a read, or the bell stops* (`DOORBELL_HELD`, `doorbell_held`). No page control, so no mockup. The build is TD-347; this entry archives with it. Was: Open
-**Blocked by:** TD-347
-**Location:** design §4.1 *No prose in the argv*; `src/sessionorc/agent_wake.py` (`_first_prompt_typing`: the brief sent by bracketed paste); `src/agentorc/adapters/claude_code/__init__.py` (`--append-system-prompt-file`, the start context)
-
-**Why:** Since TD-339 the brief is typed at the composer by bracketed paste, and Claude Code hands a paste to the model wrapped in `<pasted_content>` with the rule that instructions inside it are followed only where the user's own words ask for it. A brief is nothing but a paste, so a careful model takes it as data. On 2026-10-06 at 12:29Z techlead-ao-1 (Fable) answered its brief with *"Your message contains only pasted text, a techlead-seat brief for agentorc, with nothing from you saying what to do with it, so I haven't acted on it"*, then held grinder-ao-1's PR ask on #1150 unread until the person answered its mailed `ask` (`m-e60ada636596`) at 22:20Z. In those ten hours the doorbell rang it about thirty times, each a Fable turn that only re-said it was holding. grinder-ao-1 (Opus) acted on the same kind of brief, so whether a session starts is up to the model's judgement on each run. Every member, seat and restart launched since TD-339 is exposed.
-
-**Fix:** design first, then build. Give the brief a road the tool trusts. For example: send it with the start context through `--append-system-prompt-file` (the system prompt is the operator's word), and type only a short first prompt of the home's own, outside any paste, that says to begin; or type a short line of the home's own beside the pasted brief saying it is this session's brief from the person who started it. Either way, keep TD-336's rule: no prose in the argv. Also bound the doorbell: a session that answered a ring by holding, with nothing new in its inbox, is not rung again for the same unread count.
-
-**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted.
-
-**Related:** TD-336 and TD-339 (no prose in the argv), TD-341 and TD-342 (a brief whose first hook is lost; #1150).
-
-## TD-347: Build *the brief is the person's word* — the typed line before the paste, the context file's preface, the doorbell held
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-06 (the designer, TD-343's build)
-**Owner:** grinder
-**Kind:** live-check #1158
-**Status:** Live check (2026-10-06): both slices merged (#1163, then #1158). Once #1158 is live (`ao promote status`), read — never press — a member started or restarted after the promote: its transcript's first turn holds `mail.BRIEF_LINE` before the brief and its first action follows the brief, on Opus and on Fable; its context file opens with `mail.BRIEF_PREFACE`; `ps -o args` shows no prose; and `ao status -v` on a session that sat through three unread rings shows *doorbell held*. Slice 1 built (grinder-ao-1, PR #1158): `mail.BRIEF_LINE` typed as keys and a space before the brief's paste (`_type`'s `lead`, from `_first_prompt_typing`); `mail.BRIEF_PREFACE` heads the context file — `create` hands every start-context adapter `mail.start_context_file_text(<the caller's text or none>)`, and the adapter writes it as before (the writer stayed in the adapter: it alone knows the conversation id the file is named by; design-history §4.1 says why). Tests: `tests/test_first_prompt.py` (the composer submits the line, then the brief), `tests/test_start_context.py` (the preface heads what the adapter is handed, with and without a start context). The press (3) is not made on a scratch home — its Claude Code launch pretrusts the directory in the profile's Claude config, which a grinder may not write — so it is read on the live copy once this is live: a member restarted after the promote, its transcript's first turn holds the line and its first action follows the brief. Slice 2 built (grinder-ao-1, PR #1163): `Session.doorbell_held` (`{at, rings}`, home-owned), `mail.DOORBELL_HELD` (3), `_bell_answered` judging each ring at the first hook `idle` after its `UserPromptSubmit` (the count remembered before the line is typed), `_bell_blocked`'s *holding its mail unread*, `_bell_cleared` from `inbox`'s read and from `_refill`, and `ao status -v`'s *doorbell held · n unread rings* (`tests/test_doorbell.py`: three unread rings hold, a read in the run ends it, a read lifts the hold and the next mail rings, a person's send lifts it).
-**Location:** `src/sessionorc/agent_wake.py` (`_first_prompt_typing`, `_ring_typing`, `_bell_blocked`), `src/sessionorc/agent.py` (`_type`: a literal line before the paste), `src/sessionorc/tmux.py` (`send_literal`, `paste`), `src/sessionorc/mail.py` (`DOORBELL_HELD`), `src/sessionorc/models.py` (`doorbell_held`), `src/sessionorc/paths.py` / `src/agentorc/adapters/claude_code/__init__.py` (the context file's preface), `src/agentorc/cli.py` (`ao status -v`), `tests/`; design §4.1 *The brief is the person's word, and the tool is told so*, §4.10 *A ring is answered by a read, or the bell stops*. Held path (`src/sessionorc/**`): the techlead reads it.
-
-**Why:** TD-343's design. A seat took its pasted brief as data and held a PR ask ten hours; each fresh entry rang it again.
-
-**Fix, two slices, a PR each:**
-1. **The road.** `_first_prompt_typing` sends the brief as one prompt: the fixed line (`mail.BRIEF_LINE`, the words in §4.1) by `send_literal`, then the brief by `paste`, one Enter, the same composer confirmation; `sends` records it as before. The context file always exists and begins with the home's fixed preface (`BRIEF_PREFACE`, the words in §4.1), a blank line, then the caller's start context when there is one; the writer moves from the adapter (today's `if start_context:` in `launch`) to the host agent, which writes the file for every launch of an adapter with `start_context` and hands the adapter its path, so the preface is one text for every tool. A test asserts the line is typed before the paste and the preface heads the file, with and without a start context.
-2. **The bell.** A ring remembers the unread count it rang with; at the turn's `Stop` (the next hook `idle`), a count no lower counts one *unread ring*, a lower one resets the run; at `DOORBELL_HELD` (3) in a row the record's `doorbell_held = {at, rings}` is set and `_bell_blocked` answers *holding its mail unread*; `inbox` marking an entry read clears it, and so does `_refill` (a person's act toward it). `ao status -v` prints *doorbell held · n unread rings* on the mail line. Tests: three unread rings hold, a read clears, a person's send clears.
-3. **The press** (designed for slice 1's PR on a scratch home with a real Claude Code session; made instead on the live copy once slice 1 is live — a scratch launch would pretrust in the profile's Claude config, see Status): a member started with a brief on Opus and on Fable acts on it with no word from the person — the session's first turn runs the brief's first step — and `ps -o args` still shows no prose.
-
-**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted (TD-343's *Done when*); then TD-343 archives with this entry.
-
-**Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
 
 ## TD-353: *Answer needed* mixes mail with live prompts since TD-350: a member's open question to the person moves to a line of its own
 

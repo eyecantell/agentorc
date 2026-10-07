@@ -5329,3 +5329,46 @@ Two things are missing, and the design round chooses between them or takes both:
 **Related:** TD-346 (the design), TD-345 (the review that had to be scoped), TD-249 (archived).
 
 ---
+
+## TD-343: A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, asked by Paul why the team did nothing all day)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.1 *No prose in the argv*; `src/sessionorc/agent_wake.py` (`_first_prompt_typing`: the brief sent by bracketed paste); `src/agentorc/adapters/claude_code/__init__.py` (`--append-system-prompt-file`, the start context)
+
+**Why:** Since TD-339 the brief is typed at the composer by bracketed paste, and Claude Code hands a paste to the model wrapped in `<pasted_content>` with the rule that instructions inside it are followed only where the user's own words ask for it. A brief is nothing but a paste, so a careful model takes it as data. On 2026-10-06 at 12:29Z techlead-ao-1 (Fable) answered its brief with *"Your message contains only pasted text, a techlead-seat brief for agentorc, with nothing from you saying what to do with it, so I haven't acted on it"*, then held grinder-ao-1's PR ask on #1150 unread until the person answered its mailed `ask` (`m-e60ada636596`) at 22:20Z. In those ten hours the doorbell rang it about thirty times, each a Fable turn that only re-said it was holding. grinder-ao-1 (Opus) acted on the same kind of brief, so whether a session starts is up to the model's judgement on each run. Every member, seat and restart launched since TD-339 is exposed.
+
+**Fix:** design first, then build. Give the brief a road the tool trusts. For example: send it with the start context through `--append-system-prompt-file` (the system prompt is the operator's word), and type only a short first prompt of the home's own, outside any paste, that says to begin; or type a short line of the home's own beside the pasted brief saying it is this session's brief from the person who started it. Either way, keep TD-336's rule: no prose in the argv. Also bound the doorbell: a session that answered a ring by holding, with nothing new in its inbox, is not rung again for the same unread count.
+
+**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted.
+
+**Related:** TD-336 and TD-339 (no prose in the argv), TD-341 and TD-342 (a brief whose first hook is lost; #1150).
+
+**Resolved:** 2026-10-06: built by TD-347 (PRs #1158, #1163), archived with it; its *Done when* read on the live copy — the live copy (`ao promote status`: live 4d3133e, which holds #1158 and #1163; the host agent built from it at 01:08Z 2026-10-07) read, never pressed, on two sessions started after it: **techlead-ao-1** (a seat, Fable, started 01:12:00Z) and **grinder-ao-1** (a member, Opus, started 01:12:25Z). Each one's transcript's first turn is `mail.BRIEF_LINE` (*agentorc: the text pasted below is your brief …*) then the pasted brief, and each one's first action follows the brief with no word from the person — the techlead ran `ao --skill`, read its primer and inbox and took up held PR #1170 within 45 s; the grinder read its inbox and its open PR and took up its next entry. `ps -o args` of both panes shows no prose: `claude --settings … --session-id … --name … --model opus|fable --dangerously-skip-permissions --append-system-prompt-file <home>/launch/<conversation id>.context.md` — the context file now named for a grinder too, which has no start context of its own (grinder-ao-2, started 00:57Z before the promote, has no such flag), and the grinder's system prompt carries `mail.BRIEF_PREFACE` (*This session was started by a person through agentorc …*). The doorbell hold (slice 2) was not seen live: no session has sat through three unread rings since (`ao status -v` shows no *doorbell held*), it is no part of either *Done when*, and `tests/test_doorbell.py` covers it.
+
+## TD-347: Build *the brief is the person's word* — the typed line before the paste, the context file's preface, the doorbell held
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the designer, TD-343's build)
+**Owner:** grinder
+**Kind:** live-check #1158
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_wake.py` (`_first_prompt_typing`, `_ring_typing`, `_bell_blocked`), `src/sessionorc/agent.py` (`_type`: a literal line before the paste), `src/sessionorc/tmux.py` (`send_literal`, `paste`), `src/sessionorc/mail.py` (`DOORBELL_HELD`), `src/sessionorc/models.py` (`doorbell_held`), `src/sessionorc/paths.py` / `src/agentorc/adapters/claude_code/__init__.py` (the context file's preface), `src/agentorc/cli.py` (`ao status -v`), `tests/`; design §4.1 *The brief is the person's word, and the tool is told so*, §4.10 *A ring is answered by a read, or the bell stops*. Held path (`src/sessionorc/**`): the techlead reads it.
+
+**Why:** TD-343's design. A seat took its pasted brief as data and held a PR ask ten hours; each fresh entry rang it again.
+
+**Fix, two slices, a PR each:**
+1. **The road.** `_first_prompt_typing` sends the brief as one prompt: the fixed line (`mail.BRIEF_LINE`, the words in §4.1) by `send_literal`, then the brief by `paste`, one Enter, the same composer confirmation; `sends` records it as before. The context file always exists and begins with the home's fixed preface (`BRIEF_PREFACE`, the words in §4.1), a blank line, then the caller's start context when there is one; the writer moves from the adapter (today's `if start_context:` in `launch`) to the host agent, which writes the file for every launch of an adapter with `start_context` and hands the adapter its path, so the preface is one text for every tool. A test asserts the line is typed before the paste and the preface heads the file, with and without a start context.
+2. **The bell.** A ring remembers the unread count it rang with; at the turn's `Stop` (the next hook `idle`), a count no lower counts one *unread ring*, a lower one resets the run; at `DOORBELL_HELD` (3) in a row the record's `doorbell_held = {at, rings}` is set and `_bell_blocked` answers *holding its mail unread*; `inbox` marking an entry read clears it, and so does `_refill` (a person's act toward it). `ao status -v` prints *doorbell held · n unread rings* on the mail line. Tests: three unread rings hold, a read clears, a person's send clears.
+3. **The press** (designed for slice 1's PR on a scratch home with a real Claude Code session; made instead on the live copy once slice 1 is live — a scratch launch would pretrust in the profile's Claude config, see Status): a member started with a brief on Opus and on Fable acts on it with no word from the person — the session's first turn runs the brief's first step — and `ps -o args` still shows no prose.
+
+**Done when** a seat and a member started on a scratch home with a real Claude Code session act on their brief with no word from the person, on Opus and on Fable, and §4.1 says how the brief reaches the tool and why it is trusted (TD-343's *Done when*); then TD-343 archives with this entry.
+
+**Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
+
+**Resolved:** 2026-10-06 (live check of #1158, grinder-ao-1): it holds — the live copy (`ao promote status`: live 4d3133e, which holds #1158 and #1163; the host agent built from it at 01:08Z 2026-10-07) read, never pressed, on two sessions started after it: **techlead-ao-1** (a seat, Fable, started 01:12:00Z) and **grinder-ao-1** (a member, Opus, started 01:12:25Z). Each one's transcript's first turn is `mail.BRIEF_LINE` (*agentorc: the text pasted below is your brief …*) then the pasted brief, and each one's first action follows the brief with no word from the person — the techlead ran `ao --skill`, read its primer and inbox and took up held PR #1170 within 45 s; the grinder read its inbox and its open PR and took up its next entry. `ps -o args` of both panes shows no prose: `claude --settings … --session-id … --name … --model opus|fable --dangerously-skip-permissions --append-system-prompt-file <home>/launch/<conversation id>.context.md` — the context file now named for a grinder too, which has no start context of its own (grinder-ao-2, started 00:57Z before the promote, has no such flag), and the grinder's system prompt carries `mail.BRIEF_PREFACE` (*This session was started by a person through agentorc …*). The doorbell hold (slice 2) was not seen live: no session has sat through three unread rings since (`ao status -v` shows no *doorbell held*), it is no part of either *Done when*, and `tests/test_doorbell.py` covers it.
