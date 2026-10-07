@@ -1165,7 +1165,7 @@ class TickMixin:
                 # mail is pruned: past half its retention the reply that would clear a PR may be
                 # gone (a restarted home, a first promote), and that is no reading, never a crossing
                 old = mail.MAIL_RETENTION is not None and now - merged > mail.MAIL_RETENTION / 2
-                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr) or old:
+                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr, files) or old:
                     self._held_settled.add((addr, s.created, pr))
                     self._held_tried.pop((addr, pr), None)
                     continue

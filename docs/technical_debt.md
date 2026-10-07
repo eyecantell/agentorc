@@ -87,10 +87,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
 | TD-344 | The Org's *Needs you* counts a member's pane question as *answer needed* but its mailed `ask` only under *in the Inbox* | Low | Designed 2026-10-06 (a member's open `ask` to the person is an Answer needed block and counted) — the build is TD-350 |
-| TD-345 | The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6: rule 11 reads one reader, the verdict is spelled two ways, a switch keys on a stage name no rule may read | High | Designed 2026-10-06 (the twelve findings, in rule voice; the slice record to the history) — the build is TD-349 |
 | TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Designed 2026-10-06 (thirty section files named by §, the index, one tests helper, the history whole, the quiet window) — the build is TD-351 |
 | TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Open |
-| TD-349 | Build rule 11's read of a chain: `held.read_by` link by link, `addressed` in `sessionorc`, the review brief's line for an `ask` with no `pr` | High | Open |
 | TD-350 | Build the Org's ask block: a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup's *answer needed* | Low | Open |
 | TD-351 | Build the design split: `docs/design/<§>-<slug>.md` by script, `design.md` the index, `tests/design_doc.py`, every path that says `docs/design.md` for a grep repointed, landed in a quiet window | Medium | Open |
 
@@ -1495,37 +1493,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-343 (the ask it hid), TD-178 (archived: the Inbox count on the Org).
 
-## TD-345: The flows layer (§4.9c) is not yet one design with §4.9b, §4.9 and §6
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-06 (the anchor: a scoped review on Fable, asked by Paul, of §4.9c and §9 whole and the parts of §4.8, §4.9, §4.9b and §6 they touch)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-06** (the designer, PR #1156): all twelve findings, in present-tense rule voice. (1) §6 rule 11 reads a chain link by link — read when every link whose paths the PR touches has its reader's reply, or a thread holds a `merged` verdict or the person's reply; the code does the old reading, so the rule is marked not built and TD-349 builds it. (2) §4.9b says the three verdicts and points at §4.9c. (3) a carried `pass` is keyed on the reader, never on a stage's `name` (as `review.walk` already matches). (4) items 2 and 3 restated as the chain, the older shape its one-link form. (5) §4.9 *A person in the team* takes the flow's chain. (6) §4.9b's reader: a role's `review:` is read only with no flow. (7) `asks` is any review seat's trigger; a review seat of another role answers a non-PR ask by naming the techlead seat, the gate keys on nothing (TD-349 adds the brief's line). (8) the slice record and Paul's words moved to design-history §4.9c, one built line left. (9) the designer carve-out named transitional, TD-310 ending it (its Fix says so). (10) §9 invariant 9 covers flows and the `sit_out`/`relaunch` marks. (11) sitting out said once as a worker member's, the seat exception once. (12) *through <seat>* named as the questions' route, drawn under `build` too. Before: Open. Findings (1)–(3) were checked against the text by the anchor. The rest are as the reviewer gave them, with line numbers of `origin/main` at `f6175c3`.
-**Blocked by:** TD-349
-**Location:** `docs/design.md` §4.9c (5846–6511 at `f6175c3`), §4.9b *The reader* and *Seats with a trigger*, §4.9 *A person in the team*, §6 rule 11, §9 invariant 9
-
-**Why:** flows, role directories and review stages for any seat (TD-309, TD-313, TD-315) were added in small slices. The review's verdict: the layer is structurally sound, but the older sections still describe a single techlead with a role-owned `review:`, and the generalisation lives only in §4.9c's patches. Findings (1) and (3) are ones a builder cannot implement unambiguously; the rest are a consolidation pass.
-1. **§6 rule 11 reads one reader** (~8645: *for `reader: techlead`, an `ask` … with a reply from that seat*), while §4.9c (6354) says rule 11 already holds a chain's PR *read by a reply from any reader its asks named*. That also contradicts 6361's *only the last reader holding the PR merges it*: a chain PR merged after the first reader's `pass` is not a crossing. Rewrite rule 11 for the chain (read when every link whose paths it touches has a reply, or the last reader replied `merged`).
-2. **The verdict is spelled two ways:** §4.9b (5787) says the seat *answers on the thread: `merge`, or findings*, and §4.9c says `--verdict pass|merged|findings`. §4.9b should say the three and point at §4.9c.
-3. **A switch keys on a stage `name` that no rule may read:** 6000 says `name` is *read by no rule*, and 6416 says *a `pass` already given to a stage of the same name stands*. Key the carried `pass` on the reader and its path set, or let the `name` bullet say the switch reads it.
-4. §4.9c items 2 and 3 say the compile writes `review: {reader: techlead, held}`, and the TD-315 bullet (6344–6357) says `{chain, bound}` *in place of item 2's*. Restate items 2 and 3 as the chain, with the older shape as its one-link form.
-5. §4.9 *A person in the team* (4830–4836) takes `held:` as the union of the member roles' lists *once flows are built*. Under a flow, a role's `review:` is set aside (item 2), so it should take the flow's chain on the repos' `held:`, as a member does.
-6. §4.9b *The reader* (5756–5770) still presents `review:` as a setting of the role. It should say that a role's `review:` is read only with no flow, and that under a flow the record's `review` is the flow's chain.
-7. §4.9b *Seats with a trigger* (5436–5440) calls `asks` *the techlead's* trigger, but TD-315 staffs review stages with other seats on `trigger: asks`. Nothing says what such a seat does with a non-PR ask: pass it to `{techlead}`, or have the mail gate refuse it.
-8. §4.9c's opening paragraph (~900 words) and about 25 inline *Built (slice N)* sentences are history voice in rule text (CLAUDE.md: the design says what is true now). Move the slice record to design-history, and keep one *built* line.
-9. The designer carve-out *until TD-310* (6056–6073) is a transitional state with no stated status. State TD-310's status once, and delete the carve-out when it lands (with §4.8 ~4082's matching words).
-10. §9 says nothing about the flows layer's load-bearing rule (*the host agent never sees a flow, and the record gains no flow field*), and `closed_for: {why: sit_out}` is a flow-derived mark the tick keys on. Extend invariant 9: no rule keys on a flow or a stage, and `sit_out` and `relaunch` are person-written marks.
-11. Sitting out is stated three times (6115, 6227, 6417–6421), and the first reads as covering seats. Say *worker member* there, and give the seat exception once.
-12. The `{flow}` line and 6025–6031 route questions *through techlead-ao-1* even in a `build` flow where no seat reads. Word the strip so that a seat outside the path is not shown in it.
-
-**Fix:** one design round of rewrites in rule voice: rule 11 and §4.9b's reader first, (1)–(3), then the rest. Build entries only where code differs from the result. Rule 11's chain reading and the verdict spelling may already be built one way; read the code to see which.
-
-**Done when** §6 rule 11, §4.9b, §4.9 and §4.9c state one review model in present-tense rule voice, §9 invariant 9 covers flows, the slice history sits in design-history, and any code that differs has a build entry.
-
-**Related:** TD-309, TD-313, TD-315 (archived: the layer), TD-310 (the repos' move).
-
 ## TD-346: Split `docs/design.md` into one file per section under `docs/design/`, with `design.md` kept as the index
 
 **Priority:** Medium
@@ -1571,23 +1538,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
 
-## TD-349: Build rule 11's read of a chain — `held.read_by` link by link, `addressed` in `sessionorc`, the review brief's line for an `ask` with no `pr`
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-06 (TD-345's design round; the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/held.py` (`read_by`, `_whose`, `said`); `src/agentorc/review.py` (`addressed`, which moves down as the glob match did and is re-exported); `src/sessionorc/agent_tick.py` (the `_held_pass` caller is unchanged); `src/agentorc/flows/td/review.md`; `src/sessionorc/cadence.py` (`read_by`, the one sender rule 10 keeps on the PR's `checks` entry); `tests/test_held_missed.py` (rule 11 and `held.read_by`; its test of a chain read by one reader asserts the old reading and changes) and `tests/test_pr_held.py` (which imports `addressed` from `agentorc.review`, so the re-export stays)
-
-**Why:** design §6 rule 11 (TD-345, 2026-10-06) reads a chain's PR link by link: it is read when every link whose paths the PR touches has a reply from its reader on the thread of the record's ask carrying that `pr`, or a thread holds a reply with the verdict `merged`, or the person's reply. `held.read_by` today takes a reply from any reader an ask of the PR named as the read, so a chain PR merged after the first reader's `pass` and before the last reader's reply is no crossing — the gate rule 11 exists for passes silently for every chain. Separately, §4.9c *The words* now says a review seat of another role answers an `ask` with no `pr` by naming the techlead seat, and the review brief does not say so yet.
-
-**Fix, one PR:** `read_by` walks `review_links(s.review)` against the PR's files (`held_paths` per link; a link whose paths the PR does not touch is not asked of), and for each holding link looks for a `reply` on a thread of the record's `ask`s carrying `pr` whose `to` names that link's reader — matched as `ao pr held` matches, by the seat's name, the longest that fits — from that reader (`_bare(r.from_)` against the address); read when every holding link has one, or when any such reply carries `verdict == "merged"`, or when any such thread holds the person's reply; the one-reader form is a chain of one and reads as today, `reader: person` still the person's reply alone; the `checks` entry's kept `read_by` (rule 10, `cadence.read_by`: one sender, the first replier, written once) counts as the read for the one link its reader matches and for a one-reader record as today — so after mail is pruned a chain keeps one link's read and no more, which the build states in `held.read_by`'s docstring rather than widens (a second slot is not this entry's). `addressed` moves from `agentorc.review` into `sessionorc.held` (the package rule runs one way, as the glob match moved in TD-258) and `agentorc.review` re-exports it. `_whose`/`said` keep *its readers'* for a chain. The review brief (`flows/td/review.md`, which every review stage reads) gains one line under *A held PR*'s neighbours: an `ask` that carries no `pr` and is not the techlead's to answer is answered with one reply naming `{techlead}` as where the team's questions go, never passed up. Tests: a chain of two with a `pass` from the first reader and no reply from the second is a crossing after `GRACE`; the same with the second's `merged` is not; a `merged` from the first alone is not (the reader took the merge); the person's reply on either thread is not; a one-reader record is unchanged; the kept `read_by` on `checks` still clears a one-reader PR.
-
-**Done when** a scratch home (`scripts/look_home.py`) with a two-link chain marks a PR merged after the first reader's `pass` alone as `held_missed` and leaves one merged after the last reader's `merged` alone; then §6 rule 11's *not built* clause goes and TD-345 archives.
-
-**Related:** TD-345 (the design), TD-315 (the chain), TD-258 (rule 11 built for one reader), TD-247.
 
 ## TD-350: Build the Org's ask block — a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup
 

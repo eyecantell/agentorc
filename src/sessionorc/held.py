@@ -117,27 +117,81 @@ def _bare(address: str) -> str:
     return naming.split_address(address)[0]
 
 
-def read_by(s: Session, pr: int) -> str | None:
-    """Who read the PR, from the record's own mail: the sender of a `reply` on the thread of an
-    `ask` of this record's that carries `pr`, when that sender is one the thread's asks named. For
-    `reader: person` only the person's reply is the read; for `reader: techlead` the seat's is, and
-    so is the person's, since an ask the seat left past its bound is the person's on the same
-    thread (§4.9b). The reply is the read whatever it says. Mail is pruned, so the reply rule 10
-    kept on the PR's `checks` entry (`read_by`) counts as well."""
-    reader = str((s.review or {}).get("reader") or "")
-    named: dict[str, set[str]] = {}
+def addressed(addr: str, readers: list[str]) -> str | None:
+    """Which of a chain's `readers` — each the seat's name as the definition gives it (§4.9c) — a
+    mail address names: the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name
+    itself. The longest name that fits wins, so `ui-reader` is never taken for `reader`. None: none.
+    Here since rule 11 reads a chain at the home (TD-349); `agentorc.review` re-exports it."""
+    base = str(addr).split("@", 1)[0]
+    fits = [r for r in readers if base == r or base.endswith(f"-{r}")]
+    return max(fits, key=len) if fits else None
+
+
+def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | None:
+    """Who read the PR, from the record's own mail (§6 rule 11), or None when it was not read.
+
+    The older `{reader, held}`: the sender of a `reply` on the thread of an `ask` of this record's
+    that carries `pr`, when that sender is one the thread's asks named. For `reader: person` only
+    the person's reply is the read; for `reader: techlead` the seat's is, and so is the person's,
+    since an ask the seat left past its bound is the person's on the same thread (§4.9b).
+
+    A chain (§4.9c, TD-349) is read **link by link**: every link whose `held:` paths `files` touch
+    (all of them when `files` is None) needs a reply from its reader on a thread of an ask carrying
+    `pr` addressed to that reader — matched by the seat's name, as `ao pr held` matches (`addressed`).
+    It is read too when one such thread holds a reply with the verdict `merged` (the last reader
+    holding the PR merges it), or the person's reply (an ask past its bound made the PR the
+    person's, the rest of its chain with it). The read is returned as the last holding link's
+    replier, the merger, or the person.
+
+    The reply is the read whatever it says. Mail is pruned, so the reply rule 10 kept on the PR's
+    `checks` entry (`read_by`, one sender) counts as well: for the older form as the read, and for a
+    chain as the read of the one link its sender matches — so once mail is pruned a chain keeps one
+    link's read and no more (a second slot is not kept)."""
+    review = s.review or {}
+    kept = next((c.get("read_by") for c in s.checks if c.get("pr") == pr), None)
+    if not isinstance(review.get("chain"), list):
+        reader = str(review.get("reader") or "")
+        named: dict[str, set[str]] = {}
+        for e in s.outbox:
+            if e.kind == "ask" and e.pr == pr:
+                named.setdefault(e.root or e.id, set()).update(_bare(x) for x in e.to)
+        for r in s.inbox:
+            to = named.get(r.root or "") if r.kind == "reply" else None
+            if to is None or _bare(r.from_) not in to:
+                continue
+            if reader != "person" or r.from_ == PERSON:
+                return r.from_
+        if kept and (reader != "person" or kept == PERSON):
+            return str(kept)
+        return None
+    links = review_links(review)
+    readers = [str(x.get("reader") or "") for x in links]
+    holding = [
+        x for x in links if files is None or any(matches(f, g) for f in files for g in x.get("held") or [])
+    ]
+    threads: dict[str, set[str]] = {}  # an ask's thread → the readers it was addressed to
     for e in s.outbox:
         if e.kind == "ask" and e.pr == pr:
-            named.setdefault(e.root or e.id, set()).update(_bare(x) for x in e.to)
+            threads.setdefault(e.root or e.id, set()).update(
+                r for x in e.to if (r := addressed(_bare(x), readers)) is not None
+            )
+    read: dict[str, str] = {}  # a link's reader → who replied for it
     for r in s.inbox:
-        to = named.get(r.root or "") if r.kind == "reply" else None
-        if to is None or _bare(r.from_) not in to:
+        to = threads.get(r.root or "") if r.kind == "reply" else None
+        if to is None:
             continue
-        if reader != "person" or r.from_ == PERSON:
-            return r.from_
-    kept = next((c.get("read_by") for c in s.checks if c.get("pr") == pr), None)
-    if kept and (reader != "person" or kept == PERSON):
-        return str(kept)
+        if r.from_ == PERSON:
+            return PERSON  # the PR became the person's, the rest of its chain with it
+        who = addressed(_bare(r.from_), readers)
+        if who is None or who not in to:
+            continue
+        if r.verdict == "merged":
+            return r.from_  # the last reader holding the PR merged it
+        read.setdefault(who, r.from_)
+    if kept and (who := addressed(_bare(str(kept)), readers)) is not None:
+        read.setdefault(who, str(kept))
+    if holding and all(str(x.get("reader") or "") in read for x in holding):
+        return read[str(holding[-1].get("reader") or "")]
     return None
 
 
