@@ -5803,3 +5803,23 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1199, grinder-ao-2) — tests only: `tests/test_repo_facts.py::test_in_lanes_orders_the_rest_by_falling_count_and_reads_an_owner_in_any_case` (owners whose count and name order disagree, an owner in mixed case) and `::test_repo_lanes_reads_the_repos_own_records_and_a_claim_only_while_its_holder_lives` (another repo's record with a lane, a claim held by a closed record, then by a live one). Each of the four reverts above, made alone, fails one of them.
 
 **Related:** TD-361 (built it), TD-357 (designed it), TD-364.
+
+## TD-364: The lanes line's real callers (#1196) are untested: the team card and the Repo page read the whole fleet, and every test reaches them through `members`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/repo.py` (`team_groups`: `team_summary(..., fleet=views)`), `src/agentorc/ui/org.py` (`team_summary`: `fleet if fleet is not None else members`), `src/agentorc/ui/app.py` (`repo_page`: `team_lanes(named, vs, r)`); `tests/test_ui_team_summary.py` (`test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work`)
+
+**Why:** `team_lanes` says *every live record of the repo for what is held*, so the callers pass the whole fleet. Reverted one at a time, with `tests/test_ui_repo_page.py`, `test_ui_team_summary.py` and `test_ui_teams.py` run, each still passed:
+- `team_groups`: `, fleet=views` removed, so the Org page's card reads its own members only.
+- `repo_page`: `team_lanes(named, vs, r)` → `team_lanes(named, members, r)`.
+- `org.team_summary`: `fleet if fleet is not None else members` → `members`.
+- `test_the_lanes_line_…` calls `team_summary` without `fleet`, so only the fallback is read. A claim held by another team's live member of the same repo, which is why the fleet is passed, is in no test through a caller. The card then warns a member out of work for an entry that another team's member holds.
+
+**Resolved:** 2026-10-07 (PR #1204, grinder-ao-2) — tests only: `tests/test_ui_repo_page.py::test_the_team_card_reads_what_is_held_across_the_fleet_not_its_members_alone`, through `/repo/<name>` and so `team_groups`, with a second team's live record of the repo claiming every entry in the first team's lane: the first team's member is not warned, and is once the claims are gone. The `team_groups` and `org.team_summary` reverts each fail it. The `repo_page` revert (`vs` → `members`) is an equivalent mutant, so no test can fail it: that branch runs only when no group serves the repo, and `team_groups` makes a serving group of any record of the named team in the repo, so there the fleet holds none and `repo_lanes` gives the team nothing either way.
+
+**Related:** TD-361, TD-363.
