@@ -175,7 +175,7 @@ async def test_a_launch_whose_hooks_never_speak_gets_its_brief_on_a_scraped_idle
         w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
         rec = agent.sessions[w]
         rec.set_state("idle", confidence="scraped")  # what the tick reads off a launch no hook reached
-        assert await wait_for(lambda: _first(agent, w, "SUBMITTED " + BRIEF), timeout=8), "never sent on the scrape"
+        assert await wait_for(lambda: _first(agent, w, "SUBMITTED " + TYPED), timeout=8), "never sent on the scrape"
         assert await wait_for(lambda: _sent(rec), timeout=6)
         assert rec.first_prompt is None and rec.first_prompt_error is None and rec.first_prompt_tries == 0
         assert rec.sends[-1].text == "(the brief)" and rec.sends[-1].scraped is True
