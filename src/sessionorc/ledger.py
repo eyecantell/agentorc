@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -207,6 +207,49 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     if owners and mine and mine not in owners:
         return False
     return any(_word_matches(w, entry) for w in lane if owner_word(w) is None)
+
+
+UNOWNED = "unowned"  # the rest's name for an entry with no `Owner:` (§4.4 *In a team's lanes*)
+
+
+def in_lanes(
+    entries: list[dict[str, Any]], records: list[dict[str, Any]], held: Collection[str] = ()
+) -> dict[str, Any] | None:
+    """What one team's lanes take of a repo's open entries (design §4.4 *In a team's lanes*, TD-357,
+    TD-361) — the one reader the team card, the Repo page and `ao repo` draw from. `entries` are the
+    reading's, each with its page kind (`for_page`); `records` the team's member records, live or
+    ended, whose `lane`s are the team's lanes (`lane_matches`, rule 6's one rule); `held`, the
+    references a live record of the repo holds claimed. Returns `pickable` and `design_first`, the
+    ids in the lanes; `rest`, the *pickable* entries no lane takes, by `Owner:` (`UNOWNED` for none)
+    as `[{owner, n, ids}]` in falling count then name; `design_first_rest`, the ids that wait on a
+    build; and `out_of_work`, each record carrying `out_of_work` whose own lane takes an entry nobody
+    holds, `[{id, name, ids}]`. None where no record carries a lane: nothing is drawn."""
+    lanes = [list(r["lane"]) for r in records if r.get("lane")]
+    if not lanes:
+        return None
+    kinds = ("pickable", "design-first")
+    open_ = [e for e in entries if e.get("for_page") in kinds]
+    taken = {e["id"] for e in open_ if any(lane_matches(lane, e) for lane in lanes)}
+    by_owner: dict[str, list[str]] = {}
+    for e in open_:
+        if e["for_page"] == "pickable" and e["id"] not in taken:
+            by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
+    rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
+    rest.sort(key=lambda r: (-r["n"], r["owner"]))
+    idle = []
+    for r in records:
+        if not r.get("out_of_work") or not r.get("lane"):
+            continue
+        ids = [e["id"] for e in open_ if e["id"] not in held and lane_matches(list(r["lane"]), e)]
+        if ids:
+            idle.append({"id": r.get("id"), "name": r.get("name") or r.get("id"), "ids": ids})
+    return {
+        "pickable": [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == "pickable"],
+        "design_first": [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == "design-first"],
+        "rest": rest,
+        "design_first_rest": [e["id"] for e in open_ if e["id"] not in taken and e["for_page"] == "design-first"],
+        "out_of_work": idle,
+    }
 
 
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:

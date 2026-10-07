@@ -1433,9 +1433,18 @@ def _repo_line(r: dict[str, Any]) -> str:
         led_part = f"ledger: could not look ({led.get('error') or 'not read yet'})"
     else:
         k = led.get("by_kind") or {}
+        lanes = r.get("lanes") or {}
+        # split by the servicing teams' lanes (§4.4 *In a team's lanes*, TD-361): one parenthesis per team
+        picks = "".join(
+            f" ({t} {len(x['pickable'])}"
+            + (" · " + ", ".join(f"{o['owner']} {o['n']}" for o in x["rest"]) if x["rest"] else "")
+            + ")"
+            for t, x in lanes.items()
+        )
+        designs = "".join(f" ({t} {len(x['design_first'])})" for t, x in lanes.items())
         led_part = (
-            f"{len(led['entries'])} open entries: {k.get('pickable', 0)} pickable, {k.get('design-first', 0)}"
-            f" design-first, {k.get('for-you', 0)} for you, {k.get('other', 0)} other"
+            f"{len(led['entries'])} open entries: {k.get('pickable', 0)} pickable{picks}, {k.get('design-first', 0)}"
+            f" design-first{designs}, {k.get('for-you', 0)} for you, {k.get('other', 0)} other"
         )
         if led.get("error"):
             led_part += f" (could not look: {led['error']})"
@@ -1645,6 +1654,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
             ]
             r["standing"] = _pr_standing(members)
             r["board"] = _board_due(root)
+            r["lanes"] = teamrun.repo_lanes((r.get("ledger") or {}).get("entries"), root, fleet)
 
     def prose() -> None:
         if not picked:
@@ -1674,6 +1684,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")
+            # a member out of work with unheld work in its own lane (§4.4 *In a team's lanes*, TD-361)
+            for x in (r.get("lanes") or {}).values():
+                for m in x["out_of_work"]:
+                    print(f"  {m['name']} is out of work with {len(m['ids'])} in its lane: {', '.join(m['ids'])}")
             board = r.get("board") or {}
             if board.get("error"):
                 print(f"  board: could not look — {board['error']}")
