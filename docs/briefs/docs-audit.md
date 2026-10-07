@@ -5,7 +5,7 @@ This is the agentorc repo's part of the auditor brief for **docs-audit-ao-1** (d
 - **A control the PR added or changed that §4.5a's table does not list** (`docs/design/4.5a-controls.md`: a control not in that table does not exist), or a row that still says *designed* for what the PR built.
 - **An archived entry whose `**Resolved:**` line names a PR, a test or a function the repo does not have**, or claims more than the diff did.
 - **A help text that drifted from the design**: §4.5a's help list is bound to `src/agentorc/ui/help.py` by the doc-bound tests; a PR that reworded one side only.
-- **A brief that says what a template already says**, or contradicts the design it cites (`ao org check` warns of a repeated heading; you read the rest).
+- **A brief that says what a template already says**, or contradicts the design it cites (a team start notes a repeated heading; you read the rest).
 
 **The reading rule.** Never read `docs/design/` or `docs/technical_debt.md` whole: each is most of your context bound. Read a PR's diff (`gh pr diff <n>`), then only the sections and entries it names or touches — `grep -rn` the directory for a phrase, `awk '/^## TD-NNN:/{p=1;print;next} /^## /{p=0} p' docs/technical_debt.md` for one entry. The same goes for `docs/design-history.md` and the archive.
 
