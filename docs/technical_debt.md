@@ -75,12 +75,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Partly done — agentorc's half built (PR #1166); the other three repos' halves are the anchor's |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
-| TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
-| TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-355 | *flow changed — Apply* never clears after an Apply: the relaunch waits for the member's next run, and the record's old `review` reads as a change | High | Open |
 | TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Open |
 | TD-357 | A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take | Medium | Open |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Open |
+| TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Open |
 
 ---
 
@@ -1268,47 +1267,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
 
-## TD-336: A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-05 (the anchor, asked by Paul why cm-grind was idle)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-05** (the designer, PR #1141; the shape — the brief typed at the composer, against the brief inside the system-prompt file with a fixed first prompt — steered to Paul): design §4.1 *No prose in the argv* (the start context as `launch/<tmux name>.context.md` named by the tool's file flag; the brief as `first_prompt` on the launch record, sent by the verified send at the record's first `idle`, three tries, then `first_prompt_error`), §4.2's `SessionStart` row (every launch lands at the composer), §4.3 (`--append-system-prompt-file`, no entry of its own in `--help`, present in 2.1.290's binary; `LaunchSpec.first_prompt`), §4.5a *brief not sent* mark. The build is TD-339; this entry archives with it. Was: Open. contractmatch's side is fixed by its PR #122 (kills by executable); agentorc's is not.
-**Blocked by:** TD-339
-**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`: the brief as the prompt positional, a start context as `--append-system-prompt`, both in argv), design §4.1 (*a session's brief rides in its argv*), §4.3
-
-**Why:** On 2026-10-05 at 23:07 UTC `grinder-cm-1`'s pane died with status 143 (SIGTERM) while it ran contractmatch's `frontend/scripts/run_ci_tests.sh`, which its brief tells it to run for anything integration-affecting. The script's cleanup runs `pkill -f chromedriver` and `pkill -f "chromium"`, which match a word anywhere in a process's command line. The launch puts the session's brief there (the prompt positional), and contractmatch's `docs/briefs/grinder-cm-1.md` names *Chromium + chromedriver*, so the cleanup killed the `claude` process running it. TD-026's work was left uncommitted, as an earlier run had left the same work. The briefs' standing rule (`docs/briefs/grinder-ao-1.md`: *never run a process-matching kill with a pattern that can match your own shell command line*) cannot help: the session does not see the kill, a script it was told to run does, and nothing says its own command line holds a few kilobytes of prose. Any repo, any script, any word the brief happens to use.
-
-**Fix:** design first, then build. Keep the brief out of the process's command line: hand it to the tool from a file under the home (the 8 KB launch script of §4.1 already exists, so the text could be read there rather than written into the `exec`'d argv), if the tool takes a first prompt or a system-prompt tail from a file or from stdin; otherwise say in §4.1 why it cannot, and have every template say that a script's `pkill -f` can hit the session. The same goes for the start context `--append-system-prompt` carries, which a resume must still be handed (TD-283, archived).
-
-**Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels.
-
-**Related:** TD-283 (archived: the start context on every launch), contractmatch PR #122.
-
-## TD-339: Build *No prose in the argv* — the start context by file, the brief typed at the composer
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-05 (the designer, TD-336's build)
-**Owner:** grinder
-**Kind:** live-check #1147
-**Status:** **Live check 2026-10-06 (grinder-ao-1), #1147 live (`ao promote status`: live f6175c3):** the argv half holds — `/proc/<pid>/cmdline` of grinder-ao-1's run started 06:12 local reads `claude --settings …grind+unattended.json --session-id … --name grinder-ao-1 --model opus --dangerously-skip-permissions`, no brief and no start context (a grinder has none, so no `--append-system-prompt-file` either), `AGENTORC_AT_COMPOSER=1` in its environment, and its record's `first_prompt_sent_at` is 2026-10-06T12:12:15Z. The brief half does not hold as written (the anchor's finding, mail m-3baf82ed4750): the same session's run of 2026-10-05 22:38, a restart seconds after the promote, never got its brief — its first hook was refused as *outside* (TD-341), so no hook `idle` came, and nothing types a brief that waits on one (TD-342); it sat at an empty composer, `stalled?`, for 7.5 hours. Blocked on both; once they are live, the check is a restart's brief typed. Before: Built — slice 1 built (grinder-ao-1, PR #1147): the adapter writes the start context to `launch/<conversation id>.context.md` (`paths.context_file`, `0600`; the conversation id, since the launch runs before the tmux name is chosen) and names it with `--append-system-prompt-file`, hands the prompt back as `first_prompt`, sets `AGENTORC_AT_COMPOSER=1` on every launch but a resume, and `_forget` removes the file with the last record holding the conversation. Once #1147 is live, what is left is the press, read on the live copy: `ps -o args` of a session started after the promote shows no brief and no start context. Slice 2 built first (grinder-ao-1): the host agent's half — `LaunchSpec.first_prompt`, the record's four `first_prompt*` fields, the tick's send at the first hook `idle` (`agent_wake._send_first_prompts`), the doorbell held off until it is typed, the hook's `prompt` word on `UserPromptSubmit`, the card's *brief not sent* slot and Focus's badge (`cards.brief_unsent`, amber) and `ao status -v`'s line (`tests/test_first_prompt.py`; seen on a scratch home with the test's composer stub, PR's UI check). Both slices merged; what is left is the press on the live copy (below), once #1147 is live.
-**Blocked by:** TD-341, TD-342
-**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`, `LaunchSpec`), `src/sessionorc/adapters.py` (`LaunchSpec.first_prompt`), `src/sessionorc/agent.py` (`create`: the launch record's `first_prompt`; the send path `rpc_send` uses, `SUBMIT_SECONDS`, `prompt-stuck`), `src/sessionorc/agent_tick.py` (the first send at the record's first `idle`, the retries, `first_prompt_error`), `src/sessionorc/models.py` (the record and launch-record fields), `src/sessionorc/paths.py` (`launch/`), `src/agentorc/ui/cards.py` and `templates/card.html` (the mark), `src/agentorc/cli.py` (`ao status -v`), `tests/` (the `hookstub` adapter of `tests/_stubs.py`); design §4.1 *No prose in the argv*, §4.2's `SessionStart` row, §4.3, §4.5a *brief not sent* mark. Held path (`src/sessionorc/**`): the techlead reads slice 2.
-
-**Why:** TD-336's design. A repo script's `pkill -f <word>` killed the session whose brief, riding in its argv, held the word.
-
-**Fix, in two slices, a PR each:**
-1. **The adapter** (`src/agentorc`). `launch` writes the start context to `launch/<conversation id>.context.md` (built so: the launch runs before the tmux name is chosen) (mode `0600`) and passes `--append-system-prompt-file <path>` in place of `--append-system-prompt <text>`; the prompt leaves argv and rides on `LaunchSpec.first_prompt`, so every launch is the no-prompt launch (`AGENTORC_AT_COMPOSER=1`, §4.2). The file is removed with the launch script when the record is forgotten. A test asserts no word of a brief or a start context is in the argv, and that the context file's text is the start context given.
-2. **The host agent** (`src/sessionorc`). `create` keeps `first_prompt` on the launch record and reports `working` only when a turn starts; on the record's first hook `idle` the tick sends it by the path `rpc_send` uses (bracketed paste, the composer must empty, `prompt-stuck`), writing `first_prompt_sent_at`; a refusal is tried again on the next idle tick, `FIRST_PROMPT_TRIES` (3), then `first_prompt_error` holds the reason; a `UserPromptSubmit` clears it. The card's *brief not sent · <reason>* mark and `ao status -v`'s line. A resume with a prompt, a restart, a Resume and a profile switch go the same way. Tests: a brief sent on the first idle and `working` after; a composer that never takes it marks the record after three tries and clears on a prompt; a launch with no brief marks nothing.
-3. **The press** (slice 2's PR, on a scratch home — `scripts/look_home.py` starts the `shell` adapter alone, so the Claude Code session is started against that home with `ao new … --prompt`): a session whose brief names a word, then `pkill -f <that word>` from another pane — the session survives, and `ps -o args` on its pane's process shows no prose.
-
-**Done when** a session started by agentorc survives `pkill -f <a word from its brief>` run by another process, and §4.1 says where the brief travels (TD-336's *Done when*); then TD-336 archives with this entry.
-
-**Related:** TD-336 (the design), TD-283 (the start context on every launch), TD-027 (the verified send), TD-199 (a running member keeps its brief), contractmatch PR #122.
-
 ## TD-355: *flow changed — Apply* never clears after an Apply: a relaunch rewrites the launch record, the record keeps its old `review` until the member restarts, and `teamrun.differences` reads that as a change
 
 **Priority:** High
@@ -1416,3 +1374,30 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Done when** an Apply on a team whose idle members have declared out of work restarts them on their stage briefs within a tick (their `{stage}` line names the flow's brief), and the tests above pass.
 
 **Related:** TD-355 (the mark that outlives the Apply), TD-309 (archived: *Switching*), TD-334 (archived: rule 7's retry), TD-310 (the move that surfaced it).
+
+## TD-360: A restart's first hook is still refused as *outside* after TD-341's fix — the identity alarm fires on each ao-grind restart
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (grinder-ao-2, TD-339's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_identity.py` (`_id_pane_replaced`, `_id_log_late_hook`'s log line, `_id_channel`), `src/sessionorc/agent.py` (`_take_name`), `tests/test_identity.py`; design §4.8a *A pane the tick has not listed yet*.
+
+**Why:**
+- TD-341 (archived 2026-10-06, PR #1150) closed on one clean restart, designer-ao-1's at 17:04.
+- Every ao-grind restart read since then raised the alarm again, on live copies carrying #1150 (`journalctl --user -u agentorc-agent`, local times):
+  - 20:01:10 designer-ao-1, live `3326905`: *hook for ao-agentorc-designer-ao-1 matched no pane: peer 4111684 (start 400902643, sid 4111683), listed pane 4111697, gone pane 3680802 0.9s ago*, then *identity alarm (enforce): outside claimed 'ao-agentorc-designer-ao-1' on hook*.
+  - 20:20:38 grinder-ao-2, live `565f51f`: *peer 37172 (sid 37171), listed pane 37181, gone pane 3772118 0.9s ago*, the same alarm. Pid 37181 is that run's `claude` process.
+  - 19:48:03 grinder-ao-1 shows the same shape.
+- So the list already holds the new pane when the hook arrives; the old pane is in the gone list. The peer's pid is lower than the listed pane's, and its session id is one below its own pid. The peer is likely the process that launched `claude`, not one of its children, so the hook's peer walk never reaches the listed pane.
+- The harm TD-341 named is gone: each of those runs typed its brief one to two seconds later by the hook road (TD-339's live check). What is left is a false *outside* alarm on every restart, and the first hook it refuses.
+
+**Fix:**
+- Read the peer walk for a hook from a freshly started pane. Find why a peer in the listed pane's session, started before the pane's listed pid, is not matched, then match it. The pane's session id, or the pane pid's ancestors, are candidates.
+- Test: a restart whose hook peer is the pane's launcher, an ancestor of the listed pid in the same session, is matched and raises no alarm.
+- **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
+
+**Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
+
