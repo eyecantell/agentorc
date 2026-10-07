@@ -93,6 +93,63 @@ def test_a_fully_detached_process_is_outside_unless_the_cgroup_check_is_on():
     assert identity.classify(300, PANES, fp, detached=on) == identity.OUTSIDE  # the person is in another cgroup
 
 
+def test_an_orphan_in_a_panes_own_scope_is_that_session():
+    """TD-362: on kmaster tmux starts each pane in a `tmux-spawn-<uuid>.scope`, so a session's process
+    that shed ancestry, session id and terminal — a Claude Code background command, whose tool shell
+    is setsid'd with no tty, orphaned once that shell exits — never sat in the server's cgroup, and the
+    *unknown* clause never fired: it read as *outside*, the person. It is matched by the pane's scope."""
+    app = "/user.slice/user-1000.slice/user@1000.service/app.slice"
+    svc, sx, sy = f"{app}/agentorc-agent.service", f"{app}/tmux-spawn-x.scope", f"{app}/tmux-spawn-y.scope"
+    cg = {7: svc, 50: svc, 100: sx, 200: sy, 400: sx, 401: f"{app}/tmux-spawn-other.scope", 300: "/user.slice/s.scope"}
+    fp = FakeProc([*BASE, P(7, 1, 7), P(400, 1, 400), P(401, 1, 401), P(300, 1, 300, 0x8810)], cgroups=cg)
+    panes = [Pane("ao-x", 100, 0x8801, sx), Pane("ao-y", 200, 0x8802, sy)]
+    on = identity.detached_check(fp, agent_pid=7, tmux_pid=50)
+    for detached in (on, None):  # a positive match: the check being on or off does not decide it
+        assert identity.classify(400, panes, fp, detached=detached) == Channel("session", "ao-x", "scope")
+    assert identity.classify(401, panes, fp, detached=on) == identity.OUTSIDE  # no pane of ours: not ours to name
+    assert identity.classify(300, panes, fp, detached=on) == identity.OUTSIDE  # the person
+    assert identity.classify(400, PANES, fp, detached=on) == identity.OUTSIDE  # panes with no scope of their own
+    # a scope of our server's that no live record holds (a pane that is no record's, a gone one) is
+    # ours to call unknown — under the check, and never any other tmux-spawn scope (the person's tmux)
+    other = cg[401]
+    assert identity.classify(401, panes, fp, detached=on, ours={other}) == Channel("unknown", signal="cgroup")
+    assert identity.classify(401, panes, fp, ours={other}) == identity.OUTSIDE  # the check off: outside
+    cg[400] = svc  # every pane in the server's cgroup: today's clause still holds
+    assert identity.classify(400, PANES, fp, detached=on) == Channel("unknown", signal="cgroup")
+
+
+async def test_the_scopes_of_our_panes_no_record_holds_are_ours(agent, monkeypatch):
+    """TD-362: a pane of the server's that is no record's, and a record's gone pane inside the grace,
+    lend their scopes to `ours`; a pane shared with another, or a record's live pane, does not."""
+    import os
+
+    sx, sz, sg = "/app.slice/tmux-spawn-x.scope", "/app.slice/tmux-spawn-z.scope", "/app.slice/tmux-spawn-g.scope"
+    svc = "/app.slice/agentorc-agent.service"
+    fp = FakeProc(
+        [*BASE, P(300, 50, 300), P(500, 50, 500)],
+        {50: svc, os.getpid(): svc, 100: sx, 200: sg, 300: sz, 500: "/app.slice/tmux-spawn-w.scope"},
+    )
+    monkeypatch.setattr(agent, "proc", fp)
+    monkeypatch.setitem(agent.sessions, "ao-x", object())
+    monkeypatch.setitem(agent.sessions, "ao-y", object())
+
+    def info(pid: int, dead: bool = False) -> PaneInfo:
+        return PaneInfo(session="", created=0, current_command="sh", pane_pid=pid, dead=dead, dead_status=None)
+
+    agent._id_note_panes({"ao-x": info(100), "ao-y": info(200), "ao-stray": info(300), "ao-dead": info(500, True)})
+    assert agent._id_other_scopes == {sz}  # the stray pane's; a dead pane is not read
+    assert agent._id_ours() == {sz}
+    agent._id_note_panes({"ao-x": info(100), "ao-stray": info(300)})  # ao-y's pane went
+    assert agent._id_ours() == {sz, sg}
+    pane, at = agent._id_gone["ao-y"]
+    agent._id_gone["ao-y"] = (pane, at - identity.PANE_GONE_GRACE)
+    assert agent._id_ours() == {sz}  # past the grace: outside again
+    fp.cgroups[300] = sx  # the stray pane shares ao-x's cgroup: neither's own
+    agent._id_scopes = {}
+    agent._id_note_panes({"ao-x": info(100), "ao-stray": info(300)})
+    assert agent._id_other_scopes == set() and agent._id_panes[0].cgroup == ""
+
+
 def test_the_detached_check_is_off_when_the_tmux_server_is_not_in_the_agents_own_service():
     svc = "/system.slice/agentorc-agent.service"
     scope = "/user.slice/user-1000.slice/session-3.scope"
@@ -281,11 +338,16 @@ async def test_enforce_against_real_panes(agent, tmp_path):
         got = await _probe(me, tmp_path, a, "who", {"id": 1, "method": "whoami", "params": {}})
         assert got["result"]["channel"] == "session" and got["result"]["session"] == a
         assert (await me.call("whoami"))["channel"] == "outside"
-        # detached completely — double fork, setsid, no terminal — it has shed every signal: outside
-        # here (the cgroup check is off under a test), and outside naming a session is refused
+        # detached completely — double fork, setsid, no terminal — it has shed three signals. Where
+        # tmux starts each pane in a scope of its own (systemd), the scope is the fourth and it is the
+        # session's own (TD-362); elsewhere it is outside (the cgroup check is off under a test), and
+        # outside naming a session is refused
         got = await _probe(me, tmp_path, a, "detached", doing(a, a, "from the void"), detach=True)
-        assert got["error"] == identity.MISMATCH
-        assert (await me.call("get", id=a))["doing"]["text"] == "forgot the variable"
+        if next(p.cgroup for p in agent._id_panes if p.session == a):
+            assert got["result"]["doing"]["text"] == "from the void"
+        else:
+            assert got["error"] == identity.MISMATCH
+            assert (await me.call("get", id=a))["doing"]["text"] == "forgot the variable"
 
     # the pytest process naming a session: outside + a claim — refused, the alarm blames no record
     async with LocalClient(caller=a) as forged:
