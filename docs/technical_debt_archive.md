@@ -5712,3 +5712,21 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Related:** TD-357 (the design), TD-228 (the derived pickable, the owner on each row), TD-198 (the kind bar's buckets), §6 rule 6 (`lane_matches`, `lane_seen`).
 
 **Resolved:** 2026-10-07 (PRs #1194, #1196, grinder-ao-2) — one reader, `sessionorc.ledger.in_lanes` through `teamrun.repo_lanes` per servicing team, draws the lanes line on `ao repo`'s first line (with a line per member out of work with unheld work in its lane, and `--json` `lanes`), on the team card under the kind bar's legend (`org.lanes_line`, `lanes_line.html`: the counts linked to the Repo page's lists where it draws them, the two hovers, the tinted out-of-work mark with its ids and a Focus link) and on the Repo page's count line once per servicing team. UI-checked on a scratch home (`docs/mockups/reviews/2026-10-06-td361-card-lanes.png`, `…-repo-lanes.png`).
+
+## TD-209: The org-wide `grinder` role carries agentorc's review paths into every repo
+
+**Priority:** Low
+**Added:** 2026-09-27 (found when grinder-dc-1 was recreated: its launch record holds `review: {reader: techlead, held: [src/sessionorc/**, docs/briefs/**], bound: 2h}`)
+**Owner:** anchor
+**Kind:** decision
+**Status:** Resolved 2026-10-07. Open — **answered 2026-09-28 by TD-210's design** (design §4.9 *A repo's held paths are the repo's*): `held:` is written on the role in the repo's own `.agentorc.yml`, and the org-wide role keeps the reader and the profile. TD-229 slice 2 writes agentorc's; the org file's edit is on the board. Closes with TD-229. **Next:** `org.yml` is the anchor's, outside the repo.
+**Blocked by:** TD-229
+**Location:** `~/.agentorc/org.yml` (`roles: grinder: {profile: grind, review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}}`), design §4.9b *The reader*, §4.8 (role presets and their layers)
+
+**Why:** the `review:` line was set on 2026-09-23 for agentorc (TD-093): a grinder PR touching `src/sessionorc/**` or `docs/briefs/**` waits for the techlead. It sits on the org-wide role overlay, so every team's grinder carries it. In dev-cadence `src/sessionorc/**` doesn't exist and `docs/briefs/**` is a real path with a different meaning; samscrape's and contractmatch's grinders carry it too. It is harmless where a path is absent and wrong where it matches by accident.
+
+**Resolved:** 2026-10-07 (the anchor), with TD-210 and TD-229, both archived. A repo's held paths are the repo's (`held:` in its `.agentorc.yml`), and the *Done when* reads true: `ao --json status` shows grinder-dc-1's record with `review: null`, and ao-grind's grinders hold `{reader: techlead, held: [src/sessionorc/**, docs/briefs/**]}`.
+
+**Fix:** decide where a repo's held paths live: in the repo's own `.agentorc.yml` (per repo, reviewed with the code), on the team in `org.yml`, or both with the repo's winning. Then move agentorc's two paths there and leave the org-wide role with a reader and no paths. Check §4.9b and the settings audit's definition-versus-setting rule (ADR 2026-09-25) for which it is. Done when grinder-dc-1's record holds dev-cadence's own held paths or none, and ao-grind's grinders keep theirs.
+
+**Related:** TD-093 (the reader and `held`), TD-120 (org roles), `docs/decisions/2026-09-25-settings-audit.md`.
