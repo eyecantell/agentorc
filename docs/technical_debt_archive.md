@@ -5267,10 +5267,10 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-10-06 (grinder-ao-1, read on its own record)
 **Owner:** grinder
 **Kind:** build
-**Status:** Resolved 2026-10-06 (grinder-ao-1, PR #PRNUM).
+**Status:** Resolved 2026-10-06 (grinder-ao-1, PR #1170).
 **Location:** `src/sessionorc/agent_tick.py` (`_crash_restart`, `_wanted_restart`, rule 7's replay → `_replay(…, keep_mail=True)`), `tests/test_crash_restart.py`; design §6 rule 1, §4.10 *The name coming back adopts it*.
 
-**Resolved:** 2026-10-06 (grinder-ao-1, PR #PRNUM). Rules 1, 2 and 7 replay with `keep_mail`, as rule 8, a seat's fill and a person's Restart already did; design §6 rule 1 says every replay of the tick's keeps the mail, and §4.10 drops *the tick's own replays did not*. `tests/test_crash_restart.py`: an `ask` the run before sent survives a wanted restart and a crash restart, and the reader's reply to it is `held.read_by`'s read (it fails without the fix: the new outbox is empty).
+**Resolved:** 2026-10-06 (grinder-ao-1, PR #1170). Rules 1, 2 and 7 replay with `keep_mail`, as rule 8, a seat's fill and a person's Restart already did; design §6 rule 1 says every replay of the tick's keeps the mail, and §4.10 drops *the tick's own replays did not*. `tests/test_crash_restart.py`: an `ask` the run before sent survives a wanted restart and a crash restart, and the reader's reply to it is `held.read_by`'s read (it fails without the fix: the new outbox is empty).
 
 **Why:** grinder-ao-1 asked the techlead about #1164 and #1158, then declared `restart` (context bound). The tick's wanted restart replayed it without `keep_mail`, so the new record held no outbox; the techlead merged #1164 and replied on the ask's thread twenty seconds later, and rule 11 found no thread of the record's for the reply — a crossing on `held_missed` and *[agentorc] PR #1164 … merged without the techlead's read* typed into the member, for a PR its reader had read and merged. §4.10 *The name coming back adopts it* already listed the tick's restart among the creates that keep the mail.
 
