@@ -81,6 +81,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
+| TD-355 | *flow changed — Apply* never clears: `teamrun.differences` compares `held` lists in order, and the flow compiles them sorted | High | Open |
+| TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Open |
 
 ---
 
@@ -1380,3 +1382,59 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-339 (the brief that waited), TD-342 (no fallback when the first hook is lost), TD-225 (alarms at a restart), TD-115 (the grace).
 
+## TD-355: *flow changed — Apply* never clears: `teamrun.differences` compares `held` lists in order, and the flow compiles them sorted
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's press of Apply on ao-grind)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`differences`: `(rec.get("review") or None) != (x.review or None)`), `src/agentorc/teams.py` (the compiled reader, `{"reader": "techlead", "held": sorted(...), "bound": REVIEW_BOUND}`)
+
+**Why:**
+- On 2026-10-06 at 20:58 Paul pressed **Apply** on ao-grind's card, the first team on a flow (TD-310), and the host agent relaunched grinder-ao-1, grinder-ao-2 and designer-ao-1 with their stage briefs.
+- The mark stayed afterwards, and `ao team flow ao-grind` still lists each member as *relaunched — reader techlead → techlead*.
+- Each record's `review` holds `held: ["src/sessionorc/**", "docs/briefs/**"]`, in the order `.agentorc.yml` writes it. The flow compiles `sorted(held)`, so the two dicts differ only in list order, and `differences` reads that as a change.
+- `teams.flow_redundant` already compares `held` as a set; `differences` does not.
+
+So every team on a flow whose `held:` isn't written sorted reads *flow changed* forever, and Apply relaunches its idle members on every press for nothing.
+
+**Fix:**
+- Compare reviews as the flow means them: `reader` (or each chain link's reader and path set), `bound`, and `held` as a set, in `differences` and anywhere else a record's `review` is compared with a compiled one.
+- Check whether the record should also store `held` sorted, so that one shape travels end to end.
+- Tests:
+  - a record whose `held` is the compiled set in another order shows no difference;
+  - a changed set still does;
+  - a chain still compares link by link.
+
+**Done when** after an Apply on a team whose `held:` is not sorted, `ao team flow <team>` and the card show no *flow changed*, and the tests above pass.
+
+**Related:** TD-310 (the move that surfaced it), TD-309 (archived: *Switching*), TD-349 (archived: the chain shape).
+
+## TD-356: Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's use of the team card)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a *team card: Flow pick* and *team card: flow changed — Apply*, §4.9c *Switching*; `src/agentorc/ui/static/app.js` (the pick's `Switch <team> to <flow>?` confirm, Apply's `confirm(ap.dataset.confirm)`)
+
+**Why:**
+- Paul, 2026-10-06: changing the selected flow gives a confirmation popup, which seems redundant with an Apply button. Use one or the other.
+- As designed:
+  - the **Flow** pick writes `teams.<team>.flow` and applies it at once after a confirm naming who sits out, starts and is relaunched;
+  - **flow changed — Apply** is for records that drift from the current flow for any other reason (a hand edit of the definition, a stage brief changed), and has its own confirm.
+- To the person, it reads as two gates on one act.
+
+**Fix:** design first. Choose one gate. For example:
+- (a) the pick only selects, and the team shows *flow changed — Apply* until the person presses Apply, which is the one place a relaunch is confirmed. Or:
+- (b) the pick applies with its confirm, and Apply needs no confirm of its own, since the mark's title already lists what it will do.
+
+Paul's leaning is in his words above. This is the obvious tier unless the two shapes differ in what a person can undo.
+
+**Done when** switching a team's flow from the card takes one deliberate confirmation, and §4.5a's two rows say which control carries it.
+
+**Related:** TD-355 (Apply's mark that never cleared), TD-309 (archived: the pick and Apply), TD-307 (the design).
