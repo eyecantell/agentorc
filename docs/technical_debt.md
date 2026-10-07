@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Designed 2026-09-28 with TD-223 — the build is TD-228 |
-| TD-209 | The org-wide `grinder` role carries agentorc's review paths (`src/sessionorc/**`, `docs/briefs/**`), so every repo's grinder inherits them: grinder-dc-1's record holds them in dev-cadence | Low | Open — answered by TD-210's design; closes with TD-229 |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Designed 2026-09-28 — the build is TD-228 |
 | TD-225 | A restart or close raises a false identity alarm: the old run's last hook matches neither the new pane nor a gone one, likely because a restart reuses the tmux name, so TD-115's 10 s grace never applies | Low | Built (#746) — live check 2026-10-03: alarms still land with *gone pane None*; (a) misses them |
 | TD-228 | Build the derived pickable: the reader's `Blocked by:` rule and the archive, the page's kinds in their new order, the lane words, this ledger's migration off the `**Pickable:**` line, the briefs' pick | Medium | Built — slices 1–4 (PRs #793, #898, #901 and slice 2); left: the live half of *Done when* on dc-grind after a promote |
@@ -80,6 +79,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-363 | `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing (held by a dead record, other repos' records, the falling-count order, the owner's case) | Medium | Open |
 | TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
 | TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
+| TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Open |
+| TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Open |
 
 ---
 
@@ -925,22 +926,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-197, TD-118 (the header lines), TD-176 (the facet and the Repo page).
 
-## TD-209: The org-wide `grinder` role carries agentorc's review paths into every repo
-
-**Priority:** Low
-**Added:** 2026-09-27 (found when grinder-dc-1 was recreated: its launch record holds `review: {reader: techlead, held: [src/sessionorc/**, docs/briefs/**], bound: 2h}`)
-**Owner:** anchor
-**Kind:** decision
-**Status:** Open — **answered 2026-09-28 by TD-210's design** (design §4.9 *A repo's held paths are the repo's*): `held:` is written on the role in the repo's own `.agentorc.yml`, and the org-wide role keeps the reader and the profile. TD-229 slice 2 writes agentorc's; the org file's edit is on the board. Closes with TD-229. **Next:** `org.yml` is the anchor's, outside the repo.
-**Blocked by:** TD-229
-**Location:** `~/.agentorc/org.yml` (`roles: grinder: {profile: grind, review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}}`), design §4.9b *The reader*, §4.8 (role presets and their layers)
-
-**Why:** the `review:` line was set on 2026-09-23 for agentorc (TD-093): a grinder PR touching `src/sessionorc/**` or `docs/briefs/**` waits for the techlead. It sits on the org-wide role overlay, so every team's grinder carries it. In dev-cadence `src/sessionorc/**` doesn't exist and `docs/briefs/**` is a real path with a different meaning; samscrape's and contractmatch's grinders carry it too. It is harmless where a path is absent and wrong where it matches by accident.
-
-**Fix:** decide where a repo's held paths live: in the repo's own `.agentorc.yml` (per repo, reviewed with the code), on the team in `org.yml`, or both with the repo's winning. Then move agentorc's two paths there and leave the org-wide role with a reader and no paths. Check §4.9b and the settings audit's definition-versus-setting rule (ADR 2026-09-25) for which it is. Done when grinder-dc-1's record holds dev-cadence's own held paths or none, and ao-grind's grinders keep theirs.
-
-**Related:** TD-093 (the reader and `held`), TD-120 (org roles), `docs/decisions/2026-09-25-settings-audit.md`.
-
 ## TD-223: Rule 6 matches nothing in a ledger without Pickable, Owner and Kind lines
 
 **Priority:** Medium
@@ -1384,3 +1369,63 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** one assertion in `test_flows.py` that a pick with an open PR asked of a reader returns it in `stays`; or, if nothing is to read it, drop it from the return and the docstring. **Done when** the revert fails a test, or the key is gone.
 
 **Related:** TD-359 (#1191), TD-356.
+
+## TD-366: Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-07 (the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (the seat branch of the tick: `s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now)` → *a seat with nothing due, idle and pushed — closing it (§6 rule 3)*), `_seat_done`; design §6 rule 3, §4.9b *Seats with a trigger*
+
+**Why:**
+- On 2026-10-07 test-audit-ao-1, the first fill of the audit seats TD-098 added, mutation-tested the night's builds. It wrote TD-363 to TD-365 into PR #1197 and launched its independent fact-check as a background agent, as the cadence asks.
+- It ended its turn with *Waiting for the fact-check to finish*.
+- At 06:31:56 the tick found the seat idle, with nothing due and its work pushed, and closed it (*a seat with nothing due, idle and pushed — closing it*). That killed the fact-check and the run that would have merged.
+- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at about 17:15.
+- A member is not closed this way, but a seat is: any seat that waits on its own background work (a reviewer, a CI watch, a sleep) looks done to rule 3.
+
+**Fix:**
+- `_seat_done` (or rule 3's branch) does not close a seat that has work of its own in flight. Candidates for the signal:
+  - an open PR the seat authored that is neither merged nor handed to a reader;
+  - a background task the tool reports (Claude Code shows *N shell(s) running*, and a hook could carry it);
+  - a short grace after its last turn that a waiting seat renews.
+- The design says which (§6 rule 3).
+- At the least, a seat closed with an open PR of its own leaves it to its team's techlead seat or on the board, never stranded.
+- Tests:
+  - a seat idle with its own open, unread PR is not closed;
+  - one with nothing open still is.
+
+**Done when** an audit seat that opens a PR and waits on its fact-check lands the PR before rule 3 closes it, or hands it on, and the tests pass.
+
+**Related:** TD-098 (the audit seats), TD-259 (the on-call manager, which rule 3 also closes), TD-363 to TD-365 (the entries #1197 carried).
+
+## TD-367: *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `sessionorc.ledger` (`for_page`), `src/agentorc/ui/repo.py` (`LEDGER_LISTS`), `src/agentorc/ui/org.py` (`KIND_BARS`), the Inbox; design §4.5 screen 6 (the Inbox), §4.7 `ao repo`
+
+**Why:**
+- Paul, 2026-10-07: *15 for you* on the repo line, and *I do not see them in the inbox*.
+- The fifteen were `Owner: paul` entries, entries blocked by `decision (Paul)`, and also:
+  - TD-151, blocked by `decision (designer)`;
+  - TD-209 and TD-077, `Kind: decision` owned by the anchor.
+- So the bucket says *for you* about decisions that are not the person's.
+- And nothing in the Inbox, where the person looks for what waits on them, shows any of them. Only the Repo page lists them.
+- An entry blocked by the designer's decision is in nobody's lane: TD-151 is `Owner: grinder`, blocked, and the designer's lane is `design-first`.
+
+**Fix:** design first.
+- *for you* counts only what waits on the person: `Owner: paul`, or `Blocked by: decision (Paul)` / `decision (paul)`.
+- A decision of the designer's or the anchor's counts in its owner's bucket. A `decision (designer)` should also reach the designer's lane, as a design-first item does, so it gets made.
+- The Inbox shows the person's ledger items, for example as a fold under *Needs you* with the repo's *for you* list linking to the Repo page, so the count and the list are on the same page.
+
+**Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
+
+**Related:** TD-357 (archived: the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
