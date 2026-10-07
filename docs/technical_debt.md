@@ -1538,7 +1538,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
 
-
 ## TD-350: Build the Org's ask block — a member's open `ask` to the person under **Answer needed**, counted in the facet and the rollup
 
 **Priority:** Low
