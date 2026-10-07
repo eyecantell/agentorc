@@ -83,9 +83,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
 | TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
 | TD-343 | A brief typed at the composer arrives as a paste, and Claude Code treats pasted text as data: a session may refuse its own brief | High | Designed 2026-10-06 (a typed line of the home's before the paste, the context file's preface, the doorbell held after three unread rings) — the build is TD-347 |
-| TD-346 | Split `docs/design.md` (about 9,500 lines) into one file per section under `docs/design/`, with `design.md` kept as the index | Medium | Designed 2026-10-06 (thirty section files named by §, the index, one tests helper, the history whole, the quiet window) — the build is TD-351 |
 | TD-347 | Build *the brief is the person's word*: the typed line before the paste, the context file's preface, `doorbell_held` after `DOORBELL_HELD` unread rings | High | Live check #1158: both slices built (#1158, #1163); the press read on the live copy once live |
-| TD-351 | Build the design split: `docs/design/<§>-<slug>.md` by script, `design.md` the index, `tests/design_doc.py`, every path that says `docs/design.md` for a grep repointed, landed in a quiet window | Medium | Open |
 
 ---
 
@@ -1419,30 +1417,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-336 and TD-339 (no prose in the argv), TD-341 and TD-342 (a brief whose first hook is lost; #1150).
 
-## TD-346: Split `docs/design.md` into one file per section under `docs/design/`, with `design.md` kept as the index
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-06 (the anchor, decided by Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** **Designed 2026-10-06** (the designer, PR #1161; a steer to Paul on the two defaults — the history kept whole, the file names). The layout: **thirty files under `docs/design/`, one per `##` section and one per `###` subsection of §4, named `<§>-<slug>.md`** — `1-problem.md`, `2-goals.md`, `3-prior-art.md`, `4-architecture.md` (§4's own preamble, the lines before §4.1), `4.1-session-substrate.md`, `4.2-state-feed.md`, `4.2a-profiles.md`, `4.3-adapter-contract.md`, `4.4-host-agent.md`, `4.4a-home-and-nodes.md`, `4.5-ui.md`, `4.5a-controls.md`, `4.5b-reachability.md`, `4.5c-product-direction.md`, `4.6-transport.md`, `4.7-cli.md`, `4.8-capabilities-roles.md`, `4.8a-identity.md`, `4.9-org-team-project.md`, `4.9a-winding-down.md`, `4.9b-techlead.md`, `4.9c-flows.md`, `4.10-messages.md`, `5-configuration.md`, `6-policies.md`, `7-phases.md`, `8-lessons.md`, `9-invariants.md`, `10-open-questions.md`, `11-references.md`; **each file begins with its heading line exactly as it stands** (`## 1. Problem`, `### 4.9c Flows: …`), so the § numbers, the heading levels and every `grep -n '^### 4.9c'` are unchanged, and a file holds nothing but its section's lines. **`docs/design.md` becomes the index**: the title and the status paragraph as they stand, then CLAUDE.md's rule in one line (*a change in behaviour is a change to the design first; a control not in §4.5a's table does not exist*), then one line per file in § order — the §, the title as a link, and the section's first sentence or a one-line gloss. **The history stays one file** with its § headings as they are (a line is appended to it by every PR and conflicts there are line-level already; its sections are short). **Tests read a section through one helper**, `tests/design_doc.py`: `section("4.5a")` the file's text, `whole()` every file in index order joined — `test_help` reads the section holding *The help text*, `test_primer` the heading set from `whole()` and invariants from `section("9")`, `test_screen` the *Remote Control* lines from `whole()` (§3, §4.2, §4.3 and §6 hold them; the test's comment saying §4.2 alone is stale) and its rule-trip scan over every file, `test_ui` the Send row from `section("4.5a")` and the §4.3 rule from `section("4.3")`. **Every path that says `docs/design.md` and means a grep says `docs/design/`** — `docs/briefs/*.md` (a held path: the techlead reads the PR), `src/agentorc/briefs/*.md`, `src/agentorc/flows/td/*.md`, and CLAUDE.md's *What this repo is* says the design is the directory and `design.md` its index; a link to `docs/design.md` as the document (README's, CLAUDE.md's map) still lands on the index and stays, `docs/mockups/gen.py`'s two are rendered words in a mockup and stay, and a citation by § (*design §4.5a*) changes nowhere, since the numbers stay; a ledger entry's line numbers stay as the dated readings they are. **The move is a script** (`scripts/split_design.py`, run once, kept for the record), so it re-runs on whatever `main` holds the day it lands. **The quiet window** (Paul: *in a quiet window*): the build lands only when `gh pr list --json files` shows no open PR touching `docs/design.md`, and the PR writes the board line for the window (*the design is `docs/design/` since #N — a design branch opened before it rebases its `design.md` edits into the section files*, `Due:` the next day). Not taken: zero-padded names (`04.10-…`: the § is the name people type); splitting the history the same way (thirty more files for lines that are appended, not read whole); a file per `**bold lead-in**` paragraph (a file is a section, which is what a brief and a review name). Before: Open. Paul, 2026-10-06: do it, in a quiet window.
-**Blocked by:** TD-351
-**Location:** `docs/design.md`; the four tests that read it whole (`tests/test_help.py`, `test_primer.py`, `test_screen.py`, `test_ui.py`); the briefs (`docs/briefs/`, `src/agentorc/briefs/`) and code comments that name the file; `docs/design-history.md` (its sections follow the design's); CLAUDE.md's documentation map
-
-**Why:** the design is about 9,500 lines, roughly 200k tokens. Nobody can review it whole on one budget: a review on 2026-10-06 had to be scoped to §4.9c by line ranges (TD-345). Every design PR edits the same file, so concurrent design rounds conflict on it. A brief that names the sections a role needs can only name line ranges, and those drift. The sessions already read it by `grep -n` and ranged reads, never whole, so the split serves reviews, conflicts and briefs. Day-to-day reading doesn't need it.
-
-**Fix:** design the layout first, then move it in one PR:
-- One file per top-level section, with §4's subsections each a file of their own (`docs/design/4.5a-controls.md` and the like). **The § numbers stay as they are**, because code comments, briefs, the ledger and the history cite them.
-- `docs/design.md` becomes the index: what the design is, the present-tense rule (CLAUDE.md), and one line per section file.
-- The tests that read the file whole read the section they bind to (`help.py`'s list from §4.5a, the primer's from §4.9b, and so on), through one helper in `tests/`.
-- Briefs that say *grep `docs/design.md`* say *grep `docs/design/`*. A `grep -rn` over the directory finds what one file did.
-- `design-history.md` either splits the same way or keeps its § headings. The round decides which.
-- Land it when no design PR is open, since every open one conflicts, and say so on the board for the window.
-
-**Done when** `docs/design/` holds one file per section with unchanged § numbers, `docs/design.md` is an index, `pdm run test` passes with the doc-bound tests reading the section files, no brief or skill points at a section by line number in the old file, and a design PR touching one section changes one file.
-
-**Related:** TD-345 (the review that had to be scoped), TD-249 (archived: the bound that makes the file too large to read whole).
 ## TD-347: Build *the brief is the person's word* — the typed line before the paste, the context file's preface, the doorbell held
 
 **Priority:** High
@@ -1464,20 +1438,3 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-343 (the design), TD-339 (the brief typed at the composer), TD-336, TD-027 (the verified send), TD-108 (the doorbell).
 
-## TD-351: Build the design split — `docs/design/<§>-<slug>.md` by script, `design.md` the index, `tests/design_doc.py`, the greps repointed, landed in a quiet window
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-06 (TD-346's design round; the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/design.md` → `docs/design/` (thirty files, TD-346's list); `scripts/split_design.py` (new); `tests/design_doc.py` (new) and `tests/test_help.py`, `test_primer.py`, `test_screen.py`, `test_ui.py`; `docs/briefs/*.md` (held: the techlead reads the PR), `src/agentorc/briefs/*.md`, `src/agentorc/flows/td/*.md`, `CLAUDE.md`; `docs/user_attention.md` (the window's line)
-
-**Why:** TD-346 (designed 2026-10-06): the design is about 9,500 lines and is read by ranges and greps, never whole; every design PR edits one file, so concurrent rounds conflict on it, and a review on one budget has to be scoped by line numbers that drift. The layout is decided; what is left is the move, which is mechanical and must land when nothing else edits the file.
-
-**Fix, one PR:** `scripts/split_design.py` reads `docs/design.md`, cuts at every `^## ` and, inside §4, every `^### ` heading, writes each piece to its file of TD-346's list (the heading line first, the section's lines after, nothing added or reflowed — `cat docs/design/*.md` in index order equals the old file minus the title block), and writes `docs/design.md` as the index TD-346 describes; run it, commit the result and the script. `tests/design_doc.py` with `section()` and `whole()`, the four tests reading through it as TD-346 says, and one new test: every file begins with the heading it is named for and the index links every file once. Repoint every `docs/design.md` that means a grep to `docs/design/` (TD-346's list; `grep -rn 'docs/design\.md' docs src scripts README.md CLAUDE.md` finds them, and TD-346 says which stay; `docs/briefs/archive/*` is a dated record and stays — `docs/briefs/**` is a held path, so the PR waits for the techlead's read), and CLAUDE.md's *What this repo is* says the design is the directory and `design.md` its index. **The window**: open the PR when `gh pr list --state open --json files,number --jq '.[] | select(any(.files[]; .path == "docs/design.md")) | .number'` prints nothing (on 2026-10-06 it printed #1156 and #1158: not quiet), say so with `ao doing`, and merge within the hour it stays so; a design PR that opens meanwhile goes first and the script re-runs. The PR writes the board line (*the design is `docs/design/` since #N — a design branch opened before it rebases its `design.md` edits into the section files*, `Due:` the next day) so a session started in the window reads it; `pdm run test` green.
-
-**Done when** `docs/design/` holds one file per section with unchanged § numbers and heading lines, `docs/design.md` is the index, `pdm run test` passes with the doc-bound tests reading through `tests/design_doc.py`, no brief, skill or script points a grep at `docs/design.md`, and a design PR touching one section changes one file (TD-346's *Done when*); then TD-346 archives.
-
-**Related:** TD-346 (the design), TD-345 (the review that had to be scoped), TD-249 (archived).
