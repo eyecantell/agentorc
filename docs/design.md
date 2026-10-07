@@ -4119,7 +4119,7 @@ three are the mail kinds the Inbox already draws (§4.5a, §4.10), so the person
 batched by the Inbox and answered whenever they open it; Focus on the member is the live
 conversation when one is wanted. It is a preset since flows (TD-307, §4.9c; built by TD-309 slice 2):
 the built-in `td` names it, so the package ships `designer.md` with its mechanics and a repo's
-designer brief is its supplement under a flow, and its whole brief in a team with no flow; `director` keeps
+designer brief is its supplement, as every role's is; `director` keeps
 its name (its members are managers, and *director > manager > worker* reads as a line). The
 older words — `orchestrator` and `lead` for the manager, `orchestrate` for `control` — resolve to
 nothing: there has been no release and one user, so there is no renamed-roles table, no
@@ -6096,18 +6096,11 @@ one only a repo describes: the package ships **`designer.md`**, the mechanics of
 defines today in its own whole brief (the lane, declaring a design, the obvious / steer / ask split
 by mail, merging nothing on a held path), with the template slots; `designer` joins the presets
 (`repoconfig.PRESETS`), and §4.8 *Role names* no longer calls it a role a repo defines with its own brief.
-**The template wraps a designer only under a flow**: a designer member of a team with no `flows:` is
-started as today, its repo's brief (`roles.designer.brief`, agentorc's `designer-ao-1.md`) the whole
-brief and no template around it, so no team's designer reads its mechanics twice; a team that lists
-flows reads that brief as the template's supplement, and TD-310 cuts agentorc's `designer-ao-1.md`
-to a supplement in the same PR that lists ao-grind's flows. Where it is decided: `repoconfig.compose` takes whether the member is
-started under a flow (the team's current flow, which the client knows at every compose) and, for
-`designer` alone, leaves `template` empty when it is not, so `ao new --role designer` with no team, or a
-team with no `flows:`, composes as it did before flows, and one with no brief at all is refused
-(*designer needs a brief outside a flow*). **The carve-out is transitional, and TD-310 (open) ends
-it**: once every designer brief in use is a supplement (agentorc's is the only one), TD-310 drops it
-and this paragraph's words for it, and §4.8 *Role names*' clause on a designer's whole brief in a team
-with no flow, so the template then wraps a designer everywhere. Nothing else states it. The preset carries the default lane `[design-first,
+**The template wraps a designer as it wraps every preset**, flow or none: a repo's designer brief
+(`roles.designer.brief`, agentorc's `designer-ao-1.md`) is the `{repo}` supplement, and a designer
+with no repo brief composes from the template alone, as a grinder does. (Until TD-310, 2026-10-06,
+the template wrapped a designer only under a flow, so that the one repo brief then in use — agentorc's,
+written whole — was not read twice; TD-310 cut it to a supplement and dropped the carve-out.) The preset carries the default lane `[design-first,
 "owner:designer"]`, no icon and no label (so no designer card's badge changes at the build), and the
 message line §4.8 gives it (*a design-first entry, a control's shape, a screen*) — the one visible
 change at the build, a line in the composer where a designer showed none.

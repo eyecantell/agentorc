@@ -138,10 +138,6 @@ ORG_ROLES_SUB = "roles"
 ROLE_FILE = "role.yml"
 ROLE_TEMPLATE = "template.md"
 ROLE_TEMPLATE_ON_CALL = "template_on_call.md"
-# The one role whose template wraps it only under a flow (§4.9c *The designer gets a template*): until
-# TD-310 cuts every designer brief in use to a supplement, a designer started outside a flow is its
-# repo's brief whole, as before the build.
-FLOW_ONLY_TEMPLATES = ("designer",)
 ENTRY_SLOTS = ("{repo}", "{type}", "{ledger}")
 HANDED_ENTRY = {
     "{repo}": "the repo its `entry` names",
@@ -395,8 +391,9 @@ class Role:
         takes the template's seat shape where the package ships one (`ON_CALL_BRIEFS`: a manager on
         call, design §6 rule 3, TD-259).
         `flow` is what a member started under a team's current flow is told of it (§4.9c item 5):
-        `{flow}` and `{stage}` from it; without one, `none` and the template's `<stem>.stage.md`. A
-        designer's template wraps it only under a flow (`FLOW_ONLY_TEMPLATES`, until TD-310).
+        `{flow}` and `{stage}` from it; without one, `none` and the template's `<stem>.stage.md`. Every
+        preset's template wraps it, flow or none — the designer's too, since TD-310 cut its one repo
+        brief to a supplement (§4.9c *The designer gets a template*).
 
         Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
         `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
@@ -408,16 +405,12 @@ class Role:
         extra = supplement or own
         slots: dict[str, dict[str, str]] = {}
         template = ON_CALL_BRIEFS.get(self.template, self.template) if on_call and self.template else self.template
-        if flow is None and self.name in FLOW_ONLY_TEMPLATES:
-            template = None
         default_stage: Path | None = None
         if self.defined is not None:
             src_path = self.defined / (ROLE_TEMPLATE_ON_CALL if on_call else ROLE_TEMPLATE)
             text, base = self._defined_template(src_path, read, on_call), str(src_path)
         elif template is None:
             if not extra:
-                if self.name in FLOW_ONLY_TEMPLATES:
-                    raise ValueError(f"{self.name} needs a brief outside a flow (design §4.9c)")
                 return None, None
             text = self._read(extra, read)
             base = str(self._path(extra))
