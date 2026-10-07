@@ -79,13 +79,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-336 | A brief rides in its session's argv, so a repo script's `pkill -f <word>` kills any session whose brief names the word | High | Designed 2026-10-05 (no prose in the argv: the start context by file flag, the brief typed at the composer) — the build is TD-339 |
 | TD-339 | Build *No prose in the argv*: the start context by `--append-system-prompt-file`, the brief typed at the composer by the verified send, the *brief not sent* mark | High | Built (#1145, #1147); live check: the press |
-<<<<<<< HEAD
-| TD-341 | A restart's first hook is refused as *outside*: the identity list still holds the old run's pane | High | Built (#1150, live); live check waits for the next team restart (anchor) |
 | TD-355 | *flow changed — Apply* never clears after an Apply: the relaunch waits for the member's next run, and the record's old `review` reads as a change | High | Open |
 | TD-356 | Switching a flow asks twice: the Flow pick's confirm and Apply's confirm each guard a relaunch | Medium | Open |
-=======
 | TD-357 | A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take | Medium | Open |
->>>>>>> a4f3bf83 (Anchor triage: TD-028, TD-036, TD-098 and TD-103 to the grinders; TD-060, TD-093 and TD-100 to Paul; TD-341 and TD-125 archived; TD-357 the per-lane pickable count)
 
 ---
 
@@ -1352,23 +1348,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-336 (the design), TD-283 (the start context on every launch), TD-027 (the verified send), TD-199 (a running member keeps its brief), contractmatch PR #122.
 
-## TD-357: A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-06 (the anchor, from Paul's read of ao-grind)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Open
-**Location:** design §4.5 (the Repo facet and the kind bar on a team's card), §4.5a, §4.7 (`ao repo`'s first line); `sessionorc.ledger` (`for_page`), the team summary's Repo facet
-
-**Why:** On 2026-10-06 Paul read *24 pickable* for agentorc while all three of ao-grind's members were idle and out of work, and asked whether the calculation was wrong. It counts every entry that nothing blocks, whoever owns it. That evening the 24 were 12 anchor live checks, 8 anchor builds and 4 dev-cadence builds, and none matched a member's lane (`owner:grinder`, `owner:designer`). The number is right for the repo, and it misleads on a team, where *pickable* reads as *work this team could be doing*.
-
-**Fix:** design first. Where a team's card or the repo line shows the count, say how much of it the team's lanes can take, split by owner. For example *24 pickable · 0 for ao-grind (20 anchor, 4 dev-cadence)*, with the kind bar's hover listing them. Decide whether `ao repo` and the Repo page also split it by owner. An idle team beside a pickable count for its own lanes is then a real alarm, which the tick or the card can raise.
-
-**Done when** a team whose members are out of work never shows a pickable count for its own lanes above zero unless that work really is in their lanes, and the count says whose the rest is.
-
-<<<<<<< HEAD
 ## TD-355: *flow changed — Apply* never clears after an Apply: a relaunch rewrites the launch record, the record keeps its old `review` until the member restarts, and `teamrun.differences` reads that as a change
 
 **Priority:** High
@@ -1428,6 +1407,21 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Done when** switching a team's flow from the card takes one deliberate confirmation, and §4.5a's two rows say which control carries it.
 
 **Related:** TD-355 (Apply's mark that never cleared), TD-309 (archived: the pick and Apply), TD-307 (the design).
-=======
+
+## TD-357: A team's card and the repo line say *24 pickable* while every member is out of work: the count is the repo's, by any owner, not what the team's lanes can take
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (the anchor, from Paul's read of ao-grind)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 (the Repo facet and the kind bar on a team's card), §4.5a, §4.7 (`ao repo`'s first line); `sessionorc.ledger` (`for_page`), the team summary's Repo facet
+
+**Why:** On 2026-10-06 Paul read *24 pickable* for agentorc while all three of ao-grind's members were idle and out of work, and asked whether the calculation was wrong. It counts every entry that nothing blocks, whoever owns it. That evening the 24 were 12 anchor live checks, 8 anchor builds and 4 dev-cadence builds, and none matched a member's lane (`owner:grinder`, `owner:designer`). The number is right for the repo, and it misleads on a team, where *pickable* reads as *work this team could be doing*.
+
+**Fix:** design first. Where a team's card or the repo line shows the count, say how much of it the team's lanes can take, split by owner. For example *24 pickable · 0 for ao-grind (20 anchor, 4 dev-cadence)*, with the kind bar's hover listing them. Decide whether `ao repo` and the Repo page also split it by owner. An idle team beside a pickable count for its own lanes is then a real alarm, which the tick or the card can raise.
+
+**Done when** a team whose members are out of work never shows a pickable count for its own lanes above zero unless that work really is in their lanes, and the count says whose the rest is.
+
 **Related:** TD-228 (the derived pickable), TD-198 (the kind bar's buckets).
->>>>>>> a4f3bf83 (Anchor triage: TD-028, TD-036, TD-098 and TD-103 to the grinders; TD-060, TD-093 and TD-100 to Paul; TD-341 and TD-125 archived; TD-357 the per-lane pickable count)
