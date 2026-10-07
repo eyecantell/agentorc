@@ -496,6 +496,47 @@ async def test_a_restart_under_the_same_name_keeps_the_old_pane_for_the_grace(ag
     assert "ao-x" not in agent._id_gone
 
 
+async def test_the_old_runs_last_hook_with_neither_signal_is_refused_unheard(agent, monkeypatch):
+    """TD-360: after TD-341 every ao-grind restart still alarmed — *peer 268870 (sid 268869), listed pane
+    268896, gone pane 4063114 0.9s ago*. The peer is the old run's `SessionEnd`, spawned as the pane was
+    killed: Claude Code starts a hook in a session of its own with no terminal, so once its tool has died
+    the orphan keeps neither signal the grace reads. Served, it would be ignored (TD-186), so it is
+    refused with no alarm — and only that: any other hook from outside every pane still alarms."""
+    from types import SimpleNamespace
+
+    agent.identity_mode = "enforce"
+    agent._id_detached = ""
+    # 140 is the orphaned hook: reparented to init, its own session, no terminal; 300 is the new pane
+    monkeypatch.setattr(agent, "proc", FakeProc([*BASE, P(140, 1, 139), P(300, 50, 300, 0x8803)]))
+    rec = SimpleNamespace(state="idle", adapter_id="new-run", pane=None, host=None)  # no list is asked for
+    monkeypatch.setitem(agent.sessions, "ao-x", rec)
+    agent._id_panes = [PANES[0]]
+    agent._id_pane_replaced("ao-x")  # the restart took the name: the old pane is gone at once
+    alarms = []
+    monkeypatch.setattr(agent, "_id_alarm", lambda entry, about: alarms.append(entry))
+
+    def hook(state: str, aid: str | None) -> dict:
+        return {"id": 1, "method": "hook", "params": {"session": "ao-x", "state": state, "adapter_id": aid}}
+
+    assert (await agent._identify(hook("exited", "old-run"), 140))["error"] == identity.MISMATCH
+    assert alarms == []  # refused unheard
+    for state, aid in (("idle", "old-run"), ("exited", "new-run"), ("exited", None)):
+        assert (await agent._identify(hook(state, aid), 140))["error"] == identity.MISMATCH
+    assert len(alarms) == 3  # anything this run would apply still alarms from outside every pane
+    rec.state = "closed"  # a Close: whatever the dying run says next is ignored, so it is refused unheard
+    assert (await agent._identify(hook("idle", "new-run"), 140))["error"] == identity.MISMATCH
+    assert len(alarms) == 3
+    pane, at = agent._id_gone["ao-x"]
+    agent._id_gone["ao-x"] = (pane, at - identity.PANE_GONE_GRACE)  # past the grace: it alarms again
+    assert (await agent._identify(hook("exited", "old-run"), 140))["error"] == identity.MISMATCH
+    assert len(alarms) == 4
+    agent.identity_mode = "observe"  # observing changes nothing a caller sees: served, and ignored on apply
+    agent._id_gone["ao-x"] = (pane, at)
+    rec.state = "idle"
+    assert await agent._identify(hook("exited", "old-run"), 140) is None
+    assert len(alarms) == 4
+
+
 def test_no_read_decides_anything_on_its_caller():
     """The rule `identity.READS` rests on: a read is served under any claim, so it must not
     authorise on one. `host_files` was listed until the red-team of PR #248 — it serves the person
