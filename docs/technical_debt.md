@@ -73,7 +73,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-363 | `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing (held by a dead record, other repos' records, the falling-count order, the owner's case) | Medium | Open |
 | TD-364 | The lanes line's real callers (#1196) are untested: the team card on the Org page and the Repo page read the whole fleet, and every test reaches them through `members` | Medium | Open |
 | TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
 | TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
@@ -1258,32 +1257,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-363: `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/teamrun.py` (`repo_lanes`), `src/sessionorc/ledger.py` (`in_lanes`); `tests/test_repo_facts.py` (`test_in_lanes_splits_the_repos_count_by_the_teams_lanes`, `test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work`)
-
-**Why:** Each line below was reverted in a worktree on `origin/main` (089a10de), and `tests/test_repo_facts.py`, `test_ui_repo_page.py`, `test_ui_team_summary.py` and `test_ui_teams.py` were run: all passed.
-- `repo_lanes`: `if s.get("state") not in DEAD` → `if True`. A claim held by a dead record is counted as held, so a live member's lane entry reads as taken and the *out of work* warning is hidden. No test has a dead record that holds a claim.
-- `repo_lanes`: `Path(str(s["repo"])).resolve() == here` → `True`. Every record of every repo is read as the repo's. The fleet in both tests holds only records of one repo.
-- `in_lanes`: `rest.sort(key=lambda r: (-r["n"], r["owner"]))` → `key=lambda r: r["owner"]`. The docstring and §4.4 say falling count then name, but the one case, anchor 20 and dev-cadence 4, is alphabetical too.
-- `in_lanes`: `str(e.get("owner") or "").lower()` → no `.lower()`. A ledger `Owner: Anchor` would split from `anchor` in the rest.
-- The `superseded_by` filter is guarded: the test's `old` record carries a lane.
-
-**Fix:** Add to the existing tests, no source change:
-- a dead record that holds a claim (the entry stays unheld and the member is warned);
-- a record of another repo with a lane, absent from the result;
-- two owners whose counts and alphabetical order disagree (the larger count last by name);
-- an `Owner:` in mixed case, counted with its lowercase twin.
-- **Done when** each of the four reverts above fails a test.
-
-**Related:** TD-361 (built it), TD-357 (designed it), TD-364.
 
 ## TD-364: The lanes line's real callers (#1196) are untested: the team card and the Repo page read the whole fleet, and every test reaches them through `members`
 

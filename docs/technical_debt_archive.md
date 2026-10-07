@@ -5782,3 +5782,24 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Related:** TD-099 (a usage stop is a declaration; the header's collapse), TD-026 (schedules; a start at the reset), design §6, §4.2a (profiles), TD-073 (the windows and labels are the adapter's).
 
 **Resolved:** 2026-10-07. Everything in it is built: the gate, `ao gate`, the *paused · usage* mark, the chip's line (#449) and the Settings page (TD-146 to TD-148). The live look is Paul's own use. On 2026-10-06 he set the usage reserves to zero on the Settings page for the last hours of the week, and back after the reset. `ao gate` reads the lines he set (*grind · 5h 30 → line 70% · week 5 → line 95%*, 2026-10-07).
+
+## TD-363: `in_lanes` and `repo_lanes` (#1194): four of their filters can be reverted with every test still passing
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/teamrun.py` (`repo_lanes`), `src/sessionorc/ledger.py` (`in_lanes`); `tests/test_repo_facts.py` (`test_in_lanes_splits_the_repos_count_by_the_teams_lanes`, `test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work`)
+
+**Why:** Each line below was reverted in a worktree on `origin/main` (089a10de), and `tests/test_repo_facts.py`, `test_ui_repo_page.py`, `test_ui_team_summary.py` and `test_ui_teams.py` were run: all passed.
+- `repo_lanes`: `if s.get("state") not in DEAD` → `if True`. A claim held by a dead record is counted as held, so a live member's lane entry reads as taken and the *out of work* warning is hidden. No test has a dead record that holds a claim.
+- `repo_lanes`: `Path(str(s["repo"])).resolve() == here` → `True`. Every record of every repo is read as the repo's. The fleet in both tests holds only records of one repo.
+- `in_lanes`: `rest.sort(key=lambda r: (-r["n"], r["owner"]))` → `key=lambda r: r["owner"]`. The docstring and §4.4 say falling count then name, but the one case, anchor 20 and dev-cadence 4, is alphabetical too.
+- `in_lanes`: `str(e.get("owner") or "").lower()` → no `.lower()`. A ledger `Owner: Anchor` would split from `anchor` in the rest.
+- The `superseded_by` filter is guarded: the test's `old` record carries a lane.
+
+**Resolved:** 2026-10-07 (PR #1199, grinder-ao-2) — tests only: `tests/test_repo_facts.py::test_in_lanes_orders_the_rest_by_falling_count_and_reads_an_owner_in_any_case` (owners whose count and name order disagree, an owner in mixed case) and `::test_repo_lanes_reads_the_repos_own_records_and_a_claim_only_while_its_holder_lives` (another repo's record with a lane, a claim held by a closed record, then by a live one). Each of the four reverts above, made alone, fails one of them.
+
+**Related:** TD-361 (built it), TD-357 (designed it), TD-364.
