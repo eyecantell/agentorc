@@ -634,6 +634,48 @@ def test_in_lanes_splits_the_repos_count_by_the_teams_lanes():
     assert ledger.in_lanes(entries, []) is None
 
 
+def test_in_lanes_orders_the_rest_by_falling_count_and_reads_an_owner_in_any_case():
+    """§4.4 *In a team's lanes* (TD-363): the rest is in falling count, then name — a larger owner
+    comes first even when its name sorts last — and `Owner: Anchor` counts with `anchor`."""
+    from sessionorc import ledger
+
+    def e(i, owner):
+        return {"id": i, "title": i, "for_page": "pickable", "owner": owner, "kind": "build", "pickable": "yes"}
+
+    entries = [e("TD-1", "alpha"), e("TD-2", "zeta"), e("TD-3", "zeta"), e("TD-4", "Zeta"), e("TD-5", "mid")]
+    records = [{"id": "g", "name": "g", "team": "t", "lane": ["free-pick", "owner:grinder"]}]
+    got = ledger.in_lanes(entries, records)
+    assert [(r["owner"], r["n"]) for r in got["rest"]] == [("zeta", 3), ("alpha", 1), ("mid", 1)]
+    assert got["rest"][0]["ids"] == ["TD-2", "TD-3", "TD-4"]
+
+
+def test_repo_lanes_reads_the_repos_own_records_and_a_claim_only_while_its_holder_lives(repo, tmp_path):
+    """§4.4 *In a team's lanes* (TD-361, TD-363): a record of another repo is no team of this one,
+    lane or not, and a claim held by an ended record holds nothing — the entry is unheld and the
+    member out of work with it in its lane is warned; held by a live record, it is not."""
+    from agentorc import teamrun
+
+    other = tmp_path / "other"
+    other.mkdir()
+    grinder = {"title": "g", "for_page": "pickable", "owner": "grinder", "kind": "build", "pickable": "yes"}
+    entries = [{"id": "TD-355", **grinder}]
+    lane = ["free-pick", "owner:grinder"]
+    out = {"at": "2026-10-06T20:00:00Z", "why": "nothing pickable"}
+    claim = [{"ref": "TD-355", "status": "claimed"}]
+    sessions = [
+        {"id": "g1", "name": "grinder-ao-1", "team": "ao-grind", "repo": str(repo), "lane": lane, "state": "idle",
+         "out_of_work": out},
+        {"id": "g0", "name": "grinder-ao-0", "team": "ao-grind", "repo": str(repo), "lane": lane, "state": "closed",
+         "progress": claim},
+        {"id": "x", "name": "grinder-x-1", "team": "x-grind", "repo": str(other), "lane": lane, "state": "working"},
+    ]  # fmt: skip
+    got = teamrun.repo_lanes(entries, repo, sessions)
+    assert list(got) == ["ao-grind"]  # the other repo's team is not this repo's
+    assert [(m["name"], m["ids"]) for m in got["ao-grind"]["out_of_work"]] == [("grinder-ao-1", ["TD-355"])]
+    sessions[1]["state"] = "working"
+    assert teamrun.repo_lanes(entries, repo, sessions)["ao-grind"]["out_of_work"] == []  # a live holder holds it
+
+
 def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work(repo, monkeypatch, capsys):
     """§4.7 `ao repo` (TD-361): the first line's parentheses, one per servicing team; a member out of
     work with unheld work in its lane on a line of its own; `--json` carries `lanes` by team;
