@@ -23,6 +23,7 @@ from sessionorc.agent_common import (
     COMPOSER_LINES,
     DOORBELL_TRIES,
     FIRST_PROMPT_TRIES,
+    LeadTyped,
     RpcError,
     _parse,
     _Wait,
@@ -305,13 +306,23 @@ class WakeMixin:
         elif road == "scraped":
             return  # a scraped idle is trusted only with a composer that reads empty (§4.1, TD-348)
         try:
-            if left:
+            if left and sid in self._lead_typed:
+                # the home's line went in and the paste was refused: the brief goes after it, never an
+                # Enter on the line alone, which would submit no brief and mark it sent. Known from the
+                # failed step, not read back: the tool paints a long line over two rows (review of PR #1158)
+                await self._type(sid, adapter, s.first_prompt, lead_in=True)
+            elif left:
                 await self._enter_again(sid, reader)  # the last try's brief is still in the composer
             else:
-                await self._type(sid, adapter, s.first_prompt)  # the lock is held already
+                # the home's line, then the brief as the paste: one prompt (§4.1, TD-347); the lock is held already
+                await self._type(sid, adapter, s.first_prompt, lead=mail.BRIEF_LINE)
         except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste
             if self.sessions.get(sid) is not s:
                 return  # forgotten, or its name taken by a new record, while it typed
+            if isinstance(e, LeadTyped):
+                self._lead_typed.add(sid)  # the line alone is in the composer
+            else:
+                self._lead_typed.discard(sid)  # the paste landed: what is left holds the brief, or nothing
             s.first_prompt_tries += 1
             why = str(e) or type(e).__name__
             log.warning(
@@ -322,6 +333,7 @@ class WakeMixin:
             self._save(s)
             await self._push_changes()
             return
+        self._lead_typed.discard(sid)
         if self.sessions.get(sid) is not s:
             return  # forgotten, or its name taken by a new record, while it typed
         s.first_prompt_sent_at = now_iso()

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from _stubs import HookFedStub
 
-from sessionorc import adapters, paths
+from sessionorc import adapters, mail, paths
 from sessionorc.adapters import LaunchSpec
 from sessionorc.client import AgentError, LocalClient
 
@@ -43,20 +43,22 @@ async def test_the_start_context_reaches_the_launch_the_record_and_every_resume(
     async with LocalClient() as c:
         s = await c.call("create", name="entry-1", dir=str(tmp_path), adapter="ctxstub", start_context=lines)
         assert s["start_context"] == lines
-        assert ctxstub.launches[-1] == {"resume": None, "prompt": None, "start_context": lines}  # no turn for it
+        handed = mail.start_context_file_text(lines)  # the home's preface heads it (§4.1, TD-347)
+        assert handed.startswith(mail.BRIEF_PREFACE + "\n\n") and handed.endswith(lines)
+        assert ctxstub.launches[-1] == {"resume": None, "prompt": None, "start_context": handed}  # no turn for it
         await c.call("hook", session=s["id"], adapter_id="cc-1")
         await c.call("kill", id=s["id"])
         # the one-press Resume sends no start context: the conversation's own is handed again
         again = await c.call("create", name="entry-1", dir=str(tmp_path), adapter="ctxstub", resume="cc-1")
-        assert again["start_context"] == lines and ctxstub.launches[-1]["start_context"] == lines
+        assert again["start_context"] == lines and ctxstub.launches[-1]["start_context"] == handed
         await c.call("kill", id=again["id"])
         # …under another name too: it is the conversation's, not the name's
         other = await c.call("create", name="moved", dir=str(tmp_path), adapter="ctxstub", resume="cc-1")
-        assert other["start_context"] == lines and ctxstub.launches[-1]["start_context"] == lines
+        assert other["start_context"] == lines and ctxstub.launches[-1]["start_context"] == handed
         await c.call("kill", id=other["id"])
-        # a fresh start under the name holds nothing it was not given
+        # a fresh start under the name holds nothing it was not given: the record none, the file the preface
         fresh = await c.call("create", name="entry-1", dir=str(tmp_path), adapter="ctxstub")
-        assert fresh["start_context"] is None and ctxstub.launches[-1]["start_context"] is None
+        assert fresh["start_context"] is None and ctxstub.launches[-1]["start_context"] == mail.BRIEF_PREFACE
         await c.call("kill", id=fresh["id"])
         # a blank one is none
         blank = await c.call("create", name="b", dir=str(tmp_path), adapter="ctxstub", start_context="  \n")

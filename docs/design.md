@@ -247,8 +247,8 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   it with `--append-system-prompt-file`, hands the prompt back as `LaunchSpec.first_prompt` and sets
   `AGENTORC_AT_COMPOSER=1` on every launch but a resume, whose `source: resume` says it; a resume id
   that is not a plain file name is refused.
-- **The brief is the person's word, and the tool is told so** (TD-343; designed 2026-10-06, not
-  built — TD-347). A bracketed paste reaches Claude Code's model wrapped as pasted content, with
+- **The brief is the person's word, and the tool is told so** (TD-343; designed 2026-10-06; built —
+  TD-347 slices 1 and 2). A bracketed paste reaches Claude Code's model wrapped as pasted content, with
   the tool's own rule that instructions inside it are followed only where the user's own words ask
   for it — and a brief typed as nothing but a paste is, to a careful model, data: on 2026-10-06 a
   seat answered its brief that it held only pasted text and nothing saying what to do with it, and
@@ -269,7 +269,12 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   fixed *begin* as the first prompt — the system prompt is trusted outright, but the conversation
   would then open with no brief in it, a resume would re-give the brief on every launch, and
   *Brief changed* (§6 rule 7) would read a system prompt rather than a turn. The *Done when* is on
-  a scratch home with a real Claude Code session, on Opus and on Fable. **A brief whose first hook
+  a scratch home with a real Claude Code session, on Opus and on Fable. **Built** (TD-347 slice 1): the
+  line and the preface are `mail.BRIEF_LINE` and `mail.BRIEF_PREFACE`; the tick's first send types
+  the line and a space as literal keys, then pastes the brief (`_type`'s `lead`); `create` hands
+  every adapter that carries a start context `mail.start_context_file_text` — the preface, then the
+  caller's start context after a blank line — so the adapter's file is written at every launch, while
+  the record and the launch record keep the caller's text alone. **A brief whose first hook
   is lost** (TD-342; designed 2026-10-06, built — TD-348): the send waits for the record's first
   `idle` by hook, and a run whose first hook never lands (refused, dropped, a hook config that did
   not load) made no try and showed no mark — one sat at an empty composer 7.5 hours. So the wait is
