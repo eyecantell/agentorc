@@ -326,9 +326,10 @@ def test_under_a_flow_a_member_reads_its_path_line_and_its_stage_brief():
 
 
 @pytest.mark.unit
-def test_the_designer_is_a_preset_whose_template_wraps_it_only_under_a_flow(tmp_path):
-    # §4.9c *The designer gets a template*: outside a flow its repo's brief is the whole brief (until
-    # TD-310), and with none it is refused; under a flow the template wraps that brief as a supplement
+def test_the_designer_is_a_preset_whose_template_wraps_it_flow_or_none(tmp_path):
+    # §4.9c *The designer gets a template* (TD-310): the template wraps a designer as it wraps every
+    # preset — the repo's brief is the `{repo}` supplement, flow or none, and with no repo brief the
+    # template alone composes (the carve-out that read the repo's brief whole outside a flow is gone)
     designer = repoconfig.PRESETS["designer"]
     assert designer["kind"] == "worker" and designer["lane"] == ["design-first", "owner:designer"]
     assert "icon" not in designer and "label" not in designer
@@ -336,12 +337,13 @@ def test_the_designer_is_a_preset_whose_template_wraps_it_only_under_a_flow(tmp_
     cfg = repoconfig.load_text("roles: {designer: {brief: d.md}}\n", tmp_path)
     role = repoconfig.resolve_role(cfg, "designer")
     text, made = role.compose(techlead="T")
-    assert text == "the repo's designer brief, T\n" and made["base"] == str(tmp_path / "d.md")
+    assert made["base"].endswith("briefs/designer.md") and "the repo's designer brief, T" in text
+    assert made["slots"]["{stage}"] == {"text": "none"} and "This team's flow:** none" in text
     text, made = role.compose(techlead="T", flow=flowdefs.under(flowdefs.find("td"), "designer", techlead="T"))
     assert made["base"].endswith("briefs/designer.md") and "the repo's designer brief, T" in text
     assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "design.md")}
-    with pytest.raises(ValueError, match="designer needs a brief outside a flow"):
-        repoconfig.resolve_role(repoconfig.RepoConfig(), "designer").compose()
+    text, made = repoconfig.resolve_role(repoconfig.RepoConfig(), "designer").compose(techlead="T")
+    assert made["base"].endswith("briefs/designer.md") and repoconfig.NO_REPO in text
 
 
 def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path):  # noqa: F811

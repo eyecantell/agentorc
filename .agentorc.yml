@@ -10,33 +10,34 @@ promote:
     "$HOME/.local/share/agentorc-venv/bin/python" -c 'import sys; from sessionorc import build;
     c = build.info().get("commit"); print(c) if c else sys.exit("build unknown: the live install carries no build record")'
 
+# The paths a PR must have read before it merges (design §4.9c *What is the repo's: `held:`*; TD-310):
+# the host agent's package and the briefs. Under a flow every review stage holds them, whoever wrote
+# the PR; a team with no flow reads a role's own `review:`, and this file writes none.
+held: ["src/sessionorc/**", "docs/briefs/**"]
+
 # The ao-grind team, defined in the repo it works (design §4.9 *The org is an aggregate*; TD-229
-# slice 2): the org file's definition as it stood on 2026-10-03 (its `entries:` and `owner:` lanes
-# included), the names, lanes, briefs and techlead seat unchanged. While `~/.agentorc/org.yml` still defines `ao-grind` it wins the name and
-# this one reads *shadowed by org.yml*, so no team start changes; removing the team from the org
-# file is the switch. The roles below equal the org overlay's `review:`; read without the overlay (the
-# New session form's role list) `designer` is now a role of this repo, where it was unknown. The profiles stay the org file's `roles:` overlay (the install's word), and
-# no `host:` — where a repo's team lands is the org's `place:`.
+# slice 2), on flows since TD-310 (design §4.9c): `td` — design → build → review — is its default,
+# `build-review` the switch when no design is wanted (`ao team flow ao-grind build-review`). The flow
+# fills what the definition used to write — each member's lane, `entries.feature`, the roles' `review:`
+# — so none of those is written here (`ao org check` names any that comes back). While
+# `~/.agentorc/org.yml` still defines `ao-grind` it wins the name and this one reads *shadowed by
+# org.yml*; removing the team from the org file is the switch. The profiles stay the org file's
+# `roles:` overlay (the install's word), and no `host:` — where a repo's team lands is the org's `place:`.
 teams:
   ao-grind:
+    flows: [td, build-review]
     manager: {role: manager, name: manager-ao-1, brief: docs/briefs/manager-ao-1.md}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}
-    # Add entry's Open a session (TD-180, Paul 2026-09-28): a feature starts an interactive designer,
-    # every other type a techlead
-    entries: {feature: designer}
     members:
-      - {role: grinder, name: grinder-ao-1, lane: [free-pick, "owner:grinder"], brief: docs/briefs/grinder-ao-1.md}
+      - {role: grinder, name: grinder-ao-1, brief: docs/briefs/grinder-ao-1.md}
       # the page and git lane, apart from the host agent: the split is by file and lives in its brief
-      - {role: grinder, name: grinder-ao-2, lane: [free-pick, "owner:grinder"], brief: docs/briefs/grinder-ao-2.md}
-      # its lane is the ledger's design-first entries; it decides what Paul sees (design §4.8)
-      - {role: designer, name: designer-ao-1, unattended: true, lane: [design-first, "owner:designer"]}
+      - {role: grinder, name: grinder-ao-2, brief: docs/briefs/grinder-ao-2.md}
+      # the design stage's member; what the person sees of a design is its own call (design §4.8)
+      - {role: designer, name: designer-ao-1, unattended: true}
 
-# A repo's held paths are the repo's (design §4.9, TD-209): `review:` whole on the role, the last
-# layer of a preset, so `src/sessionorc/**` is never carried into another repo by an org-wide role.
-# A grinder's or the designer's PR on these paths waits for the techlead seat's read (§4.9b).
+# The repo's part of each role's brief (design §4.8 `{repo}`): the grinders' and the manager's are
+# named on the team above; the designer's is the preset's supplement, its mechanics the package's
+# `designer.md` (design §4.9c *The designer gets a template*).
 roles:
-  grinder:
-    review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}
   designer:
     brief: docs/briefs/designer-ao-1.md
-    review: {reader: techlead, held: ["src/sessionorc/**", "docs/briefs/**"]}

@@ -605,10 +605,13 @@ def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path,
 
 
 def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monkeypatch):
-    """TD-229 slice 2: this repo's `.agentorc.yml` carries ao-grind and the roles' held paths, so
-    removing the team from the org file starts the same team from the repo; while the org file
-    still defines it, the repo's reads *shadowed* and nothing that runs changes."""
-    from agentorc import repoconfig
+    """TD-229 slice 2: this repo's `.agentorc.yml` carries ao-grind, so removing the team from the
+    org file starts the same team from the repo; while the org file still defines it, the repo's
+    reads *shadowed* and nothing that runs changes. TD-310 (design §4.9c): the team is on flows —
+    `[td, build-review]` with the top-level `held:` — and writes nothing its flow fills: no member
+    lane, no `entries.feature`, no role `review:`, so `ao org check` warns of nothing redundant."""
+    from agentorc import repoconfig, teams
+    from sessionorc import hosts
 
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     here = Path(__file__).resolve().parents[1]
@@ -625,21 +628,36 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
     assert (team.techlead.name, team.techlead.context) == ("techlead-ao-1", "docs/briefs/techlead-context.md")
     got = [(m.role, m.names(), m.lane, m.brief, m.unattended) for m in team.members]
     assert got == [
-        ("grinder", ["grinder-ao-1"], ["free-pick", "owner:grinder"], "docs/briefs/grinder-ao-1.md", True),
-        ("grinder", ["grinder-ao-2"], ["free-pick", "owner:grinder"], "docs/briefs/grinder-ao-2.md", True),
-        ("designer", ["designer-ao-1"], ["design-first", "owner:designer"], None, True),
+        ("grinder", ["grinder-ao-1"], [], "docs/briefs/grinder-ao-1.md", True),
+        ("grinder", ["grinder-ao-2"], [], "docs/briefs/grinder-ao-2.md", True),
+        ("designer", ["designer-ao-1"], [], None, True),
     ]
-    assert team.entries == {"feature": "designer"}
+    assert team.flows == ["td", "build-review"] and team.entries == {}
     briefs = [team.manager.brief, team.techlead.context, *(m.brief for m in team.members if m.brief)]
     assert all((here / b).is_file() for b in briefs)
 
-    # the held paths are the repo's, written whole; the profile is still the org overlay's
+    # the held paths are the repo's top-level `held:`; no role writes a `review:` (the flow gives the
+    # reader); the profile is still the org overlay's
     cfg = repoconfig.load(repo)
-    held = {"reader": "techlead", "held": ["src/sessionorc/**", "docs/briefs/**"], "bound": "2h"}
+    assert cfg.held == ["src/sessionorc/**", "docs/briefs/**"]
     for name, profile in (("grinder", "grind"), ("designer", "grind-fable")):
         role = repoconfig.resolve_role(cfg, name, aggregate.roles)
-        assert (role.review, role.profile) == (held, profile)
+        assert (role.review, role.profile) == (None, profile)
     assert (here / repoconfig.resolve_role(cfg, "designer", aggregate.roles).brief).is_file()
+
+    # both listed flows are followable, and the current one (`td`, the first) compiles to what the
+    # file no longer writes: the stage lanes, `entries.feature: designer`, the techlead on `held:`;
+    # `ao org check` (teams.flow_redundant) names no key the flow would fill the same
+    host = hosts.local_host().name
+    teams._check_flows(aggregate, team, host, host, None)
+    under = teams.compiled(aggregate, team, host, host, None)
+    assert under is not None and under.flow.name == "td"
+    assert under.flow.stage_of("grinder").lane == ["free-pick", "owner:grinder"]
+    assert under.flow.stage_of("designer").lane == ["design-first", "owner:designer"]
+    assert (under.reader["reader"], under.reader["bound"]) == ("techlead", "2h")
+    assert set(under.reader["held"]) == {"src/sessionorc/**", "docs/briefs/**"}
+    assert teams.entry_role(aggregate, team, "feature", host, host) == "designer"
+    assert teams.flow_redundant(aggregate, team, host, host) == []
 
     # while the org file defines ao-grind it wins, and the repo's is recorded as shadowed
     shadowing, _ = org.with_repos(org.load(write(tmp_path, ORG)), [repo])
