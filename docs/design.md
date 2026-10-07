@@ -8714,11 +8714,13 @@ code and needs no grant; a session doing the same work does.
      chain with it (§4.9c *The bound and the person*); for `reader: person`, the same `ask` to the
      person, replied by the person alone. So a chain's PR merged after its first reader's `pass`
      and before its last reader's reply is a crossing, as a one-reader PR merged before its reply
-     is. Built for the one-reader form (TD-258); the link-by-link read is designed 2026-10-06 and
-     not built — TD-349: `held.read_by` takes a reply from any reader an ask of the PR named as the
-     read. The mail read is the record's own —
+     is. Built for the one-reader form (TD-258) and link by link (TD-349): `held.read_by(s, pr, files)`
+     walks `review_links` against the PR's files, `addressed` (moved into `sessionorc.held`,
+     re-exported by `agentorc.review`) matching each reply's sender and each ask's addressee to a
+     link's reader; the older `{reader, held}` reads as before. The mail read is the record's own —
      its `ask` in its outbox, the reply in its inbox — and, since mail is pruned, the `read_by`
-     rule 10 kept on the PR's `checks` entry. Neither found, **fifteen minutes after the merge**
+     rule 10 kept on the PR's `checks` entry — one sender, so for a chain the read of the one link
+     it matches, and once mail is pruned a chain keeps that link's read and no more. Neither found, **fifteen minutes after the merge**
      (`held.GRACE`: the reader merges first and replies after, and the home may read in between), is a crossing, written
      to the record as **`held_missed: [{pr, at, paths, told, dismissed}]`** (home-owned): the member gets one
      fixed line, rule 5's two ways — typed into the idle composer of an unattended member on the

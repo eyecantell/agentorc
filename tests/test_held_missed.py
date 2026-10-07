@@ -31,8 +31,10 @@ def _ask(s: Session, to: str, pr: int = 845, root: str = "m-1", id: str = "m-1")
     s.outbox.append(MailEntry(id=id, from_=s.id, to=[to], at="t", kind="ask", text="read it", root=root, pr=pr))
 
 
-def _reply(s: Session, frm: str, root: str = "m-1") -> None:
-    s.inbox.append(MailEntry(id="m-r", from_=frm, to=[s.id], at="t", kind="reply", text="merged", root=root))
+def _reply(s: Session, frm: str, root: str = "m-1", verdict: str | None = None) -> None:
+    s.inbox.append(
+        MailEntry(id="m-r", from_=frm, to=[s.id], at="t", kind="reply", text="merged", root=root, verdict=verdict)
+    )
 
 
 def test_the_read_is_a_named_readers_reply_on_the_prs_ask():
@@ -102,8 +104,74 @@ def test_a_chain_holds_the_union_of_its_links_paths_and_is_said_as_its_readers()
     s.review = chain
     _ask(s, "ao-x-ui")
     _reply(s, "ao-x-ui")
-    assert held.read_by(s, 845) == "ao-x-ui"
+    # link by link (§6 rule 11, TD-349): the ui reader's reply reads a PR only the ui link holds
+    assert held.read_by(s, 845, ["src/agentorc/ui/app.py"]) == "ao-x-ui"
+    assert held.read_by(s, 845, files) is None, "the techlead's link holds it too, and has no reply"
     assert "without its readers' read" in held.said({"pr": 845, "paths": ["src/sessionorc/held.py"]}, "")
+
+
+CHAIN = {
+    "chain": [
+        {"stage": "ui-review", "reader": "ui-reader", "held": ["src/agentorc/ui/**"]},
+        {"stage": "review", "reader": "techlead", "held": ["src/**"]},
+    ],
+    "bound": "2h",
+}
+BOTH = ["src/agentorc/ui/app.py", "src/sessionorc/held.py"]
+
+
+def _chain() -> Session:
+    s = _rec()
+    s.review = CHAIN
+    _ask(s, "ao-x-ui-reader", root="m-1", id="m-1")
+    _ask(s, "ao-x-techlead", root="m-2", id="m-2")
+    return s
+
+
+def test_a_chain_is_read_when_every_link_holding_the_pr_has_its_readers_reply():
+    """TD-349: a chain's PR merged after its first reader's `pass` and before its last reader's
+    reply is a crossing; read when every holding link has a reply from its reader, on a thread of
+    an ask carrying the PR addressed to that reader."""
+    s = _chain()
+    _reply(s, "ao-x-ui-reader", root="m-1", verdict="pass")
+    assert held.read_by(s, 845, BOTH) is None, "the first reader's pass alone is not the chain's read"
+    assert held.read_by(s, 845, ["src/agentorc/ui/app.py", "src/x.py"]) is None, "both links hold src/**"
+    _reply(s, "ao-x-ui-reader", root="m-2")  # the first reader on the second's thread: not that link's
+    assert held.read_by(s, 845, BOTH) is None
+    _reply(s, "ao-x-techlead", root="m-2", verdict="pass")
+    assert held.read_by(s, 845, BOTH) == "ao-x-techlead"
+    # a link whose paths the PR does not touch is not asked of
+    lone = _chain()
+    _reply(lone, "ao-x-techlead", root="m-2")
+    assert held.read_by(lone, 845, ["src/sessionorc/held.py"]) == "ao-x-techlead"
+    assert held.read_by(lone, 845, BOTH) is None
+
+
+def test_a_chains_merged_or_the_persons_reply_is_its_read():
+    """The last reader holding the PR merges it, so a `merged` on any of its threads is the read —
+    the second's, or the first's alone, which took the merge; so is the person's reply on either
+    thread, where an ask went up past its bound and the PR became the person's (TD-349)."""
+    for frm, root in (("ao-x-techlead", "m-2"), ("ao-x-ui-reader", "m-1")):
+        s = _chain()
+        _reply(s, frm, root=root, verdict="merged")
+        assert held.read_by(s, 845, BOTH) == frm
+    for root in ("m-1", "m-2"):
+        s = _chain()
+        _reply(s, PERSON, root=root)
+        assert held.read_by(s, 845, BOTH) == PERSON
+    s = _chain()
+    _reply(s, "ao-x-stranger", root="m-2", verdict="merged")
+    assert held.read_by(s, 845, BOTH) is None, "a merged from someone the thread did not name is no read"
+
+
+def test_a_chains_kept_read_is_one_links():
+    """Mail is pruned; the one sender rule 10 kept on the PR's `checks` entry reads the link it
+    matches and no more (TD-349)."""
+    s = _rec()
+    s.review = CHAIN
+    s.checks = [{"pr": 845, "read_by": "ao-x-techlead"}]
+    assert held.read_by(s, 845, ["src/sessionorc/held.py"]) == "ao-x-techlead"
+    assert held.read_by(s, 845, BOTH) is None, "the ui link's read was pruned with its mail"
 
 
 def test_the_read_of_a_pr_gives_its_files_and_its_merge(monkeypatch):
@@ -170,6 +238,23 @@ async def test_a_held_pr_the_seat_replied_on_is_no_crossing(agent, monkeypatch):
     assert s.held_missed == [] and _fyi(agent) == [] and gh.asked == [845]
     await agent._held_pass([s], LATER)
     assert gh.asked == [845], "settled: read once"
+
+
+async def test_a_chain_pr_merged_after_the_first_readers_pass_alone_is_a_crossing(agent, monkeypatch):
+    """TD-349, at the home: rule 11 reads the PR's files against each link, so a chain PR the first
+    reader passed and the second never answered is a crossing after the grace; the second's `merged`
+    clears it (§6 rule 11)."""
+    gh = _Gh(monkeypatch)
+    s, t = _member(agent, "w", review=dict(CHAIN)), _member(agent, "v", review=dict(CHAIN))
+    for m in (s, t):
+        _done(m, 845)
+        _ask(m, "ao-x-ui-reader", root="m-1", id="m-1")
+        _ask(m, "ao-x-techlead", root="m-2", id="m-2")
+        _reply(m, "ao-x-ui-reader", root="m-1", verdict="pass")
+    _reply(t, "ao-x-techlead", root="m-2", verdict="merged")
+    gh.prs[845] = (BOTH, MERGED)
+    await agent._held_pass([s, t], LATER)
+    assert [c["pr"] for c in s.held_missed] == [845] and t.held_missed == []
 
 
 async def test_a_held_pr_with_no_reply_is_an_entry_a_note_and_the_second_is_two(agent, monkeypatch):

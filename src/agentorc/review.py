@@ -15,9 +15,10 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
 
-# the glob match and the files read are `sessionorc`'s since §6 rule 11 reads them at the home
-# (TD-258 slice 2): the package rule runs one way, so `ao pr held` reads them from there
-from sessionorc.held import GH_TIMEOUT, held_paths, matches, pr_files  # noqa: F401
+# the glob match, the files read and `addressed` are `sessionorc`'s since §6 rule 11 reads them at
+# the home (TD-258 slice 2; TD-349 for a chain): the package rule runs one way, so `ao pr held`
+# reads them from there
+from sessionorc.held import GH_TIMEOUT, addressed, held_paths, matches, pr_files  # noqa: F401
 from sessionorc.models import review_links
 
 
@@ -43,15 +44,6 @@ def setting(review: Any) -> dict[str, Any] | None:
     if not held or not all(isinstance(g, str) and g.strip() for g in held):
         raise ValueError(f"review: held is a list of path globs, not {held!r}")
     return {"reader": str(review["reader"]), "held": list(held), "bound": str(review.get("bound") or "2h")}
-
-
-def addressed(addr: str, readers: list[str]) -> str | None:
-    """Which of a chain's `readers` — each the seat's name as the definition gives it (§4.9c) — a
-    mail address names: the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name
-    itself. The longest name that fits wins, so `ui-reader` is never taken for `reader`. None: none."""
-    base = str(addr).split("@", 1)[0]
-    fits = [r for r in readers if base == r or base.endswith(f"-{r}")]
-    return max(fits, key=len) if fits else None
 
 
 def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None, *, older: bool = False) -> dict[str, Any]:
