@@ -74,6 +74,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Built (#1206, #1209, #1210) — live check |
+| TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Open — decided by Paul |
+| TD-372 | The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once | Medium | Open — decided by Paul |
 
 ---
 
@@ -1149,7 +1151,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-04 (TD-307's migration; the anchor session)
 **Owner:** anchor
 **Kind:** build
-**Status:** **agentorc's half built 2026-10-06** (the designer, PR #1166, handed by Paul through the anchor): `.agentorc.yml` writes `held: [src/sessionorc/**, docs/briefs/**]` and `flows: [td, build-review]` on ao-grind, and no member lane, `entries.feature` or role `review:` — `tests/test_org.py`'s read of the repo's own file compiles `td`, finds both flows followable and `teams.flow_redundant` empty; `docs/briefs/designer-ao-1.md` is the designer template's supplement (what this repo does differently, nothing the template says), and the path is cut from `grinder-ao-1.md`, `grinder-ao-2.md` and `manager-ao-1.md`; `repoconfig`'s `FLOW_ONLY_TEMPLATES` carve-out and the design's words for it (§4.9c, §4.8) are gone, so the template wraps a designer flow or none. **Left:** while `~/.agentorc/org.yml` still defines ao-grind the repo's definition reads *shadowed* and nothing that runs changes — the switch is the person's edit of the org file, then a team restart to see the `{flow}` and `{stage}` lines (the anchor, with Paul, once this is live); samscrape, contractmatch and dev-cadence, each by its own PR in its own ledger (the anchor files them). Before: Open. The techlead's read of #1166 also noted `docs/briefs/techlead-context.md` §6's sentence that *the grinder role carries `review: {reader: techlead, held: […]}` in `org.yml`*: stale since TD-229 (the repo's file carried it) and wrong again now the flow names the reader — a held path, corrected with the other halves.
+**Status:** **The other three repos' moves are filed, 2026-10-07 (the anchor, at Paul's word):** samscrape TD-454 (#1052), contractmatch TD-054 (#162), dev-cadence TD-086 (#213), each done by that repo's own team. Left here: read each move once it lands (its team on its flows, `ao org check` naming no *same value* key), then archive. **agentorc's half built 2026-10-06** (the designer, PR #1166, handed by Paul through the anchor): `.agentorc.yml` writes `held: [src/sessionorc/**, docs/briefs/**]` and `flows: [td, build-review]` on ao-grind, and no member lane, `entries.feature` or role `review:` — `tests/test_org.py`'s read of the repo's own file compiles `td`, finds both flows followable and `teams.flow_redundant` empty; `docs/briefs/designer-ao-1.md` is the designer template's supplement (what this repo does differently, nothing the template says), and the path is cut from `grinder-ao-1.md`, `grinder-ao-2.md` and `manager-ao-1.md`; `repoconfig`'s `FLOW_ONLY_TEMPLATES` carve-out and the design's words for it (§4.9c, §4.8) are gone, so the template wraps a designer flow or none. **Left:** while `~/.agentorc/org.yml` still defines ao-grind the repo's definition reads *shadowed* and nothing that runs changes — the switch is the person's edit of the org file, then a team restart to see the `{flow}` and `{stage}` lines (the anchor, with Paul, once this is live); samscrape, contractmatch and dev-cadence, each by its own PR in its own ledger (the anchor files them). Before: Open. The techlead's read of #1166 also noted `docs/briefs/techlead-context.md` §6's sentence that *the grinder role carries `review: {reader: techlead, held: […]}` in `org.yml`*: stale since TD-229 (the repo's file carried it) and wrong again now the flow names the reader — a held path, corrected with the other halves.
 **Location:** this repo's `.agentorc.yml`; samscrape's, contractmatch's and dev-cadence's (each in its own repo, by its own PR)
 
 **Why:** after TD-309 every team still writes what its flow would fill; nothing is wrong, but the copying TD-307 exists to remove stays until each repo deletes it. A repo that writes `held:` or `flows:` before the live copy knows the keys breaks every read of its file (`repoconfig` refuses an unknown top-level key), so this waits on the promote, not the merge.
@@ -1289,3 +1291,56 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
 
+## TD-371: A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul's use of the Inbox)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open. **Decided by Paul, 2026-10-07:** a snooze only moves an item's date. It stays actionable, with its suggested answers, and **Unsnooze** is dropped. The design round is the obvious tier: write it, land it, note him.
+**Location:** design §4.10 *Snooze* (`docs/design/4.10-messages.md`), §4.5 screen 6 (the Inbox's snoozed list), §4.5a's Inbox rows (**Snooze ▾**, **Unsnooze**); `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`: the row with **Unsnooze** only), the `unsnooze` and `attention_snooze` acts in `app.js`
+
+**Why:**
+- Paul, 2026-10-07, answering TD-319's look after snoozing it: *It seems very odd to have to hit "unsnooze" first — I was expecting the snoozed items to just get their due dates moved to the new date, and they would still show the recommended answers etc in the inbox.*
+- Three snoozes work two ways today:
+  - **A board item's Snooze** moves its `Due:` date. It goes under *Not due yet* and comes back on the date. Paul expects this.
+  - **A mail entry's snooze** (`snoozed_until`) and **a state row's** (`attention_snoozed_until`) move the row to a snoozed list, where it shows **Unsnooze** alone: no answers, no Reply, no *Go with it*.
+- Hiding the controls protects nothing (§4.10 already says a snooze is never a way to lose mail), and it adds a step before every answer.
+
+**Fix:** design, then build.
+- Every snooze is a date and nothing more. The row leaves *Needs you* and the count until then, sits in a fold ordered by its date (as *Not due yet* is), and keeps every control its kind has.
+- Answering, replying or pressing *Go with it* on a snoozed row acts as it would anywhere and ends the snooze.
+- **Unsnooze** is dropped. A row comes back on its date, or the person acts on it from the fold. A **Snooze ▾** on a snoozed row picks a new date, which can be *now*.
+- `inbox_snooze` and the attention snooze keep their fields. Only the page changes, plus the RPC for an earlier date if one is needed.
+
+**Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it, no row anywhere offers **Unsnooze**, and §4.10 and §4.5a say a snooze is a date.
+
+**Related:** TD-069 (archived: the snooze), TD-220 (archived: the board's *Not due yet* fold), TD-319 (the look Paul snoozed).
+
+## TD-372: The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open. **Decided by Paul, 2026-10-07:** add a buffer before the banner shows.
+**Location:** `src/agentorc/ui/static/app.js` (the page's event socket: `ws.onclose = () => { setDown(true); … }`, `setDown`), the `#agentdown` banner in `org.html`, `inbox.html` and `settings.html`; design §4.5 (the banner a page shows when its host agent is down)
+
+**Why:**
+- Paul, 2026-10-07: *the kmaster "unreachable" error pops up often, particularly when clicking on the inbox from the org page, then it disappears.*
+- No request failed: the UI's log has no 503 in six hours. The page shows the banner the instant its event socket closes.
+- Leaving a page closes the socket, so the Org page flashes *host agent unreachable* during the navigation to the Inbox.
+- A promote restarts the host agent for about two seconds, which flashes it on every open page.
+
+**Fix:**
+- Ignore a close the page itself caused: a `pagehide` / `beforeunload` flag that `onclose` reads.
+- Show the banner only after the socket has stayed down for a grace period (3 s), cleared by any message or reconnect, so a promote's restart never draws it and a real outage still shows within seconds.
+- The same grace applies to the Inbox's polled banner, which shows after its poll has failed for that long, not on one failed poll.
+- Add one sentence to design §4.5 where the banner is described.
+- Tests: `tests/test_ui_*.py` pins the grace constant and the `pagehide` guard in `app.js`, as other page timings are pinned.
+
+**Done when** on a scratch home, navigating Org → Inbox → Org draws no banner, a host agent stopped for 1 s draws none, one stopped for 5 s draws it, and it clears on reconnect.
+
+**Related:** TD-338 / TD-340 (archived: a control answers the press), TD-226 (archived: the promote's rollback).
