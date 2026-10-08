@@ -885,10 +885,11 @@ def pick_flow(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> d
     """The **Flow** pick, the Settings page's **flow** on Save and `ao team flow <team> <flow>` (§4.5a,
     §4.7, §4.9c *Switching*): checked (`check_pick`), written to `teams.<team>.flow` through
     `set_settings` — a person's own — and nothing more: Apply is the one gate that moves the running
-    team (TD-356). Returns `{team, flow, differences, stays, feature}` read against the written org —
-    the records' differences (`flow_changed`, empty where they cannot be read: the flows' own lines
-    say why), what a switch would leave with a reader (`stays_with`), and `feature`, the role
-    **Add entry**'s *feature* now opens where the pick moved it (§4.9c item 4), else None."""
+    team (TD-356). Returns `{team, flow, differences, feature}` read against the written org — the
+    records' differences (`flow_changed`, empty where they cannot be read: the flows' own lines say
+    why), and `feature`, the role **Add entry**'s *feature* now opens where the pick moved it (§4.9c
+    item 4), else None. What a switch leaves with a reader is Apply's to say (`apply`'s `stays`, §4.9c
+    *What a switch leaves alone*), since a pick moves nothing (TD-365)."""
     check_pick(call, org, name, here, flow)
     t = teams.find(org, name)
     host = t.host or here
@@ -904,7 +905,6 @@ def pick_flow(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> d
         "team": name,
         "flow": flow,
         "differences": diffs,
-        "stays": stays_with(name, sessions),
         "feature": now if now != was else None,
     }
 

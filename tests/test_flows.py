@@ -1003,6 +1003,7 @@ def test_a_pick_says_what_add_entrys_feature_now_opens(world, tmp_path, monkeypa
     org = cli._org_here()
     got = teamrun.pick_flow(cli.call_sync, org, "ao-grind", HOST, "build-review")
     assert got["flow"] == "build-review" and got["feature"] == "techlead" and got["differences"]
+    assert "stays" not in got  # what stays with a reader is Apply's to say: a pick moves nothing (TD-365)
     org = cli._org_here()
     assert teamrun.pick_flow(cli.call_sync, org, "ao-grind", HOST, "build")["feature"] is None
     assert teamrun.pick_flow(cli.call_sync, cli._org_here(), "ao-grind", HOST, "td")["feature"] == "designer"
