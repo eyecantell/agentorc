@@ -411,7 +411,16 @@ code and needs no grant; a session doing the same work does.
      *read the ledger on `origin/main`* will not find it there — the ledger read is the checkout's file;
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      with pickable derived (§4.4 *Repo facts*, TD-223; built — TD-228 slice 1), `design-first`
-     is a pickable entry with `Kind: design-first`, and `free-pick` a pickable entry whose kind
+     is a pickable entry with `Kind: design-first` — and, pickable or not, an entry of any kind
+     whose `Blocked by:` names `decision (designer)` (TD-367; designed 2026-10-07; not built —
+     TD-368): the designer's lane is where a decision owed to the designer gets made — the designer
+     claims the entry as any reference, writes the decision into the design, and the same PR drops
+     the item from the entry's `Blocked by:`, so the next reading finds the entry pickable and
+     tells the grinder lane as it tells any lane news; for that match the decision's holder stands
+     as the entry's owner, so `[design-first, owner:designer]` takes TD-151 though its `Owner:` is
+     `grinder`, and a decision named for anyone else — `decision (paul)`, `decision (anchor)` —
+     matches no lane: the person's is *for you* (§4.4 *Repo facts*), and the anchor has none —,
+     and `free-pick` a pickable entry whose kind
      is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; built —
      TD-323 slice 1; §4.9b *A live check is a grinder's once its build is live*) — so an evaluation, a
      decision and a live check whose build is not live match no lane, and a
