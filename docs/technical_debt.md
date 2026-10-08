@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
 | TD-391 | The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing | Low | Open |
 | TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
 | TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Open — design-first |
@@ -1304,26 +1303,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
 
-## TD-387: Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-07 (the designer, from TD-381's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-386
-**Location:** `src/agentorc/ui/templates/card.html` and `src/agentorc/ui/org.py` (the on-call slot's words for a `work` trigger, and `seat_held`'s), the Members… dialog (`members.html`: the anchor seat listed beside the techlead, not removable), `src/agentorc/cli.py` (`ao team list`: the seat), `src/agentorc/ui/app.py` (`/api/occupancy`: a holder that is a seat says so, with its state and claim), `src/agentorc/ui/help.py` (the words); tests `tests/test_ui_org*.py`, `tests/test_ui_new*.py`; design §4.5 *One composed pill*, §4.5a *card: on call — the anchor seat's words*, *New session: directory field → occupancy: a seat*.
-
-**Why:** TD-381's seat must say why it waits and be seen where the checkout is picked.
-
-**Fix:** the slot words; the dialog and the list; the occupancy check's words; the help entries.
-
-**Done when** on the scratch home the seat's card reads *on call — comes when the checkout's lane gains work*, held off it reads *the checkout is yours · <why>*, Members… and `ao team list` name it, the New session form's directory check names a working seat as a seat, and the tests cover each.
-
-**Related:** TD-381, TD-385, TD-386.
-
----
 ## TD-391: The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing
 
 **Priority:** Low

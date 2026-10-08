@@ -6303,3 +6303,26 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a test in `tests/test_models.py` asserts a lane of `["anchor"]` yields no reference and is counted as nothing held, beside `free-pick`'s; the revert fails it.
 
 **Related:** TD-381, TD-384, TD-385.
+
+## TD-387: Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-381's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Blocked by:** TD-386
+**Location:** `src/agentorc/ui/templates/card.html` and `src/agentorc/ui/org.py` (the on-call slot's words for a `work` trigger, and `seat_held`'s), the Members… dialog (`members.html`: the anchor seat listed beside the techlead, not removable), `src/agentorc/cli.py` (`ao team list`: the seat), `src/agentorc/ui/app.py` (`/api/occupancy`: a holder that is a seat says so, with its state and claim), `src/agentorc/ui/help.py` (the words); tests `tests/test_ui_org*.py`, `tests/test_ui_new*.py`; design §4.5 *One composed pill*, §4.5a *card: on call — the anchor seat's words*, *New session: directory field → occupancy: a seat*.
+
+**Resolved:** 2026-10-08 (grinder-ao-2, PR #1253): the card's slot reads the anchor seat's two sets of words from `seat_held` (`cards.seat_held_words`); Members… lists the seat beside the techlead with no Remove; `ao team list` prints `anchor: <name>`; `/api/occupancy` names a seat holder with its state and claim (`cards.seat_occupant`), which the pill draws. No help paragraph: §4.5a's help list has none for the slot. Read on a scratch home (the PR's UI check); tests in `test_ui_org.py`, `test_anchor_seat.py`, `test_ui_new_host.py`.
+
+**Why:** TD-381's seat must say why it waits and be seen where the checkout is picked.
+
+**Fix:** the slot words; the dialog and the list; the occupancy check's words; the help entries.
+
+**Done when** on the scratch home the seat's card reads *on call — comes when the checkout's lane gains work*, held off it reads *the checkout is yours · <why>*, Members… and `ao team list` name it, the New session form's directory check names a working seat as a seat, and the tests cover each.
+
+**Related:** TD-381, TD-385, TD-386.
+
+---
