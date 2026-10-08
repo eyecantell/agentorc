@@ -272,6 +272,13 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .boardsub { margin: 12px 0 6px; align-items: baseline; } .boardsubh { font-weight: 600; }
 details.boardfold { margin: 6px 0 2px; } details.boardfold > .inboxrows { margin-top: 6px; }
 .boardline { padding: 6px 2px 2px; }
+/* the Inbox's *For you in the ledger* fold (TD-368): a row is one link, drawn quieter than a mail row */
+details.ledgerfold { margin: 12px 0 2px; }
+details.fold.ledgerfold > summary { font-size: inherit; color: var(--fg); } details.fold.ledgerfold > summary .meta { color: var(--muted); }
+.ledgerrepo { padding: 8px 2px 2px; }
+a.ledgerrow { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 6px 10px; margin: 4px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }
+a.ledgerrow:hover { border-color: var(--border); } a.ledgerrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+a.ledgerrow .ledgertitle { flex: 1 1 18em; min-width: 0; } a.ledgerrow[hidden], .ledgergroup[hidden] { display: none; }
 .originnote { padding: 0 0 4px; } .originnote.warnish { color: var(--warn-fg); font-weight: 600; }
 /* §4.5 screen 6 *A board item the person answered waits on them* (TD-305): back after its wait */
 .boardrow .stale.warnish { color: var(--warn-fg); }

@@ -1681,6 +1681,7 @@
       ans.open = store.get("inboxanswered", true);
       ans.addEventListener("toggle", () => { store.set("inboxanswered", ans.open); markAnsweredSeen(); });
     }
+    ledgerFold();
     // the board's *not shown* fold (TD-220): its rows join the rail's *board items* while it is open
     document.addEventListener("toggle", (ev) => { if (ev.target.matches && ev.target.matches("details.boardfold")) inboxFilter(); }, true);
     // design §4.5 screen 6 *The rail* (TD-135): the picks are the page's URL. A bare `/inbox` takes
@@ -1947,6 +1948,13 @@
       AO.restoreRowErrs(hz, errs);
       AO.reopenFolds(hz);
     }
+    // the ledger's entries that wait on you (TD-368): put back whole, reopened as the browser remembers it
+    const lf = $("#ledgerforyou");
+    // compared with what the server sent last, not with the DOM, whose `open` and `hidden` differ
+    if (lf && typeof got.html.ledger === "string" && lf.dataset.src !== got.html.ledger) {
+      lf.innerHTML = lf.dataset.src = got.html.ledger;
+      ledgerFold();
+    }
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
     const w = $("#sec-waiting");
@@ -2102,6 +2110,14 @@
       });
     });
   };
+  // design §4.5 screen 6 *The ledger's entries that wait on you* (TD-368): the fold is closed by
+  // default and this browser remembers it open; its toggle is wired again each time the poll draws it
+  function ledgerFold() {
+    const d = $("#ledgerfold"); if (!d) return;
+    d.open = store.get("inboxledger", false);
+    d.addEventListener("toggle", () => store.set("inboxledger", d.open));
+    inboxFilter();
+  }
   const railRow = (el) => ({ section: el.dataset.section || "", team: el.dataset.team || "none", kind: el.dataset.rkind || "", find: el.dataset.find || "" });
 
   function inboxFilter() {
@@ -2133,6 +2149,13 @@
       b.classList.toggle("dim", c.filtered && !cnt.shown);
     });
     $("#railclear").classList.toggle("hidden", !c.filtered);
+    // the ledger's rows (TD-368): in no rail group and no count, filtered by the *Teams* picks and
+    // the find alone; a repo's name goes with its last row shown
+    $$(".inboxpage .ledgerrow").forEach((el) => {
+      const r = railRow(el);
+      el.hidden = !((!rail.team.length || rail.team.includes(r.team)) && words.every((w) => r.find.includes(w)));
+    });
+    $$(".inboxpage .ledgergroup").forEach((g) => { g.hidden = !$$(".ledgerrow", g).some((el) => !el.hidden); });
     // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
     // the same counts, picked first so a pick never scrolls out of sight
     const pn = rail.team.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);

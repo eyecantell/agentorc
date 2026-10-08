@@ -230,6 +230,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-368 slice 3, grinder-ao-2): screen 6's *The ledger's entries that wait on you* built as a fold of one-line links; the scratch home's fixture ledger gained an `Owner: paul` entry so a look has a row to draw.
 - 2026-10-07 (TD-367, the designer; the steer to Paul is `m-77a04cc7eccc`, bound 2026-10-08 05:35 MDT): the Inbox gains **For you in the ledger (n)**, a fold under the *Needs you* rows and the board's, closed by default, listing the ledger entries that wait on the person across the repos — one row each, a link to the Repo page's row — counted nowhere; screen 11's design-first list holds a build blocked by `decision (designer)`. Rejected: counted rows, and a section of its own.
 - 2026-10-06 (TD-357, the designer): the team card's kind bar gains the **lanes line** under its legend, and the Repo page's count line the same, once per servicing team; the page's lists stay by kind, each row saying its owner (TD-228).
 - 2026-10-06 (TD-353, the designer; Paul's decision the same day, *separate line*, from his read of the Org with TD-350 live): the rollup's *answer needed* and the team card's **Answer needed** facet go back to a pane's permission or question only; a member's open `ask` to the person becomes the facet's own line, *asked you · n · <age>*, one link to its Inbox row (`/inbox?row=<id>`), and the rollup's third line sums them — TD-344's shape of that morning (the ask as a block under Answer needed, built by TD-350) mixed mail with live prompts, which Paul keeps apart: a prompt needs him now, mail can wait. Built by TD-354.
@@ -301,6 +302,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-368 slice 3, grinder-ao-2): the Inbox's **For you in the ledger (n)** fold built — under the board's rows in *Needs you*, closed until opened and remembered per browser, one link per entry to the Repo page on its id, filtered by the rail's *Teams* picks and the find alone, counted nowhere; a row's team is the definitions' team for its repo, else its live records'.
 - 2026-10-07 (TD-002, grinder-ao-2; Paul released it to the grinders that day: *still vital*): **Focus composer: Attach / drop / paste** built — the picker, a drop on the terminal or the composer, an image pasted into the composer; the path inserted at the caret and nothing sent; a pasted `image.png` named `paste-<date>-<time>`; desktop only, a session on this host only.
 - 2026-10-07 (TD-367, the designer): the row **Inbox: For you in the ledger (n) fold** — the sub-heading, the rows and their one link, counted in no number and no rail group.
 - 2026-10-06 (TD-357, the designer; the steer is `m-805f8088ba04`, bound 2026-10-07 10:16 MDT): **team card: Repo facet** — the lanes line, the two segments' hovers, and the out-of-work warning on it, a mark and never a prompt, since rule 6 mails what is new and what was there at the declaration is the person's to read.

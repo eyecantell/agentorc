@@ -1889,3 +1889,63 @@ templates.env.globals["rail_picks"] = rail_picks
 templates.env.globals["look_pair"] = look_pair
 templates.env.globals["rail_rows"] = rail_rows
 templates.env.globals["rail_counts"] = rail_counts
+
+
+def ledger_for_you(
+    repos: Mapping[str, Any], fleet: Collection[dict[str, Any]], named: Mapping[str, str] | None = None
+) -> dict[str, Any]:
+    """The Inbox's **For you in the ledger (n)** fold (design §4.5 screen 6 *The ledger's entries
+    that wait on you*, §4.5a, TD-368): the entries §4.4 *Repo facts* sorts *for you* in the home's
+    repo facts (`repos`, keyed by checkout, in the registry's order), one group per repo with any,
+    each in the Repo page's order (priority, then id). A row is `{id, title, pri, why, held, team,
+    url}`: *yours* for `Owner: paul`, *your decision* for a `decision (paul)` item; *held by* the
+    names of the live records of that repo claiming it; the team the rail's *Teams* picks filter by
+    — the definitions' team for the repo (`named`, by resolved checkout), else the team most of its
+    live records carry, else none; the link the Repo page opened on the id. `n` is every row,
+    counted in no number of the page's."""
+    from .repo import PRIORITY_RANK  # repo imports this module: read at call time
+
+    live = [s for s in fleet if s.get("state") not in ("exited", "closed") and s.get("repo")]
+    groups: list[dict[str, Any]] = []
+    for root, r in (repos or {}).items():
+        if not isinstance(r, dict):
+            continue
+        entries = [
+            e
+            for e in ((r.get("ledger") or {}).get("entries") or [])
+            if isinstance(e, dict) and e.get("for_page") == "for-you"
+        ]
+        if not entries:
+            continue
+        here = Path(str(r.get("root") or root)).resolve()
+        mine = [s for s in live if Path(str(s["repo"])).resolve() == here]
+        tally: dict[str, int] = {}
+        for s in mine:
+            if s.get("team"):
+                tally[str(s["team"])] = tally.get(str(s["team"]), 0) + 1
+        team = (named or {}).get(str(here)) or (max(sorted(tally), key=lambda t: tally[t]) if tally else "")
+        name = str(r.get("name") or here.name)
+        rows = []
+        for e in sorted(entries, key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"])):
+            held = [
+                str(s.get("name") or s.get("id"))
+                for s in mine
+                if any(
+                    isinstance(p, dict) and p.get("ref") == e["id"] and p.get("status") == "claimed"
+                    for p in s.get("progress") or []
+                )
+            ]
+            owner = str(e.get("owner") or "").lower() == "paul"
+            rows.append(
+                {
+                    "id": e["id"],
+                    "title": e.get("title") or "",
+                    "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
+                    "why": "yours" if owner else "your decision",
+                    "held": ", ".join(held),
+                    "team": team,
+                    "url": f"/repo/{quote(name)}#{quote(e['id'])}",
+                }
+            )
+        groups.append({"repo": name, "rows": rows})
+    return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}
