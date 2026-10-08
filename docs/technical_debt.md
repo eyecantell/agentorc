@@ -71,7 +71,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
-| TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Built (#1206, #1209, #1210) — live check |
 | TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Open — decided by Paul |
 | TD-372 | The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once | Medium | Open — decided by Paul |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
@@ -1228,28 +1227,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
 
 **Related:** TD-357 (archived: the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
-
-## TD-368: Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-07 (the designer, from TD-367's design)
-**Owner:** grinder
-**Kind:** live-check #1210
-**Status:** Built: slices 1 (the reader, `sessionorc.ledger`) and 2 (`ao repo`'s *decision* mark) in PR #1206, slice 3 (the Inbox's **For you in the ledger (n)** fold) in PR #1209, slice 4 (the designer briefs) in PR #1210. Left to read once #1210 is live (`ao promote status`): `ao repo` on agentorc counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else, and lists TD-151 among the design-first rows marked *decision*; a headless GET of `/inbox` draws the fold with that count, each row a link to `/repo/agentorc#TD-n`; the designer's next run is told of TD-151 by rule 6 (its record's lane news, or `ao inbox` on it).
-**Location:** `src/sessionorc/ledger.py` (`kind_of`, `lane_matches`, `_word_matches`), `src/agentorc/cli.py` (`cmd_repo`'s design-first rows), `src/agentorc/ui/inbox.py` (`inbox_sections`, the page's fourth source), `src/agentorc/ui/templates/inbox.html` and `inbox_rail.html`, `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` (the lane sentence); tests `tests/test_ledger_derived.py`, `tests/test_repo_facts.py`, `tests/test_lane_news.py`, `tests/test_ui_inbox.py`, the CLI's `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
-
-**Why:** design §4.4 *Repo facts* (the page's kinds), §6 rule 6, §4.5 screen 6 *The ledger's entries that wait on you* and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo` (TD-367, designed 2026-10-07). On 2026-10-07 the repo line said *15 for you* about decisions that were the designer's and the anchor's, and the Inbox drew none of the fifteen.
-
-**Fix:**
-1. **The reader** (`sessionorc.ledger`): `kind_of`'s first test is `Owner: paul`, or a `blocked_by` item `decision (paul)` with the holder compared lower-cased; its second takes `Kind: design-first` and any entry with a `decision (designer)` item; `Kind: decision` on its own is no longer *for you* (the anchor's TD-209-shaped entries read *other*). `lane_matches`: the `design-first` word takes an entry with a `decision (designer)` item, pickable or not, and for that entry the lane's owner words compare against `designer`, not its `Owner:`. Tests: a fixture with `Owner: paul`, `decision (Paul)`, `decision (designer)` on an `Owner: grinder` build, and `Kind: decision` owned by the anchor, against a `[design-first, owner:designer]` lane — each entry in exactly one kind, TD-151's shape in the lane and the anchor's in none; in `test_lane_news`, such an entry filed is told to the designer's lane, and with its decision item dropped, to the grinder's.
-2. **`ao repo`**: a design-first row that is there for `decision (designer)` says *decision* after its owner; `--json` keeps the entries as they are (their `blocked_by` already says it).
-3. **The Inbox fold** (§4.5 screen 6, §4.5a): the page reads the home's repo facts (the `repos` reading the Org already polls) and draws **For you in the ledger (n)** under the *Needs you* rows after the board's rows, closed by default, the browser remembering it, nothing at zero; rows grouped by repo in registry order, then priority and id, with the id, title, priority letter, *yours* / *your decision*, *held by <name>*, each one link to `/repo/<name>#TD-n`; counted in no number and no rail group, filtered by the rail's *Teams* picks (a repo's servicing teams, else *no team*) and the find. A UI change: the UI check on a scratch home (§4.9b), its shot in the PR.
-4. **The briefs**: the designer's lane sentence in `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` says the lane also holds an entry blocked by `decision (designer)`, and what to do with one: claim it, write the decision into the design, drop the item from `Blocked by:` in that PR.
-
-**Done when** `ao repo` on this ledger counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else; TD-151 is in the design-first list, marked *decision*, and rule 6 tells the designer's lane of it; the Inbox draws the fold with that count, each row opening the Repo page on its entry; the briefs say it.
-
-**Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
 
 ## TD-371: A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes
 
