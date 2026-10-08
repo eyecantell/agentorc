@@ -1950,8 +1950,9 @@
     }
     // the ledger's entries that wait on you (TD-368): put back whole, reopened as the browser remembers it
     const lf = $("#ledgerforyou");
-    if (lf && typeof got.html.ledger === "string" && lf.innerHTML !== got.html.ledger) {
-      lf.innerHTML = got.html.ledger;
+    // compared with what the server sent last, not with the DOM, whose `open` and `hidden` differ
+    if (lf && typeof got.html.ledger === "string" && lf.dataset.src !== got.html.ledger) {
+      lf.innerHTML = lf.dataset.src = got.html.ledger;
       ledgerFold();
     }
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has

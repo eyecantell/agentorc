@@ -2776,7 +2776,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         repos: dict[str, Any] = {}
         named: dict[str, str] = {}
         with contextlib.suppress(Exception):
-            repos = (await h.repo_facts())[0]
+            repos = await call("repos")
         with contextlib.suppress(Exception):
             named = repo_teams(await h.defs(), host_name())
         return ledger_for_you(repos, fleet, named)
