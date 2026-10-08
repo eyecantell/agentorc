@@ -1116,10 +1116,11 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                         print(f"{'':<{w}}  {line}")
                 if unread:  # a node's checkout this host cannot read: not judged here
                     print(f"{'':<{w}}  flows not read from here: {unread}")
-                if r["differences"]:
-                    print(f"{'':<{w}}  flow changed — Apply (ao team flow {r['name']} --apply):")
-                    for d in r["differences"]:
-                        print(f"{'':<{w}}    {d['line']}")
+            if r.get("differences"):  # …and a seat the run lacks, under a flow or none (§4.9c, TD-399)
+                word = "definition" if teamrun.definition_changed(r["differences"], r.get("flow")) else "flow"
+                print(f"{'':<{w}}  {word} changed — Apply (ao team flow {r['name']} --apply):")
+                for d in r["differences"]:
+                    print(f"{'':<{w}}    {d['line']}")
         # a repo's definition the org file's wins over, and a name two repos define (§4.9)
         for name, files in org.shadowed.items():
             for f in files:
@@ -1867,7 +1868,7 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     except (ValueError, AgentError) as e:
         return fail(args, str(e), 1)
     team = org.teams[name]
-    if not team.flows:
+    if not team.flows and args.flow is not None:
         return fail(args, f"team {name} lists no flows: — it runs as its definition is written (design §4.9c)", 1)
     if args.flow is not None:
         if args.flow not in team.flows:
@@ -1900,7 +1901,9 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             print(note)
         if unread := next((r["unread"] for r in rows if r.get("unread")), ""):
             print(f"flows not read from here: {unread}")
-        w = max(len(r["name"]) for r in rows)
+        if not rows:  # no flows: its seats alone (§4.9c, TD-399)
+            print(f"{name} lists no flows: — it runs as its definition is written")
+        w = max((len(r["name"]) for r in rows), default=0)
         for r in rows:
             mark = "*" if r["current"] else " "
             print(f"{mark} {r['name']:<{w}}  {r['strip'] or '—'}")
@@ -1908,10 +1911,11 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
                 print(f"  {'':<{w}}  {r['cannot']}")
         if applied is not None:
             done = applied["applied"] + applied["skipped"]
+            what = applied["flow"] or "the definition"
             if not done:
-                print(f"{applied['flow']}: every live record already matches, or the team is stopped")
+                print(f"{what}: every live record already matches, or the team is stopped")
             else:
-                print(f"applied {applied['flow']}:")
+                print(f"applied {what}:")
             for d in done:
                 print(f"  {d['line']}")
             for x in applied.get("stays") or []:
@@ -1919,7 +1923,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
         elif out.get("unread"):
             print(f"the records are not compared: {out['unread']}")
         elif out["differences"]:
-            print("flow changed — Apply (ao team flow " + name + " --apply):")
+            word = "definition" if teamrun.definition_changed(out["differences"], out["flow"]) else "flow"
+            print(f"{word} changed — Apply (ao team flow {name} --apply):")
             for d in out["differences"]:
                 print(f"  {d['line']}")
         elif args.flow is not None:

@@ -665,12 +665,12 @@ def create_app() -> FastAPI:
         def read() -> dict[str, Any]:
             o = org or org_here()[0]  # fresh, as the page's strip reads it: not the deltas' cached definitions
             out: dict[str, Any] = {}
-            for n, t in o.teams.items():
-                if t.flows:
-                    try:  # one team that fails to read costs its own header the flow, not every team's
-                        out[n] = teamrun.flow_view(rpc, o, n, here, sessions)
-                    except Exception:  # noqa: BLE001
-                        log.debug("team %s: its flows were not read", n, exc_info=True)
+            # every team: one with no `flows:` is read on its seats alone, and only while live (TD-399)
+            for n in o.teams:
+                try:  # one team that fails to read costs its own header the flow, not every team's
+                    out[n] = teamrun.flow_view(rpc, o, n, here, sessions)
+                except Exception:  # noqa: BLE001
+                    log.debug("team %s: its flows were not read", n, exc_info=True)
             return out
 
         try:

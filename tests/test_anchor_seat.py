@@ -199,16 +199,91 @@ def test_one_per_repo_is_per_host_and_a_team_that_lands_nowhere_holds_nothing(tm
     assert org.anchor_first(org.teams["found"]) is None
 
 
-def test_a_flow_never_reads_an_anchor_no_start_created_as_a_difference(tmp_path, monkeypatch):
-    # review of #1245: a held checkout leaves no record (until TD-386), and Apply could not clear it
+def _running(p: teams.Plan) -> list[dict]:
+    """A live record of every launch but the anchor's: the team as it ran before it had the seat."""
+    rec = {"team": "t", "state": "working"}
+    return [
+        {**rec, "id": f"ao-alpha-{x.name}", "name": x.name, "lane": x.lane, "review": x.review}
+        for x in p.launches
+        if not x.in_checkout
+    ]
+
+
+def test_a_seat_the_run_lacks_is_a_start_under_a_flow_or_none_and_one_with_a_record_is_not(tmp_path, monkeypatch):
+    """TD-400 (§4.9c *A seat the definition names that the run has no record of is a difference too*):
+    the anchor a team predates reads `start`, a seat, under a flow or with none; a record of it — live,
+    closed between fills, or held — is nothing; a team with no flow compares its seats alone."""
     org = _org(tmp_path, monkeypatch, {"t": _team()})
     p = teams.plan(org, "t", HOST)
-    p.flow = "td"  # `differences` reads a team under a flow only
-    live = [
-        {"id": f"ao-alpha-{n}", "name": n, "team": "t", "state": "working", "lane": x.lane, "review": x.review}
-        for n, x in ((x.name, x) for x in p.launches if not x.in_checkout)
-    ]
-    assert "t-anchor" not in [d.name for d in teamrun.differences(p, live)]
+    live = _running(p)
+    assert p.flow is None
+    (d,) = teamrun.differences(p, live)
+    assert (d.name, d.act, d.seat, d.line(None)) == ("t-anchor", "start", True, "t-anchor: starts")
+    # the techlead too, and a member a team with no flow lacks is no difference (no flow compiles it)
+    lacking = [r for r in live if r["name"] not in ("tl", "g")]
+    assert [x.name for x in teamrun.differences(p, lacking)] == ["tl", "t-anchor"]
+    for state in ("working", "closed"):
+        rec = {"id": "ao-alpha-t-anchor", "name": "t-anchor", "team": "t", "state": state, "seat": {"trigger": "work"}}
+        assert teamrun.differences(p, [*live, rec]) == []
+    # under a flow: the same seat start, beside whatever the flow reads of the members
+    p.flow = "td"
+    starts = [d for d in teamrun.differences(p, live) if d.act == "start"]
+    assert [(d.name, d.seat) for d in starts] == [("t-anchor", True)]
+    assert starts[0].line("td") == "t-anchor: starts under td"
+    # nothing live: nothing to compare
+    assert teamrun.differences(p, [{**r, "state": "exited"} for r in live]) == []
+
+
+def test_the_mark_reads_definition_changed_where_seats_are_all_that_differ_or_no_flow_runs():
+    seat = {"name": "t-anchor", "act": "start", "seat": True, "line": "t-anchor: starts"}
+    member = {"name": "g", "act": "relaunch", "seat": False, "line": "g: relaunched — lane a → b"}
+    assert teamrun.definition_changed([seat], "td") and teamrun.definition_changed([member], None)
+    assert not teamrun.definition_changed([seat, member], "td") and not teamrun.definition_changed([], None)
+    from agentorc.ui.repo import flow_head
+
+    assert flow_head({"flow": None, "differences": [seat]}, live=True)["definition_changed"] is True
+    assert flow_head({"flow": None, "differences": [seat]}, live=False)["flow_changed"] == []
+    head = flow_head({"flow": "td", "flows": [], "differences": [seat, member]}, live=True)
+    assert head["flow_changed"] == [seat, member] and head["definition_changed"] is False
+
+
+def _applying(tmp_path, monkeypatch, held):
+    org = _org(tmp_path, monkeypatch, {"t": _team()})
+    p = teams.plan(org, "t", HOST)
+    live = _running(p)
+    calls: list[tuple[str, dict]] = []
+
+    def call(method, **params):
+        calls.append((method, params))
+        if method == "list":
+            return live
+        if method == "name_check":
+            return {"name": params["name"], "verdict": "free"}
+        if method == "checkout_held":
+            return {"held": held}
+        if method == "create":
+            return {"id": f"ao-alpha-{params['name']}", "name": params["name"]}
+        raise AssertionError(method)
+
+    return org, call, calls
+
+
+def test_apply_creates_the_anchor_a_team_lacks_held_with_why_while_its_checkout_is_not_free(tmp_path, monkeypatch):
+    """TD-400: Apply's start of the anchor reads `checkout_held` first — not free, `create` with `held`
+    and the reason, the line saying why; free, the plain create in the checkout, under the manager."""
+    held = {"by": "ao-alpha-paul", "why": "held by ao-alpha-paul (working)"}
+    org, call, calls = _applying(tmp_path, monkeypatch, held)
+    got = teamrun.apply(call, org, "t", HOST)
+    (made,) = [p for m, p in calls if m == "create"]
+    assert made["name"] == "t-anchor" and made["held"] is True and made["held_reason"] == held
+    assert made["controllers"] == ["ao-alpha-lead"] and made["worktree"] is None
+    assert [r["line"] for r in got["applied"]] == ["t-anchor: waits — held by ao-alpha-paul (working)"]
+    assert ("checkout_held", {"host": "", "dir": str(tmp_path / "alpha")}) in calls  # this host's, as start asks
+    org, call, calls = _applying(tmp_path, monkeypatch, None)
+    got = teamrun.apply(call, org, "t", HOST)
+    (made,) = [p for m, p in calls if m == "create"]
+    assert "held" not in made and [r["line"] for r in got["applied"]] == ["t-anchor: starts"]
+
 
 
 def test_members_and_ao_team_list_name_the_seat(tmp_path, monkeypatch, capsys):
