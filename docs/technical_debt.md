@@ -73,7 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
-| TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Slices 1–2 built; 3–4 open |
+| TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Built (#1206, #1209, #1210) — live check |
 | TD-370 | The Focus composer's attach (#1205): the `attachments/<session>/` directory's `0700` and the drop, paste and closed-composer handlers are in no test | Low | Open |
 
 ---
@@ -1275,8 +1275,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Type:** debt
 **Added:** 2026-10-07 (the designer, from TD-367's design)
 **Owner:** grinder
-**Kind:** build
-**Status:** In progress — slices 1 (the reader) and 2 (`ao repo`'s *decision* mark) merged in PR #1206; slice 3, the Inbox fold, in PR #1209; slice 4, the designer briefs, in PR #1210 (grinder-ao-2).
+**Kind:** live-check #1210
+**Status:** Built: slices 1 (the reader, `sessionorc.ledger`) and 2 (`ao repo`'s *decision* mark) in PR #1206, slice 3 (the Inbox's **For you in the ledger (n)** fold) in PR #1209, slice 4 (the designer briefs) in PR #1210. Left to read once #1210 is live (`ao promote status`): `ao repo` on agentorc counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else, and lists TD-151 among the design-first rows marked *decision*; a headless GET of `/inbox` draws the fold with that count, each row a link to `/repo/agentorc#TD-n`; the designer's next run is told of TD-151 by rule 6 (its record's lane news, or `ao inbox` on it).
 **Location:** `src/sessionorc/ledger.py` (`kind_of`, `lane_matches`, `_word_matches`), `src/agentorc/cli.py` (`cmd_repo`'s design-first rows), `src/agentorc/ui/inbox.py` (`inbox_sections`, the page's fourth source), `src/agentorc/ui/templates/inbox.html` and `inbox_rail.html`, `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` (the lane sentence); tests `tests/test_ledger_derived.py`, `tests/test_repo_facts.py`, `tests/test_lane_news.py`, `tests/test_ui_inbox.py`, the CLI's `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
 
 **Why:** design §4.4 *Repo facts* (the page's kinds), §6 rule 6, §4.5 screen 6 *The ledger's entries that wait on you* and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo` (TD-367, designed 2026-10-07). On 2026-10-07 the repo line said *15 for you* about decisions that were the designer's and the anchor's, and the Inbox drew none of the fifteen.
