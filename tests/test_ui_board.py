@@ -1797,3 +1797,12 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     assert board_waiting_on(row, [{**g1, "lane": ["design-first"]}], now) == nobody
     assert board_waiting_on({**row, "kind": "fyi"}, [g1], now) == nobody
     assert board_waiting_on(row, [], now) == nobody
+    # a record whose repo will not resolve is passed over, never the page's error
+    assert board_waiting_on(row, [{**g1, "repo": "bad\x00path"}, g1], now) == "pickable by grind"
+    # a repo with no reader names no order; a reader that will not load is loaded once, not per row
+    assert board_waiting_on({**row, "root": str(tmp_path)}, [g1], now) == nobody
+    broken = tmp_path / "broken"
+    (broken / "scripts").mkdir(parents=True)
+    (broken / "scripts" / "nudge_user_attention.py").write_text("raise SystemExit(3)\n")
+    assert workorders.ref(broken, text) == ""
+    assert workorders._keys[str(broken / "scripts" / "nudge_user_attention.py")][1] is None

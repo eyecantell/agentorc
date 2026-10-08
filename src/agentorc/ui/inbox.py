@@ -7,6 +7,7 @@ suite patches both there.
 
 from __future__ import annotations
 
+import functools
 import re
 import sys
 import time
@@ -1195,20 +1196,29 @@ def _board_order(r: Mapping[str, Any]) -> str:
 def _order_teams(r: Mapping[str, Any], order: str, records: Collection[Mapping[str, Any]]) -> dict[str, bool]:
     """The teams whose `free-pick` lanes take a work order (§6 rule 6, `lane_matches`), from their
     records in the board's repo, live or ended, never one resumed as another — each `{team: live}`."""
-    try:
-        here = Path(str(r.get("root") or "")).resolve()
-    except OSError:
+    here = _resolved(str(r.get("root") or ""))
+    if not here:
         return {}
     entry = {"id": order, "work_order": True, "pickable": "yes"}
     out: dict[str, bool] = {}
     for rec in records:
         if not isinstance(rec, Mapping) or not rec.get("team") or not rec.get("repo") or rec.get("superseded_by"):
             continue
-        if Path(str(rec["repo"])).resolve() != here or not ledger_mod.lane_matches(list(rec.get("lane") or ()), entry):
+        if _resolved(str(rec["repo"])) != here or not ledger_mod.lane_matches(list(rec.get("lane") or ()), entry):
             continue
         team = str(rec["team"])
         out[team] = out.get(team, False) or rec.get("state") not in mail_mod._NOT_LIVE
     return dict(sorted(out.items()))
+
+
+@functools.lru_cache(maxsize=256)
+def _resolved(path: str) -> str:
+    """A path resolved once per process — a decided row asks it of every record on each poll — or
+    empty for one that will not resolve (a NUL, a loop)."""
+    try:
+        return str(Path(path).resolve()) if path else ""
+    except (OSError, ValueError, RuntimeError):
+        return ""
 
 
 def _board_holder(

@@ -124,14 +124,18 @@ def ledger_lists(
     its build to be live* with its build's PRs (§4.9b, TD-323; the template's), sorted by priority
     then id; `fold` the rows past the fold. The board's open decided lines, the lanes' work orders
     (§4.5a *Repo page: decided lines*, TD-384), come first in *pickable*, each with its `decided`
-    and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it."""
+    and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it, None
+    where the ledger was not read and the lanes could not be (`lanes` None or the entries unread)."""
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+    known = lanes is not None and teamrun.lane_entries(r) is not None
     orders = [
         {
             **e,
             "held": held.get(e["id"], ""),
-            "pickable_by": [t for t, got in (lanes or {}).items() if e["id"] in (got.get("pickable") or ())],
+            "pickable_by": [t for t, got in (lanes or {}).items() if e["id"] in (got.get("pickable") or ())]
+            if known
+            else None,
         }
         for e in teamrun.work_orders(r)
     ]

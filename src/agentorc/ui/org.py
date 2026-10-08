@@ -176,7 +176,8 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     entry with none or another word), drawn as a letter (TD-232). Rows in phase order, then priority
     with High first and an unmarked row last, then by reference."""
     # a claimed work order (`board:<key>`, TD-384) is drawn as any reference, its title the line's head
-    entries = {e["id"]: e for e in teamrun.lane_entries(r) or [] if isinstance(e, dict)}
+    led_entries = ((r or {}).get("ledger") or {}).get("entries") or []
+    entries = {e["id"]: e for e in [*led_entries, *teamrun.work_orders(r)] if isinstance(e, dict)}
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
     # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
     by_branch: dict[str, int] = {}

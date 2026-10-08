@@ -294,6 +294,10 @@ def test_a_decided_board_line_is_first_in_pickable_with_its_answer_and_who_holds
     assert [e["id"] for e in lists["pickable"]["rows"][1:3]] == ["TD-301", "TD-310"]
     held = ledger_lists(r, [{"ref": "board:1a2b3c4d", "members": [{"name": "g1"}]}])
     assert held[0]["rows"][0]["held"] == "g1"
+    # the ledger unread: the order still draws, and says nothing of lanes nobody could read
+    unread = {**r, "ledger": {**r["ledger"], "entries": None}}
+    (order,) = ledger_lists(unread, [], {})[0]["rows"]
+    assert order["id"] == "board:1a2b3c4d" and order["pickable_by"] is None
     facet = repo_facet(r, NOW)["ledger"]
     assert {b["key"]: b["n"] for b in facet["kind"]}["pickable"] == 7
     assert sum(b["n"] for b in facet["priority"]) == 7  # the ledger's own seven, the order not among them
@@ -315,6 +319,7 @@ def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
     r = {**reading("/r"), "work_orders": {"orders": [ORDER]}}
     m = rec("g1", "/r", progress=[{"ref": "board:1a2b3c4d", "status": "claimed"}])
     (row,) = motion_rows([m], r)
+    assert motion_rows([m], {**r, "ledger": {"entries": None}})[0]["title"] == "Keep the nightly backup?"
     assert (row["ref"], row["title"], row["phase"], row["priority"]) == (
         "board:1a2b3c4d",
         "Keep the nightly backup?",
