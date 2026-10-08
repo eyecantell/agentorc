@@ -76,10 +76,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Designed — TD-379 builds it |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-379 | Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry | Medium | Open |
-| TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Open — asked by Paul |
+| TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Open — asked by Paul |
 | TD-382 | §4.5a's Inbox *keys* row still says the ring visits snoozed rows "while *n snoozed — show* is open", the control #1218 renamed the **Snoozed (n)** fold | Low | Open |
 | TD-383 | The Inbox poll's down-banner grace (#1223): its retry and reset logic is pinned by substring only — two mutations of it leave every test passing | Low | Open |
+| TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Open |
 
 ---
 
@@ -1345,7 +1346,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — asked by Paul 2026-10-07: *it seems like we could do this mechanically, without the manager having to be spun up, but I am unsure. Let's have a designer work through it.*
+**Status:** Designed 2026-10-07 (the designer, PR #1230; the steer to Paul on lanes-versus-press-time machinery is `m-56ca5d7fc853`, bound 2026-10-08 10:00 MDT): design §4.4 *Board write-back* (*a decided line is a work order in the repo's lanes*), §4.5 screen 6 (the answered row's *pickable by <team>*), §4.5a *Repo page: decided lines*, §4.7 `ao repo`, §4.9a (*A decided board line is work*, *What a session does with a decided line*), §6 rule 6, the glossary's *work order*. Settled: the Decide press writes `Decided:` and nothing more (the board format is dev-cadence's, and no mark on an answer is needed); the repo reading lists every open decided line as `board:<key>`, High, pickable, in every `free-pick` lane, so rule 8 starts a wound-down team for it (or draws the start row under `ask`) and a running grinder picks it first — mechanical, no manager needed beyond what `on_work` says; the TD-381 anchor seat is its other taker, for a stopped team; the picker's four outcomes — close, do, ledger for its owner, ask back — each by PR; the Inbox row says who holds it or *pickable by <team>*, and the three-day comeback stands. dev-cadence changes nothing: §3.5 already says the line waits for a session to act. **Next:** designed; the build is TD-384.
+**Blocked by:** TD-384
 **Location:** design §4.4 *Board write-back* (*a decide wakes nobody*), §4.5 screen 6 *A board item the person answered waits on them*, §4.9a (a team's out of work), §4.10 *Outcomes*, §6 (the tick); `src/sessionorc/agent_inbox.py` (`rpc_board_reply`, the Decide press), `src/sessionorc/ledger.py` (`kind_of`, the lanes), `src/agentorc/briefs/manager.md`, `grinder.md`
 
 **Why:**
@@ -1425,3 +1427,26 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a node probe like the socket's drives `refreshInbox` with a fake clock and a `refreshInboxCount` that fails, then recovers, then fails: nothing at the first failure, the banner after the grace and a second failed poll, nothing again after a recovery until the grace has passed; both edits above fail a test.
 
 **Related:** TD-372.
+## TD-384: Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-07 (the designer, from TD-380's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/ledger.py` (the repo reading: a `work_orders` list from the board reading — `board:<key>` from the first eight hex of a sha256 of `item_key()`, head text, `decided` text and date, `refs`, `session`; `kind_of` → *pickable*; `lane_matches`: `free-pick` takes a work order, `owner:<word>` never drops one), `src/sessionorc/board.py` (the open decided items, read at origin as the Inbox reads them; `fyi` and closed lines left out), `src/sessionorc/agent_tick.py` (rule 6's `lane_seen` and rule 8's gains count work-order ids; rule 6's note names `board:<key>`), `src/sessionorc/models.py` (`normalize_ref` passes `board:<key>` through; a claim on one is a lease like any), `src/agentorc/ui/inbox.py` and the board row template (*pickable by <team>* / *holds board:<key>*, §4.5 screen 6), `src/agentorc/ui/repo.py` and `repo.html` (§4.5a *Repo page: decided lines*), `src/agentorc/cli.py` (`cmd_repo`: the rows, first), `src/agentorc/briefs/grinder.md` (one paragraph: a decided line first, the four outcomes of §4.9a, `board_edit.py done` by PR, `ao progress done board:<key> --pr <n>`); the repo's own grinder briefs under `docs/briefs/` that exclude the board (samscrape's) are that repo's to amend — a line on their boards; tests `tests/test_ledger_derived.py`, `tests/test_lane_news.py`, `tests/test_repo_facts.py`, `tests/test_ui_inbox.py`, the `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
+
+**Why:** TD-380 is designed: a Decide hands the line to the lanes, not to nobody. Eleven decided lines sat for days on 2026-10-07 because no lane counted them.
+
+**Fix:**
+1. The reading: the board's open decided lines become work orders in the repo reading, each `board:<key>`; a closed line or one whose `Decided:` is gone leaves on the next reading.
+2. The lanes: `free-pick` matches a work order; rule 6 tells a finished grinder of a new one; rule 8 counts it as a gain under every `on_work`; a running team's `ao repo` lists it first among the pickable rows.
+3. The claim: `ao progress claim board:<key>` is accepted and leased like a ledger id; `done` with the closing PR ends it; the Inbox's answered row reads the lease — *waiting on <session> — holds board:<key>* — else *pickable by <team>* with the team's wound-down state, and the three-day comeback (`BOARD_WAIT_DAYS`) is unchanged.
+4. The pages: the Repo page's pickable list and kind bar count the work orders; the team card's TDs in motion shows a claimed one with phase *grind* / *review* as any reference.
+5. The brief: the grinder's paragraph (§4.9a *What a session does with a decided line*): first before any entry; close, do, ledger for its owner, or ask back; every outcome a PR that closes the line with `board_edit.py done --why`.
+6. The scratch home: a fixture board with a decided line, so a look has a row to pick.
+
+**Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
+
+**Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
