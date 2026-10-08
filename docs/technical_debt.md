@@ -75,6 +75,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Open |
+| TD-369 | Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone or a handed ask from another host: reverting either still passes | Low | Open |
+| TD-370 | The Focus composer's attach (#1205): the `attachments/<session>/` directory's `0700` and the drop, paste and closed-composer handlers are in no test | Low | Open |
 
 ---
 
@@ -1322,3 +1324,37 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** `ao repo` on this ledger counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else; TD-151 is in the design-first list, marked *decision*, and rule 6 tells the designer's lane of it; the Inbox draws the fold with that count, each row opening the Repo page on its entry; the briefs say it.
 
 **Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
+
+## TD-369: Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone, and without a handed ask from another host
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1202–#1207)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_seat_prs`); `tests/test_seat_policy.py` (`test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_holds_it_or_the_wait_runs_out`)
+
+**Why:** `_seat_prs` names a claim's PR as `e.pr or e.review_pr` and matches a handed ask by `(sid, host or self.host) == (s.id, s.host or self.host)`. With `PYTHONPATH=$PWD/src pytest -q tests/test_seat_policy.py -k waiting_on_its_own`, each of these edits still passed:
+- `number = e.pr or e.review_pr` → `number = e.review_pr`. The one test's only claim with a `pr` (`handed`, #1199) is handed to a reader, so it closes whether or not a `pr` claim counts; the `claimed` seat uses `review_pr`. A seat holding a claim on its own `pr` that no reader holds, which is what the docstring's *a claim on its record carrying a PR* says, is never asserted to stay open.
+- the handed match → `if sid == s.id:`. Every record is on this host, so a same-named session on another host being taken for the seat is not shown. The mutants that drop the branch, the `derived` arm, the `PR_CLOSED` check and the `handed` filter each fail the test.
+
+**Done when** one case in that test (or beside it) has an idle seat with a claim carrying `pr` alone, not handed, that stays open, and one has an ask from the same session id on another host that does not hand the seat's PR; each edit above fails a test.
+
+**Related:** TD-366.
+
+## TD-370: The Focus composer's attach (#1205): the `0700` of `attachments/<session>/` and the drop, paste and closed-composer handlers are in no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1202–#1207)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_write_attachment`), `src/agentorc/ui/static/app.js` (the attach block in the Focus script); `tests/test_attach.py`
+
+**Why:** `_write_attachment`'s docstring says the directory is made `0700` and the file `0600`. `test_attach_writes_the_file_…` asserts the file's mode only: `where.mkdir(mode=0o700, …)` → `mode=0o755` still passes all five tests in `tests/test_attach.py`, leaving a person's screenshots listable by other users. In `app.js` the node probe runs `AO.attachName` and `AO.insertAtCaret`; the handlers that keep the feature from misfiring (a drop or paste does nothing while `#composer` is hidden, i.e. on an unattended session; a paste carrying `text/plain` is the text's; uploads are serialized) are in no test. The probe also writes to a `tempfile.mkdtemp()` directory it never removes.
+
+**Done when** `test_attach_writes_the_file_…` asserts `stat.S_IMODE` of the session's directory is `0o700`; the probe (or a second one) drives the paste and drop handlers against a stub composer and asserts the closed-composer and `text/plain` cases attach nothing; the probe's directory is removed (`tmp_path`).
+
+**Related:** TD-002.
