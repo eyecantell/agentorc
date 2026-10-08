@@ -193,17 +193,20 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _answered_of,  # noqa: F401
     _board_holder,  # noqa: F401
     _board_named,  # noqa: F401
+    _board_order,  # noqa: F401
     _civil,  # noqa: F401
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
+    _order_teams,  # noqa: F401
     _orphan_held,  # noqa: F401
     _outcome_of,  # noqa: F401
     _owing,  # noqa: F401
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
+    _resolved,  # noqa: F401
     _same_ref,  # noqa: F401
     _shot_host_down,  # noqa: F401
     _shot_on_host,  # noqa: F401
