@@ -6374,7 +6374,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Resolved — designed 2026-10-07 (the designer, PR #1232; the steer `m-581533eadebf` on the default and the checkout runs to its bound, 2026-10-08 10:35 MDT, its default being the design), built by TD-385 (PR #1245, the definition), TD-386 (PR #1248, the tick) and TD-387 (PR #1253, the surface), all grinders', each archived in its own PR; a Start gated as the fill is — TD-394 (designed #1252), built by TD-395; archived #TBD.
+**Status:** Resolved — designed 2026-10-07 (the designer, PR #1232; the steer `m-581533eadebf` on the default and the checkout runs to its bound, 2026-10-08 10:35 MDT, its default being the design), built by TD-385 (PR #1245, the definition), TD-386 (PR #1248, the tick) and TD-387 (PR #1253, the surface), all grinders', each archived in its own PR; a Start gated as the fill is — TD-394 (designed #1252), built by TD-395; archived #1255.
 **Location:** design §4.9 (a team's definition; the manager added by default), §4.9b *Seats with a trigger*, §6 rule 3 (seats; *a manager on call is a seat of this rule*), §9 invariant 2 (one agent per directory: the anchor is the first in the checkout); CLAUDE.md *The live copy is promoted*; `src/agentorc/org.py` (`ManagerDef`, `on_call`), `src/agentorc/teams.py`, `src/sessionorc/ledger.py` (`Owner: anchor`)
 
 **Why:**
