@@ -70,7 +70,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Partly done — agentorc's half built (PR #1166); the other three repos' halves are the anchor's |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Designed — TD-373 builds it |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
 | TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Designed — TD-379 builds it |
@@ -1206,34 +1205,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-371: A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-07 (the anchor, from Paul's use of the Inbox)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-07 (the designer, PR #1218; the obvious tier — Paul decided it the same day, noted): design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6 (the **Snoozed (n)** fold in place of *n snoozed — show*), §4.5a *Inbox: Snoozed (n) fold* and the `ask` row's and state row's snooze words, the glossary's *snooze*. Settled: every snoozed row — mail or state — keeps its kind's controls in the fold, a press there answers and ends the snooze, **Snooze ▾** on it picks a new time with *now* among the choices (the RPCs' no-`until` clear), and **Unsnooze** is retired. The RPCs keep their fields; the page changes. **Decided by Paul, 2026-10-07:** a snooze only moves an item's date. It stays actionable, with its suggested answers, and **Unsnooze** is dropped. **Next:** designed; the build is TD-373.
-**Blocked by:** TD-373
-**Location:** design §4.10 *Snooze* (`docs/design/4.10-messages.md`), §4.5 screen 6 (the Inbox's snoozed list), §4.5a's Inbox rows (**Snooze ▾**, **Unsnooze**); `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`: the row with **Unsnooze** only), the `unsnooze` and `attention_snooze` acts in `app.js`
-
-**Why:**
-- Paul, 2026-10-07, answering TD-319's look after snoozing it: *It seems very odd to have to hit "unsnooze" first — I was expecting the snoozed items to just get their due dates moved to the new date, and they would still show the recommended answers etc in the inbox.*
-- Three snoozes work two ways today:
-  - **A board item's Snooze** moves its `Due:` date. It goes under *Not due yet* and comes back on the date. Paul expects this.
-  - **A mail entry's snooze** (`snoozed_until`) and **a state row's** (`attention_snoozed_until`) move the row to a snoozed list, where it shows **Unsnooze** alone: no answers, no Reply, no *Go with it*.
-- Hiding the controls protects nothing (§4.10 already says a snooze is never a way to lose mail), and it adds a step before every answer.
-
-**Fix:** design, then build.
-- Every snooze is a date and nothing more. The row leaves *Needs you* and the count until then, sits in a fold ordered by its date (as *Not due yet* is), and keeps every control its kind has.
-- Answering, replying or pressing *Go with it* on a snoozed row acts as it would anywhere and ends the snooze.
-- **Unsnooze** is dropped. A row comes back on its date, or the person acts on it from the fold. A **Snooze ▾** on a snoozed row picks a new date, which can be *now*.
-- `inbox_snooze` and the attention snooze keep their fields. Only the page changes, plus the RPC for an earlier date if one is needed.
-
-**Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it, no row anywhere offers **Unsnooze**, and §4.10 and §4.5a say a snooze is a date.
-
-**Related:** TD-069 (archived: the snooze), TD-220 (archived: the board's *Not due yet* fold), TD-319 (the look Paul snoozed).
 
 ## TD-374: The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test
 
