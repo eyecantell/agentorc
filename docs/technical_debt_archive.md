@@ -6326,3 +6326,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Related:** TD-381, TD-385, TD-386.
 
 ---
+
+## TD-391: The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/teamrun.py` (`start`: `call("host_occupancy", host=x.host, dir=str(x.dir)) if x.host else call("occupancy", dir=str(x.dir))`); `tests/test_anchor_seat.py`
+
+**Resolved:** 2026-10-08 (grinder-ao-2, PR #1254): `test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_alone` starts a team on a node with a fake that answers `host_occupancy` free and held and refuses `occupancy`. The one occupancy call is `host_occupancy` with that host; held, the team starts and the seat is the `held` create (TD-386's shape, in place of *without the seat*). The local-call rewrite fails it.
+
+**Why:** #1245's start refuses to create the seat in a held checkout and picks `host_occupancy` for a seat that lands on another host. `tests/test_anchor_seat.py::_fake` answers only `occupancy`, so the branch is never taken. Against `origin/main`, rewriting the line to `call("occupancy", dir=str(x.dir))` still passes `tests/test_anchor_seat.py tests/test_link.py tests/test_cli_teams.py` (166 passed). A remote seat would be checked against the wrong host's records, and a held remote checkout would start a second agent in it (§9 invariant 2).
+
+**Done when** a test starts a team whose `host` is a node, with a fake that answers `host_occupancy` (free and held), and asserts the call is `host_occupancy` with that host and that a held one starts the team without the seat; the local-call rewrite fails it.
+
+**Related:** TD-381, TD-384, TD-385.

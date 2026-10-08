@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-391 | The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing | Low | Open |
 | TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
 | TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Designed — TD-395 builds it |
 | TD-395 | Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own writing `lane_seen` with no ids | Low | Open |
@@ -1304,23 +1303,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
 
-## TD-391: The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/teamrun.py` (`start`: `call("host_occupancy", host=x.host, dir=str(x.dir)) if x.host else call("occupancy", dir=str(x.dir))`); `tests/test_anchor_seat.py`
-
-**Why:** #1245's start refuses to create the seat in a held checkout and picks `host_occupancy` for a seat that lands on another host. `tests/test_anchor_seat.py::_fake` answers only `occupancy`, so the branch is never taken. Against `origin/main`, rewriting the line to `call("occupancy", dir=str(x.dir))` still passes `tests/test_anchor_seat.py tests/test_link.py tests/test_cli_teams.py` (166 passed). A remote seat would be checked against the wrong host's records, and a held remote checkout would start a second agent in it (§9 invariant 2).
-
-**Done when** a test starts a team whose `host` is a node, with a fake that answers `host_occupancy` (free and held), and asserts the call is `host_occupancy` with that host and that a held one starts the team without the seat; the local-call rewrite fails it.
-
-**Related:** TD-381, TD-384, TD-385.
-
----
 ## TD-393: The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing
 
 **Priority:** Low
