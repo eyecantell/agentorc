@@ -2190,21 +2190,54 @@ class TickMixin:
                 and r.dir == s.dir
             ]
         holders = [h for h in holders if not h.startswith(f"{s.id} ")]
+        return await self._checkout_why(directory, holders, s.host == self.host)
+
+    async def _checkout_why(self, directory: Path, holders: list[str], local: bool) -> dict[str, Any] | None:
+        """The one reading of a seat's checkout (§6 rule 3, §4.9b, TD-386, TD-395), the fill's and the
+        Start's: the first holder, else — on this host — the tree's own reason, else None."""
         if holders:
             return {"by": holders[0].split(" ", 1)[0], "why": f"held by {holders[0]}"}
-        if s.host != self.host:
+        if not local:
             return None
-        git = await asyncio.to_thread(git_info, directory)
+        why = await asyncio.to_thread(self._checkout_tree, directory)
+        return {"by": "checkout", "why": why} if why else None
+
+    def _checkout_tree(self, directory: Path) -> str | None:
+        """Why a checkout's tree is not the anchor seat's to work in (TD-386): off its default branch,
+        files uncommitted, or a git state that cannot be read — or None for a clean tree on its
+        default branch. Occupancy is not read here: a seat's own `none` reads its tree alone (TD-395).
+        Blocking: a thread's."""
+        git = git_info(directory)
         if git is None:
-            return {"by": "checkout", "why": "git state unknown"}
+            return "git state unknown"
         # cadence's default-branch rule (`origin/HEAD`, `init.defaultBranch`, main, master on origin);
         # a checkout with no origin to ask reads either usual name as its default
-        ref = await asyncio.to_thread(ledger_mod.default_ref, directory)
+        ref = ledger_mod.default_ref(directory)
         defaults = (ref.removeprefix("origin/"),) if ref else ("main", "master")
         why = [f"branch {git.branch}"] if git.branch not in defaults else []
         if git.dirty:
             why.append(f"{git.dirty} file{'' if git.dirty == 1 else 's'} uncommitted")
-        return {"by": "checkout", "why": ", ".join(why)} if why else None
+        return ", ".join(why) or None
+
+    async def rpc_checkout_held(self, dir: str, host: str | None = None) -> dict[str, Any]:
+        """The Start's reading of the anchor seat's checkout (§4.9b *The anchor seat*, TD-395): the
+        fill's own (`_checkout_why`), so a Start and a fill never disagree — `held: {by, why}` or
+        None. On another host the occupancy is that host's (`host_occupancy`) and the tree is not
+        read, as for a node's fill. In `modes.HOME_ONLY` as `host_occupancy` is."""
+        local = not host or host == self.host
+        directory = Path(dir).expanduser()
+        if not directory.is_dir() and local:
+            raise RpcError(f"not a directory: {directory}")
+        if local:
+            directory = directory.resolve()
+            holders = await asyncio.to_thread(self.occupants, directory)
+        else:
+            holders = [str(o) for o in (await self.rpc_host_occupancy(str(host), dir)).get("occupants") or []]
+        return {
+            "dir": str(directory),
+            "host": host or self.host,
+            "held": await self._checkout_why(directory, holders, local),
+        }
 
     async def _fill(self, s: Session, now: datetime, records: list[Session]) -> None:
         """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at

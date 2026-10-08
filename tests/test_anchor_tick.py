@@ -250,3 +250,79 @@ async def test_a_master_default_with_no_origin_is_not_held_as_a_branch(agent, tm
         await agent._keep_running(datetime.now(UTC))
         assert agent.sessions[sid].id == sid and [r["why"] for r in agent.sessions[sid].restarts] == ["fill"]
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_the_starts_reading_is_the_fills_and_a_node_is_read_for_occupancy_alone(agent, tmp_path, monkeypatch):
+    """TD-395 (§4.9b *The anchor seat*): `checkout_held` is the fill's reading, for `ao team start`."""
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    async with LocalClient() as person:
+
+        async def held(**kw):
+            return (await person.call("checkout_held", dir=str(root), **kw))["held"]
+
+        assert await held() is None
+        (root / "a.txt").write_text("a\n")
+        assert await held() == {"by": "checkout", "why": "1 file uncommitted"}
+        _git(root, "switch", "-q", "-c", "td-x")
+        assert await held(host="") == {"by": "checkout", "why": "branch td-x, 1 file uncommitted"}
+        monkeypatch.setattr(agent, "occupants", lambda d: ["ao-repo-paul (working)"])
+        assert await held() == {"by": "ao-repo-paul", "why": "held by ao-repo-paul (working)"}
+
+        # a node's checkout: its occupancy, never this host's tree (dirty and off-branch here)
+        occupants: list[str] = []
+
+        async def host_occupancy(host, dir):
+            assert host == "nodeb"
+            return {"host": host, "dir": dir, "occupants": list(occupants), "git": True}
+
+        monkeypatch.setattr(agent, "rpc_host_occupancy", host_occupancy)
+        assert await held(host="nodeb") is None
+        occupants.append("ao-x@nodeb (idle)")
+        assert await held(host="nodeb") == {"by": "ao-x@nodeb", "why": "held by ao-x@nodeb (idle)"}
+
+
+@pytest.mark.integration
+async def test_a_held_create_writes_its_reason_as_seat_held(agent, tmp_path):
+    """TD-395: the card's slot says why before the first tick."""
+    from sessionorc.client import AgentError
+
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    async with LocalClient() as person:
+        why = {"by": "checkout", "why": "2 files uncommitted"}
+        with pytest.raises(AgentError, match="held_reason"):
+            await _anchor(person, root, held_reason=why)
+        with pytest.raises(AgentError, match="held_reason"):
+            await _anchor(person, root, held=True, held_reason={"by": "checkout"})
+        sid = await _anchor(person, root, held=True, held_reason=why)
+        rec = agent.sessions[sid]
+        assert rec.state == "closed" and rec.seat_held == why
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_none_in_a_checkout_not_its_own_leaves_the_stretch_for_a_clean_one(agent, tmp_path):
+    """TD-395 (§6 rule 3): a `work` seat's `none` with the tree dirty or off its default branch writes
+    `lane_seen` with no ids, so the same ids fill it once the checkout is clean."""
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    _reading(agent, root, _entry("TD-1"))
+    async with LocalClient() as person:
+        sid = await _anchor(person, root)
+        first = agent.sessions[sid]
+        (root / "a.txt").write_text("a\n")
+        async with LocalClient(caller=sid) as me:
+            await me.call("progress", id=sid, status="none", why="the checkout is not mine")
+        assert first.lane_seen["ids"] == [], "a stretch it could not reach is not its"
+        _end(agent, sid)
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[sid] is first and first.seat_due["ids"] == ["TD-1"]
+        assert first.seat_held == {"by": "checkout", "why": "1 file uncommitted"}
+        (root / "a.txt").unlink()
+        await agent._keep_running(datetime.now(UTC))
+        new = agent.sessions[sid]
+        assert new is not first and [r["why"] for r in new.restarts] == ["fill"]
+        assert new.lane_seen["ids"] == ["TD-1"] and new.seat_held is None
+        await person.call("kill", id=sid)
