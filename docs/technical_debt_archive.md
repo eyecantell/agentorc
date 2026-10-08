@@ -5948,3 +5948,27 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Done when** a session going `needs-you` while no page is open reaches the person once, and opening it lands on that row.
 
 **Related:** TD-069 (the Inbox), TD-003 (the phone layout), design §4.5.
+
+## TD-368: Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the designer, from TD-367's design)
+**Owner:** grinder
+**Kind:** live-check #1210
+**Status:** Resolved
+**Location:** `src/sessionorc/ledger.py` (`kind_of`, `lane_matches`, `_word_matches`), `src/agentorc/cli.py` (`cmd_repo`'s design-first rows), `src/agentorc/ui/inbox.py` (`inbox_sections`, the page's fourth source), `src/agentorc/ui/templates/inbox.html` and `inbox_rail.html`, `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` (the lane sentence); tests `tests/test_ledger_derived.py`, `tests/test_repo_facts.py`, `tests/test_lane_news.py`, `tests/test_ui_inbox.py`, the CLI's `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
+
+**Why:** design §4.4 *Repo facts* (the page's kinds), §6 rule 6, §4.5 screen 6 *The ledger's entries that wait on you* and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo` (TD-367, designed 2026-10-07). On 2026-10-07 the repo line said *15 for you* about decisions that were the designer's and the anchor's, and the Inbox drew none of the fifteen.
+
+**Resolved:** 2026-10-07 (PRs #1206, #1209, #1210; grinder-ao-1 and grinder-ao-2; live check read by grinder-ao-1) — slices 1–2 (the reader in `sessionorc.ledger`, and `ao repo`'s *decision* mark) in #1206, slice 3 (the Inbox's **For you in the ledger (n)** fold) in #1209, slice 4 (the designer briefs) in #1210. The live read, with #1210 live (live `3da923c`):
+- The live `ao repo` on agentorc counts *for you* 8: TD-003, TD-055, TD-060, TD-071, TD-131, TD-133, TD-156 and TD-319. That is exactly the set of `Owner: paul` entries plus those blocked by `decision (paul)` in the ledger it reads.
+- After #1216 archived TD-319, both reads followed the ledger: `ao repo` counts 7, the fold reads (43), and its agentorc group holds the other seven.
+- Earlier the same evening, it listed TD-151 as *design-first … designer decision*.
+- A headless GET of the live `/inbox` draws the fold (*For you in the ledger (44)*, machine-wide). Its agentorc group holds those 8 rows, each a link to `/repo/agentorc#TD-n`.
+- Rule 6 told the designer *your lane gained 1 entry since you declared out of work: TD-151* at 01:14:16Z on 2026-10-08 (its transcript).
+The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For you in the ledger (n) fold* and §4.7 `ao repo`.
+
+**Done when** `ao repo` on this ledger counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else; TD-151 is in the design-first list, marked *decision*, and rule 6 tells the designer's lane of it; the Inbox draws the fold with that count, each row opening the Repo page on its entry; the briefs say it.
+
+**Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
