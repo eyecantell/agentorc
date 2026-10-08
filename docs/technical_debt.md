@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Slices 1–2 built; 3–4 open |
-| TD-369 | Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone or a handed ask from another host: reverting either still passes | Low | Open |
 | TD-370 | The Focus composer's attach (#1205): the `attachments/<session>/` directory's `0700` and the drop, paste and closed-composer handlers are in no test | Low | Open |
 
 ---
@@ -1291,24 +1290,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** `ao repo` on this ledger counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else; TD-151 is in the design-first list, marked *decision*, and rule 6 tells the designer's lane of it; the Inbox draws the fold with that count, each row opening the Repo page on its entry; the briefs say it.
 
 **Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
-
-## TD-369: Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone, and without a handed ask from another host
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1202–#1207)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_seat_prs`); `tests/test_seat_policy.py` (`test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_holds_it_or_the_wait_runs_out`)
-
-**Why:** `_seat_prs` names a claim's PR as `e.pr or e.review_pr` and matches a handed ask by `(sid, host or self.host) == (s.id, s.host or self.host)`. With `PYTHONPATH=$PWD/src pytest -q tests/test_seat_policy.py -k waiting_on_its_own`, each of these edits still passed:
-- `number = e.pr or e.review_pr` → `number = e.review_pr`. The one test's only claim with a `pr` (`handed`, #1199) is handed to a reader, so it closes whether or not a `pr` claim counts; the `claimed` seat uses `review_pr`. A seat holding a claim on its own `pr` that no reader holds, which is what the docstring's *a claim on its record carrying a PR* says, is never asserted to stay open.
-- the handed match → `if sid == s.id:`. Every record is on this host, so a same-named session on another host being taken for the seat is not shown. The mutants that drop the branch, the `derived` arm, the `PR_CLOSED` check and the `handed` filter each fail the test.
-
-**Done when** one case in that test (or beside it) has an idle seat with a claim carrying `pr` alone, not handed, that stays open, and one has an ask from the same session id on another host that does not hand the seat's PR; each edit above fails a test.
-
-**Related:** TD-366.
 
 ## TD-370: The Focus composer's attach (#1205): the `0700` of `attachments/<session>/` and the drop, paste and closed-composer handlers are in no test
 
