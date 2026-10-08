@@ -76,7 +76,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
 | TD-391 | The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing | Low | Open |
-| TD-392 | The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing | Low | Open |
 | TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
 | TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Open — design-first |
 
@@ -1338,23 +1337,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Why:** #1245's start refuses to create the seat in a held checkout and picks `host_occupancy` for a seat that lands on another host. `tests/test_anchor_seat.py::_fake` answers only `occupancy`, so the branch is never taken. Against `origin/main`, rewriting the line to `call("occupancy", dir=str(x.dir))` still passes `tests/test_anchor_seat.py tests/test_link.py tests/test_cli_teams.py` (166 passed). A remote seat would be checked against the wrong host's records, and a held remote checkout would start a second agent in it (§9 invariant 2).
 
 **Done when** a test starts a team whose `host` is a node, with a fake that answers `host_occupancy` (free and held), and asserts the call is `host_occupancy` with that host and that a held one starts the team without the seat; the local-call rewrite fails it.
-
-**Related:** TD-381, TD-384, TD-385.
-
----
-## TD-392: The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/models.py` (`LANE_WORDS = ("free-pick", "design-first", "anchor")`); `tests/test_models.py`, `tests/test_ledger_derived.py`
-
-**Why:** #1245 added `anchor` to `LANE_WORDS` so the seat's lane is no reference (not counted, nudged about or offered to `ao progress` as held). Against `origin/main`, reverting to `("free-pick", "design-first")` still passes every test that names `LANE_WORDS` or `design-first` (435 passed: `test_models`, `test_workorders`, `test_ledger_derived`, `test_repoconfig`, `test_cli_teams`, `test_work_start`, `test_lane_news`, …). `test_anchor_seat.py` asserts the plan's `lane == ["anchor"]` only, never what the lane means to `reference_of` or the counts. With the word gone the seat's lane reads as a held reference `anchor`.
-
-**Done when** a test in `tests/test_models.py` asserts a lane of `["anchor"]` yields no reference and is counted as nothing held, beside `free-pick`'s; the revert fails it.
 
 **Related:** TD-381, TD-384, TD-385.
 
