@@ -97,6 +97,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-07 (TD-151, the designer): a metered reading's windows carry `turns` and `pace` beside `spent`.
 - 2026-09-11 (TD-031): landed the model-in-use observation — the card's third part shows the model actually in use when the adapter can tell it, and `opus-5 (profile)` when only the declared one is known.
 - 2026-09-23 (TD-122, the designer; Paul comparing the chip with the account's usage page): the reading made the account's — one poll per `(adapter, account)`, every profile sharing it carrying the same reading and back-off; reserves stay per profile. Found when four profiles split by role (TD-118) on one account turned one working poll into four refused ones.
 - 2026-09-25 (TD-128, the designer; Paul 2026-09-24: *make a note to handle API (pay per token) budgets at some point*): `billing` on the profile — `subscription` or `metered` with optional prices — and a metered profile's spend summed per profile over day / week / month into a reading of the usage shape. Rejected: a team- or project-scoped budget (Paperclip's generic row), by §9 invariant 9. Steered to Paul. The build is TD-151.
@@ -302,6 +303,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-151, the designer): the metered chip's hover word *the turns' rate*, undefined since TD-128, is **the window's spend per hour** since the window began, with the time an amount would be reached at that pace, and the window's turn count beside it; turns per hour rejected, the amount being money or tokens.
 - 2026-10-07 (TD-368 slice 3, grinder-ao-2): the Inbox's **For you in the ledger (n)** fold built — under the board's rows in *Needs you*, closed until opened and remembered per browser, one link per entry to the Repo page on its id, filtered by the rail's *Teams* picks and the find alone, counted nowhere; a row's team is the definitions' team for its repo, else its live records'.
 - 2026-10-07 (TD-002, grinder-ao-2; Paul released it to the grinders that day: *still vital*): **Focus composer: Attach / drop / paste** built — the picker, a drop on the terminal or the composer, an image pasted into the composer; the path inserted at the caret and nothing sent; a pasted `image.png` named `paste-<date>-<time>`; desktop only, a session on this host only.
 - 2026-10-07 (TD-367, the designer): the row **Inbox: For you in the ledger (n) fold** — the sub-heading, the rows and their one link, counted in no number and no rail group.
