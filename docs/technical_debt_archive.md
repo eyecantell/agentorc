@@ -6634,3 +6634,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Resolved:** 2026-10-08 (PR #1268, grinder-ao-2) — moot: TD-400's live check was read and archived in PR #1268. Its premise does not hold either: a live check is read, never pressed, and is the grinder's once its build is live (design §4.9b *A live check is a grinder's once its build is live*; the grinder brief's *A live check*) — the anchor's promote made #1266 live, and the read needed no Apply of the grinder's.
 
 **Related:** TD-400, TD-399, TD-118.
+
+## TD-403: `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1257)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_tick.py` (`rpc_checkout_held`); tests `tests/test_anchor_tick.py`.
+
+**Why:** `rpc_checkout_held` is the Start's and Apply's one reading of a seat's checkout, and its docstring says what it returns. Against `origin/main` d9539fe8, with `PYTHONPATH=$PWD/src pytest -q tests/test_anchor_seat.py tests/test_anchor_tick.py` passing, each of these reverts leaves it passing: `raise RpcError(f"not a directory: {directory}")` → `pass` (a mistyped `dir` would then read as a clean, unheld tree or crash in `git_info`); `directory = directory.resolve()` → `pass` (the reply's `dir` and the holders' match depend on the resolved path, which a symlinked checkout differs in); `"host": host or self.host` → `"host": host`. Also `held_reason`'s `not isinstance(held_reason, dict)` clause in `rpc_create` can go with the tests green, so a list `held_reason` reaches `.get` and raises `AttributeError` rather than the `RpcError`.
+
+**Resolved:** 2026-10-08 (PR #1274) — `tests/test_anchor_tick.py`: `test_the_starts_reading_refuses_a_missing_dir_and_names_the_resolved_tree_and_this_host` (a missing `dir`, a symlinked checkout read and matched as its resolved tree, a bare call's `host`) and `test_a_held_create_writes_its_reason_as_seat_held` (a list `held_reason` refused). Each of the four reverts above fails the file; unreverted it passes.
+
+**Done when** each of the four reverts fails a test.
+
+**Related:** TD-395 (archived), #1257.

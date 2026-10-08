@@ -71,7 +71,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-402 | No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266): reverting each of those three CLI lines leaves 130 tests green | Medium | Open |
-| TD-403 | `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257): each can be reverted with `test_anchor_seat.py` and `test_anchor_tick.py` green | Low | Open |
 | TD-405 | §4.9b's *Seats with a trigger* still has the manager reading a `prs:` count and timing `every:`, where §6 rule 3 has the home do both | Low | Open |
 | TD-407 | A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable | Medium | Open |
 | TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Open |
@@ -1235,24 +1234,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** each of the three reverts above fails a test.
 
 **Related:** TD-400, #1266.
-
-## TD-403: `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing #1257)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`rpc_checkout_held`); tests `tests/test_anchor_tick.py`.
-
-**Why:** `rpc_checkout_held` is the Start's and Apply's one reading of a seat's checkout, and its docstring says what it returns. Against `origin/main` d9539fe8, with `PYTHONPATH=$PWD/src pytest -q tests/test_anchor_seat.py tests/test_anchor_tick.py` passing, each of these reverts leaves it passing: `raise RpcError(f"not a directory: {directory}")` → `pass` (a mistyped `dir` would then read as a clean, unheld tree or crash in `git_info`); `directory = directory.resolve()` → `pass` (the reply's `dir` and the holders' match depend on the resolved path, which a symlinked checkout differs in); `"host": host or self.host` → `"host": host`. Also `held_reason`'s `not isinstance(held_reason, dict)` clause in `rpc_create` can go with the tests green, so a list `held_reason` reaches `.get` and raises `AttributeError` rather than the `RpcError`.
-
-**Fix:** tests in `test_anchor_tick.py`: `checkout_held` on a missing dir raises `not a directory`; on a symlink to a held checkout reports the resolved `dir` and the holder; a bare call replies `host` as the host's own name; `create` with `held_reason=["a"]` raises `AgentError` matching `held_reason`.
-
-**Done when** each of the four reverts fails a test.
-
-**Related:** TD-395 (archived), #1257.
 
 ---
 
