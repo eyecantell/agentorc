@@ -6077,7 +6077,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Added:** 2026-10-07 (the anchor, from Paul's use of the Inbox)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Resolved — designed 2026-10-07 (the designer, PR #1218; Paul decided it the same day), built by TD-373 (PR #1226, grinder-ao-2; the techlead's match `m-ed1628d6a970`), archived #1226.
+**Status:** Resolved — designed 2026-10-07 (the designer, PR #1218; Paul decided it the same day), built by TD-373 (PR #1226, grinder-ao-2; the techlead's match `m-ed1628d6a970`; TD-373 archived in #1226), archived #1233.
 **Location:** design §4.10 *Snooze* (`docs/design/4.10-messages.md`), §4.5 screen 6 (the Inbox's snoozed list), §4.5a's Inbox rows (**Snooze ▾**, **Unsnooze**); `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`: the row with **Unsnooze** only), the `unsnooze` and `attention_snooze` acts in `app.js`
 
 **Why:**
