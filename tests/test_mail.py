@@ -1987,6 +1987,9 @@ async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_pa
             {"text": "merge it", "answer": "1"},  # not a whole number
             {"text": "merge it", "answer": 1.0},
             {"text": "merge it", "answer": True},
+            {"text": "hold it and more", "answer": 1},  # words after it need the blank line
+            {"text": "hold it\nand more", "answer": 1},
+            {"text": "merge it\n\nnow", "answer": 1},  # the answer before the words is the index's
         ):
             with pytest.raises(AgentError, match="not one of the suggested answers"):
                 await person.call("msg", kind="reply", reply_to=asked, **bad)
@@ -1998,6 +2001,9 @@ async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_pa
         # and the valid one goes through, index and text agreeing
         ok = await person.call("msg", kind="reply", reply_to=asked, text="hold it", answer=1)
         assert ok["entry"]["answer"] == 1 and ok["entry"]["text"] == "hold it"
+        # …and that answer, a blank line, then the replier's own words (`--pick <n> "text"`, TD-070)
+        more = await person.call("msg", kind="reply", reply_to=asked, text="hold it\n\nuntil Monday", answer=1)
+        assert more["entry"]["answer"] == 1 and more["entry"]["text"] == "hold it\n\nuntil Monday"
         await person.call("kill", id=loner)
 
 
@@ -2619,9 +2625,7 @@ async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_a
         await person.call("set_controllers", id=builder, add=[lead])
         async with LocalClient(caller=builder) as c:
             steer = (
-                await c.call(
-                    "msg", to="person", kind="steer", default="Works", text="the row?", shots=[*good, good[0]]
-                )
+                await c.call("msg", to="person", kind="steer", default="Works", text="the row?", shots=[*good, good[0]])
             )["entry"]
             # cleaned of a leading ./ and of a repeat, in the order sent; the kind's clock is unchanged
             assert steer["shots"] == [good[0], "docs/mockups/reviews/b_2.png"] and steer["bound"]

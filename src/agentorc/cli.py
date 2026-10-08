@@ -2462,7 +2462,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
     typed anywhere. `person` is the org's person inbox. With `--reply-to` the addressee may be left
     out: the reply goes to whoever sent the entry. `--answer "<line>"`, once per answer, offers the
     likely answers on a question; `--pick <n>` answers one of them by the number `ao inbox` prints
-    (from 1) and sends that answer's own text. Refusals print as the host agent words them."""
+    (from 1) and sends that answer's own text, any words given following it after a blank line.
+    Refusals print as the host agent words them."""
     words = list(args.words)
     if args.pass_up:
         return _pass_up(args, words)
@@ -2470,8 +2471,6 @@ def cmd_msg(args: argparse.Namespace) -> int:
         return fail(args, "--recommend goes with --pass-up <id>: it is your line on a question you pass up", 2)
     answer: int | None = None
     if args.pick is not None:
-        if words:
-            return fail(args, "ao msg --reply-to <id> --pick <n> sends the answer itself: leave the text out", 2)
         if not args.reply_to:
             return fail(args, "--pick answers one entry's suggested answers: name it with --reply-to <id>", 2)
         offered = _offered(args.reply_to)
@@ -2482,7 +2481,11 @@ def cmd_msg(args: argparse.Namespace) -> int:
         if not 1 <= args.pick <= len(offered):
             n = len(offered)
             return fail(args, f"--pick {args.pick}: {args.reply_to} offers {n}, numbered 1-{n}", 2)
-        to, text, answer = [], offered[args.pick - 1], args.pick - 1
+        # words after the pick follow the answer on the same reply, after a blank line (§4.10, TD-070)
+        *to, more = words or [""]
+        text, answer = offered[args.pick - 1], args.pick - 1
+        if more.strip():
+            text = f"{text}\n\n{more}"
     else:
         if not words:
             return fail(args, 'ao msg <to>… "<text>": name who the message is for (or --reply-to <id>)', 2)
@@ -2606,7 +2609,9 @@ def _picked_text(e: dict[str, Any]) -> str:
     idx = e.get("answer")
     if e.get("kind") != "reply" and isinstance(idx, int) and 0 <= idx < len(answers):
         return str(answers[idx])
-    return str(e.get("text") or "")
+    text = str(e.get("text") or "")
+    # a reply that picked one may carry words after it, past a blank line (§4.10): the answer is its first line
+    return text.split("\n", 1)[0] if isinstance(idx, int) else text
 
 
 def _inbox_status(e: dict[str, Any]) -> str:
@@ -3410,7 +3415,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(fn=cmd_td_add)
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")
-    # `nargs="*"`: `--pick <n>` sends the suggested answer's own text, so it takes no words at all
+    # `nargs="*"`: `--pick <n>` sends the suggested answer's own text, so the words are optional
     p.add_argument("words", nargs="*", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
     p.add_argument(
         "--kind",
@@ -3445,7 +3450,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--pick",
         type=int,
-        help="answer --reply-to's suggested answer number <n>, as `ao inbox` numbers them (from 1)",
+        help="answer --reply-to's suggested answer number <n>, as `ao inbox` numbers them (from 1); "
+        "any text follows the answer on the same reply",
     )
     # design §4.10 *A look* (TD-292): the screenshots a steer or an ask to the person names
     p.add_argument(
