@@ -6728,3 +6728,20 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** PR #174 (where it was seen), TD-058; docs/cadence.md §1 (worktrees, hydrate), the memory section; §9 invariant 2; memory `agentorc-td-grind-mechanics`.
 
 **Resolved:** 2026-10-08 (the person's session) — dev-cadence TD-080 (its PRs #201, #202) landed and was synced here by #962. `hydrate_worktree.sh` now writes each worktree its own `.claude/settings.local.json`, with `autoMemoryDirectory` pointing at the worktree's own `docs/claude-memory` (read in `.claude/worktrees/ao-paul` on 2026-10-08). The *Done when* holds: the designer's memory note rode its own PR, #1265 from branch `memory-ao-msg-warning`, with only its two memory files.
+
+## TD-118: Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose
+
+**Priority:** High
+**Added:** 2026-09-23 (the anchor session; a Sonnet review of the team run's token spend, asked for by Paul the same day)
+**Owner:** paul
+**Kind:** decision
+**Status:** Done — (1), (2) and (3) built; (4) dropped
+**Location:** `docs/technical_debt.md` (every entry, and `tests/test_ledger.py`), `src/agentorc/briefs/grinder.md` and `manager.md`, `docs/briefs/grinder-ao-1.md` (the out-of-work `--why`), `scripts/cadence_hooks.sh` (SYNCED — dev-cadence's), `~/.agentorc/profiles.yml` and `org.yml` (done)
+
+**Why:** an unattended session pays for every token it is handed whether or not it acts on it, and three of the five items hand it text it never acts on; the fourth hands the strongest model work a cheaper one does as well.
+
+**Fix, in order:** (1) **The ledger header** — three fixed lines after `**Added:**` on every open entry, enforced by `test_ledger.py`: `**Owner:** anchor | grinder | paul | dev-cadence`, `**Kind:** build | design-first | live-check | evaluation | decision`, `**Pickable:** yes | no — <one clause>`; the grinder template's out-of-work rule becomes *filter on the header, re-read only what is pickable*, and `ao progress none --why` cites counts by kind and owner (*excluded: 12 design-first, 8 anchor, 6 dev-cadence, 3 live-check*) rather than a sentence per entry; the manager's wind-down board line follows. Migrate the entries in batches of twenty, a grinder's, the test tightened once the last batch lands. (2) `grinder.md`'s first read names cadence §1–§4, as the manager's does; the two restart mentions leave `manager.md`. (3) The hook: dev-cadence scopes the SessionStart nudge to the session's own board, without `--fetch`, when the session is unattended (the fourth item on the board's dev-cadence line); the machine-wide `--fetch` view stays `/attention`'s. (4) After a clean night, `manager` to Haiku, one org line.
+
+**Related:** TD-103 (the rules that left the manager's brief), TD-114 (briefs as supplements), TD-105 and TD-106 (the same theme in mail and identity), TD-060 (the profile names are renamed with the rest).
+
+**Resolved:** 2026-10-08 (the person's session; Paul: *close TD-118*) — (1) and (2) were built 2026-09-23. (3) was built in dev-cadence: `cadence_hooks.sh`'s `attention_scope` prints the session's own board without `--fetch`. (4), the manager on Haiku, is **dropped**. Since TD-259 the manager is a seat on call, and what it is filled for is the judgement the tick cannot make: a permission, a `stalled?` member, an `ask` to it, escalation prose. That is the wrong place for a weaker model. Its spend was never the model. It was fills with nothing due, each one reading some 60k tokens of first reads, and that is **TD-410**.
