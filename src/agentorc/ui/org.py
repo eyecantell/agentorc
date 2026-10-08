@@ -383,16 +383,17 @@ ROLLUP_STATES = (
 )
 
 
-def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
     """The Org **rollup** (§4.5a *Org: rollup*, TD-176 slice 4): sums over every live team — the
     Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
     holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
-    counted once), and Needs you's *answer needed* and *asked you*. None when no team is live: the page then has no
-    rollup — a wound-down team's summary (TD-192) is not summed. The Inbox's count is the top bar's,
+    counted once), and Needs you's *answer needed* and *asked you*. When no team is live there is
+    nothing to sum — a wound-down team's summary (TD-192) is not summed — and the rollup is the Needs
+    you facet alone, `live` false, its *in the Inbox* (TD-406). The Inbox's count is the top bar's,
     filled in by the client."""
     live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
     if not live:
-        return None
+        return {"live": False}
     members = [m for g in live for m in g["members"]]
     tally: dict[str, int] = {}
     for m in members:
@@ -427,6 +428,7 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any] | None:
     asked = [(g["team"], g["summary"]["asked"]) for g in live if g["summary"].get("asked")]
     oldest = min((a for _, a in asked), key=lambda a: a["at"], default=None)
     return {
+        "live": True,
         "agents": agents,
         "n_agents": len(members),
         "phases": [

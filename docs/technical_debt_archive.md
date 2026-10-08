@@ -6560,3 +6560,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** the design says what a seat with a trigger is, a team can define one, the manager fills it on its trigger and the card says why it will, and one audit role has run for real.
 
 **Related:** TD-075 (the seat and its fill rule), TD-097 (the word for an empty seat), TD-091 (a periodic act on a count is the same shape as compacting on a threshold).
+
+## TD-406: The Org's rollup disappears when no team is live, and with it Needs you's *in the Inbox*
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the person's session, from Paul: *we seem to have lost our synopsis at the top of the org page*)
+**Owner:** anchor
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/org.py` (`rollup`), `src/agentorc/ui/templates/rollup.html`, `src/agentorc/ui/static/app.css` (`.rollup.quiet`); design §4.5 screen 1, §4.5a *Org: rollup*
+
+**Why:** `rollup` answered None when no team was live (§4.5a: it sums over every live team), so the whole row went. That is right for Agents, TDs in motion and PRs in motion. It is wrong for *in the Inbox* and its overdue count, which do not depend on any team. On 2026-10-08 all four teams were stopped or wound down, and the page lost the person's one count of what waits on them.
+
+**Resolved:** 2026-10-08 (the person's session) — with no team live, `rollup` answers `{live: false}` and `rollup.html` draws the Needs you facet alone: *in the Inbox* and its overdue count, filled by the client as before. *Answer needed* and *asked you* count only live teams' members, so they are left out with the other facets. Test: `tests/test_ui_team_summary.py::test_with_no_team_live_the_rollup_is_needs_you_alone`.
+
+**Done when** the Org with no team live shows Needs you with the Inbox count, and nothing else in the rollup's row.
+
+**Related:** TD-176 (the rollup), TD-178 (the overdue count), TD-192 (a wound-down team's summary).
