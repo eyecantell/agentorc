@@ -76,6 +76,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Built (#1206, #1209, #1210) — live check |
 | TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Open — decided by Paul |
 | TD-372 | The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once | Medium | Open — decided by Paul |
+| TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
+| TD-375 | The metered chip's pace (#1215) is read with no check on its `unit` in any test: `_pace_says` and `paceSays` print a junk unit as tokens | Low | Open |
+| TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
 
 ---
 
@@ -1344,3 +1347,51 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on a scratch home, navigating Org → Inbox → Org draws no banner, a host agent stopped for 1 s draws none, one stopped for 5 s draws it, and it clears on reconnect.
 
 **Related:** TD-338 / TD-340 (archived: a control answers the press), TD-226 (archived: the promote's rollback).
+
+## TD-374: The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`ledgerFold`, the `.ledgerrow` / `.ledgergroup` block in `inboxFilter`, the `#ledgerforyou` swap in the poll); `tests/test_ui_inbox_ledger.py`
+
+**Why:** `tests/test_ui_inbox_ledger.py` checks the server's markup and the poll's `html.ledger` string; `grep -rn 'ledgerFold\|ledgerrow\|ledgerforyou\|inboxledger' tests/` finds `app.js`'s side nowhere. Deleting the `$$(".inboxpage .ledgerrow")` filter lines (so a *Teams* pick or the find box leaves the fold's rows showing), the `lf.dataset.src !== got.html.ledger` swap (the fold never follows the poll) or the `store.get("inboxledger", false)` line (a fold that is not remembered open) leaves every test passing, though §4.5 screen 6 says the rows are filtered by the *Teams* picks and the find alone. Other tests (`test_ui_org.py`'s `usageChip`, `test_attach.py`) already run `app.js` under node, so the means exist.
+
+**Done when** a node probe of `app.js` (as `test_ui_org.py` does for `AO.usageChip`) draws the fold's rows and asserts a team pick and a find word hide the rows and a group with none left; each of the three edits above fails a test.
+
+**Related:** TD-368, TD-370.
+
+## TD-375: The metered chip's pace (#1215) is read with no check on its `unit` in any test: `_pace_says` and `paceSays` print a junk unit as tokens
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/common.py` (`_pace_says`), `src/agentorc/ui/static/app.js` (`paceSays`); `tests/test_ui_org.py` (`metered_paced`)
+
+**Why:** `_pace_says` ignores a pace unless `p.get("unit") in ("$", "tok")`. Replacing that clause with `or False` (and the `["$", "tok"].includes(p.unit)` test in `paceSays` likewise) leaves `tests/test_spend.py` and `tests/test_ui_org.py` passing (60 passed): the `metered_paced` case's junk window has `per_hour: True` (caught by the bool check) but a valid-looking number with an unknown `unit` is never given, so a pace of `{per_hour: 3, unit: "x"}` would print *3 tok/h*. The test's comment says *a junk field draws nothing*.
+
+**Done when** `metered_paced` gains a window whose pace has a numeric `per_hour` and an unknown `unit`, and both homes print nothing for it; the edit above fails a test.
+
+**Related:** TD-151.
+
+## TD-376: The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.wireAttach`, `each`); `tests/test_attach.py` (the second node probe)
+
+**Why:** The probe's docstring says *a failed one reported and the next still sent*, but its failing file `bad.png` is the last of its drop (`[one.png, bad.png]`); `two.png` arrives in a second drop, which the queue sends whatever became of the first. Replacing `catch (e) { fail(...) }` in `each` with `catch (e) { throw e; }` makes the rest of a batch go unsent, and `pytest tests/test_attach.py tests/test_seat_policy.py` still passes (13 passed). A person who drops three screenshots, the first refused (over 4 MiB, say), would lose the other two with only the one banner.
+
+**Done when** the failing file is first in a drop of two, and the probe asserts the second is uploaded and its path inserted; the edit above fails a test.
+
+**Related:** TD-370, TD-002.
