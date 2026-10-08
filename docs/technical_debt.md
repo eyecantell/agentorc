@@ -1382,7 +1382,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 ## TD-378: Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away
 
 **Priority:** Medium
-**Type:** research
+**Type:** feature
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** anchor
 **Kind:** evaluation
