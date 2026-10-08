@@ -1274,7 +1274,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1222 and #1223)
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1222 and #1223)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
