@@ -52,7 +52,8 @@ def test_the_fold_lists_each_repos_for_you_entries_in_the_repo_pages_order(tmp_p
     assert [g["repo"] for g in got["groups"]] == ["agentorc", "samscrape"]
     rows = got["groups"][0]["rows"]
     assert [r["id"] for r in rows] == ["TD-002", "TD-156", "TD-133", "TD-319"]
-    assert [(r["pri"], r["why"]) for r in rows] == [("H", "yours"), ("M", "yours"), ("L", "your decision"), ("L", "your decision")]
+    whys = [("H", "yours"), ("M", "yours"), ("L", "your decision"), ("L", "your decision")]
+    assert [(r["pri"], r["why"]) for r in rows] == whys
     assert [r["held"] for r in rows] == ["", "", "", "grinder-ao-1"]  # the closed record holds nothing
     assert {r["team"] for r in rows} == {"ao-grind"} and rows[0]["url"] == "/repo/agentorc#TD-002"
     assert got["groups"][1]["rows"][0]["team"] == "sam-defined"  # the definitions' team first
@@ -115,7 +116,8 @@ def test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts(tmp_path, 
             return False
 
         async def call(self, method, **kw):
-            return {"repos": repos, "list": fleet, "inbox": {"entries": []}, "host": {"name": "kmaster"}}.get(method, {})
+            got = {"repos": repos, "list": fleet, "inbox": {"entries": []}, "host": {"name": "kmaster"}}
+            return got.get(method, {})
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
     monkeypatch.setattr(ui, "read_boards", lambda *a, **k: ([], ""))
