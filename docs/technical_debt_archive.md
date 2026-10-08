@@ -6688,3 +6688,43 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** each of the three reverts above fails a test.
 
 **Related:** TD-400, #1266.
+
+## TD-050: The cadence check's `review` row reads the verdict only on a comment's first line
+
+**Priority:** Medium
+**Added:** 2026-09-14
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Moved to dev-cadence
+
+**Location:** `scripts/check_cadence.py` (`REVIEW_RE`, the `review` row), `docs/cadence.md` §4 (where the format is given)
+
+**Why:** The row matches `REVIEW_RE` against `body.splitlines()[:1]` — the comment's **first line only**. Every reviewer in this repo is briefed to *end* its report with the verdict line ("End with exactly one line: `cadence-review: …`"), which is the natural place for a conclusion, and a PR comment written that way reads to the check as **no review at all**: the row says "no `cadence-review:` comment on the PR (cadence §4)", which is indistinguishable from never having had one reviewed. PRs #138 and #139 both failed on exactly this, each with a genuine independent review posted minutes before the merge. Neither §4 nor the script's own docstring mentions the position, so the rule is invisible until a session trips it — and by then the PR is merged and the row can never go green (the board item of 2026-09-13).
+
+There is a second, sharper edge: a merged PR's row cannot be repaired. Editing the comment to move the verdict line makes the check see it and then fail on `updated_at > merged_at` ("review comment edited after the merge"), which is the right answer and still a permanent FAIL. So a session that learns the rule the usual way leaves a red row behind whatever it does.
+
+**Fix:** either (a) `docs/cadence.md` §4 says "the verdict must be the comment's first line" where it gives the format, so the rule is visible where it is read; or (b) `REVIEW_RE` scans the whole body rather than the first line, which costs nothing, removes the trap, and matches how the reports are actually written — with (a) as documentation either way. Preference is (b): the check is a detector, and a detector that misses the evidence in front of it is worse than one that is slightly looser. Done when a review comment ending with its verdict line passes the `review` row.
+
+**Related:** cadence §4; PRs #138, #139 (both failed this way), #141 (posted first-line-first and passes); the 2026-09-13 board item on a merged PR's `review` row being unclearable; TD-042.
+
+**Resolved:** 2026-10-08 (the person's session, at Paul's word) — moved, not fixed: the fix is dev-cadence's synced `check_cadence.py` and `cadence.md` §4, so the entry is filed there as **dev-cadence TD-087** (its PR #214) and closes here. The finding still held on that day: `check_cadence.py` reads `splitlines()[:1]`. The fix arrives here by the sync.
+
+## TD-061: A worker's memory write lands uncommitted in the anchor's checkout
+
+**Priority:** Medium
+**Added:** 2026-09-16 (observed by the anchor session; Paul asked for the entry). Numbered 061 because PR #173, open from another session, holds TD-059 and TD-060.
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Done
+
+**Location:** `.claude/settings.local.json` (`autoMemoryDirectory`, an absolute path to the main checkout's `docs/claude-memory/`), `scripts/hydrate_worktree.sh` (symlinks that file into every worktree — a SYNCED FILE, dev-cadence's), `scripts/check_claude_memory.sh` (the guard — also synced), docs/cadence.md §1 and the memory section; design §4.2 (the launch layer agentorc's own sessions get)
+
+**Why:** `autoMemoryDirectory` is `/home/kmaster/agentorc/docs/claude-memory`, and `hydrate_worktree.sh` symlinks `.claude/settings.local.json` into each worktree so a worker keeps the repo's memory path. The path is absolute, so a session working in `.claude/worktrees/<name>` writes its memory files into the **main checkout's** working tree, not its own worktree's. The write is on no branch of the worker's, cannot ride the worker's PR, and sits uncommitted in the anchor's tree until somebody commits there. On 2026-09-16 `tdgrind-ao-1` added a wrap-up lesson to `docs/claude-memory/agentorc-td-grind-mechanics.md` this way; the anchor session's next `git commit -a`, for an unrelated ledger change, swept it into PR #174, where the Sonnet fact-check noticed a file the PR did not describe. It was kept and explained in the PR body. The failure has three faces: a worker's lesson is stranded if the anchor never commits (cadence's *never strand work*, applied to memory); it lands in a PR whose author did not write it and whose review did not cover it; and it breaks the one-agent-per-checkout rule (§9 invariant 2) in spirit — a second session is editing the anchor's tree. `check_claude_memory.sh` does see part of it: its uncommitted-memory check runs `git status` on the memory directory and warns *N uncommitted change(s) … commit & push*, at the next SessionStart of any session in the repo. What it cannot say is whose write it was, and its advice — commit it — is exactly how the file ends up in the wrong session's PR.
+
+**Fix (decided 2026-10-01: the first of the two below, built as dev-cadence TD-080):** decide where a worktree session's memory belongs, in dev-cadence, since the wiring is its synced files: either the memory path resolves **per checkout** (a relative `autoMemoryDirectory`, or the hydrate step writing the worktree's own `docs/claude-memory` path instead of symlinking the anchor's settings), so a worker's memory write is a change on its own branch and rides its own PR; or memory stays shared and the wrap-up rule in every brief becomes *memory changes go through a PR of their own from the session that wrote them*, with `check_claude_memory.sh`'s existing uncommitted-memory warning naming the file and saying that a session which did not write it should leave it for the one that did. The first is mechanical and needs no brief to remember it. Until then: the anchor session stages files by name, never `git commit -a`.
+
+**Done when** a worker's memory write appears in that worker's own PR, and an anchor session's commit cannot pick up a file another session wrote.
+
+**Related:** PR #174 (where it was seen), TD-058; docs/cadence.md §1 (worktrees, hydrate), the memory section; §9 invariant 2; memory `agentorc-td-grind-mechanics`.
+
+**Resolved:** 2026-10-08 (the person's session) — dev-cadence TD-080 (its PRs #201, #202) landed and was synced here by #962. `hydrate_worktree.sh` now writes each worktree its own `.claude/settings.local.json`, with `autoMemoryDirectory` pointing at the worktree's own `docs/claude-memory` (read in `.claude/worktrees/ao-paul` on 2026-10-08). The *Done when* holds: the designer's memory note rode its own PR, #1265 from branch `memory-ao-msg-warning`, with only its two memory files.
