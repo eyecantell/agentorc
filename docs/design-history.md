@@ -878,6 +878,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-03 (TD-296 #15, grinder-ao-2): rule 9's `system` note — *<team> finished and the host agent wound it down* — carries its team in the envelope's `team`. Until this date a `system` note carried none, so the Inbox filed cm-grind's wind-down note, naming #102–#106, under *No team*.
 - 2026-10-04 (TD-304, the designer): the closed subset's lists nest by indent — a board item's detail block carries bullets under a bullet, and a flat list would print the inner ones as text. Not built.
 - 2026-10-04 (TD-312): built — `render._list`: an item indented deeper than the one above opens a list inside it, a shallower one closes back out.
+- 2026-10-08 (TD-070, grinder-ao-2): `ao msg --reply-to <id> --pick <n> "text"` sends the picked answer, a blank line, then the text, on one reply with `answer` kept, and the home accepts that shape. Until this date `--pick` refused any text (*sends the answer itself: leave the text out*), and the home took only the answer word for word, so a reader that wanted to pick and add a line sent two messages or typed the answer and lost the index (manager-ao-1's friction note, 2026-09-21).
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 

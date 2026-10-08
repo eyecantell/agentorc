@@ -1286,7 +1286,6 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     assert sent["entry"]["text"] == "hold it" and sent["entry"]["answer"] == 1 and sent["closed"] == ask["id"]
     # …and each way of getting it wrong is a clear error, exit 2, before anything is sent
     for argv, said in (
-        (["msg", "--reply-to", steer["id"], "--pick", "1", "off main"], "leave the text out"),
         (["msg", "--pick", "1"], "--reply-to"),
         (["msg", "--reply-to", "m-nope", "--pick", "1"], "holds no entry"),
         (["msg", "--reply-to", steer["id"], "--pick", "9"], "offers 2, numbered 1-2"),
@@ -1294,12 +1293,17 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     ):
         assert cli.main(argv) == 2, argv
         assert said in capsys.readouterr().err, argv
+    # words with a pick follow the answer after a blank line, the index kept (TD-070)
+    assert cli.main(["--json", "msg", "--reply-to", steer["id"], "--pick", "2", "rebase it first"]) == 0
+    sent = json.loads(capsys.readouterr().out)
+    assert sent["entry"]["text"] == "off develop\n\nrebase it first" and sent["entry"]["answer"] == 1
     # a closed question keeps its answers on the record but is no longer offered them to press
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert "  1. merge it" not in out
     # …and says which was pressed in that answer's words, never the question's (TD-296 #14)
     assert 'answered 2: "hold it"' in out and 'answered 2: "merge PR 9?"' not in out
+    assert 'answered 2: "off develop"' in out
     # the sender reads which answer it was, so it branches on the number and not on the text
     monkeypatch.setenv("AGENTORC_SESSION", sid)
     assert cli.main(["inbox"]) == 0

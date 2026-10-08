@@ -378,7 +378,8 @@ class MailMixin:
             copies = [x for x in same_set if x not in (sender, PERSON, *named)]
         # -- a reply may *pick* one of the answers the entry it answers carries (§4.10, TD-070) ----
         # **The home checks it**: `answer` must index the `answers` of the entry `reply_to` names
-        # and `text` must equal that answer exactly, else the reply is refused — a session can call
+        # and `text` must equal that answer exactly — or be that answer, a blank line, and the
+        # replier's own words after it (`--pick <n> "text"`) — else the reply is refused — a session can call
         # this RPC directly, and a receiver must not be asked to trust an index the text does not
         # bear out. Everything else about the reply is unchanged: same gate, same tallies, same
         # close (`replied`), same wake.
@@ -393,7 +394,8 @@ class MailMixin:
                 raise RpcError(f"{no}: {replied.id} carries no answers at all (design §4.10)")
             if not 0 <= answer < len(replied.answers):
                 raise RpcError(f"{no}: {replied.id} carries {len(replied.answers)} of them (design §4.10)")
-            if text != replied.answers[answer]:
+            said = replied.answers[answer]
+            if text != said and not (text.startswith(said + "\n\n") and text[len(said) + 2 :].strip()):
                 raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
             picked = answer
         # -- a reader's verdict on a PR's ask (§4.9c, TD-315 slice 1): a word, never read from the text ----
