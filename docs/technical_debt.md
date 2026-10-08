@@ -70,7 +70,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-402 | No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266): reverting each of those three CLI lines leaves 130 tests green | Medium | Open |
 | TD-407 | A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable | Medium | Open |
 | TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Open |
 
@@ -1215,26 +1214,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
-
-## TD-402: No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing #1266)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/cli.py` (`cmd_team_list`'s `word = "definition" if teamrun.definition_changed(...)`, `cmd_team_flow`'s same line, and `what = applied["flow"] or "the definition"`); tests `tests/test_flows.py`, `tests/test_cli_teams.py`.
-
-**Why:** TD-400's *Done when* says the header, `ao team list` and `ao team flow` carry the new words and "tests cover each". #1266 tested the Org page's header (`test_ui_teams.py`) and `definition_changed` on hand-built dicts, but the CLI's prose has no test. Evidence, at `origin/main` d9539fe8, `PYTHONPATH=$PWD/src pytest -q tests/test_anchor_seat.py tests/test_flows.py tests/test_ui_teams.py` is 130 passed, and stays 130 passed with any one of these reverted: `word = "definition" if teamrun.definition_changed(out["differences"], out["flow"]) else "flow"` → `word = "flow"` (`ao team flow`); the same line on `r["differences"]` in `ao team list`; `what = applied["flow"] or "the definition"` → `what = applied["flow"]` (which prints `applied None:` for a team with no flows). The added `test_ao_team_flow_lists_the_flows_and_writes_the_pick` lines only read the no-differences bare form.
-
-**Fix:** a CLI test with a live team that lacks its anchor and runs no flow (a fleet fake as in `test_flows.py`): `ao team list` and `ao team flow <team>` print `definition changed — Apply (ao team flow <team> --apply):` and `<team>-anchor: starts`; `--apply` prints `applied the definition:`. Revert each of the three lines and see the test fail.
-
-**Done when** each of the three reverts above fails a test.
-
-**Related:** TD-400, #1266.
-
----
 
 ## TD-407: A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable
 

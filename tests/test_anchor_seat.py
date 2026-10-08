@@ -285,6 +285,28 @@ def test_apply_creates_the_anchor_a_team_lacks_held_with_why_while_its_checkout_
     assert "held" not in made and [r["line"] for r in got["applied"]] == ["t-anchor: starts"]
 
 
+def test_ao_team_list_and_flow_say_definition_changed_and_apply_says_the_definition(tmp_path, monkeypatch, capsys):
+    """TD-402 (§4.5a *flow changed — Apply*, §4.7): a live team with no flow that lacks its anchor reads
+    *definition changed — Apply* with the seat's line in `ao team list` and `ao team flow <team>`, and
+    `--apply` says *applied the definition:*, never a flow's name it does not have."""
+    from agentorc import cli
+
+    org, call, calls = _applying(tmp_path, monkeypatch, None)
+    monkeypatch.setattr(cli.hosts, "local_host", lambda: cli.hosts.Host(name=HOST, vscode_host=HOST, local=True))
+    monkeypatch.setattr(cli, "_org_here", lambda: org)
+    monkeypatch.setattr(
+        cli, "call_sync", lambda method, **params: {} if method in ("host", "repos") else call(method, **params)
+    )
+    head = "definition changed — Apply (ao team flow t --apply):"
+    assert cli.main(["team", "list"]) == 0
+    lines = [x.strip() for x in capsys.readouterr().out.splitlines()]
+    assert lines[lines.index(head) + 1] == "t-anchor: starts"
+    assert cli.main(["team", "flow", "t"]) == 0
+    assert capsys.readouterr().out.splitlines()[-2:] == [head, "  t-anchor: starts"]
+    assert cli.main(["team", "flow", "t", "--apply"]) == 0
+    assert capsys.readouterr().out.splitlines()[-2:] == ["applied the definition:", "  t-anchor: starts"]
+    assert [p["name"] for m, p in calls if m == "create"] == ["t-anchor"]
+
 
 def test_members_and_ao_team_list_name_the_seat(tmp_path, monkeypatch, capsys):
     """TD-387 (§4.5a *card: on call — the anchor seat's words*): Members… lists the seat beside the
