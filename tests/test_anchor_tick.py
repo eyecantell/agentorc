@@ -117,6 +117,33 @@ async def test_the_lane_gaining_an_id_fills_the_ended_seat_once_per_stretch(agen
 
 
 @pytest.mark.integration
+async def test_a_live_check_that_goes_live_after_a_none_is_due_again(agent, tmp_path):
+    """TD-411 (§6 rule 3 *The anchor seat*, TD-407): the seat declared with TD-1 a build in its lane;
+    merged, it reads as a live check not yet live and leaves the seat's `lane_seen`, raising nothing;
+    at the promote it is the lane's again, and `seat_due` is raised for it and the seat filled."""
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    _reading(agent, root, _entry("TD-1"))
+    async with LocalClient() as person:
+        sid = await _anchor(person, root)
+        first = agent.sessions[sid]
+        now = datetime.now(UTC)
+        async with LocalClient(caller=sid) as me:
+            await me.call("progress", id=sid, status="none", why="nothing I can do")
+        assert first.lane_seen["ids"] == ["TD-1"]
+        _end(agent, sid)
+        _reading(agent, root, _entry("TD-1", kind="live-check", built=[7], live="no"))
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is first and first.seat_due is None and first.lane_seen["ids"] == []
+        _reading(agent, root, _entry("TD-1", kind="live-check", built=[7], live="yes"))
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not first and [r["why"] for r in new.restarts] == ["fill"]
+        assert first.seat_due == {"at": first.seat_due["at"], "by": "work", "ids": ["TD-1"]}
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
 async def test_an_idle_seat_whose_lane_gained_work_is_closed_for_a_fill_from_cold(agent, tmp_path):
     from sessionorc.agent import SEAT_IDLE_GRACE
 

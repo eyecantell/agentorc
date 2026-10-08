@@ -220,15 +220,43 @@ def finished(
     }
 
 
+def reread(
+    member: Session, entries: list[Any], lane: list[str] | None = None
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """The one reading of a lane's memory (design §6 rule 6 *`lane_seen` is the lane's memory, never
+    the ledger's*, TD-407, TD-411), for rule 6, rule 8 and the anchor seat's `work` trigger alike:
+    `member`'s `lane_seen` pruned of every id the reading holds and `lane` (the member's own when
+    not given) no longer matches — its `dropped` mark with it — and the ids that match now and the
+    pruned memory lacks, in the reading's order. An id the reading does not hold is kept: an entry
+    absent from the file is archived, or the checkout's moment, never the lane's. The memory comes
+    back as the record's own object when nothing was pruned, else a new one, so a caller writes
+    only what changed; `(None, [])` before rule 6 has written `lane_seen`, since there is nothing to
+    be new against. Reads only: the caller writes."""
+    seen = member.lane_seen
+    if seen is None:
+        return None, []
+    lane = member.lane if lane is None else lane
+    held: set[str] = set()
+    matching: list[str] = []
+    for e in entries:
+        if not (isinstance(e, dict) and e.get("id")):
+            continue
+        i = str(e["id"])
+        held.add(i)
+        if i not in matching and ledger_mod.lane_matches(lane, e):
+            matching.append(i)
+    ids = list(seen.get("ids") or [])
+    left = {i for i in ids if i in held and i not in matching}
+    if left:
+        seen = {**seen, "ids": [i for i in ids if i not in left]}
+        dropped = seen.get("dropped")
+        if isinstance(dropped, dict) and any(i in dropped for i in left):
+            seen["dropped"] = {i: at for i, at in dropped.items() if i not in left}
+    kept = set(seen.get("ids") or [])
+    return seen, [i for i in matching if i not in kept]
+
+
 def gained(member: Session, entries: list[Any]) -> list[str]:
-    """The ids in a ledger reading that match `member`'s lane and are not in its `lane_seen`, in the
-    ledger's order; none before rule 6 has written `lane_seen`, since there is nothing to be new
-    against."""
-    if member.lane_seen is None:
-        return []
-    seen = set(member.lane_seen.get("ids") or [])
-    return [
-        str(e["id"])
-        for e in entries
-        if isinstance(e, dict) and e.get("id") and str(e["id"]) not in seen and ledger_mod.lane_matches(member.lane, e)
-    ]
+    """The ids in a ledger reading that match `member`'s lane and are not in its `lane_seen` as
+    `reread` prunes it, in the ledger's order; none before rule 6 has written `lane_seen`."""
+    return reread(member, entries)[1]
