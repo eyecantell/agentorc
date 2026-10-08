@@ -210,7 +210,7 @@ code and needs no grant; a session doing the same work does.
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
      by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
-     `every`), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and cleared
+     `every`, `work`), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and cleared
      again if it returns to zero before a fill — the question was answered elsewhere); for
      `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to the
      seat's repo's default branch since the seat's record was created, read with `gh` on the
@@ -237,6 +237,18 @@ code and needs no grant; a session doing the same work does.
      count toward `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from
      `seat_count` (*on call — runs after 10 PRs · 4 of 10*), which §4.9b could not while the
      number was the manager's. (This is TD-104, folded here.)
+     **The anchor seat is a seat of this rule, with the trigger `work`** (TD-381; designed
+     2026-10-07; built — TD-386; §4.9b *The anchor seat*): `seat_due` is set with `by: work` and
+     the `ids` when the seat's lane reading — the lane word `anchor` (rule 6), kept on the seat's
+     record as `lane_seen` as a finished member's is — holds an id it did not when the seat last
+     declared or was created, and a cause fills once per stretch as the manager's do: the same ids
+     raise no second `seat_due` after a `none`. **Its fill is gated by the checkout**: the
+     `create` is in the home repo's main checkout, refused by occupancy (§9 invariant 2) while any
+     session holds it and refused while the checkout is dirty or off its default branch, each
+     leaving `seat_due` standing with the reason on the record — **`seat_held: {by, why}`**
+     (home-owned) — for the card's slot (*on call — the checkout is yours · branch td-x, 2 files
+     uncommitted*); the next tick tries again. Its idle close and its fill ceiling are this
+     rule's as for every seat.
      **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30; the trigger,
      `idle_open` and `seat_filled` built — TD-259 slice 2; the sweep's exception is slice 3's). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
      say `on_call: false` — the `manager` role's default alone, another role's manager being a seat only where its
@@ -419,13 +431,15 @@ code and needs no grant; a session doing the same work does.
      tells the grinder lane as it tells any lane news; for that match the decision's holder stands
      as the entry's owner, so `[design-first, owner:designer]` takes TD-151 though its `Owner:` is
      `grinder`, and a decision named for anyone else — `decision (paul)`, `decision (anchor)` —
-     matches no lane: the person's is *for you* (§4.4 *Repo facts*), and the anchor has none —,
+     matches no lane: the person's is *for you* (§4.4 *Repo facts*), and the anchor's is the lane word `anchor`, below —,
      and `free-pick` a pickable entry whose kind
      is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; built —
      TD-323 slice 1; §4.9b *A live check is a grinder's once its build is live*) — and **every
      open decided line of the repo's board**, a work order `board:<key>` (TD-380; designed
      2026-10-07; built — TD-384; §4.4 *Board write-back*), which `owner:<word>` never narrows
-     out, since a line has no owner — so an evaluation, a
+     out, since a line has no owner — and **`anchor`** every pickable entry whose `Owner:` is `anchor`, of any
+     kind, and every work order (TD-381; designed 2026-10-07; built — TD-386; §4.9b *The anchor
+     seat*: the seat's lane, and a person's own anchor session reads the same) — so an evaluation, a
      decision and a live check whose build is not live match no lane, and a
      ledger with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.

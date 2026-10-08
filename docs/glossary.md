@@ -190,6 +190,7 @@ not mix:
   screen 9) and never copied off the host that holds it. Not the run log, which is the pane's output.
 - **anchor session** — the first agent in a checkout; every other concurrent agent works in a
   worktree (invariant 2). — *proposed*.
+- **anchor seat** — a team's seat on call in its home repo's main checkout, present by default, filled when the lane `anchor` gains work and never while a person's session holds the checkout (design §4.9b *The anchor seat*, TD-381). — *proposed* 2026-10-07 (the designer).
 - **tick** — one pass of the host agent's own loop: derived reports, policies, the doorbell's
   next check. *Not:* a manager's loop (that is a *round*), pass. — **decided** 2026-09-16 (Paul),
   matching the code.
