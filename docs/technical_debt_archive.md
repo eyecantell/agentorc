@@ -6745,3 +6745,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** TD-103 (the rules that left the manager's brief), TD-114 (briefs as supplements), TD-105 and TD-106 (the same theme in mail and identity), TD-060 (the profile names are renamed with the rest).
 
 **Resolved:** 2026-10-08 (the person's session; Paul: *close TD-118*) — (1) and (2) were built 2026-09-23. (3) was built in dev-cadence: `cadence_hooks.sh`'s `attention_scope` prints the session's own board without `--fetch`. (4), the manager on Haiku, is **dropped**. Since TD-259 the manager is a seat on call, and what it is filled for is the judgement the tick cannot make: a permission, a `stalled?` member, an `ask` to it, escalation prose. That is the wrong place for a weaker model. Its spend was never the model. It was fills with nothing due, each one reading some 60k tokens of first reads, and that is **TD-410**.
+
+## TD-409: The auditor brief and the glossary still say the manager starts a seat; since TD-103 the home's tick fills it, as §4.9b and §6 rule 3 now say
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1267–#1277; the sibling of TD-405, which corrected §4.9b alone)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/briefs/auditor.md` (line 1), `docs/glossary.md` (the **seat** entry, "*empty* and *filled* are what the manager does to it"); `docs/design/6-policies.md` rule 3 and `docs/design/4.9b-techlead.md` *Seats with a trigger* are the text they should agree with.
+
+**Why:** TD-405 (#1277) moved the owner of a seat's trigger from the manager to the home's tick in §4.9b, because rule 3 has the tick compute `seat_due` and fill the seat (`agent_tick.py`: *the seat is due (%s) — filling it*). Two other places say the old thing. `auditor.md` opens: *"an unattended session that its manager starts after a number of merged PRs, or every so often"*; the glossary says *"empty and filled are what the manager does to it, on call is what a person sees"*. Both contradict the design they cite (the auditor brief cites §4.9b *Seats with a trigger* itself), and the auditor brief ships to every repo.
+
+**Resolved:** 2026-10-08 (PR #1281) — `src/agentorc/briefs/auditor.md` (*that the home starts once a number of PRs have merged*), the glossary's **seat** (*what the home's tick does to it*), and, found by the same grep, `src/agentorc/briefs/techlead.md`'s Stop paragraph (*The home starts you again*).
+
+**Done when** neither file names the manager as what starts or fills a trigger seat, and the doc-bound brief tests pass.
+
+**Related:** TD-405 (§4.9b), TD-098 (archived, the seats), TD-247 (the manager's jobs moved to the tick).
