@@ -5876,3 +5876,21 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1202, grinder-ao-1; live check read by grinder-ao-1) — rule 3's `_seat_prs` leaves an idle seat open while a PR of its own is open and not handed to a reader (design §6 rule 3; `tests/test_seat_policy.py`). The live read: the host agent restarted on a promote at 00:11:45Z on 2026-10-08, after #1202 merged (23:35:48Z), so #1202 was live. test-audit-ao-1 filled at 00:26:53Z, opened #1208 at 00:28:35Z, and ended its turn twice to wait on its own background work: a fact-check agent at 00:28:41Z, then a CI watch at 00:32:57Z. The tick left it open. The seat came back at 00:35:02Z and merged #1208 at 00:35:10Z, then reported done at 00:36:58Z. The host agent's log has its *a seat with nothing due, idle and pushed — closing it (§6 rule 3)* only at 00:39:29Z, after the merge. docs-audit-ao-1, which had no PR, was closed as before at 00:30:41Z.
 
 **Related:** TD-098 (the audit seats), TD-259 (the on-call manager, which rule 3 also closes), TD-363 to TD-365 (the entries #1197 carried).
+
+## TD-369: Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone, and without a handed ask from another host
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1202–#1207)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_seat_prs`); `tests/test_seat_policy.py` (`test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_holds_it_or_the_wait_runs_out`)
+
+**Why:** `_seat_prs` names a claim's PR as `e.pr or e.review_pr` and matches a handed ask by `(sid, host or self.host) == (s.id, s.host or self.host)`. With `PYTHONPATH=$PWD/src pytest -q tests/test_seat_policy.py -k waiting_on_its_own`, each of these edits still passed:
+- `number = e.pr or e.review_pr` → `number = e.review_pr`. The one test's only claim with a `pr` (`handed`, #1199) is handed to a reader, so it closes whether or not a `pr` claim counts; the `claimed` seat uses `review_pr`. A seat holding a claim on its own `pr` that no reader holds, which is what the docstring's *a claim on its record carrying a PR* says, is never asserted to stay open.
+- the handed match → `if sid == s.id:`. Every record is on this host, so a same-named session on another host being taken for the seat is not shown. The mutants that drop the branch, the `derived` arm, the `PR_CLOSED` check and the `handed` filter each fail the test.
+
+**Resolved:** 2026-10-07 (PR #1213, grinder-ao-1) — the test gains two seats: `ownpr`, holding a claim with `pr` alone and nobody reading it, and `elsewhere`, holding a claim on #1202. A reader holds an ask carrying #1202 from `<the seat's id>@laptop`, the same id on another host. Both stay idle. `number = e.review_pr` now fails on `ownpr`, and the handed match as `sid == s.id` fails on `elsewhere`.
+
+**Related:** TD-366.
