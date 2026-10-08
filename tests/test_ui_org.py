@@ -453,7 +453,9 @@ USAGE_CASES = {
          "spent": {"tokens": {"input": 3_000_000}, "total": 3_000_000, "cost": 3.2}, "turns": 1,
          "pace": {"per_hour": 2_000.0, "unit": "tok", "at": "2026-09-23T10:00:00Z"}},
         {"label": "month", "pct": None, "resets": "m", "spent": {"tokens": {}, "total": 0, "cost": None},
-         "turns": True, "pace": {"per_hour": True, "unit": "$", "at": None}}]},
+         "turns": True, "pace": {"per_hour": True, "unit": "$", "at": None}},
+        {"label": "5h", "pct": None, "resets": "f", "spent": {"tokens": {}, "total": 0, "cost": None},
+         "pace": {"per_hour": 3, "unit": "x", "at": "2026-09-20T22:30:00Z"}}]},
     "metered_unpriced": {"reason": "error: OSError", "windows": [
         {"label": "day", "pct": None, "resets": None,
          "spent": {"tokens": {"input": 900}, "total": 900, "cost": None}}]},
@@ -1342,6 +1344,7 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     wed = datetime(2026, 9, 23, 10, tzinfo=UTC).astimezone().strftime("%a %H:%M")
     assert paced[1].startswith(f"week 3M tok / 10M tok (30%) · 1 turn · 2k tok/h · at this pace 10M tok by {wed} — ")
     assert paced[2].startswith("month 0 tok — ")
+    assert paced[3].startswith("5h 0 tok — "), "a pace in no known unit draws nothing (TD-375)"
 
 
 def test_a_card_says_what_it_waits_on_after_its_declaration_or_alone(tmp_path, monkeypatch):

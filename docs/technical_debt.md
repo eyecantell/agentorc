@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Open — decided by Paul |
 | TD-372 | The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once | Medium | Open — decided by Paul |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
-| TD-375 | The metered chip's pace (#1215) is read with no check on its `unit` in any test: `_pace_says` and `paceSays` print a junk unit as tokens | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
 
 ---
@@ -1297,22 +1296,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a node probe of `app.js` (as `test_ui_org.py` does for `AO.usageChip`) draws the fold's rows and asserts a team pick and a find word hide the rows and a group with none left; each of the three edits above fails a test.
 
 **Related:** TD-368, TD-370.
-
-## TD-375: The metered chip's pace (#1215) is read with no check on its `unit` in any test: `_pace_says` and `paceSays` print a junk unit as tokens
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/common.py` (`_pace_says`), `src/agentorc/ui/static/app.js` (`paceSays`); `tests/test_ui_org.py` (`metered_paced`)
-
-**Why:** `_pace_says` ignores a pace unless `p.get("unit") in ("$", "tok")`. Replacing that clause with `or False` (and the `["$", "tok"].includes(p.unit)` test in `paceSays` likewise) leaves `tests/test_spend.py` and `tests/test_ui_org.py` passing (60 passed): the `metered_paced` case's junk window has `per_hour: True` (caught by the bool check) but a valid-looking number with an unknown `unit` is never given, so a pace of `{per_hour: 3, unit: "x"}` would print *3 tok/h*. The test's comment says *a junk field draws nothing*.
-
-**Done when** `metered_paced` gains a window whose pace has a numeric `per_hour` and an unknown `unit`, and both homes print nothing for it; the edit above fails a test.
-
-**Related:** TD-151.
 
 ## TD-376: The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent
 
