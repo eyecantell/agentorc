@@ -78,6 +78,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-391 | The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing | Low | Open |
 | TD-392 | The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing | Low | Open |
 | TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
+| TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Open — design-first |
 
 ---
 
@@ -1373,3 +1374,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the test gives a team a superseded record and a team two records (one live, one ended, in both orders) and asserts the first is not named and the second reads live; both mutants fail it.
 
 **Related:** TD-381, TD-384, TD-385.
+
+---
+## TD-394: An anchor seat's Start lands in a dirty checkout, where its fill would have waited
+
+**Priority:** Low
+**Added:** 2026-10-08 (grinder-ao-1, from the techlead's reading of #1248, TD-386)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor` (*a start whose checkout a session holds …*), §6 rule 3 (*Its fill is gated by the checkout*); `src/agentorc/teamrun.py` (`start`, TD-385's occupancy check), `src/sessionorc/agent_tick.py` (the fill's gate, `seat_held`)
+
+**Why:** the seat's fill (§6 rule 3, built in TD-386) is refused while the home repo's main checkout is held by a session, dirty, or off its default branch, writing `seat_held`. `ao team start` (TD-385) checks occupancy alone, because the design's Start paragraph names only a holder: a Start into a free checkout that has uncommitted files or another branch checked out creates the seat with a pane there. The two roads into the same checkout disagree, and the anchor brief's work (promotes, ledger PRs) could then run over the person's uncommitted work.
+
+**Fix:** decide whether a Start gates on the checkout as the fill does — a held Start (`closer {by: start, why: held}`, no pane, TD-386) for a dirty or off-branch checkout too, its `seat_held` saying why — or whether a Start is the person's own word and may land there; then the design says it and the build follows.
+
+**Done when** the design names what a Start does with a dirty or off-branch free checkout, and a test covers it.
+
+**Related:** TD-381, TD-385, TD-386, TD-387.
