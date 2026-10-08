@@ -75,6 +75,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-401 | TD-400 is a live check of #1266 owned by `grinder`: only the anchor promotes, so no grinder can finish it | Low | Open |
 | TD-402 | No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266): reverting each of those three CLI lines leaves 130 tests green | Medium | Open |
 | TD-403 | `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257): each can be reverted with `test_anchor_seat.py` and `test_anchor_tick.py` green | Low | Open |
+| TD-405 | §4.9b's *Seats with a trigger* still has the manager reading a `prs:` count and timing `every:`, where §6 rule 3 has the home do both | Low | Open |
 | TD-407 | A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable | Medium | Open |
 | TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Open |
 
@@ -1323,6 +1324,23 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 ---
 
+## TD-405: §4.9b's *Seats with a trigger* still has the manager reading a `prs:` count and timing `every:`, where §6 rule 3 has the home do both
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, archiving TD-098 in #1272; the fact-check's note)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.9b-techlead.md` (the *Seats with a trigger (TD-098)* bullet); `docs/design/6-policies.md` rule 3 is the text it should agree with.
+
+**Why:** §4.9b defines `prs: <n>` as *a count the manager reads from `gh`, as it reads the merge queue*, and `every: <duration>` as *on the manager's clock, since the home times nothing*. §6 rule 3 says the tick computes `seat_due`: `seat_count: {prs, at}` is home-owned and read with `gh` on the reports' five-minute cadence, and `every: <d>` is due once `d` has passed since the record was created. The build matches rule 3 (`agent_tick._seat_due`). The fills since 2026-10-06 are the tick's, as the journal's *the seat is due (prs) — filling it* lines show, so a reader of §4.9b is told the wrong owner of the trigger.
+
+**Fix:** reword the two clauses of §4.9b's bullet to name the home's tick and point to §6 rule 3; no behaviour changes. Run the doc-bound tests.
+
+**Done when** §4.9b names no manager in a seat trigger's count or clock, and it agrees with §6 rule 3.
+
+**Related:** TD-098 (archived, the seats), TD-247 (the manager's jobs moved to the tick).
 ## TD-407: A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable
 
 **Priority:** Medium
