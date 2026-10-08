@@ -284,6 +284,35 @@ async def test_the_starts_reading_is_the_fills_and_a_node_is_read_for_occupancy_
 
 
 @pytest.mark.integration
+async def test_the_starts_reading_refuses_a_missing_dir_and_names_the_resolved_tree_and_this_host(
+    agent, tmp_path, monkeypatch
+):
+    """TD-403 (§4.9b *The anchor seat*): a mistyped `dir` is refused rather than read as a free
+    tree; a symlinked checkout is read, and its holders matched, as the tree it points at; and the
+    reply names this host where the call named none."""
+    from sessionorc.client import AgentError
+
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    link = tmp_path / "link"
+    link.symlink_to(root)
+    seen: list[Path] = []
+
+    def occupants(d):
+        seen.append(d)
+        return ["ao-repo-paul (working)"] if d == root.resolve() else []
+
+    monkeypatch.setattr(agent, "occupants", occupants)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="not a directory"):
+            await person.call("checkout_held", dir=str(tmp_path / "nope"))
+        got = await person.call("checkout_held", dir=str(link))
+        assert got["dir"] == str(root.resolve()) and seen == [root.resolve()]
+        assert got["held"] == {"by": "ao-repo-paul", "why": "held by ao-repo-paul (working)"}
+        assert got["host"] == agent.host
+
+
+@pytest.mark.integration
 async def test_a_held_create_writes_its_reason_as_seat_held(agent, tmp_path):
     """TD-395: the card's slot says why before the first tick."""
     from sessionorc.client import AgentError
@@ -296,6 +325,8 @@ async def test_a_held_create_writes_its_reason_as_seat_held(agent, tmp_path):
             await _anchor(person, root, held_reason=why)
         with pytest.raises(AgentError, match="held_reason"):
             await _anchor(person, root, held=True, held_reason={"by": "checkout"})
+        with pytest.raises(AgentError, match="held_reason"):  # TD-403: a list never reaches `.get`
+            await _anchor(person, root, held=True, held_reason=["checkout", "2 files uncommitted"])
         sid = await _anchor(person, root, held=True, held_reason=why)
         rec = agent.sessions[sid]
         assert rec.state == "closed" and rec.seat_held == why
