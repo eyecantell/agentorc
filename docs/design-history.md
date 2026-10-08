@@ -233,6 +233,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-381, the designer): the on-call pill's words for the anchor seat — *comes when the checkout's lane gains work*, *the checkout is yours · <why>*.
 - 2026-10-07 (TD-380, the designer): screen 6's answered board row says *pickable by <team>* while no session holds the line's `board:<key>`, with the team's wound-down state, instead of *waiting on the next session to read the board*.
 - 2026-10-07 (TD-373, grinder-ao-2): the **Snoozed (n)** fold built — moved under FYI as the mockup draws it, each snoozed row drawn by its kind's own macro with *snoozed until <t>* and *now* first in its Snooze menu; **Unsnooze** and its `unsnooze` act removed; an entry closed while snoozed is listed by its close, not in the fold.
 - 2026-10-07 (TD-377, the designer; asked by Paul the same day): a team's grid ends in the **+ card** — a partial card, a dashed outline and a large **+**, whose press is the New session form on that team, Role *Interactive*; a dialog of its own and a **+** beside Members… rejected.
@@ -310,6 +311,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-381, the designer): the rows **card: on call — the anchor seat's words** and **New session: directory field → occupancy: a seat**; Members… lists the seat.
 - 2026-10-07 (TD-380, the designer): the row **Repo page: decided lines** — the open decided board lines first in the pickable list, each a work order.
 - 2026-10-07 (TD-377, the designer): the row **team card: + card** — the last card in a defined team's grid, `/new?team=<team>`, a ring stop; absent on *No team*.
 - 2026-10-07 (TD-371, the designer; Paul's decision the same day): the row **Inbox: Snoozed (n) fold**; the `ask` row's and the state row's snooze words say the row keeps its controls and *now* clears it; **Unsnooze** retired.
@@ -577,6 +579,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-07 (TD-381, the designer): the `anchor` preset row — a seat on call in the main checkout, lane `anchor`, no grants.
 - 2026-10-07 (TD-002, grinder-ao-2): `attach`, the Focus composer's **Attach**, joins the person-only list: a file put where a session will read it is the person's, and no session uploads through the page.
 - 2026-10-06 (TD-310, the designer): *Role names*' clause on a designer's whole brief in a team with no flow deleted with the carve-out — a repo's designer brief is its supplement, as every role's is.
 - 2026-10-04 (TD-108 step 3, the designer; Paul the same day: *the fold goes to the designer, not to him*): **the fold was dropped.** The design review of 2026-09-22 asked for ten person-only inbox RPCs to become one `inbox_act {entry, action}`; grinder-ao-1 looked before building and found the ten in four routing classes that `modes.py` and §4.4a key on the method name, and §4.8a already said `identity_ack`'s wire name stays. By this date the person-only RPCs numbered 25, gated by 18 `is_person` checks written into the RPCs and two helpers (`_person_entry` for five, `_promote_person` for two), each refusal worded by hand. Decided: the names stay, `mail.PERSON_ONLY` is the one list, one check opens each RPC (in the RPC, since the link's `act` bypasses the dispatcher), and a test holds list and code to each other. The build is TD-317, which also settles where `agent_wake.py`'s passengers go (the techlead's read of #642).
@@ -653,6 +656,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-07 (TD-381, the designer): the team key `anchor` — `{name, profile, brief, home}` or `false`, present by default, one per repo.
 - 2026-10-07 (TD-377, the designer): *A person in the team* — the team's card offers the start (the + card), Members… stays the definition's.
 - 2026-10-06 (TD-345, the designer): *A person in the team* — under a flow the session takes what a member stage's role takes, the flow's chain of readers on the repos' top-level `held:` (none under a flow with no review stage), in place of *the reader comes from the current flow's `techlead` stage*; a role's own `review:` wins only in a team with no flow.
 - 2026-09-12: Paul: guardians is not on kmaster and is not to be cloned there — its project entry names the devenv host.
@@ -727,6 +731,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-07 (TD-381, the designer; asked by Paul the same day): **The anchor seat** — every team has one by default (`anchor:` or `anchor: false`), role `anchor`, in the home repo's main checkout, trigger `work` on the lane `anchor` (anchor-owned entries and work orders), never while a person's session holds the checkout; never promotes; one per repo. A worktree of its own and opt-in rejected (the latter steered).
 - 2026-10-06 (TD-345, the designer): *The reader* says a role's `review:` is a setting of the role **in a team with no flow** and is read by nothing under a flow, where the record's `review` is the flow's chain (§4.9c items 2 and 3); the seat answers with one of three verdicts — `merged`, `pass`, `findings` — in place of *`merge`, or findings*, and the interactive asker's recommendation is `pass` or `findings`; *Seats with a trigger* says `asks` is the techlead's trigger and any review seat's.
 - 2026-10-04 (TD-320, the designer, on Paul's decision of that day: *we should make live-checks pickable by grinders so they do not have to wait on a promote*): **a live check became a grinder's once its build is live.** Until this date `free-pick` matched `Kind: build` or unwritten alone (TD-228), so a built entry waiting for its live check was nobody's but the anchor's, and nothing told the anchor to run it after a promote: seven High entries stood built and waiting on 2026-10-04, four designed entries blocked behind them, and the five the anchor ran that night (PR #1032) were each a read a member may make. The round settled what Paul left open: the entry names its build after the word on its `Kind:` line (`**Kind:** live-check #<n>`), not in a field of its own (the first draft's `**Built:**` line: the fact-check found cadence's script fails an edit that adds a header field the `Fields:` line does not declare), not in `Blocked by:` (cadence's line, where an item its script cannot read blocks for good) and not in the Status's prose (a lane word matches by the header, never the prose); unknown is never live; and a check that waits for an event is re-owned to the anchor so it is not picked again each run. Sixteen live checks Paul re-owned to the grinders the same day (PR #1042) are scratch-home presses and take the same rule. The build is TD-323.
 - 2026-10-04 (TD-323 slice 1, grinder-ao-1): the reading and the lane built. `ledger.built` reads the `#<n>` after a `Kind: live-check` line's word; `ledger.LiveReader` maps each `(#<n>)` squash subject on `origin/<default>` to its commit, and tests it with `merge-base --is-ancestor` against the promote reading's live commit (`_live_commits`, none where the reading carries `live_why`); `entries`, `reading` and `entries_before` take it as `live`, and `free-pick` and the page's *pickable* take a live check reading `live: yes`. Rule 6's first write (the techlead's read of #1051): origin's tip is read with `live`, or a live check would be taken for the checkout's own entry and seen untold; the ledger at the declaration is read with `live` when the promote that made today's live commit live (`promote.last`) concluded before the declaration, so a check live then stood in the lane and is told to nobody, after any number of `none`s — and without it otherwise, so a check made live after the declaration, or by a live commit no promote record names, is told once.
@@ -931,6 +936,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-07 (TD-381, the designer): rule 3 gains the trigger `work` and `seat_held` (the fill gated by occupancy and a clean checkout on its default branch); rule 6 gains the lane word `anchor`.
 - 2026-10-07 (TD-380, the designer): rule 6's `free-pick` takes every open decided line of the repo's board as `board:<key>`, which `owner:<word>` never narrows out.
 - 2026-10-07 (TD-368 slice 1, grinder-ao-1): rule 6's `design-first` word takes an entry on `decision (designer)`, pickable or not, its owner read as `designer` (`ledger.lane_matches`); the grinder's lane is told of it once the decision's PR drops the item.
 - 2026-10-07 (TD-367, the designer): rule 6's `design-first` word also takes an entry of any kind blocked by `decision (designer)`, pickable or not, the decision's holder standing as its owner for the lane's owner word; a decision named for the person or the anchor matches no lane.
@@ -1062,6 +1068,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 9. Invariants
 
+- 2026-10-07 (TD-381, the designer): invariant 2 names the anchor seat as the checkout's one agent only while no person's session holds it.
 - 2026-10-06 (TD-345, the designer): invariant 9 extended to flows — the host agent never reads a flow, the record gains no flow or stage field, no rule keys on a flow or a stage's `name`, and `relaunch`, `sit_out` and `closed_for: {why: sit_out}` are marks a person's act writes and the tick reads as marks. §4.9c had stated the load-bearing rule (*the host agent never sees a flow, and the record gains no flow field*) and §9 did not.
 - 2026-09-12: invariant 11's membership half (`controllers` on the target) proposed (§4.8, TD-036); the grant was named `orchestrate` until TD-055 step 3 renamed it `control`.
 - 2026-09-13: invariant 5's refusal of any acting RPC from a session onto an interactive session became a gate in code (TD-041).

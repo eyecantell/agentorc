@@ -77,10 +77,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-379 | Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
-| TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Open — asked by Paul |
+| TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-382 | §4.5a's Inbox *keys* row still says the ring visits snoozed rows "while *n snoozed — show* is open", the control #1218 renamed the **Snoozed (n)** fold | Low | Open |
 | TD-383 | The Inbox poll's down-banner grace (#1223): its retry and reset logic is pinned by substring only — two mutations of it leave every test passing | Low | Open |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Open |
+| TD-385 | Build TD-381 (the definition): the team key `anchor`, present by default, the `anchor` preset and its brief, `ao team start` creating the seat in the home repo's checkout, one per repo | High | Open |
+| TD-386 | Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor` | High | Open |
+| TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
 
 ---
 
@@ -1373,7 +1376,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — asked by Paul 2026-10-07: *let's also plan out the on-call anchor session. Are managers automatically added to teams? I wonder if anchor sessions should be as well.*
+**Status:** Designed 2026-10-07 (the designer, PR #TBD; the steer to Paul on the default and the checkout is `m-TBD`): design §4.9b *The anchor seat*, §4.9 (the team key `anchor`), §6 rule 3 (the trigger `work`, `seat_held`) and rule 6 (the lane word `anchor`), §4.8 (the `anchor` preset), §4.5 and §4.5a (the seat's on-call words, Members…, the occupancy check), §9 invariant 2, the glossary's *anchor seat*. Settled: per team, one per repo, present by default as the manager is (`anchor: false` opts out); it runs in the home repo's main checkout and never while a person's session holds it, or while the checkout is dirty or off its default branch — the person's session is the anchor meanwhile; its trigger is its lane gaining work — `Owner: anchor` entries of any kind and decided board lines (TD-380); no grants; it never promotes and never the third tier; it keeps the checkout current. Rejected: a worktree of its own, opt-in only (steered), a per-repo key beside `held:`. `Owner: anchor` means what it did — now a lane. **Next:** designed; the builds are TD-385 (the definition), TD-386 (the tick) and TD-387 (the surface).
+**Blocked by:** TD-385, TD-386, TD-387
 **Location:** design §4.9 (a team's definition; the manager added by default), §4.9b *Seats with a trigger*, §6 rule 3 (seats; *a manager on call is a seat of this rule*), §9 invariant 2 (one agent per directory: the anchor is the first in the checkout); CLAUDE.md *The live copy is promoted*; `src/agentorc/org.py` (`ManagerDef`, `on_call`), `src/agentorc/teams.py`, `src/sessionorc/ledger.py` (`Owner: anchor`)
 
 **Why:**
@@ -1450,3 +1454,65 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
+
+## TD-385: Build TD-381 (the definition): the team key `anchor`, present by default, the `anchor` preset and its brief, `ao team start` creating the seat in the home repo's checkout, one per repo
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-381's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/org.py` (`AnchorDef` beside `ManagerDef`: `{name, profile, brief, home}` or `false`, default present, name `<team>-anchor`, `home` resolved as the manager's; `TEAM_KEYS`; `ao org check` naming a second seat on one repo), `src/agentorc/roles.py` / the presets (`anchor`: brief `anchor.md`, lane `[anchor]`, no grants, label *Anchor*), `src/agentorc/briefs/anchor.md` (the template: first reads, the lane, the checkout rule — `git pull --ff-only` on the default branch at start and end, branch → PR → merge, memory by PR — the never list with the third tier, `ao progress none` at the end), `src/agentorc/teams.py` (`ao team start`: the seat after the techlead, `seat: {trigger: work}`, `controllers: [manager]`, directory the home repo's checkout, refused when another team's anchor seat holds that repo), `src/agentorc/repoconfig.py` (`ON_CALL_BRIEFS` gains the preset); tests `tests/test_org.py`, `tests/test_teams*.py`, `tests/test_briefs*.py`; design §4.9b *The anchor seat*, §4.9 `anchor`, §4.8. `docs/briefs/**` is a held path if a repo brief is added.
+
+**Why:** TD-381 is designed: every team has an anchor seat by default, so `Owner: anchor` work and decided lines move without a person's session in the checkout.
+
+**Fix:**
+1. The key and its default: a team with neither `anchor:` nor `anchor: false` has one; `ao team list --json` and `ao org check` show it; a second team on one home repo is refused at start naming the first.
+2. The preset and the brief template, with the repo's `{repo}` slot as every role has.
+3. The start: created after the techlead seat, in the home repo's main checkout on the team's host, with the trigger on its record.
+
+**Done when** on the scratch home a team with no `anchor:` starts with `<team>-anchor` on call in its home checkout, `anchor: false` starts none, two teams on one repo refuse the second, the brief renders with the lane and the never list, and the tests cover each.
+
+**Related:** TD-381 (the design), TD-386, TD-387 (its other slices), TD-259 (archived: the manager on call), TD-098 (seats with a trigger).
+
+## TD-386: Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor`
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-381's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-385
+**Location:** `src/sessionorc/ledger.py` (`lane_matches`: the word `anchor` — a pickable entry with `Owner: anchor` of any kind, and every work order), `src/sessionorc/agent_tick.py` (rule 3: `seat_due` with `by: work` and `ids` from the seat's `lane_seen`, a cause once per stretch; the fill's gate — occupancy of the checkout, then `git status` clean and on the default branch — writing `seat_held: {by, why}` and clearing it on the fill; rule 6's `lane_seen` kept on the seat), `src/sessionorc/models.py` (`seat_held`); tests `tests/test_tick_seats*.py`, `tests/test_ledger_derived.py`, `tests/test_lane_news.py`; design §6 rule 3 and rule 6. `src/sessionorc/**` is a held path: the techlead reads it.
+
+**Why:** TD-381's seat is filled by the tick on its lane, and only into a checkout nobody holds.
+
+**Fix:**
+1. The lane word `anchor` in the reading and the lanes line (§4.4 *In a team's lanes*: the anchor's entries are the team's once it has the seat).
+2. The trigger: `lane_seen` on the seat's record, `seat_due` when it gains an id, once per stretch.
+3. The gate: a held fill writes `seat_held` with the holder or the checkout's state and tries again next tick; a fill clears it.
+
+**Done when** on the scratch home an `Owner: anchor` entry filed in the fixture ledger fills the seat within a tick when the checkout is free, a person's session in the checkout (or a dirty tree) holds the fill with `seat_held` saying why and the fill lands once it is free, a `none` on the same ids raises no second fill, and the tests cover each.
+
+**Related:** TD-381, TD-385, TD-387, TD-380 / TD-384 (work orders in the lane).
+
+## TD-387: Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-381's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-386
+**Location:** `src/agentorc/ui/templates/card.html` and `src/agentorc/ui/org.py` (the on-call slot's words for a `work` trigger, and `seat_held`'s), the Members… dialog (`members.html`: the anchor seat listed beside the techlead, not removable), `src/agentorc/cli.py` (`ao team list`: the seat), `src/agentorc/ui/app.py` (`/api/occupancy`: a holder that is a seat says so, with its state and claim), `src/agentorc/ui/help.py` (the words); tests `tests/test_ui_org*.py`, `tests/test_ui_new*.py`; design §4.5 *One composed pill*, §4.5a *card: on call — the anchor seat's words*, *New session: directory field → occupancy: a seat*.
+
+**Why:** TD-381's seat must say why it waits and be seen where the checkout is picked.
+
+**Fix:** the slot words; the dialog and the list; the occupancy check's words; the help entries.
+
+**Done when** on the scratch home the seat's card reads *on call — comes when the checkout's lane gains work*, held off it reads *the checkout is yours · <why>*, Members… and `ao team list` name it, the New session form's directory check names a working seat as a seat, and the tests cover each.
+
+**Related:** TD-381, TD-385, TD-386.
