@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-386 | Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor` | High | Open |
 | TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
 
 ---
@@ -1301,29 +1300,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
-
-## TD-386: Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor`
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-10-07 (the designer, from TD-381's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-385
-**Location:** `src/sessionorc/ledger.py` (`lane_matches`: the word `anchor` — a pickable entry with `Owner: anchor` of any kind, and every work order), `src/sessionorc/agent_tick.py` (rule 3: `seat_due` with `by: work` and `ids` from the seat's `lane_seen`, a cause once per stretch; the fill's gate — occupancy of the checkout, then `git status` clean and on the default branch — writing `seat_held: {by, why}` and clearing it on the fill; rule 6's `lane_seen` kept on the seat), `src/sessionorc/models.py` (`seat_held`); tests `tests/test_tick_seats*.py`, `tests/test_ledger_derived.py`, `tests/test_lane_news.py`; design §6 rule 3 and rule 6. `src/sessionorc/**` is a held path: the techlead reads it.
-
-**Why:** TD-381's seat is filled by the tick on its lane, and only into a checkout nobody holds.
-
-**Fix:**
-1. The lane word `anchor` in the reading and the lanes line (§4.4 *In a team's lanes*: the anchor's entries are the team's once it has the seat).
-2. The trigger: `lane_seen` on the seat's record, `seat_due` when it gains an id, once per stretch.
-3. The gate: a held fill writes `seat_held` with the holder or the checkout's state and tries again next tick; a fill clears it.
-4. The held Start (from TD-385, the techlead's ruling `m-2eac0f07717a`): where a session holds the checkout at `ao team start`, the seat's record is written `closed` with no pane, `seat: {trigger: work}` — a `create` that writes the record alone (`src/sessionorc/agent.py`), which `teamrun.start` (`src/agentorc/teamrun.py`) then calls in place of its note naming the holder — so rule 3 can fill it once the checkout is free (design §4.9b *The anchor seat*).
-
-**Done when** on the scratch home an `Owner: anchor` entry filed in the fixture ledger fills the seat within a tick when the checkout is free, a person's session in the checkout (or a dirty tree) holds the fill with `seat_held` saying why and the fill lands once it is free, a `none` on the same ids raises no second fill, and the tests cover each.
-
-**Related:** TD-381, TD-385, TD-387, TD-380 / TD-384 (work orders in the lane).
 
 ## TD-387: Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat
 
