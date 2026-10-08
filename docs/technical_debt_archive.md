@@ -6542,3 +6542,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
+
+## TD-098: Seats with a trigger — a doc audit or a test audit that fills after n PRs or every so often
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-21 (the anchor session; Paul's idea the same evening)
+**Owner:** anchor
+**Kind:** build
+**Status:** Done
+**Location:** design §4.9b (the seat, the manager's seat rule), §4.8 (role presets), §4.9 (the team definition), the manager's brief
+
+**Why:** a check that runs on every PR is too much and one that never runs is what happens now; a seat that fills on a count or a clock is the shape in between, and the team already knows how to fill one.
+
+**Resolved:** 2026-10-08 (PR #1272, the anchor's read of step (4)) — both audit roles have run for real, many times: the seats `docs-audit-ao-1` and `test-audit-ao-1` (PR #1190, `trigger: {prs: 10}` on ao-grind) are filled by the tick's rule 3 and closed when idle (*a seat with nothing due, idle and pushed — closing it*, `journalctl --user -u agentorc-agent` from 2026-10-06). test-audit-ao-1 filed the test gaps of #1187–#1257 (TD-363–TD-365, TD-369, TD-370, TD-374–TD-376, TD-397, TD-398 among them) in ledger PRs of its own (#1197, #1208); docs-audit-ao-1 filed from its audits of #1217–#1227 and #1248–#1257 (TD-396 among them). The seat and its trigger are design §4.9b *Seats with a trigger*; the fill is the tick's (§6 rule 3), not the manager's as first written.
+
+**Done when** the design says what a seat with a trigger is, a team can define one, the manager fills it on its trigger and the card says why it will, and one audit role has run for real.
+
+**Related:** TD-075 (the seat and its fill rule), TD-097 (the word for an empty seat), TD-091 (a periodic act on a count is the same shape as compacting on a threshold).
