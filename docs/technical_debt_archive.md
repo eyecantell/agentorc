@@ -6344,3 +6344,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a test starts a team whose `host` is a node, with a fake that answers `host_occupancy` (free and held), and asserts the call is `host_occupancy` with that host and that a held one starts the team without the seat; the local-call rewrite fails it.
 
 **Related:** TD-381, TD-384, TD-385.
+
+## TD-393: The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/inbox.py` (`_order_teams`: `rec.get("superseded_by")` in the skip, `out.get(team, False) or …`); `tests/test_ui_board.py`
+
+**Resolved:** 2026-10-08 (grinder-ao-2, PR #1256): `test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any_one` (`tests/test_ui_board.py`) gives the fleet a superseded record of another team, which is not named, and a team one live and one ended record in both orders, which reads *pickable by grind* with no wound-down words. Mutants (a) and (b) each fail it.
+
+**Why:** `_order_teams`' docstring says *live or ended, never one resumed as another* and `{team: live}` per team. `tests/test_ui_board.py::test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_that_pick_it` gives each team one record, so neither is exercised. Against `origin/main`, (a) deleting ` or rec.get("superseded_by")` and (b) replacing `out.get(team, False) or rec.get(...)` with `rec.get(...)` each leave `pytest -k "board or inbox or order"` at 268 passed, as do the board/repo/workorders modules (197). (a) would name a team on a resumed-away record; (b) makes a team with one live and one ended record read as *wound down* by whichever record comes last, and print the *starts on `on_work`* words for a team that is running.
+
+**Done when** the test gives a team a superseded record and a team two records (one live, one ended, in both orders) and asserts the first is not named and the second reads live; both mutants fail it.
+
+**Related:** TD-381, TD-384, TD-385.
