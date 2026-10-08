@@ -1450,6 +1450,8 @@ def test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none(monk
         assert grid.rindex('class="card sc') == grid.index('class="card sc plus"')
         plus = grid[grid.index('class="card sc plus"') :]
         assert 'id="card-' not in plus and "data-id=" not in plus and 'tabindex="0"' in plus
+        # no session's Focus link: `markPopped` relabels every `a[data-focus]` (review of #1234)
+        assert "data-focus" not in plus[: plus.index("</div>")]
     assert sections["live"].index('id="card-ao-g1"') < sections["live"].index('class="card sc plus"')
     assert "plus" not in sections[""] and "plus" not in sections["badge-only"]
     # its hover is the help entry's first sentence, and the help entry says no definition changes
@@ -1469,6 +1471,8 @@ def test_the_plus_card_is_no_session_to_the_client():
     assert 'if (c.classList.contains("plus")) { c.hidden = filtering; return; }' in js
     assert 'if (g.plus && !plus)' in js and "else if (!g.plus && plus)" in js
     assert '$$(".sc:not(.plus)", sec).forEach((c) => home.appendChild(c));' in js
+    # `Enter` / `o` on the ringed + card press its link (§4.5a *Org: keys*)
+    assert 'sel: "a[data-focus], a.plusgo" }' in js
     css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
     assert ".sc[hidden] { display: none; }" in css  # a filter hides a card, the + card among them
     assert ".sc.plus { height: 64px;" in css and "dashed" in css[css.index(".sc.plus {") :][:120]

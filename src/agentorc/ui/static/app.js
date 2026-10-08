@@ -3720,7 +3720,9 @@
     { keys: ["j", "ArrowDown"], page: "org", control: "ring the next card", move: 1 },
     { keys: ["k", "ArrowUp"], page: "org", control: "ring the previous card", move: -1 },
     { keys: ["g"], page: "org", control: "then a team's initial, or a group's number 1–9: jump to that team", g: true },
-    { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window)", sel: "a[data-focus]" },
+    // a team's + card (TD-379) is pressed by the same keys: its link is no session's, so it carries
+    // no `data-focus` — `markPopped` would relabel it and the pop-out click would claim it
+    { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window); on a team's + card, New session on that team", sel: "a[data-focus], a.plusgo" },
     { keys: ["Shift+Enter"], page: "org", ring: true, control: "Pop out", sel: '[data-act="popout"]' },
     { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]' },
     { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },

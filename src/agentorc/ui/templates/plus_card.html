@@ -4,7 +4,8 @@
    (`/new?team=<team>`): the Team pick made, Role at Interactive. It is not a session: no `id`, no
    `data-id`, so the delta client's card swap, the counts and the sort pass it by, and it is put back
    last after each sort. A ring stop as a card is (`tabindex`), whose `Enter` / `o` press the link
-   inside, which is not a tab stop of its own. #}
+   inside (the key table names `a.plusgo`), which is not a tab stop of its own and carries no
+   `data-focus`: it is no session's Focus, and the pop-out relabelling must leave it alone. #}
 <div class="card sc plus" tabindex="0" data-plus="{{ g.team }}" title="{{ help_title('plus') }}">
-  <a class="plusgo" data-focus href="/new?team={{ g.team | urlencode }}" tabindex="-1"><span class="plusmark" aria-hidden="true">+</span><span class="meta">your session in {{ g.team }}</span></a>
+  <a class="plusgo" href="/new?team={{ g.team | urlencode }}" tabindex="-1"><span class="plusmark" aria-hidden="true">+</span><span class="meta">your session in {{ g.team }}</span></a>
 </div>
