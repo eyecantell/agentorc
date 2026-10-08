@@ -74,6 +74,8 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     next_act,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
+    seat_held_words,  # noqa: F401
+    seat_occupant,  # noqa: F401
     state_counts,  # noqa: F401
     suspended_note,  # noqa: F401
     view,  # noqa: F401
@@ -1887,10 +1889,17 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"dir": "", "occupants": [], "git": False}
         if h := away_host(host):  # the picked host's reading (§4.4a, TD-294): who holds the slot there
             try:
-                return await call("host_occupancy", host=h, dir=dir.strip())
+                got = await call("host_occupancy", host=h, dir=dir.strip())
             except HTTPException as e:
                 return {"dir": dir.strip(), "occupants": [], "git": False, "why": silent(h, e)}
-        return await call("occupancy", dir=dir.strip())
+        else:
+            got = await call("occupancy", dir=dir.strip())
+        if isinstance(got, dict) and got.get("occupants"):
+            # a holder that is a seat says so, with its state and claim (§4.5a, TD-387); the fleet the
+            # page reads, so a list that fails leaves the plain *in use by* words
+            with contextlib.suppress(HTTPException):
+                got["seat"] = cards_mod.seat_occupant(list(got["occupants"]), await call("list"), datetime.now(UTC))
+        return got
 
     @app.get("/api/name_check")
     async def api_name_check(dir: str = "", name: str = "", worktree: bool = False, host: str = ""):

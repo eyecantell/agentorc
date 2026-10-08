@@ -1295,6 +1295,8 @@ def members_view(
         "live": bool(live(crew(name, sessions))),
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,
+        # the anchor seat (§4.5a *card: on call — the anchor seat's words*, TD-387): listed, never removable
+        "anchor": held(team.anchor.name) if team.anchor else None,
         "members": entries,
         "twice": twice,
         "next": {r: team.next_name(r) for r in [*(roles or []), *(m.role for m in team.members if m.team is None)]},

@@ -53,6 +53,8 @@ def form(tmp_path, monkeypatch):
             ]}  # fmt: skip
         if method == "host_occupancy":
             return {"host": p["host"], "dir": p["dir"], "occupants": ["w1@node1 (working)"], "git": True}
+        if method == "list":  # the holder is a seat: the occupancy check says so (TD-387)
+            return [{"id": "w1", "name": "anchor-1", "state": "working", "seat": {"trigger": "work"}}]
         return {}
 
     class FakeClient:
@@ -81,6 +83,7 @@ def test_the_repo_list_and_the_checks_are_the_picked_hosts(form):
     assert gone["exists"] is False and gone["why"] == "no such directory on node1"
     occ = c.get("/api/occupancy", params={"dir": "/srv/node/alpha", "host": "node1"}).json()
     assert occ["occupants"] == ["w1@node1 (working)"] and occ["git"] is True
+    assert occ["seat"] == "anchor-1 holds it (a seat, working)"
     chips = c.get("/api/worktrees", params={"repo": "/srv/node/alpha", "host": "node1"}).json()["worktrees"]
     assert chips == [{"name": "td-1", "path": "/srv/node/alpha/.claude/worktrees/td-1"}]  # the occupied one is no chip
     # this host's own name reads this host as it always has: no host_* read is made for it

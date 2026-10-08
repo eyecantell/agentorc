@@ -14,7 +14,7 @@ from typing import Any
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
 from agentorc.ending import NO_CLOSER, closer_words, waiting_words
-from agentorc.org import MANAGER_WHEN
+from agentorc.org import ANCHOR_WHEN, MANAGER_WHEN
 from sessionorc import hosts, identity, mail, work
 from sessionorc.adapters import short_model
 from sessionorc.agent_common import CLOSED_KEEP
@@ -652,6 +652,39 @@ def _declared(d: dict[str, Any]) -> tuple[str, str] | None:
     return text, full
 
 
+def seat_occupant(occupants: list[str], fleet: Collection[Mapping[str, Any]], now: datetime) -> str:
+    """The New session form's words for a checkout a seat holds (§4.5a *New session: directory field →
+    occupancy: a seat*, TD-387), or "": *anchor-ao-1 holds it (a seat, working · TD-299)* when the
+    first holder the occupancy check names — `<id> (<state>)`, `<id>@<host>` for a container node's —
+    is a record the fleet holds with a `seat`, its claim the newest unexpired declared one. Display only."""
+    if not occupants:
+        return ""
+    sid, _, rest = str(occupants[0]).partition(" ")
+    rec = next((r for r in fleet if isinstance(r, Mapping) and r.get("id") == sid.split("@", 1)[0]), None)
+    if rec is None or not isinstance(rec.get("seat"), dict):
+        return ""
+    state = rest.strip("()") or str(rec.get("state") or "")
+    claims = [
+        p
+        for p in rec.get("progress") or ()
+        if isinstance(p, Mapping) and p.get("status") == "claimed" and (p.get("source") or "declared") == "declared"
+    ]
+    live = [p for p in claims if (at := _instant(p.get("at"))) is not None and now - at < mail.LEASE_TTL]
+    claim = max(live, key=lambda p: str(p.get("at") or ""), default=None)
+    what = f"a seat, {state}" + (f" · {claim['ref']}" if claim and claim.get("ref") else "")
+    return f"{rec.get('name') or sid} holds it ({what})"
+
+
+def seat_held_words(held: Mapping[str, Any]) -> str:
+    """Why an anchor seat's fill waits, in the card's words (§4.5a *card: on call — the anchor seat's
+    words*), from the record's `seat_held` (TD-386): *a session holds it: <who>* where `by` is a
+    session, else the tree's own reading as the tick wrote it (*branch td-x, 2 files uncommitted*)."""
+    by, why = str(held.get("by") or ""), str(held.get("why") or "")
+    if by and by != "checkout":
+        return f"a session holds it: {by}"
+    return why or "the checkout is not clean"
+
+
 def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     """The card's slot (design §4.5 *The card's anatomy*, row 5; §4.5a **doing**, TD-095): **one
     text, the first that applies**, and a caption. (a) what needs a person or explains a stop, (b)
@@ -701,7 +734,22 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
         # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)
         text = f"on call — {d.get('seat_when') or 'comes on the next question'}"
-        if d.get("seat_when") == MANAGER_WHEN:
+        held = d.get("seat_held") if isinstance(d.get("seat_held"), dict) else None
+        if d.get("seat_when") == ANCHOR_WHEN and held:
+            # the anchor seat's fill held off (§6 rule 3 *The anchor seat*, TD-386): the checkout is the
+            # person's while a session holds it or its tree is off its default branch or dirty
+            text = f"on call — the checkout is yours · {seat_held_words(held)}"
+            full = (
+                f"{text}: its lane has work, and the host agent fills the seat once the checkout is free — "
+                "no session in it, on its default branch, nothing uncommitted (design §6)"
+            )
+        elif d.get("seat_when") == ANCHOR_WHEN:
+            # the anchor seat (§4.9b *The anchor seat*, §6 rule 3's `work` trigger, TD-381)
+            full = (
+                f"{text}: new work in its checkout's lane fills the seat, in the checkout itself, and it ends "
+                "again once it has run (design §6)"
+            )
+        elif d.get("seat_when") == MANAGER_WHEN:
             # a manager on call (§4.9, §6 rule 3's `team` trigger, TD-259)
             full = (
                 f"{text}: a question to it, a member's permission, a stalled member or one idle with its work "
