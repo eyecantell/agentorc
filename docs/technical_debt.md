@@ -75,8 +75,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-373 | Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes | Medium | Open |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
-| TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Open — asked by Paul |
+| TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Designed — TD-379 builds it |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
+| TD-379 | Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry | Medium | Open |
 
 ---
 
@@ -1318,7 +1319,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — asked by Paul 2026-10-07; the design is the designer's.
+**Status:** Designed 2026-10-07 (the designer, PR #TBD; the steer to Paul on the page-versus-dialog press is `m-TBD`): design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team* (*The team's card offers it*); the mockup regenerated (`Main.dc.html`, `docs/mockups/reviews/2026-10-07-td377-plus-card.png`). Settled: the last card in every defined team's grid, live or not, the height of a compact card, a dashed outline and a large **+**; its press is the New session page with the Team pick made (`/new?team=<team>`, which the route already takes and `applyTeam()` already honours on load), Role *Interactive*, nothing written to `org.yml`; hidden with the cards on a folded team, alone under the header of a definition with no sessions, absent on *No team*; a ring stop. Rejected: a dialog of its own (steered), a **+** on the header beside Members…. **Next:** designed; the build is TD-379.
+**Blocked by:** TD-379
 **Location:** the Org page's team group (`org.html`, `group_head.html`, `card.html`), the New session form (`new.html`, its Team and Role picks); design §4.5 (the team group), §4.5a (the team card rows and the New session form), §4.9 *A person in the team*
 
 **Why:**
@@ -1360,3 +1362,27 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the findings and the recommendation are written (an ADR under `docs/decisions/`), Paul has decided which levers to take, and each one taken has a build entry.
 
 **Related:** TD-128 / TD-151 (the metered account's spend and the `cache_read` / `cache_write` prices), TD-366 (archived: a seat closed mid-wait).
+
+## TD-379: Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-377's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/org.html` (the team group's grid: the card after the members, on `g.team and g.defined`, live or not — a new `plus_card.html`), `src/agentorc/ui/static/app.css` (`.sc.plus`: a compact card's height, a dashed `--line` outline, no state bar, the large **+**; the `.tgroup:not(:has(.sc)) .grid` rule, which must still draw a grid holding only the + card), `src/agentorc/ui/static/app.js` (the `RINGS.org` selector takes the + card so it is the last ring stop of its group; `Enter` / `o` press it; the filter and *mine* hide it as a non-matching card; the fold hides it with the grid), `src/agentorc/ui/help.py` (the help entry below, in the team card's group), `docs/mockups/gen.py` (already carries it, TD-377's PR); tests `tests/test_ui_org*.py`; design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team*
+
+**Why:** TD-377 is designed (§4.5a *team card: + card*): a person's session in a team starts from the team's own card, not from a pick in the top bar's form. Paul, 2026-10-07: *a partial card shown with a big + inside it — I believe that will be more intuitive.*
+
+**Fix:**
+1. The card: `<a class="card sc plus" href="/new?team=<team>">` as the last child of a defined team's `.grid`, drawn live or not; its contents a large **+** and *your session in <team>* (meta text); `title` the help entry's text. No state bar, no foot, no `id="card-…"` (it is not a session; the delta client must leave it in place when it swaps member cards — check `AO` org delta handling in `app.js` keeps non-session children of the grid).
+2. The help entry, `help.py`, in the team card's control group, key `plus`: *Start a session of your own in this team — the New session form opens with the team picked and Role Interactive, so the session gets the team's host, repo, manager and reader; nothing is written to org.yml. For a permanent member, Members….*
+3. The press lands on the form with the Team pick made: `/new?team=<team>` already prefills the pick and `applyTeam()` runs on load (TD-173, TD-296 #8) — verify Host, the Repo list, Controllers and the reader's line are filled on arrival, and that Role reads *Interactive*; fix what is not.
+4. The ring: the + card is a stop after its group's cards; `Enter` and `o` on it follow the link. The page's filter (`.filtering`) and *mine* hide it as they hide a card that matches nothing; the fold hides the grid as before.
+5. A definition with no sessions: the grid shows with the + card alone (today the grid is hidden when it holds no `.sc`; the + card is one, or the rule is narrowed).
+6. *No team* draws none.
+
+**Done when** on the scratch home (`scripts/look_home.py`) every defined team's grid ends in the + card, live, stopped-and-unfolded and never-started alike, *No team* has none; a press lands on the New session form with that team picked, Role *Interactive* and the reader's line filled, and Start session there starts a session that appears in the team's group with the person glyph; `j`/`k` reach the card and `Enter` presses it; a folded team and a filter hide it; the help entry reads on hover and in the *i* panel; `tests/test_ui_org*.py` cover the card's presence, its link and its absence on *No team*; a screenshot of the live team group is in the PR under `docs/mockups/reviews/`.
+
+**Related:** TD-377 (the design), TD-173 (archived: the form's Team pick), TD-172 (archived: Members…), TD-124 (archived: the keys).
