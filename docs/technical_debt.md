@@ -75,6 +75,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-399 | A live team never gains a seat its definition gained: ao-grind, started before TD-381, has no anchor seat, and Apply and a Start add none | Medium | Designed — TD-400 builds it |
 | TD-400 | Build TD-399: a seat the run lacks is a difference Apply creates — `differences` on every live team, the anchor through `checkout_held` and the held create, the mark's words | Medium | Built (#1266); live check: ao-grind gains its anchor on Apply |
+| TD-401 | TD-400 is a live check of #1266 owned by `grinder`: only the anchor promotes, so no grinder can finish it | Low | Open |
 
 ---
 
@@ -1321,3 +1322,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home a live team whose definition gains a techlead, an anchor or a `seats:` entry reads *definition changed — Apply* (or *flow changed — Apply* with other differences), Apply creates the seat without a restart — the anchor held with `seat_held` when the checkout is not free — a second Apply finds nothing, a team with no flows is read the same, and tests cover each; and ao-grind, once promoted, gains `ao-grind-anchor` on Paul's Apply.
 
 **Related:** TD-399, TD-381 (archived), TD-385 / TD-386 / TD-395 (archived: the anchor's start, tick and gate), TD-356 (Apply's gate).
+
+---
+
+## TD-401: TD-400 is a live check of #1266 owned by `grinder`: only the anchor promotes, so no grinder can finish it
+
+**Priority:** Low
+**Type:** bug
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1257–#1266)
+**Owner:** anchor
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md`, TD-400's header (`**Owner:** grinder`, `**Kind:** live-check #1266`).
+
+**Why:** TD-400's `**Kind:**` was changed to `live-check #1266` by #1266, with `**Owner:** grinder` kept. Its **Status** says the live check is *once #1266 is live (`ao promote status`), read ao-grind … After Paul's Apply, `ao status -v` should show the `ao-grind-anchor` record*. CLAUDE.md: *Never promote from a feature branch; a lead or a worker never promotes*, and the live read needs Paul's Apply on the real ao-grind. Every other `Kind: live-check` entry in the ledger carries `**Owner:** anchor` (TD-052 #343, TD-064 #431, TD-151 #1215, TD-225 #746 and the rest; `grep -B4 '^\*\*Kind:\*\* live-check'`), and `Owner` is what a worker filters on to pick (`docs/technical_debt.md` header, TD-118). A grinder filtering on `Owner: grinder` is offered an entry it cannot press. The same status line also leaves the **Location** naming `src/agentorc/ui/cards.py` (`flow_mark`) as changed, which #1266 did not touch (`repo.py` and `group_head.html` carry the mark).
+
+**Fix:** set TD-400's `**Owner:**` to `anchor`; correct its **Location** to the files #1266 changed (`ui/repo.py`, `ui/app.py`, `ui/templates/group_head.html`, `cli.py`).
+
+**Related:** TD-400, TD-399, TD-118.
