@@ -6652,3 +6652,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** each of the four reverts fails a test.
 
 **Related:** TD-395 (archived), #1257.
+
+## TD-405: §4.9b's *Seats with a trigger* still has the manager reading a `prs:` count and timing `every:`, where §6 rule 3 has the home do both
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, archiving TD-098 in #1272; the fact-check's note)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/design/4.9b-techlead.md` (the *Seats with a trigger (TD-098)* bullet); `docs/design/6-policies.md` rule 3 is the text it should agree with.
+
+**Why:** §4.9b defines `prs: <n>` as *a count the manager reads from `gh`, as it reads the merge queue*, and `every: <duration>` as *on the manager's clock, since the home times nothing*. §6 rule 3 says the tick computes `seat_due`: `seat_count: {prs, at}` is home-owned and read with `gh` on the reports' five-minute cadence, and `every: <d>` is due once `d` has passed since the record was created. The build matches rule 3 (`agent_tick._seat_due`). The fills since 2026-10-06 are the tick's, as the journal's *the seat is due (prs) — filling it* lines show, so a reader of §4.9b is told the wrong owner of the trigger.
+
+**Resolved:** 2026-10-08 (PR #1277) — design §4.9b *Seats with a trigger* names the home's tick as what reads the `prs:` count (§6 rule 3's `seat_count`) and times `every:`; the dated line is under §4.9b in design-history.md.
+
+**Done when** §4.9b names no manager in a seat trigger's count or clock, and it agrees with §6 rule 3.
+
+**Related:** TD-098 (archived, the seats), TD-247 (the manager's jobs moved to the tick).
