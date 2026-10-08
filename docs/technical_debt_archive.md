@@ -5912,3 +5912,39 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1214, grinder-ao-2) — the attach test asserts the session directory's `0o700`; the attach wiring is `AO.wireAttach`, which the Focus page calls with its elements and its upload, and a second node probe drives its drop, paste, dragover and pick handlers against stubs: one upload at a time, a failure reported and the next still sent, a `text/plain` paste the text's, nothing attached or prevented with the composer closed; the paste handler now checks the closed composer before `preventDefault`, as the drop did. Both probes write under `tmp_path`.
 
 **Related:** TD-002.
+
+## TD-319: Build the Telegram channel — the home tells the person what newly stops a session or a team
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-04 (the designer, TD-092's build)
+**Owner:** grinder
+**Kind:** live-check #1146
+**Status:** Resolved
+**Location:** `src/sessionorc/settings.py` (`notify:`), a new `src/sessionorc/notify.py` (the lines, and the child's `__main__`), `src/sessionorc/agent_attention.py` (`_note_attention`: a row beginning), `agent_mail.py` (an `ask` reaching the person inbox, a `blocked` outcome), `agent_tick.py` (the restart and team-start marks), `agent_inbox.py` (`notify_test`), `modes.py` (`HOME_EDITS`), `mail.py` (`PERSON_ONLY`, once TD-317 has it), `src/agentorc/ui/` (the Settings page's card, the poll's `watching`, the Inbox's `?row=`), `src/agentorc/ui/help.py`, `tests/`; design §4.10 *Told on Telegram when nobody is looking*, §5 `notify:`, §4.5a **You**: **Telegram**. Held path (`src/sessionorc/**`): the techlead reads slices 1 and 2.
+
+**Why:** TD-092's design: a `needs-you` session or an `ask` sits in the Inbox until somebody opens the page, and Paul chose Telegram to be told.
+
+**Resolved:** 2026-10-07 (PRs #1086, #1092, #1146; grinder-ao-1 and grinder-ao-2) — the Telegram channel is built: `notify.telegram` in settings, `sessionorc/notify.py` and the home's held, bounded, once-only send through a `doppler run` child (`agent_notify.py`), the watching signal, `notify_test`, the Settings page's **Telegram** card and the Inbox's `?row=` landing. The scratch-home half of *Done when* held in #1146's UI check, and the live half is Paul's look, mail `m-cd1c58805bcb`, which he answered *Works* on 2026-10-07 (`m-542ffe586291`). The lasting content is design §4.10 *Told on Telegram when nobody is looking*, §5 `notify:` and §4.5a **You**: **Telegram**.
+
+**Done when** on a scratch home with the switch on, a session going `needs-you` with no page open produces exactly one recorded send after the hold, whose link opens the Inbox on that row; with a page visible it produces none; and the suite passes. **Then a live check that is Paul's** (it needs the Doppler config's name saved on the Settings page and his phone): **Send a test** arrives, and one real `needs-you` reaches him once — TD-092 archives on that.
+
+**Related:** TD-092 (the design), TD-317 (`PERSON_ONLY`, which `notify_test` joins), TD-069 and TD-079 (the Inbox and its trail), TD-146 (`settings.yml`), samscrape's `scripts/nudge_user_attention.py` (the same bot, for the board).
+
+## TD-092: Nothing reaches a person who is not looking at the page when a session needs them
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from the neighbours survey, TD-059)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** `src/agentorc/ui/` (the Inbox, the top bar's count), design §4.5, §4.5a
+
+**Why:** the Inbox is where a person works from, and a `needs-you` session or an `ask` sits there until somebody opens the page. Three of the neighbours read in TD-059 push instead: agentboss sends a desktop notification on a transition into *needs you* that jumps to the session; `multi-agent-shogun` and another dashboard send to ntfy / Pushover, and the latter only when the person is not looking at the dashboard. An unattended team whose only question is waiting on a closed browser tab is a team that waits ([ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md)).
+
+**Resolved:** 2026-10-07 (built as TD-319, PRs #1086, #1092, #1146) — the channel is Telegram, and the rule is design §4.10 *Told on Telegram when nobody is looking*. TD-319's live check held: Paul answered *Works* to its look (`m-cd1c58805bcb`, reply `m-542ffe586291`), and TD-319 says this entry archives on that.
+
+**Done when** a session going `needs-you` while no page is open reaches the person once, and opening it lands on that row.
+
+**Related:** TD-069 (the Inbox), TD-003 (the phone layout), design §4.5.
