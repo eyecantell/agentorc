@@ -128,6 +128,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-07 (TD-380, the designer; asked by Paul the same day): a decided board line is a **work order** in the repo's lanes — the repo reading lists it as `board:<key>`, High, pickable; rule 8 counts it and a grinder picks it first; the Decide press writes nothing more, and the anchor seat (TD-381) is its other taker.
 - 2026-10-07 (TD-368 slice 1, grinder-ao-1): the reader built — `ledger.kind_of` reads *for you* as `Owner: paul` or `decision (paul)` (any case, `decided_by`), *design-first* as `Kind: design-first` or any entry on `decision (designer)`; the anchor's `Kind: decision` and a build on `decision (anchor)` read *other*.
 - 2026-10-07 (TD-002, grinder-ao-2): *Attachment drop* built for a session on this host — the `attach` RPC, a person's own act, base64 on one line and so 4 MiB a file; the name made safe for a prompt and never written over. A node's session waits for phase 2's copy over ssh.
 - 2026-10-07 (TD-367, the designer; Paul the same day, reading *15 for you* on the repo line: *I do not see them in the inbox*; filed by the anchor): the page's *for you* kind narrows to what waits on the person — `Owner: paul`, or `decision (paul)` — where any `Kind: decision` and any `decision (<who>)` had counted (fifteen, among them TD-151 on the designer's decision and the anchor's TD-209 and TD-077); an entry blocked by `decision (designer)` is *design-first*, the designer's; the anchor's decisions are *other*. The build is TD-368.
@@ -232,6 +233,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-380, the designer): screen 6's answered board row says *pickable by <team>* while no session holds the line's `board:<key>`, with the team's wound-down state, instead of *waiting on the next session to read the board*.
 - 2026-10-07 (TD-373, grinder-ao-2): the **Snoozed (n)** fold built — moved under FYI as the mockup draws it, each snoozed row drawn by its kind's own macro with *snoozed until <t>* and *now* first in its Snooze menu; **Unsnooze** and its `unsnooze` act removed; an entry closed while snoozed is listed by its close, not in the fold.
 - 2026-10-07 (TD-377, the designer; asked by Paul the same day): a team's grid ends in the **+ card** — a partial card, a dashed outline and a large **+**, whose press is the New session form on that team, Role *Interactive*; a dialog of its own and a **+** beside Members… rejected.
 - 2026-10-07 (TD-372, grinder-ao-2; Paul: *add a buffer before the banner shows*): the *host agent unreachable* banner waits three seconds — it had shown the instant the page's event socket closed, so every page change (the socket closing as the Org was left) and every promote's restart flashed it with no request failed.
@@ -308,6 +310,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-380, the designer): the row **Repo page: decided lines** — the open decided board lines first in the pickable list, each a work order.
 - 2026-10-07 (TD-377, the designer): the row **team card: + card** — the last card in a defined team's grid, `/new?team=<team>`, a ring stop; absent on *No team*.
 - 2026-10-07 (TD-371, the designer; Paul's decision the same day): the row **Inbox: Snoozed (n) fold**; the `ask` row's and the state row's snooze words say the row keeps its controls and *now* clears it; **Unsnooze** retired.
 - 2026-10-07 (TD-151, grinder-ao-1): the metered chip's hover built with each window's turns and pace — *day $3.20 / $5 (64%) · 412 turns · $0.40/h · at this pace $5 by 12:30* — in `_metered_chip` and `AO.usageChip` alike; the clock time carries its weekday when it is not today, a week's or a month's.
@@ -517,6 +520,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-04 (TD-296 #12, grinder-ao-2; the techlead's ruling on the steer): *The mouse is the browser's* says a program that asks for the mouse gets it. Until this date the paragraph said such a program *gets no mouse, since tmux forwards none with its mouse off*, a runtime fact TD-174's build could not look at and left for the first live look; the look of 2026-10-03 sent a program asking for SGR tracking and the pane received the press and release (`\x1b[<0;26;6M`). The sentence changed, not the forwarding: blocking it would take the mouse from programs that ask for it, for a selection Shift+drag already gives. A read-only attach's bridge drops the reports with every other key frame.
 
 ## 4.7 CLI
+- 2026-10-07 (TD-380, the designer): `ao repo` lists a decided board line among the pickable rows, first, as `board:<key>`.
 - 2026-10-07 (TD-368 slice 2, grinder-ao-1): `ao repo`'s design-first row for an entry of another kind on `decision (designer)` says *decision* after its owner.
 - 2026-10-07 (TD-367, the designer): `ao repo`'s *for you* counts what waits on the person alone, and a design-first row that is a decision owed to the designer says *decision* after its owner.
 - 2026-10-06 (TD-357, the designer): `ao repo`'s first line splits *pickable* and *design-first* by the servicing team's lanes, the rest by owner, and names a member out of work with unheld work in its lane; `--json` `lanes`; `--all` unchanged.
@@ -699,6 +703,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9a Winding down: a team that runs out of work
 
+- 2026-10-07 (TD-380, the designer): a team is not out of work while a decided line is unclaimed; *What a session does with a decided line* — claim `board:<key>`, then close it, do it, ledger it for its owner, or ask back, by PR.
 - 2026-10-04 (TD-321, the designer; found by the anchor in TD-249's live check, PR #1032; Paul chose to count the work rather than split every slice into its own entry): **a merged slice became work the record sees.** The rule of 2026-09-30 already said *an entry worked in slices is new work when its PR is a new one*, and nothing could write it: `progress` holds one entry per reference, `done` closes it, and a derived `done` is refused beside a declared claim (§9 invariant 10), so grinder-ao-2's run that merged #1025 and #1027 on TD-309 left `done: []` and stood one run from a *repeat*. Decided: a claim carries `slices`, written by `ao progress done <ref> --pr <n> --slice` and by the tick from a derived `done` on the claim's reference; a run's `done` holds them; a reference with a new slice is not `left`. Both writers, because a slice merged seconds before the `restart` is declared (#1027: 25 seconds) is not yet derived, and a session that forgets the flag is still counted. The build is TD-325.
 - 2026-10-04 (TD-325 slice 1, grinder-ao-1): the record and the reading built. `ProgressEntry.slices` (`add_slice`, one item per `pr`, a derived one turned declared when the session says it), kept by a re-claim and by the last slice's plain `done`; `rpc_progress(slice=True)` (`_slice`: refused but for a declared `done` with a PR on a declared claim, the claim left as it was); `_note_review` holds a derived merged PR on a declared claim as a `derived` slice; `_reported(s, now)` puts each slice since `created` in `done` as `{ref, pr, slice: true}` and keeps a reference with a new one out of `left`; `_restart_reading` reads a declared slice as the run's word. `tests/test_slices_done.py`.
 - 2026-10-05 (TD-325 slice 2, grinder-ao-1): the words built. `ao progress done <ref> --pr <n> --slice` (refused at the CLI without `--pr` or with another action, sent only when asked, its reply's line printed); the Focus panel's Reports row prints *claimed · slices #a, #b*, each a link from the field; `ao status -v` a *slices:* line, a derived slice marked `~`; the grinder preset's brief and `ao --skill` say it in one sentence. TD-325 and TD-321 archived.
@@ -926,6 +931,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-07 (TD-380, the designer): rule 6's `free-pick` takes every open decided line of the repo's board as `board:<key>`, which `owner:<word>` never narrows out.
 - 2026-10-07 (TD-368 slice 1, grinder-ao-1): rule 6's `design-first` word takes an entry on `decision (designer)`, pickable or not, its owner read as `designer` (`ledger.lane_matches`); the grinder's lane is told of it once the decision's PR drops the item.
 - 2026-10-07 (TD-367, the designer): rule 6's `design-first` word also takes an entry of any kind blocked by `decision (designer)`, pickable or not, the decision's holder standing as its owner for the lane's owner word; a decision named for the person or the anchor matches no lane.
 - 2026-10-07 (TD-366, grinder-ao-1): rule 3 no longer closes an idle seat that waits on a PR of its own — open on its checked-out branch, on a claim, or a claim derived from that branch before a reading has its PR — unless it handed the PR to a reader with an `ask`, or it has sat idle `SEAT_PR_WAIT` (two hours). On 2026-10-07 test-audit-ao-1 opened #1197, launched its fact-check as a background agent and ended its turn; the tick closed it at 06:31, killing the fact-check, and the PR sat with nobody for ten hours. Of the Fix's three candidate signals the build took the open PR, since it is read from the records; a background task the tool reports needs a hook no adapter carries, and a renewable grace needs the seat to renew it.

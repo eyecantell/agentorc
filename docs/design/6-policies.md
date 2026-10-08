@@ -422,7 +422,10 @@ code and needs no grant; a session doing the same work does.
      matches no lane: the person's is *for you* (§4.4 *Repo facts*), and the anchor has none —,
      and `free-pick` a pickable entry whose kind
      is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; built —
-     TD-323 slice 1; §4.9b *A live check is a grinder's once its build is live*) — so an evaluation, a
+     TD-323 slice 1; §4.9b *A live check is a grinder's once its build is live*) — and **every
+     open decided line of the repo's board**, a work order `board:<key>` (TD-380; designed
+     2026-10-07; built — TD-384; §4.4 *Board write-back*), which `owner:<word>` never narrows
+     out, since a line has no owner — so an evaluation, a
      decision and a live check whose build is not live match no lane, and a
      ledger with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of references gains
      nothing, and any other lane word matches nothing until a role gives it a meaning here.
