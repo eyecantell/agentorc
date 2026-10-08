@@ -41,7 +41,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Medium | Open |
 | TD-111 | `ao doctor`: one command that checks what the ledger keeps finding live — hooks, tmux, identity, usage, links, build | Medium | Open |
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
-| TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Partly done — (1), (2) and (3) built; (4), the manager on Haiku, is Paul's call |
 | TD-128 | A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend | Low | Open — designed (the designer) and reconciled 2026-09-25 (a cloud session with Paul); the build is TD-151, and this entry archives with it |
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
@@ -71,6 +70,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-407 | A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable | Medium | Open |
 | TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Open |
 | TD-409 | The auditor brief and the glossary still say the manager starts a seat; since TD-103 the home's tick fills it, as §4.9b and §6 rule 3 now say | Low | Open |
+| TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Open |
 
 ---
 
@@ -615,21 +615,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** every Claude-shaped feature built before a second adapter exists is a feature that may have to be unbuilt, and the claim the product is sold on has not been tested.
 
 **Related:** TD-015 (the classifier), TD-052 (mail's adapter step), design §4.3.
-
-## TD-118: Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose
-
-**Priority:** High
-**Added:** 2026-09-23 (the anchor session; a Sonnet review of the team run's token spend, asked for by Paul the same day)
-**Owner:** paul
-**Kind:** decision
-**Status:** Partly done — **(1) and (2) built 2026-09-23 (PRs #485, #487, #489, #493); decided by Paul 2026-09-23; the profile split is live the same day.** The review read the templates, the supplements, the skill, the hooks and last night's run logs, and ranked what it found by tokens per team-run-day. (1) **The SessionStart hook prints the whole machine's attention board** — `scripts/cadence_hooks.sh --session-start` runs dev-cadence's `nudge_user_attention.py --report --due-only --fetch` over every repo in the roster: 71 items, 16,915 bytes, about 4,200 tokens, at every start, restart and seat fill, nearly all of it samscrape and contractmatch lines no agentorc session can act on. **(2) One model for every role**: `grind` pinned every unattended role to Opus, the manager's mechanical rounds and the techlead's lookups included. **(3) The out-of-work search**: a grinder re-reads every open entry (the ledger is some 1,100 lines, some Status lines 500 words) and writes a paragraph classifying each, which the manager copies onto the board, which (1) then prints into every later start. (4) `grinder.md` points at all of `docs/cadence.md` (about 15,500 tokens) where `manager.md` points at §1–§4. (5) `manager.md` still mentions the crash restart and the ceiling twice after the TD-103 cut. The techlead primer was reviewed and left: it is already lean, and its cost was the model. **Done 2026-09-23:** profiles split by role in `~/.agentorc/profiles.yml` and the org's `roles:` — grinders stay on `grind` (Opus, the stronger coder), `manager`, `hunter` and `auditor` on `grind-sonnet`, `techlead` on `grind-fable` (Paul: *they are the guards of the architecture for each repo so I want them to be strong*); one account, one login, the gate reserves set on both new profiles; Haiku for the manager is the next step after a clean night on Sonnet. **Step (1), batch 1 built 2026-09-23 (`grinder-ao-2`, PR #485):** the three lines on TD-002 to TD-057 (twenty entries), in the template and the preamble, and `test_ledger.py` checks the shape of any entry that carries them; **batch 2 the same day** (TD-058 to TD-095, PR #487), and **batch 3** (TD-096 to TD-118), with the test now requiring the header on every open entry. **The rest of step (1) and step (2) built the same day** (`grinder-ao-2`): `src/agentorc/briefs/grinder.md`'s out-of-work rule filters on the header where a ledger carries it and its `--why` cites counts (the manager's wind-down line copies the `why`, so it follows), its first read names cadence §1–§4, and `manager.md`'s crash-restart and ceiling sentence is cut to the rule and the Inbox row that carries it. Left: (3), dev-cadence's; (4), after a clean night. (The review of that PR noticed the *wants a restart* sentence still boards `restart_blocked` and an `early` `restart_wanted`, which the same Inbox row carries — left as it is, being TD-103 slice (5)'s deliberate wording; the anchor's call.) **Also decided 2026-09-23: briefs stay prose** (a brief is read by a model, and the data a program enforces is already YAML in `org.yml`, `.agentorc.yml` and `settings.yml`); the parsable layer goes on the ledger, below. **(3) built in dev-cadence, read 2026-10-08:** `files/scripts/cadence_hooks.sh --session-start` prints the session's own board (`attention_scope` *own*, no `--fetch`) and keeps the machine-wide `--fetch` view for the rest. **Re-owned 2026-10-08 (the person's session):** what is left is (4), moving the manager's profile to Haiku after a clean night, which is Paul's call on `org.yml`'s `roles:`. **Next:** Paul decides (4), or drops it.
-**Location:** `docs/technical_debt.md` (every entry, and `tests/test_ledger.py`), `src/agentorc/briefs/grinder.md` and `manager.md`, `docs/briefs/grinder-ao-1.md` (the out-of-work `--why`), `scripts/cadence_hooks.sh` (SYNCED — dev-cadence's), `~/.agentorc/profiles.yml` and `org.yml` (done)
-
-**Why:** an unattended session pays for every token it is handed whether or not it acts on it, and three of the five items hand it text it never acts on; the fourth hands the strongest model work a cheaper one does as well.
-
-**Fix, in order:** (1) **The ledger header** — three fixed lines after `**Added:**` on every open entry, enforced by `test_ledger.py`: `**Owner:** anchor | grinder | paul | dev-cadence`, `**Kind:** build | design-first | live-check | evaluation | decision`, `**Pickable:** yes | no — <one clause>`; the grinder template's out-of-work rule becomes *filter on the header, re-read only what is pickable*, and `ao progress none --why` cites counts by kind and owner (*excluded: 12 design-first, 8 anchor, 6 dev-cadence, 3 live-check*) rather than a sentence per entry; the manager's wind-down board line follows. Migrate the entries in batches of twenty, a grinder's, the test tightened once the last batch lands. (2) `grinder.md`'s first read names cadence §1–§4, as the manager's does; the two restart mentions leave `manager.md`. (3) The hook: dev-cadence scopes the SessionStart nudge to the session's own board, without `--fetch`, when the session is unattended (the fourth item on the board's dev-cadence line); the machine-wide `--fetch` view stays `/attention`'s. (4) After a clean night, `manager` to Haiku, one org line.
-
-**Related:** TD-103 (the rules that left the manager's brief), TD-114 (briefs as supplements), TD-105 and TD-106 (the same theme in mail and identity), TD-060 (the profile names are renamed with the rest).
 
 ## TD-128: A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend
 
@@ -1237,3 +1222,31 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** neither file names the manager as what starts or fills a trigger seat, and the doc-bound brief tests pass.
 
 **Related:** TD-405 (§4.9b), TD-098 (archived, the seats), TD-247 (the manager's jobs moved to the tick).
+
+---
+
+## TD-410: Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do*
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the person's session, from Paul's *what does the manager still do — do you recommend moving it to Haiku?*; TD-118's step (4) dropped in its favour)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`start`: `plan.lead` is created live whatever `team.manager.on_call` says); `src/agentorc/briefs/manager.md` (*First:* reads `ao --skill`, design §4.8 and §6, cadence §1–§4); design §4.9 `on_call`, §6 rule 3 (the `team` trigger), §6 *What is left is judgement, and a seat holds it*, §4.8
+
+**Why:**
+- Since TD-259 the manager is a seat on call, meant to be filled by §6 rule 3's `team` trigger only when a reading needs judgement: an `ask` to it, a permission on an unattended member, a `stalled?` member, *idle · open work* after the nudge, an escalation.
+- `ao team start` still creates the manager as a live session, before the techlead and the members. So every Start fills it.
+- Each fill reads the brief (about 4,200 words), then its first reads: design §4.8 (about 9,500 words), §6 (about 21,000) and cadence.md (about 8,500). That is some 60–70k tokens.
+- The host agent's journal, 2026-10-01 to 2026-10-08, has 14 closes of a filled manager across the four teams, from 2026-10-03 on, each logged as *a seat with nothing due, idle and pushed*. They line up with Starts: on 2026-10-08, ao-grind's manager started at 15:12 and closed at 15:15 MDT, and samscrape's started at 15:54 and closed at 15:56. manager-ao-1's round log for each reads *filled with no seat_due … nothing to do*.
+
+**Fix (to design):**
+1. A Start writes an on-call manager's record without a pane, as a held seat is written (TD-386's `create` with `held`). Rule 3's `team` trigger fills it on its first due reading. Say what the controllers point at until then: the members' `controllers` name the manager's id whether or not it has a pane.
+2. A filled manager's first reads shrink to its brief, plus the one §6 rule its filling reading names, read on demand. The brief's *First:* paragraph names no whole section.
+3. A fill says why it came (the reading that made it due, on the line the tick types), so the round starts from it.
+- Decide whether a Start with something already due (an open `ask` to the manager carried over) fills at once.
+
+**Done when** a Start on a team with an on-call manager creates no manager pane, the manager is filled the first time one of its readings is due, a fill's first reads are its brief and the rule it was filled for, and a week's journal shows no *nothing due* close for a manager.
+
+**Related:** TD-118 (archived; its step (4), the manager on Haiku, dropped for this), TD-247 (the manager's jobs moved to the tick), TD-259 (the seat on call), TD-386 (the held create), TD-381 (the anchor seat's record without a pane).
