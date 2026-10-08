@@ -1282,7 +1282,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-08 (the anchor, from Paul's Apply)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed — the design in §4.9c *Switching* (the seat the run lacks), §4.9b *The anchor seat*, §4.5a *flow changed — Apply* (PR #TBD); TD-400 builds it
+**Status:** Designed — the design in §4.9c *Switching* (the seat the run lacks), §4.9b *The anchor seat*, §4.5a *flow changed — Apply* (PR #1264); TD-400 builds it
 **Blocked by:** TD-400
 **Location:** design §4.9c *Switching* (what Apply starts), §4.9b *The anchor seat* (*created by `ao team start` after the techlead seat*), §4.9 (a Start on a live team); `src/agentorc/teamrun.py` (`start`, `differences`), `ao team flow --apply`
 
