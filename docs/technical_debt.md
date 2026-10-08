@@ -75,6 +75,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
+| TD-391 | The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing | Low | Open |
+| TD-392 | The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing | Low | Open |
+| TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
 
 ---
 
@@ -1319,3 +1322,54 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home the seat's card reads *on call — comes when the checkout's lane gains work*, held off it reads *the checkout is yours · <why>*, Members… and `ao team list` name it, the New session form's directory check names a working seat as a seat, and the tests cover each.
 
 **Related:** TD-381, TD-385, TD-386.
+
+---
+## TD-391: The anchor seat's start (#1245): the remote-host occupancy branch is pinned by no test — replacing it with the local call leaves 166 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`start`: `call("host_occupancy", host=x.host, dir=str(x.dir)) if x.host else call("occupancy", dir=str(x.dir))`); `tests/test_anchor_seat.py`
+
+**Why:** #1245's start refuses to create the seat in a held checkout and picks `host_occupancy` for a seat that lands on another host. `tests/test_anchor_seat.py::_fake` answers only `occupancy`, so the branch is never taken. Against `origin/main`, rewriting the line to `call("occupancy", dir=str(x.dir))` still passes `tests/test_anchor_seat.py tests/test_link.py tests/test_cli_teams.py` (166 passed). A remote seat would be checked against the wrong host's records, and a held remote checkout would start a second agent in it (§9 invariant 2).
+
+**Done when** a test starts a team whose `host` is a node, with a fake that answers `host_occupancy` (free and held), and asserts the call is `host_occupancy` with that host and that a held one starts the team without the seat; the local-call rewrite fails it.
+
+**Related:** TD-381, TD-384, TD-385.
+
+---
+## TD-392: The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/models.py` (`LANE_WORDS = ("free-pick", "design-first", "anchor")`); `tests/test_models.py`, `tests/test_ledger_derived.py`
+
+**Why:** #1245 added `anchor` to `LANE_WORDS` so the seat's lane is no reference (not counted, nudged about or offered to `ao progress` as held). Against `origin/main`, reverting to `("free-pick", "design-first")` still passes every test that names `LANE_WORDS` or `design-first` (435 passed: `test_models`, `test_workorders`, `test_ledger_derived`, `test_repoconfig`, `test_cli_teams`, `test_work_start`, `test_lane_news`, …). `test_anchor_seat.py` asserts the plan's `lane == ["anchor"]` only, never what the lane means to `reference_of` or the counts. With the word gone the seat's lane reads as a held reference `anchor`.
+
+**Done when** a test in `tests/test_models.py` asserts a lane of `["anchor"]` yields no reference and is counted as nothing held, beside `free-pick`'s; the revert fails it.
+
+**Related:** TD-381, TD-384, TD-385.
+
+---
+## TD-393: The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/inbox.py` (`_order_teams`: `rec.get("superseded_by")` in the skip, `out.get(team, False) or …`); `tests/test_ui_board.py`
+
+**Why:** `_order_teams`' docstring says *live or ended, never one resumed as another* and `{team: live}` per team. `tests/test_ui_board.py::test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_that_pick_it` gives each team one record, so neither is exercised. Against `origin/main`, (a) deleting ` or rec.get("superseded_by")` and (b) replacing `out.get(team, False) or rec.get(...)` with `rec.get(...)` each leave `pytest -k "board or inbox or order"` at 268 passed, as do the board/repo/workorders modules (197). (a) would name a team on a resumed-away record; (b) makes a team with one live and one ended record read as *wound down* by whichever record comes last, and print the *starts on `on_work`* words for a team that is running.
+
+**Done when** the test gives a team a superseded record and a team two records (one live, one ended, in both orders) and asserts the first is not named and the second reads live; both mutants fail it.
+
+**Related:** TD-381, TD-384, TD-385.
