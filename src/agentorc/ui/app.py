@@ -235,6 +235,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     horizon_of,  # noqa: F401
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
+    ledger_for_you,  # noqa: F401
     live_look,  # noqa: F401
     look_pair,  # noqa: F401
     look_review,  # noqa: F401
@@ -2769,6 +2770,17 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     call, person_view, inbox_html, board_items = h.call, h.person_view, h.inbox_html, h.board_items
     board_view = h.board_view
 
+    async def ledger_view(fleet: list[dict[str, Any]]) -> dict[str, Any]:
+        """The fold **For you in the ledger** (§4.5 screen 6, TD-368) from the home's repo facts and the
+        definitions' team per repo; empty when either cannot be read — the fold then draws nothing."""
+        repos: dict[str, Any] = {}
+        named: dict[str, str] = {}
+        with contextlib.suppress(Exception):
+            repos = (await h.repo_facts())[0]
+        with contextlib.suppress(Exception):
+            named = repo_teams(await h.defs(), host_name())
+        return ledger_for_you(repos, fleet, named)
+
     @app.get("/inbox", response_class=HTMLResponse)
     async def inbox_page(request: Request):
         """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the
@@ -2812,6 +2824,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "origin": page_origin(request),
                 "board_note": board_note,
                 "horizon": hz,
+                "ledger": {"n": 0, "groups": []} if agent_down else await ledger_view(fleet),
                 "board_choices": board_choices(),
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
@@ -2971,6 +2984,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         got["html"] = inbox_html(sections, page_origin(request))
         # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
         got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=page_origin(request))
+        got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=await ledger_view(fleet))
         # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its rows,
         # so the poll brings the group's markup as it brings the rows'; the script presses the lines
         # the URL picks and recounts every line from the rows on the page

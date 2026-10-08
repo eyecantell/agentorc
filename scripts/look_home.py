@@ -66,6 +66,7 @@ LEDGER = """# Technical debt
 | ID | Summary | Priority | Status |
 |---|---|---|---|
 | TD-001 | A fixture entry | Medium | Open |
+| TD-002 | A fixture entry for you | Low | Open |
 
 ## TD-001: A fixture entry
 
@@ -77,7 +78,21 @@ LEDGER = """# Technical debt
 **Status:** Open
 **Location:** nowhere
 
-**Why:** the scratch home's ledger has one entry, so the Repo page has something to draw.
+**Why:** the scratch home's ledger has entries, so the Repo page has something to draw.
+
+**Done when:** never.
+
+## TD-002: A fixture entry for you
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07
+**Owner:** paul
+**Kind:** decision
+**Status:** Open
+**Location:** nowhere
+
+**Why:** an entry that waits on the person, so the Inbox's *For you in the ledger* fold has a row (TD-368).
 
 **Done when:** never.
 """

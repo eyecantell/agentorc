@@ -74,6 +74,8 @@
     <div class="note empty" hidden>Nothing is waiting on you.</div>
     {#- the board's horizon (TD-220): coming up, the fold and the line — its own box, which the poll puts back -#}
     <div id="boardhorizon">{% with hz = horizon %}{% include "board_horizon.html" %}{% endwith %}</div>
+    {#- the ledger's entries that wait on you (TD-368): its own box, which the poll puts back -#}
+    <div id="ledgerforyou">{% with lf = ledger %}{% include "ledger_for_you.html" %}{% endwith %}</div>
   </section>
 
   <section class="isec" id="sec-steering">
