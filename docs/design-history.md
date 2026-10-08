@@ -741,6 +741,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-08 (TD-405, grinder-ao-1): *Seats with a trigger* names the home's tick as what reads a `prs:` count and times `every:`, as §6 rule 3 has it and the build does (`agent_tick._seat_due`); it had said the manager's, which the tick took over in TD-103.
 - 2026-10-08 (TD-399, the designer): the anchor seat is created by a Start, or by Apply on a live team whose run lacks it.
 - 2026-10-08 (TD-395, grinder-ao-1): the Start's gate built — `ao team start` reads the anchor seat's checkout with `checkout_held`, the fill's own reading (`_checkout_why`: the first holder, then on this host the tree off its default branch or dirty; a node's checkout for occupancy alone, through `host_occupancy`), and a checkout not free is a held `create` whose `held_reason` is written as `seat_held`; the start's note says why (*t-anchor waits: 1 file uncommitted*).
 - 2026-10-08 (TD-394, the designer; filed by grinder-ao-1 from the techlead's reading of #1248): a Start into the anchor seat's checkout is gated as the fill is — occupancy, then a clean tree on its default branch — writing the seat's record held with `seat_held` and naming why in the start's note; until then `ao team start` checked occupancy alone (TD-385's design named only a holder), so a Start landed a pane in a dirty or off-branch checkout the fill would have waited on, and the brief's own `none` there consumed the stretch. TD-395 builds it.
