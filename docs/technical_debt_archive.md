@@ -6223,3 +6223,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a test calls `render_heads` on a defined team, a defined team with no sessions, *No team* and a badge-only team, and asserts the `plus` html is the card for the first two and `""` for the others; blanking the key fails it.
 
 **Related:** TD-379, TD-390.
+
+## TD-385: Build TD-381 (the definition): the team key `anchor`, present by default, the `anchor` preset and its brief, `ao team start` creating the seat in the home repo's checkout, one per repo
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-381's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/org.py` (`AnchorDef` beside `ManagerDef`: `{name, profile, brief, home}` or `false`, default present, name `<team>-anchor`, `home` resolved as the manager's; `TEAM_KEYS`; `ao org check` naming a second seat on one repo), `src/agentorc/roles.py` / the presets (`anchor`: brief `anchor.md`, lane `[anchor]`, no grants, label *Anchor*), `src/agentorc/briefs/anchor.md` (the template: first reads, the lane, the checkout rule — `git pull --ff-only` on the default branch at start and end, branch → PR → merge, memory by PR — the never list with the third tier, `ao progress none` at the end), `src/agentorc/teams.py` (`ao team start`: the seat after the techlead, `seat: {trigger: work}`, `controllers: [manager]`, directory the home repo's checkout, refused when another team's anchor seat holds that repo), `src/agentorc/repoconfig.py` (`ON_CALL_BRIEFS` gains the preset); tests `tests/test_org.py`, `tests/test_teams*.py`, `tests/test_briefs*.py`; design §4.9b *The anchor seat*, §4.9 `anchor`, §4.8. `docs/briefs/**` is a held path if a repo brief is added.
+
+**Why:** TD-381 is designed: every team has an anchor seat by default, so `Owner: anchor` work and decided lines move without a person's session in the checkout.
+
+**Resolved:** 2026-10-08 (PR #1245, grinder-ao-2) — `org.AnchorDef` and `ANCHOR_DEFAULT` (a team with no `anchor:` has `<team>-anchor`; `anchor: false` none; an unwritten one with no home to tell none), the `anchor` preset and `src/agentorc/briefs/anchor.md`, `teams.plan` launching it after the techlead in the main checkout (`Launch.in_checkout`, `seat: {trigger: work}`) and refusing a second team on one repo by `Org.anchor_first`, `teamrun.start` creating it or, with the checkout held, naming the holder; `ao team list --json`'s `anchor`. Tests: `tests/test_anchor_seat.py`. Design §4.9b *The anchor seat*, §4.9 `anchor`. The held checkout's record with no pane went to TD-386 item 4 (the techlead's ruling `m-2eac0f07717a`). Not run on a scratch home: a team start there launches real `claude` sessions.
+
+**Done when** on the scratch home a team with no `anchor:` starts with `<team>-anchor` on call in its home checkout, `anchor: false` starts none, two teams on one repo refuse the second, the brief renders with the lane and the never list, and the tests cover each.
+
+**Related:** TD-381 (the design), TD-386, TD-387 (its other slices), TD-259 (archived: the manager on call), TD-098 (seats with a trigger).
