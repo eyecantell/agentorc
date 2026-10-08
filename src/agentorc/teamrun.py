@@ -669,17 +669,17 @@ def start(
                 )
         if plan.anchor:
             # The anchor seat (§4.9b, TD-381): created after the techlead, in the home checkout itself,
-            # which a session already holding it refuses (§9 invariant 2) — then the rest of the team
-            # starts, the seat's record is written alone, closed with no pane, and §6 rule 3 fills it
-            # once the checkout is free (TD-386), said rather than failing the start
+            # gated as §6 rule 3's fill is (TD-395) — a session holding it (§9 invariant 2), or a tree
+            # dirty or off its default branch (the person's work) — then the rest of the team starts,
+            # the seat's record is written alone, closed with no pane and `seat_held` saying why, and
+            # rule 3 fills it once the checkout is free (TD-386), said rather than failing the start
             x = plan.anchor
-            occ = call("host_occupancy", host=x.host, dir=str(x.dir)) if x.host else call("occupancy", dir=str(x.dir))
-            holders = [str(o) for o in occ.get("occupants") or []]
-            if holders:
-                created.append(call("create", **params(x, [lead_id] if lead_id else []), held=True))
+            held = call("checkout_held", host=x.host, dir=str(x.dir)).get("held")
+            if held:
+                created.append(call("create", **params(x, [lead_id] if lead_id else []), held=True, held_reason=held))
                 notes.append(
-                    f"{x.name} waits: {x.dir} is held by {holders[0]} — the anchor seat is the checkout's one "
-                    "agent (§9 invariant 2); it is on call, filled once the checkout is free"
+                    f"{x.name} waits: {held['why']} ({x.dir}) — the anchor seat works only in a free, clean "
+                    "checkout on its default branch (§4.9b); it is on call, filled once the checkout is free"
                 )
             else:
                 created.append(call("create", **params(x, [lead_id] if lead_id else [])))

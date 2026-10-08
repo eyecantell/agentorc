@@ -781,11 +781,14 @@ class HostAgent(
         start_at: str | None = None,
         start_of: str | None = None,
         held: bool = False,
+        held_reason: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """`held` (design §4.9b *The anchor seat*, TD-386): a seat's record written alone, `closed`
-        with no pane, for a team's start whose seat's checkout another session holds — the occupancy
-        that refuses every other create is why it is asked — so §6 rule 3 fills it once the checkout
-        is free. Refused without `seat` and `unattended`, and beside `start_at` or a resume.
+        with no pane, for a team's start whose seat's checkout is not free — held by another session,
+        dirty, or off its default branch, as the fill reads it (`checkout_held`, TD-395) — so §6 rule 3
+        fills it once the checkout is free. `held_reason` is that reading, `{by, why}`, written as the
+        record's `seat_held` so its card says why before the first tick. Refused without `seat` and
+        `unattended`, and beside `start_at` or a resume; `held_reason` without `held`.
 
         `start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
         **record** now — the name taken, the worktree made, the launch record written, the slot held
@@ -825,6 +828,12 @@ class HostAgent(
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
         reading, bound = _review(review), _context_bound(context_bound)
         starts = _start_time(start_at, unattended, run_until)
+        if held_reason is not None and (
+            not held
+            or not isinstance(held_reason, dict)
+            or not all(isinstance(held_reason.get(k), str) and held_reason[k].strip() for k in ("by", "why"))
+        ):
+            raise RpcError("held_reason is a held seat's {by, why}, both words, and only beside held (TD-395)")
         if held and (not (seat and unattended) or starts or resume):
             raise RpcError(
                 "held writes a seat's record alone, closed, for rule 3 to fill: it takes a seat and unattended, "
@@ -1120,6 +1129,8 @@ class HostAgent(
             s.closed_at = s.created
             s.closer = {"by": "start", "why": "held"}
             s.lane_seen = {"at": s.created, "ids": []}
+            if given.get("held_reason"):
+                s.seat_held = {"by": str(given["held_reason"]["by"]), "why": str(given["held_reason"]["why"])}
         if isinstance(holder, Session):
             s.supersedes = [{"id": holder.id, "mail": False, "at": s.created}]
         self.sessions[sid] = s
@@ -2406,6 +2417,10 @@ class HostAgent(
             # a second `none` is a declaration like the first: the tick looks afresh — but a `work` seat's
             # (§6 rule 3, TD-386) is the reading now, so an id that lands before the next tick fills it
             ids = self._seat_lane(s) if (s.seat or {}).get("trigger") == "work" else None
+            if ids and s.host == self.host and await asyncio.to_thread(self._checkout_tree, Path(s.dir)):
+                # …unless the checkout was not its own to work in (dirty, or off its default branch, TD-395):
+                # what it could not reach is not its stretch, so the same ids fill it once the tree is clean
+                ids = []
             s.lane_seen = {"at": now_iso(), "ids": ids} if ids is not None else None
         else:
             # The word stands whenever it is said — it is the session's — but one said inside

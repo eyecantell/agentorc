@@ -122,15 +122,15 @@ def test_two_teams_on_one_repo_refuse_the_second_naming_the_first(tmp_path, monk
     assert orgcheck.check(org, [], HOST, [str(tmp_path / "alpha")], [])["ok"]
 
 
-def _fake(occupants: list[str]):
+def _fake(held: dict | None = None):
     calls: list[tuple[str, dict]] = []
 
     def call(method, **params):
         calls.append((method, params))
         if method == "name_check":
             return {"name": params["name"], "verdict": "free"}
-        if method == "occupancy":
-            return {"dir": params["dir"], "occupants": list(occupants), "git": True}
+        if method == "checkout_held":
+            return {"dir": params["dir"], "host": params["host"] or HOST, "held": held}
         if method == "create":
             return {"id": f"ao-alpha-{params['name']}", "name": params["name"]}
         raise AssertionError(method)
@@ -140,25 +140,44 @@ def _fake(occupants: list[str]):
 
 def test_a_start_creates_the_seat_after_the_techlead_under_the_manager(tmp_path, monkeypatch):
     org = _org(tmp_path, monkeypatch, {"t": _team()})
-    call, calls = _fake([])
+    call, calls = _fake()
     _, out = teamrun.start(call, org, "t", HOST)
     made = [p for m, p in calls if m == "create"]
     assert [p["name"] for p in made] == ["lead", "tl", "t-anchor", "g"]
     seat = made[2]
     assert seat["worktree"] is None and seat["controllers"] == ["ao-alpha-lead"] and seat["role"] == "anchor"
-    assert ("occupancy", {"dir": str(tmp_path / "alpha")}) in calls
+    assert "held" not in seat and "held_reason" not in seat
+    # the fill's own reading (TD-395), never occupancy alone
+    assert ("checkout_held", {"host": "", "dir": str(tmp_path / "alpha")}) in calls
+    assert not any(m in ("occupancy", "host_occupancy") for m, _ in calls)
 
 
 def test_a_held_checkout_starts_the_team_and_writes_the_seat_alone_saying_who_holds_it(tmp_path, monkeypatch):
     """TD-386: the seat's record is written `held` — closed, no pane — for rule 3 to fill once free."""
     org = _org(tmp_path, monkeypatch, {"t": _team()})
-    call, calls = _fake(["claude-1 (claude-code, outside agentorc)"])
+    held = {"by": "claude-1", "why": "held by claude-1 (claude-code, outside agentorc)"}
+    call, calls = _fake(held)
     _, out = teamrun.start(call, org, "t", HOST)
     made = [p for m, p in calls if m == "create"]
     assert [p["name"] for p in made] == ["lead", "tl", "t-anchor", "g"]
     assert made[2].get("held") is True and not any(p.get("held") for p in made if p["name"] != "t-anchor")
+    assert made[2]["held_reason"] == held
     (said,) = [n for n in out["notes"] if n.startswith("t-anchor")]
     assert "held by claude-1 (claude-code, outside agentorc)" in said and "filled once the checkout is free" in said
+
+
+@pytest.mark.parametrize("why", ["1 file uncommitted", "branch td-x", "branch td-x, 2 files uncommitted"])
+def test_a_dirty_or_off_branch_checkout_writes_the_seat_held_saying_why(tmp_path, monkeypatch, why):
+    """TD-395 (§4.9b *The anchor seat*): a free checkout the fill would wait on — files uncommitted, or
+    another branch checked out — is a held Start too: no pane over the person's work, the reason kept."""
+    org = _org(tmp_path, monkeypatch, {"t": _team()})
+    call, calls = _fake({"by": "checkout", "why": why})
+    _, out = teamrun.start(call, org, "t", HOST)
+    made = {p["name"]: p for m, p in calls if m == "create"}
+    assert made["t-anchor"]["held"] is True and made["t-anchor"]["held_reason"] == {"by": "checkout", "why": why}
+    assert not made["g"].get("held")  # the rest of the team starts
+    (said,) = [n for n in out["notes"] if n.startswith("t-anchor")]
+    assert said.startswith(f"t-anchor waits: {why}") and "filled once the checkout is free" in said
 
 
 def test_ao_team_list_names_the_seat_and_reads_it_as_a_seat(tmp_path, monkeypatch):
@@ -219,8 +238,9 @@ def test_members_and_ao_team_list_name_the_seat(tmp_path, monkeypatch, capsys):
 
 
 def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_alone(tmp_path, monkeypatch):
-    """TD-391: a team whose `host:` is a node checks the seat's checkout with `host_occupancy` on that
-    host, never this host's `occupancy`; held there, the team starts and the seat is the `held` create."""
+    """TD-391, TD-395: a team whose `host:` is a node asks the one reading (`checkout_held`) for that
+    host's checkout — which reads its occupancy there, never this host's (tests/test_anchor_tick.py) —
+    and held there, the team starts and the seat is the `held` create."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("AGENTORC_HOME", str(home))
@@ -238,14 +258,15 @@ def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_al
                 return {"files": {k: None for k in params["paths"]}}
             if method == "name_check":
                 return {"name": params["name"], "verdict": "free"}
-            if method == "host_occupancy":
-                return {"host": params["host"], "dir": params["dir"], "occupants": list(occupants), "git": True}
+            if method == "checkout_held":
+                held = {"by": occupants[0].split(" ")[0], "why": f"held by {occupants[0]}"} if occupants else None
+                return {"host": params["host"], "dir": params["dir"], "held": held}
             if method == "create":
                 return {"id": f"ao-alpha-{params['name']}", "name": params["name"]}
-            raise AssertionError(method)  # this host's `occupancy` among them
+            raise AssertionError(method)  # `occupancy` and `host_occupancy` among them
 
         _, out = teamrun.start(call, org, "t", HOST)
-        assert [p for m, p in calls if m == "host_occupancy"] == [{"host": "nodeb", "dir": "/srv/alpha"}]
+        assert [p for m, p in calls if m == "checkout_held"] == [{"host": "nodeb", "dir": "/srv/alpha"}]
         made = [p for m, p in calls if m == "create"]
         assert [p["name"] for p in made] == ["lead", "tl", "t-anchor", "g"]
         assert bool(made[2].get("held")) is bool(occupants)

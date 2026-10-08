@@ -248,12 +248,12 @@ code and needs no grant; a session doing the same work does.
      leaving `seat_due` standing with the reason on the record — **`seat_held: {by, why}`**
      (home-owned) — for the card's slot (*on call — the checkout is yours · branch td-x, 2 files
      uncommitted*); the next tick tries again. **`ao team start` is gated by the same reading**
-     (TD-394; designed 2026-10-08): a Start whose checkout is not free writes the seat's record held
+     (TD-394; designed 2026-10-08, built — TD-395): a Start whose checkout is not free writes the seat's record held
      — `closed`, no pane, `seat_held` with the reason, which stands while its lane holds work due and
      is cleared as any `seat_held` is when nothing is — in place of a pane there, and this rule fills
      it once the checkout is free; the gate is one reading, never two that can disagree (a node's
      checkout: occupancy alone, from its records, on both roads). **A `none` that consumes no
-     stretch**: a `work` seat's `none` declared while its checkout is not its own — dirty or off its
+     stretch** (built — TD-395): a `work` seat's `none` declared while its checkout is not its own — dirty or off its
      default branch at the declaration, the holder being itself — writes `lane_seen` with no ids
      (`ids: []`, as a held Start's record is written; never `None`, which the next tick fills from
      the reading), so the ids it could not work stand due and fill it again once the checkout is clean; the fill ceiling

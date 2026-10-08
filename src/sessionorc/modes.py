@@ -117,7 +117,7 @@ PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"
 # any host are read by a caller at the home, for a team start there — `_forwarded` refuses it. The
 # New session form's two reads join it (TD-293): they name another host's sessions and worktrees,
 # and a person at a node starts nothing on a third host.
-HOME_ONLY = frozenset({"host_files", "host_occupancy", "host_worktrees"})
+HOME_ONLY = frozenset({"host_files", "host_occupancy", "host_worktrees", "checkout_held"})
 
 
 def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:

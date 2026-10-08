@@ -6395,3 +6395,26 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Related:** TD-394 / TD-395 (the Start's gate), TD-380 (decided lines), TD-247 / TD-259 (the manager on call), TD-098 (seats with a trigger), TD-132 (archived: the promote policy).
 
 ---
+
+## TD-395: Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own writing `lane_seen` with no ids
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-08 (the designer, from TD-394's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/teamrun.py` (`start`: the anchor's gate — today `occupancy`/`host_occupancy` alone — becomes the fill's reading), `src/sessionorc/agent_tick.py` (`_checkout_held`: the one reading, exposed to the Start — an RPC the client calls, or the function moved where both can import it; the builder chooses, one reading either way), `src/sessionorc/agent.py` (`create` with `held` taking the reason and writing `seat_held: {by, why}`; the `none` declaration of a `work` seat: `lane_seen` written `{at, ids: []}` — as `create` with `held` writes it, never `None`, which `_work_due` fills from the reading on the next tick — when `_checkout_held`'s tree half says the checkout is not the seat's own at the declaration, occupancy being itself); tests `tests/test_anchor_seat.py` (the Start), `tests/test_anchor_tick.py` (the `none`); design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor`, §6 rule 3. `src/sessionorc/**` is a held path: the techlead reads it.
+
+**Why:** TD-394: `ao team start` checked occupancy alone, so a Start landed a pane in a dirty or off-branch checkout the fill would have waited on, and the brief's own `none` there consumed the stretch. The design now says the Start is gated as the fill is, and such a `none` consumes no stretch.
+
+**Fix:**
+1. The Start's gate is the fill's reading: occupancy, then a clean tree on its default branch (a node's checkout: occupancy alone, as `_checkout_held` has it). Held, dirty or off-branch, `teamrun.start` calls `create` with `held` and the reason; the note says why (*waits: 2 files uncommitted*, *waits: branch td-x*), as it names a holder today.
+2. `create` with `held` writes `seat_held: {by, why}` from that reason, so the card's slot says why before the first tick; the tick's own reading keeps or clears it as it does now (`_seat_pass` clears it when nothing in the lane is due).
+3. A `work` seat's `none`: at the declaration, the tree read as the fill reads it; dirty or off its default branch, `lane_seen` is written `{at, ids: []}` (not `None`: `_work_due` turns a `None` into the reading's ids on the next tick, which consumes the stretch), so `_work_due` finds the same ids new once the checkout is clean. Clean, as today.
+
+**Resolved:** 2026-10-08 (PR #1257, grinder-ao-1) — `checkout_held(dir, host)`, the fill's own reading (`_checkout_why`: the first holder, then on this host `_checkout_tree` — off its default branch, files uncommitted), exposed to `ao team start`, which no longer reads `occupancy` alone; a node's checkout is its `host_occupancy`, the tree unread. A checkout not free is `create` with `held` and `held_reason`, written as `seat_held`; the note says why (*t-anchor waits: 1 file uncommitted*). A `work` seat's `none` with its tree dirty or off its default branch writes `lane_seen` `{at, ids: []}`. The design's markers say built. Tests: `tests/test_anchor_seat.py` (held, dirty, off-branch and both; a node seat asking its host), `tests/test_anchor_tick.py` (the reading on each case and a node's for occupancy alone; `held_reason` written and refused; a dirty `none` filled again on the same ids once clean, the clean `none` being the existing stretch test).
+
+**Done when** on a scratch home `ao team start` over a checkout with an uncommitted file writes the seat's record closed with no pane and `seat_held` saying *1 file uncommitted*, the note says why, and rule 3 fills it on the tick after the file is committed; a seat whose `none` says the checkout was not its own is filled again on the same ids once the checkout is clean, and one whose checkout was clean is not; and tests cover a dirty Start, an off-branch Start, a node's Start (occupancy alone) and both `none` cases.
+
+**Related:** TD-394, TD-381, TD-385, TD-386, TD-387.
