@@ -2365,6 +2365,7 @@
       const rows = [];
       if (v.manager) rows.push(`<div class="row gap"><span class="meta">manager</span> ${who(v.manager)}</div>`);
       if (v.techlead) rows.push(`<div class="row gap"><span class="meta">techlead seat</span> ${who(v.techlead)}</div>`);
+      if (v.anchor) rows.push(`<div class="row gap"><span class="meta">anchor seat</span> ${who(v.anchor)}</div>`);  // TD-387: not removable
       v.members.forEach((e) => {
         if (e.nested) { rows.push(`<div class="row gap"><span class="meta">team</span> ${esc(e.nested)} <span class="meta">— nested, edited by hand</span></div>`); return; }
         const held = (e.sessions || []).map(who).join(", ");
@@ -2860,7 +2861,7 @@
         // …and a shell may share it (§9: shells never hold the slot), so for one it is only said
         const held = !!(o.occupants && o.occupants.length), taken = held && !isShell();
         here.disabled = taken; herechoice.classList.toggle("taken", taken);
-        inuse.hidden = !held; inuse.textContent = held ? `in use by ${o.occupants.join(", ")}` : "";
+        inuse.hidden = !held; inuse.textContent = held ? (o.seat || `in use by ${o.occupants.join(", ")}`) : "";  // a seat says so (TD-387)
         if (taken && o.git) { wt.checked = true; nameCheck(); }  // the scope moved to the repo
         else defaultWhere(o.git);
         dirBlocked = taken && !o.git;

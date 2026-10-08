@@ -1100,6 +1100,7 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             print(
                 f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}{' (on call)' if r.get('on_call') else ''}  "
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")
+                + (f"anchor: {r['anchor']['name']}  " if r.get("anchor") else "")  # the anchor seat (TD-387)
                 + (f"seats: {', '.join(s['name'] for s in r['seats'])}  " if r.get("seats") else "")
                 + f"members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"

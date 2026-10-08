@@ -190,3 +190,29 @@ def test_a_flow_never_reads_an_anchor_no_start_created_as_a_difference(tmp_path,
         for n, x in ((x.name, x) for x in p.launches if not x.in_checkout)
     ]
     assert "t-anchor" not in [d.name for d in teamrun.differences(p, live)]
+
+
+def test_members_and_ao_team_list_name_the_seat(tmp_path, monkeypatch, capsys):
+    """TD-387 (§4.5a *card: on call — the anchor seat's words*): Members… lists the seat beside the
+    techlead, with no Remove (it is no member entry), and `ao team list` names it."""
+    org = _org(tmp_path, monkeypatch, {"t": _team(), "off": _team(anchor=False)})
+    rec = {"id": "ao-alpha-t-anchor", "name": "t-anchor", "team": "t", "state": "closed", "unattended": True}
+    v = teamrun.members_view(org, "t", [rec])
+    assert v["anchor"] == {"name": "t-anchor", "id": "ao-alpha-t-anchor", "state": "closed"}
+    assert "t-anchor" not in [e.get("name") for e in v["members"]]
+    assert teamrun.members_view(org, "off", [])["anchor"] is None
+    js = (Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert '<span class="meta">anchor seat</span> ${who(v.anchor)}' in js
+    from agentorc import cli
+
+    def call(method, **params):
+        if method == "list":
+            return [rec]
+        raise cli.AgentError(f"{method}: not in this test")
+
+    monkeypatch.setattr(cli, "_org_here", lambda: org)
+    monkeypatch.setattr(cli, "call_sync", call)
+    monkeypatch.setattr(teamrun, "flow_view", lambda *a, **k: {})
+    assert cli.main(["team", "list"]) == 0
+    out = {line.split()[0]: line for line in capsys.readouterr().out.splitlines() if line.strip()}
+    assert "techlead: tl  anchor: t-anchor  " in out["t"] and "anchor:" not in out["off"]
