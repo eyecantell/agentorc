@@ -377,7 +377,7 @@
   {%- set st = state_line(e) | trim %}
   {%- if st %}<span class="st">{{ st }}</span>{% endif %}
   <span class="grow"></span>
-  {{ put_btn(e) }}
+  {%- if section != 'snoozed' %}{{ put_btn(e) }}{% endif %}  {#- FYI's door only, never from the fold (§4.5a) #}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this entry? It leaves your inbox; the sender keeps its copy.">Dismiss</button>
 </div>
 {%- endmacro %}
