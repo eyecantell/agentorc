@@ -79,7 +79,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-392 | The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing | Low | Open |
 | TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
 | TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Designed — TD-395 builds it |
-| TD-395 | Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own leaving `lane_seen` empty | Low | Open |
+| TD-395 | Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own writing `lane_seen` with no ids | Low | Open |
 
 ---
 
@@ -1397,7 +1397,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 ---
 
-## TD-395: Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own leaving `lane_seen` empty
+## TD-395: Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own writing `lane_seen` with no ids
 
 **Priority:** Low
 **Type:** feature
@@ -1405,14 +1405,14 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/agentorc/teamrun.py` (`start`: the anchor's gate — today `occupancy`/`host_occupancy` alone — becomes the fill's reading), `src/sessionorc/agent_tick.py` (`_checkout_held`: the one reading, exposed to the Start — an RPC the client calls, or the function moved where both can import it; the builder chooses, one reading either way), `src/sessionorc/agent.py` (`create` with `held` taking the reason and writing `seat_held: {by, why}`; the `none` declaration of a `work` seat: `lane_seen` left `None` when `_checkout_held`'s tree half says the checkout is not the seat's own at the declaration, occupancy being itself); tests `tests/test_anchor_seat.py` (the Start), `tests/test_anchor_tick.py` (the `none`); design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor`, §6 rule 3. `src/sessionorc/**` is a held path: the techlead reads it.
+**Location:** `src/agentorc/teamrun.py` (`start`: the anchor's gate — today `occupancy`/`host_occupancy` alone — becomes the fill's reading), `src/sessionorc/agent_tick.py` (`_checkout_held`: the one reading, exposed to the Start — an RPC the client calls, or the function moved where both can import it; the builder chooses, one reading either way), `src/sessionorc/agent.py` (`create` with `held` taking the reason and writing `seat_held: {by, why}`; the `none` declaration of a `work` seat: `lane_seen` written `{at, ids: []}` — as `create` with `held` writes it, never `None`, which `_work_due` fills from the reading on the next tick — when `_checkout_held`'s tree half says the checkout is not the seat's own at the declaration, occupancy being itself); tests `tests/test_anchor_seat.py` (the Start), `tests/test_anchor_tick.py` (the `none`); design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor`, §6 rule 3. `src/sessionorc/**` is a held path: the techlead reads it.
 
 **Why:** TD-394: `ao team start` checked occupancy alone, so a Start landed a pane in a dirty or off-branch checkout the fill would have waited on, and the brief's own `none` there consumed the stretch. The design now says the Start is gated as the fill is, and such a `none` consumes no stretch.
 
 **Fix:**
 1. The Start's gate is the fill's reading: occupancy, then a clean tree on its default branch (a node's checkout: occupancy alone, as `_checkout_held` has it). Held, dirty or off-branch, `teamrun.start` calls `create` with `held` and the reason; the note says why (*waits: 2 files uncommitted*, *waits: branch td-x*), as it names a holder today.
-2. `create` with `held` writes `seat_held: {by, why}` from that reason, so the card's slot says why before the first tick; the tick's own reading keeps or clears it as it does now.
-3. A `work` seat's `none`: at the declaration, the tree read as the fill reads it; dirty or off its default branch, `lane_seen` stays `None`, so `_work_due` finds the same ids new once the checkout is clean. Clean, as today.
+2. `create` with `held` writes `seat_held: {by, why}` from that reason, so the card's slot says why before the first tick; the tick's own reading keeps or clears it as it does now (`_seat_pass` clears it when nothing in the lane is due).
+3. A `work` seat's `none`: at the declaration, the tree read as the fill reads it; dirty or off its default branch, `lane_seen` is written `{at, ids: []}` (not `None`: `_work_due` turns a `None` into the reading's ids on the next tick, which consumes the stretch), so `_work_due` finds the same ids new once the checkout is clean. Clean, as today.
 
 **Done when** on a scratch home `ao team start` over a checkout with an uncommitted file writes the seat's record closed with no pane and `seat_held` saying *1 file uncommitted*, the note says why, and rule 3 fills it on the tick after the file is committed; a seat whose `none` says the checkout was not its own is filled again on the same ids once the checkout is clean, and one whose checkout was clean is not; and tests cover a dirty Start, an off-branch Start, a node's Start (occupancy alone) and both `none` cases.
 
