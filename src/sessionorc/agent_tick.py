@@ -25,7 +25,6 @@ from sessionorc import (
     workorders,
 )
 from sessionorc import balance as balance_mod
-from sessionorc import board as board_mod
 from sessionorc import brief as brief_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import conventions as conventions_mod
@@ -2198,11 +2197,11 @@ class TickMixin:
         git = await asyncio.to_thread(git_info, directory)
         if git is None:
             return {"by": "checkout", "why": "git state unknown"}
-        try:
-            default = await asyncio.to_thread(board_mod.default_branch, directory)
-        except Exception:  # noqa: BLE001 — a default that cannot be read is the usual name
-            default = "main"
-        why = [f"branch {git.branch}"] if git.branch != default else []
+        # cadence's default-branch rule (`origin/HEAD`, `init.defaultBranch`, main, master on origin);
+        # a checkout with no origin to ask reads either usual name as its default
+        ref = await asyncio.to_thread(ledger_mod.default_ref, directory)
+        defaults = (ref.removeprefix("origin/"),) if ref else ("main", "master")
+        why = [f"branch {git.branch}"] if git.branch not in defaults else []
         if git.dirty:
             why.append(f"{git.dirty} file{'' if git.dirty == 1 else 's'} uncommitted")
         return {"by": "checkout", "why": ", ".join(why)} if why else None

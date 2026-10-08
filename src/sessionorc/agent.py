@@ -926,14 +926,14 @@ class HostAgent(
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)
             if resume:
-                for held in [r for r in self.sessions.values() if r.adapter_id == resume and r.suspended]:
-                    self._refuse_suspended(held, caller, "a resume of that conversation")
+                for gone in [r for r in self.sessions.values() if r.adapter_id == resume and r.suspended]:
+                    self._refuse_suspended(gone, caller, "a resume of that conversation")
                     # a person got past that line, which **is** the lift (§4.8a) — and it lifts
                     # here rather than only in `_take_name`, because a resume under another name
                     # leaves this record standing, and a mark nothing can clear would hold its
                     # old name for ever (review of PR #301)
-                    held.suspended = None
-                    self._save(held)
+                    gone.suspended = None
+                    self._save(gone)
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
                 if start_context is None:
@@ -942,6 +942,10 @@ class HostAgent(
             if starts:
                 return await self._schedule(locals(), holder, directory, repo, name, starts)
             if held:
+                if isinstance(holder, Session) and holder.state not in ("exited", "closed"):
+                    # the name's record is running (or scheduled): the seat is there already, and a
+                    # record written over it would take its name and kill its pane (review of TD-386)
+                    raise RpcError(f"{holder.id} is {holder.state}: the seat is already there, nothing to write")
                 return await self._schedule(locals(), holder, directory, repo, name, None, state="closed")
             try:
                 spec = ad.launch(
@@ -2399,7 +2403,10 @@ class HostAgent(
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
             s.balance_refused = None  # taken, so the mark has gone: nothing left to ring
-            s.lane_seen = None  # a second `none` is a declaration like the first: the tick looks afresh
+            # a second `none` is a declaration like the first: the tick looks afresh — but a `work` seat's
+            # (§6 rule 3, TD-386) is the reading now, so an id that lands before the next tick fills it
+            ids = self._seat_lane(s) if (s.seat or {}).get("trigger") == "work" else None
+            s.lane_seen = {"at": now_iso(), "ids": ids} if ids is not None else None
         else:
             # The word stands whenever it is said — it is the session's — but one said inside
             # `RESTART_EARLY` of this record's own start is marked, and a controller does not act

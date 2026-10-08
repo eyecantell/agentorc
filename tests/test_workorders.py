@@ -116,3 +116,13 @@ def test_the_repo_reading_lists_them_on_a_full_read_and_keeps_them_between(tmp_p
     failed = TickMixin._read_repos([str(root)], {str(root): full}, {str(root)})[str(root)]
     assert failed["work_orders"]["orders"] == full["work_orders"]["orders"]
     assert failed["work_orders"]["error"] == "the reader failed"
+
+
+@pytest.mark.unit
+def test_reading_the_reader_writes_nothing_into_the_checkout(tmp_path):
+    """TD-386: the reader's `item_key` is compiled from its text, never imported, so no
+    `scripts/__pycache__` lands in the repo — which the anchor's gate would read as the person's work."""
+    root = _repo(tmp_path, DECIDED)
+    workorders._keys.clear()
+    assert workorders.read(root, fetch=False)["orders"]
+    assert not (root / "scripts" / "__pycache__").exists()

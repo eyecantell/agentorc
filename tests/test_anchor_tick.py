@@ -108,7 +108,7 @@ async def test_the_lane_gaining_an_id_fills_the_ended_seat_once_per_stretch(agen
         # it declares out of work on the same ids: the next reading raises no second fill
         async with LocalClient(caller=sid) as me:
             await me.call("progress", id=sid, status="none", why="nothing I can do")
-        assert new.lane_seen is None
+        assert new.lane_seen["ids"] == ["TD-1", "TD-2", "board:1a2b3c4d"], "the reading at the declaration"
         _end(agent, sid)
         await agent._keep_running(now)
         assert agent.sessions[sid] is new and new.seat_due is None
@@ -198,4 +198,55 @@ async def test_a_held_create_writes_the_seat_closed_with_no_pane_and_its_whole_l
         await agent._keep_running(datetime.now(UTC))
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["fill"]
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_an_id_landing_between_the_declaration_and_the_tick_still_fills(agent, tmp_path):
+    """Review of TD-386: a `work` seat's `none` writes `lane_seen` from the reading then, not at the
+    next tick, so an entry filed in between is new."""
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    _reading(agent, root, _entry("TD-1"))
+    async with LocalClient() as person:
+        sid = await _anchor(person, root)
+        first = agent.sessions[sid]
+        async with LocalClient(caller=sid) as me:
+            await me.call("progress", id=sid, status="none", why="looked")
+        assert first.lane_seen["ids"] == ["TD-1"]
+        _reading(agent, root, _entry("TD-1"), _entry("TD-2"))
+        _end(agent, sid)
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[sid] is not first and first.seat_due["ids"] == ["TD-2"]
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_held_create_never_writes_over_a_running_seat(agent, tmp_path):
+    from sessionorc.client import AgentError
+
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    async with LocalClient() as person:
+        sid = await _anchor(person, root)
+        with pytest.raises(AgentError, match="is running|the seat is already there"):
+            await _anchor(person, root, held=True)
+        assert agent.sessions[sid].state not in ("exited", "closed")
+        for bad in ({"unattended": False}, {"resume": "abc"}):
+            with pytest.raises(AgentError, match="held writes a seat's record alone"):
+                await _anchor(person, root, held=True, **bad)
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_master_default_with_no_origin_is_not_held_as_a_branch(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    _git(root, "branch", "-m", "main", "master")
+    _reading(agent, root, _entry("TD-1"))
+    async with LocalClient() as person:
+        sid = await _anchor(person, root, held=True)
+        monkeypatch.setattr(agent, "occupants", lambda d: [])
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[sid].id == sid and [r["why"] for r in agent.sessions[sid].restarts] == ["fill"]
         await person.call("kill", id=sid)
