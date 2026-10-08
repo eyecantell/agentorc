@@ -1426,7 +1426,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Status:** Open
 **Location:** `tests/test_ui_org.py` (`test_the_plus_card_is_no_session_to_the_client`); `src/agentorc/ui/static/app.js` (the sort, `applyFilter`, the group swap)
 
-**Why:** The docstring says *a filter hides it, a delta puts it back where the server still draws it, and a removed group never moves it elsewhere*; the body is eleven `assert "<source line>" in js` lines, so it fails on a reformat and passes when the behaviour is wrong (the same shape as TD-383's). E.g. a `filtering` computed after the `plus` line, or the swap appending the card to the wrong grid, passes as long as the quoted text is present; `tests/test_ui_down_grace.py` already shows the node fake-DOM probe this suite uses.
+**Why:** The docstring says *a filter hides it, a delta puts it back where the server still draws it, and a removed group never moves it elsewhere*; the body is eight asserts, seven of them `"<source line>" in js` and one `in css`, so it fails on a reformat and passes when the behaviour is wrong (the same shape as TD-383's). E.g. a `filtering` computed after the `plus` line, or the swap appending the card to the wrong grid, passes as long as the quoted text is present; `tests/test_ui_down_grace.py` already shows the node fake-DOM probe this suite uses.
 
 **Done when** a node probe drives the sort, a filter, and a delta whose group lacks the card, over a small fake DOM, and asserts the + card stays last, is hidden under a filter and is restored; the substring asserts are dropped.
 
