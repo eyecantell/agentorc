@@ -213,7 +213,8 @@ async function run() {
     fail: (m) => failed.push(m) });
   const out = {};
   const over = ev("dataTransfer", [], ["Files"]); term.on.dragover(over); out.dragover_open = over.prevented;
-  const drop = ev("dataTransfer", [file("one.png"), file("bad.png")]); term.on.drop(drop);
+  // the refused file first in its drop (TD-376): the rest of that same drop is still sent
+  const drop = ev("dataTransfer", [file("bad.png"), file("one.png")]); term.on.drop(drop);
   const drop2 = ev("dataTransfer", [file("two.png")]); compose.on.drop(drop2);
   await tick();
   out.during = { disabled: button.disabled, label: button.lastChild.textContent };
@@ -243,12 +244,13 @@ run().catch((e) => { console.error(e); process.exit(1); });
 def test_the_composers_drop_and_paste_handlers_run_as_themselves(tmp_path):
     """TD-370: the handlers `AO.wireAttach` hangs on the composer, driven under node against stubs —
     a drop on the terminal or the composer attaches its files one upload at a time, a failed one
-    reported and the next still sent, each path at the caret; a paste carrying `text/plain` is the
+    reported and the next file of the same drop still sent (TD-376: the refused one first), each path
+    at the caret; a paste carrying `text/plain` is the
     text's; with the composer closed (an unattended session) no dragover, drop, paste or pick
     attaches anything."""
     got = _node(tmp_path, WIRE_PROBE)
     assert got["dragover_open"] is True
-    assert got["during"] == {"disabled": True, "label": "Attaching one.png…"}
+    assert got["during"] == {"disabled": True, "label": "Attaching bad.png…"}
     assert got["drop"] == {
         "prevented": True, "uploaded": ["one.png", "two.png"], "most": 1, "failed": ["Attach failed: refused"],
         "value": "/a/one.png /a/two.png ", "disabled": False, "label": "Attach",
