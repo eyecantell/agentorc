@@ -6461,3 +6461,39 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** `grep -n "TD-395" docs/design/4.9b-techlead.md` shows no mention of TD-395 as unbuilt.
 
 **Related:** TD-395, TD-394, TD-386.
+
+## TD-397: #1257: `checkout_held` is in `modes.HOME_ONLY` and no test would catch it out — dropping it from the set leaves 103 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1257)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/modes.py` (`HOME_ONLY`); `tests/test_anchor_tick.py`, `tests/test_link.py`
+
+**Why:** #1257 added `"checkout_held"` to `HOME_ONLY` (its docstring: "In `modes.HOME_ONLY` as `host_occupancy` is"), so a node refuses a read that names a third host. In a worktree off `origin/main`, deleting `, "checkout_held"` from the set and running every test that mentions `HOME_ONLY` or `host_occupancy` (`test_anchor_seat.py test_link.py test_ui_new_host.py test_anchor_tick.py`) still gives 103 passed. `test_the_starts_reading_is_the_fills_and_a_node_is_read_for_occupancy_alone` calls the method on the home alone; nothing calls it as a node would.
+
+**Resolved:** 2026-10-08 (PR #1262, grinder-ao-1) — `tests/test_anchor_tick.py::test_a_node_is_never_served_checkout_held`: a call forwarded from a node for `checkout_held` is refused at the home, as `host_occupancy` is; dropping the name from `modes.HOME_ONLY` fails it.
+
+**Done when** a test pins that a node refuses `checkout_held` with a `host` (the way `host_occupancy`'s membership is pinned, or `offline_refusal`/`_forwarded` with `HOME_ONLY`), and removing the name from the set fails it.
+
+**Related:** TD-395, TD-386.
+
+## TD-398: #1257: a seat's `none` on another host skips the local tree reading (`s.host == self.host`) and no test pins it — removing the guard leaves 27 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1257)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent.py` (`_ending`: `if ids and s.host == self.host and await asyncio.to_thread(self._checkout_tree, Path(s.dir))`); `tests/test_anchor_tick.py`
+
+**Why:** the new branch clears a `work` seat's `lane_seen` ids when its `none` was said in a tree that is dirty or off its default branch, but only for a seat on this host: for a node's seat `s.dir` is a path on another machine, which `git_info` here would read as the wrong tree (or none), and `_checkout_why` skips the tree for a node for the same reason. `test_a_none_in_a_checkout_not_its_own_leaves_the_stretch_for_a_clean_one` runs a local seat only. Replacing the condition with `if ids and await asyncio.to_thread(...)` leaves `tests/test_anchor_seat.py tests/test_anchor_tick.py` at 27 passed; the other two edits of the PR (the `ids = []` line, the `held_reason` write) do fail a test.
+
+**Resolved:** 2026-10-08 (PR #1262, grinder-ao-1) — `tests/test_anchor_tick.py::test_a_node_seats_none_keeps_its_ids_whatever_a_tree_here_reads`: a `work` seat on another host declares `none` (as `id@nodeb`) while the same path here is dirty and off its branch, and `lane_seen` keeps the reading's ids; removing the host guard fails it.
+
+**Done when** a test ends a `work` seat whose `host` is another host, with a dirty or off-branch tree at its `dir` here, and asserts the `none` keeps its ids; removing the host guard fails it.
+
+**Related:** TD-395, TD-386.

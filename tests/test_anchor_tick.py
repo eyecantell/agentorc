@@ -326,3 +326,34 @@ async def test_a_none_in_a_checkout_not_its_own_leaves_the_stretch_for_a_clean_o
         assert new is not first and [r["why"] for r in new.restarts] == ["fill"]
         assert new.lane_seen["ids"] == ["TD-1"] and new.seat_held is None
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_node_seats_none_keeps_its_ids_whatever_a_tree_here_reads(agent, tmp_path):
+    """TD-398 (§6 rule 3, TD-395): a seat on another host declares from a checkout that is not this
+    host's to read — a path here of the same name is some other tree — so its `none` writes the
+    reading's ids, never the empty stretch a dirty tree here would give a seat of this host's."""
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    _reading(agent, root, _entry("TD-1"))
+    async with LocalClient() as person:
+        sid = await _anchor(person, root)
+        rec = agent.sessions[sid]
+        (root / "a.txt").write_text("a\n")  # dirty here, and off its branch: neither is the node's tree
+        _git(root, "switch", "-q", "-c", "td-x")
+        rec.host = "nodeb"
+        try:
+            await agent._ending(rec, "none", "nothing for me", "declared", f"{sid}@nodeb")
+        finally:
+            rec.host = agent.host
+        assert rec.lane_seen["ids"] == ["TD-1"], "a node's tree is never read here"
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_node_is_never_served_checkout_held(agent):
+    """TD-397 (§4.4a, `modes.HOME_ONLY`): the Start's reading names another host's sessions and reads
+    a checkout's tree, so a call forwarded from a node is refused at the home, as `host_occupancy` is."""
+    for rpc in ("checkout_held", "host_occupancy"):
+        got = await agent._forwarded("laptop", {"rpc": rpc, "params": {"dir": "/", "host": "kmaster"}})
+        assert got.get("error") == f"{rpc} is not served to a call from laptop: ask at the home (design §4.4a)"
