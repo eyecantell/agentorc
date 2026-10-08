@@ -84,5 +84,5 @@ def test_a_close_the_page_caused_by_leaving_and_one_failed_inbox_poll_draw_nothi
     assert 'window.addEventListener("pagehide", () => { leaving = true; });' in connect
     assert 'window.addEventListener("pageshow", () => { leaving = false; });' in connect
     assert re.search(r"ws\.onclose = \(\) => \{ if \(!leaving\) setDown\(true\);", connect)
-    assert "setTimeout(refreshInbox, AO.DOWN_GRACE)" in js
-    assert "Date.now() - inboxDownSince >= AO.DOWN_GRACE" in js
+    assert "inboxDownLong = true; refreshInbox(); }, AO.DOWN_GRACE);" in js
+    assert "if (!isDown || shown || inboxDownLong) {" in js

@@ -1973,7 +1973,7 @@
     if (newest) store.set(ANSWERED_SEEN, newest);
   }
 
-  let inboxDownSince = 0;
+  let inboxDownWait = null, inboxDownLong = false;  // the grace's retry pending; it has fired (TD-372)
   async function refreshInbox() {
     const got = await AO.refreshInboxCount();
     const down = $("#agentdown");
@@ -1987,9 +1987,9 @@
       // nothing, so a promote's restart between two polls never shows it; a banner the page
       // rendered at load is the server's word and stands until a poll succeeds
       const isDown = !!(got && got.agent_down), shown = !down.classList.contains("hidden");
-      if (!isDown) inboxDownSince = 0;
-      else if (!shown && !inboxDownSince) { inboxDownSince = Date.now(); setTimeout(refreshInbox, AO.DOWN_GRACE); }
-      if (!isDown || shown || Date.now() - inboxDownSince >= AO.DOWN_GRACE) {
+      if (!isDown) { clearTimeout(inboxDownWait); inboxDownWait = null; inboxDownLong = false; }
+      else if (!shown && !inboxDownWait && !inboxDownLong) inboxDownWait = setTimeout(() => { inboxDownWait = null; inboxDownLong = true; refreshInbox(); }, AO.DOWN_GRACE);
+      if (!isDown || shown || inboxDownLong) {
         down.classList.toggle("hidden", !isDown);
         if (isDown && got.why) $("#agentdownwhy").textContent = got.why;
       }
