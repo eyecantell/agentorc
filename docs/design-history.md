@@ -232,6 +232,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-377, the designer; asked by Paul the same day): a team's grid ends in the **+ card** — a partial card, a dashed outline and a large **+**, whose press is the New session form on that team, Role *Interactive*; a dialog of its own and a **+** beside Members… rejected.
 - 2026-10-07 (TD-372, grinder-ao-2; Paul: *add a buffer before the banner shows*): the *host agent unreachable* banner waits three seconds — it had shown the instant the page's event socket closed, so every page change (the socket closing as the Org was left) and every promote's restart flashed it with no request failed.
 - 2026-10-07 (TD-371, the designer; Paul's decision the same day): the Inbox's *n snoozed — show* list becomes the **Snoozed (n)** fold, the shape of *Not due yet*: each row with its kind's controls and *snoozed until <t>*, **Snooze ▾** with *now*, no **Unsnooze**; the press-leaves list loses Unsnooze.
 - 2026-10-07 (TD-368 slice 3, grinder-ao-2): screen 6's *The ledger's entries that wait on you* built as a fold of one-line links; the scratch home's fixture ledger gained an `Owner: paul` entry so a look has a row to draw.
@@ -306,6 +307,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-377, the designer): the row **team card: + card** — the last card in a defined team's grid, `/new?team=<team>`, a ring stop; absent on *No team*.
 - 2026-10-07 (TD-371, the designer; Paul's decision the same day): the row **Inbox: Snoozed (n) fold**; the `ask` row's and the state row's snooze words say the row keeps its controls and *now* clears it; **Unsnooze** retired.
 - 2026-10-07 (TD-151, grinder-ao-1): the metered chip's hover built with each window's turns and pace — *day $3.20 / $5 (64%) · 412 turns · $0.40/h · at this pace $5 by 12:30* — in `_metered_chip` and `AO.usageChip` alike; the clock time carries its weekday when it is not today, a week's or a month's.
 - 2026-10-07 (TD-151, the designer): the metered chip's hover word *the turns' rate*, undefined since TD-128, is **the window's spend per hour** since the window began, with the time an amount would be reached at that pace, and the window's turn count beside it; turns per hour rejected, the amount being money or tokens.
@@ -646,6 +648,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-07 (TD-377, the designer): *A person in the team* — the team's card offers the start (the + card), Members… stays the definition's.
 - 2026-10-06 (TD-345, the designer): *A person in the team* — under a flow the session takes what a member stage's role takes, the flow's chain of readers on the repos' top-level `held:` (none under a flow with no review stage), in place of *the reader comes from the current flow's `techlead` stage*; a role's own `review:` wins only in a team with no flow.
 - 2026-09-12: Paul: guardians is not on kmaster and is not to be cloned there — its project entry names the devenv host.
 - 2026-09-13: section written, the same day as the Org/Team/Project ADR; the "Guardians in a container" paragraph settled the §10 question of that date as "this session's call, revisable".

@@ -537,6 +537,17 @@ def team_desktop(team_first=False):
     STRIPS = {"samscrape-grind": strip("samscrape", 4, "3d", 7, 3, 2, 1,
                                        ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3, #812)"])}
 
+    # design §4.5 screen 1 *The + card* / §4.5a **team card: + card** (TD-377; Paul, 2026-10-07): the last card
+    # in a defined team's grid, live or not — a partial card the height of a compact card, a dashed outline,
+    # no state bar, a large + and *your session in <team>*; its press is the New session form with the Team
+    # pick made (/new?team=<team>), Role Interactive, nothing written to org.yml. Not on *No team*.
+    def plus_card(team, compact=True):
+        h = "64px"  # a card's head, never a full card, whatever its neighbours are
+        return (f'<a class="card" href="#" title="start a session of your own in {team}: the New session form opens with the team picked and Role Interactive — the team\'s host, repo, manager and reader; nothing is written to org.yml (for a permanent member, Members…)" '
+                f'style="height: {h}; box-sizing: border-box; border: 1px dashed #9aa3ad; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #6b7280;">'
+                f'<span style="font-size: 30px; line-height: 1; font-weight: 300; color: #374151;">+</span>'
+                f'<span class="meta" style="font-size: 12px;">your session in {team}</span></a>')
+
     # the team-first shape (compared 2026-09-25): the team card carries a **summary block** — the
     # repo strip, the whole *on now* list, the reader's queue, the manager's word — and its members
     # shrink to name, state and buttons. Not the design; one of two shapes Paul is choosing between.
@@ -574,7 +585,7 @@ def team_desktop(team_first=False):
             if x[2] != "needs":
                 counts[w] = counts.get(w, 0) + 1
         tally = " · ".join(f"{n} {w}" for w, n in counts.items())
-        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True, compact=team_first) for h, r, x in members), needs, team=True,
+        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True, compact=team_first) for h, r, x in members) + plus_card(team, compact=team_first), needs, team=True,
                       strip=summary(team) if team_first else STRIPS.get(team, ""), stops="06:00" if team == "samscrape-grind" else "")
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
