@@ -247,8 +247,16 @@ code and needs no grant; a session doing the same work does.
      session holds it and refused while the checkout is dirty or off its default branch, each
      leaving `seat_due` standing with the reason on the record — **`seat_held: {by, why}`**
      (home-owned) — for the card's slot (*on call — the checkout is yours · branch td-x, 2 files
-     uncommitted*); the next tick tries again. Its idle close and its fill ceiling are this
-     rule's as for every seat.
+     uncommitted*); the next tick tries again. **`ao team start` is gated by the same reading**
+     (TD-394; designed 2026-10-08): a Start whose checkout is not free writes the seat's record held
+     — `closed`, no pane, `seat_held` with the reason — in place of a pane there, and this rule fills
+     it once the checkout is free; the gate is one reading, never two that can disagree (a node's
+     checkout: occupancy alone, from its records, on both roads). **A `none` that consumes no
+     stretch**: a `work` seat's `none` declared while its checkout is not its own — dirty or off its
+     default branch at the declaration, the holder being itself — leaves `lane_seen` empty, so the
+     ids it could not work stand due and fill it again once the checkout is clean; the fill ceiling
+     bounds a checkout that keeps turning dirty between the gate and the first prompt. Its idle close
+     and its fill ceiling are this rule's as for every seat.
      **A manager on call is a seat of this rule** (TD-247; designed 2026-09-30; the trigger,
      `idle_open` and `seat_filled` built — TD-259 slice 2; the sweep's exception is slice 3's). `ao team start` writes `seat: {trigger: team}` on a manager whose definition does not
      say `on_call: false` — the `manager` role's default alone, another role's manager being a seat only where its
