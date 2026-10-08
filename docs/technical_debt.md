@@ -71,8 +71,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
-| TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Open — decided by Paul |
+| TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Designed — TD-373 builds it |
 | TD-372 | The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once | Medium | Open — decided by Paul |
+| TD-373 | Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes | Medium | Open |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
 
@@ -1234,7 +1235,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the anchor, from Paul's use of the Inbox)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open. **Decided by Paul, 2026-10-07:** a snooze only moves an item's date. It stays actionable, with its suggested answers, and **Unsnooze** is dropped. The design round is the obvious tier: write it, land it, note him.
+**Status:** Designed 2026-10-07 (the designer, PR #PRNUM; the obvious tier — Paul decided it the same day, noted): design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6 (the **Snoozed (n)** fold in place of *n snoozed — show*), §4.5a *Inbox: Snoozed (n) fold* and the `ask` row's and state row's snooze words, the glossary's *snooze*. Settled: every snoozed row — mail or state — keeps its kind's controls in the fold, a press there answers and ends the snooze, **Snooze ▾** on it picks a new time with *now* among the choices (the RPCs' no-`until` clear), and **Unsnooze** is retired. The RPCs keep their fields; the page changes. **Decided by Paul, 2026-10-07:** a snooze only moves an item's date. It stays actionable, with its suggested answers, and **Unsnooze** is dropped. **Next:** designed; the build is TD-373.
+**Blocked by:** TD-373
 **Location:** design §4.10 *Snooze* (`docs/design/4.10-messages.md`), §4.5 screen 6 (the Inbox's snoozed list), §4.5a's Inbox rows (**Snooze ▾**, **Unsnooze**); `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`: the row with **Unsnooze** only), the `unsnooze` and `attention_snooze` acts in `app.js`
 
 **Why:**
@@ -1281,6 +1283,28 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-338 / TD-340 (archived: a control answers the press), TD-226 (archived: the promote's rollback).
 
+## TD-373: Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the designer, from TD-371's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/inbox.html` (`#snoozedbox`, its label), `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`, the promote and work rows' `section == 'snoozed'` branches, `snooze_btn`, `state_snooze`), `src/agentorc/ui/static/app.js` (the `unsnooze` act, `PRESS_LEAVES`, the toasts, `#snoozedlabel`), `src/agentorc/ui/inbox.py` (`inbox_sections`' `snoozed` list; the rows' kinds kept), `src/agentorc/ui/help.py` if a snoozed row's words are there; tests `tests/test_ui_inbox.py`, the templates' tests.
+
+**Why:** design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6, §4.5a *Inbox: Snoozed (n) fold* (TD-371, designed 2026-10-07 on Paul's decision). A snoozed `ask` showed **Unsnooze** alone: a press before every answer that protected nothing.
+
+**Fix:**
+1. **The fold**: `#snoozedbox` becomes the **Snoozed (n)** sub-heading with *back on their dates · not counted*, closed by default, nothing at zero, soonest first (the list is already sorted so).
+2. **The rows**: a snoozed mail entry is drawn by its kind's own macro — the `ask` row with Reply, its suggested answers and Delete; a steer-shaped orphaned question likewise — with *snoozed until <t>* on its line; a snoozed state row (`stalled?`, unpushed work, promote, team start, idle · open work, cadence check failed) by its own macro with its Open, Dismiss or press. The `snoozed`, `state_snoozed` and the two `section == 'snoozed'` branches that drew **Unsnooze** go.
+3. **Snooze ▾ on a snoozed row**: the row's own choices with *now* first — `inbox_snooze` with no `until`, `attention_snooze` with none — and a later time as before. The `unsnooze` act and its toast go; *now*'s toast says *back in its section*.
+4. **A press ends the snooze**: a reply, a suggested answer, *Go with it*, Delete, Dismiss, Open-and-act leave the row as anywhere (`PRESS_LEAVES`); the home already closes the entry, and a closed entry is listed by its close, not by its snooze — check `inbox_sections` lists a closed-but-still-snoozed entry under FYI, not the fold.
+5. A UI change: the UI check on a scratch home (§4.9b), the shot in the PR.
+
+**Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it and the row leaves, a snoozed state row shows its Open and Dismiss, *now* on **Snooze ▾** brings a row back into its section, no row anywhere offers **Unsnooze**, and the fold's heading reads *Snoozed (n) · back on their dates · not counted*.
+
+**Related:** TD-371 (the design), TD-069 (archived: the snooze), TD-079 (archived: the state row's snooze), TD-220 (archived: the *Not due yet* fold, the shape).
 ## TD-374: The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test
 
 **Priority:** Low
