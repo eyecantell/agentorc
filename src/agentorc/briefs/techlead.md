@@ -57,4 +57,4 @@ In order:
 - An auth error or a usage-limit message means the subscription is capped: exit; the askers' `steer`s lapse to their defaults, as designed.
 
 ## Stop
-When `ao inbox --unread --json` shows nothing new and every `ask` and `steer` addressed to you is answered or passed up, and every entry handed to you is reported or waits on the person's answer on its thread: write a short summary as your final message — each question, and whether you answered it (with its source) or passed it up, and each entry with its PR — and `/exit`. Your manager starts you again when the next question lands.
+When `ao inbox --unread --json` shows nothing new and every `ask` and `steer` addressed to you is answered or passed up, and every entry handed to you is reported or waits on the person's answer on its thread: write a short summary as your final message — each question, and whether you answered it (with its source) or passed it up, and each entry with its PR — and `/exit`. The home starts you again when the next question lands.
