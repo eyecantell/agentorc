@@ -128,6 +128,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-07 (TD-384 slice 1, grinder-ao-1): work orders built in the repo reading — `sessionorc/workorders.py` runs the repo's own `nudge_user_attention.py --report --json --fetch` (a plain read when the fetch fails) and keys each open decided line, `fyi` left out, `board:<key>` by the reader's own `item_key`, loaded from that file; `_read_repo` reads them with the PRs every `REPOS_EVERY` as `work_orders`, a failed read keeping the last with the error; `ao repo` lists them first among the pickable rows and counts them.
 - 2026-10-07 (TD-380, the designer; asked by Paul the same day): a decided board line is a **work order** in the repo's lanes — the repo reading lists it as `board:<key>`, High, pickable; rule 8 counts it and a grinder picks it first; the Decide press writes nothing more, and the anchor seat (TD-381) is its other taker.
 - 2026-10-07 (TD-368 slice 1, grinder-ao-1): the reader built — `ledger.kind_of` reads *for you* as `Owner: paul` or `decision (paul)` (any case, `decided_by`), *design-first* as `Kind: design-first` or any entry on `decision (designer)`; the anchor's `Kind: decision` and a build on `decision (anchor)` read *other*.
 - 2026-10-07 (TD-002, grinder-ao-2): *Attachment drop* built for a session on this host — the `attach` RPC, a person's own act, base64 on one line and so 4 MiB a file; the name made safe for a prompt and never written over. A node's session waits for phase 2's copy over ssh.
@@ -936,6 +937,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-07 (TD-384 slice 1, grinder-ao-1): rule 6 and rule 8 read the repo's work orders beside its entries; `lane_matches` puts a work order in every `free-pick` lane whatever its `owner:` words; a work order is never in the first `lane_seen`, so one that sat unclaimed at a declaration is told on the next tick; a claim on `board:<key>` is a lease as any reference's.
 - 2026-10-07 (TD-381, the designer): rule 3 gains the trigger `work` and `seat_held` (the fill gated by occupancy and a clean checkout on its default branch); rule 6 gains the lane word `anchor`.
 - 2026-10-07 (TD-380, the designer): rule 6's `free-pick` takes every open decided line of the repo's board as `board:<key>`, which `owner:<word>` never narrows out.
 - 2026-10-07 (TD-368 slice 1, grinder-ao-1): rule 6's `design-first` word takes an entry on `decision (designer)`, pickable or not, its owner read as `designer` (`ledger.lane_matches`); the grinder's lane is told of it once the decision's PR drops the item.

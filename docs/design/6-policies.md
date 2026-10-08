@@ -436,7 +436,7 @@ code and needs no grant; a session doing the same work does.
      is `build` or unwritten — or `live-check`, **once its build is live** (TD-320; built —
      TD-323 slice 1; §4.9b *A live check is a grinder's once its build is live*) — and **every
      open decided line of the repo's board**, a work order `board:<key>` (TD-380; designed
-     2026-10-07; built — TD-384; §4.4 *Board write-back*), which `owner:<word>` never narrows
+     2026-10-07; built — TD-384 slice 1; §4.4 *Board write-back*), which `owner:<word>` never narrows
      out, since a line has no owner — and **`anchor`** every pickable entry whose `Owner:` is `anchor`, of any
      kind, and every work order (TD-381; designed 2026-10-07; built — TD-386; §4.9b *The anchor
      seat*: the seat's lane, and a person's own anchor session reads the same) — so an evaluation, a

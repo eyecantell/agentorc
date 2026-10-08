@@ -22,6 +22,7 @@ from sessionorc import (
     naming,
     paths,
     reports,
+    workorders,
 )
 from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
@@ -1240,9 +1241,14 @@ class TickMixin:
                 str(e["id"]) for e in got if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(s.lane, e)
             ]
 
-        ids = matching(led["entries"])
+        ledger_ids = matching(led["entries"])
+        # the board's decided lines are work in the lane too (§6 rule 6, TD-384): never in the first
+        # `lane_seen`, so one that sat unclaimed while its member declared is told on the next tick
+        wos = (self._repos.get(s.repo or "") or {}).get("work_orders") or {}
+        order_ids = [i for i in matching(wos.get("orders") or []) if i not in ledger_ids]
+        ids = ledger_ids + order_ids
         if s.lane_seen is None:
-            seen, read = ids, "the reading at this tick"
+            seen, read = list(ledger_ids), "the reading at this tick"
             root, rel = (self._repos.get(s.repo or "") or {}).get("root") or s.repo, s.ledger or led.get("path")
             try:
                 at = _parse(str((s.out_of_work or {}).get("at")))
@@ -1284,7 +1290,7 @@ class TickMixin:
                     # tell it as new — and again after each `none`
                     seen = matching(then)
                     on_tip = set(matching(tip))
-                    seen += [i for i in ids if i not in on_tip and i not in seen]
+                    seen += [i for i in ledger_ids if i not in on_tip and i not in seen]
                     read = f"the ledger at the declaration ({why}), the checkout's own entries seen"
                 else:
                     read = f"the reading at this tick ({why})"
@@ -1313,7 +1319,8 @@ class TickMixin:
         count = f"{len(told)} entr{'y' if len(told) == 1 else 'ies'}"
         self._system_note(
             self._address(s),
-            f"your lane gained {count} since you declared out of work: {named} — read the ledger on "
+            f"your lane gained {count} since you declared out of work: {named} — read the "
+            f"{'ledger and the board' if any(i in order_ids for i in new) else 'ledger'} on "
             "`origin/main`, then claim one or declare again",
         )
         self._save(s)
@@ -1449,7 +1456,9 @@ class TickMixin:
                     return old
                 continue
             ids = news.setdefault(str(r.repo), {}).setdefault(r.name, [])
-            ids.extend(i for i in work_mod.gained(r, led["entries"]) if i not in ids)
+            # the repo's work orders count as entries do (§6 rule 8, TD-384): a decided line starts its team
+            orders = ((self._repos.get(r.repo or "") or {}).get("work_orders") or {}).get("orders") or []
+            ids.extend(i for i in work_mod.gained(r, [*led["entries"], *orders]) if i not in ids)
         news = {repo: {m: ids for m, ids in ms.items() if ids} for repo, ms in news.items()}
         news = {repo: ms for repo, ms in news.items() if ms}
         if not news:
@@ -2481,12 +2490,22 @@ class TickMixin:
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
+        # the board's open decided lines, the lanes' work orders (§4.4 *Board write-back*, TD-384): read
+        # with the PRs, every `REPOS_EVERY`; a failed read keeps the last orders with the error beside them
+        wos = old.get("work_orders")
+        if due:
+            got = workorders.read(root)
+            if "error" in got:
+                wos = {**(wos or {"orders": []}), "error": got["error"], "failed_at": stamp}
+            else:
+                wos = {"orders": [workorders.entry(o) for o in got["orders"]], "at": stamp}
         return {
             "name": Path(root).name,
             "root": root,
             "remote": remote,
             "ledger": led,
             "prs": prs,
+            "work_orders": wos or {"orders": []},
             "at": stamp if due else str(old.get("at") or stamp),
         }
 

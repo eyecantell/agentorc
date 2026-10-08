@@ -1416,6 +1416,13 @@ def _main_checkout(start: str) -> str | None:
     return str(pathlib.Path(common).resolve().parent) if common else None
 
 
+def _work_orders(r: dict[str, Any]) -> list[dict[str, Any]]:
+    """A repo reading's work orders — its board's open decided lines, `board:<key>` (§4.4 *Board
+    write-back*, TD-384) — as entries; none from an agent that predates them."""
+    got = (r.get("work_orders") or {}).get("orders")
+    return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
+
+
 def _repo_line(r: dict[str, Any]) -> str:
     """One repo's numbers on a line (design §4.7 `ao repo`): its PRs and its ledger, each *could not
     look* when its last read failed, with the reading's age."""
@@ -1443,8 +1450,11 @@ def _repo_line(r: dict[str, Any]) -> str:
             for t, x in lanes.items()
         )
         designs = "".join(f" ({t} {len(x['design_first'])})" for t, x in lanes.items())
+        orders = _work_orders(r)
+        decided = f", {len(orders)} decided board line{'' if len(orders) == 1 else 's'}" if orders else ""
         led_part = (
-            f"{len(led['entries'])} open entries: {k.get('pickable', 0)} pickable{picks}, {k.get('design-first', 0)}"
+            f"{len(led['entries'])} open entries{decided}: {k.get('pickable', 0) + len(orders)} pickable{picks},"
+            f" {k.get('design-first', 0)}"
             f" design-first{designs}, {k.get('for-you', 0)} for you, {k.get('other', 0)} other"
         )
         if led.get("error"):
@@ -1655,7 +1665,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
             ]
             r["standing"] = _pr_standing(members)
             r["board"] = _board_due(root)
-            r["lanes"] = teamrun.repo_lanes((r.get("ledger") or {}).get("entries"), root, fleet)
+            # the board's decided lines are in the lanes beside the entries (§4.4 *Board write-back*, TD-384)
+            entries = (r.get("ledger") or {}).get("entries")
+            orders = _work_orders(r)
+            r["lanes"] = teamrun.repo_lanes([*entries, *orders] if entries is not None else None, root, fleet)
 
     def prose() -> None:
         if not picked:
@@ -1670,6 +1683,11 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
                 if st := (r.get("standing") or {}).get(str(p["number"])):
                     print(f"         {st}")
+            # a decided board line first among the pickable rows (§4.7, TD-384): the person has answered
+            for e in _work_orders(r):
+                d = e.get("decided") or {}
+                said = f" · decided {d.get('text') or '?'} {d.get('date') or ''}".rstrip()
+                print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'board':<11}  {e.get('title') or ''}{said}")
             for kind in ("pickable", "design-first", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
                 # the pick order is cadence's (design §4.4 *Repo facts*, §4.8 *Choosing in a free-pick
