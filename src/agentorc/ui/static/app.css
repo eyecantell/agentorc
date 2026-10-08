@@ -457,6 +457,14 @@ details.more .menu .menutoggle { display: flex; align-items: center; gap: 6px; p
 .page.focus { flex-direction: row; align-items: flex-start; gap: 14px; }
 .focus .main { flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; } .focus .side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
 .focus .title { font-size: var(--t-title); font-weight: 500; }
+/* the panel put away (§4.5 *The panel put away*, TD-412): a 28px rail of glyphs, the terminal taking the width */
+.focus .sidetop { margin-bottom: -6px; } .focus .sidetop .btn { padding: 0 4px; color: var(--muted); background: transparent; border-color: transparent; }
+.focus .siderail { display: none; flex-direction: column; align-items: center; gap: 6px; }
+.focus .side.rail { width: 28px; } .focus .side.rail > :not(.siderail):not(script) { display: none; } .focus .side.rail > .siderail { display: flex; }
+.focus .railglyphs { display: contents; }
+.focus .railbtn { width: 24px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 3px; background: var(--card); color: var(--fg); font-size: var(--t-small); line-height: 1; cursor: pointer; }
+.focus .railbtn:hover { background: var(--hover); } .focus #sideback { border-color: transparent; background: transparent; color: var(--muted); }
+.focus .railbtn.g-needs { background: var(--needs-bg); color: var(--needs-fg); border-color: var(--needs); font-weight: 600; }
 /* a popped-out Focus (§4.5 *Pop out*, TD-046): no top bar, so the terminal takes the room it left */
 body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(100vh - 150px); }
 /* design §4.5a **Focus header** (TD-085). The row had no wrap, and 2026-09-19 and -20 put three
@@ -514,7 +522,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .railsheet[open] { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; padding: 16px; }
   .railchips .chip, .railsheet .btn, .railsheet .railline, .railsheet .input { min-height: 44px; }
   .inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }
-  .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
+  .page.focus { flex-direction: column; } .focus .side { width: 100%; }
+  /* put away on a phone, the rail is one row under the composer, 44px targets (TD-412) */
+  .focus .side.rail { width: 100%; } .focus .siderail { flex-direction: row; flex-wrap: wrap; } .focus .railbtn { width: 44px; height: 44px; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
   /* a phone (TD-296 #9): the usage chip takes a row of its own under the buttons */
   #usagechip { order: 1; flex-basis: 100%; max-width: 100%; } #usagechip:empty, #usagechip:not(:has([data-account])) { display: none; }
   .grid { grid-template-columns: 1fr; }

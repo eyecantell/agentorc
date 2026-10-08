@@ -3114,6 +3114,19 @@
   };
 
   // ---- Focus ----
+  // The rail's glyphs (§4.5 *The panel put away*, TD-412): one per side card that has something to
+  // say, in the panel's order — `card` is the `data-side` a press opens ("" for needs-you, whose
+  // prompt is the identity line's, never the panel's), `title` the card's heading and its line.
+  AO.railGlyphs = function (v, ready, inboxN, lines) {
+    const g = [], ln = lines || {};
+    if (v.state === "needs-you") g.push({ card: "", text: "!", title: "Needs you — the prompt is on the identity line" });
+    if (v.doing && v.doing.text) g.push({ card: "working", text: "✎", title: `Working — ${v.doing.text}` });
+    const reports = (v.progress || []).length + (v.findings || []).length;
+    if (reports) g.push({ card: "reports", text: String(reports), title: `Reports — ${ln.reports || reports}` });
+    if (inboxN) g.push({ card: "inbox", text: String(inboxN), title: `Inbox — ${ln.inbox || inboxN}` });
+    if (ready) g.push({ card: "ready", text: "✓", title: "Ready to close — every check passes" });
+    return g;
+  };
   AO.focus = function (s, popped) {
     const id = s.id;
     document.title = AO.focusTitle(s);
@@ -3533,7 +3546,34 @@
       // …and the next act only on the person's own session (`own`): a team member runs itself
       $("#fready").classList.toggle("hidden", !(ready && v.own));
       $("#fclose").classList.toggle("hidden", !(ready && v.own));
+      renderRail(v, ready);
     }
+    // **» put away** / **«** (§4.5 *The panel put away*, §4.5a, TD-412): the panel to a 28px rail,
+    // the terminal taking the width (the fit's observer on `#term` refits it and the pty hears the
+    // new columns as a window resize). Remembered per browser (`focus.side`), read by the template
+    // before the first paint; the folds inside are untouched. The rail's glyphs are drawn from the
+    // same delta the cards are, so it is as current as the panel: one per card with something to say.
+    let railV = s, railReady = false, inboxN = 0;
+    function renderRail(v, ready) {
+      if (v) { railV = v; railReady = !!ready; }
+      const lines = { reports: $("#reportscount").textContent, inbox: $("#inboxcount").textContent };
+      const html = AO.railGlyphs(railV, railReady, inboxN, lines)
+        .map((x) => `<button class="railbtn g-${x.card || "needs"}" type="button" data-rail="${x.card}" title="${esc(x.title)}">${esc(x.text)}</button>`)
+        .join("");
+      const el = $("#railglyphs");
+      if (el && el.innerHTML !== html) el.innerHTML = html;
+    }
+    const sidePanel = $("#side");
+    const putAway = (away) => { sidePanel.classList.toggle("rail", away); store.set("focus.side", away ? "away" : null); };
+    $("#sideaway").addEventListener("click", () => putAway(true));
+    $("#sideback").addEventListener("click", () => putAway(false));
+    // a glyph brings the panel back with its card open — the fold's key written as a click would
+    $("#railglyphs").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-rail]"); if (!b) return;
+      putAway(false);
+      const d = b.dataset.rail ? $(`details.side[data-side="${b.dataset.rail}"]`) : null;
+      if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
+    });
     // design §4.5a **Reports** / **grants** chip (§4.8, TD-028 step 4). The lists come from the
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
     function renderReports(v) {
@@ -3608,6 +3648,7 @@
         const es = got.entries || [];
         $("#inboxcard").classList.toggle("hidden", !es.length);
         $("#inboxcount").textContent = es.length ? `${got.unread} unread · ${es.length}` : "";
+        inboxN = es.length; renderRail();
         $("#inboxlist").innerHTML = es.slice().reverse().map((e) => AO.mailEntry(e, id)).join("");
         AO.reopenFolds($("#inboxlist"));
         if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
@@ -3730,6 +3771,8 @@
     { keys: ["n"], page: "all", control: "New session", sel: '.topbar a[href="/new"]' },
     { keys: ["/"], page: "all", control: "the filter box (Esc leaves it)", sel: "#filter, #ifilter", focus: true },
     { keys: ["?"], page: "all", control: "this list (? or Esc closes it)", help: true },
+    // the side panel put away and brought back (§4.5 *The panel put away*, TD-412): whichever is drawn
+    { keys: ["s"], page: "focus", control: "put the side panel away / bring it back", sel: ".side:not(.rail) #sideaway, .side.rail #sideback" },
     { keys: ["j", "ArrowDown"], page: "org", control: "ring the next card", move: 1 },
     { keys: ["k", "ArrowUp"], page: "org", control: "ring the previous card", move: -1 },
     { keys: ["g"], page: "org", control: "then a team's initial, or a group's number 1–9: jump to that team", g: true },

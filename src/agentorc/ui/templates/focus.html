@@ -174,7 +174,18 @@
      remembered per browser as a team's fold is (`data-side` is the key), in reading order — Git,
      Reports, Inbox, Members, Ready to close, Told at start, then Session, which starts folded. `open` here is the
      first paint's default; `AO.focus` applies what this browser remembers. #}
-  <div class="side">
+  <div class="side" id="side">
+    {# **» put away** / **«** (§4.5 *The panel put away*, §4.5a, TD-412): the whole panel to a 28px
+       rail, the terminal taking the width. Read before the first paint, so a put-away panel never
+       flashes open; this browser's, for every session and the popped-out window alike. #}
+    <script>try { if (JSON.parse(localStorage.getItem("ao.focus.side")) === "away") document.getElementById("side").classList.add("rail"); } catch (e) {}</script>
+    <div class="sidetop row"><span class="grow"></span><button class="btn sm link" type="button" id="sideaway" title="{{ help_title('side-panel') }} (s)">» put away</button></div>
+    {# the rail: «, then one glyph per card that has something to say, in the panel's order, drawn
+       from the same pushed delta the cards are (`renderRail`) #}
+    <div class="siderail" id="siderail">
+      <button class="railbtn" type="button" id="sideback" title="bring the side panel back (s)" aria-label="bring the side panel back">«</button>
+      <span class="railglyphs" id="railglyphs"></span>
+    </div>
     {# **Working** (TD-156, Paul: *drop the current work to a card on the right*): what the session
        says it is doing (§4.8 `doing`), with its age — its own words, shown, never acted on; drawn
        only while it says something, beside Reports, which is what it has finished. Always in the
