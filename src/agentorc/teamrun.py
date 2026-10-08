@@ -306,6 +306,8 @@ def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
     a manager on call (§4.9, TD-259) — with what would make it come, in the card's words
     (`SeatDef.when`, `org.MANAGER_WHEN`)."""
     out = {team.techlead.name: "comes on the next question"} if team.techlead is not None else {}
+    if team.anchor is not None:  # §6 rule 3's `work` trigger (§4.9b *The anchor seat*, TD-381)
+        out[team.anchor.name] = orgmod.ANCHOR_WHEN
     out.update({s.name: s.when() for s in team.seats})
     if team.manager.on_call and team.manager.name:  # §4.9, §6 rule 3's `team` trigger (TD-259)
         out[team.manager.name] = orgmod.MANAGER_WHEN
@@ -325,7 +327,11 @@ def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, 
     # started with until its next Start (§4.9 `on_call`), so a standing manager started before the
     # definition read *on call* is no seat — nothing would fill it, and it still declares
     lead = team.manager.name if team.manager.on_call else None
-    named = {s.name for s in team.seats} | ({team.techlead.name} if team.techlead is not None else set())
+    named = (
+        {s.name for s in team.seats}
+        | ({team.techlead.name} if team.techlead is not None else set())
+        | ({team.anchor.name} if team.anchor is not None else set())
+    )
     out: dict[str, str] = {}
     for s in sessions:
         n = str(s.get("name") or "")
@@ -374,6 +380,8 @@ def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
         add(t.manager.role, [t.manager.name], False)
     if t.techlead:
         add("techlead", [t.techlead.name], True)
+    if t.anchor:
+        add(orgmod.ANCHOR_ROLE, [t.anchor.name], True)
     for seat in t.seats:
         add(seat.role, [seat.name], True)
     for m in t.members:
@@ -464,6 +472,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # a seat on call, filled when a member needs a reading, or a standing session (§4.9, TD-247)
                 "on_call": t.manager.on_call,
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
+                # the anchor seat (§4.9b, TD-381): the name and the home repo, None under `anchor: false`
+                "anchor": {"name": t.anchor.name, "home": t.anchor.home} if t.anchor else None,
                 # the role Add entry's **Open a session** starts, per Type (§4.9, TD-219), each said
                 "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
@@ -657,6 +667,20 @@ def start(
                     f"the techlead started as {rec['id']}, but the briefs name {plan.techlead_id} — "
                     "a stale tmux session holds that id; tell the team, or restart it once that session is gone"
                 )
+        if plan.anchor:
+            # The anchor seat (§4.9b, TD-381): created after the techlead, in the home checkout itself,
+            # which a session already holding it refuses (§9 invariant 2) — then the rest of the team
+            # starts and the seat waits for the next Start, said rather than failing the start
+            x = plan.anchor
+            occ = call("host_occupancy", host=x.host, dir=str(x.dir)) if x.host else call("occupancy", dir=str(x.dir))
+            holders = [str(o) for o in occ.get("occupants") or []]
+            if holders:
+                notes.append(
+                    f"{x.name} not started: {x.dir} is held by {holders[0]} — the anchor seat is the checkout's "
+                    "one agent (§9 invariant 2); it starts at the next Start with the checkout free"
+                )
+            else:
+                created.append(call("create", **params(x, [lead_id] if lead_id else [])))
         for x in plan.seats:
             # A seat with a trigger (§4.9b, TD-098): started with the team, as the techlead is, so it
             # runs once now and is on call after; its manager fills it again when its trigger is met.

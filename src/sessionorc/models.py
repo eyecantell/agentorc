@@ -648,8 +648,8 @@ def reference_of(about: str | None) -> str | None:
 
 # A lane's words that are no reference (design §4.8, §6 rule 6): `free-pick` and `design-first` name
 # what a member may pick, and `owner:<word>` narrows it (TD-214, TD-227). None is counted, nudged
-# about or offered to `ao progress` as something held.
-LANE_WORDS = ("free-pick", "design-first")
+# about or offered to `ao progress` as something held. `anchor` is the anchor seat's (§4.9b, TD-381).
+LANE_WORDS = ("free-pick", "design-first", "anchor")
 OWNER_WORD = "owner:"
 
 

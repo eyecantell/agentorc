@@ -211,6 +211,17 @@ PRESETS: dict[str, dict[str, Any]] = {
         "context": WORKER_CONTEXT,
         "message": "what its trigger counts: the last n PRs, the period",
     },
+    # The anchor seat (design §4.9b *The anchor seat*, TD-381): the checkout's own work, from the lane
+    # word `anchor`, in the home repo's main checkout. No icon: the design names none.
+    "anchor": {
+        "kind": "seat",
+        "brief": "anchor.md",
+        "lane": ["anchor"],
+        "grants": [],
+        "label": "Anchor",
+        "context": WORKER_CONTEXT,
+        "message": "the checkout's own work: an anchor-owned entry, a live check, a decided board line",
+    },
     # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
     # label, so no designer card's badge changes at the build.
     "designer": {
