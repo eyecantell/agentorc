@@ -241,6 +241,20 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
         hookstub.spend_turns.append(_t("u2", at, 2, source="t1", inp=900_000))
         await agent._refresh_spend_inner()
         assert agent._usage["api"]["windows"][0]["pct"] == 100
+        # a pass with nothing spent: the pace alone moved, so the reading is kept current and nothing
+        # is pushed (TD-151) — a stale pace stands in for the one an hour ago
+        agent._usage["api"]["windows"][0]["pace"] = "stale"
+        pushed: list[dict] = []
+        real_broadcast = agent._broadcast
+
+        async def recording(ev):
+            pushed.append(ev)
+            await real_broadcast(ev)
+
+        monkeypatch.setattr(agent, "_broadcast", recording)
+        await agent._refresh_spend_inner()
+        assert [e for e in pushed if e.get("event") == "usage"] == []
+        assert agent._usage["api"]["windows"][0]["pace"]["unit"] == "$"
         await agent._enforce_usage_gate(now)
         g = agent.sessions[w["id"]].gated
         assert g and (g["label"], g["pct"], g["line"]) == ("day", 100, 100)
