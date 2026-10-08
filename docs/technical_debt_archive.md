@@ -6363,6 +6363,39 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 
 **Related:** TD-381, TD-384, TD-385.
 
+---
+
+---
+
+## TD-381: An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved — designed 2026-10-07 (the designer, PR #1232; the steer `m-581533eadebf` on the default and the checkout runs to its bound, 2026-10-08 10:35 MDT, its default being the design), built by TD-385 (PR #1245, the definition), TD-386 (PR #1248, the tick) and TD-387 (PR #1253, the surface), all grinders', each archived in its own PR; a Start gated as the fill is — TD-394 (designed #1252), built by TD-395; archived #1255.
+**Location:** design §4.9 (a team's definition; the manager added by default), §4.9b *Seats with a trigger*, §6 rule 3 (seats; *a manager on call is a seat of this rule*), §9 invariant 2 (one agent per directory: the anchor is the first in the checkout); CLAUDE.md *The live copy is promoted*; `src/agentorc/org.py` (`ManagerDef`, `on_call`), `src/agentorc/teams.py`, `src/sessionorc/ledger.py` (`Owner: anchor`)
+
+**Why:**
+- `Owner: anchor` is the ledger's most common owner: 34 of agentorc's open entries on 2026-10-07 (15 evaluations, 13 live checks, 5 builds, 1 decision). They move only while Paul keeps an interactive session open in the checkout. samscrape, contractmatch and dev-cadence have no anchor at all, so anything only an anchor does (a decided board line, TD-380; a host chore; a promote) waits for Paul to open one.
+- **A manager is added to every team by default**: a team that writes no `manager:` gets one named `<team>-lead`, role `manager`, on call (`on_call` defaults on for the `manager` role), filled by the tick when the team needs it. Only `role: person` starts none. A techlead seat and other `seats:` are written by hand. The anchor seat could follow the manager's pattern.
+
+**Fix (to design):**
+- **Per repo or per team.** The anchor is the checkout's (one per directory, §9 invariant 2), and a repo can be serviced by more than one team. Settle whether the seat belongs to the repo (`.agentorc.yml`, beside `held:`) or to a team, and whether it is added by default as the manager is.
+- **Where it runs.** The main checkout itself rather than a worktree, which the occupancy rule must allow; what happens when a person's own session already holds it.
+- **Its trigger.** For example, an entry with `Owner: anchor` that is pickable, a decided board line (TD-380), a merged PR whose live check is due, a promote held or failed, or `every:`.
+- **Its grants and limits.** It may promote (§6 *Promote*), merge its repo's anchor-owned PRs after their review, and run host chores the board approved. It may not deploy, touch credentials or do anything CLAUDE.md keeps as Paul's.
+- **What changes for the interactive anchor.** Paul's own session in the checkout keeps working as now. Settle which of the two holds the checkout when both want it, and what `Owner: anchor` means after this.
+
+**Done when** the design names the seat (who adds it, where it runs, its trigger, its grants), its §4.5a and §4.9b rows are written, and the build entries are written.
+
+**Resolved:** 2026-10-08 (the designer) — designed in #1232 (§4.9b *The anchor seat*, §4.9 `anchor`, §6 rules 3 and 6, §4.8 the `anchor` preset, §4.5/§4.5a the seat's words, §9 invariant 2, the glossary); built by TD-385 (#1245), TD-386 (#1248) and TD-387 (#1253), each read on a scratch home and archived in its PR; the Start's gate settled by TD-394 (#1252), TD-395 building it. The steer `m-581533eadebf` (present by default, in the checkout) runs to its bound, 2026-10-08 10:35 MDT, its default being what is built; a reply that chooses otherwise is a new entry.
+
+**Related:** TD-394 / TD-395 (the Start's gate), TD-380 (decided lines), TD-247 / TD-259 (the manager on call), TD-098 (seats with a trigger), TD-132 (archived: the promote policy).
+
+---
+
 ## TD-395: Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own writing `lane_seen` with no ids
 
 **Priority:** Low

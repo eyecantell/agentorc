@@ -72,7 +72,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
-| TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Designed — TD-395 builds it |
 
@@ -1250,32 +1249,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the design says, in §4.4 and §4.9a, where a decided line goes at the press and who carries it out, and the build entries are written.
 
 **Related:** TD-381 (the anchor seat), TD-303 / TD-305 (archived: the decided row under *Waiting on them*), TD-142 (archived: board reply), TD-255 (archived: answers and *Go with it*).
-
-## TD-381: An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-10-07 (the anchor, from Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-07 (the designer, PR #1232; the steer to Paul on the default and the checkout is `m-581533eadebf`, bound 2026-10-08 10:35 MDT): design §4.9b *The anchor seat*, §4.9 (the team key `anchor`), §6 rule 3 (the trigger `work`, `seat_held`) and rule 6 (the lane word `anchor`), §4.8 (the `anchor` preset), §4.5 and §4.5a (the seat's on-call words, Members…, the occupancy check), §9 invariant 2, the glossary's *anchor seat*. Settled: per team, one per repo, present by default as the manager is (`anchor: false` opts out); it runs in the home repo's main checkout and never while a person's session holds it, or while the checkout is dirty or off its default branch — the person's session is the anchor meanwhile; its trigger is its lane gaining work — `Owner: anchor` entries of any kind and decided board lines (TD-380); no grants; it never promotes and never the third tier; it keeps the checkout current. Rejected: a worktree of its own, opt-in only (steered), a per-repo key beside `held:`. `Owner: anchor` means what it did — now a lane. **Next:** designed; the builds are TD-385 (the definition), TD-386 (the tick) and TD-387 (the surface).
-**Blocked by:** TD-385, TD-386, TD-387
-**Location:** design §4.9 (a team's definition; the manager added by default), §4.9b *Seats with a trigger*, §6 rule 3 (seats; *a manager on call is a seat of this rule*), §9 invariant 2 (one agent per directory: the anchor is the first in the checkout); CLAUDE.md *The live copy is promoted*; `src/agentorc/org.py` (`ManagerDef`, `on_call`), `src/agentorc/teams.py`, `src/sessionorc/ledger.py` (`Owner: anchor`)
-
-**Why:**
-- `Owner: anchor` is the ledger's most common owner: 34 of agentorc's open entries on 2026-10-07 (15 evaluations, 13 live checks, 5 builds, 1 decision). They move only while Paul keeps an interactive session open in the checkout. samscrape, contractmatch and dev-cadence have no anchor at all, so anything only an anchor does (a decided board line, TD-380; a host chore; a promote) waits for Paul to open one.
-- **A manager is added to every team by default**: a team that writes no `manager:` gets one named `<team>-lead`, role `manager`, on call (`on_call` defaults on for the `manager` role), filled by the tick when the team needs it. Only `role: person` starts none. A techlead seat and other `seats:` are written by hand. The anchor seat could follow the manager's pattern.
-
-**Fix (to design):**
-- **Per repo or per team.** The anchor is the checkout's (one per directory, §9 invariant 2), and a repo can be serviced by more than one team. Settle whether the seat belongs to the repo (`.agentorc.yml`, beside `held:`) or to a team, and whether it is added by default as the manager is.
-- **Where it runs.** The main checkout itself rather than a worktree, which the occupancy rule must allow; what happens when a person's own session already holds it.
-- **Its trigger.** For example, an entry with `Owner: anchor` that is pickable, a decided board line (TD-380), a merged PR whose live check is due, a promote held or failed, or `every:`.
-- **Its grants and limits.** It may promote (§6 *Promote*), merge its repo's anchor-owned PRs after their review, and run host chores the board approved. It may not deploy, touch credentials or do anything CLAUDE.md keeps as Paul's.
-- **What changes for the interactive anchor.** Paul's own session in the checkout keeps working as now. Settle which of the two holds the checkout when both want it, and what `Owner: anchor` means after this.
-
-**Done when** the design names the seat (who adds it, where it runs, its trigger, its grants), its §4.5a and §4.9b rows are written, and the build entries are written.
-
-**Related:** TD-380 (decided lines), TD-247 / TD-259 (the manager on call), TD-098 (seats with a trigger), TD-132 (archived: the promote policy).
 
 ## TD-384: Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes
 
