@@ -1347,6 +1347,7 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
     from agentorc.cli import team_skill_text
 
     importlib.reload(orgmod)
+    monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", False)  # the reload took conftest's off back (anchor: tests' own)
     (tmp_path / "org.yml").write_text(
         yaml.safe_dump({
             "projects": {"p": {"repos": {"r": {"h": str(tmp_path)}}}},

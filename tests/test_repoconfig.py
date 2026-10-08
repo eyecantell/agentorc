@@ -30,6 +30,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
         "manager",
         "techlead",
         "auditor",
+        "anchor",
         "designer",
         "plain",
     ]
@@ -89,6 +90,7 @@ commands:
         "manager",
         "techlead",
         "auditor",
+        "anchor",
         "designer",
         "plain",
         "reviewer",
@@ -258,6 +260,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "manager": "Manager",
         "techlead": "Tech Lead",
         "auditor": "Auditor",
+        "anchor": "Anchor",
         "designer": "Designer",
         "plain": "Plain",
     }
@@ -292,6 +295,7 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
         "manager": "flag",
         "techlead": "book",
         "auditor": "eye",
+        "anchor": None,
         "designer": None,
         "plain": None,
     }

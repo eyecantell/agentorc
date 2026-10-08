@@ -128,11 +128,13 @@ class Launch:
     context_bound: int | None = None  # tokens past which rule 5 tells it to end its run (§4.8, TD-190)
     prompt_from: dict[str, Any] | None = None  # what `prompt` was made from (§6 rule 7, TD-217)
     set_aside: bool = False  # its role's own `review:` was set aside under the team's flow (§4.9c item 2)
+    in_checkout: bool = False  # runs in the main checkout itself, not a worktree: the anchor seat (§4.9b)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
         session lives in `<repo>/.claude/worktrees/<name>`, so the main checkout stays the
-        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting.
+        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting —
+        but the anchor seat, which is the checkout's one agent (§4.9b *The anchor seat*).
         `host` is sent only when the session lands elsewhere (§4.4, a client never sends a
         parameter it has not set): the home routes the create to that node."""
         return {
@@ -141,7 +143,7 @@ class Launch:
             "dir": str(self.dir),
             "adapter": self.adapter,
             "repo": str(self.dir),
-            "worktree": self.name,
+            "worktree": None if self.in_checkout else self.name,
             "unattended": self.unattended,
             "resume": None,
             "profile": self.profile,
@@ -173,6 +175,7 @@ class Plan:
     source: Path | None = None
     lead: Launch | None = None
     techlead: Launch | None = None
+    anchor: Launch | None = None  # the anchor seat, in the home checkout (§4.9b, TD-381); None: `anchor: false`
     techlead_id: str = ""  # the id the seat will take, which every brief's `{techlead}` names
     manager_id: str = ""  # the id the manager will take, which every brief's `{manager}` names
     seats: list[Launch] = field(default_factory=list)  # seats with a trigger (§4.9b, TD-098)
@@ -192,6 +195,7 @@ class Plan:
         return (
             ([self.lead] if self.lead else [])
             + ([self.techlead] if self.techlead else [])
+            + ([self.anchor] if self.anchor else [])
             + list(self.seats)
             + list(self.members)
         )
@@ -266,7 +270,7 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
 # A lead, a member and the techlead seat are shaped alike where a launch is concerned (§4.9): each
 # names a lane, a brief override, grants, a profile and whether it is unattended. `None` is the
 # person-lead case.
-Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | orgmod.SeatDef | None
+Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | orgmod.AnchorDef | orgmod.SeatDef | None
 
 
 # `(host, checkout, [paths relative to it])` → `{path: text, or None when there is no such file}`:
@@ -953,9 +957,12 @@ def team_roles(team: orgmod.TeamDef, cfg: repoconfig.RepoConfig, overlay: dict[s
 def _trigger(member: Spec) -> dict[str, str]:
     """A seat's trigger as its record carries it (design §4.9b, §6 rule 3): a seat with a trigger
     gives its own, `{trigger, after}`; the techlead's is a question landing, `asks`; a manager on
-    call's is `team`, a member needing a reading no policy makes (§6 *A manager on call*, TD-247)."""
+    call's is `team`, a member needing a reading no policy makes (§6 *A manager on call*, TD-247);
+    the anchor's is `work`, its lane gaining an id (§6 rule 3, TD-381)."""
     if isinstance(member, orgmod.ManagerDef):
         return {"trigger": "team"}
+    if isinstance(member, orgmod.AnchorDef):
+        return {"trigger": "work"}
     if isinstance(member, orgmod.SeatDef):
         return {"trigger": member.trigger, **({"after": member.after} if member.after else {})}
     return {"trigger": "asks"}
@@ -1025,6 +1032,38 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
         missing = _primer_missing(seat, p.techlead.dir, host, here, files)
         if missing:
             p.notes.append(missing)
+    if team.anchor is not None:
+        # The anchor seat (§4.9b, TD-381): one per repo across the org, so a second team whose anchor's
+        # home is the same repo is refused naming the first, and `ao org check` says so through here
+        anchor = team.anchor
+        if (first := org.anchor_first(team)) is not None:
+            raise TeamError(
+                f"team {team.name}: {first.name} already has the anchor seat of {anchor.home} — one per repo "
+                f"(design §4.9b); write `anchor: false` on one of them"
+            )
+        if anchor.name in seen:
+            raise TeamError(f"team {team.name}: two sessions would be called {anchor.name!r} — a name is one session")
+        seen.add(anchor.name)
+        p.anchor = _launch(
+            org=org,
+            team=team,
+            name=anchor.name,
+            role_name=orgmod.ANCHOR_ROLE,
+            home=anchor.home,
+            host=host,
+            here=here,
+            profile_override=profile or anchor.profile,
+            member=anchor,
+            lead=False,
+            block=project_block(org, team.projects, host, anchor.home) if reach else "",
+            files=files,
+            techlead=tid,
+            context=ctx,
+            manager=mid,
+            under=under,
+            seat=True,
+        )
+        p.anchor.in_checkout = True  # the home repo's main checkout: what makes it the anchor (§9 invariant 2)
     for trig in team.seats:
         # A seat with a trigger (§4.9b, TD-098): launched as the techlead is — its manager its
         # controller, no grants — and filled again by the manager when its trigger is met.

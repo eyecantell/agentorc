@@ -44,6 +44,7 @@ def test_every_preset_has_a_kind_and_an_overlay_may_not_write_one(tmp_path):
         "manager": "manager",
         "techlead": "seat",
         "auditor": "seat",
+        "anchor": "seat",
         "plain": "plain",
     }
     with pytest.raises(ValueError, match=r"grinder.kind: a role's kind is its definition's"):
@@ -971,6 +972,7 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
         "grind-2": "grind-2: devenv is not answering — applied to the others",
     }
     assert not [p for m, p in state["calls"] if m == "relaunch" and p["id"] != "ao-agentorc-grind-1"]
+
 
 def test_a_flow_named_is_written_and_nothing_more(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     """§4.7, §4.9c *A switch takes one gate, Apply* (TD-356, TD-359): `ao team flow <team> <flow>`

@@ -10,6 +10,7 @@ teams:
     projects: [agentorc]
     manager: {role: manager, name: manager-ao-1}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # optional: the go-between (§4.9b)
+    # anchor: false                   # every team has an anchor seat, `<team>-anchor`, unless it says so (§4.9b)
     seats: [{name: docs-audit-ao-1, role: auditor, trigger: {prs: 10}}]   # optional: seats with a trigger (§4.9b)
     entries: {feature: designer}      # optional: the role Add entry's session takes, per Type (§4.9)
     members:
@@ -105,6 +106,30 @@ class TechleadDef:
     unattended: bool = True
 
 
+# Whether a team that writes no `anchor:` has the seat (design §4.9b *The anchor seat*: by default, as
+# it has a manager). The suite turns it off (tests/conftest.py), as it turns identity off: a test of
+# something else starts the team it writes, and the anchor's own tests turn it back on.
+ANCHOR_DEFAULT = True
+# What fills the anchor seat, in the card's words (design §4.5a *card: on call — the anchor seat's words*)
+ANCHOR_WHEN = "comes when the checkout's lane gains work"
+
+
+@dataclass
+class AnchorDef:
+    """A team's anchor seat (design §4.9b *The anchor seat*, TD-381): present by default as the
+    manager is, always the `anchor` role, run in the home repo's **main checkout** rather than a
+    worktree, filled on §6 rule 3's `work` trigger. Its lane and grants are the preset's."""
+
+    name: str = ""  # default `<team>-anchor`, filled by the loader
+    home: str = ""  # default the manager's home, by the `home` rule
+    profile: str | None = None
+    brief: str | None = None  # overrides the preset's `anchor.md`
+    lane: list[str] = field(default_factory=list)
+    grants: list[str] | None = None
+    unattended: bool = True
+    implied: bool = False  # the definition wrote no `anchor:`: the default's seat
+
+
 @dataclass
 class SeatDef:
     """A seat with a trigger (design §4.9b *Seats with a trigger*, TD-098): a session its manager
@@ -160,6 +185,7 @@ class TeamDef:
     manager: ManagerDef = field(default_factory=ManagerDef)
     members: list[MemberDef] = field(default_factory=list)
     techlead: TechleadDef | None = None  # the seat (§4.9b), when the definition has one
+    anchor: AnchorDef | None = None  # the anchor seat (§4.9b, TD-381): present unless `anchor: false`
     seats: list[SeatDef] = field(default_factory=list)  # seats with a trigger (§4.9b, TD-098)
     source: Path | None = None  # the file it was read from (`ao team list` names it)
     host: str = ""  # where every session lands (design §4.4a "Teams across hosts"); "" is the host the start runs on
@@ -179,11 +205,13 @@ class TeamDef:
 
     def session_names(self) -> list[str]:
         """Every session name the definition names, as often as it names it: the manager (when a
-        session manages), the techlead seat, then each member entry's (design §4.9 *Add or remove a
-        member from the team card*: a name the definition holds is never added again, TD-268)."""
+        session manages), the techlead seat, the anchor seat, then each member entry's (design §4.9 *Add
+        or remove a member from the team card*: a name the definition holds is never added again, TD-268)."""
         out = [self.manager.name] if self.manager.role != PERSON and self.manager.name else []
         if self.techlead is not None:
             out.append(self.techlead.name)
+        if self.anchor is not None:
+            out.append(self.anchor.name)
         return out + [n for m in self.members if m.team is None for n in m.names()]
 
     def twice_named(self) -> list[str]:
@@ -250,6 +278,23 @@ class Org:
                 if rname not in out:
                     out.append(rname)
         return out
+
+    def anchor_first(self, team: TeamDef) -> TeamDef | None:
+        """The team before `team`, in the org's order, whose anchor seat has the same home repo on
+        the same host (design §4.9b *One per repo*: two seats in one checkout) — the one `ao team start` and
+        `ao org check` name when they refuse `team`'s. None when `team` has no anchor or is first."""
+        if team.anchor is None:
+            return None
+
+        for other in self.teams.values():
+            if other is team:
+                return None
+            if other.name in self.unlanded or other.anchor is None:
+                continue  # a team whose landing cannot be told starts nowhere, so it holds no checkout
+            # `host` is where it lands — a repo's team landing elsewhere has it set (`_land`); "" here
+            if other.anchor.home == team.anchor.home and other.host == team.host:
+                return other
+        return None
 
 
 def org_file() -> Path:
@@ -583,11 +628,13 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended", "on_call")
 # a member is never on call (§4.9): the key is the manager's alone, so on a member it is a stray one
 MEMBER_KEYS = (*(k for k in MANAGER_KEYS if k != "on_call"), "count", "team")
-TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host", "entries", "flows")
+TEAM_KEYS = ("projects", "manager", "techlead", "anchor", "seats", "members", "host", "entries", "flows")
 # the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
 ENTRY_TYPES = ("debt", "feature")
 TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
+ANCHOR_KEYS = ("name", "home", "profile", "brief")
+ANCHOR_ROLE = "anchor"
 SEAT_KEYS = ("name", "role", "trigger", "brief", "profile", "home")
 TRIGGERS = ("asks", "prs", "every")
 _DURATION = re.compile(r"[1-9]\d*[mhd]")
@@ -672,6 +719,9 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         manager,
         members,
         techlead=_techlead(name, raw.get("techlead"), f"{key}.techlead") if "techlead" in raw else None,
+        anchor=_anchor(name, raw["anchor"], f"{key}.anchor")
+        if "anchor" in raw
+        else (AnchorDef(name=f"{name}-anchor", implied=True) if ANCHOR_DEFAULT else None),
         seats=_seats(name, raw.get("seats"), f"{key}.seats"),
         source=source,
         host=_str(raw.get("host"), f"{key}.host"),
@@ -728,6 +778,25 @@ def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
     )
 
 
+def _anchor(team: str, raw: Any, key: str) -> AnchorDef | None:
+    """`anchor: {name, home, profile, brief}` or `anchor: false` (design §4.9b *The anchor seat*): a
+    team that says neither has one, as it has a manager. No `role:`, `lane:` or `grants:` — the seat
+    is the role, and its lane and grants are the preset's. `anchor: true` reads as the default."""
+    if raw is False:
+        return None
+    if raw is True or raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{key} must be a mapping {{name, home, profile, brief}} or false, not {raw!r}")
+    _no_stray(raw, ANCHOR_KEYS, key)
+    return AnchorDef(
+        name=_str(raw.get("name"), f"{key}.name", default=f"{team}-anchor"),
+        home=_str(raw.get("home"), f"{key}.home"),
+        profile=_opt_str(raw.get("profile"), f"{key}.profile"),
+        brief=_opt_str(raw.get("brief"), f"{key}.brief"),
+    )
+
+
 def _seats(team: str, raw: Any, key: str) -> list[SeatDef]:
     """`seats: [{name, role, trigger, brief, profile, home}]` (design §4.9b *Seats with a trigger*).
     `trigger` is `asks`, `{prs: <n>}` or `{every: <n>m|h|d}`, and is required: a seat nobody says
@@ -745,10 +814,10 @@ def _seats(team: str, raw: Any, key: str) -> list[SeatDef]:
         role = _str(item.get("role"), f"{skey}.role")
         if not role:
             raise ValueError(f"{skey}.role is required")
-        if role in (PERSON, DEFAULT_MANAGER_ROLE, TECHLEAD_ROLE):
+        if role in (PERSON, DEFAULT_MANAGER_ROLE, TECHLEAD_ROLE, ANCHOR_ROLE):
             raise ValueError(
                 f"{skey}.role: {role!r} is not a seat's role — a seat is a session its manager fills on a trigger "
-                "(the techlead has its own `techlead:` key)"
+                "(the techlead and the anchor have their own `techlead:` and `anchor:` keys)"
             )
         trigger, after = _trigger(item.get("trigger"), f"{skey}.trigger")
         out.append(
@@ -802,6 +871,12 @@ def _validate(org: Org, label: str) -> None:
             team.manager.home = _home(team.manager.home, repos, f"{key}.manager.home")
         if team.techlead is not None:
             team.techlead.home = _home(team.techlead.home, repos, f"{key}.techlead.home")
+        if team.anchor is not None:  # `home` as the manager's (§4.9): unsaid, the manager's home where it has one
+            mhome = team.manager.home if team.manager.role != PERSON else ""
+            if team.anchor.implied and not (team.anchor.home or mhome) and len(repos) > 1:
+                team.anchor = None  # no home to tell, and nothing written to say one: no seat, never a refusal
+            else:
+                team.anchor.home = _home(team.anchor.home or mhome, repos, f"{key}.anchor.home")
         for i, seat in enumerate(team.seats):
             seat.home = _home(seat.home, repos, f"{key}.seats[{i}].home")
         for i, m in enumerate(team.members):
