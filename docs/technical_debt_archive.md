@@ -6019,3 +6019,28 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Resolved:** 2026-10-07 (PR #1223, grinder-ao-2) — design §4.5 *The host agent's down banner*: the event socket's close starts a `AO.DOWN_GRACE` (3 s) wait instead of drawing the banner, a second close keeps the first wait, any message clears it (a banner rendered at load included); a close after `pagehide` draws nothing; the Inbox's poll asks again after the grace and draws only when it is still failing. Read on a scratch home under headless Chromium: Org → Inbox → Org drew nothing, a 1 s outage nothing, a 5 s outage drew it at 3.0 s and the reconnect cleared it, the Inbox drew nothing for one failed poll and drew it when the retry failed too. `tests/test_ui_down_grace.py` runs the timer under node with a fake clock.
 
 **Related:** TD-338 / TD-340 (archived: a control answers the press), TD-226 (archived: the promote's rollback).
+
+## TD-367: *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved — designed 2026-10-07 (the designer, PR #1203), built by TD-368 (PRs #1209, #1210, live check held, archived #1220). Paul's reply to the steer `m-77a04cc7eccc` (2026-10-07): *go with it, but make sure we are not leaving TD entries untracked or unreachable through our UI* — checked in the code: `kind_of` gives every entry one of four kinds (*for you*, *design-first*, *pickable*, *other*) and the Repo page lists all four (`LEDGER_LISTS`), so every open entry is reachable from the Repo page, and the person's from the Inbox fold.
+**Location:** `sessionorc.ledger` (`kind_of`, `lane_matches`), `src/agentorc/ui/repo.py` (`LEDGER_LISTS`), `src/agentorc/ui/org.py` (`KIND_BARS`), the Inbox; design §4.5 screen 6 (the Inbox), §4.7 `ao repo`
+
+**Why:**
+- Paul, 2026-10-07: *15 for you* on the repo line, and *I do not see them in the inbox*.
+- The fifteen were `Owner: paul` entries, entries blocked by `decision (Paul)`, and also:
+  - TD-151, blocked by `decision (designer)`;
+  - TD-209 and TD-077, `Kind: decision` owned by the anchor.
+- So the bucket says *for you* about decisions that are not the person's.
+- And nothing in the Inbox, where the person looks for what waits on them, shows any of them. Only the Repo page lists them.
+- An entry blocked by the designer's decision is in nobody's lane: TD-151 is `Owner: grinder`, blocked, and the designer's lane is `design-first`.
+
+**Resolved:** 2026-10-07 (archived PR #TBD). The lasting content: design §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6 and §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo`; the code in `sessionorc.ledger` (`kind_of`, `lane_matches`), `src/agentorc/ui/inbox.py`.
+
+**Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
+
+**Related:** TD-357 (archived: the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
