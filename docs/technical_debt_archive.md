@@ -6670,3 +6670,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** §4.9b names no manager in a seat trigger's count or clock, and it agrees with §6 rule 3.
 
 **Related:** TD-098 (archived, the seats), TD-247 (the manager's jobs moved to the tick).
+
+## TD-402: No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1266)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/cli.py` (`cmd_team_list`'s `word = "definition" if teamrun.definition_changed(...)`, `cmd_team_flow`'s same line, and `what = applied["flow"] or "the definition"`); tests `tests/test_flows.py`, `tests/test_cli_teams.py`.
+
+**Why:** TD-400's *Done when* says the header, `ao team list` and `ao team flow` carry the new words and "tests cover each". #1266 tested the Org page's header (`test_ui_teams.py`) and `definition_changed` on hand-built dicts, but the CLI's prose has no test. Evidence, at `origin/main` d9539fe8, `PYTHONPATH=$PWD/src pytest -q tests/test_anchor_seat.py tests/test_flows.py tests/test_ui_teams.py` is 130 passed, and stays 130 passed with any one of these reverted: `word = "definition" if teamrun.definition_changed(out["differences"], out["flow"]) else "flow"` → `word = "flow"` (`ao team flow`); the same line on `r["differences"]` in `ao team list`; `what = applied["flow"] or "the definition"` → `what = applied["flow"]` (which prints `applied None:` for a team with no flows). The added `test_ao_team_flow_lists_the_flows_and_writes_the_pick` lines only read the no-differences bare form.
+
+**Resolved:** 2026-10-08 (PR #1276, grinder-ao-2) — `tests/test_anchor_seat.py::test_ao_team_list_and_flow_say_definition_changed_and_apply_says_the_definition`: a live team with no flow that lacks its anchor reads *definition changed — Apply (ao team flow t --apply):* and *t-anchor: starts* in `ao team list` and `ao team flow t`, and `--apply` prints *applied the definition:*; each of the three reverts above fails it.
+
+**Done when** each of the three reverts above fails a test.
+
+**Related:** TD-400, #1266.
