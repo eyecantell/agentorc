@@ -76,7 +76,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check: the wound-down team's start for a decided line |
 | TD-386 | Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor` | High | Open |
 | TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
-| TD-390 | The team's + card (#1234): `test_the_plus_card_is_no_session_to_the_client` greps `app.js` for source lines, so it asserts none of the client behaviour its docstring names | Low | Open |
 
 ---
 
@@ -1344,19 +1343,3 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home the seat's card reads *on call — comes when the checkout's lane gains work*, held off it reads *the checkout is yours · <why>*, Members… and `ao team list` name it, the New session form's directory check names a working seat as a seat, and the tests cover each.
 
 **Related:** TD-381, TD-385, TD-386.
-
-## TD-390: The team's + card (#1234): `test_the_plus_card_is_no_session_to_the_client` greps `app.js` for source lines, so it asserts none of the client behaviour its docstring names
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1234)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_ui_org.py` (`test_the_plus_card_is_no_session_to_the_client`); `src/agentorc/ui/static/app.js` (the sort, `applyFilter`, the group swap)
-
-**Why:** The docstring says *a filter hides it, a delta puts it back where the server still draws it, and a removed group never moves it elsewhere*; the body is eight asserts, seven of them `"<source line>" in js` and one `in css`, so it fails on a reformat and passes when the behaviour is wrong (the same shape as TD-383's). E.g. a `filtering` computed after the `plus` line, or the swap appending the card to the wrong grid, passes as long as the quoted text is present; `tests/test_ui_down_grace.py` already shows the node fake-DOM probe this suite uses.
-
-**Done when** a node probe drives the sort, a filter, and a delta whose group lacks the card, over a small fake DOM, and asserts the + card stays last, is hidden under a filter and is restored; the substring asserts are dropped.
-
-**Related:** TD-379, TD-383, TD-389.
