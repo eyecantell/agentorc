@@ -91,7 +91,7 @@ def test_the_three_sections_their_order_and_what_the_count_is():
 @pytest.mark.unit
 def test_a_snoozed_entry_is_in_no_section_and_in_no_count_until_its_time():
     """§4.10 *Snooze*: the entry leaves its section and the page's count until that time — and is
-    listed under *n snoozed*, because a snooze is never a way to lose mail. A `snoozed_until` that
+    listed in the **Snoozed (n)** fold, because a snooze is never a way to lose mail. A `snoozed_until` that
     has passed, or that cannot be read at all, puts the entry back where it belongs."""
     from agentorc.ui.app import inbox_sections
 
@@ -260,15 +260,22 @@ def test_an_fyi_row_dismisses_and_a_system_note_has_no_reply():
 
 
 @pytest.mark.unit
-def test_a_snoozed_row_offers_unsnooze_and_says_when_in_the_persons_own_clock():
-    """§4.10 *Snooze* — and the rule every clock on this page follows: the entry stores a UTC
+def test_a_snoozed_ask_keeps_its_controls_offers_now_and_says_when_in_the_persons_own_clock():
+    """§4.10 *Snooze* — *a snooze is a date, not a hiding place* (TD-373): a snoozed `ask` is drawn
+    as an `ask`, Reply, its suggested answers and Delete in place, with *now* first in its Snooze
+    menu and no Unsnooze. And the rule every clock on this page follows: the entry stores a UTC
     instant, and the person set that time in their own clock, so the row hands the instant to the
     browser to format and never prints the bare `Z` string. The raw instant stays on hover."""
-    html = rows("snoozed", [entry("m-1", "ask", snoozed_until="2026-09-19T18:00:00Z")])
-    assert 'data-act="unsnooze" data-id="person" data-msg="m-1"' in html
+    html = rows("snoozed", [entry("m-1", "ask", snoozed_until="2026-09-19T18:00:00Z", answers=["merge it", "hold it"])])
+    assert "Unsnooze" not in html and "unsnooze" not in html
+    assert 'data-act="reply"' in html and 'data-act="answer"' in html and 'data-act="unmail"' in html
+    menu = html[html.index(">Snooze</summary>") :]
+    assert menu.index('data-when="now"') < menu.index('data-when="1h"')  # *now* first
+    assert 'data-act="snooze" data-id="person" data-msg="m-1" data-when="now"' in html
+    assert "open · no bound" not in html  # the snoozed line says when instead
     assert 'class="localtime" data-at="2026-09-19T18:00:00Z" title="2026-09-19T18:00:00Z"' in html
     assert ">2026-09-19T18:00:00Z<" not in html  # never the stored instant as the visible text
-    assert 'data-act="snooze"' not in html
+    assert 'data-when="now"' not in rows("needs", [entry("m-2", "ask")])  # *now* only on a snoozed row
     js = (UI / "static" / "app.js").read_text()
     assert ".localtime[data-at]" in js and "toLocaleString()" in js
 
@@ -317,8 +324,9 @@ def test_the_team_filter_has_the_data_it_filters_on_and_no_team_is_a_badge_too()
 
 @pytest.mark.unit
 def test_the_page_renders_its_three_sections_the_count_and_the_snoozed_affordance(monkeypatch, tmp_path):
-    """§4.5 screen 6: three sections, FYI folded by default, and a small *n snoozed — show* that
-    lists what is set aside. The Steering section says doing nothing is a valid answer."""
+    """§4.5 screen 6: three sections, FYI folded by default, and the **Snoozed (n)** fold under the
+    sections, closed, listing what is set aside. The Steering section says doing nothing is a valid
+    answer."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     from agentorc.ui.app import inbox_sections, templates
@@ -338,7 +346,11 @@ def test_the_page_renders_its_three_sections_the_count_and_the_snoozed_affordanc
     assert ">Needs you<" in html and ">Steering<" in html and ">FYI<" in html
     assert "Doing nothing is a valid answer" in html
     assert needs_line(html) == "1"  # the snoozed ask is not in it
-    assert "1 snoozed — show" in html
+    fold = html[html.index('id="snoozedbox"') :]
+    assert fold.index('id="snoozedbox"') == 0 and html.index('id="sec-fyi"') < html.index('id="snoozedbox"')
+    assert '<span class="boardsubh">Snoozed</span> <span class="meta" id="snoozedlabel">(1)</span>' in fold
+    assert "back on their dates · not counted" in fold
+    assert " open" not in fold[: fold.index(">")]  # closed by default
     fyi = html[html.index('id="sec-fyi"') : html.index('id="sec-fyi"') + 40]
     assert " open" not in fyi  # folded by default; the browser remembers what the person did
     assert 'class="btn light on" href="/inbox"' in html  # the top bar's control is this page's nav item
@@ -493,9 +505,10 @@ def test_the_page_the_count_and_the_poll_agree_and_reading_marks_nothing(client,
 
 
 @pytest.mark.integration
-def test_snooze_hides_and_uncounts_an_entry_and_unsnooze_brings_it_back(client, tmp_path):
+def test_snooze_hides_and_uncounts_an_entry_and_now_brings_it_back(client, tmp_path):
     """§4.10 *Snooze*: `/api/person/snooze` is `inbox_snooze` caller-less; the entry leaves its
-    section and the count until its time, is listed under *snoozed*, and no `until` clears it. A
+    section and the count until its time, is listed under *snoozed*, and no `until` — the snoozed
+    row's *now* — clears it. A
     `steer` is refused a snooze by the agent, and that refusal reaches the page as an error."""
     sender = sender_session(client, tmp_path)
     ask = send(sender, text="merge PR 9?", kind="ask")["id"]
@@ -507,7 +520,11 @@ def test_snooze_hides_and_uncounts_an_entry_and_unsnooze_brings_it_back(client, 
     assert r.status_code == 200 and r.json()["snoozed_until"] == later
     got = client.get("/api/person/inbox").json()
     assert got["needs"] == 0 and got["sections"]["needs"] == [] and got["sections"]["snoozed"] == [ask]
-    assert got["snoozed_n"] == 1 and ">Unsnooze<" in got["html"]["snoozed"]
+    assert (
+        got["snoozed_n"] == 1
+        and 'data-when="now"' in got["html"]["snoozed"]
+        and ">Unsnooze<" not in got["html"]["snoozed"]
+    )
     assert ask not in got["sections"]["fyi"] and ask not in got["sections"]["steering"]
 
     assert client.post("/api/person/snooze", json={"msg": ask}).json()["snoozed_until"] is None
@@ -1218,14 +1235,14 @@ def test_a_steers_default_answer_is_marked_and_its_answers_sit_above_its_control
 @pytest.mark.unit
 def test_answers_are_offered_exactly_where_reply_is_and_nowhere_else():
     """§4.10 *Suggested answers*: **buttons follow Reply exactly** — present wherever Reply is,
-    absent wherever only Dismiss is. So a closed question in **FYI**, the snoozed list, a `system`
-    note and a session's state row carry none, whatever their envelope says."""
+    absent wherever only Dismiss is. So a closed question in **FYI**, a `system` note and a
+    session's state row carry none, whatever their envelope says — and a snoozed `ask` carries them,
+    since a snooze keeps every control its kind has (TD-373)."""
     answers = ["merge it", "hold it"]
     for section, e in (
         ("fyi", entry("m-1", "ask", answers=answers, closed_reason="replied", closed_by="m-9")),
         ("fyi", entry("m-2", "steer", answers=answers, default="off main", closed_reason="lapsed")),
         ("fyi", entry("m-3", "note", answers=answers)),
-        ("snoozed", entry("m-4", "ask", answers=answers, snoozed_until="2026-09-20T10:00:00Z")),
         ("needs", entry("m-5", "ask", answers=answers, from_="system", from_name="system")),
     ):
         html = rows(section, [e])
@@ -1238,6 +1255,7 @@ def test_answers_are_offered_exactly_where_reply_is_and_nowhere_else():
         ("needs", entry("m-6", "ask", answers=answers)),
         ("steering", entry("m-7", "steer", answers=answers, default="off main")),
         ("needs", entry("m-8", "steer", answers=answers, default="off main", paused_at="2026-09-19T11:00:00Z")),
+        ("snoozed", entry("m-4", "ask", answers=answers, snoozed_until="2026-09-20T10:00:00Z")),
     ):
         html = rows(section, [e])
         assert 'data-act="reply"' in html and html.count('data-act="answer"') == 2, e["id"]
@@ -1427,7 +1445,9 @@ def test_a_time_left_is_words_from_the_server_and_never_a_placeholder():
     lapsed = rows("steering", [entry("m-3", "steer", default="off main", bound="x", left="")])
     assert "the time is up: the sender goes with its default" in lapsed
     snoozed = rows("snoozed", [entry("m-4", "ask", snoozed_until="2026-09-21T09:00:00Z", until_words="21h 0m")])
-    assert "snoozed until <span" in snoozed and ">in 21h 0m<" in snoozed and "…" not in snoozed
+    says = snoozed[snoozed.index('class="st snoozedsays"') :]
+    says = says[: says.index("</span></span>")]
+    assert "snoozed until <span" in says and ">in 21h 0m" in says and "…" not in says
     js = (UI / "static" / "app.js").read_text()
     assert "function fmtLeft(iso)" in js and 'String(s % 60).padStart(2, "0")' in js
 
@@ -1680,8 +1700,11 @@ def test_a_state_row_can_be_snoozed_and_a_snoozed_one_is_in_no_section_and_no_co
     assert [x["id"] for x in got["snoozed"]] == ["ao-w1:stalled"]
     sn = rows("snoozed", got["snoozed"])
     assert "in 3h 0m" in sn and "the state itself is untouched" in sn
-    assert 'data-act="attention_snooze" data-id="person" data-sid="ao-w1" data-row="stalled"' in sn
-    assert "…" not in sn
+    # …drawn as its kind draws it (TD-373): its Open, and *now* first in its Snooze menu
+    assert 'href="/focus/ao-w1"' in sn and "Unsnooze" not in sn
+    assert 'data-act="attention_snooze" data-id="person" data-sid="ao-w1" data-row="stalled" data-when="now"' in sn
+    says = sn[sn.index('class="st snoozedsays"') :]
+    assert "…" not in says[: says.index("</div>")]
     # a snooze whose time has passed is no snooze: the row is back, and nothing was lost
     back = sections_of([], states=[stalled], snoozed={"ao-w1|stalled": "2026-09-19T09:00:00Z"})
     assert [x["id"] for x in back["needs"]] == ["ao-w1:stalled"]
@@ -2280,6 +2303,8 @@ def test_answered_for_you_is_its_own_section_uncounted_newest_first_and_apart_fr
     assert [e["id"] for e in got["fyi"]] == ["m-3"] and got["fyi_n"] == 1
     assert [e["id"] for e in got["snoozed"]] == ["m-4"]
     assert got["count"] == 0 and not got["needs"]
+    sn = rows("snoozed", got["snoozed"])  # a note in the fold is drawn as FYI draws it (TD-373)
+    assert "snoozed until" in sn and "Delete this question?" not in sn and 'data-act="reply"' not in sn
     # a malformed `answered` costs the row its group, never the page: it reads as a plain note
     assert [e["id"] for e in sections_of([entry("m-5", "note", answered="yes")])["fyi"]] == ["m-5"]
     assert [e["id"] for e in sections_of([entry("m-6", "note", answered={})])["fyi"]] == ["m-6"]
@@ -3096,3 +3121,23 @@ def test_the_org_draws_a_members_open_ask_as_its_teams_asked_you_line(client, tm
     asyncio.run(answer())
     page = client.get("/").text
     assert f'href="/inbox?row={mid}"' not in page and "asked you · " not in page and ">asked you</a>" not in page
+
+
+@pytest.mark.unit
+def test_an_entry_closed_while_snoozed_is_listed_by_its_close_not_in_the_fold():
+    """§4.10 *Snooze* (TD-373): a press that answers or closes a snoozed entry ends the snooze with
+    it — the home closes the entry and leaves `snoozed_until` as it was, so the page lists a closed
+    entry by its close, never in the **Snoozed (n)** fold."""
+    from agentorc.ui.app import inbox_sections
+
+    now = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    later = iso(now + timedelta(hours=3))
+    got = inbox_sections(
+        [
+            entry("m-1", "ask", snoozed_until=later),
+            entry("m-2", "ask", snoozed_until=later, closed_reason="declined", closed_at=iso(now)),
+        ],
+        now=now,
+    )
+    assert [e["id"] for e in got["snoozed"]] == ["m-1"]
+    assert "m-2" in [e["id"] for e in got["fyi"]]

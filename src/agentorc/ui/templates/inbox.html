@@ -59,12 +59,6 @@
   {#- §4.10 *Told on Telegram* (TD-319 slice 3): a Telegram link's `?row=` named a row the page no longer has -#}
   <div class="note warn hidden" id="landgone" role="status">that row is gone — it was answered</div>
 
-  {# Snoozed: in none of the sections and in no count until its time — and never lost (§4.10). #}
-  <details class="card pad snoozedbox" id="snoozedbox"{% if not sections.snoozed %} hidden{% endif %}>
-    <summary class="st"><span id="snoozedlabel">{{ sections.snoozed | length }} snoozed — show</span></summary>
-    <div class="inboxrows" id="rows-snoozed">{% with rows = sections.snoozed, section = 'snoozed' %}{% include "inbox_rows.html" %}{% endwith %}</div>
-  </details>
-
   <section class="isec" id="sec-needs">
     <div class="row gap wrap sechead"><span class="h2">Needs you</span><span class="meta" id="n-needs">{{ headn('needs') }}</span>{{ imark('needs', 'Needs you') }}</div>
     <p class="note secinfo" id="info-needs" hidden>{{ info['needs'] }}</p>
@@ -87,7 +81,7 @@
 
   {# design §4.5a **Inbox section: Waiting on them** (§4.10 *Outcomes*, TD-079 step 2): under
      *Steering*, in neither number, and empty for most people most of the time — so it draws only
-     when it has something, like the snoozed box above. #}
+     when it has something, like the Snoozed fold below. #}
   <section class="isec{% if not sections.waiting %} hidden{% endif %}" id="sec-waiting">
     <div class="row gap wrap sechead"><span class="h2">Waiting on them</span><span class="meta" id="n-waiting">{{ headn('waiting') }}</span>{{ imark('waiting', 'Waiting on them') }}</div>
     <p class="note secinfo" id="info-waiting" hidden>{{ info['waiting'] }}</p>
@@ -119,6 +113,16 @@
     <p class="note secinfo" id="info-fyi" hidden>{{ info['fyi'] }}</p>
     <div class="inboxrows" id="rows-fyi">{% with rows = sections.fyi, section = 'fyi' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing here.</div>
+  </details>
+
+  {# design §4.5 screen 6, §4.5a **Inbox: Snoozed (n)** fold (TD-371; built — TD-373): under the
+     sections, the shape of the board's *Not due yet* — closed by default, nothing drawn at zero,
+     soonest first. Each row is drawn by its kind's own macro with every control it has, says when
+     it comes back, and its Snooze menu offers *now*; in none of the sections and no count until its
+     time — a snooze is a date, never a way to lose mail (§4.10 *Snooze*). #}
+  <details class="fold snoozedbox" id="snoozedbox"{% if not sections.snoozed %} hidden{% endif %}>
+    <summary><span class="boardsubh">Snoozed</span> <span class="meta" id="snoozedlabel">({{ sections.snoozed | length }})</span> <span class="meta">back on their dates · not counted</span></summary>
+    <div class="inboxrows" id="rows-snoozed">{% with rows = sections.snoozed, section = 'snoozed' %}{% include "inbox_rows.html" %}{% endwith %}</div>
   </details>
   </div>
   </div>

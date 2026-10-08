@@ -81,7 +81,8 @@
    A press sends the **index**; the server looks the text up from the entry it holds and the RPC
    re-checks that the two agree, so the label is a label and nothing more. No confirm: a reply is
    mail (§4.10). It follows **Reply** exactly — rendered only by the macros that offer Reply, and
-   so absent from an FYI row, a closed question, a `system` note and the snoozed list. #}
+   so absent from an FYI row, a closed question and a `system` note — and drawn on a snoozed
+   `ask`, which keeps every control its kind has (TD-373). #}
 {#- A question **passed up** (§4.9b, TD-075 step 3) carries the passer's answers, not the asker's
     — the recommendation first — so the group names the passer: whose words they are is the point. -#}
 {% macro answers(e) -%}
@@ -107,6 +108,9 @@
 {% macro snooze_btn(e) -%}
 <details class="more"><summary class="btn sm ghost" title="set it aside until later">Snooze</summary>
   <div class="menu">
+    {%- if e.snoozed_until or e.snoozed_for %}
+    <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="now" title="clear the snooze: back in its section">now</button>
+    {%- endif %}
     <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="1h">in 1 hour</button>
     <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="tomorrow">tomorrow 08:00</button>
     <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="pick">a date and time…</button>
@@ -281,7 +285,7 @@
 {{ looked_by(e) }}
 {{ answers(e) }}
 <div class="row gap wrap mfoot">
-  <span class="st">open · no bound — it waits until you answer it</span>
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · no bound — it waits until you answer it</span>{% endif %}
   <span class="grow"></span>
   {{ reply_btn(e) }}
   {{ review_btn(e) }}
@@ -339,7 +343,7 @@
   {%- if e.kind == 'steer' and e.bound %}
   <span class="st timeleft" data-deadline="{{ e.bound }}" data-then="then it waits on you">{% if e.left %}{{ e.left }} left, then it waits on you{% else %}the time is up: it waits on you{% endif %}</span>
   {%- else %}
-  <span class="st">open · its asker is gone — it waits until you answer it</span>
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · its asker is gone — it waits until you answer it</span>{% endif %}
   {%- endif %}
   <span class="grow"></span>
   {{ reply_btn(e) }}
@@ -373,7 +377,7 @@
   {%- set st = state_line(e) | trim %}
   {%- if st %}<span class="st">{{ st }}</span>{% endif %}
   <span class="grow"></span>
-  {{ put_btn(e) }}
+  {%- if section != 'snoozed' %}{{ put_btn(e) }}{% endif %}  {#- FYI's door only, never from the fold (§4.5a) #}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this entry? It leaves your inbox; the sender keeps its copy.">Dismiss</button>
 </div>
 {%- endmacro %}
@@ -413,33 +417,17 @@
 </div>
 {%- endmacro %}
 
-{# The snoozed list (§4.10 *Snooze*): the row as its kind draws it, with **Unsnooze** — clearing
-   `snoozed_until` — so a snooze is never a way to lose mail. #}
-{% macro state_snoozed(e, section) -%}
-{{ state_head(e) }}
-<div class="body">{{ e.text }}</div>
-<div class="row gap wrap mfoot">
-  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span> — the state itself is untouched</span>
-  <span class="grow"></span>
-  <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" title="bring this row back into its section now">Unsnooze</button>
-</div>
-{%- endmacro %}
-
-{% macro snoozed(e, section) -%}
-{{ head(e) }}
-{{ body(e) }}
-<div class="row gap wrap mfoot">
-  {#- the instant is stored UTC; the person set it in their own clock and reads it back in it,
-      as every other time on the page is shown. The raw instant stays on hover. -#}
-  {%- if e.snoozed_for %}
-  {#- a look with a reviewer (§4.5a **Send to reviewer**): until the seat reports, not until a time #}
-  <span class="st">with {{ e.with_seat or 'a reviewer' }}{% if e.with_since %} since <span title="{{ e.with_at }}">{{ e.with_since }}</span>{% endif %} — it comes back with the reading when the seat reports</span>
-  {%- else %}
-  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span></span>
-  {%- endif %}
-  <span class="grow"></span>
-  <button class="btn sm ghost" data-act="unsnooze" data-id="person" data-msg="{{ e.id }}" title="bring it back into its section now">Unsnooze</button>
-</div>
+{# §4.10 *Snooze* — *a snooze is a date, not a hiding place* (TD-371, TD-373): a snoozed row in the
+   **Snoozed (n)** fold is drawn by its kind's own macro, with every control it has, and says when it
+   comes back here; its Snooze menu offers *now* first, which clears it. The instant is stored UTC and
+   read back in the person's own clock; the raw instant stays on hover. A look with a reviewer
+   (`snoozed_for`, §4.5a **Send to reviewer**) comes back with the reading, not at a time. #}
+{% macro snoozed_says(e) -%}
+{%- if e.snoozed_for %}
+<span class="st snoozedsays">with {{ e.with_seat or 'a reviewer' }}{% if e.with_since %} since <span title="{{ e.with_at }}">{{ e.with_since }}</span>{% endif %} — it comes back with the reading when the seat reports</span>
+{%- else %}
+<span class="st snoozedsays">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span></span>
+{%- endif %}
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: state** (§4.5 screen 6; TD-069 step 2) ───────────────────────────
@@ -485,6 +473,9 @@
 {%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') or e.mark == 'cadence' %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
+    {%- if e.snoozed_until %}
+    <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="now" title="clear the snooze: back in its section">now</button>
+    {%- endif %}
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="1h">in 1 hour</button>
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="tomorrow">tomorrow 08:00</button>
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="pick">a date and time…</button>
@@ -503,6 +494,7 @@
     record's fields, and `e.text` is the same words unlinked, which Find reads -#}
 <div class="body">{% if e.parts %}{% for p in e.parts %}{% if p.url %}<a class="ref" href="{{ p.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">{{ p.text }}</a>{% else %}{{ p.text }}{% endif %}{% endfor %}{% else %}{{ e.text }}{% endif %}</div>
 {{ doing_line(e) }}
+{%- if section == 'snoozed' %}<div class="row">{{ snoozed_says(e) }}<span class="st">&nbsp;— the state itself is untouched</span></div>{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.row == 'permission' %}
   <span class="st">waiting on your answer — through the hook channel, not the terminal (§4.2)</span>
@@ -774,16 +766,15 @@
 <div class="st">not now: {{ e.unmet.text }}</div>
 {%- endif %}
 <div class="row gap wrap mfoot">
-  {%- if section == 'snoozed' %}
-  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span></span>
-  <span class="grow"></span>
-  <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="promote" title="bring this row back into its section now">Unsnooze</button>
-  {%- else %}
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
   <button class="btn sm primary" data-act="promote" data-id="person" data-repo="{{ e.repo }}"{% if e.inflight %} disabled title="a promote is in flight"{% else %} title="{{ help_title('promote') }}"{% endif %}>Promote</button>
   {%- if not e.inflight %}
   <details class="more"><summary class="btn sm ghost" title="{{ help_title('promote-snooze') }}">Snooze ▾</summary>
     <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="promote" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="promote" data-when="1d">+1 day</button>
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="promote" data-when="1w">+1 week</button>
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="promote" data-when="pick">pick a date…</button>
@@ -791,7 +782,6 @@
   </details>
   {%- endif %}
   {%- if e.failed or e.held %}<button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ e.repo }}" data-held="{{ '1' if e.held else '' }}" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}
-  {%- endif %}
 </div>
 {%- endmacro %}
 
@@ -816,22 +806,20 @@
 <div class="st">not started: {{ e.held }}</div>
 {%- endif %}
 <div class="row gap wrap mfoot">
-  {%- if section == 'snoozed' %}
-  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span></span>
-  <span class="grow"></span>
-  <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="work" title="bring this row back into its section now">Unsnooze</button>
-  {%- else %}
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
   <button class="btn sm primary" data-act="work_start" data-id="person" data-team="{{ e.team }}" title="{{ help_title('work-start') }}">Start</button>
   <details class="more"><summary class="btn sm ghost" title="{{ help_title('work-snooze') }}">Snooze ▾</summary>
     <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="work" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="work" data-when="1d">+1 day</button>
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="work" data-when="1w">+1 week</button>
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="work" data-when="pick">pick a date…</button>
     </div>
   </details>
   <button class="btn sm ghost" data-act="clear_work" data-id="person" data-team="{{ e.team }}" title="{{ help_title('work-dismiss') }}">Dismiss</button>
-  {%- endif %}
 </div>
 {%- endmacro %}
 
@@ -852,7 +840,6 @@
 <div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {%- if e.row == 'promote' %}{{ promote_row(e, section) }}
 {%- elif e.row == 'work' %}{{ work_row(e, section) }}
-{%- elif section == 'snoozed' %}{{ state_snoozed(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
@@ -861,7 +848,6 @@
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if e.handed_row %}{{ handed(e, section) }}
-{%- elif section == 'snoozed' %}{{ snoozed(e, section) }}
 {%- elif section == 'waiting' %}{{ waiting(e, section) }}
 {%- elif section == 'answered' %}{{ answered(e, section) }}
 {#- in *Needs you* an entry that is not open is one of the two §4.10 puts there: a `blocked`
@@ -870,6 +856,9 @@
     question. The section decides, as it does for a closed `steer` in FYI. -#}
 {%- elif section == 'needs' and (e.owes or e.outcome) %}{{ owed(e, section) }}
 {%- elif section == 'fyi' %}{{ fyi(e, section) }}
+{#- a snoozed entry that is no question (a note set aside through the RPC) is drawn as FYI draws it,
+    with its snoozed line: it is never an `ask` row offering to decline it (TD-373) -#}
+{%- elif section == 'snoozed' and e.kind not in ('ask', 'steer', 'conflict') %}{{ fyi(e, section) }}<div class="row">{{ snoozed_says(e) }}</div>
 {%- elif e.orphaned %}{{ orphaned(e, section) }}
 {%- elif e.kind == 'steer' %}{{ steer(e, section) }}
 {%- else %}{{ ask(e, section) }}

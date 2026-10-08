@@ -214,8 +214,6 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage details.isec > summary::-webkit-details-marker { display: none; }
 .inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: var(--t-cap); }
 .inboxpage details.isec[open] > summary::before { content: "▾"; }
-.inboxpage .snoozedbox > summary { list-style: none; cursor: pointer; color: var(--muted); }
-.inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
 /* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
    thing in a heading — everything bordered is a control, and this is one (§4.5a) */
 .inboxpage .imark, .reports .imark, .helpmark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
@@ -273,8 +271,9 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 details.boardfold { margin: 6px 0 2px; } details.boardfold > .inboxrows { margin-top: 6px; }
 .boardline { padding: 6px 2px 2px; }
 /* the Inbox's *For you in the ledger* fold (TD-368): a row is one link, drawn quieter than a mail row */
-details.ledgerfold { margin: 12px 0 2px; }
-details.fold.ledgerfold > summary { font-size: inherit; color: var(--fg); } details.fold.ledgerfold > summary .meta { color: var(--muted); }
+details.ledgerfold, details.snoozedbox { margin: 12px 0 2px; }
+details.fold.ledgerfold > summary, details.fold.snoozedbox > summary { font-size: inherit; color: var(--fg); }
+details.fold.ledgerfold > summary .meta, details.fold.snoozedbox > summary .meta { color: var(--muted); }
 .ledgerrepo { padding: 8px 2px 2px; }
 a.ledgerrow { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 6px 10px; margin: 4px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }
 a.ledgerrow:hover { border-color: var(--border); } a.ledgerrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }

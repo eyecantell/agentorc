@@ -1605,7 +1605,7 @@ def inbox_sections(
       retention prunes it (`MAIL_RETENTION`, 12 h); newest first, because the useful end of a list
       nobody must act on is the recent end.
     - **Snoozed** — an entry whose `snoozed_until` is still ahead is in none of the three and in
-      no count (§4.10 *Snooze*); soonest first, so the page can say *n snoozed — show* and a
+      no count (§4.10 *Snooze*); soonest first, so the page can draw the **Snoozed (n)** fold and a
       snooze is never a way to lose mail.
 
     `count` is the **Needs you** section's length, which is the top bar's number (§4.5a): what is
@@ -1666,9 +1666,12 @@ def inbox_sections(
     for e in entries:
         snoozed = _iso(e.get("snoozed_until"))
         outcome = _outcome_of(e)
-        if (snoozed and snoozed > at) or (e.get("snoozed_for") and _entry_open(e)):
+        question = e.get("kind") in (*PERSON_ASK_KINDS, "steer")
+        if (snoozed and snoozed > at and (_entry_open(e) or not question)) or (e.get("snoozed_for") and _entry_open(e)):
             # a look with a reviewer (`snoozed_for`, §4.5a **Send to reviewer**) is set aside until
-            # that debt closes, which clears the field: listed with the snoozed, in no count
+            # that debt closes, which clears the field: listed with the snoozed, in no count. A
+            # question closed while snoozed is not: a press that answers or closes it ends the
+            # snooze with it, and it is listed by its close (§4.10 *Snooze*, TD-373)
             out["snoozed"].append(e)
         elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at") or _orphan_held(e)):
             out["needs"].append(e)

@@ -220,6 +220,8 @@ def test_a_look_from_a_sender_on_another_host_is_addressed_and_served_through_th
         assert c.get("/repo/proj/shot/a.png?host=laptop").status_code == 404, "the node's origin does not hold it"
         assert c.get("/repo/proj/shot/a.txt?host=laptop").status_code == 404
         assert c.get("/repo/proj/shot/a.png?host=kmaster").content == PNG + b"a.png", "this host: read here"
+
+
 # -- §4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b) --------------------------------
 
 
@@ -267,7 +269,10 @@ def test_a_look_with_a_reviewer_is_listed_with_the_snoozed_as_with_the_seat_sinc
     assert [x["id"] for x in got["snoozed"]] == ["m-1"] and got["count"] == 0 and not got["needs"]
     html = rows("snoozed", [e])
     assert "with techlead-ao-1 since" in html and "snoozed until" not in html
-    assert 'data-act="unsnooze"' in html  # Unsnooze brings it back sooner
+    assert (
+        'data-act="snooze" data-id="person" data-msg="m-1" data-when="now"' in html
+    )  # *now* brings it back sooner (TD-373)
+    assert "Unsnooze" not in html and 'data-act="reply"' in html  # the look's own controls, in place
     gone = look(snoozed_for="m-8")  # the read no longer lists the handed entry
     look_review(gone, "", "", {})
     assert gone["with_seat"] == "a reviewer" and gone["with_since"] == ""
