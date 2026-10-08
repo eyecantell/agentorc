@@ -5972,3 +5972,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** `ao repo` on this ledger counts *for you* as the `Owner: paul` entries plus those blocked by `decision (paul)` and nothing else; TD-151 is in the design-first list, marked *decision*, and rule 6 tells the designer's lane of it; the Inbox draws the fold with that count, each row opening the Repo page on its entry; the briefs say it.
 
 **Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
+
+## TD-375: The metered chip's pace (#1215) is read with no check on its `unit` in any test: `_pace_says` and `paceSays` print a junk unit as tokens
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/common.py` (`_pace_says`), `src/agentorc/ui/static/app.js` (`paceSays`); `tests/test_ui_org.py` (`metered_paced`)
+
+**Why:** `_pace_says` ignores a pace unless `p.get("unit") in ("$", "tok")`. Replacing that clause with `or False` (and the `["$", "tok"].includes(p.unit)` test in `paceSays` likewise) leaves `tests/test_spend.py` and `tests/test_ui_org.py` passing (60 passed): the `metered_paced` case's junk window has `per_hour: True` (caught by the bool check) but a valid-looking number with an unknown `unit` is never given, so a pace of `{per_hour: 3, unit: "x"}` would print *3 tok/h*. The test's comment says *a junk field draws nothing*.
+
+**Resolved:** 2026-10-07 (PR #NNN, grinder-ao-1) — `metered_paced` gains a `5h` window whose pace is `{per_hour: 3, unit: "x"}`, and both homes draw nothing for it (`5h 0 tok — …`). Dropping the unit check fails `test_a_metered_accounts_chip_reads_spend_over_its_amount` in Python, and dropping it in `paceSays` fails the parity test.
+
+**Done when** `metered_paced` gains a window whose pace has a numeric `per_hour` and an unknown `unit`, and both homes print nothing for it; the edit above fails a test.
+
+**Related:** TD-151.
