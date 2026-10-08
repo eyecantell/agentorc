@@ -74,6 +74,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-399 | A live team never gains a seat its definition gained: ao-grind, started before TD-381, has no anchor seat, and Apply and a Start add none | Medium | Designed — TD-400 builds it |
 | TD-400 | Build TD-399: a seat the run lacks is a difference Apply creates — `differences` on every live team, the anchor through `checkout_held` and the held create, the mark's words | Medium | Built (#1266); live check: ao-grind gains its anchor on Apply |
 | TD-401 | TD-400 is a live check of #1266 owned by `grinder`: only the anchor promotes, so no grinder can finish it | Low | Open |
+| TD-402 | No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266): reverting each of those three CLI lines leaves 130 tests green | Medium | Open |
+| TD-403 | `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257): each can be reverted with `test_anchor_seat.py` and `test_anchor_tick.py` green | Low | Open |
 
 ---
 
@@ -1297,3 +1299,39 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** set TD-400's `**Owner:**` to `anchor`; correct its **Location** to the files #1266 changed (`ui/repo.py`, `ui/app.py`, `ui/templates/group_head.html`, `cli.py`).
 
 **Related:** TD-400, TD-399, TD-118.
+
+## TD-402: No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266)
+
+**Priority:** Medium
+**Type:** test
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1266)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/cli.py` (`cmd_team_list`'s `word = "definition" if teamrun.definition_changed(...)`, `cmd_team_flow`'s same line, and `what = applied["flow"] or "the definition"`); tests `tests/test_flows.py`, `tests/test_cli_teams.py`.
+
+**Why:** TD-400's *Done when* says the header, `ao team list` and `ao team flow` carry the new words and "tests cover each". #1266 tested the Org page's header (`test_ui_teams.py`) and `definition_changed` on hand-built dicts, but the CLI's prose has no test. Evidence, at `origin/main` d9539fe8, `PYTHONPATH=$PWD/src pytest -q tests/test_anchor_seat.py tests/test_flows.py tests/test_ui_teams.py` is 130 passed, and stays 130 passed with any one of these reverted: `word = "definition" if teamrun.definition_changed(out["differences"], out["flow"]) else "flow"` → `word = "flow"` (`ao team flow`); the same line on `r["differences"]` in `ao team list`; `what = applied["flow"] or "the definition"` → `what = applied["flow"]` (which prints `applied None:` for a team with no flows). The added `test_ao_team_flow_lists_the_flows_and_writes_the_pick` lines only read the no-differences bare form.
+
+**Fix:** a CLI test with a live team that lacks its anchor and runs no flow (a fleet fake as in `test_flows.py`): `ao team list` and `ao team flow <team>` print `definition changed — Apply (ao team flow <team> --apply):` and `<team>-anchor: starts`; `--apply` prints `applied the definition:`. Revert each of the three lines and see the test fail.
+
+**Done when** each of the three reverts above fails a test.
+
+**Related:** TD-400, #1266.
+
+## TD-403: `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257)
+
+**Priority:** Low
+**Type:** test
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1257)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`rpc_checkout_held`); tests `tests/test_anchor_tick.py`.
+
+**Why:** `rpc_checkout_held` is the Start's and Apply's one reading of a seat's checkout, and its docstring says what it returns. Against `origin/main` d9539fe8, with `PYTHONPATH=$PWD/src pytest -q tests/test_anchor_seat.py tests/test_anchor_tick.py` passing, each of these reverts leaves it passing: `raise RpcError(f"not a directory: {directory}")` → `pass` (a mistyped `dir` would then read as a clean, unheld tree or crash in `git_info`); `directory = directory.resolve()` → `pass` (the reply's `dir` and the holders' match depend on the resolved path, which a symlinked checkout differs in); `"host": host or self.host` → `"host": host`. Also `held_reason`'s `not isinstance(held_reason, dict)` clause in `rpc_create` can go with the tests green, so a list `held_reason` reaches `.get` and raises `AttributeError` rather than the `RpcError`.
+
+**Fix:** tests in `test_anchor_tick.py`: `checkout_held` on a missing dir raises `not a directory`; on a symlink to a held checkout reports the resolved `dir` and the holder; a bare call replies `host` as the host's own name; `create` with `held_reason=["a"]` raises `AgentError` matching `held_reason`.
+
+**Done when** each of the four reverts fails a test.
+
+**Related:** TD-395 (archived), #1257.
