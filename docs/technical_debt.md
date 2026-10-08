@@ -72,7 +72,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
-| TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Designed — TD-379 builds it |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
@@ -1235,31 +1234,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the failing file is first in a drop of two, and the probe asserts the second is uploaded and its path inserted; the edit above fails a test.
 
 **Related:** TD-370, TD-002.
-
-## TD-377: A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-07 (the anchor, from Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-07 (the designer, PR #1225; the steer to Paul on the page-versus-dialog press is `m-114456565d2f`, bound 2026-10-08 09:25 MDT): design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team* (*The team's card offers it*); the mockup regenerated (`Main.dc.html`, `docs/mockups/reviews/2026-10-07-td377-plus-card.png`). Settled: the last card in every defined team's grid, live or not, the height of a compact card, a dashed outline and a large **+**; its press is the New session page with the Team pick made (`/new?team=<team>`, which the route already takes and `applyTeam()` already honours on load), Role *Interactive*, nothing written to `org.yml`; hidden with the cards on a folded team, alone under the header of a definition with no sessions, absent on *No team*; a ring stop. Rejected: a dialog of its own (steered), a **+** on the header beside Members…. **Next:** designed; the build is TD-379.
-**Blocked by:** TD-379
-**Location:** the Org page's team group (`org.html`, `group_head.html`, `card.html`), the New session form (`new.html`, its Team and Role picks); design §4.5 (the team group), §4.5a (the team card rows and the New session form), §4.9 *A person in the team*
-
-**Why:**
-- Paul, 2026-10-07: *have the on-demand session be started by having a partial card shown with a big + inside it — I believe that will be more intuitive. Pressing the plus would open a dialog for starting a new team member, defaulted to an interactive session on the selected team.*
-- Today a person's session in a team starts from the top bar's **New session**, with the Team picked by hand and the Role left at *Interactive*. Nothing on the team's own cards says it can be done there. **Members… → Add member** is the other path, and it edits `org.yml`: a permanent member, not a session for now.
-
-**Fix (to design):**
-- One extra, partial card at the end of each team's cards: a dashed outline with a large **+**, the size of a card's head, not a full card.
-- A press opens the New session form (or a dialog built on it) with Team = that team, Role = *Interactive*, and the Host, Repo, Controllers and review line the Team pick already fills. Nothing is written to `org.yml`: the session is the person's, in the team, as §4.9 *A person in the team* has it.
-- Settle: whether it is drawn on a stopped team, a folded one and *No team*; its key and its §4.5a row; whether it replaces or sits beside any existing control.
-- The mockup regenerated from `docs/mockups/gen.py`, with a rendering for Paul to look at.
-
-**Done when** the design names the card, its press and its defaults in §4.5a, and a build entry carries it.
-
-**Related:** TD-160 / TD-173 (archived: the form's Team picker), TD-163 / TD-172 (archived: Members…), TD-277 (archived: the New session form).
 
 ## TD-378: Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away
 
