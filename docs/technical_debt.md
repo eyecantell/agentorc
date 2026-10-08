@@ -80,6 +80,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-385 | Build TD-381 (the definition): the team key `anchor`, present by default, the `anchor` preset and its brief, `ao team start` creating the seat in the home repo's checkout, one per repo | High | Open |
 | TD-386 | Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor` | High | Open |
 | TD-387 | Build TD-381 (the surface): the seat's on-call words from `seat_held`, Members… and `ao team list` naming it, the New session occupancy check naming a seat | Medium | Open |
+| TD-388 | `ao repo` lists a repo's decided board lines first (#1235), and §4.7's `ao repo` text does not say so | Low | Open |
 
 ---
 
@@ -1414,3 +1415,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home the seat's card reads *on call — comes when the checkout's lane gains work*, held off it reads *the checkout is yours · <why>*, Members… and `ao team list` name it, the New session form's directory check names a working seat as a seat, and the tests cover each.
 
 **Related:** TD-381, TD-385, TD-386.
+
+## TD-388: `ao repo` lists a repo's decided board lines first (#1235), and §4.7's `ao repo` text does not say so
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing the docs of #1227–#1236)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.7-cli.md` (the `ao repo` paragraph, the *pickable* list sentence), `src/agentorc/cli.py` (`_cmd_repo`: the loop over `_work_orders(r)` before the `pickable` / `design-first` / `live-check` kinds)
+
+**Why:** #1235 (TD-384 slice 1) made `ao repo` print each open decided board line first among the pickable rows (`pickable  board:<key>  High  board  <title> · decided <answer> <date>`), and counts them in the repo's lanes. Its code comment cites "§4.7, TD-384", and the design-history line and §4.4's built note say "and `ao repo`" — but the `ao repo` paragraph of §4.7 describes the *pickable* list as the ledger's entries "in cadence's pick order — High first, debt before a feature within a priority" and `grep -n "decided\|work order\|board:" docs/design/4.7*.md` finds nothing about decided lines. The one place that says what `ao repo` prints (the CLI is a control surface; a behaviour not in the design does not exist) is silent about the change.
+
+**Fix:** add to §4.7's `ao repo` paragraph, in the present tense, that the *pickable* list opens with the repo's work orders (`board:<key>`, High, *decided <answer> <date>*), then the ledger's entries in pick order; date the fact in `docs/design-history.md` under §4.7.
+
+**Done when** §4.7's `ao repo` paragraph names the work orders first in the pickable list and the history has its line.
+
+**Related:** TD-380 (the design), TD-384 (the build; slices 2–3 open).
