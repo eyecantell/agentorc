@@ -86,3 +86,61 @@ def test_a_close_the_page_caused_by_leaving_and_one_failed_inbox_poll_draw_nothi
     assert re.search(r"ws\.onclose = \(\) => \{ if \(!leaving\) setDown\(true\);", connect)
     assert "inboxDownLong = true; refreshInbox(); }, AO.DOWN_GRACE);" in js
     assert "if (!isDown || shown || inboxDownLong) {" in js
+
+
+POLL_PROBE = PROBE.split("const AO = window.AO;")[0] + """
+const AO = window.AO;
+const why = { textContent: "" };
+const base = document.querySelector;
+document.querySelector = (s) => (s === "#agentdownwhy" ? why : base(s));
+const settle = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); };
+let polls = 0, isDown = true;
+const DOWN = { agent_down: true, why: "refused" }, UP = { agent_down: false };
+AO.refreshInboxCount = async () => { polls++; return isDown ? DOWN : UP; };
+const step = async (ms) => { advance(ms); await settle(); };
+const seen = () => ({ banner: !banner.classList.contains("hidden"), polls, pending: timers.length });
+const out = {};
+async function run() {
+  await AO.inboxPoll(); out.first_failure = seen();             // nothing drawn, one retry pending
+  await step(2000); out.within_grace = seen();                   // still nothing
+  await step(1100); out.after_grace = seen();                    // the retry failed too: drawn, nothing pending
+  out.why = why.textContent;
+  await AO.inboxPoll(); out.failing_while_drawn = seen();        // drawn stays drawn, no retry armed
+  await step(10000); out.no_stray_retry = seen();                // no poll the grace left behind
+  isDown = false; await AO.inboxPoll(); out.recovered = seen();  // cleared
+  isDown = true; await AO.inboxPoll(); out.down_again = seen();  // the grace again, not the banner at once
+  isDown = false; await step(1000); await AO.inboxPoll(); out.back_within_grace = seen();  // cancels the retry
+  await step(5000); out.after_cancelled = seen();                // nothing drawn, nothing polled
+  isDown = true; await AO.inboxPoll(); await step(3100); out.down_for_the_grace_again = seen();
+  console.log(JSON.stringify(out));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+
+
+@pytest.mark.unit
+def test_the_inbox_polls_banner_waits_out_the_grace_and_a_recovery_resets_it(tmp_path):
+    """The Inbox poll's own grace (TD-372, pinned by TD-383), `refreshInbox` run under node with a fake
+    clock and a `refreshInboxCount` that fails, recovers and fails: a first failed poll draws nothing and
+    asks again after `AO.DOWN_GRACE`; the second failure draws the banner and arms nothing more; a
+    successful poll clears it and resets the grace, so the next outage waits again; a recovery within
+    the grace cancels the retry."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = tmp_path / "poll_probe.js"
+    probe.write_text(POLL_PROBE)
+    run = subprocess.run([node, str(probe), str(APP)], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0, run.stderr
+    got = json.loads(run.stdout)
+    assert got["first_failure"] == {"banner": False, "polls": 1, "pending": 1}
+    assert got["within_grace"] == {"banner": False, "polls": 1, "pending": 1}
+    assert got["after_grace"] == {"banner": True, "polls": 2, "pending": 0}
+    assert got["why"] == "refused"
+    assert got["failing_while_drawn"] == {"banner": True, "polls": 3, "pending": 0}
+    assert got["no_stray_retry"] == {"banner": True, "polls": 3, "pending": 0}
+    assert got["recovered"] == {"banner": False, "polls": 4, "pending": 0}
+    assert got["down_again"] == {"banner": False, "polls": 5, "pending": 1}  # the grace was reset
+    assert got["back_within_grace"] == {"banner": False, "polls": 6, "pending": 0}
+    assert got["after_cancelled"] == {"banner": False, "polls": 6, "pending": 0}
+    assert got["down_for_the_grace_again"] == {"banner": True, "polls": 8, "pending": 0}
