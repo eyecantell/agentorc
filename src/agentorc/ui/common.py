@@ -316,12 +316,40 @@ def _money(v: Any) -> str:
     return f"${float(v):,.2f}".removesuffix(".00")
 
 
-def _metered_chip(prof: str, u: dict[str, Any], windows: list[dict[str, Any]]) -> dict[str, Any]:
+def _pace_says(w: dict[str, Any], now: datetime) -> str:
+    """A metered window's turns and pace on the hover (§4.5a **usage**, TD-151): *· 412 turns ·
+    $0.40/h · at this pace $5 by 12:30* — the clock time only where the pace reaches the amount before
+    the reset, its weekday in front when it is not today. Nothing for what is not one."""
+    out = ""
+    turns = w.get("turns")
+    if isinstance(turns, int) and not isinstance(turns, bool):
+        out += f" · {turns:,} turn{'' if turns == 1 else 's'}"
+    p = w.get("pace")
+    v = p.get("per_hour") if isinstance(p, dict) else None
+    if (
+        not isinstance(v, int | float)
+        or isinstance(v, bool)
+        or not math.isfinite(v)
+        or p.get("unit") not in ("$", "tok")
+    ):
+        return out
+    out += f" · {_money(v) if p['unit'] == '$' else f'{tokens_short(int(v))} tok'}/h"
+    at, amount = _instant(p.get("at")), _amount_says(w.get("amount"))
+    if at is not None and amount:
+        local, today = at.astimezone(), now.astimezone().date()
+        out += f" · at this pace {amount} by {local.strftime('%H:%M' if local.date() == today else '%a %H:%M')}"
+    return out
+
+
+def _metered_chip(
+    prof: str, u: dict[str, Any], windows: list[dict[str, Any]], now: datetime | None = None
+) -> dict[str, Any]:
     """A **metered** account's chip (§4.5a **usage**, §4.2a; TD-151 slice 5): *Claude · key · day
     $3.20 / $5* — the account's spend over the window's amount — or *day 1.2M tok* with no amount;
-    its worst window the one nearest its amount, red at it, amber from eight tenths; tokens by kind
-    on hover; *spend unknown* beside it when the adapter could not read. Never *stale*: the reading
-    is a sum. `AO.usageChip` is the same rule."""
+    its worst window the one nearest its amount, red at it, amber from eight tenths; tokens by kind,
+    the window's turns and its pace on hover; *spend unknown* beside it when the adapter could not
+    read. Never *stale*: the reading is a sum. `AO.usageChip` is the same rule."""
+    now = now or datetime.now(UTC)
 
     def spend(w: dict[str, Any]) -> str:
         s, a = w["spent"], w.get("amount") if isinstance(w.get("amount"), dict) else {}
@@ -351,6 +379,7 @@ def _metered_chip(prof: str, u: dict[str, Any], windows: list[dict[str, Any]]) -
         part = f"{w.get('label')} {spend(w)}"
         if amount(w):
             part += f" / {amount(w)} ({pct(w) if pct(w) is not None else '?'}%)"
+        part += _pace_says(w, now)
         parts.append(f"{part} — {kinds} (resets {w.get('resets') or '?'})")
     title = "\n".join(parts)  # one window per line (TD-270)
     reason = str(u.get("reason") or "ok")
@@ -393,7 +422,7 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
         return None
     spent = [w for w in (u.get("windows") or []) if isinstance(w, dict) and isinstance(w.get("spent"), dict)]
     if spent:
-        return _metered_chip(prof, u, spent)
+        return _metered_chip(prof, u, spent, now)
     windows = [
         w
         for w in (u.get("windows") or [])

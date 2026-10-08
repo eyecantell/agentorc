@@ -444,6 +444,16 @@ USAGE_CASES = {
     "metered_ties": {"reason": "ok", "windows": [  # half to even in both homes: 2k and 1.2M
         {"label": "day", "pct": 3, "resets": "d", "amount": {"value": 1_250_000, "unit": "tok"},
          "spent": {"tokens": {"input": 2_500, "output": 3_500}, "total": 1_250_000, "cost": None}}]},
+    # the window's turns and pace on hover (TD-151, decided 2026-10-07)
+    "metered_paced": {"reason": "ok", "windows": [
+        {"label": "day", "pct": 64, "resets": "2026-09-21T06:00:00Z", "amount": {"value": 5.0, "unit": "$"},
+         "spent": {"tokens": {"input": 3_000_000}, "total": 3_000_000, "cost": 3.2}, "turns": 412,
+         "pace": {"per_hour": 0.4, "unit": "$", "at": "2026-09-20T22:30:00Z"}},
+        {"label": "week", "pct": 30, "resets": "2026-09-28T06:00:00Z", "amount": {"value": 10_000_000, "unit": "tok"},
+         "spent": {"tokens": {"input": 3_000_000}, "total": 3_000_000, "cost": 3.2}, "turns": 1,
+         "pace": {"per_hour": 2_000.0, "unit": "tok", "at": "2026-09-23T10:00:00Z"}},
+        {"label": "month", "pct": None, "resets": "m", "spent": {"tokens": {}, "total": 0, "cost": None},
+         "turns": True, "pace": {"per_hour": True, "unit": "$", "at": None}}]},
     "metered_unpriced": {"reason": "error: OSError", "windows": [
         {"label": "day", "pct": None, "resets": None,
          "spent": {"tokens": {"input": 900}, "total": 900, "cost": None}}]},
@@ -1322,6 +1332,16 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     assert "amounts" not in bare["p"]["profiles"][0]
     shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
     assert shared.endswith(":\napi [day amount $5, week amount 2M tok]: w1\napi2 [day amount $10]")
+    # the turns and the pace (TD-151): *day $3.20 / $5 · 412 turns · $0.40/h · at this pace $5 by 12:30*,
+    # the clock time the home's local one, its weekday in front when it is not today; a junk field draws nothing
+    paced = usage_chip("Claude · key", USAGE_CASES["metered_paced"], USAGE_NOW)["title"].split("\n")
+    by = datetime(2026, 9, 20, 22, 30, tzinfo=UTC).astimezone()
+    today = by.date() == USAGE_NOW.astimezone().date()
+    clock = by.strftime("%H:%M" if today else "%a %H:%M")
+    assert paced[0].startswith(f"day $3.20 / $5 (64%) · 412 turns · $0.40/h · at this pace $5 by {clock} — 3M in")
+    wed = datetime(2026, 9, 23, 10, tzinfo=UTC).astimezone().strftime("%a %H:%M")
+    assert paced[1].startswith(f"week 3M tok / 10M tok (30%) · 1 turn · 2k tok/h · at this pace 10M tok by {wed} — ")
+    assert paced[2].startswith("month 0 tok — ")
 
 
 def test_a_card_says_what_it_waits_on_after_its_declaration_or_alone(tmp_path, monkeypatch):

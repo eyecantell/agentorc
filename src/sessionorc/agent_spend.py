@@ -98,7 +98,7 @@ class SpendMixin:
             acct = self._spend.get(key) or {}
             window_sums = node_sums[key] if self.mode == "node" else spend_mod.sums(acct, now)
             for prof in g["profiles"]:
-                reading = spend_mod.reading(window_sums, amounts.get(prof) or {}, now_iso())
+                reading = spend_mod.reading(window_sums, amounts.get(prof) or {}, now_iso(), now)
                 reading |= {"account": g["account"], "tool": g["tool"]}
                 if why := self._spend_reason.get(prof):
                     reading["reason"] = why  # the chip's *spend unknown* (§4.3); the sum so far still stands
@@ -106,12 +106,14 @@ class SpendMixin:
                     # the person inbox is the home's: a node's accounts are noted in `_push_spend_usage`
                     self._spend_notes(acct, prof, reading)
                 was = self._usage.get(prof) or {}
-                if {k: v for k, v in was.items() if k != "fetched"} != {
-                    k: v for k, v in reading.items() if k != "fetched"
-                }:
+                if _settled(was) != _settled(reading):
                     self._usage[prof] = reading
                     changed = True
                     await self._broadcast({"event": "usage", "profile": prof, "usage": reading})
+                elif prof in self._usage:
+                    self._usage[prof] = (
+                        reading  # the pace drifts with the clock alone: kept current, pushed with the next move
+                    )
         # a metered profile no live session runs under any more leaves the top bar, as a polled one does
         shown = {p for g in groups.values() for p in g["profiles"]}
         for prof in [p for p in self._metered_shown if p not in shown and p in self._usage]:
@@ -374,3 +376,13 @@ class SpendMixin:
         if not known and profile in self._spend_node_prices:
             return {"billing": "metered", "prices": dict(self._spend_node_prices[profile])}
         return None
+
+
+def _settled(reading: dict[str, Any]) -> dict[str, Any]:
+    """A metered reading less what moves with the clock alone — `fetched` and each window's `pace`
+    (TD-151) — so a usage event goes when the spend, a percent or a reset moves, not on every tick."""
+    out = {k: v for k, v in reading.items() if k not in ("fetched", "windows")}
+    out["windows"] = [
+        {k: v for k, v in w.items() if k != "pace"} if isinstance(w, dict) else w for w in reading.get("windows") or []
+    ]
+    return out

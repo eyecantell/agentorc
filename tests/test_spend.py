@@ -129,6 +129,67 @@ def test_the_windows_roll_in_the_homes_clock_and_pct_is_spend_over_the_amount():
     assert spend_mod.reading(priceless, {"day": amounts["day"]}, "t")["windows"][0]["pct"] is None
 
 
+def test_a_windows_turns_and_pace_are_its_spend_per_hour_since_it_began():
+    """§4.2a, §4.5a **usage** (TD-151, decided 2026-10-07): each window carries its `turns` (the rows
+    summed) and its `pace` — the spend so far, in the amount's unit, over the hours since the window
+    began — with the instant that pace reaches the amount when it does so before the reset."""
+    rows = {
+        TODAY.isoformat(): {"input": 400, "cost": 3.2, "turns": 412},
+        (TODAY - timedelta(days=3)).isoformat(): {"input": 200, "cost": 0.8, "turns": 88},
+    }
+    now = datetime(2026, 9, 27, 8, 0, tzinfo=UTC)  # eight hours into the day, Monday the 21st began the week
+    sums = spend_mod.sums({"days": rows}, now)
+    assert (sums["day"]["turns"], sums["week"]["turns"]) == (412, 500)
+    assert (
+        sums["day"]["begins"] == "2026-09-27T00:00:00+00:00" and sums["week"]["begins"] == "2026-09-21T00:00:00+00:00"
+    )
+    amounts = {
+        "day": settings.parse_amount("$5"),
+        "week": settings.parse_amount("$4.5"),
+        "month": settings.parse_amount("1M tok"),
+    }
+    by = {w["label"]: w for w in spend_mod.reading(sums, amounts, "2026-09-27T08:00:00Z")["windows"]}
+    # the design's example: $3.20 at $0.40/h reaches $5 by 12:30
+    assert by["day"]["turns"] == 412
+    assert by["day"]["pace"] == {"per_hour": 0.4, "unit": "$", "at": "2026-09-27T12:30:00+00:00"}
+    # $4 over 152 hours does not reach $4.50 before Monday's reset: a pace, no time
+    week = by["week"]["pace"]
+    assert week["unit"] == "$" and week["at"] is None and round(week["per_hour"], 4) == round(4.0 / 152, 4)
+    # a token amount reads tokens per hour, whatever was priced
+    assert by["month"]["pace"]["unit"] == "tok" and by["month"]["pace"]["per_hour"] == round(
+        600 / (26 * 24 + 8), 6
+    )  # since the 1st
+    # past the amount already, or nothing priced under a money amount: no time
+    over = spend_mod.reading(sums, {"day": settings.parse_amount("$3")}, "", now)["windows"][0]["pace"]
+    assert over["at"] is None and over["per_hour"] == 0.4
+    priceless = spend_mod.sums({"days": {TODAY.isoformat(): {"input": 800, "turns": 2}}}, now)
+    p = spend_mod.reading(priceless, {"day": amounts["day"]}, "", now)["windows"][0]["pace"]
+    assert p == {"per_hour": 100.0, "unit": "tok", "at": None}
+    # no time to reckon from, or a node's held sums from a home before the rate: no pace
+    assert spend_mod.reading(sums, amounts, "")["windows"][0]["pace"] is None
+    old = {k: {kk: vv for kk, vv in v.items() if kk not in ("turns", "begins")} for k, v in sums.items()}
+    w = spend_mod.reading(old, amounts, "", now)["windows"][0]
+    assert w["pace"] is None and w["turns"] == 0
+
+
+def test_a_pace_moving_with_the_clock_alone_pushes_no_usage_event():
+    """The pace drifts every tick while nothing is spent; a `usage` event goes when the spend, a
+    percent or a reset moves (`_settled`), and the pace rides along with it."""
+    from sessionorc.agent_spend import _settled
+
+    sums = spend_mod.sums(
+        {"days": {TODAY.isoformat(): {"input": 400, "cost": 3.2, "turns": 4}}}, datetime(2026, 9, 27, 8, tzinfo=UTC)
+    )
+    amounts = {"day": settings.parse_amount("$5")}
+    a = spend_mod.reading(sums, amounts, "2026-09-27T08:00:00Z")
+    b = spend_mod.reading(sums, amounts, "2026-09-27T09:00:00Z")
+    assert a["windows"][0]["pace"] != b["windows"][0]["pace"] and _settled(a) == _settled(b)
+    more = spend_mod.sums(
+        {"days": {TODAY.isoformat(): {"input": 400, "cost": 3.3, "turns": 5}}}, datetime(2026, 9, 27, 8, tzinfo=UTC)
+    )
+    assert _settled(spend_mod.reading(more, amounts, "2026-09-27T09:00:00Z")) != _settled(a)
+
+
 def test_an_amount_is_money_or_tokens_and_the_percents_do_not_read_it(tmp_path):
     assert settings.parse_amount("$5") == {"value": 5.0, "unit": "$"}
     assert settings.parse_amount("2M tok") == {"value": 2_000_000.0, "unit": "tok"}
@@ -180,6 +241,20 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
         hookstub.spend_turns.append(_t("u2", at, 2, source="t1", inp=900_000))
         await agent._refresh_spend_inner()
         assert agent._usage["api"]["windows"][0]["pct"] == 100
+        # a pass with nothing spent: the pace alone moved, so the reading is kept current and nothing
+        # is pushed (TD-151) — a stale pace stands in for the one an hour ago
+        agent._usage["api"]["windows"][0]["pace"] = "stale"
+        pushed: list[dict] = []
+        real_broadcast = agent._broadcast
+
+        async def recording(ev):
+            pushed.append(ev)
+            await real_broadcast(ev)
+
+        monkeypatch.setattr(agent, "_broadcast", recording)
+        await agent._refresh_spend_inner()
+        assert [e for e in pushed if e.get("event") == "usage"] == []
+        assert agent._usage["api"]["windows"][0]["pace"]["unit"] == "$"
         await agent._enforce_usage_gate(now)
         g = agent.sessions[w["id"]].gated
         assert g and (g["label"], g["pct"], g["line"]) == ("day", 100, 100)
@@ -285,6 +360,10 @@ def test_the_offline_figure_is_the_held_sums_plus_the_nodes_own_turns():
     fig = spend_mod.figure(held, [t | {"at": tomorrow.isoformat()}], None, tomorrow)
     assert (fig["day"]["total"], fig["week"]["total"]) == (500, 500), "the day and the week (Sunday→Monday) rolled"
     assert fig["month"]["total"] == 1500
+    # the turns add as the tokens do, and the pace is reckoned from the window's own start
+    held["day"]["turns"] = 7
+    fig = spend_mod.figure(held, [t], None, now)
+    assert fig["day"]["turns"] == 8 and fig["day"]["begins"] == "2026-09-27T00:00:00+00:00"
 
 
 async def test_the_home_takes_a_nodes_spend_and_pushes_its_sums_when_its_readings_move(agent, monkeypatch):

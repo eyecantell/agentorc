@@ -1120,7 +1120,23 @@
   // A **metered** account's chip (§4.5a **usage**, TD-151 slice 5) — `_metered_chip` in app.py is
   // the same rule: the account's spend over the window's amount, worst the one nearest its amount,
   // amber from eight tenths, red at it; *spend unknown* when the adapter could not read; never stale.
-  function meteredChip(profile, u, windows) {
+  // A window's turns and pace on the hover (TD-151) — `_pace_says` in app.py is the same rule.
+  function paceSays(w, now) {
+    let out = "";
+    if (Number.isInteger(w.turns)) out += ` · ${w.turns.toLocaleString("en-US")} turn${w.turns === 1 ? "" : "s"}`;
+    const p = w.pace && typeof w.pace === "object" ? w.pace : null;
+    if (!p || typeof p.per_hour !== "number" || !Number.isFinite(p.per_hour) || !["$", "tok"].includes(p.unit)) return out;
+    out += ` · ${p.unit === "$" ? money(p.per_hour) : `${tokShort(Math.trunc(p.per_hour))} tok`}/h`;
+    const at = instant(p.at), amount = amountSays(w.amount);
+    if (at !== null && amount) {
+      const d = new Date(at), pad = (n) => String(n).padStart(2, "0"), hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const today = d.toDateString() === new Date(now).toDateString();
+      out += ` · at this pace ${amount} by ${today ? hm : `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]} ${hm}`}`;
+    }
+    return out;
+  }
+  function meteredChip(profile, u, windows, now) {
+    now = typeof now === "number" ? now : Date.now();
     const isNum = (v) => typeof v === "number" && Number.isFinite(v);
     const spend = (w) => {
       const s = w.spent, a = w.amount && typeof w.amount === "object" ? w.amount : {};
@@ -1138,6 +1154,7 @@
       const kinds = METERED_KINDS.map(([k, word]) => `${tokShort(Math.trunc(t[k] || 0))} ${word}`).join(", ");
       let part = `${w.label} ${spend(w)}`;
       if (amount(w)) part += ` / ${amount(w)} (${pct(w) !== null ? pct(w) : "?"}%)`;
+      part += paceSays(w, now);
       return `${part} — ${kinds} (resets ${w.resets || "?"})`;
     }).join("\n");  // one window per line (TD-270)
     const reason = String(u.reason || "ok");
@@ -1168,7 +1185,7 @@
   AO.usageChip = function (profile, u, now) {
     if (!u || typeof u !== "object") return null;
     const spent = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w === "object" && w.spent && typeof w.spent === "object" && !Array.isArray(w.spent));
-    if (spent.length) return meteredChip(profile, u, spent);
+    if (spent.length) return meteredChip(profile, u, spent, now);
     const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
     const reason = String(u.reason || "ok"), refused = reason !== "ok";
     if (!windows.length && !refused) return null;
