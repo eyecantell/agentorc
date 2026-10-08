@@ -6865,39 +6865,3 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the Focus page has **» put away**; pressing it gives the terminal the column's width (a Playwright shot of the live page at 1440 shows the rail and the wider terminal, committed as `docs/mockups/reviews/<date>-td412-*.png`), **«** and every glyph bring it back, a glyph's press opens its card, the choice survives a reload and a pop-out, `s` toggles it with the terminal unfocused and is listed by `?`, the phone row draws under 720px; `tests/test_ui_focus*.py` pin the button, the rail's glyphs for a `needs-you` session with `doing`, reports, inbox and a passing checklist, the `AO.KEYS` row, and the help paragraph; `pdm run test` and `pdm run lint` pass; TD-408 is archived with this entry.
 
 **Related:** TD-408 (the design), TD-156 (the side panel's folds), TD-046 (Pop out), TD-124 (the keys table), TD-003 (the phone layout).
-
-## TD-408: The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-08 (the person's session, from Paul: *make the right side bar (Session, Ready to close, Git sections) collapsible — that way the terminal window can expand*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Done
-**Location:** design §4.5 *The Focus screen's anatomy*, §4.5a (the Focus side panel's rows); `src/agentorc/ui/templates/focus.html` (`<div class="side">`), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/static/app.js` (the terminal's fit on resize)
-
-**Why:** every card in the Focus side panel (Session, Ready to close, Git, Reports, Inbox …) is a `<details>` fold remembered per browser (TD-156), but folding them all leaves the column at its width. The terminal cannot take the space, and on a laptop screen it is the terminal Paul wants wide.
-
-**Resolved:** 2026-10-08 (PR #1283 the design, PR #1286 the build, TD-412) — design §4.5 *The panel put away* and §4.5a *» put away / « (the rail)*; built as TD-412 says.
-
-**Done when** the Focus page has the control, collapsing gives the terminal the panel's width with its columns refit, expanding restores it, and the choice survives a reload.
-
-**Related:** TD-156 (the side panel's folds), TD-003 (the phone layout, which plans a collapsed side panel and has not built one).
-
-## TD-412: Build TD-408: the Focus side panel's **» put away** / **«** rail — the terminal takes the width, remembered per browser, key `s`, the phone's row
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-08 (the designer, from TD-408's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Done
-**Location:** `src/agentorc/ui/templates/focus.html` (`<div class="side">`: the top line's button, the rail), `src/agentorc/ui/static/app.css` (`.focus .side`, the rail's width, the phone's row under 720px), `src/agentorc/ui/static/app.js` (`AO.focus`: the toggle and `store` key `focus.side`; `AO.KEYS`: `s` on page `focus`), `src/agentorc/ui/help.py` (the control's paragraph), `tests/test_ui_focus*.py`
-
-**Why:** TD-408: every side card folds, but the column keeps its 320px and the terminal never grows. Design §4.5 *The panel put away* and §4.5a *» put away / « (the rail)*.
-
-**Resolved:** 2026-10-08 (PR #1286, grinder-ao-2) — `focus.html` (**» put away**, the rail and the `focus.side` read before the first paint), `app.js` (`AO.railGlyphs`, the toggle, the `s` row in `AO.KEYS`), `app.css` (the 28px rail, the phone's row), `ui/help.py` and §4.5a *The help text* (**» put away**); pinned by `tests/test_ui_focus_rail.py` and `tests/test_ui_keys.py`. The UI check (the PR's body) read the side 320 → 28px and the terminal 1066 → 1358px with xterm refit, reload, a glyph's press opening its card, `s`, the `?` overlay, the pop-out and the phone row; shots `docs/mockups/reviews/2026-10-08-td412-*.png`.
-
-**Done when** the Focus page has **» put away**; pressing it gives the terminal the column's width (a Playwright shot of the live page at 1440 shows the rail and the wider terminal, committed as `docs/mockups/reviews/<date>-td412-*.png`), **«** and every glyph bring it back, a glyph's press opens its card, the choice survives a reload and a pop-out, `s` toggles it with the terminal unfocused and is listed by `?`, the phone row draws under 720px; `tests/test_ui_focus*.py` pin the button, the rail's glyphs for a `needs-you` session with `doing`, reports, inbox and a passing checklist, the `AO.KEYS` row, and the help paragraph; `pdm run test` and `pdm run lint` pass; TD-408 is archived with this entry.
-
-**Related:** TD-408 (the design), TD-156 (the side panel's folds), TD-046 (Pop out), TD-124 (the keys table), TD-003 (the phone layout).
