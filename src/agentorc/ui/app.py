@@ -193,17 +193,20 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _answered_of,  # noqa: F401
     _board_holder,  # noqa: F401
     _board_named,  # noqa: F401
+    _board_order,  # noqa: F401
     _civil,  # noqa: F401
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
+    _order_teams,  # noqa: F401
     _orphan_held,  # noqa: F401
     _outcome_of,  # noqa: F401
     _owing,  # noqa: F401
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
+    _resolved,  # noqa: F401
     _same_ref,  # noqa: F401
     _shot_host_down,  # noqa: F401
     _shot_on_host,  # noqa: F401
@@ -1234,21 +1237,17 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)
         hz = with_standings(horizon_of((await board_view())[0], str(r.get("root") or "")), sessions, now)
         boards = hz["due"]
+        # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
+        lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
         ctx = {
             "r": r,
             "name": name,
             "g": {"team": summary["team"], "summary": summary},
             "teams": teams,
             "prs": pr_rows(r, members, standing, now),
-            "lists": ledger_lists(r, summary["motion"]),
+            "lists": ledger_lists(r, summary["motion"], lanes),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
-            "lanes": [
-                ln
-                for team, got in teamrun.repo_lanes(
-                    (r.get("ledger") or {}).get("entries"), str(r.get("root") or ""), sessions
-                ).items()
-                if (ln := lanes_line(team, got, (r.get("ledger") or {}).get("by_kind") or {}))
-            ],
+            "lanes": [ln for team, got in lanes.items() if (ln := lanes_line(team, got, teamrun.lane_kinds(r)))],
             "boards": boards,
             "horizon": hz,
             "doing": summary["doing"],

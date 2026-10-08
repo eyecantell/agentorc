@@ -4,6 +4,7 @@ Technical debt, Waiting on you and Doing — and a page for a registered repo no
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -126,7 +127,9 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
             ]
         },
         "techlead-1/sent": {"entries": [{"id": "m-1", "kind": "reply", "verdict": "pass"}]},
-        "ui-reader-1": {"entries": [{"kind": "ask", "pr": 811, "at": _iso(NOW - timedelta(hours=1)), "closed_by": "m-2"}]},
+        "ui-reader-1": {
+            "entries": [{"kind": "ask", "pr": 811, "at": _iso(NOW - timedelta(hours=1)), "closed_by": "m-2"}]
+        },
         "ui-reader-1/sent": {"entries": [{"id": "m-2", "kind": "reply", "verdict": "pass"}]},
     }
     c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet, doing, inbox))
@@ -137,7 +140,10 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
     assert prs.index("#805") < prs.index("#811")
     assert 'href="/focus/tdgrind-1">tdgrind-1</a>' in prs and ">draft<" in prs
     # each reader named, its answer's verdict said (§4.9c *What is shown*, TD-315 slice 5b)
-    assert '"tag wait">passed by ui-reader-1 · waiting on techlead-1 · 40m<' in prs and '"tag done">passed by techlead-1<' in prs
+    assert (
+        '"tag wait">passed by ui-reader-1 · waiting on techlead-1 · 40m<' in prs
+        and '"tag done">passed by techlead-1<' in prs
+    )
     # Technical debt: four lists, held by, folded past four with +n more
     assert 'id="debt-pickable"' in html and "held by tdgrind-1" in html and "+2 more" in html
     assert html.count('class="rrow folded"') == 2
@@ -260,3 +266,63 @@ def test_the_team_card_reads_what_is_held_across_the_fleet_not_its_members_alone
     assert "in grind's lanes: " in html and "lanewarn" not in html
     fleet[1]["progress"] = []
     assert "g1</a> out of work with 6 in its lane" in c.get("/repo/samscrape").text
+
+
+ORDER = {
+    "id": "board:1a2b3c4d",
+    "title": "Keep the nightly backup?",
+    "priority": "High",
+    "for_page": "pickable",
+    "pickable": "yes",
+    "work_order": True,
+    "decided": {"text": "keep", "date": "2026-10-03"},
+    "refs": ["TD-777"],
+}
+
+
+def test_a_decided_board_line_is_first_in_pickable_with_its_answer_and_who_holds_it(tmp_path, monkeypatch):
+    """TD-384 slice 2 (§4.5a *Repo page: decided lines*): a work order heads the *pickable* list —
+    `board:<key>`, its head text, *decided <answer> · <date>*, *pickable by <team>* or *held by* —
+    is counted in the kind bar's *pickable* and the lanes line, and not in the priorities."""
+    from agentorc.ui.app import ledger_lists, repo_facet
+
+    root = str(tmp_path / "samscrape")
+    r = {**reading(root), "work_orders": {"orders": [ORDER]}}
+    lists = {x["key"]: x for x in ledger_lists(r, [], {"grind": {"pickable": ["board:1a2b3c4d", "TD-301"]}})}
+    first = lists["pickable"]["rows"][0]
+    assert (first["id"], first["pickable_by"], first["held"]) == ("board:1a2b3c4d", ["grind"], "")
+    assert [e["id"] for e in lists["pickable"]["rows"][1:3]] == ["TD-301", "TD-310"]
+    held = ledger_lists(r, [{"ref": "board:1a2b3c4d", "members": [{"name": "g1"}]}])
+    assert held[0]["rows"][0]["held"] == "g1"
+    # the ledger unread: the order still draws, and says nothing of lanes nobody could read
+    unread = {**r, "ledger": {**r["ledger"], "entries": None}}
+    (order,) = ledger_lists(unread, [], {})[0]["rows"]
+    assert order["id"] == "board:1a2b3c4d" and order["pickable_by"] is None
+    facet = repo_facet(r, NOW)["ledger"]
+    assert {b["key"]: b["n"] for b in facet["kind"]}["pickable"] == 7
+    assert sum(b["n"] for b in facet["priority"]) == 7  # the ledger's own seven, the order not among them
+
+    fleet = [rec("g1", root, lane=["free-pick"])]
+    c = client(monkeypatch, tmp_path, fake({root: r}, fleet))
+    html = c.get("/repo/samscrape").text
+    debt = html[html.index('id="debt"') :]
+    assert debt.index("board:1a2b3c4d") < debt.index("TD-301")
+    assert "decided keep · 2026-10-03" in debt and "pickable by grind" in debt
+    # the lanes line: seven pickable, the order in grind's free-pick lane, the ledger's six by owner
+    assert "7 pickable · 1 in grind&#39;s lanes · grinder 6" in re.findall(r"\d+ pickable · [^<\"]*", html)
+
+
+def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
+    """TD-384 slice 2: the team card's TDs in motion draws a claim on `board:<key>` as any reference."""
+    from agentorc.ui.app import motion_rows
+
+    r = {**reading("/r"), "work_orders": {"orders": [ORDER]}}
+    m = rec("g1", "/r", progress=[{"ref": "board:1a2b3c4d", "status": "claimed"}])
+    (row,) = motion_rows([m], r)
+    assert motion_rows([m], {**r, "ledger": {"entries": None}})[0]["title"] == "Keep the nightly backup?"
+    assert (row["ref"], row["title"], row["phase"], row["priority"]) == (
+        "board:1a2b3c4d",
+        "Keep the nightly backup?",
+        "grind",
+        "high",
+    )

@@ -1761,3 +1761,48 @@ def test_the_row_draws_its_standing_and_hands_its_refs_to_reply(tmp_path, monkey
     hz = with_standings(board_horizon(rows, "all"), [holder], now)
     assert [r["standing"]["text"] for r in hz["ahead"]] == ["gone"]
     assert all("standing" not in r for r in rows)
+
+
+@pytest.mark.unit
+def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_that_pick_it(tmp_path):
+    """TD-384 slice 2 (§4.5 screen 6): a decided line is a work order, `board:<key>` by the repo's
+    own reader — a lease on it is *holds board:<key>*; held by nobody and its session gone, it is
+    *pickable by <team>* for each team whose `free-pick` lane takes it, with the team's wound-down
+    state when none is live; a `fyi` line and a repo no team services keep the next reader."""
+    from agentorc.ui.inbox import board_waiting_on
+    from sessionorc import workorders
+
+    root = tmp_path / "repo"
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(
+        pathlib.Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts"
+    )
+    text = (
+        "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
+        " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."
+    )
+    ref = workorders.ref(root, text)
+    assert workorders.is_work_order(ref)
+    now = datetime(2026, 10, 4, 12, tzinfo=UTC)
+    row = {"repo": "repo", "root": str(root), "text": text, "decided": "keep", "session": "gone-1", "refs": ["TD-777"]}
+    lease = {"ref": ref, "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
+    g1 = {"id": "ao-g1", "name": "g1", "state": "working", "team": "grind", "repo": str(root), "lane": ["free-pick"]}
+    assert board_waiting_on(row, [{**g1, "progress": [lease]}], now) == f"waiting on g1 — holds {ref}"
+    assert board_waiting_on(row, [g1], now) == "pickable by grind"
+    down = {**g1, "state": "exited"}
+    assert board_waiting_on(row, [down], now) == "pickable by grind · grind wound down — starts on `on_work`"
+    assert board_waiting_on(row, [down], now, {"grind"}) == "pickable by grind · the start row is in Needs you"
+    # a lane that takes no free-pick work, a fyi line, and no team: the next reader
+    nobody = "waiting on the next session to read repo's board"
+    assert board_waiting_on(row, [{**g1, "lane": ["design-first"]}], now) == nobody
+    assert board_waiting_on({**row, "kind": "fyi"}, [g1], now) == nobody
+    assert board_waiting_on(row, [], now) == nobody
+    # a record whose repo will not resolve is passed over, never the page's error
+    assert board_waiting_on(row, [{**g1, "repo": "bad\x00path"}, g1], now) == "pickable by grind"
+    # a repo with no reader names no order; a reader that will not load is loaded once, not per row
+    assert board_waiting_on({**row, "root": str(tmp_path)}, [g1], now) == nobody
+    broken = tmp_path / "broken"
+    (broken / "scripts").mkdir(parents=True)
+    (broken / "scripts" / "nudge_user_attention.py").write_text("raise SystemExit(3)\n")
+    assert workorders.ref(broken, text) == ""
+    assert workorders._keys[str(broken / "scripts" / "nudge_user_attention.py")][1] is None

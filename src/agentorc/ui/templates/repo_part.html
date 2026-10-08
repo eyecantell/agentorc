@@ -34,14 +34,19 @@
     {% if ledger_editor %}<a class="btn sm ghost" href="{{ ledger_editor.url }}">‹› Open ledger</a>{% endif %}
     {% if r.ledger %}<button class="btn sm ghost" type="button" data-addentry="{{ name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button>{% endif %}</div>
   {% for ln in lanes or [] %}{% with url = '' %}{% include "lanes_line.html" %}{% endwith %}{% endfor %}
-  <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes; <i>held by</i> is a member's claim</div>
+  <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes, and first among the pickable the board's decided lines, <i>board:</i>; <i>held by</i> is a member's claim</div>
   <div class="rlist">
   {% if r.ledger and r.ledger.entries is none %}<div class="rrow meta">could not look — {{ r.ledger.error or 'not read yet' }}</div>{% endif %}
   {% for l in lists %}{% if l.rows %}
     <div class="rlh" id="debt-{{ l.key }}">{{ l.label }} · {{ l.rows | length }}</div>
     {% for e in l.rows %}
+    {% if e.work_order %}{# a decided board line, a work order of the lanes (§4.5a *Repo page: decided lines*, TD-384) #}
+    <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}" data-order><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
+      <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?{% if teams %}team={{ teams[0] }}&{% endif %}kind=board" title="the line on the board, in the Inbox">board →</a></div>
+    {% else %}
     <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
       {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}</div>
+    {% endif %}
     {% endfor %}
     {% if l.fold %}<button class="rrow meta mono more" type="button" data-unfold="{{ l.key }}">+{{ l.fold }} more</button>{% endif %}
   {% endif %}{% endfor %}

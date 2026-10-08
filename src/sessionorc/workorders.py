@@ -29,7 +29,8 @@ FETCH_TIMEOUT = 45.0  # the reader's fetch is serial and its own; a read past th
 READ_TIMEOUT = 20.0
 HEAD_MOST = 120
 _REF_RE = re.compile(r"board:[0-9a-f]{8}")
-_keys: dict[tuple[str, float], Callable[[str], str]] = {}
+# one loaded reader per file, its `item_key` or None for one that will not load, kept while its mtime holds
+_keys: dict[str, tuple[float, Callable[[str], str] | None]] = {}
 
 
 def is_work_order(ref: str) -> bool:
@@ -38,31 +39,45 @@ def is_work_order(ref: str) -> bool:
 
 
 def _item_key(script: Path) -> Callable[[str], str] | None:
-    """The reader's own `item_key`, loaded from that file and kept while its mtime holds."""
+    """The reader's own `item_key`, loaded from that file and kept while its mtime holds — a reader
+    that will not load is kept as None too, so a page asking per row never runs it again (TD-384)."""
     try:
         stamp = script.stat().st_mtime
     except OSError:
         return None
-    got = _keys.get((str(script), stamp))
-    if got is None:
-        spec = importlib.util.spec_from_file_location(f"_ao_board_reader_{abs(hash(str(script)))}", script)
-        if spec is None or spec.loader is None:
-            return None
+    held = _keys.get(str(script))
+    if held is not None and held[0] == stamp:
+        return held[1]
+    got: Callable[[str], str] | None = None
+    spec = importlib.util.spec_from_file_location(f"_ao_board_reader_{abs(hash(str(script)))}", script)
+    if spec is not None and spec.loader is not None:
         mod = importlib.util.module_from_spec(spec)
         try:
             spec.loader.exec_module(mod)
-        except Exception:  # noqa: BLE001 — a reader that will not load lists no work orders, never raises
-            return None
-        got = getattr(mod, "item_key", None)
-        if not callable(got):
-            return None
-        _keys[(str(script), stamp)] = got
+            got = getattr(mod, "item_key", None)
+        except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
+            got = None
+    got = got if callable(got) else None
+    _keys[str(script)] = (stamp, got)
     return got
 
 
 def key(text: str, item_key: Callable[[str], str]) -> str:
     """`board:<key>` for an open item's text as the report gives it — its line less the open tick."""
     return PREFIX + hashlib.sha256(item_key(f"- [ ] {text}").encode("utf-8")).hexdigest()[:8]
+
+
+def ref(root: str | Path, text: str) -> str:
+    """`board:<key>` for an open line of the board under `root`, by that repo's own reader — what a
+    page that holds the line but not the reading names it by (§4.5 screen 6, TD-384) — or empty
+    where the repo has no reader or its key cannot take the line."""
+    item_key = _item_key(Path(root) / READER) if root and text else None
+    if item_key is None:
+        return ""
+    try:
+        return key(text, item_key)
+    except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no reference
+        return ""
 
 
 def head(text: str) -> str:
