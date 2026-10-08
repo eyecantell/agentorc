@@ -1239,7 +1239,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 - Since TD-259 the manager is a seat on call, meant to be filled by §6 rule 3's `team` trigger only when a reading needs judgement: an `ask` to it, a permission on an unattended member, a `stalled?` member, *idle · open work* after the nudge, an escalation.
 - `ao team start` still creates the manager as a live session, before the techlead and the members. So every Start fills it.
 - Each fill reads the brief (about 4,200 words), then its first reads: design §4.8 (about 9,500 words), §6 (about 21,000) and cadence.md (about 8,500). That is some 60–70k tokens.
-- The host agent's journal, 2026-10-01 to 2026-10-08, has 14 fills across the four teams, from 2026-10-03 on, that closed with *a seat with nothing due, idle and pushed*. They line up with Starts: on 2026-10-08, ao-grind's at 15:13 and samscrape's at 15:56 MDT. manager-ao-1's round log for each reads *filled with no seat_due … nothing to do*.
+- The host agent's journal, 2026-10-01 to 2026-10-08, has 14 closes of a filled manager across the four teams, from 2026-10-03 on, each that closed with *a seat with nothing due, idle and pushed*. They line up with Starts: on 2026-10-08, ao-grind's manager started at 15:12 and closed at 15:15 MDT, and samscrape's started at 15:54 and closed at 15:56. manager-ao-1's round log for each reads *filled with no seat_due … nothing to do*.
 
 **Fix (to design):**
 1. A Start writes an on-call manager's record without a pane, as a held seat is written (TD-386's `create` with `held`). Rule 3's `team` trigger fills it on its first due reading. Say what the controllers point at until then: the members' `controllers` name the manager's id whether or not it has a pane.
@@ -1250,4 +1250,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane, the manager is filled the first time one of its readings is due, a fill's first reads are its brief and the rule it was filled for, and a week's journal shows no *nothing due* close for a manager.
 
 **Related:** TD-118 (archived; its step (4), the manager on Haiku, dropped for this), TD-247 (the manager's jobs moved to the tick), TD-259 (the seat on call), TD-386 (the held create), TD-381 (the anchor seat's record without a pane).
-
