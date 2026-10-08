@@ -6418,3 +6418,26 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** on a scratch home `ao team start` over a checkout with an uncommitted file writes the seat's record closed with no pane and `seat_held` saying *1 file uncommitted*, the note says why, and rule 3 fills it on the tick after the file is committed; a seat whose `none` says the checkout was not its own is filled again on the same ids once the checkout is clean, and one whose checkout was clean is not; and tests cover a dirty Start, an off-branch Start, a node's Start (occupancy alone) and both `none` cases.
 
 **Related:** TD-394, TD-381, TD-385, TD-386, TD-387.
+
+---
+
+## TD-394: An anchor seat's Start lands in a dirty checkout, where its fill would have waited
+
+**Priority:** Low
+**Added:** 2026-10-08 (grinder-ao-1, from the techlead's reading of #1248, TD-386)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved — designed 2026-10-08 (the designer, PR #1252), built by TD-395 (PR #1257, grinder-ao-1; TD-395 archived in #1257), archived #TBD.
+**Location:** design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor` (*a start whose checkout a session holds …*), §6 rule 3 (*Its fill is gated by the checkout*); `src/agentorc/teamrun.py` (`start`, TD-385's occupancy check), `src/sessionorc/agent_tick.py` (the fill's gate, `seat_held`)
+
+**Why:** the seat's fill (§6 rule 3, built in TD-386) is refused while the home repo's main checkout is held by a session, dirty, or off its default branch, writing `seat_held`. `ao team start` (TD-385) checks occupancy alone, because the design's Start paragraph names only a holder: a Start into a free checkout that has uncommitted files or another branch checked out creates the seat with a pane there. The two roads into the same checkout disagree, and the anchor brief's work (promotes, ledger PRs) could then run over the person's uncommitted work.
+
+**Fix:** decide whether a Start gates on the checkout as the fill does — a held Start (`closer {by: start, why: held}`, no pane, TD-386) for a dirty or off-branch checkout too, its `seat_held` saying why — or whether a Start is the person's own word and may land there; then the design says it and the build follows.
+
+**Done when** the design names what a Start does with a dirty or off-branch free checkout, and a test covers it.
+
+**Resolved:** 2026-10-08 (the designer) — the design in §4.9b *The anchor seat*, §4.9 `anchor` and §6 rule 3 (#1252): a Start is gated as the fill is, a held Start writes `seat_held`, and a `work` seat's `none` in a checkout not its own writes `lane_seen` with no ids; built by TD-395 (#1257): `checkout_held` as the one reading for the Start and the fill, `create` with `held_reason`, the `none` case, with tests.
+
+**Related:** TD-395, TD-381, TD-385, TD-386, TD-387.
+
+---
