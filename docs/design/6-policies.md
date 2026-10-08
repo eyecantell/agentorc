@@ -240,7 +240,9 @@ code and needs no grant; a session doing the same work does.
      **The anchor seat is a seat of this rule, with the trigger `work`** (TD-381; designed
      2026-10-07; built — TD-386; §4.9b *The anchor seat*): `seat_due` is set with `by: work` and
      the `ids` when the seat's lane reading — the lane word `anchor` (rule 6), kept on the seat's
-     record as `lane_seen` as a finished member's is — holds an id it did not when the seat last
+     record as `lane_seen` as a finished member's is, and pruned as rule 6 prunes it (TD-407: an
+     id the lane no longer matches leaves it, so a live check that goes live after the seat saw it
+     as a build is due again) — holds an id it did not when the seat last
      declared or was created, and a cause fills once per stretch as the manager's do: the same ids
      raise no second `seat_due` after a `none`. **Its fill is gated by the checkout**: the
      `create` is in the home repo's main checkout, refused by occupancy (§9 invariant 2) while any
@@ -466,7 +468,22 @@ code and needs no grant; a session doing the same work does.
      **one `note` from `system`** into its inbox: *your lane gained n entries since you declared
      out of work: TD-180, TD-181, TD-183 — read the ledger on `origin/main`, then claim one or
      declare again* — the ids from the reading, five at most and *and n more*, nothing a session
-     wrote — and adds them to `lane_seen`, so an entry is told once. It is mail, so the doorbell
+     wrote — and adds them to `lane_seen`, so an entry is told once. **`lane_seen` is the lane's
+     memory, never the ledger's** (TD-407; designed 2026-10-08; built — TD-411): on every reading,
+     an id in it that the reading holds and the lane no longer matches is removed, with the drop
+     kept for it under `dropped`, for a live member and a gone one alike, so an entry that leaves
+     the lane and comes back is news once more — a build that became a live check and then went
+     live, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
+     the reading does not hold is kept, since an entry absent from the checkout's file is archived
+     or the checkout's moment, not the lane's. The reading is one function (`sessionorc.work`),
+     the memory pruned and the news read in one pass, so rule 6, rule 8 and the anchor seat's
+     `work` trigger (rule 3) never disagree on what is new; it keys on the id alone still, since
+     *matches the lane now and did not when last seen* is what being news means, and no kind or
+     workability is written beside the id. Before this, `lane_seen` kept the id for good, so
+     TD-400 — seen by one grinder as a build and by the other as the live check its merge made
+     of it, workable again eleven minutes later at the promote — was news to nobody, and ao-grind wound down over it
+     three hours on. The promote tells nobody itself: it is one of the ways an entry comes back,
+     and the reading sees them all. It is mail, so the doorbell
      is what wakes the member, under every rule the doorbell has (§4.10: hook-confirmed idle, an
      empty composer, a pending stop beats it, **one unit of the wake budget**), and a node's
      member is reached as any mail reaches it. What the member does is its own: a claim clears
@@ -557,7 +574,9 @@ code and needs no grant; a session doing the same work does.
      killed or closed by a person makes it *stopped*, which this rule leaves alone, and a
      person's own session in the team changes nothing. The reading is written once
      (`sessionorc.work`), and the card's is the same function given the definition's seat names.
-     When a wound-down team's member's lane holds a matching id its `lane_seen` does not, and
+     When a wound-down team's member's lane holds a matching id its `lane_seen` does not — the
+     memory pruned as rule 6 prunes it for a member that is gone (TD-407), so an entry that left
+     the lane before the wind-down and came back after it is this rule's news — and
      `WORK_SETTLE` (ten minutes) has passed since the home first read the newest of them — a
      time the home keeps in memory, so a restart of the home starts the settle again and
      entries filed together are one event — the home writes **`work_waiting: {at, repo,
@@ -698,7 +717,13 @@ code and needs no grant; a session doing the same work does.
      minutes, a clock the home keeps in memory per team from the tick the reading first held,
      dropped the tick it stops holding, so a restart of the home starts it again as rule 8's
      `WORK_SETTLE` does: a finished member may claim again on rule 6's news, and a manager whose
-     round has the wind-down in hand makes it as today) the home **winds the team down itself**:
+     round has the wind-down in hand makes it as today) the home **winds the team down itself**
+     — and it **holds no wind-down for an entry a declared member has not been told of** (TD-407,
+     decided 2026-10-08): rule 6 tells on the tick an entry matches, inside this rule's settle, and
+     the cases it does not tell in — gated, wrapping up, past its stop, suspended, over its balance
+     line — are each a reason the member is not to be started into it, and leave the id out of
+     `lane_seen`, so the wound-down team finds it by rule 8; a hold would make this rule a second
+     reader of the lane, and two readers disagree —:
      the members' half is `ao team stop --close`'s (§4.9a) — each finished member is closed
      under the wrap-up's own safety check, one with uncommitted or unpushed work left open and
      the Inbox row it is after any wrap-up — and the manager's half is this rule's own. The
