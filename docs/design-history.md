@@ -97,6 +97,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-07 (TD-151, grinder-ao-1): built — `spend.sums` keeps the rows' `turns` and each window's `begins`, and `spend.reading` gives each window `turns` and `pace` (`{per_hour, unit, at}`); a pace that moves with the clock alone is kept current at the host agent and pushed with the next move of the spend.
 - 2026-10-07 (TD-151, the designer): a metered reading's windows carry `turns` and `pace` beside `spent`.
 - 2026-09-11 (TD-031): landed the model-in-use observation — the card's third part shows the model actually in use when the adapter can tell it, and `opus-5 (profile)` when only the declared one is known.
 - 2026-09-23 (TD-122, the designer; Paul comparing the chip with the account's usage page): the reading made the account's — one poll per `(adapter, account)`, every profile sharing it carrying the same reading and back-off; reserves stay per profile. Found when four profiles split by role (TD-118) on one account turned one working poll into four refused ones.
@@ -303,6 +304,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-151, grinder-ao-1): the metered chip's hover built with each window's turns and pace — *day $3.20 / $5 (64%) · 412 turns · $0.40/h · at this pace $5 by 12:30* — in `_metered_chip` and `AO.usageChip` alike; the clock time carries its weekday when it is not today, a week's or a month's.
 - 2026-10-07 (TD-151, the designer): the metered chip's hover word *the turns' rate*, undefined since TD-128, is **the window's spend per hour** since the window began, with the time an amount would be reached at that pace, and the window's turn count beside it; turns per hour rejected, the amount being money or tokens.
 - 2026-10-07 (TD-368 slice 3, grinder-ao-2): the Inbox's **For you in the ledger (n)** fold built — under the board's rows in *Needs you*, closed until opened and remembered per browser, one link per entry to the Repo page on its id, filtered by the rail's *Teams* picks and the find alone, counted nowhere; a row's team is the definitions' team for its repo, else its live records'.
 - 2026-10-07 (TD-002, grinder-ao-2; Paul released it to the grinders that day: *still vital*): **Focus composer: Attach / drop / paste** built — the picker, a drop on the terminal or the composer, an image pasted into the composer; the path inserted at the caret and nothing sent; a pasted `image.png` named `paste-<date>-<time>`; desktop only, a session on this host only.

@@ -109,6 +109,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _look_for,  # noqa: F401
     _metered_chip,  # noqa: F401
     _money,  # noqa: F401
+    _pace_says,  # noqa: F401
     _place_asking,  # noqa: F401
     _place_cache,  # noqa: F401
     _projected,  # noqa: F401

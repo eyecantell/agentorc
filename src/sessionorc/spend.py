@@ -231,26 +231,58 @@ def bounds(now: datetime) -> dict[str, tuple[date, datetime]]:
 
 
 def sums(acct: dict[str, Any], now: datetime) -> dict[str, dict[str, Any]]:
-    """`{label: {tokens: {kind: n}, total, cost, resets}}` over the ledger's rows, `cost` None when
-    no row in the window was priced."""
+    """`{label: {tokens: {kind: n}, total, cost, turns, begins, resets}}` over the ledger's rows,
+    `cost` None when no row in the window was priced; `begins` the window's first instant, whence its
+    pace is reckoned (§4.2a, TD-151)."""
     out = {}
     for label, (start, resets) in bounds(now).items():
         tokens = {k: 0 for k in KINDS}
         cost: float | None = None
+        turns = 0
         for d, row in (acct.get("days") or {}).items():
             if not isinstance(row, dict) or d < start.isoformat() or d > now.date().isoformat():
                 continue
             for k in KINDS:
                 tokens[k] += int(row.get(k) or 0)
+            turns += int(row.get("turns") or 0)
             if isinstance(row.get("cost"), int | float):
                 cost = (cost or 0.0) + float(row["cost"])
         out[label] = {
             "tokens": tokens,
             "total": sum(tokens.values()),
             "cost": None if cost is None else round(cost, 6),
+            "turns": turns,
+            "begins": _begins(start, resets).isoformat(),
             "resets": resets.isoformat(),
         }
     return out
+
+
+def _begins(start: date, resets: datetime) -> datetime:
+    """A window's first instant: its first day's local midnight, in the zone its reset is in (the
+    home's), through the system's zone as `bounds` does past a DST change."""
+    naive = datetime(start.year, start.month, start.day)
+    return naive.replace(tzinfo=UTC) if resets.tzinfo is UTC else naive.astimezone()
+
+
+def pace(s: dict[str, Any], amount: dict[str, Any] | None, now: datetime | None) -> dict[str, Any] | None:
+    """A window's **pace** (§4.2a, §4.5a **usage**; TD-151, decided 2026-10-07): its spend so far over
+    the hours since it began, in the amount's unit — tokens on a priceless profile or with no amount
+    and nothing priced — and, under an amount that pace reaches before the reset, the instant it
+    would (`at`). None before the window has begun, or with no `begins` (a node's held sums from a
+    home before TD-151's rate)."""
+    begins, resets = _when(s.get("begins")), _when(s.get("resets"))
+    if now is None or begins is None or now <= begins:
+        return None
+    unit = "tok" if (amount or {}).get("unit") == "tok" or s.get("cost") is None else "$"
+    spent = float(s["total"]) if unit == "tok" else float(s["cost"])
+    per_hour = spent / ((now - begins).total_seconds() / 3600)
+    at = None
+    if amount and amount.get("unit") == unit and per_hour > 0 and spent < amount["value"]:
+        reach = now + timedelta(hours=(amount["value"] - spent) / per_hour)
+        if resets is None or reach < resets:
+            at = reach.isoformat()
+    return {"per_hour": round(per_hour, 6), "unit": unit, "at": at}
 
 
 def spent_of(amount: dict[str, Any], s: dict[str, Any]) -> float | None:
@@ -261,11 +293,18 @@ def spent_of(amount: dict[str, Any], s: dict[str, Any]) -> float | None:
     return None if s["cost"] is None else float(s["cost"])
 
 
-def reading(window_sums: dict[str, dict[str, Any]], amounts: dict[str, dict[str, Any]], fetched: str) -> dict[str, Any]:
+def reading(
+    window_sums: dict[str, dict[str, Any]],
+    amounts: dict[str, dict[str, Any]],
+    fetched: str,
+    now: datetime | None = None,
+) -> dict[str, Any]:
     """The account's sums as this profile's reading: a `Window` per label, `pct` the spend over this
     profile's amount for that window (floored, so the pause lands at the amount and not a cent
-    before) or None without one, and `spent`/`amount` beside it for the chip. The reading is the
-    account's and the amount the profile's, exactly as a reserve is (§4.2a)."""
+    before) or None without one, and `spent`/`amount` beside it for the chip, with the window's
+    `turns` and its `pace` at `now` (`fetched` when not given; no pace when neither is a time). The
+    reading is the account's and the amount the profile's, exactly as a reserve is (§4.2a)."""
+    now = now or _when(fetched)
     windows = []
     for label in LABELS:
         s = window_sums[label]
@@ -282,6 +321,8 @@ def reading(window_sums: dict[str, dict[str, Any]], amounts: dict[str, dict[str,
                 "resets": s["resets"],
                 "spent": {"tokens": s["tokens"], "total": s["total"], "cost": s["cost"]},
                 **({"amount": amount} if amount else {}),
+                "turns": int(s.get("turns") or 0),
+                "pace": pace(s, amount, now),
             }
         )
     return {"windows": windows, "fetched": fetched, "reason": "ok"}
@@ -352,6 +393,8 @@ def figure(
             "tokens": tokens,
             "total": sum(tokens.values()),
             "cost": round(sum(costs), 6) if costs else None,
+            "turns": int(h.get("turns") or 0) + m["turns"],
+            "begins": m["begins"],
             "resets": h["resets"],
         }
     return out
