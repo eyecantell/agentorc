@@ -73,8 +73,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-397 | #1257: `checkout_held` is in `modes.HOME_ONLY` and no test would catch it out — dropping it from the set leaves 103 passing | Low | Open |
-| TD-398 | #1257: a seat's `none` on another host skips the local tree reading (`s.host == self.host`) and no test pins it — removing the guard leaves 27 passing | Low | Open |
 
 ---
 
@@ -1274,35 +1272,3 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
-
-## TD-397: #1257: `checkout_held` is in `modes.HOME_ONLY` and no test would catch it out — dropping it from the set leaves 103 passing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1257)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/modes.py` (`HOME_ONLY`); `tests/test_anchor_tick.py`, `tests/test_link.py`
-
-**Why:** #1257 added `"checkout_held"` to `HOME_ONLY` (its docstring: "In `modes.HOME_ONLY` as `host_occupancy` is"), so a node refuses a read that names a third host. In a worktree off `origin/main`, deleting `, "checkout_held"` from the set and running every test that mentions `HOME_ONLY` or `host_occupancy` (`test_anchor_seat.py test_link.py test_ui_new_host.py test_anchor_tick.py`) still gives 103 passed. `test_the_starts_reading_is_the_fills_and_a_node_is_read_for_occupancy_alone` calls the method on the home alone; nothing calls it as a node would.
-
-**Done when** a test pins that a node refuses `checkout_held` with a `host` (the way `host_occupancy`'s membership is pinned, or `offline_refusal`/`_forwarded` with `HOME_ONLY`), and removing the name from the set fails it.
-
-**Related:** TD-395, TD-386.
-
-## TD-398: #1257: a seat's `none` on another host skips the local tree reading (`s.host == self.host`) and no test pins it — removing the guard leaves 27 passing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1257)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`_ending`: `if ids and s.host == self.host and await asyncio.to_thread(self._checkout_tree, Path(s.dir))`); `tests/test_anchor_tick.py`
-
-**Why:** the new branch clears a `work` seat's `lane_seen` ids when its `none` was said in a tree that is dirty or off its default branch, but only for a seat on this host: for a node's seat `s.dir` is a path on another machine, which `git_info` here would read as the wrong tree (or none), and `_checkout_why` skips the tree for a node for the same reason. `test_a_none_in_a_checkout_not_its_own_leaves_the_stretch_for_a_clean_one` runs a local seat only. Replacing the condition with `if ids and await asyncio.to_thread(...)` leaves `tests/test_anchor_seat.py tests/test_anchor_tick.py` at 27 passed; the other two edits of the PR (the `ids = []` line, the `held_reason` write) do fail a test.
-
-**Done when** a test ends a `work` seat whose `host` is another host, with a dirty or off-branch tree at its `dir` here, and asserts the `none` keeps its ids; removing the host guard fails it.
-
-**Related:** TD-395, TD-386.
