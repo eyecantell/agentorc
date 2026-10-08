@@ -6069,3 +6069,26 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Resolved:** 2026-10-07 (PR #1226, grinder-ao-2) — the **Snoozed (n)** fold sits under FYI, as `Inbox.dc.html` draws it (the techlead: *matches*, `m-ed1628d6a970`), headed *Snoozed (n) back on their dates · not counted*, closed by default. Each snoozed row is drawn by its kind's own macro with `snoozed_says` (*snoozed until <t>*, or *with <seat> since*), and its Snooze menu offers *now* first (no `until`). The `unsnooze` act, its toasts and its key entry are gone, and a question closed while snoozed is listed by its close. A snoozed note is drawn as FYI draws it, without *Put on the board*. Read on a scratch home: a snoozed `ask` in the fold with its answers, Reply, Snooze and Delete; *now* brought it back to *Needs you*; an answer pressed in the fold moved it to *Waiting on them*; no Unsnooze anywhere. A snoozed state row's Open and *now* are read from the template (`test_a_state_row_can_be_snoozed…`), since the scratch home cannot make a snoozable state row.
 
 **Related:** TD-371 (the design), TD-069 (archived: the snooze), TD-079 (archived: the state row's snooze), TD-220 (archived: the *Not due yet* fold, the shape).
+
+## TD-371: A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul's use of the Inbox)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved — designed 2026-10-07 (the designer, PR #1218; Paul decided it the same day), built by TD-373 (PR #1226, grinder-ao-2; the techlead's match `m-ed1628d6a970`; TD-373 archived in #1226), archived #1233.
+**Location:** design §4.10 *Snooze* (`docs/design/4.10-messages.md`), §4.5 screen 6 (the Inbox's snoozed list), §4.5a's Inbox rows (**Snooze ▾**, **Unsnooze**); `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`: the row with **Unsnooze** only), the `unsnooze` and `attention_snooze` acts in `app.js`
+
+**Why:**
+- Paul, 2026-10-07, answering TD-319's look after snoozing it: *It seems very odd to have to hit "unsnooze" first — I was expecting the snoozed items to just get their due dates moved to the new date, and they would still show the recommended answers etc in the inbox.*
+- Three snoozes work two ways today:
+  - **A board item's Snooze** moves its `Due:` date. It goes under *Not due yet* and comes back on the date. Paul expects this.
+  - **A mail entry's snooze** (`snoozed_until`) and **a state row's** (`attention_snoozed_until`) move the row to a snoozed list, where it shows **Unsnooze** alone: no answers, no Reply, no *Go with it*.
+- Hiding the controls protects nothing (§4.10 already says a snooze is never a way to lose mail), and it adds a step before every answer.
+
+**Resolved:** 2026-10-07 (archived PR #1233). The lasting content: design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6 (the **Snoozed (n)** fold), §4.5a *Inbox: Snoozed (n) fold*, the glossary's *snooze*; the code in `src/agentorc/ui/inbox.py` and `inbox_rows.html`.
+
+**Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it, no row anywhere offers **Unsnooze**, and §4.10 and §4.5a say a snooze is a date.
+
+**Related:** TD-069 (archived: the snooze), TD-220 (archived: the board's *Not due yet* fold), TD-319 (the look Paul snoozed).
