@@ -6151,3 +6151,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** the design names the card, its press and its defaults in §4.5a, and a build entry carries it.
 
 **Related:** TD-160 / TD-173 (archived: the form's Team picker), TD-163 / TD-172 (archived: Members…), TD-277 (archived: the New session form).
+
+## TD-374: The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`ledgerFold`, the `.ledgerrow` / `.ledgergroup` block in `inboxFilter`, the `#ledgerforyou` swap in the poll); `tests/test_ui_inbox_ledger.py`
+
+**Why:** `tests/test_ui_inbox_ledger.py` checks the server's markup and the poll's `html.ledger` string; `grep -rn 'ledgerFold\|ledgerrow\|ledgerforyou\|inboxledger' tests/` finds `app.js`'s side nowhere. Deleting the `$$(".inboxpage .ledgerrow")` filter lines (so a *Teams* pick or the find box leaves the fold's rows showing), the `lf.dataset.src !== got.html.ledger` swap (the fold never follows the poll) or the `store.get("inboxledger", false)` line (a fold that is not remembered open) leaves every test passing, though §4.5 screen 6 says the rows are filtered by the *Teams* picks and the find alone. Other tests (`test_ui_org.py`'s `usageChip`, `test_attach.py`) already run `app.js` under node, so the means exist.
+
+**Resolved:** 2026-10-07 (PR #1237, grinder-ao-2) — the fold's three rules are `AO.ledgerFilter` (the *Teams* picks and the find on `.ledgerrow`, a `.ledgergroup` hidden with its last row), `AO.ledgerSwap` (the poll's swap against the markup last sent) and `AO.ledgerFold` (open as this browser left it), called where the code was; `tests/test_ui_inbox_ledger.py::test_the_folds_rows_follow_the_teams_picks_and_the_find_the_poll_and_the_remembered_open` runs them under node. Each of the three edits named in the Why, and deleting the group line, fails it. Read on a scratch home: the fold closed by default, opened and remembered across a reload, a find that matches nothing hides the row and its repo, cleared it is back, and a poll leaves it open.
+
+**Done when** a node probe of `app.js` (as `test_ui_org.py` does for `AO.usageChip`) draws the fold's rows and asserts a team pick and a find word hide the rows and a group with none left; each of the three edits above fails a test.
+
+**Related:** TD-368, TD-370.

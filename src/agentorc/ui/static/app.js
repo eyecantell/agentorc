@@ -2036,12 +2036,7 @@
       AO.reopenFolds(hz);
     }
     // the ledger's entries that wait on you (TD-368): put back whole, reopened as the browser remembers it
-    const lf = $("#ledgerforyou");
-    // compared with what the server sent last, not with the DOM, whose `open` and `hidden` differ
-    if (lf && typeof got.html.ledger === "string" && lf.dataset.src !== got.html.ledger) {
-      lf.innerHTML = lf.dataset.src = got.html.ledger;
-      ledgerFold();
-    }
+    if (AO.ledgerSwap($("#ledgerforyou"), got.html.ledger)) ledgerFold();
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
     const w = $("#sec-waiting");
@@ -2198,13 +2193,33 @@
     });
   };
   // design §4.5 screen 6 *The ledger's entries that wait on you* (TD-368): the fold is closed by
-  // default and this browser remembers it open; its toggle is wired again each time the poll draws it
-  function ledgerFold() {
-    const d = $("#ledgerfold"); if (!d) return;
+  // default and this browser remembers it open; its toggle is wired again each time the poll draws it.
+  // The three rules are `AO.` so that `tests/test_ui_inbox_ledger.py` runs them under node (TD-374).
+  AO.ledgerFold = function (d) {
     d.open = store.get("inboxledger", false);
     d.addEventListener("toggle", () => store.set("inboxledger", d.open));
+  };
+  function ledgerFold() {
+    const d = $("#ledgerfold"); if (!d) return;
+    AO.ledgerFold(d);
     inboxFilter();
   }
+  // the poll's swap: put back whole when the server's markup changed — compared with what it sent
+  // last, not with the DOM, whose `open` and `hidden` differ. True when it swapped.
+  AO.ledgerSwap = function (lf, html) {
+    if (!lf || typeof html !== "string" || lf.dataset.src === html) return false;
+    lf.innerHTML = lf.dataset.src = html;
+    return true;
+  };
+  // the fold's rows: in no rail group and no count, filtered by the *Teams* picks and the find
+  // alone; a repo's name goes with its last row shown
+  AO.ledgerFilter = function (root, teams, words) {
+    $$(".inboxpage .ledgerrow", root).forEach((el) => {
+      const r = railRow(el);
+      el.hidden = !((!teams.length || teams.includes(r.team)) && words.every((w) => r.find.includes(w)));
+    });
+    $$(".inboxpage .ledgergroup", root).forEach((g) => { g.hidden = !$$(".ledgerrow", g).some((el) => !el.hidden); });
+  };
   const railRow = (el) => ({ section: el.dataset.section || "", team: el.dataset.team || "none", kind: el.dataset.rkind || "", find: el.dataset.find || "" });
 
   function inboxFilter() {
@@ -2236,13 +2251,8 @@
       b.classList.toggle("dim", c.filtered && !cnt.shown);
     });
     $("#railclear").classList.toggle("hidden", !c.filtered);
-    // the ledger's rows (TD-368): in no rail group and no count, filtered by the *Teams* picks and
-    // the find alone; a repo's name goes with its last row shown
-    $$(".inboxpage .ledgerrow").forEach((el) => {
-      const r = railRow(el);
-      el.hidden = !((!rail.team.length || rail.team.includes(r.team)) && words.every((w) => r.find.includes(w)));
-    });
-    $$(".inboxpage .ledgergroup").forEach((g) => { g.hidden = !$$(".ledgerrow", g).some((el) => !el.hidden); });
+    // the ledger's rows (TD-368): the *Teams* picks and the find alone
+    AO.ledgerFilter(document, rail.team, words);
     // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
     // the same counts, picked first so a pick never scrolls out of sight
     const pn = rail.team.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);

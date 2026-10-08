@@ -126,3 +126,97 @@ def test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts(tmp_path, 
     got = c.get("/api/person/inbox").json()
     assert 'href="/repo/samscrape#TD-400"' in got["html"]["ledger"]
     assert got["needs"] == 0  # counted nowhere
+
+
+LEDGER_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({
+  dataset: {}, style: {}, hidden: false, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+}, o);
+const document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: () => el() };
+const window = {};
+const kept = new Map();
+global.window = window; global.document = document;
+global.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => kept.set(k, String(v)) };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/inbox", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+// the fold as `ledger_for_you.html` draws it: two repos' groups, each `.ledgerrow` with its team and find words
+const row = (team, find) => el({ dataset: { team, find } });
+const a1 = row("ao-grind", "td-156 entry 156 agentorc ao-grind"), a2 = row("", "td-002 entry 2 agentorc");
+const s1 = row("sam-grind", "td-400 entry 400 samscrape sam-grind");
+const ga = el({ querySelectorAll: (s) => (s === ".ledgerrow" ? [a1, a2] : []) });
+const gs = el({ querySelectorAll: (s) => (s === ".ledgerrow" ? [s1] : []) });
+const all = { ".inboxpage .ledgerrow": [a1, a2, s1], ".inboxpage .ledgergroup": [ga, gs] };
+const root = el({ querySelectorAll: (s) => all[s] || [] });
+const shown = () => [a1, a2, s1, ga, gs].map((x) => !x.hidden);
+const out = {};
+AO.ledgerFilter(root, [], []); out.none = shown();
+AO.ledgerFilter(root, ["ao-grind"], []); out.team = shown();
+AO.ledgerFilter(root, ["none"], []); out.no_team = shown();
+AO.ledgerFilter(root, [], AO.findWords("samscrape")); out.find = shown();
+AO.ledgerFilter(root, ["ao-grind"], AO.findWords("entry 2")); out.both = shown();
+AO.ledgerFilter(root, [], []); out.cleared = shown();
+// the poll's swap: new markup is put in and remembered; the same markup again is left alone
+const lf = el({ innerHTML: "drawn by the page" });
+out.swap_first = AO.ledgerSwap(lf, "<details>v1</details>"); out.html_first = lf.innerHTML;
+lf.innerHTML = "the person's open fold";
+out.swap_same = AO.ledgerSwap(lf, "<details>v1</details>"); out.html_same = lf.innerHTML;
+out.swap_new = AO.ledgerSwap(lf, "<details>v2</details>"); out.html_new = lf.innerHTML;
+out.swap_missing = [AO.ledgerSwap(null, "x"), AO.ledgerSwap(lf, undefined)];
+// the fold: closed by default, opened by its toggle and remembered, so the next draw opens it
+let toggle = null;
+const d = el({ open: true, addEventListener: (ev, f) => { if (ev === "toggle") toggle = f; } });
+AO.ledgerFold(d); out.fold_default = d.open;
+d.open = true; toggle();
+const d2 = el({ open: false }); AO.ledgerFold(d2); out.fold_remembered = d2.open;
+d.open = false; toggle(); const d3 = el({ open: true }); AO.ledgerFold(d3); out.fold_closed_again = d3.open;
+console.log(JSON.stringify(out));
+"""
+
+
+def test_the_folds_rows_follow_the_teams_picks_and_the_find_the_poll_and_the_remembered_open():
+    """§4.5 screen 6 *The ledger's entries that wait on you* (TD-374): the fold's client side, run
+    under node — a *Teams* pick and a find word hide the rows that do not match, and a repo's group
+    with none left; the poll puts new markup back and leaves the same markup alone; the fold opens
+    as this browser left it."""
+    import json
+    import pathlib
+    import shutil
+    import subprocess
+    import tempfile
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rules are JavaScript, and nothing else runs them")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "ledger_probe.js"
+    probe.write_text(LEDGER_PROBE)
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
+    out = subprocess.run([node, str(probe), str(app_js)], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    # [ao-grind row, no-team row, sam-grind row, agentorc group, samscrape group]
+    assert got["none"] == [True, True, True, True, True]
+    assert got["team"] == [True, False, False, True, False]  # samscrape's name goes with its last row
+    assert got["no_team"] == [False, True, False, True, False]  # a row with no team is *no team*'s
+    assert got["find"] == [False, False, True, False, True]
+    assert got["both"] == [False, False, False, False, False]  # the pick and the find compose
+    assert got["cleared"] == [True, True, True, True, True]
+    assert got["swap_first"] is True and got["html_first"] == "<details>v1</details>"
+    assert got["swap_same"] is False and got["html_same"] == "the person's open fold"
+    assert got["swap_new"] is True and got["html_new"] == "<details>v2</details>"
+    assert got["swap_missing"] == [False, False]
+    assert got["fold_default"] is False  # closed by default
+    assert got["fold_remembered"] is True and got["fold_closed_again"] is False
+    # …and the page calls them where the rules apply
+    js = app_js.read_text()
+    assert "AO.ledgerFilter(document, rail.team, words);" in js
+    assert 'if (AO.ledgerSwap($("#ledgerforyou"), got.html.ledger)) ledgerFold();' in js
+    assert "AO.ledgerFold(d);" in js
