@@ -232,6 +232,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-372, grinder-ao-2; Paul: *add a buffer before the banner shows*): the *host agent unreachable* banner waits three seconds — it had shown the instant the page's event socket closed, so every page change (the socket closing as the Org was left) and every promote's restart flashed it with no request failed.
 - 2026-10-07 (TD-371, the designer; Paul's decision the same day): the Inbox's *n snoozed — show* list becomes the **Snoozed (n)** fold, the shape of *Not due yet*: each row with its kind's controls and *snoozed until <t>*, **Snooze ▾** with *now*, no **Unsnooze**; the press-leaves list loses Unsnooze.
 - 2026-10-07 (TD-368 slice 3, grinder-ao-2): screen 6's *The ledger's entries that wait on you* built as a fold of one-line links; the scratch home's fixture ledger gained an `Owner: paul` entry so a look has a row to draw.
 - 2026-10-07 (TD-367, the designer; the steer to Paul is `m-77a04cc7eccc`, bound 2026-10-08 05:35 MDT): the Inbox gains **For you in the ledger (n)**, a fold under the *Needs you* rows and the board's, closed by default, listing the ledger entries that wait on the person across the repos — one row each, a link to the Repo page's row — counted nowhere; screen 11's design-first list holds a build blocked by `decision (designer)`. Rejected: counted rows, and a section of its own.

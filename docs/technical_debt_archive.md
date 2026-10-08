@@ -5990,3 +5990,32 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** `metered_paced` gains a window whose pace has a numeric `per_hour` and an unknown `unit`, and both homes print nothing for it; the edit above fails a test.
 
 **Related:** TD-151.
+
+## TD-372: The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (the page's event socket: `ws.onclose = () => { setDown(true); … }`, `setDown`), the `#agentdown` banner in `org.html`, `inbox.html` and `settings.html`; design §4.5 (the banner a page shows when its host agent is down)
+
+**Why:**
+- Paul, 2026-10-07: *the kmaster "unreachable" error pops up often, particularly when clicking on the inbox from the org page, then it disappears.*
+- No request failed: the UI's log has no 503 in six hours. The page shows the banner the instant its event socket closes.
+- Leaving a page closes the socket, so the Org page flashes *host agent unreachable* during the navigation to the Inbox.
+- A promote restarts the host agent for about two seconds, which flashes it on every open page.
+
+**Fix:**
+- Ignore a close the page itself caused: a `pagehide` / `beforeunload` flag that `onclose` reads.
+- Show the banner only after the socket has stayed down for a grace period (3 s), cleared by any message or reconnect, so a promote's restart never draws it and a real outage still shows within seconds.
+- The same grace applies to the Inbox's polled banner, which shows after its poll has failed for that long, not on one failed poll.
+- Add one sentence to design §4.5 where the banner is described.
+- Tests: `tests/test_ui_*.py` pins the grace constant and the `pagehide` guard in `app.js`, as other page timings are pinned.
+
+**Done when** on a scratch home, navigating Org → Inbox → Org draws no banner, a host agent stopped for 1 s draws none, one stopped for 5 s draws it, and it clears on reconnect.
+
+**Resolved:** 2026-10-07 (PR #1223, grinder-ao-2) — design §4.5 *The host agent's down banner*: the event socket's close starts a `AO.DOWN_GRACE` (3 s) wait instead of drawing the banner, a second close keeps the first wait, any message clears it (a banner rendered at load included); a close after `pagehide` draws nothing; the Inbox's poll asks again after the grace and draws only when it is still failing. Read on a scratch home under headless Chromium: Org → Inbox → Org drew nothing, a 1 s outage nothing, a 5 s outage drew it at 3.0 s and the reconnect cleared it, the Inbox drew nothing for one failed poll and drew it when the retry failed too. `tests/test_ui_down_grace.py` runs the timer under node with a fake clock.
+
+**Related:** TD-338 / TD-340 (archived: a control answers the press), TD-226 (archived: the promote's rollback).

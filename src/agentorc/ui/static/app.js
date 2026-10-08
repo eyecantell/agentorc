@@ -1033,14 +1033,18 @@
 
   // ---- events websocket with backoff; a reconnect reloads the snapshot once ----
   function connectEvents(onEvent) {
-    let delay = 500, reconnected = false;
+    let delay = 500, reconnected = false, leaving = false;
+    window.addEventListener("pagehide", () => { leaving = true; });
+    window.addEventListener("pageshow", () => { leaving = false; });
     function open() {
       const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events`);
       // The handshake succeeds even when the agent is down (the server accepts, then closes), so
       // "connected" means the first message, not onopen — otherwise a down agent reload-loops.
       ws.onopen = () => { delay = 500; };
       ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; } const ev = JSON.parse(m.data); if (ev.event === "usage") onUsage(ev); else onEvent(ev); };
-      ws.onclose = () => { setDown(true); reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
+      // a close the page caused by leaving is no outage (TD-372); the reconnect stays, so a page
+      // restored from the back-forward cache reconnects and reloads as after any other close
+      ws.onclose = () => { if (!leaving) setDown(true); reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
       ws.onerror = () => ws.close();
     }
     open();
@@ -1278,10 +1282,22 @@
     }
     if (hidden.length) more.title = hidden.map((s) => `${s.textContent} — ${s.title}`).join("\n\n");  // a chip's title is lines now: a blank line between chips (TD-270)
   }
-  function setDown(down) {
+  // design §4.5 *The host agent's down banner* (TD-372): drawn only once the socket has stayed
+  // down for `AO.DOWN_GRACE`, so a navigation or a promote's two-second restart draws nothing; any
+  // message clears it at once. A close while one is already pending or shown keeps the first.
+  AO.DOWN_GRACE = 3000;
+  let downTimer = null, downShown = false;
+  function drawDown(down) {
+    downShown = down;
     const dot = $("#hostdot"); if (dot) dot.classList.toggle("down", down);
     const b = $("#agentdown"); if (b) b.classList.toggle("hidden", !down);
   }
+  function setDown(down) {
+    if (down) { if (!downTimer && !downShown) downTimer = setTimeout(() => { downTimer = null; drawDown(true); }, AO.DOWN_GRACE); return; }
+    clearTimeout(downTimer); downTimer = null;
+    drawDown(false);  // a banner the server rendered at load included
+  }
+  AO.setDown = setDown;
 
   // ---- Org (design §4.5 screen 1) ----
   // The page is one or more `.tgroup` sections, each an optional header plus its own `.grid`: one
@@ -1957,6 +1973,7 @@
     if (newest) store.set(ANSWERED_SEEN, newest);
   }
 
+  let inboxDownWait = null, inboxDownLong = false;  // the grace's retry pending; it has fired (TD-372)
   async function refreshInbox() {
     const got = await AO.refreshInboxCount();
     const down = $("#agentdown");
@@ -1966,8 +1983,16 @@
       // `.hidden` the class, never the attribute: `.warn` sets `display`, which beats the UA's
       // `[hidden]` rule — the trap `.badge[hidden]` is commented for in app.css, and the Org's own
       // banner avoids the same way (review of PR #271)
-      down.classList.toggle("hidden", !(got && got.agent_down));
-      if (got && got.agent_down && got.why) $("#agentdownwhy").textContent = got.why;
+      // …after the grace (TD-372): a first failed poll asks again in `AO.DOWN_GRACE` and draws
+      // nothing, so a promote's restart between two polls never shows it; a banner the page
+      // rendered at load is the server's word and stands until a poll succeeds
+      const isDown = !!(got && got.agent_down), shown = !down.classList.contains("hidden");
+      if (!isDown) { clearTimeout(inboxDownWait); inboxDownWait = null; inboxDownLong = false; }
+      else if (!shown && !inboxDownWait && !inboxDownLong) inboxDownWait = setTimeout(() => { inboxDownWait = null; inboxDownLong = true; refreshInbox(); }, AO.DOWN_GRACE);
+      if (!isDown || shown || inboxDownLong) {
+        down.classList.toggle("hidden", !isDown);
+        if (isDown && got.why) $("#agentdownwhy").textContent = got.why;
+      }
     }
     // …and nothing else changes while it is down: an empty `html` would blank every section and a
     // `needs` of 0 would claim nothing is waiting, which is precisely what is not known (§4.5)

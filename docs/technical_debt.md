@@ -72,7 +72,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Designed — TD-373 builds it |
-| TD-372 | The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once | Medium | Open — decided by Paul |
 | TD-373 | Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes | Medium | Open |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
@@ -1257,33 +1256,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it, no row anywhere offers **Unsnooze**, and §4.10 and §4.5a say a snooze is a date.
 
 **Related:** TD-069 (archived: the snooze), TD-220 (archived: the board's *Not due yet* fold), TD-319 (the look Paul snoozed).
-
-## TD-372: The *host agent unreachable* banner flashes on every page change and every promote: a closed socket shows it at once
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-07 (the anchor, from Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open. **Decided by Paul, 2026-10-07:** add a buffer before the banner shows.
-**Location:** `src/agentorc/ui/static/app.js` (the page's event socket: `ws.onclose = () => { setDown(true); … }`, `setDown`), the `#agentdown` banner in `org.html`, `inbox.html` and `settings.html`; design §4.5 (the banner a page shows when its host agent is down)
-
-**Why:**
-- Paul, 2026-10-07: *the kmaster "unreachable" error pops up often, particularly when clicking on the inbox from the org page, then it disappears.*
-- No request failed: the UI's log has no 503 in six hours. The page shows the banner the instant its event socket closes.
-- Leaving a page closes the socket, so the Org page flashes *host agent unreachable* during the navigation to the Inbox.
-- A promote restarts the host agent for about two seconds, which flashes it on every open page.
-
-**Fix:**
-- Ignore a close the page itself caused: a `pagehide` / `beforeunload` flag that `onclose` reads.
-- Show the banner only after the socket has stayed down for a grace period (3 s), cleared by any message or reconnect, so a promote's restart never draws it and a real outage still shows within seconds.
-- The same grace applies to the Inbox's polled banner, which shows after its poll has failed for that long, not on one failed poll.
-- Add one sentence to design §4.5 where the banner is described.
-- Tests: `tests/test_ui_*.py` pins the grace constant and the `pagehide` guard in `app.js`, as other page timings are pinned.
-
-**Done when** on a scratch home, navigating Org → Inbox → Org draws no banner, a host agent stopped for 1 s draws none, one stopped for 5 s draws it, and it clears on reconnect.
-
-**Related:** TD-338 / TD-340 (archived: a control answers the press), TD-226 (archived: the promote's rollback).
 
 ## TD-373: Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes
 
