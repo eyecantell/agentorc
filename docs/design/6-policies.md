@@ -298,7 +298,26 @@ code and needs no grant; a session doing the same work does.
      does — is closed as one with nothing due is, and filled for it on the next tick. The
      fill and the close are this rule's as for any seat — `create` with `keep_mail`, the launch
      record, `restarts: [{why: fill}]`; closed once idle with no `seat_due` for
-     `SEAT_IDLE_GRACE` with nothing dirty or unpushed. Its `control` grant and its place in its
+     `SEAT_IDLE_GRACE` with nothing dirty or unpushed. **A Start writes the seat and never fills
+     it** (TD-410; designed 2026-10-08; built — TD-413): `ao team start`, and a Start's or an
+     Apply's create of a manager the run lacks (§4.9c), writes a manager on call's record as the
+     anchor's is written when its checkout is not free (§4.9b, TD-386: `create` with `held`) —
+     `closed`, no pane, the launch record written, `seat: {trigger: team}`, no `seat_held`, since
+     nothing holds it: it is simply not due — and the Start's line for it reads *on call — comes
+     when a member needs a reading*, the card's words. The team's other records list its id in
+     `controllers` as before: the id is the name's (§4.1) and the fill keeps it, so the members'
+     briefs name it before it has ever run, as they name the techlead's. The first tick reads its
+     causes as it reads any seat's, so **a Start with something already due fills at once** — a
+     question in the mail a Start keeps (`keep_mail`), a member `needs-you` from the first
+     minute — by this rule and no Start-time case: the Start itself is never a cause. Before
+     this, `start` created the manager live before every other record, so each Start filled it
+     into nothing: fourteen fills across the four teams from 2026-10-03 to 2026-10-08, every one
+     closed as *a seat with nothing due, idle and pushed*, each a brief read for no reading.
+     **A fill says why it came**: the prompt a fill hands `create` is the brief, filled again as rule
+     7 has it, with **one closing line** in fixed words — *[agentorc] you are filled for: <by> —
+     <member or the question's id>* — the cause as `seat_due` carries it, so the seat's first act
+     is the reading and not `ao status`; `seat_due` on the record stays the truth it reads back,
+     and a replay for any other `why` adds no such line. Its `control` grant and its place in its
      members' `controllers` are the record's and survive the close, since a fill supersedes the
      record in place at the same id (§4.1) — which is why a person's session joins the team
      under the seat's id as its controller, live or not (§4.5a New session **Controllers**,
@@ -375,6 +394,14 @@ code and needs no grant; a session doing the same work does.
   seat for a manager of the `manager` role (§4.9: the template with a seat's shape is that role's, so another role's manager stands unless its definition says `on_call: true`), and every team takes the shape at its next Start, since the seat field is written at the
   create; dc-grind's first run on call, whose needs are the most mechanical, is the first look, written
   in TD-259 — what the seat could not do there is a finding, not a gate. The
+  **A fill's first reads are its brief and what its cause names** (TD-410): the on-call template
+  (`manager_on_call.md`, 1,400 words) reads `ao --skill` and its own log, and each of the four
+  causes says what to read for it (a tail, a transcript, the member's record), never a section of
+  the design whole; a repo's supplement to it names reads for a reading, never for a round, and
+  agentorc's own (`docs/briefs/manager-ao-1.md`) moves its *first reads* — §4.2, §9's invariants,
+  the cadence skill — under the readings that need them. The standing manager's brief
+  (`manager.md`, 4,200 words, reading §4.8, §6 and the cadence whole) is `on_call: false`'s alone.
+  The
   wind-down is rule 9's whichever shape the manager has: a manager on call that is closed is not
   live, so the reading holds without it, the home closes the members and writes the
   announcement, and the seat is not filled for a finished team — every act the manager's last
