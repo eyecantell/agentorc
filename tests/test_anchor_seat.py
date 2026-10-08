@@ -165,3 +165,25 @@ def test_ao_team_list_names_the_seat_and_reads_it_as_a_seat(tmp_path, monkeypatc
     assert {"role": "anchor", "names": ["t-anchor"], "seat": True} in rows["t"]["roles"]
     rec = {"id": "ao-alpha-t-anchor", "name": "t-anchor", "team": "t", "state": "closed", "seat": {"trigger": "work"}}
     assert teamrun.seat_ids(org, [rec]) == {"ao-alpha-t-anchor": orgmod.ANCHOR_WHEN}
+
+
+def test_one_per_repo_is_per_host_and_a_team_that_lands_nowhere_holds_nothing(tmp_path, monkeypatch):
+    # review of #1245: the same repo name on two hosts is two checkouts, and a repo's team whose
+    # landing cannot be told starts nowhere
+    org = _org(tmp_path, monkeypatch, {"here": _team(), "there": _team(host="nodeb")})
+    assert org.anchor_first(org.teams["there"]) is None
+    org = _org(tmp_path, monkeypatch, {"lost": _team(), "found": _team()})
+    org.unlanded["lost"] = "its landing cannot be told"
+    assert org.anchor_first(org.teams["found"]) is None
+
+
+def test_a_flow_never_reads_an_anchor_no_start_created_as_a_difference(tmp_path, monkeypatch):
+    # review of #1245: a held checkout leaves no record (until TD-386), and Apply could not clear it
+    org = _org(tmp_path, monkeypatch, {"t": _team()})
+    p = teams.plan(org, "t", HOST)
+    p.flow = "td"  # `differences` reads a team under a flow only
+    live = [
+        {"id": f"ao-alpha-{n}", "name": n, "team": "t", "state": "working", "lane": x.lane, "review": x.review}
+        for n, x in ((x.name, x) for x in p.launches if not x.in_checkout)
+    ]
+    assert "t-anchor" not in [d.name for d in teamrun.differences(p, live)]

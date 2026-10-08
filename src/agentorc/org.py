@@ -280,15 +280,19 @@ class Org:
         return out
 
     def anchor_first(self, team: TeamDef) -> TeamDef | None:
-        """The team before `team`, in the org's order, whose anchor seat has the same home repo
-        (design §4.9b *One per repo*: two seats in one checkout) — the one `ao team start` and
+        """The team before `team`, in the org's order, whose anchor seat has the same home repo on
+        the same host (design §4.9b *One per repo*: two seats in one checkout) — the one `ao team start` and
         `ao org check` name when they refuse `team`'s. None when `team` has no anchor or is first."""
         if team.anchor is None:
             return None
+
         for other in self.teams.values():
             if other is team:
                 return None
-            if other.anchor is not None and other.anchor.home == team.anchor.home:
+            if other.name in self.unlanded or other.anchor is None:
+                continue  # a team whose landing cannot be told starts nowhere, so it holds no checkout
+            # `host` is where it lands — a repo's team landing elsewhere has it set (`_land`); "" here
+            if other.anchor.home == team.anchor.home and other.host == team.host:
                 return other
         return None
 

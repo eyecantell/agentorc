@@ -833,6 +833,11 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
         out.append(Difference(name, "left" if persons(rec) else "sit_out", record=rec))
     for x in plan.launches:
         rec = _current(x.name, mine)
+        if rec is None and x.in_checkout:
+            # an anchor seat a Start never created — its checkout was held, or the team predates it — is
+            # the next Start's, never a flow's difference Apply could not clear (the record with no pane
+            # that would let rule 3 fill it is TD-386's)
+            continue
         if rec is None or sat_out(rec):
             out.append(Difference(x.name, "start", record=rec, launch=x))
             continue
