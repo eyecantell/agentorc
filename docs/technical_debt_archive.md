@@ -6497,3 +6497,48 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a test ends a `work` seat whose `host` is another host, with a dirty or off-branch tree at its `dir` here, and asserts the `none` keeps its ids; removing the host guard fails it.
 
 **Related:** TD-395, TD-386.
+
+## TD-225: A restart or close raises an identity alarm from the old run's last hook
+
+**Priority:** Low
+**Added:** 2026-09-28 (Paul, on the anchor's report of the alarms: *yes file a TD for the alarms*)
+**Owner:** anchor
+**Kind:** live-check #746
+**Status:** Done
+**Location:** `src/sessionorc/agent_identity.py` (`_id_channel`: a peer that matches no pane is *outside*), `src/sessionorc/agent_tick.py` (`_apply_event`: *ignored the end of a previous run*, TD-186), `~/.agentorc/identity_alarms.json`
+
+**Why:** every alarm on record has the same shape: `channel: outside`, `rpc: hook`, a session's own id claimed. grinder-ao-1 14 times (2026-09-23T23:48:09Z to 2026-09-29T03:23:24Z), designer-ao-1 3 (latest 2026-09-29T03:22:37Z), grinder-ao-2, manager-ao-1, manager-dc-1 and techlead-ao-1 once each. Those that can be placed fell at a supersede: designer-ao-1's latest two seconds after the host agent restarted it (03:22:35Z, *superseded the closed session of the same name*), grinder-ao-1's at its own restart a minute later, and techlead-ao-1's when its seat was refilled (2026-09-28T06:56:02Z, *superseded the closed session of the same name*), in the same second as alarms for designer-ao-1 and grinder-ao-1. TD-115 already covers part of this. A hook that matches no live pane is judged against the pane its record held if that pane left the list less than `PANE_GONE_GRACE` (10 s) before (`_id_gone_channel`, `identity.classify_gone`). The alarms still fire, so something falls outside it. The likeliest: a **restart reuses the tmux session name**, so the old pane never leaves the list as *gone*. The name at once has the new pane, and the old run's last hook (its `SessionEnd`, which the tick then ignores as the end of a previous run, TD-186) matches neither the new pane nor a gone one. designer-ao-1's alarm two seconds after its restart fits that, not the grace running out. Others may be hooks later than 10 s. The false alarms train the person to dismiss the list that exists to catch a real impersonation.
+
+**Resolved:** 2026-10-08 (PR #PRNUM, the anchor's live check of #746 with #1150 and #1189) — it holds: the anchor read `journalctl --user -u agentorc-agent` (read only) from #1189's promote (2026-10-06 23:03 local) to 2026-10-08 15:13 and `ao identity`: twelve member restarts (*wants another run … restarting it*: ao-grind's designer and grinders and one contractmatch member, through 2026-10-08 07:11), every seat fill and the team's restart at 15:12 each followed by *superseded the closed session of the same name*, no *matched no pane* line at all, and no identity alarm newer than 2026-10-07T04:05:12Z (designer-ao-1, before the promote); `identity_alarms.json`'s counts are unchanged across that day, so (b) is not needed.
+
+**Fix:** first confirm which case each alarm is. Log, for an outside hook claiming a session, the peer's pid and its start, the session's current and previous pane pids, and the time since the supersede or close. Then (a) on a supersede or restart that reuses the name, record the old pane as gone at that moment, so the grace applies to it too; (b) if some are genuinely later than 10 s, match the old run by its pid and start pair for as long as that process lives, not by a clock. Keep the alarm for a claim from a process that was never that session's pane. Tests: a restart followed by the old run's `SessionEnd` raises no alarm; an unknown process claiming the id still does. Done when a day of team restarts leaves `identity_alarms.json` unchanged.
+
+**Related:** TD-115 (the gone-pane grace), TD-186 (the previous run's end, ignored), TD-077 (identity), TD-201 (hooks outside the turn), design §4.8a.
+
+## TD-360: A restart's first hook is still refused as *outside* after TD-341's fix — the identity alarm fires on each ao-grind restart
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-06 (grinder-ao-2, TD-339's live check)
+**Owner:** anchor
+**Kind:** live-check #1189
+**Status:** Done
+**Location:** `src/sessionorc/agent_identity.py` (`_id_pane_replaced`, `_id_log_late_hook`'s log line, `_id_channel`), `src/sessionorc/agent.py` (`_take_name`), `tests/test_identity.py`; design §4.8a *A pane the tick has not listed yet*.
+
+**Why:**
+- TD-341 (archived 2026-10-06, PR #1150) closed on one clean restart, designer-ao-1's at 17:04.
+- Every ao-grind restart read since then raised the alarm again, on live copies carrying #1150 (`journalctl --user -u agentorc-agent`, local times):
+  - 20:01:10 designer-ao-1, live `3326905`: *hook for ao-agentorc-designer-ao-1 matched no pane: peer 4111684 (start 400902643, sid 4111683), listed pane 4111697, gone pane 3680802 0.9s ago*, then *identity alarm (enforce): outside claimed 'ao-agentorc-designer-ao-1' on hook*.
+  - 20:20:38 grinder-ao-2, live `565f51f`: *peer 37172 (sid 37171), listed pane 37181, gone pane 3772118 0.9s ago*, the same alarm. Pid 37181 is that run's `claude` process.
+  - 19:48:03 grinder-ao-1 shows the same shape.
+- So the list already holds the new pane when the hook arrives; the old pane is in the gone list. The peer's pid is lower than the listed pane's, and its session id is one below its own pid. The peer is likely the process that launched `claude`, not one of its children, so the hook's peer walk never reaches the listed pane.
+- The harm TD-341 named is gone: each of those runs typed its brief one to two seconds later by the hook road (TD-339's live check). What is left is a false *outside* alarm on every restart, and the first hook it refuses.
+
+**Resolved:** 2026-10-08 (PR #PRNUM, the anchor's live check of #1189) — it holds: the anchor read `journalctl --user -u agentorc-agent` (read only) from #1189's promote (2026-10-06 23:03 local) to 2026-10-08 15:13 and `ao identity`: twelve member restarts (*wants another run … restarting it*: ao-grind's designer and grinders and one contractmatch member, through 2026-10-08 07:11), every seat fill and the team's restart at 15:12 each followed by *superseded the closed session of the same name*, no *matched no pane* line at all, and no identity alarm newer than 2026-10-07T04:05:12Z (designer-ao-1, before the promote).
+
+**Fix:**
+- Read the peer walk for a hook from a freshly started pane. Find why a peer in the listed pane's session, started before the pane's listed pid, is not matched, then match it. The pane's session id, or the pane pid's ancestors, are candidates.
+- Test: a restart whose hook peer is the pane's launcher, an ancestor of the listed pid in the same session, is matched and raises no alarm.
+- **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
+
+**Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
