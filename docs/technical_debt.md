@@ -77,6 +77,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Designed — TD-379 builds it |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-379 | Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry | Medium | Open |
+| TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Open — asked by Paul |
+| TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Open — asked by Paul |
 
 ---
 
@@ -1356,3 +1358,54 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) every defined team's grid ends in the + card, live, stopped-and-unfolded and never-started alike, *No team* has none; a press lands on the New session form with that team picked, Role *Interactive* and the reader's line filled, and Start session there starts a session that appears in the team's group with the person glyph; `j`/`k` reach the card and `Enter` presses it; a folded team and a filter hide it; the help entry reads on hover and in the *i* panel; `tests/test_ui_org*.py` cover the card's presence, its link and its absence on *No team*; a screenshot of the live team group is in the PR under `docs/mockups/reviews/`.
 
 **Related:** TD-377 (the design), TD-173 (archived: the form's Team pick), TD-172 (archived: Members…), TD-124 (archived: the keys).
+
+## TD-380: A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — asked by Paul 2026-10-07: *it seems like we could do this mechanically, without the manager having to be spun up, but I am unsure. Let's have a designer work through it.*
+**Location:** design §4.4 *Board write-back* (*a decide wakes nobody*), §4.5 screen 6 *A board item the person answered waits on them*, §4.9a (a team's out of work), §4.10 *Outcomes*, §6 (the tick); `src/sessionorc/agent_inbox.py` (`rpc_board_reply`, the Decide press), `src/sessionorc/ledger.py` (`kind_of`, the lanes), `src/agentorc/briefs/manager.md`, `grinder.md`
+
+**Why:**
+- On 2026-10-07 the start-up check listed 11 decided board items *waiting on a session*: ten on samscrape's board (decided 2026-10-06) and one on contractmatch's (2026-10-05).
+- The design says a decided item stays on the board as its session's work order and *a decide wakes nobody*: it reaches *the next session that reads the board*. In practice that is an interactive anchor in the checkout, whose start-up hook prints the due items. No anchor ran in either repo.
+- No team counts a decided line as work. A grinder's lane is the ledger alone, samscrape's grinder briefs exclude everything on `user_attention.md`, and the manager brief says nothing about decided lines. cm-grind wound itself down with its ledger lane empty while a decided line waited.
+- Of the 11, six needed only the line closed, three needed a ledger entry or a fix, one was a host chore (an approved disk cleanup) and one waited on Paul again (a date to name). The anchor cleared them by hand on 2026-10-07.
+
+**Fix (to design):**
+- What a Decide does mechanically, at the press, with no session: for example, an answer that needs nothing done closes the line, and one that needs work writes or updates a ledger entry that the repo's team's lane already picks. Settle how a tool tells the two apart: the item's kind, a mark on the answer when the line is written (`Answers: keep (closes) | revert`), or always a ledger entry.
+- What reaches a session when a session is needed: the repo's servicing team (its lane, its manager seat, or the TD-381 anchor seat), whether a stopped team starts, and whether a team winds down while its repo holds a decided line.
+- What the line says in the meantime, so the Inbox and the start-up check stop reporting a decided item as *waiting on a session* when the work is already queued.
+- The briefs' and cadence §3.5's part: what a session does with a decided line it meets, and what dev-cadence must change (the board format is SYNCED).
+
+**Done when** the design says, in §4.4 and §4.9a, where a decided line goes at the press and who carries it out, and the build entries are written.
+
+**Related:** TD-381 (the anchor seat), TD-303 / TD-305 (archived: the decided row under *Waiting on them*), TD-142 (archived: board reply), TD-255 (archived: answers and *Go with it*).
+
+## TD-381: An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — asked by Paul 2026-10-07: *let's also plan out the on-call anchor session. Are managers automatically added to teams? I wonder if anchor sessions should be as well.*
+**Location:** design §4.9 (a team's definition; the manager added by default), §4.9b *Seats with a trigger*, §6 rule 3 (seats; *a manager on call is a seat of this rule*), §9 invariant 2 (one agent per directory: the anchor is the first in the checkout); CLAUDE.md *The live copy is promoted*; `src/agentorc/org.py` (`ManagerDef`, `on_call`), `src/agentorc/teams.py`, `src/sessionorc/ledger.py` (`Owner: anchor`)
+
+**Why:**
+- `Owner: anchor` is the ledger's most common owner: 34 of agentorc's open entries on 2026-10-07 (15 evaluations, 13 live checks, 5 builds, 1 decision). They move only while Paul keeps an interactive session open in the checkout. samscrape, contractmatch and dev-cadence have no anchor at all, so anything only an anchor does (a decided board line, TD-380; a host chore; a promote) waits for Paul to open one.
+- **A manager is added to every team by default**: a team that writes no `manager:` gets one named `<team>-lead`, role `manager`, on call (`on_call` defaults on for the `manager` role), filled by the tick when the team needs it. Only `role: person` starts none. A techlead seat and other `seats:` are written by hand. The anchor seat could follow the manager's pattern.
+
+**Fix (to design):**
+- **Per repo or per team.** The anchor is the checkout's (one per directory, §9 invariant 2), and a repo can be serviced by more than one team. Settle whether the seat belongs to the repo (`.agentorc.yml`, beside `held:`) or to a team, and whether it is added by default as the manager is.
+- **Where it runs.** The main checkout itself rather than a worktree, which the occupancy rule must allow; what happens when a person's own session already holds it.
+- **Its trigger.** For example, an entry with `Owner: anchor` that is pickable, a decided board line (TD-380), a merged PR whose live check is due, a promote held or failed, or `every:`.
+- **Its grants and limits.** It may promote (§6 *Promote*), merge its repo's anchor-owned PRs after their review, and run host chores the board approved. It may not deploy, touch credentials or do anything CLAUDE.md keeps as Paul's.
+- **What changes for the interactive anchor.** Paul's own session in the checkout keeps working as now. Settle which of the two holds the checkout when both want it, and what `Owner: anchor` means after this.
+
+**Done when** the design names the seat (who adds it, where it runs, its trigger, its grants), its §4.5a and §4.9b rows are written, and the build entries are written.
+
+**Related:** TD-380 (decided lines), TD-247 / TD-259 (the manager on call), TD-098 (seats with a trigger), TD-132 (archived: the promote policy).
