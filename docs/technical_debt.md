@@ -80,6 +80,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Open — asked by Paul |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Open — asked by Paul |
 | TD-382 | §4.5a's Inbox *keys* row still says the ring visits snoozed rows "while *n snoozed — show* is open", the control #1218 renamed the **Snoozed (n)** fold | Low | Open |
+| TD-383 | The Inbox poll's down-banner grace (#1223): its retry and reset logic is pinned by substring only — two mutations of it leave every test passing | Low | Open |
 
 ---
 
@@ -1431,3 +1432,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** `grep -rn "n snoozed — show" docs/design` finds only the "where … was" history clause.
 
 **Related:** TD-371 (the design), TD-373 (its build).
+
+## TD-383: The Inbox poll's down-banner grace (#1223): its retry and reset logic is pinned by substring only — two mutations of it leave every test passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1222 and #1223)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`refreshInbox`: `inboxDownWait`, `inboxDownLong`); `tests/test_ui_down_grace.py` (`test_a_close_the_page_caused_by_leaving_and_one_failed_inbox_poll_draw_nothing`), `tests/test_ui.py` (the `agentdown` poll test)
+
+**Why:** The socket's grace has a node fake-clock probe; the Inbox poll's has only `assert "..." in js` lines, so the test passes whatever the code does. Against `origin/main`, with `tests/test_ui_down_grace.py tests/test_ui.py tests/test_ui_org.py` (113 passed): (a) changing `!shown && !inboxDownWait && !inboxDownLong) inboxDownWait = setTimeout` to `!shown && !inboxDownWait) inboxDownWait = setTimeout` (a second failed poll after the grace re-arms the wait forever, so the banner never draws once `inboxDownLong` is set) still passes 113; (b) replacing `if (!isDown) { clearTimeout(inboxDownWait); inboxDownWait = null; inboxDownLong = false; }` with `if (!isDown) { }` (a recovered poll no longer resets the grace, so the next outage draws the banner at once — TD-372's bug) still passes 113. The docstring says the poll *asks again after the grace rather than drawing the banner on one failed poll*; no test runs `refreshInbox`.
+
+**Done when** a node probe like the socket's drives `refreshInbox` with a fake clock and a `refreshInboxCount` that fails, then recovers, then fails: nothing at the first failure, the banner after the grace and a second failed poll, nothing again after a recovery until the grace has passed; both edits above fail a test.
+
+**Related:** TD-372.
