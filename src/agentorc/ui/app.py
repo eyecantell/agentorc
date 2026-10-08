@@ -697,6 +697,7 @@ def create_app() -> FastAPI:
             return None
         head = templates.get_template("group_head.html")
         summary = templates.get_template("team_summary.html")
+        plus = templates.get_template("plus_card.html")
         return [
             {
                 "team": g["team"],
@@ -706,6 +707,8 @@ def create_app() -> FastAPI:
                 "html": head.render(g=g),
                 # the summary's facets (TD-176 slice 3), swapped by the client as the header is
                 "summary": summary.render(g=g) if g.get("summary") else "",
+                # the team's + card (§4.5a *team card: + card*, TD-379): put in by the client when missing
+                "plus": plus.render(g=g) if g["team"] and g.get("defined") else "",
             }
             for g in groups
         ]

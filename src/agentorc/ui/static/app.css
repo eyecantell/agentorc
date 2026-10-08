@@ -397,6 +397,7 @@ details.fold[open] > summary { margin-bottom: 3px; }
 .strip .warnish { color: var(--warn-fg); }
 .badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
+.sc[hidden] { display: none; }  /* .sc sets display, which beats [hidden]: a filter left the cards it hid drawn beside a match (TD-379) */
 /* design §4.5 *The card's anatomy* (TD-095): six rows, the same on every card, **at one height** —
    so every row is one line that never wraps, and what does not fit is clipped with the whole of it
    on hover. The name, the pill and the clock never shrink; the long derived strings do. */
@@ -584,6 +585,12 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .pill.nog::before { content: none; }  /* no state glyph: a compact card, a count pill (§4.5a *state icon*) */
 .sc.compact .r1 .mine .ricon { vertical-align: -2px; margin-left: 4px; }
 .sc.compact .cline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the team's + card (§4.5a *team card: + card*, TD-379): a card's head, never a full card — a dashed
+   outline, no state bar, a large + over *your session in <team>*; the whole card is the link (mockup: gen.py `plus_card`) */
+.sc.plus { height: 64px; padding: 0; gap: 0; border: 1px dashed var(--border); background: transparent; }
+.sc.plus .plusgo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); text-decoration: none; }
+.sc.plus .plusmark { font-size: 2em; line-height: 1; font-weight: 300; color: var(--strong); }
+.sc.plus:hover { background: var(--hover); }
 .tsum .lv, .tsum .wv, .tsum .fv { display: flex; flex-direction: column; gap: 5px; }
 .tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden] { display: none; }
 /* the Org rollup (§4.5a *Org: rollup*, TD-176 slice 4) */
