@@ -655,13 +655,14 @@ def _declared(d: dict[str, Any]) -> tuple[str, str] | None:
 def seat_occupant(occupants: list[str], fleet: Collection[Mapping[str, Any]], now: datetime) -> str:
     """The New session form's words for a checkout a seat holds (§4.5a *New session: directory field →
     occupancy: a seat*, TD-387), or "": *anchor-ao-1 holds it (a seat, working · TD-299)* when the
-    first holder the occupancy check names — `<id> (<state>)`, `<id>@<host>` for a container node's —
+    first holder the occupancy check names that is a seat — `<id> (<state>)`, `<id>@<host>` for a container node's —
     is a record the fleet holds with a `seat`, its claim the newest unexpired declared one. Display only."""
-    if not occupants:
-        return ""
-    sid, _, rest = str(occupants[0]).partition(" ")
-    rec = next((r for r in fleet if isinstance(r, Mapping) and r.get("id") == sid.split("@", 1)[0]), None)
-    if rec is None or not isinstance(rec.get("seat"), dict):
+    seats = {str(r.get("id")): r for r in fleet if isinstance(r, Mapping) and isinstance(r.get("seat"), dict)}
+    for o in occupants:
+        sid, _, rest = str(o).partition(" ")
+        if (rec := seats.get(sid.split("@", 1)[0])) is not None:
+            break
+    else:
         return ""
     state = rest.strip("()") or str(rec.get("state") or "")
     claims = [

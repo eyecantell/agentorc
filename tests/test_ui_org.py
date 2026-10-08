@@ -1546,5 +1546,9 @@ def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
     assert seat_occupant(["ao-alpha-paul (idle)"], fleet, now) == ""
     assert seat_occupant(["claude-1 (claude-code, outside agentorc)"], fleet, now) == ""
     assert seat_occupant([], fleet, now) == ""
+    # a seat listed after another holder is still named (review of #1253)
+    assert seat_occupant(["claude-1 (claude-code, outside agentorc)", "ao-alpha-anchor-ao-1 (idle)"], fleet, now) == (
+        "anchor-ao-1 holds it (a seat, idle · TD-299)"
+    )
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
     assert "(o.seat || `in use by ${o.occupants.join" in js
