@@ -308,8 +308,10 @@ code and needs no grant; a session doing the same work does.
      `controllers` as before: the id is the name's (§4.1) and the fill keeps it, so the members'
      briefs name it before it has ever run, as they name the techlead's. The first tick reads its
      causes as it reads any seat's, so **a Start with something already due fills at once** — a
-     question in the mail a Start keeps (`keep_mail`), a member `needs-you` from the first
-     minute — by this rule and no Start-time case: the Start itself is never a cause. Before
+     question in the mail a Start keeps (`keep_mail`; the held create moves the mail as a fill
+     does, which it did not before TD-413: a held record began with an empty inbox), a member
+     `needs-you` from the first minute — by this rule and no Start-time case: the Start itself
+     is never a cause. Before
      this, `start` created the manager live before every other record, so each Start filled it
      into nothing: fourteen fills across the four teams from 2026-10-03 to 2026-10-08, every one
      closed as *a seat with nothing due, idle and pushed*, each a brief read for no reading.
@@ -400,7 +402,7 @@ code and needs no grant; a session doing the same work does.
   the design whole; a repo's supplement to it names reads for a reading, never for a round, and
   agentorc's own (`docs/briefs/manager-ao-1.md`) moves its *first reads* — §4.2, §9's invariants,
   the cadence skill — under the readings that need them. The standing manager's brief
-  (`manager.md`, 4,200 words, reading §4.8, §6 and the cadence whole) is `on_call: false`'s alone.
+  (`manager.md`, 4,200 words, reading §4.8 and §6 whole and cadence §1–§4) is `on_call: false`'s alone.
   The
   wind-down is rule 9's whichever shape the manager has: a manager on call that is closed is not
   live, so the reading holds without it, the home closes the members and writes the
