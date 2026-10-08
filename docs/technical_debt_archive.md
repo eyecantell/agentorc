@@ -6390,7 +6390,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 
 **Done when** the design names the seat (who adds it, where it runs, its trigger, its grants), its §4.5a and §4.9b rows are written, and the build entries are written.
 
-**Resolved:** 2026-10-08 (the designer) — designed in #1232 (§4.9b *The anchor seat*, §4.9 `anchor`, §6 rules 3 and 6, §4.8 the `anchor` preset, §4.5/§4.5a the seat's words, §9 invariant 2, the glossary); built by TD-385 (#1245), TD-386 (#1248) and TD-387 (#1253), each read on a scratch home and archived in its PR; the Start's gate settled by TD-394 (#1252), TD-395 building it. The steer `m-581533eadebf` (present by default, in the checkout) runs to its bound this morning, its default being what is built; a reply that chooses otherwise is a new entry.
+**Resolved:** 2026-10-08 (the designer) — designed in #1232 (§4.9b *The anchor seat*, §4.9 `anchor`, §6 rules 3 and 6, §4.8 the `anchor` preset, §4.5/§4.5a the seat's words, §9 invariant 2, the glossary); built by TD-385 (#1245), TD-386 (#1248) and TD-387 (#1253), each read on a scratch home and archived in its PR; the Start's gate settled by TD-394 (#1252), TD-395 building it. The steer `m-581533eadebf` (present by default, in the checkout) runs to its bound, 2026-10-08 10:35 MDT, its default being what is built; a reply that chooses otherwise is a new entry.
 
 **Related:** TD-394 / TD-395 (the Start's gate), TD-380 (decided lines), TD-247 / TD-259 (the manager on call), TD-098 (seats with a trigger), TD-132 (archived: the promote policy).
 
