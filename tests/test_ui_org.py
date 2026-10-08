@@ -1476,3 +1476,30 @@ def test_the_plus_card_is_no_session_to_the_client():
     css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
     assert ".sc[hidden] { display: none; }" in css  # a filter hides a card, the + card among them
     assert ".sc.plus { height: 64px;" in css and "dashed" in css[css.index(".sc.plus {") :][:120]
+
+
+def test_a_delta_carries_the_plus_card_for_a_defined_team_and_none_for_the_rest(monkeypatch, tmp_path):
+    """§4.5a *team card: + card* (TD-379; pinned by TD-389): `render_heads` is what a delta sends, and
+    its `plus` is how the client puts the card back after a sort or a group swap — the card for a
+    defined team, sessions or none, and nothing for *No team* or a badge no definition carries."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import render_heads, view
+
+    records = [
+        {"id": "ao-g1", "name": "grinder-1", "state": "working", "dir": "/tmp/r", "kind": "agent", "team": "live"},
+        {"id": "ao-x1", "name": "stray-1", "state": "idle", "dir": "/tmp/r", "kind": "agent", "team": "badge-only"},
+        {"id": "ao-sh", "name": "sh1", "state": "idle", "dir": "/tmp/x", "kind": "agent", "adapter": "shell"},
+    ]
+    rows = [
+        {"name": "live", "manager": "orc", "members": 1, "projects": ["p"], "wound_down": None},
+        {"name": "never-run", "manager": "orc", "members": 2, "projects": ["p"], "wound_down": None},
+    ]
+    heads = {h["team"]: h for h in render_heads(team_groups([view(r, records) for r in records], rows))}
+    assert set(heads) == {"live", "never-run", "badge-only", ""}
+    for team in ("live", "never-run"):
+        plus = heads[team]["plus"]
+        assert plus.lstrip().startswith('<div class="card sc plus"') and f'data-plus="{team}"' in plus, team
+        assert f'href="/new?team={team}"' in plus
+    assert heads[""]["plus"] == "" and heads["badge-only"]["plus"] == ""
+    assert render_heads(None) is None  # the flat page has no groups to carry

@@ -6205,3 +6205,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a node probe like the socket's drives `refreshInbox` with a fake clock and a `refreshInboxCount` that fails, then recovers, then fails: nothing at the first failure, the banner after the grace and a second failed poll, nothing again after a recovery until the grace has passed; both edits above fail a test.
 
 **Related:** TD-372.
+
+## TD-389: The team's + card (#1234): `render_heads`' `plus` key, which puts the card back after a delta, is pinned by no test — blanking it leaves 49 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1234)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (`render_heads`: `"plus": plus.render(g=g) if g["team"] and g.get("defined") else ""`); `tests/test_ui_org.py`, `tests/test_help.py`
+
+**Why:** #1234's second half is the delta path: `render_heads` sends each defined team's `plus` so the client puts the card back after a sort or a swap (`if (g.plus && !plus) … appendChild`). Against `origin/main`, replacing that line with `"plus": "",` still passes `tests/test_ui_org.py tests/test_help.py` (49 passed), while removing the `{% include "plus_card.html" %}` from `org.html` fails the first-render test, so only the first render is pinned. `grep -rn render_heads tests/` finds no test of the key. A live page whose + card was lost would be the result: after the first delta that rebuilds a group the card is gone and never returns.
+
+**Resolved:** 2026-10-07 (PR #PRNUM, grinder-ao-2) — `render_heads` is a module function of `src/agentorc/ui/app.py` (it reads only the module's `templates`), and `tests/test_ui_org.py::test_a_delta_carries_the_plus_card_for_a_defined_team_and_none_for_the_rest` calls it on a live defined team, a defined team with no sessions, *No team* and a badge-only team: the card for the first two, `""` for the others, `None` for the flat page. Blanking the key fails it.
+
+**Done when** a test calls `render_heads` on a defined team, a defined team with no sessions, *No team* and a badge-only team, and asserts the `plus` html is the card for the first two and `""` for the others; blanking the key fails it.
+
+**Related:** TD-379, TD-390.
