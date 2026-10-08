@@ -6044,3 +6044,28 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
 
 **Related:** TD-357 (archived: the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
+
+## TD-373: Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-07 (the designer, from TD-371's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/inbox.html` (`#snoozedbox`, its label), `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`, the promote and work rows' `section == 'snoozed'` branches, `snooze_btn`, `state_snooze`), `src/agentorc/ui/static/app.js` (the `unsnooze` act, `PRESS_LEAVES`, the toasts, `#snoozedlabel`, the `x` key's table naming Unsnooze), `src/agentorc/ui/app.py` (docstrings and comments naming Unsnooze), `src/agentorc/ui/inbox.py` (`inbox_sections`' `snoozed` list; the rows' kinds kept), `src/agentorc/ui/help.py` if a snoozed row's words are there; tests `tests/test_ui_inbox.py`, the templates' tests.
+
+**Why:** design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6, §4.5a *Inbox: Snoozed (n) fold* (TD-371, designed 2026-10-07 on Paul's decision). A snoozed `ask` showed **Unsnooze** alone: a press before every answer that protected nothing.
+
+**Fix:**
+1. **The fold**: `#snoozedbox` becomes the **Snoozed (n)** sub-heading with *back on their dates · not counted*, closed by default, nothing at zero, soonest first (the list is already sorted so).
+2. **The rows**: a snoozed mail entry is drawn by its kind's own macro — the `ask` row with Reply, its suggested answers and Delete; a steer-shaped orphaned question likewise — with *snoozed until <t>* on its line; a snoozed state row (`stalled?`, unpushed work, promote, team start, idle · open work, cadence check failed) by its own macro with its Open, Dismiss or press. The `snoozed`, `state_snoozed` and the two `section == 'snoozed'` branches that drew **Unsnooze** go.
+3. **Snooze ▾ on a snoozed row**: the row's own choices with *now* first — `inbox_snooze` with no `until`, `attention_snooze` with none — and a later time as before. The `unsnooze` act and its toast go; *now*'s toast says *back in its section*.
+4. **A press ends the snooze**: a reply, a suggested answer, *Go with it*, Delete, Dismiss, Open-and-act leave the row as anywhere (`PRESS_LEAVES`); the home already closes the entry, and a closed entry is listed by its close, not by its snooze — check `inbox_sections` lists a closed-but-still-snoozed entry under FYI, not the fold.
+5. A UI change: the UI check on a scratch home (§4.9b), the shot in the PR.
+
+**Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it and the row leaves, a snoozed state row shows its Open and Dismiss, *now* on **Snooze ▾** brings a row back into its section, no row anywhere offers **Unsnooze**, and the fold's heading reads *Snoozed (n) · back on their dates · not counted*.
+
+**Resolved:** 2026-10-07 (PR #1226, grinder-ao-2) — the **Snoozed (n)** fold sits under FYI, as `Inbox.dc.html` draws it (the techlead: *matches*, `m-ed1628d6a970`), headed *Snoozed (n) back on their dates · not counted*, closed by default. Each snoozed row is drawn by its kind's own macro with `snoozed_says` (*snoozed until <t>*, or *with <seat> since*), and its Snooze menu offers *now* first (no `until`). The `unsnooze` act, its toasts and its key entry are gone, and a question closed while snoozed is listed by its close. A snoozed note is drawn as FYI draws it, without *Put on the board*. Read on a scratch home: a snoozed `ask` in the fold with its answers, Reply, Snooze and Delete; *now* brought it back to *Needs you*; an answer pressed in the fold moved it to *Waiting on them*; no Unsnooze anywhere. A snoozed state row's Open and *now* are read from the template (`test_a_state_row_can_be_snoozed…`), since the scratch home cannot make a snoozable state row.
+
+**Related:** TD-371 (the design), TD-069 (archived: the snooze), TD-079 (archived: the state row's snooze), TD-220 (archived: the *Not due yet* fold, the shape).
