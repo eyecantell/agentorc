@@ -104,6 +104,46 @@ async def test_a_wound_down_teams_lane_news_waits_the_settle_then_is_written(age
     assert "g" not in (agent._host_rec.get("teams") or {})
 
 
+async def test_a_build_seen_then_made_a_live_check_is_work_once_live(agent, tmp_path, monkeypatch):
+    """TD-411 (§6 rule 8, TD-407): both members saw TD-005 as a build and declared; merged, it reads as
+    a live check not yet live, which leaves their `lane_seen` (rule 6 prunes a gone member's memory);
+    at the promote it is in their lanes again, so the wound-down team has work waiting after the
+    settle — what ao-grind missed for three hours over TD-400."""
+    await park_ticks(agent)
+    monkeypatch.setattr(agent, "_replay", lambda *a, **k: None)
+    now = datetime.now(UTC)
+    repo = str(tmp_path)
+
+    def check(live: str) -> dict:
+        return {**_e("TD-005"), "kind": "live-check", "built": [7], "live": live}
+
+    agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001"), _e("TD-005")]}}
+    recs = _team(
+        agent, repo,
+        _rec("grinder-ao-1", lane=["free-pick"], lane_seen={"at": "x", "ids": ["TD-001", "TD-005"]}),
+        _rec("grinder-ao-2", lane=["free-pick"], lane_seen={"at": "x", "ids": ["TD-005", "TD-001"]}),
+    )  # fmt: skip
+
+    async def tick(at: datetime) -> None:
+        for r in recs:
+            await agent._lane_news(r, at)  # the keep-running pass, which runs before rule 8's
+        await agent._work_marks(at)
+
+    def waiting() -> dict | None:
+        return (agent._host_rec.get("teams") or {}).get("g", {}).get("work_waiting")
+
+    await tick(now + WORK_SETTLE)
+    assert waiting() is None, "nothing new"
+    agent._repos[repo]["ledger"]["entries"] = [_e("TD-001"), check("no")]
+    await tick(now + 2 * WORK_SETTLE)
+    assert [r.lane_seen["ids"] for r in recs] == [["TD-001"], ["TD-001"]] and waiting() is None
+    agent._repos[repo]["ledger"]["entries"] = [_e("TD-001"), check("yes")]
+    await tick(now + 3 * WORK_SETTLE)
+    assert waiting() is None, "not before the settle"
+    await tick(now + 4 * WORK_SETTLE)
+    assert waiting()["members"] == {"grinder-ao-1": ["TD-005"], "grinder-ao-2": ["TD-005"]}
+
+
 async def test_a_stopped_team_and_on_work_off_write_nothing(agent, tmp_path):
     await park_ticks(agent)
     now = datetime.now(UTC)

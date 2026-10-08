@@ -1298,8 +1298,13 @@ class TickMixin:
             self._save(s)
             log.info("%s: lane_seen from %s", self._address(s), read)
             # and on: an entry merged since the declaration is told on this tick
+        # the lane's memory, never the ledger's (§6 rule 6, TD-407): an id the lane no longer takes
+        # leaves it, written for a gone member as for a live one, so an entry that comes back is news
+        pruned, new = work_mod.reread(s, [*led["entries"], *(wos.get("orders") or [])])
+        if pruned is not s.lane_seen:
+            s.lane_seen = pruned
+            self._save(s)
         seen = set(s.lane_seen.get("ids") or [])
-        new = [i for i in ids if i not in seen]
         drops = self._lane_drops(s, [i for i in ids if i in seen])
         if not (new or drops) or s.state in ("exited", "closed") or s.suspended:
             return
@@ -1376,7 +1381,8 @@ class TickMixin:
         memory, so a restart settles again). It is removed when the team is no longer wound down —
         a crew session live again, or a member that never declared — when no id is new, and under
         `on_work: off`. `lane_seen` itself is rule 6's, written for a member that is gone as for a
-        live one. One team's surprise is a log line, never another's."""
+        live one and pruned by it on the same tick, before this pass (`work.reread`, TD-407), which
+        `work.gained` reads the same way. One team's surprise is a log line, never another's."""
         if self.mode != "home":
             return
         teams = self._host_rec.setdefault("teams", {})
@@ -2138,16 +2144,28 @@ class TickMixin:
             met = every is not None and now - _parse(s.created) >= every
         return {"at": now_iso(), "by": trigger} if met else None
 
-    def _seat_lane(self, s: Session) -> list[str] | None:
-        """The ids the anchor seat's lane takes of its repo's reading (§6 rule 3 and rule 6, TD-386):
-        the ledger's entries and the board's work orders by `lane_matches`, its lane `[anchor]` as
-        its preset writes it; None where the ledger was not read, which changes nothing."""
+    def _seat_reading(self, s: Session) -> list[Any] | None:
+        """The anchor seat's repo's reading — the ledger's entries, then the board's work orders —
+        or None where the ledger was not read, which changes nothing (§6 rule 3, TD-386)."""
         r = self._repos.get(s.repo or "") or {}
         led = r.get("ledger") or {}
         if "error" in led or not isinstance(led.get("entries"), list):
             return None
-        lane = list(s.lane or [ledger_mod.ANCHOR_OWNER])
-        got = [*led["entries"], *((r.get("work_orders") or {}).get("orders") or [])]
+        return [*led["entries"], *((r.get("work_orders") or {}).get("orders") or [])]
+
+    @staticmethod
+    def _seat_lane_word(s: Session) -> list[str]:
+        """The anchor seat's lane, `[anchor]` as its preset writes it."""
+        return list(s.lane or [ledger_mod.ANCHOR_OWNER])
+
+    def _seat_lane(self, s: Session) -> list[str] | None:
+        """The ids the anchor seat's lane takes of its repo's reading (§6 rule 3 and rule 6, TD-386):
+        the ledger's entries and the board's work orders by `lane_matches`; None where the ledger
+        was not read, which changes nothing."""
+        got = self._seat_reading(s)
+        if got is None:
+            return None
+        lane = self._seat_lane_word(s)
         ids = [str(e["id"]) for e in got if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(lane, e)]
         return list(dict.fromkeys(ids))
 
@@ -2157,14 +2175,15 @@ class TickMixin:
         reading the first time it is missing — at the record's create, or after a `none`, which
         clears it — so what stood then is the run's that saw it, and a cause fills once per stretch:
         the same ids after a `none` raise nothing. A due whose ids all left the lane before the fill
-        is cleared. No reading keeps what stands."""
-        ids = self._seat_lane(s)
-        if ids is None:
+        is cleared. No reading keeps what stands. `lane_seen` is pruned as rule 6 prunes it
+        (`work.reread`, TD-407): an id the lane no longer takes leaves it, so a live check that goes
+        live after the seat saw it as a build is due again."""
+        got = self._seat_reading(s)
+        if got is None:
             return s.seat_due
         if s.lane_seen is None:
-            s.lane_seen = {"at": now_iso(), "ids": ids}
-        seen = set(s.lane_seen.get("ids") or [])
-        new = [i for i in ids if i not in seen]
+            s.lane_seen = {"at": now_iso(), "ids": self._seat_lane(s) or []}
+        s.lane_seen, new = work_mod.reread(s, got, self._seat_lane_word(s))
         if not new:
             return None
         at = (s.seat_due or {}).get("at") if (s.seat_due or {}).get("by") == "work" else None

@@ -319,6 +319,60 @@ async def test_a_live_check_whose_build_becomes_live_is_told_once(agent, tmp_pat
         await person.call("kill", id=sid)
 
 
+async def test_an_entry_that_leaves_the_lane_and_comes_back_is_told_again(agent, tmp_path):
+    """TD-411 (design §6 rule 6 *`lane_seen` is the lane's memory, never the ledger's*, TD-407): an id
+    the reading holds and the lane no longer takes leaves `lane_seen`, its `dropped` mark with it,
+    untold; back in the lane it is news once more — a build its merge made a live check not yet live,
+    then live at the promote (TD-400's case), and a `Blocked by` that reopened and cleared. An id the
+    reading does not hold is kept, and a gone member's memory is pruned as a live one's is."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+
+    def check(id: str, live: str) -> dict:
+        return {**_e(id, kind="live-check"), "built": [7], "live": live}
+
+    async with LocalClient() as person:
+        sid = await _finished(
+            agent, person, tmp_path, "w", ["free-pick", "owner:grinder"], [_e("TD-001"), _e("TD-002")]
+        )
+        rec = agent.sessions[sid]
+        reading = agent._repos[str(tmp_path)]["ledger"]
+        await agent._keep_running(now)
+        assert rec.lane_seen["ids"] == ["TD-001", "TD-002"] and _notes(agent, sid) == []
+        # merged: TD-002 reads as a live check whose build is not live — out of the lane, told nothing
+        reading["entries"] = [_e("TD-001"), check("TD-002", "no")]
+        await agent._lane_news(rec, now)
+        assert rec.lane_seen["ids"] == ["TD-001"] and _notes(agent, sid) == []
+        # the promote: live, in the lane again — news, told once
+        reading["entries"] = [_e("TD-001"), check("TD-002", "yes")]
+        await agent._lane_news(rec, now)
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "your lane gained 1 entry since you declared out of work: TD-002" in notes[0]
+        # a `Blocked by` that reopens takes TD-001 out, its drop mark with it; cleared, it is told again
+        rec.lane_seen["dropped"] = {"TD-001": "2026-09-27T21:00:00Z", "TD-002": "2026-09-27T21:00:00Z"}
+        reading["entries"] = [_e("TD-001", pickable="no"), check("TD-002", "yes")]
+        await agent._lane_news(rec, now)
+        assert rec.lane_seen["ids"] == ["TD-002"] and rec.lane_seen["dropped"] == {"TD-002": "2026-09-27T21:00:00Z"}
+        assert agent.store.load(sid).lane_seen["ids"] == ["TD-002"], "the pruned memory is saved"
+        reading["entries"] = [_e("TD-001"), check("TD-002", "yes")]
+        await agent._lane_news(rec, now)
+        assert (
+            len(_notes(agent, sid)) == 2
+            and "gained 1 entry since you declared out of work: TD-001" in _notes(agent, sid)[1]
+        )
+        # an id the reading does not hold (archived, or the checkout's moment) is kept
+        reading["entries"] = [check("TD-002", "yes")]
+        await agent._lane_news(rec, now)
+        assert rec.lane_seen["ids"] == ["TD-002", "TD-001"]
+        # a gone member's memory is pruned too, though it is told nothing
+        rec.state = "exited"
+        reading["entries"] = [_e("TD-001"), check("TD-002", "no")]
+        await agent._lane_news(rec, now)
+        assert rec.lane_seen["ids"] == ["TD-001"] and len(_notes(agent, sid)) == 2
+        await person.call("kill", id=sid)
+
+
 @pytest.mark.parametrize("promoted", ["before", "after"])
 async def test_a_live_check_live_at_the_declaration_is_told_to_nobody(agent, tmp_path, promoted):
     """The techlead's read of #1051 (§4.9b *told once by rule 6*, §6 rule 6 *the ledger as it stood
