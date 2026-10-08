@@ -3190,10 +3190,17 @@
     // the same road; a paste that carries text is the text's, as before. Not while the composer is
     // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*).
     const attachBtn = $("#attach"), attachIn = $("#attachfile");
-    async function attach(files) {
+    const attachLabel = attachBtn.lastChild, attachWord = attachLabel.textContent;
+    const composerShut = () => $("#composer").classList.contains("hidden");
+    let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
+    function attach(files) {
       const list = Array.from(files || []);
-      if (!list.length || $("#composer").classList.contains("hidden")) return;
-      const label = attachBtn.lastChild, was = label.textContent;
+      if (!list.length || composerShut()) return attaching;
+      attaching = attaching.then(() => attachEach(list)).catch((e) => banner(`Attach failed: ${e.message}`));
+      return attaching;
+    }
+    async function attachEach(list) {
+      const label = attachLabel;
       attachBtn.disabled = true;
       for (const f of list) {
         label.textContent = `Attaching ${f.name}…`;
@@ -3205,14 +3212,14 @@
           AO.insertAtCaret(compose, (await r.json()).path);
         } catch (e) { banner(`Attach failed: ${e.message}`); }
       }
-      label.textContent = was; attachBtn.disabled = false;
+      label.textContent = attachWord; attachBtn.disabled = false;
       compose.dispatchEvent(new Event("input")); compose.focus();
     }
     attachBtn.addEventListener("click", () => attachIn.click());
     attachIn.addEventListener("change", () => { attach(attachIn.files).finally(() => { attachIn.value = ""; }); });
     for (const el of [$("#term"), compose]) {
-      el.addEventListener("dragover", (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
-      el.addEventListener("drop", (e) => { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); attach(e.dataTransfer.files); } });
+      el.addEventListener("dragover", (e) => { if (!composerShut() && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+      el.addEventListener("drop", (e) => { if (!composerShut() && e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); attach(e.dataTransfer.files); } });
     }
     compose.addEventListener("paste", (e) => {
       const cd = e.clipboardData;
