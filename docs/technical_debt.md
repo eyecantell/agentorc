@@ -72,7 +72,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-365 | `pick_flow` returns `stays` (#1191) and no test or caller reads it | Low | Open |
 | TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Open |
@@ -1240,22 +1239,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-365: `pick_flow` returns `stays` (#1191) and no test or caller reads it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/teamrun.py` (`pick_flow`: `"stays": stays_with(name, sessions)`); `tests/test_flows.py`
-
-**Why:** `"stays": stays_with(name, sessions)` → `"stays": []` leaves `tests/test_flows.py`, `test_ui_teams.py`, `test_cli_teams.py`, `test_ui_settings.py` and `test_cli.py` passing. The docstring says `pick_flow` returns `stays` and what it is for; `app.js`'s `AO.flowSet` and `ao team flow <team> <flow>` read `differences` and `feature` but not `stays` (only `--apply`'s reply is printed with it).
-
-**Fix:** one assertion in `test_flows.py` that a pick with an open PR asked of a reader returns it in `stays`; or, if nothing is to read it, drop it from the return and the docstring. **Done when** the revert fails a test, or the key is gone.
-
-**Related:** TD-359 (#1191), TD-356.
 
 ## TD-366: Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours
 

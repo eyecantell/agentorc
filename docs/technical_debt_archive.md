@@ -5839,3 +5839,19 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1205, grinder-ao-2) — **Attach** (the picker), a drop on the terminal or the composer, and an image pasted into the composer each go to `POST /api/sessions/<id>/attach` → the host agent's `attach` (a person's own act), which writes the file `0600` under `~/.agentorc/attachments/<session>/` by a name a prompt needs no quoting for and answers its path; the composer inserts it at the caret and sends nothing. A pasted screenshot lands as a path Claude Code can read (checked on a scratch home, `docs/mockups/reviews/2026-10-07-td002-attach.png`). Desktop and this host only, 4 MiB a file: a node's session waits for phase 2's copy over ssh, the phone's share sheet is TD-003. Design §4.4 *Attachment drop*, §4.5a *Focus composer*; `tests/test_attach.py`.
 
 **Related:** design §4.4 attachment drop, §4.5a Focus composer rows.
+
+## TD-365: `pick_flow` returns `stays` (#1191) and no test or caller reads it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1187–#1196)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/teamrun.py` (`pick_flow`: `"stays": stays_with(name, sessions)`); `tests/test_flows.py`
+
+**Why:** `"stays": stays_with(name, sessions)` → `"stays": []` leaves `tests/test_flows.py`, `test_ui_teams.py`, `test_cli_teams.py`, `test_ui_settings.py` and `test_cli.py` passing. The docstring says `pick_flow` returns `stays` and what it is for; `app.js`'s `AO.flowSet` and `ao team flow <team> <flow>` read `differences` and `feature` but not `stays` (only `--apply`'s reply is printed with it).
+
+**Resolved:** 2026-10-07 (PR #1207, grinder-ao-2) — the key is gone: nothing reads a pick's `stays`, and §4.9c *What a switch leaves alone* has Apply say what stays (`teamrun.apply`'s `stays`, tested by `test_a_switch_says_which_prs_stay_with_their_reader`), since a pick moves nothing. `pick_flow` returns `{team, flow, differences, feature}`, its docstring says so, and `test_a_pick_says_what_add_entrys_feature_now_opens` asserts `stays` is absent.
+
+**Related:** TD-359 (#1191), TD-356.
