@@ -73,6 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
+| TD-396 | §4.9b's anchor Start paragraph still says the dirty and off-branch cases are TD-395's, after TD-395 built them | Low | Open |
 
 ---
 
@@ -1272,3 +1273,23 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
+
+---
+
+## TD-396: §4.9b's anchor Start paragraph still reads the dirty and off-branch cases as TD-395's to build, after PR #1257 built them
+
+**Priority:** Low
+**Type:** documentation
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1248–#1257)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.9b-techlead.md` (*The anchor seat*, the Start paragraph, line 83)
+
+**Why:** PR #1257 marked built the three places that name TD-395 as the build (`4.9b-techlead.md` line 74, `6-policies.md` rules 3's Start gate and `none`, `4.9-org-team-project.md` `anchor`) but not this one. Line 83 reads *"(built — TD-386: `create` with `held`, which writes the record alone, its `lane_seen` empty so everything in its lane is the first fill's; the dirty and off-branch cases — TD-395)"*, which says the dirty and off-branch cases are still TD-395's. `src/agentorc/teamrun.py` (`checkout_held`) and the archived TD-395 entry say they are built. The design is written in the present tense; this parenthesis is the one place that still reads as future work.
+
+**Fix:** write *built — TD-395* after the dirty and off-branch cases in that parenthesis; nothing else.
+
+**Done when** `grep -n "TD-395" docs/design/4.9b-techlead.md` shows no mention of TD-395 as unbuilt.
+
+**Related:** TD-395, TD-394, TD-386.
