@@ -1589,7 +1589,7 @@
       let o = {}; try { o = await r.json(); } catch (e) {}
       if (!r.ok) throw new Error(o.detail || r.statusText);
       const lines = [...(o.applied || []), ...(o.skipped || []), ...(o.stays || [])].map((d) => d.line);
-      if (!lines.length) AO.toast(`${name}: every live record already matches ${o.flow}`, true);
+      if (!lines.length) AO.toast(`${name}: every live record already matches ${o.flow || "the definition"}`, true);  // no flow: its seats (TD-399)
       lines.forEach((l) => AO.toast(`${name}: ${l}`, true));
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);

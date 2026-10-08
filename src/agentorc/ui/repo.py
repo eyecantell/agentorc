@@ -207,9 +207,19 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
     person; `flow_lines`, what is drawn under the header: a pick that is not one it lists, each listed
     flow it cannot follow — the current one first, with the flows it could — and a repo not read
     from here; and `flow_changed`, a live team's members whose records differ from what the flow compiles
-    to, each `{name, act, line}`."""
+    to, each `{name, act, line}`, with `definition_changed` when the mark reads **definition changed —
+    Apply** (§4.5a, TD-399): the team runs no flow, or every difference is a seat it lacks."""
     if not fv or not fv.get("flow"):
-        return {"flow": "", "flow_strip": "", "flow_lines": [], "flow_changed": [], "flow_picks": []}
+        # a team that runs no flow is read on its seats alone (§4.9c, TD-399): one it lacks is the mark
+        diffs = list((fv or {}).get("differences") or []) if live else []
+        return {
+            "flow": "",
+            "flow_strip": "",
+            "flow_lines": [],
+            "flow_changed": diffs,
+            "definition_changed": bool(diffs),
+            "flow_picks": [],
+        }
     rows = list(fv.get("flows") or [])
     now = next((r for r in rows if r.get("current")), {})
     lines = [str(fv["flow_note"])] if fv.get("flow_note") else []
@@ -224,6 +234,7 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
         "flow_strip": str(now.get("strip") or ""),
         "flow_lines": lines,
         "flow_changed": list(fv.get("differences") or []) if live else [],
+        "definition_changed": teamrun.definition_changed(list(fv.get("differences") or []) if live else [], fv["flow"]),
         # the **Flow** pick (§4.5a), on a team that lists more than one: each `{name, current, cannot}`
         "flow_picks": [{k: r.get(k) for k in ("name", "current", "cannot")} for r in rows] if len(rows) > 1 else [],
     }

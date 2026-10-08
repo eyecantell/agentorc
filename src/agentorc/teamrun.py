@@ -725,12 +725,13 @@ class Difference:
     what: list[str] = field(default_factory=list)
     record: dict[str, Any] | None = None
     launch: teams.Launch | None = None
+    seat: bool = False  # a seat the definition names that the run has no record of (§4.9c, TD-399)
 
     def line(self, flow: str | None) -> str:
         if self.act == "sit_out":
             return f"{self.name}: sits out under {flow}"
         if self.act == "start":
-            return f"{self.name}: starts under {flow}"
+            return f"{self.name}: starts under {flow}" if flow else f"{self.name}: starts"
         if self.act == "left":
             return f"{self.name}: sits out under {flow} — a person's session, left running: close it yourself"
         return f"{self.name}: relaunched — {'; '.join(self.what)}"
@@ -743,7 +744,14 @@ class Difference:
             "act": self.act,
             "what": list(self.what),
             "line": self.line(flow),
+            "seat": self.seat,
         }
+
+
+def definition_changed(diffs: list[dict[str, Any]], flow: str | None) -> bool:
+    """Whether the team header's mark reads **definition changed — Apply** rather than *flow changed*
+    (§4.5a, §4.9c, TD-399): the team runs no flow, or every difference is a seat to start."""
+    return bool(diffs) and (not flow or all(d.get("seat") and d.get("act") == "start" for d in diffs))
 
 
 def stage_of(prompt_from: Any) -> str | None:
@@ -821,10 +829,19 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     """How a live team's records differ from what its current flow compiles to (design §4.9c
     *Switching*), member by member: lane, `review`, the `{stage}` file's path, and who should be
     running — never `{flow}`'s text, which names no member, and nothing of a person's session but
-    that the flow sits it out. Empty for a team that runs no flow, or with nothing live."""
+    that the flow sits it out. A seat the definition names — the techlead, the anchor, a `seats:`
+    entry — with no record is a `start` on any live team (§4.9c, TD-399), and a team that runs no flow
+    is compared on its seats alone. Empty with nothing live."""
     mine = badged(plan.team, sessions)
-    if plan.flow is None or not live(crew(plan.team, sessions)):
+    if not live(crew(plan.team, sessions)):
         return []
+    seats = {x.name for x in (plan.techlead, plan.anchor, *plan.seats) if x is not None}
+    if plan.flow is None:
+        return [
+            Difference(x.name, "start", launch=x, seat=True)
+            for x in plan.launches
+            if x.name in seats and _current(x.name, mine) is None
+        ]
     out: list[Difference] = []
     for name in plan.sit_out:
         rec = _current(name, mine)
@@ -835,13 +852,9 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
         out.append(Difference(name, "left" if persons(rec) else "sit_out", record=rec))
     for x in plan.launches:
         rec = _current(x.name, mine)
-        if rec is None and x.in_checkout:
-            # an anchor seat a Start never created — the team predates it — is the next Start's, never a
-            # flow's difference Apply could not clear (a Start over a held checkout writes its record,
-            # closed with no pane, for rule 3 to fill: TD-386)
-            continue
         if rec is None or sat_out(rec):
-            out.append(Difference(x.name, "start", record=rec, launch=x))
+            # a seat the run lacks — the anchor a team predates among them — is Apply's to create (TD-399)
+            out.append(Difference(x.name, "start", record=rec, launch=x, seat=rec is None and x.name in seats))
             continue
         if rec.get("sit_out"):
             continue  # still winding down from a sit-out: once the home has closed it, it reads `start`
@@ -867,10 +880,11 @@ def flow_changed(
 ) -> list[dict[str, Any]]:
     """What a client that reads a live team says of its records against its current flow (§4.9c
     *Switching*: the Org page, `ao team list`, `ao team flow`), one `Difference.as_dict` per member;
-    empty for a team with no `flows:` or nothing live, which compiles nothing until its next start.
-    Raises what `teams.plan` raises: the caller says why the records were not compared."""
+    empty with nothing live, which compiles nothing until its next start; a team with no `flows:` is
+    read on its seats alone (TD-399). Raises what `teams.plan` raises: the caller says why the records
+    were not compared."""
     t = org.teams.get(name)
-    if t is None or not t.flows or not live(crew(name, sessions)):
+    if t is None or not live(crew(name, sessions)):
         return []
     plan = teams.plan(org, name, host, files=files_via(call))
     return [d.as_dict(plan.flow) for d in differences(plan, sessions)]
@@ -884,9 +898,14 @@ def flow_view(call: Call, org: orgmod.Org, name: str, here: str, sessions: list[
     plan fails, which the flows' own lines say. Reads files: once per page load or listing, never
     per delta."""
     t = org.teams.get(name)
-    if t is None or not t.flows:
+    if t is None:
         return {"flow": None, "flows": [], "flow_note": "", "differences": []}
-    out: dict[str, Any] = {
+    if not t.flows:  # no flow: its seats alone, which a live team may lack (§4.9c, TD-399)
+        out: dict[str, Any] = {"flow": None, "flows": [], "flow_note": "", "differences": []}
+        with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError):
+            out["differences"] = flow_changed(call, org, name, here, sessions)
+        return out
+    out = {
         "flow": teams.current_flow(t),
         "flows": teams.flow_rows(org, t, t.host or here, here),
         "flow_note": teams.flow_unlisted(t),
@@ -1068,8 +1087,16 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
                 keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
                 keep = {"keep_mail": True} if keeps else {}
                 ctl = [lead_id] if lead_id and x is not plan.lead else []
-                got = call("create", **x.create_params(ctl), **keep)
+                held = None
+                if x is plan.anchor:
+                    # the anchor seat, gated as `start` and the fill are (§6 rule 3, TD-395, TD-399): not
+                    # free, its record is written alone with `seat_held`, and rule 3 fills it once it is
+                    held = call("checkout_held", host=x.host, dir=str(x.dir)).get("held")
+                gate = {"held": True, "held_reason": held} if held else {}
+                got = call("create", **x.create_params(ctl), **keep, **gate)
                 row["id"] = got.get("id")
+                if held:
+                    row["line"] = f"{x.name}: waits — {held.get('why') or 'the checkout is not free'}"
                 row["line"] += "".join(f" — {n}" for n in said)
         except (AgentError, teams.TeamError) as e:
             row["line"] = f"{d.name}: not applied — {e}"

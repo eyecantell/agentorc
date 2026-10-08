@@ -647,8 +647,11 @@ def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsy
     monkeypatch.delenv("AGENTORC_SESSION")
     del doc["teams"]["ao-grind"]["flows"]
     _write(tmp_path, doc)
-    assert cli.main(["team", "flow", "ao-grind"]) != 0
+    # no flows: a flow named is refused; the bare read and Apply read its seats alone (§4.9c, TD-399)
+    assert cli.main(["team", "flow", "ao-grind", "td"]) != 0
     assert "lists no flows:" in capsys.readouterr().err
+    assert cli.main(["team", "flow", "ao-grind"]) == 0
+    assert "ao-grind lists no flows:" in capsys.readouterr().out
 
 
 # ── the listings (TD-309 slice 6) ────────────────────────────────────────────────────────────────

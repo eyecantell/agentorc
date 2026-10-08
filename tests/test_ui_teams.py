@@ -986,6 +986,21 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
     assert client.post("/api/teams/nobody/flow/apply").status_code == 400
 
 
+def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(world, client, monkeypatch):
+    """§4.9c, §4.5a (TD-399, built by TD-400): a live team that runs no flow is compared on its seats
+    alone — the anchor it lacks reads *definition changed* and **Apply** names the start."""
+    from agentorc import org as orgmod
+
+    monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", True)
+    tmp_path, fleet = world
+    write_org(tmp_path, org_doc(tmp_path))
+    fleet.sessions = [{**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    head = _head(client.get("/").text)
+    assert '<span class="meta flowchanged" title="ao-grind-anchor: starts">definition changed</span>' in head
+    assert 'data-confirm="Apply the definition to ao-grind? ao-grind-anchor: starts.">Apply</button>' in head
+    assert "flow:" not in head and ">flow changed<" not in head
+
+
 def test_the_flow_pick_lists_the_teams_flows_and_disables_one_it_cannot_follow(world, client):
     """§4.5a team card **Flow** pick (TD-309 slice 4b): on a team that lists more than one flow, the
     current selected, each it cannot follow disabled with the reason; one flow, no pick."""
