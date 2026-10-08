@@ -6787,3 +6787,45 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** an ask sent with `--answer` shows its answers as buttons beside Reply and Delete, pressing one delivers that text as a `reply` that wakes the sender's `ao wait`, free-text Reply still works, and the bounds are in §4.10 and enforced at the RPC.
 
 **Related:** design §4.10 (kinds, bounds, *a reply is mail, not a send*), §4.4 (board write-back), TD-069 (the page these sit on), TD-052, dev-cadence `docs/cadence.md` §3 (the entry format).
+
+## TD-407: A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the person's session, from Paul's *why is the team stopped?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — built by TD-411 (PR #1284); designed 2026-10-08 (the designer, PR #1275): design §6 rule 6 *`lane_seen` is the lane's memory, never the ledger's* — on every reading an id in `lane_seen` that the reading holds and the lane no longer matches is removed (its `dropped` mark with it), for a live member and a gone one alike, so an entry that leaves the lane and comes back is news once more; an id the reading does not hold is kept. The key stays the id: *matches now and did not when last seen* is what news means, so no kind or workability is written beside it. Rule 3's anchor seat and rule 8 read the same pruned memory, one function in `sessionorc.work` reading the news and the pruning in one pass. The promote tells nobody itself (one of the ways an entry comes back; the reading sees them all). Rule 9 holds no wind-down for an untold entry: rule 6 tells inside the settle, and each case it withholds in (gated, wrapping up, past its stop, suspended, over the balance line) leaves the id for rule 8. TD-411 builds it. Before: Open.
+**Location:** design §6 rule 6 (`lane_seen`) and rule 8 (*Work for a team that wound down*); `src/sessionorc/work.py` (`gained`), `src/sessionorc/agent_tick.py` (rule 8's reading)
+
+**Why:** every time below is MDT, from the host agent's journal and `ao status`.
+- **06:52.** grinder-ao-1 declared out of work. TD-400 was then a pickable `Kind: build` entry in the grinder lane, which it left as grinder-ao-2's package. Its `lane_seen` became `{ids: [TD-400]}` (*lane_seen from the ledger at the declaration, origin/HEAD at 70ed46e6*).
+- **07:12.** grinder-ao-2 merged #1266 (TD-400's build). TD-400 became `Kind: live-check #1266`, not workable until #1266 was live. grinder-ao-2 declared out of work on that ground, and its `lane_seen` also holds `[TD-400]`.
+- **07:23.** The promote made #1266 live (`promote: promoted agentorc d9539fe`). TD-400 was pickable in the grinder lane again. Both members had already seen the id, so rule 6 told neither of them (`gained` drops any id in `lane_seen`).
+- **10:31.** Rule 9 wound the team down (*rule 9: ao-grind finished*), which reads the declarations alone. Afterwards rule 8 found no gain either, so no *team start* row reached the Inbox.
+- At 14:56 Paul found the Org with 59 open entries, 22 pickable, and every team stopped. `ao repo` read *grinder-ao-1 is out of work with 1 in its lane: TD-400*.
+- `lane_seen` keys on the id alone. So an entry seen while workable that goes unworkable and comes back never counts as news: a build that becomes a live check and then goes live, or an entry whose `Blocked by` reopens and clears. Only the id is remembered, never whether it was workable.
+
+**Resolved:** 2026-10-08 (PR #1284, built as TD-411) — design §6 rule 6 *`lane_seen` is the lane's memory, never the ledger's* (designed in #1275) and `sessionorc.work.reread`: an id that leaves the lane leaves `lane_seen` and is news when it comes back. *Done when* read against the tests: `test_lane_news.py::test_an_entry_that_leaves_the_lane_and_comes_back_is_told_again` (the member told of the build-then-live-check), `test_work_waiting.py::test_a_build_seen_then_made_a_live_check_is_work_once_live` (the wound-down team's `work_waiting`, rule 8's row or start).
+
+**Done when** a member that declared with an entry in its lane, where the entry turned unworkable and then workable again (a build, then a live check that goes live), is told of it, and a wound-down team gets rule 8's start or its Inbox *team start* row. A test pins the build-then-live-check case.
+
+**Related:** TD-400 (the entry it happened on), TD-214 (rule 8), TD-195 (rule 6), TD-240 (rule 9).
+
+## TD-411: Build TD-407: `lane_seen` pruned on every reading — one pass in `sessionorc.work` for rule 6, rule 8 and the anchor seat's `work` trigger
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the designer, from TD-407's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/work.py` (`gained`; the new pass), `src/sessionorc/agent_tick.py` (`_lane_news`, `_work_mark`, `_work_due`), `tests/test_lane_news.py`, `tests/test_work_waiting.py`, `tests/test_anchor_tick.py`
+
+**Why:** TD-407: `lane_seen` keys on the id alone and keeps it for good, so TD-400 — seen as a build, turned `live-check` by its merge, workable again at the promote — was news to nobody, and ao-grind wound down three hours after it became pickable. Design §6 rule 6 now says the memory is the lane's: an id the lane no longer matches leaves it.
+
+**Resolved:** 2026-10-08 (PR #1284) — `sessionorc.work.reread` (the one pass; `gained` its caller), `_lane_news` writing the pruned memory for a gone member too, `_work_due` pruning the seat's; tests in `test_lane_news.py`, `test_work_waiting.py`, `test_anchor_tick.py` (`test_a_live_check_that_goes_live_after_a_none_is_due_again`).
+
+**Done when** `tests/test_lane_news.py` pins: a member that declared with a pickable build in its lane, whose entry then reads `Kind: live-check #n` with `live: no` (pruned, nothing told), then `live: yes`, is told of it once in rule 6's note; a `Blocked by` that reopens and clears is told again; an id absent from the reading stays in `lane_seen`; `tests/test_work_waiting.py` pins the same build-then-live-check case for a wound-down team (both members gone, `work_waiting` written for the id after the settle); `tests/test_anchor_tick.py` pins the seat's `seat_due` raised again for a live check that goes live after a `none`. `pdm run test` and `pdm run lint` pass; TD-407 is archived with this entry, its *Done when* read against the tests.
+
+**Related:** TD-407 (the design), TD-400 (the entry it happened on), TD-195 (rule 6), TD-214 (rule 8), TD-386 (the seat's trigger).
