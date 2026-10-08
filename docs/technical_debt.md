@@ -73,7 +73,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Designed — TD-395 builds it |
 
 ---
 
@@ -1273,21 +1272,3 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
-
-## TD-394: An anchor seat's Start lands in a dirty checkout, where its fill would have waited
-
-**Priority:** Low
-**Added:** 2026-10-08 (grinder-ao-1, from the techlead's reading of #1248, TD-386)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed — the design in §4.9b *The anchor seat*, §4.9 `anchor` and §6 rule 3 (PR #1252); TD-395 builds it
-**Blocked by:** TD-395
-**Location:** design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor` (*a start whose checkout a session holds …*), §6 rule 3 (*Its fill is gated by the checkout*); `src/agentorc/teamrun.py` (`start`, TD-385's occupancy check), `src/sessionorc/agent_tick.py` (the fill's gate, `seat_held`)
-
-**Why:** the seat's fill (§6 rule 3, built in TD-386) is refused while the home repo's main checkout is held by a session, dirty, or off its default branch, writing `seat_held`. `ao team start` (TD-385) checks occupancy alone, because the design's Start paragraph names only a holder: a Start into a free checkout that has uncommitted files or another branch checked out creates the seat with a pane there. The two roads into the same checkout disagree, and the anchor brief's work (promotes, ledger PRs) could then run over the person's uncommitted work.
-
-**Fix:** decide whether a Start gates on the checkout as the fill does — a held Start (`closer {by: start, why: held}`, no pane, TD-386) for a dirty or off-branch checkout too, its `seat_held` saying why — or whether a Start is the person's own word and may land there; then the design says it and the build follows.
-
-**Done when** the design names what a Start does with a dirty or off-branch free checkout, and a test covers it.
-
-**Related:** TD-381, TD-385, TD-386, TD-387.
