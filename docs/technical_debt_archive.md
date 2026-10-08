@@ -6087,7 +6087,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
   - **A mail entry's snooze** (`snoozed_until`) and **a state row's** (`attention_snoozed_until`) move the row to a snoozed list, where it shows **Unsnooze** alone: no answers, no Reply, no *Go with it*.
 - Hiding the controls protects nothing (§4.10 already says a snooze is never a way to lose mail), and it adds a step before every answer.
 
-**Resolved:** 2026-10-07 (archived PR #TBD). The lasting content: design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6 (the **Snoozed (n)** fold), §4.5a *Inbox: Snoozed (n) fold*, the glossary's *snooze*; the code in `src/agentorc/ui/inbox.py` and `inbox_rows.html`.
+**Resolved:** 2026-10-07 (archived PR #1233). The lasting content: design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6 (the **Snoozed (n)** fold), §4.5a *Inbox: Snoozed (n) fold*, the glossary's *snooze*; the code in `src/agentorc/ui/inbox.py` and `inbox_rows.html`.
 
 **Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it, no row anywhere offers **Unsnooze**, and §4.10 and §4.5a say a snooze is a date.
 
