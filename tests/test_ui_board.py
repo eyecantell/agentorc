@@ -1806,3 +1806,27 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     (broken / "scripts" / "nudge_user_attention.py").write_text("raise SystemExit(3)\n")
     assert workorders.ref(broken, text) == ""
     assert workorders._keys[str(broken / "scripts" / "nudge_user_attention.py")][1] is None
+
+
+def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any_one(tmp_path):
+    """TD-393 (`_order_teams`): a record resumed as another (`superseded_by`) names no team, and a
+    team with one live and one ended record reads live whichever comes first — never *wound down*."""
+    from agentorc.ui.inbox import board_waiting_on
+
+    root = tmp_path / "repo"
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(
+        pathlib.Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts"
+    )
+    text = (
+        "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
+        " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."
+    )
+    now = datetime(2026, 10, 4, 12, tzinfo=UTC)
+    row = {"repo": "repo", "root": str(root), "text": text, "decided": "keep", "session": "gone-1", "refs": ["TD-777"]}
+    g1 = {"id": "ao-g1", "name": "g1", "state": "working", "team": "grind", "repo": str(root), "lane": ["free-pick"]}
+    old = {**g1, "id": "ao-old", "name": "old", "team": "gone", "state": "exited", "superseded_by": "ao-g1"}
+    assert board_waiting_on(row, [old, g1], now) == "pickable by grind"
+    ended = {**g1, "id": "ao-g0", "name": "g0", "state": "exited"}
+    for fleet in ([g1, ended], [ended, g1]):
+        assert board_waiting_on(row, fleet, now) == "pickable by grind", [r["id"] for r in fleet]
