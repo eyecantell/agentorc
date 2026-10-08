@@ -1310,7 +1310,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the designer, from TD-367's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slices 1 (the reader, `sessionorc.ledger`) and 2 (`ao repo`'s *decision* mark) built in PR #NNN; left: 3 (the Inbox fold, a page change with its UI check) and 4 (the designer briefs).
+**Status:** Slices 1 (the reader, `sessionorc.ledger`) and 2 (`ao repo`'s *decision* mark) built in PR #1206; left: 3 (the Inbox fold, a page change with its UI check) and 4 (the designer briefs).
 **Location:** `src/sessionorc/ledger.py` (`kind_of`, `lane_matches`, `_word_matches`), `src/agentorc/cli.py` (`cmd_repo`'s design-first rows), `src/agentorc/ui/inbox.py` (`inbox_sections`, the page's fourth source), `src/agentorc/ui/templates/inbox.html` and `inbox_rail.html`, `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` (the lane sentence); tests `tests/test_ledger_derived.py`, `tests/test_repo_facts.py`, `tests/test_lane_news.py`, `tests/test_ui_inbox.py`, the CLI's `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
 
 **Why:** design §4.4 *Repo facts* (the page's kinds), §6 rule 6, §4.5 screen 6 *The ledger's entries that wait on you* and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo` (TD-367, designed 2026-10-07). On 2026-10-07 the repo line said *15 for you* about decisions that were the designer's and the anchor's, and the Inbox drew none of the fifteen.
