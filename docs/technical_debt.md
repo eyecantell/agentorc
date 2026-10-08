@@ -1396,7 +1396,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Location:** design §4.9 (a team's definition; the manager added by default), §4.9b *Seats with a trigger*, §6 rule 3 (seats; *a manager on call is a seat of this rule*), §9 invariant 2 (one agent per directory: the anchor is the first in the checkout); CLAUDE.md *The live copy is promoted*; `src/agentorc/org.py` (`ManagerDef`, `on_call`), `src/agentorc/teams.py`, `src/sessionorc/ledger.py` (`Owner: anchor`)
 
 **Why:**
-- `Owner: anchor` is the ledger's most common owner: 35 of agentorc's open entries on 2026-10-07 (15 evaluations, 13 live checks, 6 builds, 1 decision). They move only while Paul keeps an interactive session open in the checkout. samscrape, contractmatch and dev-cadence have no anchor at all, so anything only an anchor does (a decided board line, TD-380; a host chore; a promote) waits for Paul to open one.
+- `Owner: anchor` is the ledger's most common owner: 34 of agentorc's open entries on 2026-10-07 (15 evaluations, 13 live checks, 5 builds, 1 decision). They move only while Paul keeps an interactive session open in the checkout. samscrape, contractmatch and dev-cadence have no anchor at all, so anything only an anchor does (a decided board line, TD-380; a host chore; a promote) waits for Paul to open one.
 - **A manager is added to every team by default**: a team that writes no `manager:` gets one named `<team>-lead`, role `manager`, on call (`on_call` defaults on for the `manager` role), filled by the tick when the team needs it. Only `role: person` starts none. A techlead seat and other `seats:` are written by hand. The anchor seat could follow the manager's pattern.
 
 **Fix (to design):**
