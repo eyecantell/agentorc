@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-393 | The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing | Low | Open |
 | TD-394 | An anchor seat's Start lands in a dirty checkout, where its fill would have waited | Low | Designed — TD-395 builds it |
 | TD-395 | Build TD-394: `ao team start` gated by the fill's checkout reading, a held Start writing `seat_held`, and a `work` seat's `none` in a checkout not its own writing `lane_seen` with no ids | Low | Open |
 
@@ -1303,23 +1302,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
 
-## TD-393: The Inbox board row (#1241): `_order_teams` skipping superseded records and OR-ing a team's liveness is pinned by no test — two mutants leave 268 passing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/inbox.py` (`_order_teams`: `rec.get("superseded_by")` in the skip, `out.get(team, False) or …`); `tests/test_ui_board.py`
-
-**Why:** `_order_teams`' docstring says *live or ended, never one resumed as another* and `{team: live}` per team. `tests/test_ui_board.py::test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_that_pick_it` gives each team one record, so neither is exercised. Against `origin/main`, (a) deleting ` or rec.get("superseded_by")` and (b) replacing `out.get(team, False) or rec.get(...)` with `rec.get(...)` each leave `pytest -k "board or inbox or order"` at 268 passed, as do the board/repo/workorders modules (197). (a) would name a team on a resumed-away record; (b) makes a team with one live and one ended record read as *wound down* by whichever record comes last, and print the *starts on `on_work`* words for a team that is running.
-
-**Done when** the test gives a team a superseded record and a team two records (one live, one ended, in both orders) and asserts the first is not named and the second reads live; both mutants fail it.
-
-**Related:** TD-381, TD-384, TD-385.
-
----
 ## TD-394: An anchor seat's Start lands in a dirty checkout, where its fill would have waited
 
 **Priority:** Low
