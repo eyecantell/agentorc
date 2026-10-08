@@ -6427,7 +6427,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Added:** 2026-10-08 (grinder-ao-1, from the techlead's reading of #1248, TD-386)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Resolved — designed 2026-10-08 (the designer, PR #1252), built by TD-395 (PR #1257, grinder-ao-1; TD-395 archived in #1257), archived #TBD.
+**Status:** Resolved — designed 2026-10-08 (the designer, PR #1252), built by TD-395 (PR #1257, grinder-ao-1; TD-395 archived in #1257), archived #1258.
 **Location:** design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor` (*a start whose checkout a session holds …*), §6 rule 3 (*Its fill is gated by the checkout*); `src/agentorc/teamrun.py` (`start`, TD-385's occupancy check), `src/sessionorc/agent_tick.py` (the fill's gate, `seat_held`)
 
 **Why:** the seat's fill (§6 rule 3, built in TD-386) is refused while the home repo's main checkout is held by a session, dirty, or off its default branch, writing `seat_held`. `ao team start` (TD-385) checks occupancy alone, because the design's Start paragraph names only a holder: a Start into a free checkout that has uncommitted files or another branch checked out creates the seat with a pane there. The two roads into the same checkout disagree, and the anchor brief's work (promotes, ledger PRs) could then run over the person's uncommitted work.
