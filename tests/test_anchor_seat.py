@@ -230,7 +230,7 @@ def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_al
     for occupants in ([], ["ao-alpha-paul@nodeb (idle)"]):
         calls: list[tuple[str, dict]] = []
 
-        def call(method, **params):
+        def call(method, calls=calls, occupants=occupants, **params):
             calls.append((method, params))
             if method == "host_dir":
                 return {"exists": True}
