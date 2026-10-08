@@ -1287,7 +1287,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Why:**
 - On 2026-10-08 Paul asked for ao-grind's anchor seat to show up. `ao team list` names `anchor: ao-grind-anchor`, but no record exists: the team was started before TD-381 was built.
 - `ao team flow ao-grind --apply` restarted `manager-ao-1` under `td` and created no anchor seat: Apply starts *a member the flow now uses that is not live* (§4.9c), and a seat is not a member.
-- `ao team start` on a live team refuses the names its live sessions hold (`start` closes them only when the team is concluded), so the only way to add the seat today is a wind-down and a fresh Start, which stops three working members.
+- `ao team start` on a live team refuses the names its live sessions hold (`start` closes them only when the team is concluded), so the only way to add the seat today is a wind-down and a fresh Start, which stops its three members and the manager mid-work.
 - The same holds for any seat a live team's definition gains: a new `seats:` entry, a techlead written in later.
 
 **Fix (to design):** say what makes a live team gain a seat its definition now names — Apply (the *flow changed* line listing *ao-grind-anchor: created*), the card's Members… dialog, or rule 3 writing the seat's record when it reads a definition that names a seat with none — and build it.
