@@ -11,7 +11,6 @@ import pathlib
 import shutil
 import stat
 import subprocess
-import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -43,6 +42,7 @@ async def test_attach_writes_the_file_under_the_sessions_attachments_and_answers
         first, second = pathlib.Path(got["path"]), pathlib.Path(again["path"])
         assert first == paths.attachments_dir() / "ao-att-1" / "Screen_Shot_1.png" and got["bytes"] == len(png)
         assert first.read_bytes() == png and stat.S_IMODE(first.stat().st_mode) == 0o600
+        assert stat.S_IMODE(first.parent.stat().st_mode) == 0o700  # a person's screenshots, listable by nobody else
         assert second.name == "Screen_Shot_1-2.png" and second.read_bytes() == b"second"
         traversal = await c.call("attach", id=s.id, name="../../settings.yml", data=_b64(b"x"))
         assert pathlib.Path(traversal["path"]).parent == first.parent  # its last component only
@@ -125,7 +125,7 @@ def test_the_composer_draws_attach_beside_send(tmp_path, monkeypatch):
     assert '<input type="file" id="attachfile" multiple hidden>' in composer
 
 
-PROBE = """
+PRELUDE = """
 const fs = require("fs");
 const noop = () => {};
 const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
@@ -141,6 +141,11 @@ global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
+"""
+
+PROBE = (
+    PRELUDE
+    + """
 const now = new Date(2026, 9, 7, 17, 4, 9);
 const box = (value, a, b) => ({ value, selectionStart: a, selectionEnd: b === undefined ? a : b });
 const at = (b, t) => { AO.insertAtCaret(b, t); return [b.value, b.selectionStart]; };
@@ -154,24 +159,103 @@ console.log(JSON.stringify({
   over_selection: at(box("see THIS please", 4, 8), "/a/x.png"),
 }));
 """
+)
 
 
-@pytest.mark.unit
-def test_the_composers_attach_rules_run_as_themselves():
-    """The JavaScript half, under node: a pasted image, which the browser always calls `image.png`,
-    is named for the moment; any other file keeps its name; the path goes in at the caret, over a
-    selection, a space either side where the neighbour is not one, the caret after it."""
+def _node(tmp_path, probe):
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "attach_probe.js"
-    probe.write_text(PROBE)
-    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    script = tmp_path / "attach_probe.js"
+    script.write_text(probe)
+    out = subprocess.run([node, str(script), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
-    got = json.loads(out.stdout)
+    return json.loads(out.stdout)
+
+
+@pytest.mark.unit
+def test_the_composers_attach_rules_run_as_themselves(tmp_path):
+    """The JavaScript half, under node: a pasted image, which the browser always calls `image.png`,
+    is named for the moment; any other file keeps its name; the path goes in at the caret, over a
+    selection, a space either side where the neighbour is not one, the caret after it."""
+    got = _node(tmp_path, PROBE)
     assert got["named"] == "spec.pdf"
     assert got["pasted"] == "paste-20261007-170409.png" and got["unnamed"] == "paste-20261007-170409.jpeg"
     assert got["empty"] == ["/a/x.png ", 9]
     assert got["after_word"] == ["look at /a/x.png ", 17]
     assert got["mid"] == ["see /a/x.png please", 12]
     assert got["over_selection"] == ["see /a/x.png please", 12]
+
+
+WIRE_PROBE = (
+    PRELUDE
+    + """
+const tick = () => new Promise((r) => setImmediate(r));
+const stub = (extra) => { const on = {}; return Object.assign({ on, classList: { contains: () => false },
+  addEventListener: (k, f) => { on[k] = f; }, dispatchEvent: () => {}, focus: () => {}, click: () => {} }, extra); };
+const ev = (kind, files, types) => { const e = { prevented: false, preventDefault() { this.prevented = true; } };
+  e[kind] = { files, types: types || (files.length ? ["Files"] : []) }; return e; };
+const file = (name) => ({ name, type: "image/png" });
+async function run() {
+  let hidden = false, live = 0, most = 0;
+  const uploaded = [], failed = [];
+  const button = stub({ lastChild: { textContent: "Attach" }, disabled: false });
+  const input = stub({ files: [], value: "x" });
+  const composer = stub({ classList: { contains: (c) => c === "hidden" && hidden } });
+  const compose = stub({ value: "", selectionStart: 0, selectionEnd: 0 });
+  const term = stub();
+  const upload = async (f) => {
+    live++; most = Math.max(most, live); await tick(); await tick(); live--;
+    if (f.name === "bad.png") throw new Error("refused");
+    uploaded.push(f.name); return "/a/" + f.name;
+  };
+  const attach = AO.wireAttach({ button, input, composer, compose, targets: [term, compose], upload,
+    fail: (m) => failed.push(m) });
+  const out = {};
+  const over = ev("dataTransfer", [], ["Files"]); term.on.dragover(over); out.dragover_open = over.prevented;
+  const drop = ev("dataTransfer", [file("one.png"), file("bad.png")]); term.on.drop(drop);
+  const drop2 = ev("dataTransfer", [file("two.png")]); compose.on.drop(drop2);
+  await tick();
+  out.during = { disabled: button.disabled, label: button.lastChild.textContent };
+  await attach([]);
+  out.drop = { prevented: drop.prevented && drop2.prevented, uploaded: [...uploaded], most, failed: [...failed],
+    value: compose.value, disabled: button.disabled, label: button.lastChild.textContent };
+  const text = ev("clipboardData", [file("image.png")], ["Files", "text/plain"]); compose.on.paste(text);
+  const image = ev("clipboardData", [file("shot.png")], ["Files"]); compose.on.paste(image);
+  await attach([]);
+  out.paste = { text_prevented: text.prevented, image_prevented: image.prevented, uploaded: [...uploaded] };
+  hidden = true;
+  const shutOver = ev("dataTransfer", [], ["Files"]); term.on.dragover(shutOver);
+  const shutDrop = ev("dataTransfer", [file("late.png")]); term.on.drop(shutDrop);
+  const shutPaste = ev("clipboardData", [file("late.png")], ["Files"]); compose.on.paste(shutPaste);
+  input.files = [file("late.png")]; input.on.change();
+  await attach([]); await tick();
+  out.shut = { prevented: shutOver.prevented || shutDrop.prevented || shutPaste.prevented,
+    uploaded: [...uploaded], input_value: input.value };
+  console.log(JSON.stringify(out));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.mark.unit
+def test_the_composers_drop_and_paste_handlers_run_as_themselves(tmp_path):
+    """TD-370: the handlers `AO.wireAttach` hangs on the composer, driven under node against stubs —
+    a drop on the terminal or the composer attaches its files one upload at a time, a failed one
+    reported and the next still sent, each path at the caret; a paste carrying `text/plain` is the
+    text's; with the composer closed (an unattended session) no dragover, drop, paste or pick
+    attaches anything."""
+    got = _node(tmp_path, WIRE_PROBE)
+    assert got["dragover_open"] is True
+    assert got["during"] == {"disabled": True, "label": "Attaching one.png…"}
+    assert got["drop"] == {
+        "prevented": True, "uploaded": ["one.png", "two.png"], "most": 1, "failed": ["Attach failed: refused"],
+        "value": "/a/one.png /a/two.png ", "disabled": False, "label": "Attach",
+    }  # fmt: skip
+    assert got["paste"] == {
+        "text_prevented": False,
+        "image_prevented": True,
+        "uploaded": ["one.png", "two.png", "shot.png"],
+    }
+    assert got["shut"] == {"prevented": False, "uploaded": ["one.png", "two.png", "shot.png"], "input_value": ""}

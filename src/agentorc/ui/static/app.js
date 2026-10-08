@@ -144,6 +144,44 @@
     box.selectionStart = box.selectionEnd = before.length + ins.length;
   };
 
+  // The Focus composer's attach wiring (§4.5a *Focus composer*, TD-002), its elements and its upload
+  // handed in, so the rules run as themselves under node (TD-370): the picker, a drop on any of
+  // `targets` and a paste into `compose` each attach their files one upload at a time, the path each
+  // answers inserted at the caret; nothing while `composer` is closed, and a paste carrying
+  // `text/plain` is the text's. Answers `attach(files)`, the promise of the queue.
+  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail }) {
+    const label = button.lastChild, word = label.textContent;
+    const shut = () => composer.classList.contains("hidden");
+    let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
+    async function each(list) {
+      button.disabled = true;
+      for (const f of list) {
+        label.textContent = `Attaching ${f.name}…`;
+        try { AO.insertAtCaret(compose, await upload(f)); } catch (e) { fail(`Attach failed: ${e.message}`); }
+      }
+      label.textContent = word; button.disabled = false;
+      compose.dispatchEvent(new Event("input")); compose.focus();
+    }
+    function attach(files) {
+      const list = Array.from(files || []);
+      if (!list.length || shut()) return attaching;
+      attaching = attaching.then(() => each(list)).catch((e) => fail(`Attach failed: ${e.message}`));
+      return attaching;
+    }
+    button.addEventListener("click", () => input.click());
+    input.addEventListener("change", () => { attach(input.files).finally(() => { input.value = ""; }); });
+    for (const el of targets) {
+      el.addEventListener("dragover", (e) => { if (!shut() && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+      el.addEventListener("drop", (e) => { if (!shut() && e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); attach(e.dataTransfer.files); } });
+    }
+    compose.addEventListener("paste", (e) => {
+      const cd = e.clipboardData;
+      if (shut() || !cd || !cd.files.length || [...cd.types].includes("text/plain")) return;
+      e.preventDefault(); attach(cd.files);
+    });
+    return attach;
+  };
+
   // ---- Pop out (design §4.5 screen 2 *Pop out*, §4.5a **Pop out** / **Focus** / **title**, TD-046) ----
   // A session's Focus in its own browser window, for the OS window switcher. Client-side only:
   // nothing about a window is written to the record. The window is named for the session, so a
@@ -3212,42 +3250,16 @@
     // until Send. A drop on the terminal or the composer and an image pasted into the composer take
     // the same road; a paste that carries text is the text's, as before. Not while the composer is
     // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*).
-    const attachBtn = $("#attach"), attachIn = $("#attachfile");
-    const attachLabel = attachBtn.lastChild, attachWord = attachLabel.textContent;
-    const composerShut = () => $("#composer").classList.contains("hidden");
-    let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
-    function attach(files) {
-      const list = Array.from(files || []);
-      if (!list.length || composerShut()) return attaching;
-      attaching = attaching.then(() => attachEach(list)).catch((e) => banner(`Attach failed: ${e.message}`));
-      return attaching;
-    }
-    async function attachEach(list) {
-      const label = attachLabel;
-      attachBtn.disabled = true;
-      for (const f of list) {
-        label.textContent = `Attaching ${f.name}…`;
+    AO.wireAttach({
+      button: $("#attach"), input: $("#attachfile"), composer: $("#composer"), compose, targets: [$("#term"), compose],
+      fail: banner,
+      upload: async (f) => {
         const fd = new FormData();
         fd.append("file", f, AO.attachName(f, new Date()));
-        try {
-          const r = await fetch(`/api/sessions/${id}/attach`, { method: "POST", body: fd });
-          if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
-          AO.insertAtCaret(compose, (await r.json()).path);
-        } catch (e) { banner(`Attach failed: ${e.message}`); }
-      }
-      label.textContent = attachWord; attachBtn.disabled = false;
-      compose.dispatchEvent(new Event("input")); compose.focus();
-    }
-    attachBtn.addEventListener("click", () => attachIn.click());
-    attachIn.addEventListener("change", () => { attach(attachIn.files).finally(() => { attachIn.value = ""; }); });
-    for (const el of [$("#term"), compose]) {
-      el.addEventListener("dragover", (e) => { if (!composerShut() && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
-      el.addEventListener("drop", (e) => { if (!composerShut() && e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); attach(e.dataTransfer.files); } });
-    }
-    compose.addEventListener("paste", (e) => {
-      const cd = e.clipboardData;
-      if (!cd || !cd.files.length || [...cd.types].includes("text/plain")) return;
-      e.preventDefault(); attach(cd.files);
+        const r = await fetch(`/api/sessions/${id}/attach`, { method: "POST", body: fd });
+        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+        return (await r.json()).path;
+      },
     });
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
