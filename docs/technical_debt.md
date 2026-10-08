@@ -1383,7 +1383,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-08 (grinder-ao-1, from the techlead's reading of #1248, TD-386)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed — the design in §4.9b *The anchor seat*, §4.9 `anchor` and §6 rule 3 (PR #TBD); TD-395 builds it
+**Status:** Designed — the design in §4.9b *The anchor seat*, §4.9 `anchor` and §6 rule 3 (PR #1252); TD-395 builds it
 **Blocked by:** TD-395
 **Location:** design §4.9b *The anchor seat* (the Start paragraph), §4.9 `anchor` (*a start whose checkout a session holds …*), §6 rule 3 (*Its fill is gated by the checkout*); `src/agentorc/teamrun.py` (`start`, TD-385's occupancy check), `src/sessionorc/agent_tick.py` (the fill's gate, `seat_held`)
 
