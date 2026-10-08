@@ -6139,14 +6139,14 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Resolved — designed 2026-10-07 (the designer, PR #1225; the steer `m-114456565d2f` on page-versus-dialog stood), built by TD-379 (PR #1234, grinder-ao-2; TD-379 archived in #1234), archived #TBD.
+**Status:** Resolved — designed 2026-10-07 (the designer, PR #1225; the steer `m-114456565d2f` on page-versus-dialog stood), built by TD-379 (PR #1234, grinder-ao-2; TD-379 archived in #1234), archived #1236.
 **Location:** the Org page's team group (`org.html`, `group_head.html`, `card.html`), the New session form (`new.html`, its Team and Role picks); design §4.5 (the team group), §4.5a (the team card rows and the New session form), §4.9 *A person in the team*
 
 **Why:**
 - Paul, 2026-10-07: *have the on-demand session be started by having a partial card shown with a big + inside it — I believe that will be more intuitive. Pressing the plus would open a dialog for starting a new team member, defaulted to an interactive session on the selected team.*
 - Today a person's session in a team starts from the top bar's **New session**, with the Team picked by hand and the Role left at *Interactive*. Nothing on the team's own cards says it can be done there. **Members… → Add member** is the other path, and it edits `org.yml`: a permanent member, not a session for now.
 
-**Resolved:** 2026-10-07 (archived PR #TBD). The lasting content: design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team*; the code in `src/agentorc/ui/templates/plus_card.html` and `org.html`; the mockup `docs/mockups/reviews/2026-10-07-td377-plus-card.png`.
+**Resolved:** 2026-10-07 (archived PR #1236). The lasting content: design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team*; the code in `src/agentorc/ui/templates/plus_card.html` and `org.html`; the mockup `docs/mockups/reviews/2026-10-07-td377-plus-card.png`.
 
 **Done when** the design names the card, its press and its defaults in §4.5a, and a build entry carries it.
 
