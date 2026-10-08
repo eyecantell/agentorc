@@ -1328,7 +1328,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 ## TD-401: TD-400 is a live check of #1266 owned by `grinder`: only the anchor promotes, so no grinder can finish it
 
 **Priority:** Low
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-08 (docs-audit-ao-1, auditing #1257–#1266)
 **Owner:** anchor
 **Kind:** build
