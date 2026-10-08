@@ -22,6 +22,7 @@ from agentorc import orgcheck, repoconfig, service, teamrun, teams
 from agentorc.ending import closer_words, waiting_words
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
+from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import settings as settings_mod
 from sessionorc.adapters import short_model
@@ -1680,6 +1681,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # whose it is (TD-228): pickable reads no owner, so the line says the entry's
                     # `Owner:` and a lane's reader passes over what is not its own
                     owner = str(e.get("owner") or "") or "-"
+                    # a decision owed to the designer is design-first by it alone (§4.7, TD-367)
+                    designers = kind == "design-first" and e.get("kind") != "design-first"
+                    if designers and ledger_mod.decided_by(e, ledger_mod.DESIGNER_OWNER):
+                        owner += " decision"
                     print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""

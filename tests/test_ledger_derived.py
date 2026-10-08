@@ -214,6 +214,34 @@ def test_the_page_kinds_in_order():
     assert kind("**Kind:** live-check") == "other"
 
 
+def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_designers():
+    """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is `Owner: paul` or a
+    `decision (paul)`, any case; an entry of any kind on `decision (designer)` is design-first and
+    in the designer's lane, pickable or not, though its `Owner:` is the grinder's; the anchor's
+    `Kind: decision` and a build on `decision (anchor)` are *other* and in no lane."""
+    text = (
+        "## TD-050: the person's\n\n**Owner:** paul\n**Kind:** evaluation\n\n"
+        "## TD-051: on the person's decision\n\n**Owner:** grinder\n**Kind:** build\n"
+        "**Blocked by:** decision (Paul)\n\n"
+        "## TD-052: on the designer's\n\n**Owner:** grinder\n**Kind:** build\n**Blocked by:** decision (designer)\n\n"
+        "## TD-053: the anchor's decision\n\n**Owner:** anchor\n**Kind:** decision\n\n"
+        "## TD-054: on the anchor's\n\n**Owner:** grinder\n**Kind:** build\n**Blocked by:** decision (anchor)\n"
+    )
+    got = {e["id"]: e for e in ledger.entries(text)}
+    assert {i: e["for_page"] for i, e in got.items()} == {
+        "TD-050": "for-you",
+        "TD-051": "for-you",
+        "TD-052": "design-first",
+        "TD-053": "other",
+        "TD-054": "other",
+    }
+    designer, grinder = ["design-first", "owner:designer"], ["free-pick", "owner:grinder"]
+    assert [i for i, e in got.items() if ledger.lane_matches(designer, e)] == ["TD-052"]
+    assert [i for i, e in got.items() if ledger.lane_matches(grinder, e)] == []
+    assert not ledger.lane_matches(["design-first", "owner:grinder"], got["TD-052"]), "its owner reads designer"
+    assert got["TD-052"]["pickable"] == "no"
+
+
 def test_the_archive_is_read_beside_the_ledger(tmp_path):
     from datetime import UTC, datetime
 

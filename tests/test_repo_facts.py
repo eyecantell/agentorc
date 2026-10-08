@@ -70,7 +70,8 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "pickable": "yes",
         "for_page": "pickable",
     }
-    assert [got[t]["for_page"] for t in got] == ["pickable", "design-first", "for-you", "for-you", "other"]
+    # an anchor's `Kind: decision` is no longer *for you* (TD-367): it waits on no person
+    assert [got[t]["for_page"] for t in got] == ["pickable", "design-first", "for-you", "other", "other"]
     # derived (TD-228): no Blocked by is pickable, and an open blocker is not
     assert got["TD-014"]["pickable"] == "yes" and got["TD-011"]["pickable"] == "no"
     assert got["TD-011"]["blocked_by"] == ["TD-014"]
@@ -460,6 +461,28 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     assert "live-check   TD-021  Low     grinder      waits for its build to be live (no PR on its Kind: line)" in out
     assert out.index("live-check   TD-022") < out.index("live-check   TD-021") and "TD-023" not in out
     assert "a build" in out and "live check #" not in out.split("TD-010")[1].split("\n")[0]
+
+
+def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):
+    """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design-first
+    list and says *decision* after its owner; a `Kind: design-first` row does not."""
+    from agentorc import cli
+
+    entries = [
+        {"id": "TD-151", "title": "metered", "for_page": "design-first", "priority": "low", "owner": "grinder",
+         "kind": "build", "blocked_by": ["decision (designer)"]},
+        {"id": "TD-230", "title": "a question", "for_page": "design-first", "priority": "high", "owner": "designer",
+         "kind": "design-first", "blocked_by": []},
+    ]  # fmt: skip
+    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+    )
+    monkeypatch.chdir(repo)
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "design-first TD-151  Low     grinder decision  metered" in out
+    assert "design-first TD-230  High    designer     a question" in out
 
 
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):

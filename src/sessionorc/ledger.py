@@ -170,18 +170,29 @@ class LiveReader:
         return self._seen[n]
 
 
+PERSON_OWNER = "paul"  # the person's owner word, as this ledger's `Fields:` line declares it (§4.4 *Repo facts*)
+DESIGNER_OWNER = "designer"
+
+
+def decided_by(entry: dict[str, Any], who: str) -> bool:
+    """Whether the entry's `Blocked by:` still names `decision (<who>)`, the holder compared
+    lower-cased, so `decision (Paul)` is `paul`'s (TD-367)."""
+    return any(
+        b.startswith("decision (") and b[len("decision (") : -1].strip().lower() == who
+        for b in entry.get("blocked_by") or []
+    )
+
+
 def kind_of(entry: dict[str, Any]) -> str:
     """The page's kind for an entry (§4.4 *Repo facts*), tested in this order so each has one:
-    *for you* (`Owner: paul`, `Kind: decision`, or blocked by a decision), *design-first* (`Kind:
-    design-first`), *pickable* (pickable, `Kind: build` or none, or a live check whose build is
-    live, TD-323), else *other*."""
-    if (
-        entry.get("owner") == "paul"
-        or entry.get("kind") == "decision"
-        or any(b.startswith("decision (") for b in entry.get("blocked_by") or [])
-    ):
+    *for you* — what waits on the person, and only that (TD-367): `Owner: paul`, or blocked by
+    `decision (paul)`; *design-first* (`Kind: design-first`, or any entry blocked by `decision
+    (designer)`: a decision owed to the designer is design work); *pickable* (pickable, `Kind:
+    build` or none, or a live check whose build is live, TD-323), else *other* — among it a
+    `Kind: decision` the anchor owns and a build on `decision (anchor)`."""
+    if str(entry.get("owner") or "").lower() == PERSON_OWNER or decided_by(entry, PERSON_OWNER):
         return "for-you"
-    if entry.get("kind") == "design-first":
+    if entry.get("kind") == "design-first" or decided_by(entry, DESIGNER_OWNER):
         return "design-first"
     if entry.get("pickable") == "yes" and _buildlike(entry):
         return "pickable"
@@ -195,15 +206,17 @@ def _buildlike(entry: dict[str, Any]) -> bool:
 
 def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
-    prose. A word: `design-first` is a pickable entry with `Kind: design-first`; `free-pick` a
+    prose. A word: `design-first` is a pickable entry with `Kind: design-first`, or any entry
+    blocked by `decision (designer)`; `free-pick` a
     pickable one whose kind is `build` or unwritten (TD-228), or a live check whose build is live
     (§4.9b, TD-323), so a live check not yet live, an evaluation and a decision match no lane; a
     reference, or any other word, matches nothing until a role gives it a meaning here. **An
     `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the entry's `Owner:` must
     be one named or absent, so `[free-pick, owner:grinder]` leaves the anchor's entries out; it
-    matches nothing by itself."""
+    matches nothing by itself. An entry blocked by `decision (designer)` is the designer's
+    (TD-367): `design-first` takes it pickable or not, and its owner reads `designer`."""
     owners = {o for w in lane if (o := owner_word(w))}
-    mine = str(entry.get("owner") or "").lower()
+    mine = DESIGNER_OWNER if decided_by(entry, DESIGNER_OWNER) else str(entry.get("owner") or "").lower()
     if owners and mine and mine not in owners:
         return False
     return any(_word_matches(w, entry) for w in lane if owner_word(w) is None)
@@ -253,6 +266,8 @@ def in_lanes(
 
 
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
+    if word == "design-first" and decided_by(entry, DESIGNER_OWNER):
+        return True
     if entry.get("pickable") != "yes":
         return False
     if word == "design-first":

@@ -412,8 +412,8 @@ code and needs no grant; a session doing the same work does.
      where the history cannot be read, the reading at that tick, as before. **A lane word matches by the entry's header, never its prose**:
      with pickable derived (§4.4 *Repo facts*, TD-223; built — TD-228 slice 1), `design-first`
      is a pickable entry with `Kind: design-first` — and, pickable or not, an entry of any kind
-     whose `Blocked by:` names `decision (designer)` (TD-367; designed 2026-10-07; not built —
-     TD-368): the designer's lane is where a decision owed to the designer gets made — the designer
+     whose `Blocked by:` names `decision (designer)` (TD-367; designed 2026-10-07; built —
+     TD-368 slice 1): the designer's lane is where a decision owed to the designer gets made — the designer
      claims the entry as any reference, writes the decision into the design, and the same PR drops
      the item from the entry's `Blocked by:`, so the next reading finds the entry pickable and
      tells the grinder lane as it tells any lane news; for that match the decision's holder stands
