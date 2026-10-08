@@ -597,6 +597,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .rollup { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr; gap: 12px; margin: 12px 0 18px; }
 @media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 @media (max-width: 640px) { .rollup { grid-template-columns: minmax(0, 1fr); } }
+.rollup.quiet { grid-template-columns: minmax(0, 22rem); } /* no team live: Needs you alone (TD-406) */
 .rollup button.pill { border: 0; cursor: pointer; font-family: inherit; }
 .rollup .fneeds.answering { background: var(--warn-bg); border-color: var(--warn-line); }
 .rollup .nrow { display: flex; gap: 8px; align-items: baseline; }

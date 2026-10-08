@@ -341,7 +341,8 @@ def test_a_wound_down_team_shows_what_it_left():
     html = ui.templates.get_template("team_summary.html").render(g=g)
     assert "TD-301" in html and "TD-301: the last test" in html
     assert none["summary"] is None and not any(m.get("compact") for m in none["members"])
-    assert ui.rollup(groups) is None  # nothing live: no rollup, whatever the summaries hold
+    # nothing live: nothing summed, whatever the summaries hold — Needs you alone (TD-406)
+    assert ui.rollup(groups) == {"live": False}
     # nothing claimed: the facet says so
     (quiet,) = ui.team_groups([member("q", state="exited", rank=1, slot={}, place="x")], (), {}, {})
     assert quiet["summary"]["motion"] == [] and "nothing claimed" in ui.templates.get_template(
@@ -389,12 +390,22 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
     # the repos whose PRs could not be read, one per line on the hover (TD-270)
     bad = ui.templates.get_template("rollup.html").render(ro={**ro, "prs_errors": ["a: x", "b: y"]}, person_needs=4)
     assert 'title="a: x\nb: y"' in bad
-    assert ui.rollup(None) is None and ui.rollup([g for g in groups if not g["team"]]) is None
+    assert ui.rollup(None) == ui.rollup([g for g in groups if not g["team"]]) == {"live": False}
     # a wound-down team beside them carries a summary now (TD-192), and adds nothing to the sums
     gone = [{**member("z1", state="exited", progress=[claim("TD-290")]), "team": "gone", "rank": 1, "slot": {}}]
     more = ui.team_groups([*a, *b, *gone], (), {"/r/samscrape": reading("/r/samscrape")}, {})
     assert next(g for g in more if g["team"] == "gone")["summary"]
     assert ui.rollup(more) == ro
+
+
+def test_with_no_team_live_the_rollup_is_needs_you_alone():
+    """§4.5a *Org: rollup* (TD-406): with no team live there is nothing to sum, and the Inbox's count
+    and its overdue still need a place — the Needs you facet alone, *in the Inbox*, no team rows."""
+    html = ui.templates.get_template("rollup.html").render(ro=ui.rollup([]), person_needs=7, person_overdue=2)
+    assert 'class="rollup quiet"' in html and "Needs you" in html
+    assert "data-inbox-needs>7<" in html and "data-inbox-overdue>2<" in html and 'href="/inbox"' in html
+    assert "Agents (" not in html and "TDs in motion" not in html and "PRs in motion" not in html
+    assert "answer needed" not in html and "asked you" not in html
 
 
 def test_every_card_carries_the_word_the_state_filter_matches():

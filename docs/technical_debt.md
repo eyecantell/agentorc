@@ -75,6 +75,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-401 | TD-400 is a live check of #1266 owned by `grinder`: only the anchor promotes, so no grinder can finish it | Low | Open |
 | TD-402 | No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266): reverting each of those three CLI lines leaves 130 tests green | Medium | Open |
 | TD-403 | `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257): each can be reverted with `test_anchor_seat.py` and `test_anchor_tick.py` green | Low | Open |
+| TD-407 | A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable | Medium | Open |
+| TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Open |
 
 ---
 
@@ -1318,3 +1320,49 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** each of the four reverts fails a test.
 
 **Related:** TD-395 (archived), #1257.
+
+---
+
+## TD-407: A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the person's session, from Paul's *why is the team stopped?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 rule 6 (`lane_seen`) and rule 8 (*Work for a team that wound down*); `src/sessionorc/work.py` (`gained`), `src/sessionorc/agent_tick.py` (rule 8's reading)
+
+**Why:** every time below is MDT, from the host agent's journal and `ao status`.
+- **06:52.** grinder-ao-1 declared out of work. TD-400 was then a pickable `Kind: build` entry in the grinder lane, which it left as grinder-ao-2's package. Its `lane_seen` became `{ids: [TD-400]}` (*lane_seen from the ledger at the declaration, origin/HEAD at 70ed46e6*).
+- **07:12.** grinder-ao-2 merged #1266 (TD-400's build). TD-400 became `Kind: live-check #1266`, not workable until #1266 was live. grinder-ao-2 declared out of work on that ground, and its `lane_seen` also holds `[TD-400]`.
+- **07:23.** The promote made #1266 live (`promote: promoted agentorc d9539fe`). TD-400 was pickable in the grinder lane again. Both members had already seen the id, so rule 6 told neither of them (`gained` drops any id in `lane_seen`).
+- **10:31.** Rule 9 wound the team down (*rule 9: ao-grind finished*), which reads the declarations alone. Afterwards rule 8 found no gain either, so no *team start* row reached the Inbox.
+- At 14:56 Paul found the Org with 59 open entries, 22 pickable, and every team stopped. `ao repo` read *grinder-ao-1 is out of work with 1 in its lane: TD-400*.
+- `lane_seen` keys on the id alone. So an entry seen while workable that goes unworkable and comes back never counts as news: a build that becomes a live check and then goes live, or an entry whose `Blocked by` reopens and clears. Only the id is remembered, never whether it was workable.
+
+**Fix (to design):** decide what counts as news. Either rules 6 and 8 key `lane_seen` on the id together with its kind (or with whether it was workable), so an entry coming back to workable is news, or the promote that makes a live check workable tells the members whose lane holds it. Also decide whether rule 9 should hold a wind-down while a declared member's lane holds a workable entry it has not been told of.
+
+**Done when** a member that declared with an entry in its lane, where the entry turned unworkable and then workable again (a build, then a live check that goes live), is told of it, and a wound-down team gets rule 8's start or its Inbox *team start* row. A test pins the build-then-live-check case.
+
+**Related:** TD-400 (the entry it happened on), TD-214 (rule 8), TD-195 (rule 6), TD-240 (rule 9).
+
+---
+
+## TD-408: The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-08 (the person's session, from Paul: *make the right side bar (Session, Ready to close, Git sections) collapsible — that way the terminal window can expand*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 *The Focus screen's anatomy*, §4.5a (the Focus side panel's rows); `src/agentorc/ui/templates/focus.html` (`<div class="side">`), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/static/app.js` (the terminal's fit on resize)
+
+**Why:** every card in the Focus side panel (Session, Ready to close, Git, Reports, Inbox …) is a `<details>` fold remembered per browser (TD-156), but folding them all leaves the column at its width. The terminal cannot take the space, and on a laptop screen it is the terminal Paul wants wide.
+
+**Fix (to design):** one control that collapses the whole panel to a thin rail and back, the terminal refitting to the width it gains (columns resized through the pty, as a window resize is). Decide where the control sits, whether the choice is remembered per browser (as the folds are) or per session, a key for it, what stays visible on the rail (a needs-you or Ready to close mark, so a collapsed panel hides no prompt), and how it meets TD-003's phone layout, which plans a collapsed panel of its own.
+
+**Done when** the Focus page has the control, collapsing gives the terminal the panel's width with its columns refit, expanding restores it, and the choice survives a reload.
+
+**Related:** TD-156 (the side panel's folds), TD-003 (the phone layout, which plans a collapsed side panel and has not built one).
