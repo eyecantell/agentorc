@@ -69,7 +69,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-407 | A team winds down while its lane holds a workable entry its members saw earlier in another kind: ao-grind wound down three hours after TD-400's live check became pickable | Medium | Open |
 | TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Open |
-| TD-409 | The auditor brief and the glossary still say the manager starts a seat; since TD-103 the home's tick fills it, as §4.9b and §6 rule 3 now say | Low | Open |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Open |
 
 ---
@@ -1204,26 +1203,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the Focus page has the control, collapsing gives the terminal the panel's width with its columns refit, expanding restores it, and the choice survives a reload.
 
 **Related:** TD-156 (the side panel's folds), TD-003 (the phone layout, which plans a collapsed side panel and has not built one).
-
-## TD-409: The auditor brief and the glossary still say the manager starts a seat; since TD-103 the home's tick fills it, as §4.9b and §6 rule 3 now say
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1267–#1277; the sibling of TD-405, which corrected §4.9b alone)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/briefs/auditor.md` (line 1), `docs/glossary.md` (the **seat** entry, "*empty* and *filled* are what the manager does to it"); `docs/design/6-policies.md` rule 3 and `docs/design/4.9b-techlead.md` *Seats with a trigger* are the text they should agree with.
-
-**Why:** TD-405 (#1277) moved the owner of a seat's trigger from the manager to the home's tick in §4.9b, because rule 3 has the tick compute `seat_due` and fill the seat (`agent_tick.py`: *the seat is due (%s) — filling it*). Two other places say the old thing. `auditor.md` opens: *"an unattended session that its manager starts after a number of merged PRs, or every so often"*; the glossary says *"empty and filled are what the manager does to it, on call is what a person sees"*. Both contradict the design they cite (the auditor brief cites §4.9b *Seats with a trigger* itself), and the auditor brief ships to every repo.
-
-**Fix:** word both as the tick's fill (the auditor brief: *that the home starts once a number of PRs have merged, or every so often*; the glossary: *empty and filled are what the home's tick does to it*). The brief is not a held path unless `docs/briefs/**` covers `src/agentorc/briefs/` in this repo's definition: read `.agentorc.yml` before choosing the PR's reader.
-
-**Done when** neither file names the manager as what starts or fills a trigger seat, and the doc-bound brief tests pass.
-
-**Related:** TD-405 (§4.9b), TD-098 (archived, the seats), TD-247 (the manager's jobs moved to the tick).
-
----
 
 ## TD-410: Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do*
 

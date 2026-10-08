@@ -126,8 +126,8 @@ not mix:
   — the session in it may end and another be started into it (`ao new --keep-mail`, so the
   questions that were waiting are still there) — and it is never *finished*, since it declares
   nothing and is not counted in a wind-down (design §4.9b). Workers are members, not seats. On
-  a card a seat with nobody in it reads **on call** — *empty* and *filled* are what the manager
-  does to it, *on call* is what a person sees (TD-097). Every seat has a **trigger**: the
+  a card a seat with nobody in it reads **on call** — *empty* and *filled* are what the home's
+  tick does to it, *on call* is what a person sees (TD-097). Every seat has a **trigger**: the
   techlead's is a question; an **auditor**'s is a count of merged PRs or a period (TD-098). —
   **decided** 2026-09-21 (asked for by Paul: the word was in use and not defined; *on call* his
   choice the same evening).
