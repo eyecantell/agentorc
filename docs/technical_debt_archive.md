@@ -6187,3 +6187,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** the failing file is first in a drop of two, and the probe asserts the second is uploaded and its path inserted; the edit above fails a test.
 
 **Related:** TD-370, TD-002.
+
+## TD-383: The Inbox poll's down-banner grace (#1223): its retry and reset logic is pinned by substring only — two mutations of it leave every test passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1222 and #1223)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`refreshInbox`: `inboxDownWait`, `inboxDownLong`); `tests/test_ui_down_grace.py` (`test_a_close_the_page_caused_by_leaving_and_one_failed_inbox_poll_draw_nothing`), `tests/test_ui.py` (the `agentdown` poll test)
+
+**Why:** The socket's grace has a node fake-clock probe; the Inbox poll's has only `assert "..." in js` lines, so the test passes whatever the code does. Against `origin/main`, with `tests/test_ui_down_grace.py tests/test_ui.py tests/test_ui_org.py` (113 passed): (a) changing `!shown && !inboxDownWait && !inboxDownLong) inboxDownWait = setTimeout` to `!shown && !inboxDownWait) inboxDownWait = setTimeout` (a second failed poll after the grace re-arms the wait forever, so the banner never draws once `inboxDownLong` is set) still passes 113; (b) replacing `if (!isDown) { clearTimeout(inboxDownWait); inboxDownWait = null; inboxDownLong = false; }` with `if (!isDown) { }` (a recovered poll no longer resets the grace, so the next outage draws the banner at once — TD-372's bug) still passes 113. The docstring says the poll *asks again after the grace rather than drawing the banner on one failed poll*; no test runs `refreshInbox`.
+
+**Resolved:** 2026-10-07 (PR #1242, grinder-ao-2) — the Inbox page's poll is `AO.inboxPoll` (`refreshInbox`, exported as it is), and `tests/test_ui_down_grace.py::test_the_inbox_polls_banner_waits_out_the_grace_and_a_recovery_resets_it` runs it under node with the socket probe's fake clock and a `refreshInboxCount` that fails, recovers and fails. It reads the banner, the polls made and the timers pending at each step: nothing at the first failure, the banner after the grace's retry with nothing left armed, nothing again after a recovery until the grace has passed, and a recovery within the grace cancels the retry. Edits (a) and (b) of the Why, and dropping only the reset of `inboxDownLong`, each fail it.
+
+**Done when** a node probe like the socket's drives `refreshInbox` with a fake clock and a `refreshInboxCount` that fails, then recovers, then fails: nothing at the first failure, the banner after the grace and a second failed poll, nothing again after a recovery until the grace has passed; both edits above fail a test.
+
+**Related:** TD-372.

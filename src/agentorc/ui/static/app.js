@@ -2075,6 +2075,7 @@
     $("#snoozedlabel").textContent = `(${sn})`;
     inboxFilter();
   }
+  AO.inboxPoll = refreshInbox;  // the poll as itself, for `tests/test_ui_down_grace.py`'s fake clock (TD-383)
 
   // design §4.5 screen 6 *The rail* and *Find* (TD-129, built by TD-135). Within a group the picks
   // are OR'd, across groups AND'd, a group with nothing picked means all of it, and the find is a
