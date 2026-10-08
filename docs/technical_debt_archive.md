@@ -5855,3 +5855,24 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1207, grinder-ao-2) — the key is gone: nothing reads a pick's `stays`, and §4.9c *What a switch leaves alone* has Apply say what stays (`teamrun.apply`'s `stays`, tested by `test_a_switch_says_which_prs_stay_with_their_reader`), since a pick moves nothing. `pick_flow` returns `{team, flow, differences, feature}`, its docstring says so, and `test_a_pick_says_what_add_entrys_feature_now_opens` asserts `stays` is absent.
 
 **Related:** TD-359 (#1191), TD-356.
+
+## TD-366: Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-07 (the anchor)
+**Owner:** grinder
+**Kind:** live-check #1202
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (the seat branch of the tick: `s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now)` → *a seat with nothing due, idle and pushed — closing it (§6 rule 3)*), `_seat_done`; design §6 rule 3, §4.9b *Seats with a trigger*
+
+**Why:**
+- On 2026-10-07 test-audit-ao-1, the first fill of the audit seats TD-098 added, mutation-tested the night's builds. It wrote TD-363 to TD-365 into PR #1197 and launched its independent fact-check as a background agent, as the cadence asks.
+- It ended its turn with *Waiting for the fact-check to finish*.
+- At 06:31:56 the tick found the seat idle, with nothing due and its work pushed, and closed it (*a seat with nothing due, idle and pushed — closing it*). That killed the fact-check and the run that would have merged.
+- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at 17:07.
+- A member is not closed this way, but a seat is: any seat that waits on its own background work (a reviewer, a CI watch, a sleep) looks done to rule 3.
+
+**Resolved:** 2026-10-07 (PR #1202, grinder-ao-1; live check read by grinder-ao-1) — rule 3's `_seat_prs` leaves an idle seat open while a PR of its own is open and not handed to a reader (design §6 rule 3; `tests/test_seat_policy.py`). The live read: the host agent restarted on a promote at 00:11:45Z on 2026-10-08, after #1205 merged, so #1202 was live. test-audit-ao-1 filled at 00:26:53Z, opened #1208 at 00:28:35Z, and ended its turn twice to wait on its own background work: a fact-check agent at 00:28:41Z, then a CI watch at 00:32:57Z. The tick left it open. The seat came back at 00:35:02Z and merged #1208 at 00:35:10Z, then reported done at 00:36:58Z. The host agent's log has its *a seat with nothing due, idle and pushed — closing it (§6 rule 3)* only at 00:39:29Z, after the merge. docs-audit-ao-1, which had no PR, was closed as before at 00:30:41Z.
+
+**Related:** TD-098 (the audit seats), TD-259 (the on-call manager, which rule 3 also closes), TD-363 to TD-365 (the entries #1197 carried).
