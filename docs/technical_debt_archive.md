@@ -6758,7 +6758,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Why:** TD-405 (#1277) moved the owner of a seat's trigger from the manager to the home's tick in §4.9b, because rule 3 has the tick compute `seat_due` and fill the seat (`agent_tick.py`: *the seat is due (%s) — filling it*). Two other places say the old thing. `auditor.md` opens: *"an unattended session that its manager starts after a number of merged PRs, or every so often"*; the glossary says *"empty and filled are what the manager does to it, on call is what a person sees"*. Both contradict the design they cite (the auditor brief cites §4.9b *Seats with a trigger* itself), and the auditor brief ships to every repo.
 
-**Resolved:** 2026-10-08 (PR #1281) — `src/agentorc/briefs/auditor.md` (*that the home starts once a number of PRs have merged*), the glossary's **seat** (*what the home's tick does to it*), and, found by the same grep, `src/agentorc/briefs/techlead.md`'s Stop paragraph (*The home starts you again*).
+**Resolved:** 2026-10-08 (PR #1281) — `src/agentorc/briefs/auditor.md` (*that the home starts once a number of PRs have merged*), the glossary's **seat** (*what the home's tick does to it*), and, found by the same grep, `src/agentorc/briefs/techlead.md` (its Stop paragraph, *The home starts you again*; and *Your manager is your controller*, no longer *started you*).
 
 **Done when** neither file names the manager as what starts or fills a trigger seat, and the doc-bound brief tests pass.
 
