@@ -411,7 +411,7 @@
   const PRESS_VERBS = {
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
     board_notright: "deciding…", board_add: "writing…", snooze: "snoozing…", attention_snooze: "snoozing…",
-    unsnooze: "unsnoozing…", dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
+    dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
     suspend: "suspending…", promote: "promoting…", work_start: "starting…", restart: "restarting…",
@@ -419,13 +419,13 @@
   };
   const PRESS_NOT = {
     board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",
-    unsnooze: "unsnoozed", dismiss: "dismissed", identity_ack: "dismissed", clear_work: "dismissed",
+    dismiss: "dismissed", identity_ack: "dismissed", clear_work: "dismissed",
     clear_mark: "dismissed", clear_promote: "dismissed", unmail: "deleted", allow: "allowed", deny: "denied",
     gowithit: "sent", identity_log: "logged", restart: "restarted", resume: "resumed", "reopen-push": "resumed",
   };
   // the presses that take their row away: it leaves as the request leaves (rule 3); a state or board
   // row leaves on any answer but Suspend and a decide, as it did on the answer before
-  const PRESS_LEAVES = ["board_done", "board_snooze", "snooze", "attention_snooze", "unsnooze", "dismiss", "identity_ack",
+  const PRESS_LEAVES = ["board_done", "board_snooze", "snooze", "attention_snooze", "dismiss", "identity_ack",
     "clear_work", "clear_mark", "clear_promote", "unmail", "allow", "deny", "gowithit", "identity_log", "restart", "resume",
     "reopen-push"];
   AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
@@ -492,7 +492,7 @@
     if (action === "popout") { const m = b.closest("details.more"); if (m) m.open = false; AO.popOut(id); return; }
     // A choice made in a row's *more ▾* or *Snooze* menu folds that menu — and only a menu: the
     // nearest `<details>` of any kind used to be closed, and a control that sits in no menu (an FYI
-    // row's Dismiss, the snoozed list's Unsnooze) has the *section* as its nearest one, so dismissing
+    // row's Dismiss, a snoozed row's own press) has the *section* as its nearest one, so dismissing
     // an entry closed the FYI list under the person (Paul, 2026-09-20; TD-079).
     const menu = b.closest("details.more"); if (menu) menu.open = false;
     try {
@@ -597,8 +597,9 @@
       // §4.5a **Send to reviewer** (TD-292 slice 4b): the look and its sender's team — the server
       // reads that team's techlead seat from `org.yml`, and the host agent's refusal is the toast
       if (action === "hand_look") body = { msg: b.dataset.msg, team: b.dataset.team };
-      if (action === "unsnooze") { action2 = "snooze"; body = { msg: b.dataset.msg }; }  // no `until` clears it
-      if (action === "snooze") {
+      // a snoozed row's *now* (§4.10 *Snooze*, TD-373): no `until` clears it, back in its section
+      if (action === "snooze" && b.dataset.when === "now") body = { msg: b.dataset.msg };
+      else if (action === "snooze") {
         const until = snoozeUntil(b.dataset.when);
         if (!until) return;
         body = { msg: b.dataset.msg, until };
@@ -627,7 +628,7 @@
         body = { id: b.dataset.sid, kind: b.dataset.row };
         // the restart row's **Dismiss** (§4.5a, TD-103): the store keeps `dismissed:<the mark's at>`
         if (b.dataset.until) body.until = b.dataset.until;
-        if (b.dataset.when) {
+        if (b.dataset.when && b.dataset.when !== "now") {  // *now*: no `until`, the clear
           const until = snoozeUntil(b.dataset.when);
           if (!until) return;
           body.until = until;
@@ -732,8 +733,7 @@
       if (action === "answer" && !orphanNote) say(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
       if (action === "unmail") say(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
       if (["message", "reply", "answer", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
-      if (action === "snooze") say("snoozed — it comes back at that time; the sender is not told", true);
-      if (action === "unsnooze") say("back in its section", true);
+      if (action === "snooze") say(b.dataset.when === "now" ? "back in its section" : "snoozed — it comes back at that time; the sender is not told", true);
       if (action === "hand_look") {
         say(`sent to ${b.dataset.name || res.to || "the reviewer"} — set aside until it reports, then back with its reading`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
@@ -2070,7 +2070,7 @@
     showLocalTimes();
     const sn = got.snoozed_n || 0;
     $("#snoozedbox").hidden = !sn;
-    $("#snoozedlabel").textContent = `${sn} snoozed — show`;
+    $("#snoozedlabel").textContent = `(${sn})`;
     inboxFilter();
   }
 
@@ -3732,13 +3732,13 @@
     { keys: ["k", "ArrowUp"], page: "msg", control: "the previous entry of the list", step: -1 },
     { keys: ["r"], page: "msg", ring: true, control: "Reply", sel: '[data-act="reply"]', text: ["Reply", "Overrule"] },
     { keys: ["s"], page: "msg", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
-    { keys: ["x"], page: "msg", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
+    { keys: ["x"], page: "msg", ring: true, control: "Dismiss or Done", sel: "button", text: ["Dismiss", "Done"] },
     { keys: ["a"], page: "inbox", ring: true, control: "Allow", sel: '[data-act="allow"]' },
     { keys: ["d"], page: "inbox", ring: true, control: "Deny", sel: '[data-act="deny"]' },
     // a board row's Reply is `board_reply` (TD-280): `r` opens it as it opens a message's
     { keys: ["r"], page: "inbox", ring: true, control: "Reply", sel: '[data-act="reply"], [data-act="board_reply"]', text: ["Reply"] },
     { keys: ["s"], page: "inbox", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
-    { keys: ["x"], page: "inbox", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
+    { keys: ["x"], page: "inbox", ring: true, control: "Dismiss or Done", sel: "button", text: ["Dismiss", "Done"] },
     // **Go with it** on a `steer` row and on a board row with a default; and a row's answer buttons
     // — an `ask`'s suggested answers, a board item's answers — in the order written (TD-254, TD-255).
     // `1` and `2` are the page's on any row without them: `AO.keyAnswers` is where they yield.

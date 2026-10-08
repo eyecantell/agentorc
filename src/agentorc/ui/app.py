@@ -3025,7 +3025,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         lands in the sender's inbox (the agent addresses it to the entry's sender and closes its
         `ask`); delete removes the entry from the person inbox only — the sender keeps its copy.
         From 2026-09-19 (TD-069 step 1) the Inbox page's own controls join it: **Snooze** and
-        **Unsnooze** (`inbox_snooze`, with and without an `until`), **Pause** / **Resume**, and
+        a snoozed row's *now* (`inbox_snooze`, with and without an `until`), **Pause** / **Resume**, and
         **Go with it**."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if action in PERSON_ACTS or action == "snooze":
@@ -3033,7 +3033,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not ref:
                 raise HTTPException(400, f"{action} needs the entry's id")
             if action == "snooze":
-                # no `until` is the clear — *Unsnooze* on the page's snoozed list (§4.10 *Snooze*)
+                # no `until` is the clear — *now* on a snoozed row's Snooze menu (§4.10 *Snooze*, TD-373)
                 until = str(body.get("until") or "").strip() or None
                 got = await call("inbox_snooze", msg=ref, until=until)
             else:
@@ -3127,7 +3127,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # design §4.5a **Inbox row: state** / §4.10: a **state row's** snooze — `stalled?` and
             # unpushed work, the two that are not on the tool's clock. It is keyed on the record
             # **and the row kind**, because a session's permission and its stalled row are two rows
-            # and snoozing one is not snoozing the other; no `until` is the clear (*Unsnooze*).
+            # and snoozing one is not snoozing the other; no `until` is the clear (a snoozed row's *now*).
             sid, kind = str(body.get("id") or "").strip(), str(body.get("kind") or "").strip()
             if not sid or not kind:
                 raise HTTPException(400, "a state row's snooze names the session and the row kind")

@@ -232,6 +232,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-373, grinder-ao-2): the **Snoozed (n)** fold built — moved under FYI as the mockup draws it, each snoozed row drawn by its kind's own macro with *snoozed until <t>* and *now* first in its Snooze menu; **Unsnooze** and its `unsnooze` act removed; an entry closed while snoozed is listed by its close, not in the fold.
 - 2026-10-07 (TD-377, the designer; asked by Paul the same day): a team's grid ends in the **+ card** — a partial card, a dashed outline and a large **+**, whose press is the New session form on that team, Role *Interactive*; a dialog of its own and a **+** beside Members… rejected.
 - 2026-10-07 (TD-372, grinder-ao-2; Paul: *add a buffer before the banner shows*): the *host agent unreachable* banner waits three seconds — it had shown the instant the page's event socket closed, so every page change (the socket closing as the Org was left) and every promote's restart flashed it with no request failed.
 - 2026-10-07 (TD-371, the designer; Paul's decision the same day): the Inbox's *n snoozed — show* list becomes the **Snoozed (n)** fold, the shape of *Not due yet*: each row with its kind's controls and *snoozed until <t>*, **Snooze ▾** with *now*, no **Unsnooze**; the press-leaves list loses Unsnooze.
