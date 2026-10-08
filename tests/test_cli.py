@@ -2292,3 +2292,22 @@ def test_a_shot_path_is_sent_relative_to_its_repo(tmp_path, monkeypatch):
     assert cli._shot_path("docs/mockups/reviews/elsewhere.png") == "docs/mockups/reviews/elsewhere.png"
     args = cli.build_parser().parse_args(["msg", "--kind", "ask", "--shot", "a.png", "--shot", "b.png", "person", "x"])
     assert args.shot == ["a.png", "b.png"]
+
+
+def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outcomes():
+    """TD-384 slice 3 (design §4.9a *What a session does with a decided line*): the work order is
+    claimed as `board:<key>` before any entry, ends one of four ways in a PR that closes the line, and
+    an unclaimed one keeps the lane from out of work."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    assert "A decided board line comes first" in text and "Take it before any entry" in text
+    assert "`ao progress claim board:<key>`" in text and "`ao progress done board:<key> --pr <n>`" in text
+    for outcome in (
+        "needs nothing but the line closed",
+        "is your own work",
+        "is someone else's",
+        "asks the person something back",
+    ):
+        assert f"**the answer {outcome}**" in text, outcome
+    done = re.search(r"`(python3 scripts/board_edit\.py done [^`]*)`", text).group(1)
+    assert all(f in done for f in ("--board", "--line", "--expect", "--why"))
+    assert "the board holds no decided line nobody has claimed" in text
