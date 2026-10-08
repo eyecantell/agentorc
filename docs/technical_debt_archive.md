@@ -6092,3 +6092,24 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** on a scratch home a snoozed `ask` shows its answer buttons in the fold, a press answers it, no row anywhere offers **Unsnooze**, and §4.10 and §4.5a say a snooze is a date.
 
 **Related:** TD-069 (archived: the snooze), TD-220 (archived: the board's *Not due yet* fold), TD-319 (the look Paul snoozed).
+
+## TD-382: §4.5a's Inbox *keys* row still says the ring visits snoozed rows "while *n snoozed — show* is open", the control #1218 renamed the **Snoozed (n)** fold
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1217–#1227)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/design/4.5a-controls.md` row *Inbox page: keys: the ring* (line 12)
+
+**Why:**
+- #1218 designed TD-371: the Inbox's *n snoozed — show* list becomes the **Snoozed (n)** fold (§4.5 screen 6, and the new §4.5a row *Inbox: Snoozed (n) fold*, which says it is "where *n snoozed — show* was").
+- The *keys* row was not touched: it still reads "snoozed rows only while *n snoozed — show* is open", naming a control the same PR retired, so the design names two controls for one fold.
+- TD-373's Fix does not list this row, so the build would leave it.
+
+**Resolved:** 2026-10-08 (PR #1226, grinder-ao-2, with TD-373's build) — the *keys* row of §4.5a now reads "snoozed rows while the **Snoozed (n)** fold is open (TD-373)"; `grep -rn "n snoozed — show" docs/design` finds only the "where … was" clauses of §4.5 screen 6 and §4.5a *Inbox: Snoozed (n) fold*. Archived by this ledger-only PR.
+
+**Done when** `grep -rn "n snoozed — show" docs/design` finds only the "where … was" history clause.
+
+**Related:** TD-371 (the design), TD-373 (its build).
