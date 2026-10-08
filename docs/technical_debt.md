@@ -73,6 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
+| TD-399 | A live team never gains a seat its definition gained: ao-grind, started before TD-381, has no anchor seat, and Apply and a Start add none | Medium | Open |
 
 ---
 
@@ -1272,3 +1273,25 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** on the scratch home (`scripts/look_home.py`) a Decide on a board line makes `ao repo --json` list `board:<key>` first among the pickable rows within a tick, a wound-down team under `on_work: start` starts for it and under `ask` the Inbox's team-start row names it, a grinder's claim on it makes the Inbox's answered row say *holds board:<key>*, the grinder's brief tells it the four outcomes, closing the line drops the work order, and the tests above cover each.
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
+
+## TD-399: A live team never gains a seat its definition gained: ao-grind, started before TD-381, has no anchor seat, and Apply and a Start add none
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from Paul's Apply)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9c *Switching* (what Apply starts), §4.9b *The anchor seat* (*created by `ao team start` after the techlead seat*), §4.9 (a Start on a live team); `src/agentorc/teamrun.py` (`start`, `differences`), `ao team flow --apply`
+
+**Why:**
+- On 2026-10-08 Paul asked for ao-grind's anchor seat to show up. `ao team list` names `anchor: ao-grind-anchor`, but no record exists: the team was started before TD-381 was built.
+- `ao team flow ao-grind --apply` restarted `manager-ao-1` under `td` and created no anchor seat: Apply starts *a member the flow now uses that is not live* (§4.9c), and a seat is not a member.
+- `ao team start` on a live team refuses the names its live sessions hold (`start` closes them only when the team is concluded), so the only way to add the seat today is a wind-down and a fresh Start, which stops three working members.
+- The same holds for any seat a live team's definition gains: a new `seats:` entry, a techlead written in later.
+
+**Fix (to design):** say what makes a live team gain a seat its definition now names — Apply (the *flow changed* line listing *ao-grind-anchor: created*), the card's Members… dialog, or rule 3 writing the seat's record when it reads a definition that names a seat with none — and build it.
+
+**Done when** a live team whose definition names a seat with no record gets that record without a restart, and ao-grind has `ao-grind-anchor`.
+
+**Related:** TD-381 (archived: the anchor seat), TD-358 (Apply and a declared member), TD-098 (seats with a trigger).
