@@ -6039,7 +6039,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 - And nothing in the Inbox, where the person looks for what waits on them, shows any of them. Only the Repo page lists them.
 - An entry blocked by the designer's decision is in nobody's lane: TD-151 is `Owner: grinder`, blocked, and the designer's lane is `design-first`.
 
-**Resolved:** 2026-10-07 (archived PR #TBD). The lasting content: design §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6 and §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo`; the code in `sessionorc.ledger` (`kind_of`, `lane_matches`), `src/agentorc/ui/inbox.py`.
+**Resolved:** 2026-10-07 (archived PR #1224). The lasting content: design §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6 and §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo`; the code in `sessionorc.ledger` (`kind_of`, `lane_matches`), `src/agentorc/ui/inbox.py`.
 
 **Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
 
