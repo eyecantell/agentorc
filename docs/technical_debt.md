@@ -1291,7 +1291,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/agentorc/ui/templates/inbox.html` (`#snoozedbox`, its label), `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`, the promote and work rows' `section == 'snoozed'` branches, `snooze_btn`, `state_snooze`), `src/agentorc/ui/static/app.js` (the `unsnooze` act, `PRESS_LEAVES`, the toasts, `#snoozedlabel`), `src/agentorc/ui/inbox.py` (`inbox_sections`' `snoozed` list; the rows' kinds kept), `src/agentorc/ui/help.py` if a snoozed row's words are there; tests `tests/test_ui_inbox.py`, the templates' tests.
+**Location:** `src/agentorc/ui/templates/inbox.html` (`#snoozedbox`, its label), `src/agentorc/ui/templates/inbox_row.html` (`snoozed`, `state_snoozed`, the promote and work rows' `section == 'snoozed'` branches, `snooze_btn`, `state_snooze`), `src/agentorc/ui/static/app.js` (the `unsnooze` act, `PRESS_LEAVES`, the toasts, `#snoozedlabel`, the `x` key's table naming Unsnooze), `src/agentorc/ui/app.py` (docstrings and comments naming Unsnooze), `src/agentorc/ui/inbox.py` (`inbox_sections`' `snoozed` list; the rows' kinds kept), `src/agentorc/ui/help.py` if a snoozed row's words are there; tests `tests/test_ui_inbox.py`, the templates' tests.
 
 **Why:** design §4.10 *Snooze* (*A snooze is a date, not a hiding place*), §4.5 screen 6, §4.5a *Inbox: Snoozed (n) fold* (TD-371, designed 2026-10-07 on Paul's decision). A snoozed `ask` showed **Unsnooze** alone: a press before every answer that protected nothing.
 
