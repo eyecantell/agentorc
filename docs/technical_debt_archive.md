@@ -5894,3 +5894,21 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1213, grinder-ao-1) — the test gains two seats: `ownpr`, holding a claim with `pr` alone and nobody reading it, and `elsewhere`, holding a claim on #1202. A reader holds an ask carrying #1202 from `<the seat's id>@laptop`, the same id on another host. Both stay idle. `number = e.review_pr` now fails on `ownpr`, and the handed match as `sid == s.id` fails on `elsewhere`.
 
 **Related:** TD-366.
+
+## TD-370: The Focus composer's attach (#1205): the `0700` of `attachments/<session>/` and the drop, paste and closed-composer handlers are in no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1202–#1207)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`_write_attachment`), `src/agentorc/ui/static/app.js` (the attach block in the Focus script); `tests/test_attach.py`
+
+**Why:** `_write_attachment`'s docstring says the directory is made `0700` and the file `0600`. `test_attach_writes_the_file_…` asserts the file's mode only: `where.mkdir(mode=0o700, …)` → `mode=0o755` still passes all five tests in `tests/test_attach.py`, leaving a person's screenshots listable by other users. In `app.js` the node probe runs `AO.attachName` and `AO.insertAtCaret`; the handlers that keep the feature from misfiring (a drop or paste does nothing while `#composer` is hidden, i.e. on an unattended session; a paste carrying `text/plain` is the text's; uploads are serialized) are in no test. The probe also writes to a `tempfile.mkdtemp()` directory it never removes.
+
+**Done when** `test_attach_writes_the_file_…` asserts `stat.S_IMODE` of the session's directory is `0o700`; the probe (or a second one) drives the paste and drop handlers against a stub composer and asserts the closed-composer and `text/plain` cases attach nothing; the probe's directory is removed (`tmp_path`).
+
+**Resolved:** 2026-10-07 (PR #1214, grinder-ao-2) — the attach test asserts the session directory's `0o700`; the attach wiring is `AO.wireAttach`, which the Focus page calls with its elements and its upload, and a second node probe drives its drop, paste, dragover and pick handlers against stubs: one upload at a time, a failure reported and the next still sent, a `text/plain` paste the text's, nothing attached or prevented with the composer closed; the paste handler now checks the closed composer before `preventDefault`, as the drop did. Both probes write under `tmp_path`.
+
+**Related:** TD-002.

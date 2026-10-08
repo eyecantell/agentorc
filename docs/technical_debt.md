@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Built (#1206, #1209, #1210) — live check |
-| TD-370 | The Focus composer's attach (#1205): the `attachments/<session>/` directory's `0700` and the drop, paste and closed-composer handlers are in no test | Low | Open |
 
 ---
 
@@ -1291,18 +1290,3 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-367 (the design), TD-357 (the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
 
-## TD-370: The Focus composer's attach (#1205): the `0700` of `attachments/<session>/` and the drop, paste and closed-composer handlers are in no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1202–#1207)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`_write_attachment`), `src/agentorc/ui/static/app.js` (the attach block in the Focus script); `tests/test_attach.py`
-
-**Why:** `_write_attachment`'s docstring says the directory is made `0700` and the file `0600`. `test_attach_writes_the_file_…` asserts the file's mode only: `where.mkdir(mode=0o700, …)` → `mode=0o755` still passes all five tests in `tests/test_attach.py`, leaving a person's screenshots listable by other users. In `app.js` the node probe runs `AO.attachName` and `AO.insertAtCaret`; the handlers that keep the feature from misfiring (a drop or paste does nothing while `#composer` is hidden, i.e. on an unattended session; a paste carrying `text/plain` is the text's; uploads are serialized) are in no test. The probe also writes to a `tempfile.mkdtemp()` directory it never removes.
-
-**Done when** `test_attach_writes_the_file_…` asserts `stat.S_IMODE` of the session's directory is `0o700`; the probe (or a second one) drives the paste and drop handlers against a stub composer and asserts the closed-composer and `text/plain` cases attach nothing; the probe's directory is removed (`tmp_path`).
-
-**Related:** TD-002.
