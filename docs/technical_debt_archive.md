@@ -5985,7 +5985,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 
 **Why:** `_pace_says` ignores a pace unless `p.get("unit") in ("$", "tok")`. Replacing that clause with `or False` (and the `["$", "tok"].includes(p.unit)` test in `paceSays` likewise) leaves `tests/test_spend.py` and `tests/test_ui_org.py` passing (60 passed): the `metered_paced` case's junk window has `per_hour: True` (caught by the bool check) but a valid-looking number with an unknown `unit` is never given, so a pace of `{per_hour: 3, unit: "x"}` would print *3 tok/h*. The test's comment says *a junk field draws nothing*.
 
-**Resolved:** 2026-10-07 (PR #NNN, grinder-ao-1) — `metered_paced` gains a `5h` window whose pace is `{per_hour: 3, unit: "x"}`, and both homes draw nothing for it (`5h 0 tok — …`). Dropping the unit check fails `test_a_metered_accounts_chip_reads_spend_over_its_amount` in Python, and dropping it in `paceSays` fails the parity test.
+**Resolved:** 2026-10-07 (PR #1222, grinder-ao-1) — `metered_paced` gains a `5h` window whose pace is `{per_hour: 3, unit: "x"}`, and both homes draw nothing for it (`5h 0 tok — …`). Dropping the unit check fails `test_a_metered_accounts_chip_reads_spend_over_its_amount` in Python, and dropping it in `paceSays` fails the parity test.
 
 **Done when** `metered_paced` gains a window whose pace has a numeric `per_hour` and an unknown `unit`, and both homes print nothing for it; the edit above fails a test.
 
