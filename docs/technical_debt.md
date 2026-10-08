@@ -73,7 +73,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-399 | A live team never gains a seat its definition gained: ao-grind, started before TD-381, has no anchor seat, and Apply and a Start add none | Medium | Open |
+| TD-399 | A live team never gains a seat its definition gained: ao-grind, started before TD-381, has no anchor seat, and Apply and a Start add none | Medium | Designed — TD-400 builds it |
+| TD-400 | Build TD-399: a seat the run lacks is a difference Apply creates — `differences` on every live team, the anchor through `checkout_held` and the held create, the mark's words | Medium | Open |
 
 ---
 
@@ -1281,7 +1282,8 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-08 (the anchor, from Paul's Apply)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed — the design in §4.9c *Switching* (the seat the run lacks), §4.9b *The anchor seat*, §4.5a *flow changed — Apply* (PR #1264); TD-400 builds it
+**Blocked by:** TD-400
 **Location:** design §4.9c *Switching* (what Apply starts), §4.9b *The anchor seat* (*created by `ao team start` after the techlead seat*), §4.9 (a Start on a live team); `src/agentorc/teamrun.py` (`start`, `differences`), `ao team flow --apply`
 
 **Why:**
@@ -1295,3 +1297,27 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a live team whose definition names a seat with no record gets that record without a restart, and ao-grind has `ao-grind-anchor`.
 
 **Related:** TD-381 (archived: the anchor seat), TD-358 (Apply and a declared member), TD-098 (seats with a trigger).
+
+---
+
+## TD-400: Build TD-399: a seat the run lacks is a difference Apply creates — `differences` on every live team, the anchor through `checkout_held` and the held create, the mark's words
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-08 (the designer, from TD-399's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/teamrun.py` (`differences`: the `in_checkout` skip goes — a seat launch with no record is `Difference(name, "start")`; `flow_changed` and `apply` read a live team with no `flows:` too, on its seats alone; `apply`'s start of a seat: `seat: {trigger}` as `x.create_params` carries it, the anchor through `checkout_held(dir, host)` and `create` with `held` and `held_reason` as `start` does, the note saying why), `src/agentorc/ui/cards.py` (`flow_mark` and the team header's mark: *definition changed — Apply* where every difference is a seat's `start` or the team runs no flow), the Org page's header mark and Apply confirm (`org.html`, `group_head.html`), `ao team list` / `ao team flow` (the differences carried as today); tests `tests/test_flows.py` and `tests/test_anchor_seat.py` (`differences` and `apply`; `test_anchor_seat.py:211` asserts the anchor is no difference and must turn round), `tests/test_cli_teams.py`, `tests/test_ui_teams.py`, `tests/test_ui_org*.py` (the mark); design §4.9c *Switching*, §4.9b *The anchor seat*, §4.5a *flow changed — Apply*.
+
+**Why:** TD-399: ao-grind's definition names `ao-grind-anchor` and the run has no record of it; Apply created none because `differences` set an uncreated anchor aside as the next Start's (a client had no held create then), and a Start on a live team refuses the names its sessions hold. The design now says such a seat is a difference Apply creates as a Start would.
+
+**Fix:**
+1. `differences`: a seat launch (the techlead, the anchor, a `seats:` entry) with no current record is `start`; one with a record — live, `closed`, held — is nothing; a team with no flow is compared on its seats alone (`plan.flow is None` no longer returns `[]`; the sit-out and relaunch halves still need a flow).
+2. `apply`'s `start` of the anchor: `checkout_held` first, then `create` with `held` and `held_reason` where the checkout is not free, the row's line saying why (*ao-grind-anchor: waits — held by ao-agentorc-paul (working)*); otherwise the plain create in the checkout. The techlead and a `seats:` seat as the start creates them.
+3. The words: *definition changed — Apply* on the header where the differences are all seats to start, or the team lists no flows; the lines as today (*ao-grind-anchor: starts*; under a flow, *starts under td*).
+4. A read on the scratch home: a team started with `anchor: false`, its definition then edited to name one, reads the mark and Apply creates the seat, held while a session sits in the checkout and filled by rule 3 once it is free.
+
+**Done when** on the scratch home a live team whose definition gains a techlead, an anchor or a `seats:` entry reads *definition changed — Apply* (or *flow changed — Apply* with other differences), Apply creates the seat without a restart — the anchor held with `seat_held` when the checkout is not free — a second Apply finds nothing, a team with no flows is read the same, and tests cover each; and ao-grind, once promoted, gains `ao-grind-anchor` on Paul's Apply.
+
+**Related:** TD-399, TD-381 (archived), TD-385 / TD-386 / TD-395 (archived: the anchor's start, tick and gate), TD-356 (Apply's gate).
