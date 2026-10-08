@@ -171,6 +171,33 @@ async def test_an_entry_filed_after_the_declaration_is_told_once(agent, tmp_path
         await person.call("kill", id=sid)
 
 
+async def test_an_entry_on_the_designers_decision_is_told_to_the_designer_and_once_decided_to_the_grinder(
+    agent, tmp_path
+):
+    """TD-368 (design §6 rule 6, TD-367): an entry blocked by `decision (designer)` is the designer's
+    lane news, though its `Owner:` is the grinder's; the PR that makes the decision drops the item,
+    and the grinder's lane is told of it then."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    held = {**_e("TD-151", pickable="no"), "blocked_by": ["decision (designer)"]}
+    async with LocalClient() as person:
+        des = await _finished(agent, person, tmp_path, "d", ["design-first", "owner:designer"], [_e("TD-001")])
+        gri = await _finished(agent, person, tmp_path, "g", ["free-pick", "owner:grinder"], [_e("TD-001")])
+        await agent._keep_running(now)
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [_e("TD-001"), held]
+        for sid in (des, gri):
+            await agent._lane_news(agent.sessions[sid], now)
+        assert len(_notes(agent, des)) == 1 and "TD-151" in _notes(agent, des)[0]
+        assert _notes(agent, gri) == []
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [_e("TD-001"), _e("TD-151")]
+        for sid in (des, gri):
+            await agent._lane_news(agent.sessions[sid], now + timedelta(minutes=1))
+        assert len(_notes(agent, gri)) == 1 and "TD-151" in _notes(agent, gri)[0]
+        assert len(_notes(agent, des)) == 1, "a decided entry is no longer the designer's"
+        for sid in (des, gri):
+            await person.call("kill", id=sid)
+
+
 async def test_a_lease_a_sibling_dropped_is_told_once(agent, tmp_path):
     """Rule 6's dropped lease (TD-258 slice 4): an id the member saw at its declaration, dropped
     since by another record of its repo, is told once with the dropper's name; a drop before the

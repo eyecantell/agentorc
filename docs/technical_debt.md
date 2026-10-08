@@ -74,7 +74,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
 | TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
-| TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Open |
+| TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Slices 1–2 built; 3–4 open |
 | TD-369 | Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone or a handed ask from another host: reverting either still passes | Low | Open |
 | TD-370 | The Focus composer's attach (#1205): the `attachments/<session>/` directory's `0700` and the drop, paste and closed-composer handlers are in no test | Low | Open |
 
@@ -1310,7 +1310,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Added:** 2026-10-07 (the designer, from TD-367's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slices 1 (the reader, `sessionorc.ledger`) and 2 (`ao repo`'s *decision* mark) built in PR #1206; left: 3 (the Inbox fold, a page change with its UI check) and 4 (the designer briefs).
 **Location:** `src/sessionorc/ledger.py` (`kind_of`, `lane_matches`, `_word_matches`), `src/agentorc/cli.py` (`cmd_repo`'s design-first rows), `src/agentorc/ui/inbox.py` (`inbox_sections`, the page's fourth source), `src/agentorc/ui/templates/inbox.html` and `inbox_rail.html`, `docs/briefs/designer-ao-1.md` and `src/agentorc/briefs/designer.md` (the lane sentence); tests `tests/test_ledger_derived.py`, `tests/test_repo_facts.py`, `tests/test_lane_news.py`, `tests/test_ui_inbox.py`, the CLI's `ao repo` tests. `src/sessionorc/**` and `docs/briefs/**` are held paths: the techlead reads those slices.
 
 **Why:** design §4.4 *Repo facts* (the page's kinds), §6 rule 6, §4.5 screen 6 *The ledger's entries that wait on you* and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo` (TD-367, designed 2026-10-07). On 2026-10-07 the repo line said *15 for you* about decisions that were the designer's and the anchor's, and the Inbox drew none of the fifteen.
