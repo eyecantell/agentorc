@@ -79,6 +79,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-379 | Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Open — asked by Paul |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Open — asked by Paul |
+| TD-382 | §4.5a's Inbox *keys* row still says the ring visits snoozed rows "while *n snoozed — show* is open", the control #1218 renamed the **Snoozed (n)** fold | Low | Open |
 
 ---
 
@@ -1409,3 +1410,24 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the design names the seat (who adds it, where it runs, its trigger, its grants), its §4.5a and §4.9b rows are written, and the build entries are written.
 
 **Related:** TD-380 (decided lines), TD-247 / TD-259 (the manager on call), TD-098 (seats with a trigger), TD-132 (archived: the promote policy).
+
+## TD-382: §4.5a's Inbox *keys* row still says the ring visits snoozed rows "while *n snoozed — show* is open", the control #1218 renamed the **Snoozed (n)** fold
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1217–#1227)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.5a-controls.md` row *Inbox page: keys: the ring* (line 12)
+
+**Why:**
+- #1218 designed TD-371: the Inbox's *n snoozed — show* list becomes the **Snoozed (n)** fold (§4.5 screen 6, and the new §4.5a row *Inbox: Snoozed (n) fold*, which says it is "where *n snoozed — show* was").
+- The *keys* row was not touched: it still reads "snoozed rows only while *n snoozed — show* is open", naming a control the same PR retired, so the design names two controls for one fold.
+- TD-373's Fix does not list this row, so the build would leave it.
+
+**Fix:** reword that sentence to "snoozed rows only while the **Snoozed (n)** fold is open" (and say the rows now carry their kind's controls, so `Enter`/`o`/the answer keys apply there, if the row's key list is to match TD-371); keep the help list in step if it quotes it (`src/agentorc/ui/help.py`, doc-bound tests).
+
+**Done when** `grep -rn "n snoozed — show" docs/design` finds only the "where … was" history clause.
+
+**Related:** TD-371 (the design), TD-373 (its build).
