@@ -557,6 +557,30 @@ class _WsAttemptLog:
         await self.app(scope, receive, send)
 
 
+def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    """The groups as a delta carries them (§4.5a **team groups**): each header, summary and + card
+    rendered, the client swapping them in place; `None` is the flat page."""
+    if groups is None:
+        return None
+    head = templates.get_template("group_head.html")
+    summary = templates.get_template("team_summary.html")
+    plus = templates.get_template("plus_card.html")
+    return [
+        {
+            "team": g["team"],
+            "manager": (g["manager"] or {}).get("id", ""),
+            "live": g["live"],  # what the fold's default keys on: nothing live opens folded (TD-194)
+            "ids": g["ids"],
+            "html": head.render(g=g),
+            # the summary's facets (TD-176 slice 3), swapped by the client as the header is
+            "summary": summary.render(g=g) if g.get("summary") else "",
+            # the team's + card (§4.5a *team card: + card*, TD-379): put in by the client when missing
+            "plus": plus.render(g=g) if g["team"] and g.get("defined") else "",
+        }
+        for g in groups
+    ]
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="agentorc")
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
@@ -691,27 +715,6 @@ def create_app() -> FastAPI:
         )
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
-
-    def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
-        if groups is None:
-            return None
-        head = templates.get_template("group_head.html")
-        summary = templates.get_template("team_summary.html")
-        plus = templates.get_template("plus_card.html")
-        return [
-            {
-                "team": g["team"],
-                "manager": (g["manager"] or {}).get("id", ""),
-                "live": g["live"],  # what the fold's default keys on: nothing live opens folded (TD-194)
-                "ids": g["ids"],
-                "html": head.render(g=g),
-                # the summary's facets (TD-176 slice 3), swapped by the client as the header is
-                "summary": summary.render(g=g) if g.get("summary") else "",
-                # the team's + card (§4.5a *team card: + card*, TD-379): put in by the client when missing
-                "plus": plus.render(g=g) if g["team"] and g.get("defined") else "",
-            }
-            for g in groups
-        ]
 
     identity_cache: dict[str, Any] = {"at": 0.0, "info": None}
 
