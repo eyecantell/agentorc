@@ -147,6 +147,20 @@ def test_report_line_shows_the_reference_the_pr_and_the_lane_count():
     assert report_line(pr.to_dict()) == "#360 · 2/2 done"
 
 
+def test_the_anchor_lane_word_is_no_reference_like_free_pick():
+    """§4.9b, TD-381, TD-392: the anchor seat's lane `anchor` is a lane word, as `free-pick` is: no
+    reference, so nothing held, counted or offered to `ao progress` — never a claim named `anchor`."""
+    from sessionorc.models import lane_refs
+
+    for words in (["free-pick"], ["anchor"], ["anchor", "owner:anchor"]):
+        assert lane_refs(words) == []
+        s = Session(id="a", name="a", kind="interactive", adapter="shell", dir="/", lane=words)
+        assert report_line(s.to_dict()) == ""
+        s.report_progress(ProgressEntry(ref="TD-025", status="done", pr=59))
+        assert report_line(s.to_dict()) == "TD-025 → #59 · 1/1 done"
+    assert lane_refs(["anchor", "TD-027"]) == ["TD-027"]
+
+
 def test_every_record_field_has_exactly_one_owner():
     """Design §4.4a, §9 invariant 15: merges go by owner, never by last write, so every field of
     the record is node-owned, home-owned or identity — one set, never two, never none."""
