@@ -21,7 +21,7 @@ from types import SimpleNamespace
 from typing import Annotated, Any
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -2071,6 +2071,20 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             why = str(e.detail).strip('"') or "the host agent refused the resume"
             return JSONResponse({"ok": False, "form": resume_form_url(rec, why), "why": why})
         return JSONResponse({"ok": True, "id": new["id"]})
+
+    @app.post("/api/sessions/{sid}/attach")
+    async def attach_file(sid: str, file: UploadFile):
+        """design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002):
+        one file, multipart, handed to the host agent's `attach` — a person's act — which writes it
+        under `attachments/<session>/` and answers its path; the page inserts the path into the
+        composer and sends nothing. Past `paths.ATTACH_BYTES_MAX` it is refused here (413), before the
+        host agent is asked — the upload itself has arrived by then, since the form is parsed first."""
+        raw = await file.read(paths.ATTACH_BYTES_MAX + 1)
+        if len(raw) > paths.ATTACH_BYTES_MAX:
+            mib = paths.ATTACH_BYTES_MAX // (1024 * 1024)
+            raise HTTPException(413, f"{file.filename or 'the file'} is past the {mib} MiB a file may be")
+        got = await call("attach", id=sid, name=file.filename or "", data=base64.b64encode(raw).decode("ascii"))
+        return JSONResponse({"ok": True, "path": got["path"]})
 
     @app.post("/api/sessions/{sid}/{action}")
     async def action(sid: str, action: str, request: Request):

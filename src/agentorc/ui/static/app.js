@@ -126,6 +126,24 @@
   }
   AO.act = act;
 
+  // The Focus composer's **Attach** (§4.5a, TD-002): a pasted image carries the browser's own name
+  // for it, `image.png`, every time, so it is named for the moment instead — `paste-20261007-171204.png`.
+  AO.attachName = function (f, now) {
+    if (f.name && f.name !== "image.png") return f.name;
+    const p = (n) => String(n).padStart(2, "0");
+    const ext = ((f.type || "").split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
+    return `paste-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}.${ext}`;
+  };
+  // `text` into a textarea at its caret (over its selection), a space either side where the
+  // neighbour is not one, the caret left after it.
+  AO.insertAtCaret = function (box, text) {
+    const v = box.value, a = box.selectionStart ?? v.length, b = box.selectionEnd ?? a;
+    const before = v.slice(0, a), after = v.slice(b);
+    const ins = (before && !/\s$/.test(before) ? " " : "") + text + (/^\s/.test(after) ? "" : " ");
+    box.value = before + ins + after;
+    box.selectionStart = box.selectionEnd = before.length + ins.length;
+  };
+
   // ---- Pop out (design §4.5 screen 2 *Pop out*, §4.5a **Pop out** / **Focus** / **title**, TD-046) ----
   // A session's Focus in its own browser window, for the OS window switcher. Client-side only:
   // nothing about a window is written to the record. The window is named for the session, so a
@@ -3165,6 +3183,49 @@
       if (compose.disabled) { banner($("#composehint").textContent || "nothing can be sent now"); return; }
       try { await act(id, "send", { text }); term.focus(); } catch (err) { banner(`Send failed: ${err.message}`); }
     }));
+    // design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002): each
+    // file goes to the host agent through `/api/sessions/<id>/attach`, and the path it answers is
+    // inserted at the composer's caret — Claude Code reads a path in a prompt — and nothing is sent
+    // until Send. A drop on the terminal or the composer and an image pasted into the composer take
+    // the same road; a paste that carries text is the text's, as before. Not while the composer is
+    // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*).
+    const attachBtn = $("#attach"), attachIn = $("#attachfile");
+    const attachLabel = attachBtn.lastChild, attachWord = attachLabel.textContent;
+    const composerShut = () => $("#composer").classList.contains("hidden");
+    let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
+    function attach(files) {
+      const list = Array.from(files || []);
+      if (!list.length || composerShut()) return attaching;
+      attaching = attaching.then(() => attachEach(list)).catch((e) => banner(`Attach failed: ${e.message}`));
+      return attaching;
+    }
+    async function attachEach(list) {
+      const label = attachLabel;
+      attachBtn.disabled = true;
+      for (const f of list) {
+        label.textContent = `Attaching ${f.name}…`;
+        const fd = new FormData();
+        fd.append("file", f, AO.attachName(f, new Date()));
+        try {
+          const r = await fetch(`/api/sessions/${id}/attach`, { method: "POST", body: fd });
+          if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+          AO.insertAtCaret(compose, (await r.json()).path);
+        } catch (e) { banner(`Attach failed: ${e.message}`); }
+      }
+      label.textContent = attachWord; attachBtn.disabled = false;
+      compose.dispatchEvent(new Event("input")); compose.focus();
+    }
+    attachBtn.addEventListener("click", () => attachIn.click());
+    attachIn.addEventListener("change", () => { attach(attachIn.files).finally(() => { attachIn.value = ""; }); });
+    for (const el of [$("#term"), compose]) {
+      el.addEventListener("dragover", (e) => { if (!composerShut() && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+      el.addEventListener("drop", (e) => { if (!composerShut() && e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); attach(e.dataTransfer.files); } });
+    }
+    compose.addEventListener("paste", (e) => {
+      const cd = e.clipboardData;
+      if (!cd || !cd.files.length || [...cd.types].includes("text/plain")) return;
+      e.preventDefault(); attach(cd.files);
+    });
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
     function render(v) {

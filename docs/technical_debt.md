@@ -16,7 +16,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
-| TD-002 | Focus composer: Attach / drop / paste upload | Medium | Open |
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
 | TD-004 | Host identity: `hosts.yml` `local` entry complete; ssh entries pending (phase 2, now the node→home link of TD-057) | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
@@ -96,22 +95,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 
 **Related:** other TDs, PRs, decision docs.
 -->
-
-## TD-002: Focus composer: Attach / drop / paste upload
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-09-06
-**Owner:** grinder
-**Kind:** build
-**Status:** **Released to the grinders 2026-10-07 (Paul: still vital).** It is designed: §4.5a *Focus composer: Attach / drop / paste* and this entry's *Fix*. It is a page change, so it is verified on a scratch home with screenshots (§4.9b). The grinder brief's reserve list drops it in the same day's brief PR. Desktop only: the phone's share sheet is TD-003's, which Paul reserves until the real connection path exists.
-**Location:** `src/agentorc/ui/templates/focus.html`, `src/agentorc/ui/app.py`
-
-**Why:** Goal §2.2 says attaching files must be effortless; the mockup has Attach, drop, and paste. The design (§7 phase 2) parks it with the ssh copy path since the plumbing is the same. The composer ships without it.
-
-**Fix:** `POST /api/sessions/<id>/attach` (multipart) → agent `attach` RPC writes to `~/.agentorc/attachments/<session>/`, returns the path, composer inserts it; drop and clipboard paste on desktop; share sheet on the phone. Done when a pasted screenshot lands as a path Claude Code can read.
-
-**Related:** design §4.4 attachment drop, §4.5a Focus composer rows.
 
 ## TD-003: Phone layout: narrow Focus with a soft-key row
 

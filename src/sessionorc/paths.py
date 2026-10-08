@@ -36,6 +36,22 @@ def attachments_dir() -> Path:
     return home() / "attachments"
 
 
+# One file the Focus composer attaches (design §4.4 *Attachment drop*, TD-002): the page sends it to
+# the host agent as base64 on one line, and a line is 8 MiB (`client.LINE_LIMIT`).
+ATTACH_BYTES_MAX = 4 * 1024 * 1024
+
+
+def attachment_name(name: str) -> str:
+    """A file name as the composer inserts it into a prompt: its last component, every character
+    but letters, digits, `.`, `-` and `_` made `_` (so the path needs no quoting), no leading dot,
+    at most 100 characters, `attachment` where nothing is left."""
+    base = re.sub(r"[^A-Za-z0-9._-]", "_", Path(str(name).replace("\\", "/")).name).lstrip(".")
+    if len(base) > 100:
+        stem, dot, ext = base.rpartition(".")
+        base = (stem[: 100 - len(ext) - 1] + dot + ext) if dot and len(ext) <= 10 else base[:100]
+    return base or "attachment"
+
+
 def launch_dir() -> Path:
     """Launch scripts for commands too long for tmux's own command line (`Tmux.new_session`)."""
     return home() / "launch"

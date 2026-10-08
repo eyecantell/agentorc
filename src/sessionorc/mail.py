@@ -140,6 +140,7 @@ PERSON_ONLY = frozenset(
         "relaunch",
         "notify_test",
         "forget_host",
+        "attach",
     }
 )
 

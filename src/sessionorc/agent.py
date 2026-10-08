@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
+import binascii
 import contextlib
 import json
 import logging
@@ -209,6 +211,27 @@ from sessionorc.store import (
     UsageStore,
 )
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+
+
+def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
+    """`raw` as a new file in `where` (made `0700`), named `paths.attachment_name(name)`, or with
+    `-2`, `-3`… before its extension where that is taken: never over an earlier attachment, whose
+    path a sent prompt may still name. The file is `0600`."""
+    where.mkdir(mode=0o700, parents=True, exist_ok=True)
+    base = paths.attachment_name(name)
+    stem, dot, ext = base.rpartition(".")
+    if not stem:
+        stem, dot, ext = base, "", ""
+    for n in range(1, 1000):
+        path = where / (base if n == 1 else f"{stem}-{n}{dot}{ext}")
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            continue
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+        return path
+    raise RpcError(f"attach: {base} is taken a thousand times over in {where}")
 
 
 def _bound(path: Path) -> socket.socket:
@@ -1943,6 +1966,26 @@ class HostAgent(
         else:
             out["reason"] = f"rule {m.rule} matched and no fresher hook state exists — applied as scraped"
         return out
+
+    async def rpc_attach(self, id: str, name: str = "", data: str = "", caller: Any = None) -> dict[str, Any]:
+        """The Focus composer's **Attach** / drop / paste (design §4.4 *Attachment drop*, §4.5a,
+        TD-002): the person's file, base64 in `data`, written under `attachments/<session>/` by its
+        name made safe for a prompt (`paths.attachment_name`, `-2`, `-3`… where it is taken), and its
+        path returned for the composer to insert — Claude Code reads a path in a prompt. A person's
+        own act. A session on this host only: `_get` refuses a node's, whose copy over ssh is §7's
+        phase 2. Refused past `paths.ATTACH_BYTES_MAX` or when `data` is not base64."""
+        agent_common.person_only(caller, "attach a file", "§4.5a")
+        s = self._get(id)
+        try:
+            raw = base64.b64decode(data, validate=True)
+        except (binascii.Error, ValueError):
+            raise RpcError("attach: the file did not arrive as base64") from None
+        if len(raw) > paths.ATTACH_BYTES_MAX:
+            raise RpcError(
+                f"attach: {len(raw)} bytes is past the {paths.ATTACH_BYTES_MAX // (1024 * 1024)} MiB a file may be"
+            )
+        path = await asyncio.to_thread(_write_attachment, paths.attachments_dir() / s.id, name, raw)
+        return {"path": str(path), "bytes": len(raw)}
 
     async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
         self._get(id)

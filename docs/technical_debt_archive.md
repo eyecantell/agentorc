@@ -5823,3 +5823,19 @@ Paul's leaning is in his words above. This is the obvious tier unless the two sh
 **Resolved:** 2026-10-07 (PR #1204, grinder-ao-2) — tests only: `tests/test_ui_repo_page.py::test_the_team_card_reads_what_is_held_across_the_fleet_not_its_members_alone`, through `/repo/<name>` and so `team_groups`, with a second team's live record of the repo claiming every entry in the first team's lane: the first team's member is not warned, and is once the claims are gone. The `team_groups` and `org.team_summary` reverts each fail it. The `repo_page` revert (`vs` → `members`) is an equivalent mutant, so no test can fail it: that branch runs only when no group serves the repo, and `team_groups` makes a serving group of any record of the named team in the repo, so there the fleet holds none and `repo_lanes` gives the team nothing either way.
 
 **Related:** TD-361, TD-363.
+
+## TD-002: Focus composer: Attach / drop / paste upload
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-09-06
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/focus.html`, `src/agentorc/ui/app.py`
+
+**Why:** Goal §2.2 says attaching files must be effortless; the mockup has Attach, drop, and paste. The design (§7 phase 2) parks it with the ssh copy path since the plumbing is the same. The composer ships without it.
+
+**Resolved:** 2026-10-07 (PR #1205, grinder-ao-2) — **Attach** (the picker), a drop on the terminal or the composer, and an image pasted into the composer each go to `POST /api/sessions/<id>/attach` → the host agent's `attach` (a person's own act), which writes the file `0600` under `~/.agentorc/attachments/<session>/` by a name a prompt needs no quoting for and answers its path; the composer inserts it at the caret and sends nothing. A pasted screenshot lands as a path Claude Code can read (checked on a scratch home, `docs/mockups/reviews/2026-10-07-td002-attach.png`). Desktop and this host only, 4 MiB a file: a node's session waits for phase 2's copy over ssh, the phone's share sheet is TD-003. Design §4.4 *Attachment drop*, §4.5a *Focus composer*; `tests/test_attach.py`.
+
+**Related:** design §4.4 attachment drop, §4.5a Focus composer rows.
