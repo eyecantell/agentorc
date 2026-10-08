@@ -70,7 +70,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Partly done — agentorc's half built (PR #1166); the other three repos' halves are the anchor's |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
@@ -1201,22 +1200,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-376: The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (`AO.wireAttach`, `each`); `tests/test_attach.py` (the second node probe)
-
-**Why:** The probe's docstring says *a failed one reported and the next still sent*, but its failing file `bad.png` is the last of its drop (`[one.png, bad.png]`); `two.png` arrives in a second drop, which the queue sends whatever became of the first. Replacing `catch (e) { fail(...) }` in `each` with `catch (e) { throw e; }` makes the rest of a batch go unsent, and `pytest tests/test_attach.py tests/test_seat_policy.py` still passes (13 passed). A person who drops three screenshots, the first refused (over 4 MiB, say), would lose the other two with only the one banner.
-
-**Done when** the failing file is first in a drop of two, and the probe asserts the second is uploaded and its path inserted; the edit above fails a test.
-
-**Related:** TD-370, TD-002.
 
 ## TD-378: Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away
 

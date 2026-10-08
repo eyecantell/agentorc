@@ -6169,3 +6169,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a node probe of `app.js` (as `test_ui_org.py` does for `AO.usageChip`) draws the fold's rows and asserts a team pick and a find word hide the rows and a group with none left; each of the three edits above fails a test.
 
 **Related:** TD-368, TD-370.
+
+## TD-376: The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1207–#1215)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`AO.wireAttach`, `each`); `tests/test_attach.py` (the second node probe)
+
+**Why:** The probe's docstring says *a failed one reported and the next still sent*, but its failing file `bad.png` is the last of its drop (`[one.png, bad.png]`); `two.png` arrives in a second drop, which the queue sends whatever became of the first. Replacing `catch (e) { fail(...) }` in `each` with `catch (e) { throw e; }` makes the rest of a batch go unsent, and `pytest tests/test_attach.py tests/test_seat_policy.py` still passes (13 passed). A person who drops three screenshots, the first refused (over 4 MiB, say), would lose the other two with only the one banner.
+
+**Resolved:** 2026-10-07 (PR #1238, grinder-ao-2) — `tests/test_attach.py`'s second probe drops `[bad.png, one.png]`: the refused file first, and the probe asserts `one.png` from the same drop is uploaded and its path inserted. The edit in the Why (`catch (e) { throw e; }` in `each`) now fails `test_the_composers_drop_and_paste_handlers_run_as_themselves`. No code changed.
+
+**Done when** the failing file is first in a drop of two, and the probe asserts the second is uploaded and its path inserted; the edit above fails a test.
+
+**Related:** TD-370, TD-002.
