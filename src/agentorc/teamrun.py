@@ -670,14 +670,16 @@ def start(
         if plan.anchor:
             # The anchor seat (§4.9b, TD-381): created after the techlead, in the home checkout itself,
             # which a session already holding it refuses (§9 invariant 2) — then the rest of the team
-            # starts and the seat waits for the next Start, said rather than failing the start
+            # starts, the seat's record is written alone, closed with no pane, and §6 rule 3 fills it
+            # once the checkout is free (TD-386), said rather than failing the start
             x = plan.anchor
             occ = call("host_occupancy", host=x.host, dir=str(x.dir)) if x.host else call("occupancy", dir=str(x.dir))
             holders = [str(o) for o in occ.get("occupants") or []]
             if holders:
+                created.append(call("create", **params(x, [lead_id] if lead_id else []), held=True))
                 notes.append(
-                    f"{x.name} not started: {x.dir} is held by {holders[0]} — the anchor seat is the checkout's "
-                    "one agent (§9 invariant 2); it starts at the next Start with the checkout free"
+                    f"{x.name} waits: {x.dir} is held by {holders[0]} — the anchor seat is the checkout's one "
+                    "agent (§9 invariant 2); it is on call, filled once the checkout is free"
                 )
             else:
                 created.append(call("create", **params(x, [lead_id] if lead_id else [])))
@@ -834,9 +836,9 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     for x in plan.launches:
         rec = _current(x.name, mine)
         if rec is None and x.in_checkout:
-            # an anchor seat a Start never created — its checkout was held, or the team predates it — is
-            # the next Start's, never a flow's difference Apply could not clear (the record with no pane
-            # that would let rule 3 fill it is TD-386's)
+            # an anchor seat a Start never created — the team predates it — is the next Start's, never a
+            # flow's difference Apply could not clear (a Start over a held checkout writes its record,
+            # closed with no pane, for rule 3 to fill: TD-386)
             continue
         if rec is None or sat_out(rec):
             out.append(Difference(x.name, "start", record=rec, launch=x))

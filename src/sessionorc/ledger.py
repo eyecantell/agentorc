@@ -172,6 +172,7 @@ class LiveReader:
 
 PERSON_OWNER = "paul"  # the person's owner word, as this ledger's `Fields:` line declares it (§4.4 *Repo facts*)
 DESIGNER_OWNER = "designer"
+ANCHOR_OWNER = "anchor"  # the anchor seat's owner word and lane word (§4.9b *The anchor seat*, §6 rule 6)
 
 
 def decided_by(entry: dict[str, Any], who: str) -> bool:
@@ -216,12 +217,22 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     matches nothing by itself. An entry blocked by `decision (designer)` is the designer's
     (TD-367): `design-first` takes it pickable or not, and its owner reads `designer`. A **work
     order** — a decided board line, `board:<key>` (§4.4 *Board write-back*, TD-384) — is in every
-    `free-pick` lane, whatever `owner:` words stand beside it, and in no other."""
+    `free-pick` lane, whatever `owner:` words stand beside it, and in every `anchor` lane. **`anchor`**
+    (TD-381, TD-386: the anchor seat's lane, which a person's own anchor session reads the same) is
+    every pickable entry whose `Owner:` is `anchor`, of any kind — a live check once its build is
+    live — any entry blocked by `decision (anchor)`, pickable or not, its owner then reading
+    `anchor`, and every work order."""
     owners = {o for w in lane if (o := owner_word(w))}
     if entry.get("work_order"):
         # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384)
-        return any(w == "free-pick" and entry.get("pickable") == "yes" for w in lane)
-    mine = DESIGNER_OWNER if decided_by(entry, DESIGNER_OWNER) else str(entry.get("owner") or "").lower()
+        return any(w in ("free-pick", ANCHOR_OWNER) and entry.get("pickable") == "yes" for w in lane)
+    mine = (
+        DESIGNER_OWNER
+        if decided_by(entry, DESIGNER_OWNER)
+        else ANCHOR_OWNER
+        if decided_by(entry, ANCHOR_OWNER)
+        else str(entry.get("owner") or "").lower()
+    )
     if owners and mine and mine not in owners:
         return False
     return any(_word_matches(w, entry) for w in lane if owner_word(w) is None)
@@ -273,8 +284,13 @@ def in_lanes(
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     if word == "design-first" and decided_by(entry, DESIGNER_OWNER):
         return True
+    if word == ANCHOR_OWNER and decided_by(entry, ANCHOR_OWNER):
+        return True  # a decision the anchor owes is its to make, as the designer's is (§6 rule 6)
     if entry.get("pickable") != "yes":
         return False
+    if word == ANCHOR_OWNER:
+        live = entry.get("kind") != "live-check" or entry.get("live") == "yes"
+        return str(entry.get("owner") or "").lower() == ANCHOR_OWNER and live
     if word == "design-first":
         return entry.get("kind") == "design-first"
     if word == "free-pick":
