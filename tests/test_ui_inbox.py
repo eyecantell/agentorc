@@ -2303,6 +2303,8 @@ def test_answered_for_you_is_its_own_section_uncounted_newest_first_and_apart_fr
     assert [e["id"] for e in got["fyi"]] == ["m-3"] and got["fyi_n"] == 1
     assert [e["id"] for e in got["snoozed"]] == ["m-4"]
     assert got["count"] == 0 and not got["needs"]
+    sn = rows("snoozed", got["snoozed"])  # a note in the fold is drawn as FYI draws it (TD-373)
+    assert "snoozed until" in sn and "Delete this question?" not in sn and 'data-act="reply"' not in sn
     # a malformed `answered` costs the row its group, never the page: it reads as a plain note
     assert [e["id"] for e in sections_of([entry("m-5", "note", answered="yes")])["fyi"]] == ["m-5"]
     assert [e["id"] for e in sections_of([entry("m-6", "note", answered={})])["fyi"]] == ["m-6"]
