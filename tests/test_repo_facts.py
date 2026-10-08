@@ -438,6 +438,11 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert "6 open entries, 1 decided board line: 2 pickable, 0 design-first" in out
     assert "pickable     board:0123abcd  High    board        Keep the backup? · decided keep 2026-10-07" in out
     assert out.index("board:0123abcd") < out.index("pickable     TD-012")
+    # the lanes take it beside the entries: the out-of-work line names it (§4.4 *In a team's lanes*)
+    fleet.append({"id": "g2", "name": "g2", "team": "t", "repo": str(repo), "state": "idle", "lane": ["free-pick"],
+                  "out_of_work": {"at": now.isoformat()}})  # fmt: skip
+    assert cli.main(["repo"]) == 0
+    assert "g2 is out of work with" in (out := capsys.readouterr().out) and "board:0123abcd" in out.split("g2 is")[1]
     assert cli.main(["--json", "repo"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["work_orders"]["orders"][0]["id"] == "board:0123abcd"
 
