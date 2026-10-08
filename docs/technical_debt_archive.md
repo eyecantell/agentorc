@@ -6285,3 +6285,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** on the scratch home an `Owner: anchor` entry filed in the fixture ledger fills the seat within a tick when the checkout is free, a person's session in the checkout (or a dirty tree) holds the fill with `seat_held` saying why and the fill lands once it is free, a `none` on the same ids raises no second fill, and the tests cover each.
 
 **Related:** TD-381, TD-385, TD-387, TD-380 / TD-384 (work orders in the lane).
+
+## TD-392: The anchor lane word (#1245): `LANE_WORDS` gaining `anchor` is pinned by no test — removing it leaves 435 passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing the tests of #1241 and #1245)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/models.py` (`LANE_WORDS = ("free-pick", "design-first", "anchor")`); `tests/test_models.py`, `tests/test_ledger_derived.py`
+
+**Why:** #1245 added `anchor` to `LANE_WORDS` so the seat's lane is no reference (not counted, nudged about or offered to `ao progress` as held). Against `origin/main`, reverting to `("free-pick", "design-first")` still passes every test that names `LANE_WORDS` or `design-first` (435 passed: `test_models`, `test_workorders`, `test_ledger_derived`, `test_repoconfig`, `test_cli_teams`, `test_work_start`, `test_lane_news`, …). `test_anchor_seat.py` asserts the plan's `lane == ["anchor"]` only, never what the lane means to `reference_of` or the counts. With the word gone the seat's lane reads as a held reference `anchor`.
+
+**Resolved:** 2026-10-08 (PR #1251, grinder-ao-1) — `tests/test_models.py::test_the_anchor_lane_word_is_no_reference_like_free_pick`: a lane of `["anchor"]` (and with `owner:anchor`) yields no reference from `lane_refs` and reads as `free-pick`'s on the card line; reverting `LANE_WORDS` fails it.
+
+**Done when** a test in `tests/test_models.py` asserts a lane of `["anchor"]` yields no reference and is counted as nothing held, beside `free-pick`'s; the revert fails it.
+
+**Related:** TD-381, TD-384, TD-385.
