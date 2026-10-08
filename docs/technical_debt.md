@@ -72,7 +72,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-319 | Build the Telegram channel: `notify:` in settings, the home's hold-once-bounded send through a `doppler run` child, the watching signal, the Settings card with **Send a test**, the row a link lands on | Low | Built (slices 1–3); live check read 2026-10-05, the look with Paul (m-cd1c58805bcb) |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-366 | Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours | High | Built (#1202) — live check |
 | TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-368 | Build TD-367: *for you* is what waits on the person, a `decision (designer)` is the designer's, and the Inbox lists the ledger's for-you entries | Medium | Slices 1–2 built; 3–4 open |
 | TD-369 | Rule 3's seat-PR wait (#1202) is tested without a claim that carries `pr` alone or a handed ask from another host: reverting either still passes | Low | Open |
@@ -1241,38 +1240,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-366: Rule 3 closes a seat that ended its turn to wait on its own background agent: test-audit-ao-1's PR #1197 sat unreviewed for ten hours
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-07 (the anchor)
-**Owner:** grinder
-**Kind:** live-check #1202
-**Status:** Built in PR #1202 (rule 3's `_seat_prs`, design §6 rule 3; `tests/test_seat_policy.py`). Left to read once #1202 is live (`ao promote status`): the next fill of an audit seat (test-audit-ao-1 or docs-audit-ao-1) that opens a PR — its record is not closed by the tick while the PR is open and unhanded (the host agent's log has no *a seat with nothing due, idle and pushed — closing it* for it before the PR merges or its `ask --pr` lands), and the PR is merged or with a reader.
-**Location:** `src/sessionorc/agent_tick.py` (the seat branch of the tick: `s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now)` → *a seat with nothing due, idle and pushed — closing it (§6 rule 3)*), `_seat_done`; design §6 rule 3, §4.9b *Seats with a trigger*
-
-**Why:**
-- On 2026-10-07 test-audit-ao-1, the first fill of the audit seats TD-098 added, mutation-tested the night's builds. It wrote TD-363 to TD-365 into PR #1197 and launched its independent fact-check as a background agent, as the cadence asks.
-- It ended its turn with *Waiting for the fact-check to finish*.
-- At 06:31:56 the tick found the seat idle, with nothing due and its work pushed, and closed it (*a seat with nothing due, idle and pushed — closing it*). That killed the fact-check and the run that would have merged.
-- #1197 sat open, with no review and no reader, until the anchor fact-checked and merged it at 17:07.
-- A member is not closed this way, but a seat is: any seat that waits on its own background work (a reviewer, a CI watch, a sleep) looks done to rule 3.
-
-**Fix:**
-- `_seat_done` (or rule 3's branch) does not close a seat that has work of its own in flight. Candidates for the signal:
-  - an open PR the seat authored that is neither merged nor handed to a reader;
-  - a background task the tool reports (Claude Code shows *N shell(s) running*, and a hook could carry it);
-  - a short grace after its last turn that a waiting seat renews.
-- The design says which (§6 rule 3).
-- At the least, a seat closed with an open PR of its own leaves it to its team's techlead seat or on the board, never stranded.
-- Tests:
-  - a seat idle with its own open, unread PR is not closed;
-  - one with nothing open still is.
-
-**Done when** an audit seat that opens a PR and waits on its fact-check lands the PR before rule 3 closes it, or hands it on, and the tests pass.
-
-**Related:** TD-098 (the audit seats), TD-259 (the on-call manager, which rule 3 also closes), TD-363 to TD-365 (the entries #1197 carried).
 
 ## TD-367: *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them
 
