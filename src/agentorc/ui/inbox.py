@@ -22,9 +22,11 @@ from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import hosts
+from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mail_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
+from sessionorc import workorders as workorders_mod
 from sessionorc.agent_common import WRAPUP_GRACE
 from sessionorc.client import call_sync
 from sessionorc.models import (
@@ -1148,25 +1150,74 @@ def board_answered(it: Mapping[str, Any], today: str) -> dict[str, Any]:
     return {"answered": how, "answered_at": at, "stale": stale, "stale_line": line}
 
 
-def board_waiting_on(r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime) -> str:
+def board_waiting_on(
+    r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime, starting: Collection[str] = ()
+) -> str:
     """The *waiting on …* words of an answered board row (§4.5 screen 6, the standing of §4.5a as
-    words): a live record with an unexpired declared lease on one of the item's `refs` (*waiting on
-    grinder-ao-2 — holds TD-122*), else a live record the item's `session` names, else the next
-    session to read the repo's board. Read from the fleet the page already holds, as
-    `orphan_standing` reads it for mail; display only."""
-    holder, ref = _board_holder(r, records, now)
+    words): a live record with an unexpired declared lease on one of the item's `refs` or on the
+    line's own work order (*waiting on grinder-ao-2 — holds TD-122*, *… — holds board:1a2b3c4d*),
+    else a live record the item's `session` names, else — a decided line being a work order in the
+    repo's lanes (§4.4 *Board write-back*, TD-384) — *pickable by <team>* naming the teams whose
+    `free-pick` lanes take it, with each one's wound-down state when none of them is live (*· the
+    start row is in Needs you* for a team in `starting`, the teams a *team start* row names, else
+    *· <team> wound down — starts on `on_work`*), else the next session to read the repo's board.
+    Read from the fleet the page already holds, as `orphan_standing` reads it for mail; display only."""
+    order = _board_order(r)
+    holder, ref = _board_holder(r, records, now, order)
     if holder:
         return f"waiting on {holder} — holds {ref}"
     named = _board_named(r, records)
     if named:
         return f"waiting on {named}"
+    if order:
+        teams = _order_teams(r, order, records)
+        if teams:
+            words = f"pickable by {', '.join(teams)}"
+            if not any(teams.values()):
+                for t in teams:
+                    words += (
+                        " · the start row is in Needs you"
+                        if t in starting
+                        else f" · {t} wound down — starts on `on_work`"
+                    )
+            return words
     return f"waiting on the next session to read {r.get('repo') or 'its repo'}'s board"
 
 
-def _board_holder(r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime) -> tuple[str, str]:
-    """The first live record with an unexpired declared lease on one of a board row's `refs`, as
-    `(name, ref)` — the session `board_reply` hands its note to — or `("", "")`."""
-    for ref in r.get("refs") or ():
+def _board_order(r: Mapping[str, Any]) -> str:
+    """A board row's work order, `board:<key>` by its repo's own reader (TD-384), or empty: only a
+    decided line that is not `fyi` is one."""
+    if not r.get("decided") or r.get("kind") == "fyi" or not r.get("root"):
+        return ""
+    return workorders_mod.ref(str(r["root"]), str(r.get("text") or ""))
+
+
+def _order_teams(r: Mapping[str, Any], order: str, records: Collection[Mapping[str, Any]]) -> dict[str, bool]:
+    """The teams whose `free-pick` lanes take a work order (§6 rule 6, `lane_matches`), from their
+    records in the board's repo, live or ended, never one resumed as another — each `{team: live}`."""
+    try:
+        here = Path(str(r.get("root") or "")).resolve()
+    except OSError:
+        return {}
+    entry = {"id": order, "work_order": True, "pickable": "yes"}
+    out: dict[str, bool] = {}
+    for rec in records:
+        if not isinstance(rec, Mapping) or not rec.get("team") or not rec.get("repo") or rec.get("superseded_by"):
+            continue
+        if Path(str(rec["repo"])).resolve() != here or not ledger_mod.lane_matches(list(rec.get("lane") or ()), entry):
+            continue
+        team = str(rec["team"])
+        out[team] = out.get(team, False) or rec.get("state") not in mail_mod._NOT_LIVE
+    return dict(sorted(out.items()))
+
+
+def _board_holder(
+    r: Mapping[str, Any], records: Collection[Mapping[str, Any]], now: datetime, order: str = ""
+) -> tuple[str, str]:
+    """The first live record with an unexpired declared lease on one of a board row's `refs`, or on
+    its work order `order`, as `(name, ref)` — the session `board_reply` hands its note to — or
+    `("", "")`."""
+    for ref in [*(r.get("refs") or ()), *([order] if order else [])]:
         held = mail_mod.lease_holders(str(ref), records, now)
         if held:
             return str(held[0].get("name") or held[0].get("id") or ""), str(ref)
@@ -1692,10 +1743,12 @@ def inbox_sections(
     for e in handed:
         out["needs" if _outcome_of(e).get("state") == "blocked" else "waiting"].append(e)
     out["fyi"].extend(_trail_rows(trail or (), at))
+    # the teams a *team start* row names (§6 rule 8): a decided line pickable by one says so (TD-384)
+    starting = {str(x.get("team") or "") for x in states if x.get("row") == "work"}
     for r in boards:
         if board_waits(r):
             # a copy: the board rows are the page's cache, read again by the next request
-            out["waiting"].append({**r, "waiting_on": board_waiting_on(r, fleet, at)})
+            out["waiting"].append({**r, "waiting_on": board_waiting_on(r, fleet, at, starting)})
         else:
             out["needs"].append({**r, "standing": board_standing(r, fleet, at)})
     out["needs"].sort(key=_needs_key)

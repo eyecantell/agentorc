@@ -916,6 +916,29 @@ def _feature_role(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, c
         return None
 
 
+def work_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """A repo reading's work orders — its board's open decided lines, `board:<key>` (§4.4 *Board
+    write-back*, TD-384) — as entries; none from an agent that predates them."""
+    got = ((r or {}).get("work_orders") or {}).get("orders")
+    return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
+
+
+def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
+    """What a team's lanes read of a repo (§4.4 *In a team's lanes*): the ledger's open entries and
+    the board's work orders beside them (TD-384), or None where the ledger was not read."""
+    entries = ((r or {}).get("ledger") or {}).get("entries")
+    return None if entries is None else [*entries, *work_orders(r)]
+
+
+def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The ledger's counts by the page's kind, a work order counted *pickable* (§4.5a *Repo page:
+    decided lines*, TD-384) — never in the priorities, which are the ledger's alone."""
+    kinds = dict(((r or {}).get("ledger") or {}).get("by_kind") or {})
+    if n := len(work_orders(r)):
+        kinds["pickable"] = int(kinds.get("pickable") or 0) + n
+    return kinds
+
+
 def repo_lanes(
     entries: list[dict[str, Any]] | None, root: str | Path, sessions: list[dict[str, Any]]
 ) -> dict[str, dict[str, Any]]:

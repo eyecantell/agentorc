@@ -65,6 +65,19 @@ def key(text: str, item_key: Callable[[str], str]) -> str:
     return PREFIX + hashlib.sha256(item_key(f"- [ ] {text}").encode("utf-8")).hexdigest()[:8]
 
 
+def ref(root: str | Path, text: str) -> str:
+    """`board:<key>` for an open line of the board under `root`, by that repo's own reader — what a
+    page that holds the line but not the reading names it by (§4.5 screen 6, TD-384) — or empty
+    where the repo has no reader or its key cannot take the line."""
+    item_key = _item_key(Path(root) / READER) if root and text else None
+    if item_key is None:
+        return ""
+    try:
+        return key(text, item_key)
+    except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no reference
+        return ""
+
+
 def head(text: str) -> str:
     """A line's head text, the work order's title: its bold head where it has one, else what
     follows the `(session …) —` lead, clipped."""

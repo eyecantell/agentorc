@@ -58,6 +58,9 @@ BOARD = "\n".join(
         _LINE.format(kind="look", head="A fixture look.", rest="Say whether the Inbox reads right. ", due="{today}")
         + " Answers: Works | Not right: <what>.",
         _LINE.format(kind="watch", head="A fixture line not due yet.", rest="", due="2099-01-01"),
+        # a decided line: a work order `board:<key>` in the repo reading's lanes (§4.4 *Board write-back*, TD-384)
+        _LINE.format(kind="decide", head="A fixture decided line.", rest="Keep it or drop it? ", due="{today}")
+        + " Answers: keep | drop. Decided: keep ({today}).",
         "",
     ]
 )

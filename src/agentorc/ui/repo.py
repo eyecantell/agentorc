@@ -115,20 +115,34 @@ def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) ->
     return review.standing(seats, lambda at: _age(at, now))
 
 
-def ledger_lists(r: Mapping[str, Any], motion: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+def ledger_lists(
+    r: Mapping[str, Any], motion: Collection[dict[str, Any]], lanes: Mapping[str, Mapping[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """**Technical debt** (§4.5 screen 11): the open entries in four lists by the page's kind, each
     row id, title, priority and owner, *held by <name>* when a member claims it and *blocked by …*
     from the entry's `blocked_by` (§4.4 *Repo facts*), and a live check *live check* or *waits for
     its build to be live* with its build's PRs (§4.9b, TD-323; the template's), sorted by priority
-    then id; `fold` the rows past the fold."""
+    then id; `fold` the rows past the fold. The board's open decided lines, the lanes' work orders
+    (§4.5a *Repo page: decided lines*, TD-384), come first in *pickable*, each with its `decided`
+    and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it."""
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+    orders = [
+        {
+            **e,
+            "held": held.get(e["id"], ""),
+            "pickable_by": [t for t, got in (lanes or {}).items() if e["id"] in (got.get("pickable") or ())],
+        }
+        for e in teamrun.work_orders(r)
+    ]
     out = []
     for key, label in LEDGER_LISTS:
         rows = sorted(
             ({**e, "held": held.get(e["id"], "")} for e in entries if e.get("for_page") == key),
             key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"]),
         )
+        if key == "pickable":
+            rows = orders + rows  # the person has answered: nothing in a ledger outranks it
         out.append({"key": key, "label": label, "rows": rows, "fold": max(0, len(rows) - LEDGER_FOLD)})
     return out
 

@@ -234,6 +234,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-07 (TD-384 slice 2, grinder-ao-1): the answered board row's *pickable by <team>* built — `board_waiting_on` names the line by its repo's own reader (`workorders.ref`), reads a lease on `board:<key>` as *holds board:<key>*, and, held by nobody and its session gone, the teams whose `free-pick` lanes take it, each *wound down — starts on `on_work`* or *the start row is in Needs you* (a *team start* row names it) when none is live. The team card's kind bar and lanes line count the work orders as *pickable*, never in the priorities; TDs in motion titles a claimed one by the line's head.
 - 2026-10-07 (TD-381, the designer): the on-call pill's words for the anchor seat — *comes when the checkout's lane gains work*, *the checkout is yours · <why>*.
 - 2026-10-07 (TD-380, the designer): screen 6's answered board row says *pickable by <team>* while no session holds the line's `board:<key>`, with the team's wound-down state, instead of *waiting on the next session to read the board*.
 - 2026-10-07 (TD-373, grinder-ao-2): the **Snoozed (n)** fold built — moved under FYI as the mockup draws it, each snoozed row drawn by its kind's own macro with *snoozed until <t>* and *now* first in its Snooze menu; **Unsnooze** and its `unsnooze` act removed; an entry closed while snoozed is listed by its close, not in the fold.
@@ -313,6 +314,7 @@ decisions; this file points at them rather than repeating them.
 ## 4.5a Controls
 
 - 2026-10-07 (TD-379, grinder-ao-2): the **+ card** built — `plus_card.html` ends every defined team's grid, live or not; the client's sort, counts, filter and group swap pass it by, and the delta puts it back where the server still draws it. *The help text* gains its paragraph (**+ card**, team card) and the team card's *i* group names it. A filter had left the cards it hid drawn beside a match (`.sc` sets `display`, which beats `[hidden]`); `.sc[hidden]` now hides them, the + card among them.
+- 2026-10-07 (TD-384 slice 2, grinder-ao-1): **Repo page: decided lines** built — the work orders head the Technical debt section's *pickable* list, each `board:<key>`, its head text, *decided <answer> · <date>*, *held by* or *pickable by <team>*, and one link, *board →*, to the Inbox's board rows, where an answered line is drawn (the Repo page's *Waiting on you* draws due lines only).
 - 2026-10-07 (TD-381, the designer): the rows **card: on call — the anchor seat's words** and **New session: directory field → occupancy: a seat**; Members… lists the seat.
 - 2026-10-07 (TD-380, the designer): the row **Repo page: decided lines** — the open decided board lines first in the pickable list, each a work order.
 - 2026-10-07 (TD-377, the designer): the row **team card: + card** — the last card in a defined team's grid, `/new?team=<team>`, a ring stop; absent on *No team*.

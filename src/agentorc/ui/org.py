@@ -127,7 +127,8 @@ def repo_facet(
             "error": led.get("error") or "",
             "history_error": led.get("history_error") or "",
             "priority": _bars(led.get("by_priority") or {}, PRIORITY_BARS),
-            "kind": _bars(led.get("by_kind") or {}, KIND_BARS),
+            # a decided board line counts *pickable* (TD-384), never in the priorities above
+            "kind": _bars(teamrun.lane_kinds(r), KIND_BARS),
             "lanes": lanes,
             "windows": {w: _blocks((led.get("windows") or {}).get(w)) for w in WINDOWS} if led.get("windows") else None,
         },
@@ -174,7 +175,8 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     the entry's `priority` — *high*, *medium* or *low*, else '' (a foreign or archived reference, an
     entry with none or another word), drawn as a letter (TD-232). Rows in phase order, then priority
     with High first and an unmarked row last, then by reference."""
-    entries = {e["id"]: e for e in ((r or {}).get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
+    # a claimed work order (`board:<key>`, TD-384) is drawn as any reference, its title the line's head
+    entries = {e["id"]: e for e in teamrun.lane_entries(r) or [] if isinstance(e, dict)}
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
     # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
     by_branch: dict[str, int] = {}
@@ -319,9 +321,8 @@ def team_lanes(team: str, fleet: list[dict[str, Any]], r: Mapping[str, Any] | No
     """The team's lanes line for its repo's reading (§4.4 *In a team's lanes*), from the one reader
     `teamrun.repo_lanes` runs over the fleet — the team's records for its lanes, every live record of
     the repo for what is held; None with no reading or no lane."""
-    led = (r or {}).get("ledger") or {}
-    got = teamrun.repo_lanes(led.get("entries"), str((r or {}).get("root") or ""), fleet).get(team)
-    return lanes_line(team, got, led.get("by_kind") or {})
+    got = teamrun.repo_lanes(teamrun.lane_entries(r), str((r or {}).get("root") or ""), fleet).get(team)
+    return lanes_line(team, got, teamrun.lane_kinds(r))
 
 
 def team_summary(
