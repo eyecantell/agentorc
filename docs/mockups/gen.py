@@ -711,6 +711,32 @@ def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, lo
       </dl>'''
     return side_card("Session", f'<span class="meta" style="font-size: 12px;">{profile} · <span title="the context reading, from the transcript (design §6 rule 5, TD-188)">context 212k of 1M</span></span>', body, open_=open_)
 
+PUT_AWAY = ('<div style="display: flex; justify-content: flex-end;"><span class="btn sm ghost" style="height: 22px; padding: 0 6px;" '
+            'title="Put the panel away — the terminal takes its width (s); remembered in this browser (design §4.5a, TD-408)">» put away</span></div>')
+
+
+def focus_rail():
+    """Focus with the side panel put away (design §4.5 *The panel put away*, TD-408): the column is a
+    28px rail — bring back at its top, then one glyph per card that has something to say — and
+    the terminal takes the width, its columns refit through the pty. The folds inside are untouched:
+    bring it back and the cards stand as they were left."""
+    html = focus()
+    i = html.index('<div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">')
+    j = html.rindex("</div>\n</div>\n</x-dc>")
+    glyph = lambda g, title, color="#6b7280", bg="#fff": (f'<span title="{title}" style="width: 24px; height: 24px; border-radius: 4px; border: 1px solid #dfe3e8; '
+                                                       f'background: {bg}; color: {color}; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">{g}</span>')
+    rail = f'''<div style="width: 28px; display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0;" title="the side panel, put away — its cards fold back out with «, or with s (design §4.5a, TD-408)">
+    <span class="btn sm ghost" style="height: 22px; width: 24px; padding: 0;" title="Bring the panel back (s)">«</span>
+    {glyph("!", "needs you — Bash · git push: answer on the header; the rail hides no prompt", "#92400e", "#fef3c7")}
+    {glyph("✎", "Working: TD-301: pushing the branch for review · 14s ago")}
+    {glyph("3", "Reports: 1/3 done · 2 filed — press to bring the panel back with Reports open")}
+    {glyph("2", "Inbox: 2 unread — press to bring the panel back with Inbox open", "#1f5fa8", "#e8f0fb")}
+    <span class="note" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; margin-top: 6px;">side panel put away · the terminal has its 320px</span>
+  </div>
+'''
+    return html[:i] + rail + html[j:]
+
+
 def focus():
     term = '''<span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
 
@@ -746,6 +772,7 @@ def focus():
     </div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {PUT_AWAY}
     {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 14s ago</span>', '<div style="font-size: 12px; margin-top: 8px;" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review</div>')}
     {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span>', '''
       <div class="mono" style="font-size: 12px; line-height: 1.7; margin-top: 8px;">
@@ -1896,6 +1923,7 @@ files = {
     "Focus.dc.html": focus(),
     "FocusOrc.dc.html": focus_orchestrator(),
     "FocusReady.dc.html": focus_ready(),
+    "FocusRail.dc.html": focus_rail(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -1932,6 +1960,7 @@ LAYOUT = [
     ("Focus.dc.html", "Focus — member", 0),
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
     ("FocusReady.dc.html", "Focus — ready to close", 0),
+    ("FocusRail.dc.html", "Focus — the side panel put away (TD-408, 2026-10-08)", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Members.dc.html", "Members — the team card's dialog", 0),

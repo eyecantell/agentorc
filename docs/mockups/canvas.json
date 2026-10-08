@@ -57,10 +57,18 @@
       "h": 1080
     },
     {
+      "file": "FocusRail.dc.html",
+      "title": "Focus \u2014 the side panel put away (TD-408, 2026-10-08)",
+      "x": 0,
+      "y": 10260,
+      "w": 1440,
+      "h": 1280
+    },
+    {
       "file": "Legend.dc.html",
       "title": "States & badges",
       "x": 0,
-      "y": 10260,
+      "y": 11640,
       "w": 900,
       "h": 1180
     },
@@ -68,7 +76,7 @@
       "file": "Resumable.dc.html",
       "title": "Resumable",
       "x": 0,
-      "y": 11540,
+      "y": 12920,
       "w": 1440,
       "h": 700
     },
@@ -76,7 +84,7 @@
       "file": "Members.dc.html",
       "title": "Members \u2014 the team card's dialog",
       "x": 0,
-      "y": 12340,
+      "y": 13720,
       "w": 1440,
       "h": 760
     },
@@ -84,7 +92,7 @@
       "file": "AddEntry.dc.html",
       "title": "Add entry \u2014 the form, and the composer it fills",
       "x": 0,
-      "y": 13200,
+      "y": 14580,
       "w": 1440,
       "h": 860
     },
@@ -92,7 +100,7 @@
       "file": "Help.dc.html",
       "title": "Help",
       "x": 0,
-      "y": 14160,
+      "y": 15540,
       "w": 1440,
       "h": 1500
     },
@@ -100,7 +108,7 @@
       "file": "Transcript.dc.html",
       "title": "Transcript",
       "x": 0,
-      "y": 15760,
+      "y": 17140,
       "w": 1440,
       "h": 1180
     },
@@ -108,7 +116,7 @@
       "file": "Message.dc.html",
       "title": "Message \u2014 when it is read",
       "x": 0,
-      "y": 17040,
+      "y": 18420,
       "w": 1440,
       "h": 1060
     },
