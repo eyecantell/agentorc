@@ -1303,7 +1303,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 ## TD-402: No test reads `ao team flow` / `ao team list` saying *definition changed* or *applied the definition* (#1266)
 
 **Priority:** Medium
-**Type:** test
+**Type:** debt
 **Added:** 2026-10-08 (test-audit-ao-1, auditing #1266)
 **Owner:** grinder
 **Kind:** build
@@ -1321,7 +1321,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 ## TD-403: `rpc_checkout_held`'s not-a-directory refusal, its `resolve()` and its reply's `host` default have no test (#1257)
 
 **Priority:** Low
-**Type:** test
+**Type:** debt
 **Added:** 2026-10-08 (test-audit-ao-1, auditing #1257)
 **Owner:** grinder
 **Kind:** build
