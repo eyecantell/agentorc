@@ -1407,3 +1407,72 @@ def test_the_usage_chip_prints_a_whole_float_as_the_script_does():
     c = usage_chip("grind", u, USAGE_NOW)
     assert c["text"] == "grind · week 52%"
     assert "week 52% (resets r)" in c["title"] and "5h 7.5% (resets r)" in c["title"]
+
+
+def test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none(monkeypatch, tmp_path):
+    """§4.5a *team card: + card* (TD-377, built by TD-379): the last card in every defined team's grid,
+    live or not, whose press is the New session form on that team; none on *No team*, and none on a
+    badge no definition carries (there is no team for the form to pick)."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import view
+
+    records = [
+        {"id": "ao-g1", "name": "grinder-1", "state": "working", "dir": "/tmp/r", "kind": "agent", "team": "live"},
+        {"id": "ao-x1", "name": "stray-1", "state": "idle", "dir": "/tmp/r", "kind": "agent", "team": "badge-only"},
+        {"id": "ao-sh", "name": "sh1", "state": "idle", "dir": "/tmp/x", "kind": "agent", "adapter": "shell"},
+    ]
+    rows = [
+        {"name": "live", "manager": "orc", "members": 1, "projects": ["p"], "wound_down": None},
+        {"name": "never-run", "manager": "orc", "members": 2, "projects": ["p"], "wound_down": None},
+    ]
+    vs = [view(r, records) for r in records]
+    groups = team_groups(vs, rows)
+    html = templates.get_template("org.html").render(
+        sessions=vs,
+        groups=groups,
+        counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+        strip={"teams": [], "source": "", "notes": []},
+        host="kmaster",
+        active="Org",
+        agent_down=False,
+        volatile=False,
+        usage={},
+    )
+    sections = {s.split('"', 1)[0]: s for s in html.split('<section class="tgroup" data-team="')[1:]}
+    assert set(sections) == {"live", "never-run", "badge-only", ""}
+    for team in ("live", "never-run"):
+        sec = sections[team]
+        assert sec.count('class="card sc plus"') == 1, team
+        assert f'href="/new?team={team}"' in sec and f"your session in {team}</span>" in sec
+        # the last card in the grid, after the members; not a session: no id the delta client swaps
+        grid = sec[sec.index('<div class="grid">') :]
+        assert grid.rindex('class="card sc') == grid.index('class="card sc plus"')
+        plus = grid[grid.index('class="card sc plus"') :]
+        assert 'id="card-' not in plus and "data-id=" not in plus and 'tabindex="0"' in plus
+        # no session's Focus link: `markPopped` relabels every `a[data-focus]` (review of #1234)
+        assert "data-focus" not in plus[: plus.index("</div>")]
+    assert sections["live"].index('id="card-ao-g1"') < sections["live"].index('class="card sc plus"')
+    assert "plus" not in sections[""] and "plus" not in sections["badge-only"]
+    # its hover is the help entry's first sentence, and the help entry says no definition changes
+    from agentorc.ui.help import BY_KEY, first_sentence
+
+    assert f'title="{first_sentence("plus")}"'.replace("'", "&#39;") in sections["live"]
+    assert "Nothing is written to org.yml" in BY_KEY["plus"].text
+
+
+def test_the_plus_card_is_no_session_to_the_client():
+    """§4.5a *team card: + card* (TD-379): the client's readers of `.sc` — the sort, the counts, the
+    filter, the delta's group swap — must not take the + card for a session. A filter hides it, a
+    delta puts it back where the server still draws it, and a removed group never moves it elsewhere."""
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert 'const cards = $$(".sc:not(.plus)", grid);' in js
+    assert 'const shown = $$("#groups .sc:not(.plus)").filter((c) => !c.hidden);' in js
+    assert 'if (c.classList.contains("plus")) { c.hidden = filtering; return; }' in js
+    assert 'if (g.plus && !plus)' in js and "else if (!g.plus && plus)" in js
+    assert '$$(".sc:not(.plus)", sec).forEach((c) => home.appendChild(c));' in js
+    # `Enter` / `o` on the ringed + card press its link (§4.5a *Org: keys*)
+    assert 'sel: "a[data-focus], a.plusgo" }' in js
+    css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
+    assert ".sc[hidden] { display: none; }" in css  # a filter hides a card, the + card among them
+    assert ".sc.plus { height: 64px;" in css and "dashed" in css[css.index(".sc.plus {") :][:120]

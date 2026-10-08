@@ -1,0 +1,11 @@
+{# design §4.5a *team card: + card* (TD-377, built by TD-379): the last card in a defined team's grid,
+   after its members — a partial card the height of a compact one, a dashed outline, no state bar, a
+   large **+** and *your session in <team>*. Its press is the New session form on that team
+   (`/new?team=<team>`): the Team pick made, Role at Interactive. It is not a session: no `id`, no
+   `data-id`, so the delta client's card swap, the counts and the sort pass it by, and it is put back
+   last after each sort. A ring stop as a card is (`tabindex`), whose `Enter` / `o` press the link
+   inside (the key table names `a.plusgo`), which is not a tab stop of its own and carries no
+   `data-focus`: it is no session's Focus, and the pop-out relabelling must leave it alone. #}
+<div class="card sc plus" tabindex="0" data-plus="{{ g.team }}" title="{{ help_title('plus') }}">
+  <a class="plusgo" href="/new?team={{ g.team | urlencode }}" tabindex="-1"><span class="plusmark" aria-hidden="true">+</span><span class="meta">your session in {{ g.team }}</span></a>
+</div>

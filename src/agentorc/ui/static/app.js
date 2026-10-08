@@ -1309,14 +1309,16 @@
     const box = $("#groups"); if (!box) return;
     sections().forEach((sec) => {
       const grid = $(".grid", sec), manager = sec.dataset.manager || "";
-      const cards = $$(".sc", grid);
+      // a team's + card (§4.5a *team card: + card*, TD-379) is no session: it is not sorted, and
+      // placing every session from index 0 leaves it last
+      const cards = $$(".sc:not(.plus)", grid);
       // `card_order` in app.py: urgency, then an interactive session ahead of an unattended one (TD-095)
       cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank)
         || (!!b.dataset.mine - !!a.dataset.mine) || a.dataset.name.localeCompare(b.dataset.name))
         .forEach((c, i) => AO.placeAt(grid, c, i));
     });
     applyFilter();
-    const shown = $$("#groups .sc").filter((c) => !c.hidden);
+    const shown = $$("#groups .sc:not(.plus)").filter((c) => !c.hidden);
     $("#count").textContent = `${shown.length} session${shown.length === 1 ? "" : "s"}`;
     $("#empty").hidden = shown.length > 0;
     const counts = {}; shown.forEach((c) => (counts[c.dataset.state] = (counts[c.dataset.state] || 0) + 1));
@@ -1334,7 +1336,9 @@
     // card's pill word, hyphenated — `needs-you`, `working`, `on-call`
     const state = /^state:/i.test(raw) ? raw.slice(6).trim().toLowerCase() : null;
     const q = team === null && state === null ? raw.toLowerCase() : "";
+    const filtering = !!raw || mine;
     $$("#groups .sc").forEach((c) => {
+      if (c.classList.contains("plus")) { c.hidden = filtering; return; }  // a filter hides the + card (§4.5a)
       const hideKind = c.dataset.kind === "command" && !cmd;
       const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team
         : state !== null ? (c.dataset.pill || "") !== state
@@ -1343,7 +1347,6 @@
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
     // A team's card stays while no filter is set, sessions or none: it is where Start lives.
-    const filtering = !!raw || mine;
     sections().forEach((sec) => {
       sec.hidden = !$$(".sc", sec).some((c) => !c.hidden) && (filtering || !sec.dataset.team);
       sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
@@ -1355,7 +1358,7 @@
   function syncGroups(gs) {
     const box = $("#groups"); if (!box) return;
     box.classList.toggle("flat", !gs);
-    const wanted = gs || [{ team: "", manager: "", ids: $$("#groups .sc").map((c) => c.dataset.id), html: "" }];
+    const wanted = gs || [{ team: "", manager: "", ids: $$("#groups .sc:not(.plus)").map((c) => c.dataset.id), html: "" }];
     // a scrolled list keeps where the person left it (TD-205): every summary's boxes are read here,
     // before anything moves — the read forces a layout, and one taken halfway through the swap let
     // the page's scroll anchoring chase a section being moved, throwing the page to the top (TD-224).
@@ -1398,6 +1401,10 @@
       } else if (sum) sum.remove();
       const grid = $(".grid", sec);
       (g.ids || []).forEach((id) => { const c = $(`#card-${CSS.escape(id)}`); if (c && c.parentElement !== grid) grid.appendChild(c); });
+      // the team's + card (TD-379): drawn by the server on a defined team, kept as it is, gone with the definition
+      const plus = $(".sc.plus", grid);
+      if (g.plus && !plus) { const tpl = document.createElement("template"); tpl.innerHTML = g.plus.trim(); grid.appendChild(tpl.content.firstElementChild); }
+      else if (!g.plus && plus) { AO.handRing(plus); plus.remove(); }
       AO.placeAt(box, sec, keep.length);  // in the server's order
       keep.push(sec);
     });
@@ -1408,7 +1415,7 @@
       // team is preferred.
       const dest = keep.find((k) => !k.dataset.team) || keep.find((k) => +k.dataset.live) || keep[0];
       const home = $(".grid", dest);
-      $$(".sc", sec).forEach((c) => home.appendChild(c));
+      $$(".sc:not(.plus)", sec).forEach((c) => home.appendChild(c));
       sec.remove();
     });
   }
@@ -3713,7 +3720,9 @@
     { keys: ["j", "ArrowDown"], page: "org", control: "ring the next card", move: 1 },
     { keys: ["k", "ArrowUp"], page: "org", control: "ring the previous card", move: -1 },
     { keys: ["g"], page: "org", control: "then a team's initial, or a group's number 1–9: jump to that team", g: true },
-    { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window)", sel: "a[data-focus]" },
+    // a team's + card (TD-379) is pressed by the same keys: its link is no session's, so it carries
+    // no `data-focus` — `markPopped` would relabel it and the pop-out click would claim it
+    { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window); on a team's + card, New session on that team", sel: "a[data-focus], a.plusgo" },
     { keys: ["Shift+Enter"], page: "org", ring: true, control: "Pop out", sel: '[data-act="popout"]' },
     { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]' },
     { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },

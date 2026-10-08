@@ -6113,3 +6113,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** `grep -rn "n snoozed — show" docs/design` finds only the "where … was" history clause.
 
 **Related:** TD-371 (the design), TD-373 (its build).
+
+## TD-379: Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-377's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/org.html` (the team group's grid: the card after the members, on `g.team and g.defined`, live or not — a new `plus_card.html`), `src/agentorc/ui/static/app.css` (`.sc.plus`: a compact card's height, a dashed `--line` outline, no state bar, the large **+**; the `.tgroup:not(:has(.sc)) .grid` rule, which must still draw a grid holding only the + card), `src/agentorc/ui/static/app.js` (a `.sc` card is already a ring stop by `RINGS.org`, so the + card is the last of its group as drawn; `Enter` / `o` press it; every other reader of `.sc` — the filter, *mine*, the counts, the delta client's card swap — must not take it for a session; the fold hides it with the grid), `src/agentorc/ui/help.py` (the help entry below, in the team card's group), `docs/mockups/gen.py` (already carries it, TD-377's PR); tests `tests/test_ui_org*.py`; design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team*
+
+**Why:** TD-377 is designed (§4.5a *team card: + card*): a person's session in a team starts from the team's own card, not from a pick in the top bar's form. Paul, 2026-10-07: *a partial card shown with a big + inside it — I believe that will be more intuitive.*
+
+**Resolved:** 2026-10-07 (PR #1234, grinder-ao-2) — `src/agentorc/ui/templates/plus_card.html`, included last in a defined team's grid by `org.html`, and re-sent as the group's `plus` by `render_heads` so the delta client puts it back; `app.js` keeps it out of the sort, the counts, *mine* and the filter (a filter hides it) and never moves it to another group; `.sc.plus` in `app.css` (64 px, a dashed `--border` outline, no state bar). *The help text* gains **+ card** (team card), `help.py` key `plus`, in the team card's *i* group. Read on a scratch home with two definitions (`alpha` carrying sessions, `never-run` nothing): each grid ends in the + card, `never-run` shows it alone, a folded `alpha` hides it, *No team* has none; `j` rings it after the cards, `Enter` and `o` open `/new?team=<team>` with the team picked, Role *Interactive* and the reader's line (*no reader: this team has no techlead seat*); **Start session** there put the session in the team's group with the person glyph, the + card still last, as it stayed when a session joined a team under an open page; a filter hides it. On the way: a filter left the cards it hid drawn beside a match in the same group (`.sc` sets `display`, which beats `[hidden]`) — `.sc[hidden]` fixes it. Tests: `tests/test_ui_org.py` (`test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none`, `test_the_plus_card_is_no_session_to_the_client`), `tests/test_help.py`. Screenshots: `docs/mockups/reviews/2026-10-07-td379-*.png`.
+
+**Done when** on the scratch home (`scripts/look_home.py`) every defined team's grid ends in the + card, live, stopped-and-unfolded and never-started alike, *No team* has none; a press lands on the New session form with that team picked, Role *Interactive* and the reader's line filled, and Start session there starts a session that appears in the team's group with the person glyph; `j`/`k` reach the card and `Enter` presses it; a folded team and a filter hide it; the help entry reads on hover and in the *i* panel; `tests/test_ui_org*.py` cover the card's presence, its link and its absence on *No team*; a screenshot of the live team group is in the PR under `docs/mockups/reviews/`.
+
+**Related:** TD-377 (the design), TD-173 (archived: the form's Team pick), TD-172 (archived: Members…), TD-124 (archived: the keys).

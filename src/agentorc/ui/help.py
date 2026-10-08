@@ -114,6 +114,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "plus",
+        "+ card",
+        "team card",
+        (
+            "Starts a session of your own in this team, and changes no definition: the New session form "
+            "opens with the team picked and Role at Interactive, so the session gets the team's host, repo, "
+            "manager and reader. Press it to work beside the team — on its repo, under its manager, its held "
+            "PRs read by its reader. Nothing is written to org.yml and no member is added: for a permanent "
+            "member, Members…."
+        ),
+    ),
+    Help(
         "kill",
         "Kill",
         "Focus header, *more ▾*",
@@ -380,6 +392,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "not-concluded",
         "forget-all",
         "fold",
+        "plus",
         "forget",
         "resume",
         "close",
@@ -404,6 +417,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "fold",
             "not-concluded",
             "forget-all",
+            "plus",
             "forget",
             "close",
             "message",

@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
 | TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Designed — TD-379 builds it |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
-| TD-379 | Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-381 | An anchor seat on call, run by agentorc: the main checkout's work (live checks, evaluations, promotes, host chores) moves only while a person keeps an interactive anchor open | High | Designed — TD-385, TD-386 and TD-387 build it |
 | TD-383 | The Inbox poll's down-banner grace (#1223): its retry and reset logic is pinned by substring only — two mutations of it leave every test passing | Low | Open |
@@ -1287,30 +1286,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the findings and the recommendation are written (an ADR under `docs/decisions/`), Paul has decided which levers to take, and each one taken has a build entry.
 
 **Related:** TD-128 / TD-151 (the metered account's spend and the `cache_read` / `cache_write` prices), TD-366 (archived: a seat closed mid-wait).
-
-## TD-379: Build TD-377: the team's + card, its press to the New session form on that team, the ring stop and the help entry
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-07 (the designer, from TD-377's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/templates/org.html` (the team group's grid: the card after the members, on `g.team and g.defined`, live or not — a new `plus_card.html`), `src/agentorc/ui/static/app.css` (`.sc.plus`: a compact card's height, a dashed `--line` outline, no state bar, the large **+**; the `.tgroup:not(:has(.sc)) .grid` rule, which must still draw a grid holding only the + card), `src/agentorc/ui/static/app.js` (a `.sc` card is already a ring stop by `RINGS.org`, so the + card is the last of its group as drawn; `Enter` / `o` press it; every other reader of `.sc` — the filter, *mine*, the counts, the delta client's card swap — must not take it for a session; the fold hides it with the grid), `src/agentorc/ui/help.py` (the help entry below, in the team card's group), `docs/mockups/gen.py` (already carries it, TD-377's PR); tests `tests/test_ui_org*.py`; design §4.5 screen 1 *The + card*, §4.5a *team card: + card*, §4.9 *A person in the team*
-
-**Why:** TD-377 is designed (§4.5a *team card: + card*): a person's session in a team starts from the team's own card, not from a pick in the top bar's form. Paul, 2026-10-07: *a partial card shown with a big + inside it — I believe that will be more intuitive.*
-
-**Fix:**
-1. The card: `<a class="card sc plus" href="/new?team=<team>">` as the last child of a defined team's `.grid`, drawn live or not; its contents a large **+** and *your session in <team>* (meta text); `title` the help entry's text. No state bar, no foot, no `id="card-…"` (it is not a session; the delta client must leave it in place when it swaps member cards — check `AO` org delta handling in `app.js` keeps non-session children of the grid).
-2. The help entry, `help.py`, in the team card's control group, key `plus`: *Start a session of your own in this team — the New session form opens with the team picked and Role Interactive, so the session gets the team's host, repo, manager and reader; nothing is written to org.yml. For a permanent member, Members….*
-3. The press lands on the form with the Team pick made: `/new?team=<team>` already prefills the pick and `applyTeam()` runs on load (TD-173, TD-296 #8) — verify Host, the Repo list, Controllers and the reader's line are filled on arrival, and that Role reads *Interactive*; fix what is not.
-4. The ring: the + card is a stop after its group's cards; `Enter` and `o` on it follow the link. The page's filter (`.filtering`) and *mine* hide it as they hide a card that matches nothing; the fold hides the grid as before.
-5. A definition with no sessions: the grid shows with the + card alone (today the grid is hidden when it holds no `.sc`; the + card is one, or the rule is narrowed).
-6. *No team* draws none.
-
-**Done when** on the scratch home (`scripts/look_home.py`) every defined team's grid ends in the + card, live, stopped-and-unfolded and never-started alike, *No team* has none; a press lands on the New session form with that team picked, Role *Interactive* and the reader's line filled, and Start session there starts a session that appears in the team's group with the person glyph; `j`/`k` reach the card and `Enter` presses it; a folded team and a filter hide it; the help entry reads on hover and in the *i* panel; `tests/test_ui_org*.py` cover the card's presence, its link and its absence on *No team*; a screenshot of the live team group is in the PR under `docs/mockups/reviews/`.
-
-**Related:** TD-377 (the design), TD-173 (archived: the form's Team pick), TD-172 (archived: Members…), TD-124 (archived: the keys).
 
 ## TD-380: A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch
 

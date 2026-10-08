@@ -311,6 +311,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-07 (TD-379, grinder-ao-2): the **+ card** built — `plus_card.html` ends every defined team's grid, live or not; the client's sort, counts, filter and group swap pass it by, and the delta puts it back where the server still draws it. *The help text* gains its paragraph (**+ card**, team card) and the team card's *i* group names it. A filter had left the cards it hid drawn beside a match (`.sc` sets `display`, which beats `[hidden]`); `.sc[hidden]` now hides them, the + card among them.
 - 2026-10-07 (TD-381, the designer): the rows **card: on call — the anchor seat's words** and **New session: directory field → occupancy: a seat**; Members… lists the seat.
 - 2026-10-07 (TD-380, the designer): the row **Repo page: decided lines** — the open decided board lines first in the pickable list, each a work order.
 - 2026-10-07 (TD-377, the designer): the row **team card: + card** — the last card in a defined team's grid, `/new?team=<team>`, a ring stop; absent on *No team*.
