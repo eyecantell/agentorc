@@ -214,8 +214,13 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the entry's `Owner:` must
     be one named or absent, so `[free-pick, owner:grinder]` leaves the anchor's entries out; it
     matches nothing by itself. An entry blocked by `decision (designer)` is the designer's
-    (TD-367): `design-first` takes it pickable or not, and its owner reads `designer`."""
+    (TD-367): `design-first` takes it pickable or not, and its owner reads `designer`. A **work
+    order** — a decided board line, `board:<key>` (§4.4 *Board write-back*, TD-384) — is in every
+    `free-pick` lane, whatever `owner:` words stand beside it, and in no other."""
     owners = {o for w in lane if (o := owner_word(w))}
+    if entry.get("work_order"):
+        # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384)
+        return any(w == "free-pick" and entry.get("pickable") == "yes" for w in lane)
     mine = DESIGNER_OWNER if decided_by(entry, DESIGNER_OWNER) else str(entry.get("owner") or "").lower()
     if owners and mine and mine not in owners:
         return False
@@ -273,7 +278,7 @@ def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     if word == "design-first":
         return entry.get("kind") == "design-first"
     if word == "free-pick":
-        return _buildlike(entry)
+        return bool(entry.get("work_order")) or _buildlike(entry)
     return False
 
 

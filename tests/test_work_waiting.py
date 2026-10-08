@@ -274,3 +274,31 @@ async def test_a_questions_end_on_a_stopped_or_live_team_or_under_off_writes_not
     settings_mod.save({"teams": {"g": {"on_work": "off"}}})
     agent._question_end(q, "lapsed")
     assert "g" not in (agent._host_rec.get("teams") or {}), "off: nothing written"
+
+
+async def test_a_decided_board_line_is_work_for_a_wound_down_team(agent, tmp_path, monkeypatch):
+    """TD-384 (§6 rule 8): the repo's work orders count as entries do — a decided line in a wound-down
+    grinder's `free-pick` lane, owner words or not, is written as the team's work, by `board:<key>`."""
+    from sessionorc import workorders
+
+    await park_ticks(agent)
+
+    async def replay(*a, **k):
+        pass
+
+    monkeypatch.setattr(agent, "_replay", replay)
+    now = datetime.now(UTC)
+    repo = str(tmp_path)
+    order = workorders.entry({"id": "board:0123abcd", "title": "Keep the backup?"})
+    agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001")]}}
+    _team(
+        agent, repo,
+        _rec("manager-ao", lane=["TD-900"], lane_seen={"at": "x", "ids": []}),
+        _rec("grinder-ao-1", lane=["free-pick", "owner:grinder"], lane_seen={"at": "x", "ids": ["TD-001"]}),
+    )  # fmt: skip
+    await agent._work_marks(now + WORK_SETTLE)
+    assert "work_waiting" not in (agent._host_rec.get("teams") or {}).get("g", {}), "nothing new without it"
+    agent._repos[repo]["work_orders"] = {"orders": [order]}
+    await agent._work_marks(now + WORK_SETTLE)
+    await agent._work_marks(now + 2 * WORK_SETTLE)
+    assert agent._host_rec["teams"]["g"]["work_waiting"]["members"] == {"grinder-ao-1": ["board:0123abcd"]}

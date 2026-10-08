@@ -363,3 +363,32 @@ async def test_a_live_check_live_at_the_declaration_is_told_to_nobody(agent, tmp
         else:
             assert len(notes) == 1 and "gained 1 entry since you declared out of work: TD-002" in notes[0]
         await person.call("kill", id=sid)
+
+
+async def test_a_decided_board_line_is_told_at_once_to_the_free_pick_lane_and_claimed_as_a_lease(agent, tmp_path):
+    """TD-384 (design §6 rule 6, §4.9a): a work order, `board:<key>`, is in every `free-pick` lane
+    whatever its `owner:` words; one already there when the member declared is told on the first
+    tick, since it sat unclaimed; the note says to read the board; a claim on it is a lease."""
+    from sessionorc import workorders
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    order = workorders.entry({"id": "board:0123abcd", "title": "Keep the backup?", "decided": {"text": "keep"}})
+    async with LocalClient() as person:
+        gri = await _finished(agent, person, tmp_path, "g", ["free-pick", "owner:grinder"], [_e("TD-001")])
+        des = await _finished(agent, person, tmp_path, "d", ["design-first", "owner:designer"], [_e("TD-001")])
+        agent._repos[str(tmp_path)]["work_orders"] = {"orders": [order]}
+        await agent._keep_running(now)
+        assert agent.sessions[gri].lane_seen["ids"] == ["TD-001", "board:0123abcd"]
+        notes = _notes(agent, gri)
+        assert len(notes) == 1 and "board:0123abcd" in notes[0] and "read the ledger and the board" in notes[0]
+        assert _notes(agent, des) == []
+        await agent._lane_news(agent.sessions[gri], now + timedelta(minutes=1))
+        assert len(_notes(agent, gri)) == 1, "told once"
+        await person.call("progress", id=gri, ref="board:0123abcd", status="claimed", caller=gri)
+        from sessionorc.client import AgentError
+
+        with pytest.raises(AgentError, match="board:0123abcd is claimed by"):
+            await person.call("progress", id=des, ref="board:0123abcd", status="claimed", caller=des)
+        for sid in (gri, des):
+            await person.call("kill", id=sid)
