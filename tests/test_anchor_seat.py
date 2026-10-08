@@ -238,8 +238,9 @@ def test_members_and_ao_team_list_name_the_seat(tmp_path, monkeypatch, capsys):
 
 
 def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_alone(tmp_path, monkeypatch):
-    """TD-391: a team whose `host:` is a node checks the seat's checkout with `host_occupancy` on that
-    host, never this host's `occupancy`; held there, the team starts and the seat is the `held` create."""
+    """TD-391, TD-395: a team whose `host:` is a node asks the one reading (`checkout_held`) for that
+    host's checkout — which reads its occupancy there, never this host's (tests/test_anchor_tick.py) —
+    and held there, the team starts and the seat is the `held` create."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("AGENTORC_HOME", str(home))
@@ -257,14 +258,15 @@ def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_al
                 return {"files": {k: None for k in params["paths"]}}
             if method == "name_check":
                 return {"name": params["name"], "verdict": "free"}
-            if method == "host_occupancy":
-                return {"host": params["host"], "dir": params["dir"], "occupants": list(occupants), "git": True}
+            if method == "checkout_held":
+                held = {"by": occupants[0].split(" ")[0], "why": f"held by {occupants[0]}"} if occupants else None
+                return {"host": params["host"], "dir": params["dir"], "held": held}
             if method == "create":
                 return {"id": f"ao-alpha-{params['name']}", "name": params["name"]}
-            raise AssertionError(method)  # this host's `occupancy` among them
+            raise AssertionError(method)  # `occupancy` and `host_occupancy` among them
 
         _, out = teamrun.start(call, org, "t", HOST)
-        assert [p for m, p in calls if m == "host_occupancy"] == [{"host": "nodeb", "dir": "/srv/alpha"}]
+        assert [p for m, p in calls if m == "checkout_held"] == [{"host": "nodeb", "dir": "/srv/alpha"}]
         made = [p for m, p in calls if m == "create"]
         assert [p["name"] for p in made] == ["lead", "tl", "t-anchor", "g"]
         assert bool(made[2].get("held")) is bool(occupants)
