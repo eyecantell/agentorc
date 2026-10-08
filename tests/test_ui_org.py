@@ -1461,23 +1461,6 @@ def test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none(monk
     assert "Nothing is written to org.yml" in BY_KEY["plus"].text
 
 
-def test_the_plus_card_is_no_session_to_the_client():
-    """§4.5a *team card: + card* (TD-379): the client's readers of `.sc` — the sort, the counts, the
-    filter, the delta's group swap — must not take the + card for a session. A filter hides it, a
-    delta puts it back where the server still draws it, and a removed group never moves it elsewhere."""
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
-    assert 'const cards = $$(".sc:not(.plus)", grid);' in js
-    assert 'const shown = $$("#groups .sc:not(.plus)").filter((c) => !c.hidden);' in js
-    assert 'if (c.classList.contains("plus")) { c.hidden = filtering; return; }' in js
-    assert 'if (g.plus && !plus)' in js and "else if (!g.plus && plus)" in js
-    assert '$$(".sc:not(.plus)", sec).forEach((c) => home.appendChild(c));' in js
-    # `Enter` / `o` on the ringed + card press its link (§4.5a *Org: keys*)
-    assert 'sel: "a[data-focus], a.plusgo" }' in js
-    css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
-    assert ".sc[hidden] { display: none; }" in css  # a filter hides a card, the + card among them
-    assert ".sc.plus { height: 64px;" in css and "dashed" in css[css.index(".sc.plus {") :][:120]
-
-
 def test_a_delta_carries_the_plus_card_for_a_defined_team_and_none_for_the_rest(monkeypatch, tmp_path):
     """§4.5a *team card: + card* (TD-379; pinned by TD-389): `render_heads` is what a delta sends, and
     its `plus` is how the client puts the card back after a sort or a group swap — the card for a

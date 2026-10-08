@@ -6241,3 +6241,21 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** on the scratch home a team with no `anchor:` starts with `<team>-anchor` on call in its home checkout, `anchor: false` starts none, two teams on one repo refuse the second, the brief renders with the lane and the never list, and the tests cover each.
 
 **Related:** TD-381 (the design), TD-386, TD-387 (its other slices), TD-259 (archived: the manager on call), TD-098 (seats with a trigger).
+
+## TD-390: The team's + card (#1234): `test_the_plus_card_is_no_session_to_the_client` greps `app.js` for source lines, so it asserts none of the client behaviour its docstring names
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-07 (test-audit-ao-1, auditing the tests of #1234)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_ui_org.py` (`test_the_plus_card_is_no_session_to_the_client`); `src/agentorc/ui/static/app.js` (the sort, `applyFilter`, the group swap)
+
+**Why:** The docstring says *a filter hides it, a delta puts it back where the server still draws it, and a removed group never moves it elsewhere*; the body is eight asserts, seven of them `"<source line>" in js` and one `in css`, so it fails on a reformat and passes when the behaviour is wrong (the same shape as TD-383's). E.g. a `filtering` computed after the `plus` line, or the swap appending the card to the wrong grid, passes as long as the quoted text is present; `tests/test_ui_down_grace.py` already shows the node fake-DOM probe this suite uses.
+
+**Resolved:** 2026-10-08 (PR #1246, grinder-ao-2) — `tests/test_ui_org_plus.py::test_the_plus_card_is_no_session_to_the_client` runs the Org page's `layout` and `syncGroups` (exported as `AO.orgLayout`, `AO.orgSyncGroups`) under node over a small fake DOM: the sort leaves the card last and out of `#count`, a filter hides it and clearing shows it, a delta without it removes it and one with it puts it back last, a removed group hands on its sessions and never the card; five mutations of those lines each fail it. The substring asserts on the behaviour are gone; the key binding and the CSS rule stay as `test_the_enter_key_presses_the_plus_cards_link`.
+
+**Done when** a node probe drives the sort, a filter, and a delta whose group lacks the card, over a small fake DOM, and asserts the + card stays last, is hidden under a filter and is restored; the substring asserts are dropped.
+
+**Related:** TD-379, TD-383, TD-389.

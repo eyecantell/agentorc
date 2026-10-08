@@ -1419,6 +1419,7 @@
       sec.remove();
     });
   }
+  Object.assign(AO, { orgLayout: layout, orgSyncGroups: syncGroups });  // run under node by tests/test_ui_org_plus.py (TD-390)
   // ---- a team's card: the fold, and a request in flight (design §4.5a *team card: fold*) ----
   // Any team with sessions folds to its header, by the header's row or its *n sessions* button. A
   // team opens as it did before anyone chose — open while something is live (a concluded team is
