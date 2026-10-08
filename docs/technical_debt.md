@@ -1279,7 +1279,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 ## TD-396: §4.9b's anchor Start paragraph still reads the dirty and off-branch cases as TD-395's to build, after PR #1257 built them
 
 **Priority:** Low
-**Type:** documentation
+**Type:** debt
 **Added:** 2026-10-08 (docs-audit-ao-1, auditing #1248–#1257)
 **Owner:** grinder
 **Kind:** build
