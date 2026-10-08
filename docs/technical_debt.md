@@ -70,7 +70,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Partly done — agentorc's half built (PR #1166); the other three repos' halves are the anchor's |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-360 | A restart's first hook is still refused as *outside* after TD-341's fix: the identity alarm fires on each ao-grind restart | Medium | Built — live check of #1189: the next team restart logs no alarm |
-| TD-367 | *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them | Medium | Designed — TD-368 builds it |
 | TD-371 | A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes | Medium | Designed — TD-373 builds it |
 | TD-373 | Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes | Medium | Open |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
@@ -1199,35 +1198,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **Done when** a team restart after the build is live logs no *matched no pane* and no identity alarm in the seconds after *superseded the closed session of the same name*.
 
 **Related:** TD-341 (archived, the first fix), TD-225 (the unmatched-hook log line), TD-339 (archived; found here).
-
-## TD-367: *for you* counts every entry blocked by any `decision`, the designer's and the anchor's too, and the Inbox lists none of them
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-07 (the anchor, from Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-07 (the designer, PR #1203; the steer to Paul on the fold is `m-77a04cc7eccc`, bound 2026-10-08 05:35 MDT): design §4.4 *Repo facts* (the *for you* kind is what waits on the person — `Owner: paul`, or `decision (paul)` — and an entry blocked by `decision (designer)` is *design-first*; a session's decision is *other*), §6 rule 6 (the `design-first` lane word takes such an entry, the decision's holder standing as its owner), §4.5 screen 6 *The ledger's entries that wait on you* (the Inbox's **For you in the ledger (n)** fold) and screen 11, §4.5a *Inbox: For you in the ledger (n) fold*, §4.7 `ao repo`, the glossary's *for you*; the mockup `Inbox.dc.html` (`docs/mockups/reviews/2026-10-07-td367-inbox-ledger-fold.png`). Settled: (a) the person's owner word stays `paul`, the one the ledger's `Fields:` line declares, read lower-cased for the decision's holder; (b) a `decision (designer)` makes the entry the designer's — in its lane by rule 6 whatever its `Owner:`, listed design-first, made by a PR that writes the decision and drops the item; (c) the Inbox fold is uncounted and closed by default, under *Needs you* after the board's rows, one link per row and no control (steered). **Next:** designed; the build is TD-368.
-**Blocked by:** TD-368
-**Location:** `sessionorc.ledger` (`kind_of`, `lane_matches`), `src/agentorc/ui/repo.py` (`LEDGER_LISTS`), `src/agentorc/ui/org.py` (`KIND_BARS`), the Inbox; design §4.5 screen 6 (the Inbox), §4.7 `ao repo`
-
-**Why:**
-- Paul, 2026-10-07: *15 for you* on the repo line, and *I do not see them in the inbox*.
-- The fifteen were `Owner: paul` entries, entries blocked by `decision (Paul)`, and also:
-  - TD-151, blocked by `decision (designer)`;
-  - TD-209 and TD-077, `Kind: decision` owned by the anchor.
-- So the bucket says *for you* about decisions that are not the person's.
-- And nothing in the Inbox, where the person looks for what waits on them, shows any of them. Only the Repo page lists them.
-- An entry blocked by the designer's decision is in nobody's lane: TD-151 is `Owner: grinder`, blocked, and the designer's lane is `design-first`.
-
-**Fix:** design first.
-- *for you* counts only what waits on the person: `Owner: paul`, or `Blocked by: decision (Paul)` / `decision (paul)`.
-- A decision of the designer's or the anchor's counts in its owner's bucket. A `decision (designer)` should also reach the designer's lane, as a design-first item does, so it gets made.
-- The Inbox shows the person's ledger items, for example as a fold under *Needs you* with the repo's *for you* list linking to the Repo page, so the count and the list are on the same page.
-
-**Done when** the repo line's *for you* counts only entries that wait on the person, each is reachable from the Inbox, and a `decision (designer)` lands in the designer's lane.
-
-**Related:** TD-357 (archived: the lanes line, which split *pickable* the same way), TD-151 (stranded on the designer's decision), TD-228 (the derived pickable).
 
 ## TD-371: A snooze is a date, not a hiding place: a snoozed Inbox row keeps its controls, and **Unsnooze** goes
 
