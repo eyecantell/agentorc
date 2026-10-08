@@ -76,6 +76,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-373 | Build TD-371: the Snoozed fold keeps every row's controls, Snooze ▾ picks a new time with *now*, Unsnooze goes | Medium | Open |
 | TD-374 | The Inbox's *For you in the ledger* fold (#1209): its JS — the rail's team and find filter on its rows, the poll's swap, the remembered open — is in no test | Low | Open |
 | TD-376 | The Focus attach (#1214): a failed upload in one drop is not shown to leave the rest of that drop's files sent | Low | Open |
+| TD-377 | A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team | Medium | Open — asked by Paul |
+| TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 
 ---
 
@@ -1336,3 +1338,53 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the failing file is first in a drop of two, and the probe asserts the second is uploaded and its path inserted; the edit above fails a test.
 
 **Related:** TD-370, TD-002.
+
+## TD-377: A team card for starting a session in the team: a partial card with a big **+** that opens the New session form, Interactive, on that team
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — asked by Paul 2026-10-07; the design is the designer's.
+**Location:** the Org page's team group (`org.html`, `group_head.html`, `card.html`), the New session form (`new.html`, its Team and Role picks); design §4.5 (the team group), §4.5a (the team card rows and the New session form), §4.9 *A person in the team*
+
+**Why:**
+- Paul, 2026-10-07: *have the on-demand session be started by having a partial card shown with a big + inside it — I believe that will be more intuitive. Pressing the plus would open a dialog for starting a new team member, defaulted to an interactive session on the selected team.*
+- Today a person's session in a team starts from the top bar's **New session**, with the Team picked by hand and the Role left at *Interactive*. Nothing on the team's own cards says it can be done there. **Members… → Add member** is the other path, and it edits `org.yml`: a permanent member, not a session for now.
+
+**Fix (to design):**
+- One extra, partial card at the end of each team's cards: a dashed outline with a large **+**, the size of a card's head, not a full card.
+- A press opens the New session form (or a dialog built on it) with Team = that team, Role = *Interactive*, and the Host, Repo, Controllers and review line the Team pick already fills. Nothing is written to `org.yml`: the session is the person's, in the team, as §4.9 *A person in the team* has it.
+- Settle: whether it is drawn on a stopped team, a folded one and *No team*; its key and its §4.5a row; whether it replaces or sits beside any existing control.
+- The mockup regenerated from `docs/mockups/gen.py`, with a rendering for Paul to look at.
+
+**Done when** the design names the card, its press and its defaults in §4.5a, and a build entry carries it.
+
+**Related:** TD-160 / TD-173 (archived: the form's Team picker), TD-163 / TD-172 (archived: Members…), TD-277 (archived: the New session form).
+
+## TD-378: Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** anchor
+**Kind:** evaluation
+**Status:** Open — asked by Paul 2026-10-07: research it (a Sonnet agent can do the reading), then see what agentorc could change.
+**Location:** design §4.2a (profiles and `prices:`, which already carry `cache_read` and `cache_write`), §6 (the tick: rule 3's idle close, restarts, wakes and rings), §4.9b (a techlead started per batch); `src/sessionorc/agent_tick.py`, `src/sessionorc/agent_wake.py`
+
+**Why:**
+- Paul, 2026-10-07: *do some (or have sonnet do some) research on how cached input works for claude and see if we could leverage it in ao to save token costs.*
+- On a coding agent most input tokens are cache reads, priced at about a tenth of fresh input (§4.2a). A cache write costs more than fresh input, and an entry expires after a few minutes unused unless a longer lifetime is paid for.
+- Several of agentorc's own acts could be costing a full re-read of a session's context: a member restarted onto a new brief, a seat closed when idle (§6 rule 3) and filled again, a wake or ring that reaches a session after its cache has lapsed, a resume after a team restart.
+- Nobody has measured how much of the week's spend these account for, or which are worth changing.
+
+**Fix (the research):**
+1. How caching works for Claude Code sessions: the cache lifetimes and their prices, what breaks a cached prefix (a changed system prompt, tools, CLAUDE.md, a hook's injected context), what `/clear`, `/compact` and `--resume` cost, and whether Claude Code sets anything a profile could choose. Sources: Anthropic's prompt-caching docs and Claude Code's docs and settings.
+2. Measure from agentorc's own records: the run logs' and usage ledger's cache-read, cache-write and fresh-input tokens, per role, around restarts, rings after idle, and seat fills.
+3. List the levers, each with the saving it would buy and what it costs: e.g. waking a session before its cache lapses versus letting it lapse, batching rings, keeping a seat's prefix stable, a brief or primer ordered so the shared part comes first, the order of injected context.
+4. A recommendation for Paul, and the build entries it implies.
+
+**Done when** the findings and the recommendation are written (an ADR under `docs/decisions/`), Paul has decided which levers to take, and each one taken has a build entry.
+
+**Related:** TD-128 / TD-151 (the metered account's spend and the `cache_read` / `cache_write` prices), TD-366 (archived: a seat closed mid-wait).
